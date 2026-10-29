@@ -11,12 +11,21 @@ import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { formDefaults } from "../lib/formDefaults.ts"
 import { SvgIcon, type IconName } from "./icons.tsx"
+import { t, type Key } from "../../../i18n/index.ts"
 
 interface ToolDefinition { readonly name: string; readonly action: string; readonly icon: () => JSX.Element }
 interface ToolCategory { readonly name: string; readonly tools: ReadonlyArray<ToolDefinition> }
 
 const svg = (name: IconName) => () => <SvgIcon name={name} />
 const feather = (Icon: typeof Box) => () => <Icon size={16} />
+
+/** Display text from the table; the English `name` of the data below is the fallback for a key a pack does not have. */
+const labelOr = (key: string, fallback: string): string => {
+  const text = t(key as Key)
+  return text === key ? fallback : text
+}
+const categoryLabel = (category: ToolCategory): string => labelOr(`cad.toolpanel.cat.${category.name.toLowerCase().replaceAll(" ", "-")}`, category.name)
+const toolLabel = (tool: ToolDefinition): string => labelOr(`cad.toolpanel.tool.${tool.action}`, tool.name)
 
 export const CATEGORIZED_TOOLS: ReadonlyArray<ToolCategory> = [
   { name: "Basic Primitives", tools: [
@@ -79,13 +88,13 @@ interface ElementFormProps {
 }
 
 /** The numeric fields of the types that have a dedicated form; every other type shows position and a note. */
-const FIELD_ROWS: Record<string, ReadonlyArray<ReadonlyArray<readonly [name: string, label: string]>>> = {
+const FIELD_ROWS: Record<string, ReadonlyArray<ReadonlyArray<readonly [name: string, label: Key | string]>>> = {
   line: [[["x1", "X1"], ["y1", "Y1"], ["z1", "Z1"]], [["x2", "X2"], ["y2", "Y2"], ["z2", "Z2"]]],
-  circle: [[["radius", "Radius"]]], sphere: [[["radius", "Radius"]]],
-  rectangle: [[["width", "Width"], ["height", "Height"]]],
-  cube: [[["width", "Width"], ["height", "Height"], ["depth", "Depth"]]],
-  cylinder: [[["radius", "Radius"], ["height", "Height"]]], cone: [[["radius", "Radius"], ["height", "Height"]]],
-  torus: [[["radius", "Radius"], ["tube", "Tube"]]]
+  circle: [[["radius", "cad.field.radius"]]], sphere: [[["radius", "cad.field.radius"]]],
+  rectangle: [[["width", "cad.width"], ["height", "cad.height"]]],
+  cube: [[["width", "cad.width"], ["height", "cad.height"], ["depth", "cad.depth"]]],
+  cylinder: [[["radius", "cad.field.radius"], ["height", "cad.height"]]], cone: [[["radius", "cad.field.radius"], ["height", "cad.height"]]],
+  torus: [[["radius", "cad.field.radius"], ["tube", "cad.toolpanel.tube"]]]
 }
 const WIREFRAME = new Set(["sphere", "cube", "cylinder", "cone", "torus"])
 
@@ -96,7 +105,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
 
   const numberInput = (name: string, label: string) => (
     <div>
-      <label class="block text-xs text-gray-500">{label}</label>
+      <label class="block text-xs text-gray-500">{labelOr(label, label)}</label>
       <input type="number" name={name} value={data()[name] ?? 0} onInput={(e) => change(name, "number", e.currentTarget)} class={INPUT} />
     </div>
   )
@@ -107,7 +116,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
     <div class="mt-2">
       <label class="flex items-center text-xs text-gray-500">
         <input type="checkbox" name="wireframe" checked={data()["wireframe"] === true} onChange={(e) => change("wireframe", "checkbox", e.currentTarget)} class="mr-2" />
-        Wireframe
+        {t("cad.wireframe")}
       </label>
     </div>
   )
@@ -117,14 +126,14 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
       return <>
         {positionFields()}
         <div class="mt-3">
-          <p class="text-xs text-gray-500 mb-2">This element type ({props.type}) has additional properties available in advanced mode.</p>
+          <p class="text-xs text-gray-500 mb-2">{t("cad.toolpanel.advancedNote", { type: props.type })}</p>
           <Show when={props.type === "parametric"}>
-            <p class="text-xs text-gray-500 mb-2">Starts as a plate with a hole. Select it afterwards to edit its parameters (width, depth, thick, hole) and features in the property panel.</p>
+            <p class="text-xs text-gray-500 mb-2">{t("cad.toolpanel.parametricNote")}</p>
           </Show>
           <Show when={props.type.includes("boolean")}>
             <div class="text-xs text-gray-500 mb-2">
-              <p>To use boolean operations:</p>
-              <ol class="list-decimal list-inside"><li>Create and position objects</li><li>Select the objects to be combined</li><li>Apply the boolean operation</li></ol>
+              <p>{t("cad.toolpanel.booleanHow")}</p>
+              <ol class="list-decimal list-inside"><li>{t("cad.toolpanel.booleanStep1")}</li><li>{t("cad.toolpanel.booleanStep2")}</li><li>{t("cad.toolpanel.booleanStep3")}</li></ol>
             </div>
           </Show>
         </div>
@@ -152,22 +161,22 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
         "scrollbar-width": "none"
       }}
     >
-      <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Add {props.type.charAt(0).toUpperCase() + props.type.slice(1)}</h4>
+      <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">{t("cad.toolpanel.addType", { type: labelOr(`cad.toolpanel.tool.${props.type}`, props.type.charAt(0).toUpperCase() + props.type.slice(1)) })}</h4>
       <form onSubmit={submit}>
         {fields()}
         <div class="mt-3">
-          <label class="block text-xs text-gray-500">Color</label>
+          <label class="block text-xs text-gray-500">{t("library.color")}</label>
           <input type="color" name="color" value={data()["color"] ?? "#1e88e5"} onInput={(e) => change("color", "text", e.currentTarget)} class="w-full h-8" />
         </div>
         <Show when={props.type === "line" || props.type === "circle" || props.type === "rectangle"}>
           <div class="mt-2">
-            <label class="block text-xs text-gray-500">Line Width</label>
+            <label class="block text-xs text-gray-500">{t("cad.toolpanel.lineWidth")}</label>
             <input type="number" name="linewidth" value={data()["linewidth"] ?? 1} min={1} max={10} onInput={(e) => change("linewidth", "number", e.currentTarget)} class={INPUT} />
           </div>
         </Show>
         <div class="mt-4 flex justify-end space-x-2">
-          <button type="button" onClick={props.onCancel} class="panel-btn">Cancel</button>
-          <button type="submit" class="panel-btn panel-btn--primary">Add Element</button>
+          <button type="button" onClick={props.onCancel} class="panel-btn">{t("common.cancel")}</button>
+          <button type="submit" class="panel-btn panel-btn--primary">{t("cad.toolpanel.addElement")}</button>
         </div>
       </form>
     </Motion.div>
@@ -205,21 +214,21 @@ export default function ToolPanel(): JSX.Element {
   return (
     <div class="panel sidebar-toolbox">
       <Show when={!activeLayerInfo()}>
-        <div class="bg-yellow-50 dark:bg-yellow-700 dark:text-yellow-100 text-yellow-800 p-3 rounded-md mb-3 text-xs">Please select a layer first to add elements.</div>
+        <div class="bg-yellow-50 dark:bg-yellow-700 dark:text-yellow-100 text-yellow-800 p-3 rounded-md mb-3 text-xs">{t("cad.toolpanel.selectLayer")}</div>
       </Show>
       <div class="space-y-3">
         <For each={CATEGORIZED_TOOLS}>{(category) =>
-          <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={category.name} icon={Wrench} summary={String(category.tools.length)}>
+          <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={categoryLabel(category)} icon={Wrench} summary={String(category.tools.length)}>
             <div class="grid grid-cols-4 gap-1">
               <For each={category.tools}>{(tool) =>
                 <Motion.button
                   onClick={(e: MouseEvent) => click(tool.action, e)}
                   class={`sidebar-tool ${selectedTool() === tool.action ? "sidebar-tool--selected" : ""}`}
                   disabled={!activeLayerInfo()}
-                  title={tool.name}
+                  title={toolLabel(tool)}
                 >
                   <div class="mb-0.5">{tool.icon()}</div>
-                  <span class="text-[10px] truncate w-full text-center">{tool.name}</span>
+                  <span class="text-[10px] truncate w-full text-center">{toolLabel(tool)}</span>
                 </Motion.button>}</For>
             </div>
           </SidebarSection>}</For>

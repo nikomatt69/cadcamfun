@@ -46,21 +46,28 @@ export interface BannerModel {
 const RETRY: BannerAction = { kind: "retry", label: "Retry", hint: "Checks the connection to your desktop again" }
 
 /** `null` while there is nothing to say: online, not paired yet, or suspended in the background. */
-export const connectionBanner = (input: { connectivity: Connectivity; connectionError: string | null; waiting: number }): BannerModel | null => {
+export const connectionBanner = (input: { connectivity: Connectivity; connectionError: string | null; waiting: number; cloud?: boolean }): BannerModel | null => {
   const { connectivity, connectionError, waiting } = input
   switch (connectivity) {
     case "connecting":
+      if (input.cloud) return { tone: "warning", label: "Connecting to your cloud workspace…", busy: true, action: null, announcement: "Connecting to your cloud workspace", key: "cloud:connecting" }
       return { tone: "warning", label: "Connecting to your desktop…", busy: true, action: null, announcement: "Connecting to your desktop", key: "connecting" }
     case "offline": {
       // Messages written meanwhile wait in the outbox; saying so keeps them from looking lost.
-      const label = waiting > 0 ? `Desktop offline · ${waiting} ${waiting === 1 ? "message" : "messages"} waiting` : "Desktop offline"
-      return { tone: "warning", label, busy: false, action: RETRY, announcement: "Desktop offline", key: "offline" }
+      const target = input.cloud ? "Cloud workspace offline" : "Desktop offline"
+      const label = waiting > 0 ? `${target} · ${waiting} ${waiting === 1 ? "message" : "messages"} waiting` : target
+      return { tone: "warning", label, busy: false, action: input.cloud ? { ...RETRY, hint: "Checks the connection to your cloud workspace again" } : RETRY, announcement: target, key: input.cloud ? "cloud:offline" : "offline" }
     }
     case "error": {
       const label = connectionError?.trim() || "Connection failed"
       return { tone: "danger", label, busy: false, action: RETRY, announcement: label, key: `error:${label}` }
     }
     case "auth-required":
+      if (input.cloud) return {
+        tone: "danger", label: "Cloud access needs attention. Check your sign-in and pairing in Settings.", busy: false,
+        action: { kind: "settings", label: "Settings", hint: "Opens Settings to sign in again or renew this cloud pairing" },
+        announcement: "Cloud access needs attention. Check your sign-in and pairing in Settings.", key: "cloud:auth-required",
+      }
       return {
         tone: "danger",
         label: "The desktop revoked this phone. Pair it again in Settings.",

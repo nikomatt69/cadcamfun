@@ -14,6 +14,7 @@ import { ErrorBoundary as SolidErrorBoundary } from "solid-js"
 import { type JSX, Show, createSignal, createMemo } from "solid-js"
 import AlertTriangle from "lucide-solid/icons/triangle-alert"
 import RefreshCw from "lucide-solid/icons/refresh-cw"
+import { t } from "../../i18n/index.ts"
 
 export interface ErrorBoundaryProps {
   readonly children: JSX.Element
@@ -47,12 +48,12 @@ function ErrorFallback(props: ErrorFallbackProps): JSX.Element {
         <AlertTriangle size={18} />
       </div>
       <div class="ui-error-fallback-body">
-        <h4 class="ui-error-fallback-title">Something went wrong</h4>
+        <h4 class="ui-error-fallback-title">{t("common.error")}</h4>
         <p class="ui-error-fallback-message">{describeError(props.error)}</p>
       </div>
       <button type="button" class="ui-error-fallback-retry" onClick={() => props.onRetry()}>
         <RefreshCw size={14} aria-hidden="true" />
-        <span>Retry</span>
+        <span>{t("boot.retry")}</span>
       </button>
     </div>
   )

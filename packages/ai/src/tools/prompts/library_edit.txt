@@ -16,12 +16,12 @@ Parameters
 - upsert_library_item: id, name, category, type, data ({...}), description, properties, tags, isPublic.
 - set_cost: kind (material|tool_wear|operation), id (omit to create). material: materialId, costPerUnit, wasteFactor, minimumCharge. tool_wear: toolId, wearRatePerMeter, replacementCost, replacementThreshold. operation: name, machineHourlyRate, operatorHourlyRate, setupTime (min). currencyCode.
 - set_default: materialId, toolId, machineConfigId (any subset; the open project is the one that changes).
-- delete: kind (material|tool|machine_config|library_item), id, confirm (true, only when the user asked).
+- delete: kind (material|tool|machine_config|library_item), id, confirm (true).
 
-Fill every parameter the row stores: empty fields are incomplete, not a draft. Use the units named (mm, rpm, mm/min) and keep values consistent (cutting length within total length, shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) draw the tool's 3D model: set those the cutter type has, omit the rest.
+Fill every parameter the row stores: empty fields are incomplete. Use the units named (mm, rpm, mm/min) and keep values consistent (cutting length within total length, shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) draw the tool's 3D model: set those the cutter type has, omit the rest.
 
 Result (JSON)
-- ok, id, created (true when a row was created, false when an existing one was replaced); the store's answer, not the intention. delete also returns what still refers to the row.
+- ok, id, created (true: created, false: an existing row replaced); the store's answer, not the intention. delete also returns what still refers to the row.
 
 Do not use it
 - To read what exists: library is read-only.

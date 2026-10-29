@@ -57,7 +57,7 @@ Owner-requested assistant extensions: add typed AI endpoints for project-owned M
 
 ## Assistant control integration (2026-10-10)
 
-See `24-assistant-control-flow.md`: WP3 adds schema-first agents/session-control endpoints and optional chat role/mode/model variant; WP4 delegates controls to WP8's session-bound service. Generate both clients after changes. Status: in progress. Change log: 2026-10-10 — registered the assistant control contract before implementation.
+See `completed/24-assistant-control-flow.md`: WP3 adds schema-first agents/session-control endpoints and optional chat role/mode/model variant; WP4 delegates controls to WP8's session-bound service. Generate both clients after changes. Status: in progress. Change log: 2026-10-10 — registered the assistant control contract before implementation.
 
 ## AI lifecycle alignment (2026-10-09)
 

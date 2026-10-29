@@ -180,11 +180,11 @@ export default function ParameterControls(props: ParameterControlsProps): JSX.El
                   <div>
                     <span class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t("cad.customElements.type")}</span>
                     <select class={FIELD} value={parameter.type} onChange={(event) => editParameter(name, { type: event.currentTarget.value as CustomElementParameter["type"] })}>
-                      <option value="number">Number</option>
-                      <option value="string">String</option>
-                      <option value="boolean">Boolean</option>
-                      <option value="color">Color</option>
-                      <option value="select">Select</option>
+                      <option value="number">{t("cad.input.number")}</option>
+                      <option value="string">{t("cad.input.string")}</option>
+                      <option value="boolean">{t("keys.group.boolean")}</option>
+                      <option value="color">{t("library.color")}</option>
+                      <option value="select">{t("cad.select")}</option>
                     </select>
                   </div>
 

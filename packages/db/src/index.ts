@@ -25,6 +25,8 @@ export interface DatabaseConfig {
   readonly migrationsFolder?: string
   /** Backup directory; defaults to "backups" beside the SQLite file. Keeps the last five. */
   readonly backupsDirectory?: string
+  /** Hosted storage barrier. Every changed query waits for durable publication; desktop leaves this unset. */
+  readonly onMutation?: (snapshot: () => Uint8Array) => Promise<void>
 }
 
 /**
@@ -95,6 +97,33 @@ export class Database extends Context.Service<Database, {
           }
         }
         const db = drizzle({ client: sqlite, schema })
+        let pending: Promise<unknown> = Promise.resolve()
+        let durabilityFailed = false
+        const snapshot = () => new Uint8Array(sqlite.serialize())
+        const changes = () => sqlite.query<{ count: number }, []>("SELECT total_changes() AS count").get()?.count ?? 0
+        // Serialize hosted queries across the storage barrier. A committed but unpersisted database
+        // must never be exposed by a later read: restart restores the last acknowledged checkpoint.
+        const durable = async <A>(run: () => PromiseLike<A> | A): Promise<A> => {
+          if (durabilityFailed) throw new Error("Cloud durability failed; restart the workspace before continuing")
+          const before = changes()
+          const result = await run()
+          if (changes() !== before && config.onMutation) {
+            try { await config.onMutation(snapshot) }
+            catch (cause) { durabilityFailed = true; throw cause }
+          }
+          return result
+        }
+        const execute = <A>(run: () => PromiseLike<A> | A): Promise<A> => {
+          if (!config.onMutation) return Promise.resolve().then(run)
+          const result = pending.then(() => durable(run))
+          pending = result.catch(() => undefined)
+          return result
+        }
+        const initialBarrier = config.onMutation
+        if (initialBarrier) yield* Effect.tryPromise({
+          try: () => initialBarrier(snapshot),
+          catch: (cause) => new DatabaseError({ operation: "durability", cause })
+        })
         return Database.of({
           db,
           storage: Effect.fn("Database.storage")(() => Effect.try({
@@ -107,7 +136,7 @@ export class Database extends Context.Service<Database, {
           })),
           query: (operation, run) =>
             Effect.tryPromise({
-              try: async () => run(db),
+              try: () => execute(() => run(db)),
               catch: (cause) => new DatabaseError({ operation, cause })
             })
         })

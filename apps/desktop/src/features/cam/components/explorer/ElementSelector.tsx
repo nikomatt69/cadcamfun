@@ -64,7 +64,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
     <div class="bg-gray-800 rounded-lg p-4">
       <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
         <Layers size={20} />
-        Gestione Multi-Toolpath
+        {t("cam.multi.manage")}
       </h3>
 
       {/* CAD elements */}
@@ -133,14 +133,14 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
           <h4 class="text-sm font-semibold text-gray-300">Toolpath Generati ({store.toolpaths.length})</h4>
 
           <Show when={store.toolpaths.some(toolpath => toolpath.selected)}>
-            <button onClick={removeSelectedToolpaths} class="text-red-400 hover:text-red-300 transition-colors" title="Rimuovi toolpath selezionati">
+            <button onClick={removeSelectedToolpaths} class="text-red-400 hover:text-red-300 transition-colors" title={t("cam.multi.removeSelected")}>
               <Trash2 size={16} />
             </button>
           </Show>
         </div>
 
         <div class="space-y-2 max-h-80 overflow-y-auto">
-          <Show when={store.toolpaths.length > 0} fallback={<p class="text-gray-500 text-sm text-center py-4">Nessun toolpath generato</p>}>
+          <Show when={store.toolpaths.length > 0} fallback={<p class="text-gray-500 text-sm text-center py-4">{t("cam.multi.none")}</p>}>
             <For each={store.toolpaths}>
               {(toolpath, index) => (
                 <div class={`border rounded-lg p-3 transition-colors ${toolpath.selected ? "border-blue-500 bg-blue-900/20" : "border-gray-700 bg-gray-800/50"}`}>
@@ -150,7 +150,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                         {toolpath.selected ? <CheckSquare size={16} /> : <Square size={16} />}
                       </button>
 
-                      <div class="w-4 h-4 rounded" style={{ "background-color": toolpath.color }} title="Colore visualizzazione" />
+                      <div class="w-4 h-4 rounded" style={{ "background-color": toolpath.color }} title={t("cam.multi.color")} />
 
                       {icon(toolpath.elementType)}
 
@@ -162,7 +162,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                         {toolpath.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                       </button>
 
-                      <button onClick={() => props.onSelectElement(toolpath.elementId)} class="p-1 text-gray-400 hover:text-white transition-colors" title="Modifica impostazioni">
+                      <button onClick={() => props.onSelectElement(toolpath.elementId)} class="p-1 text-gray-400 hover:text-white transition-colors" title={t("cam.multi.editSettings")}>
                         <Settings size={16} />
                       </button>
 
@@ -174,7 +174,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                         <ChevronDown size={16} />
                       </button>
 
-                      <button onClick={() => store.removeToolpath(toolpath.id)} class="p-1 text-red-400 hover:text-red-300 transition-colors" title="Rimuovi">
+                      <button onClick={() => store.removeToolpath(toolpath.id)} class="p-1 text-red-400 hover:text-red-300 transition-colors" title={t("cam.multi.remove")}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -182,7 +182,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
 
                   {/* Toolpath info */}
                   <div class="text-xs text-gray-400 flex items-center gap-4">
-                    <span>Ø{toolpath.toolpathSettings.toolDiameter}mm</span>
+                    <span>Ø{toolpath.toolpathSettings.toolDiameter}{t("cad.millimeters")}</span>
                     <span>{toolpath.toolpathSettings.operationType}</span>
                     <Show when={toolpath.distance > 0}><span>Dist: {(toolpath.distance / 1000).toFixed(2)}m</span></Show>
                     <Show when={toolpath.estimatedTime > 0}><span>Tempo: {formatDuration(toolpath.estimatedTime)}</span></Show>

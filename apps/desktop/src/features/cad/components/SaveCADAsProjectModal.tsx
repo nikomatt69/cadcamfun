@@ -32,7 +32,7 @@ export default function SaveCADAsProjectModal(props: Props): JSX.Element {
       props.onClose()
       navigate(`/projects/${result.projectId}`)
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : "Failed to save project")
+      setError(cause instanceof Error && cause.message ? cause.message : t("cad.saveProject.failed"))
       setSubmitting(false)
     }
   }

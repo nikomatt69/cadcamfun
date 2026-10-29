@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.ts"
 /**
  * The enterprise page vocabulary — the one seam every non-CAD/CAM screen composes.
  *
@@ -137,7 +138,7 @@ export function StatTile(props: StatTileProps): JSX.Element {
           </Show>
         </span>
       </Show>
-      <span class="ent-stat__value">{props.value ?? "—"}</span>
+      <span class="ent-stat__value">{props.value ?? t("dashboard.metric.unavailable")}</span>
       <span class="ent-stat__label">{props.label}</span>
       <Show when={props.meta !== undefined}>
         <span class={`ent-stat__meta${props.alert === true ? " ent-stat--alert" : ""}`}>{props.meta}</span>

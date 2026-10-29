@@ -80,7 +80,7 @@ export function SignUpScreen(): JSX.Element {
     <div class="reference-standalone-container">
       <div class="ent-card" style={{ "max-width": "26rem" }}>
         <div class="ent-card__head" style={{ "text-align": "center" }}>
-          <img src="/logo.png" alt="CAD/CAM FUN" style={{ height: "40px", width: "auto", "margin-inline": "auto", display: "block", "margin-bottom": "10px" }} />
+          <img src="/logo.png" alt={t("shell.brand")} style={{ height: "40px", width: "auto", "margin-inline": "auto", display: "block", "margin-bottom": "10px" }} />
           <h1 class="ent-header__title" style={{ "font-size": "17px", "text-align": "center" }}>{t("signup.title")}</h1>
           <p class="ent-header__description" style={{ "text-align": "center", "margin-inline": "auto" }}>{t("signup.subtitle")}</p>
         </div>

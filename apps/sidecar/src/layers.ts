@@ -65,6 +65,10 @@ import { MiscRepo } from "./repos/misc-repo.ts"
 import { KvHandlers } from "./http/kv.ts"
 import { KvStore } from "./services/kv.ts"
 import { VcsHandlers } from "./http/vcs.ts"
+import { CloudHandlers } from "./http/cloud.ts"
+import { CloudProjectRepo } from "./repos/cloud-project-repo.ts"
+import { CloudConnections, CloudHttp } from "./services/cloud-connection.ts"
+import { CloudSync } from "./services/cloud-sync.ts"
 import { CompanionHandlers } from "./http/companion.ts"
 import { Companion } from "./services/companion.ts"
 import { ProjectVcsRepo } from "./repos/project-vcs-repo.ts"
@@ -79,7 +83,7 @@ import { AssistantTurns } from "./services/assistant-turns.ts"
 import { MetricsRouteLive, httpMetrics } from "./observability.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
-export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers)
+export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers, CloudHandlers)
 
 /**
  * The version-control services themselves. `LocalProfile` is provided here (not in `RepoServices`)
@@ -122,7 +126,14 @@ const VcsServices = Layer.mergeAll(WorkflowServiceStepsLive, VcsBackfill).pipe(
  * `LocalProfile` are absent on purpose: `VcsServices` provides them, because `WorkflowRunner` and the
  * steps it registers need them, and a service provided twice would be built twice.
  */
-const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer)), FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, AssistantTurns.layer, Companion.layer.pipe(Layer.provide(Layer.mergeAll(KvStore.layer, AuthTokens.layer))))
+const CloudServices = CloudSync.layer.pipe(
+  Layer.provideMerge(CloudProjectRepo.layer),
+  Layer.provideMerge(CloudConnections.layer),
+  Layer.provideMerge(CloudHttp.layer),
+  Layer.provideMerge(StorageService.layer),
+)
+
+const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer)), FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, AssistantTurns.layer, Companion.layer.pipe(Layer.provide(Layer.mergeAll(KvStore.layer, AuthTokens.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer))))), CloudServices)
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
 export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(Layer.provideMerge(RepoServices))))
@@ -133,7 +144,7 @@ export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
   Api.groups.drawings, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.projectToolpaths, Api.groups.library,
-  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace
+  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace, Api.groups.cloud
 ) {}
 
 /**
@@ -165,11 +176,14 @@ export const ApiRoutes = Layer.mergeAll(
   Layer.provide(Services)
 )
 
+import { checkpointHostedDatabase } from "./services/cloud-checkpoint.ts"
+
 export const DatabaseLive = Layer.unwrap(
   AppConfigService.useSync((c) =>
     Database.layer({
       path: `${c.dataDir}/cadcamfun.db`,
-      ...(c.migrationsDir ? { migrationsFolder: c.migrationsDir } : {})
+      ...(c.migrationsDir ? { migrationsFolder: c.migrationsDir } : {}),
+      ...(c.cloudCheckpointUrl ? { onMutation: (snapshot: () => Uint8Array) => checkpointHostedDatabase(c, snapshot) } : {})
     })
   )
 )

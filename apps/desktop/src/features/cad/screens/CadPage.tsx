@@ -113,9 +113,9 @@ export default function CadPage(): JSX.Element {
         applyStoredDrawing(app, row)
         setDrawingId(row.id)
         setDrawingName(row.name)
-        toast.success(`Drawing "${row.name}" opened`)
-      }, () => { if (active()) toast.error("The drawing could not be opened") })
-    })().catch(() => { if (active()) toast.error("The drawing could not be opened") })
+        toast.success(t("cad.page.drawingOpened", { name: row.name }))
+      }, () => { if (active()) toast.error(t("cad.page.drawingOpenFailed")) })
+    })().catch(() => { if (active()) toast.error(t("cad.page.drawingOpenFailed")) })
   })
 
   /**
@@ -155,7 +155,7 @@ export default function CadPage(): JSX.Element {
   // The legacy page set its document title through `MetaTags`.
   onMount(() => {
     const previous = document.title
-    document.title = "CAD Editor"
+    document.title = t("cad.page.title")
     onCleanup(() => { document.title = previous })
   })
 
@@ -165,17 +165,17 @@ export default function CadPage(): JSX.Element {
     if (!componentId || typeof componentId !== "string") return
     try {
       const stored = localStorage.getItem("componentToLoadInCAD")
-      if (!stored) { toast.error("Component data not found"); return }
+      if (!stored) { toast.error(t("cad.page.componentMissing")); return }
       const data = JSON.parse(stored)
-      if (!data || !data.id || data.id !== componentId) { toast.error("Invalid component data"); return }
+      if (!data || !data.id || data.id !== componentId) { toast.error(t("cad.page.componentInvalid")); return }
       elements.addElement(transformLibraryItemToCADElement(data, { x: 0, y: 0, z: 0 }))
-      toast.success(`Component '${data.name}' loaded successfully`)
+      toast.success(t("cad.page.componentLoaded", { name: data.name }))
       localStorage.removeItem("componentToLoadInCAD")
       localStorage.removeItem("componentToLoadInCAD_timestamp")
       setSearch({ loadComponent: undefined, loadTimestamp: undefined }, { replace: true })
     } catch (cause) {
       console.error("Error loading component from localStorage:", cause)
-      toast.error("Failed to load component data. See console for details.")
+      toast.error(t("cad.page.componentLoadFailed"))
     }
   })
 
@@ -202,7 +202,7 @@ export default function CadPage(): JSX.Element {
   const pickComponent = (component: LibraryComponent) => {
     setLibraryItem(component)
     setLibraryComponent(component.id)
-    toast.success(`Component '${component.name}' selected. Place it on the canvas.`)
+    toast.success(t("cad.page.componentSelected", { name: component.name }))
     setShowLibrary(false)
     setSidebarTab("tools")
   }
@@ -243,7 +243,7 @@ export default function CadPage(): JSX.Element {
           <div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2">
             <CADCanvas
               width="100%" height="100%" previewComponent={libraryComponent()} previewLibraryItem={libraryItem()}
-              onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
+              onComponentPlaced={() => { toast.success(t("cad.page.componentPlaced")); setLibraryComponent(null) }}
               onReady={setCanvas} onSave={save}
               footerActions={<CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} />}
               footerDock={<TitleBlockOverlay mode={cad.viewMode} />}

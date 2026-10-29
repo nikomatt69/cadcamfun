@@ -228,7 +228,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         input[param.name] = param.type === "array" ? JSON.parse(raw) : param.type === "boolean" ? raw === "true" : param.type === "string" ? raw : Number(raw)
       }
       const result = buildRecipe(spec.name, input)
-      if (!window.confirm(`Replace the history of this part with the ${spec.title} recipe?`)) return
+      if (!window.confirm(t("cad.param.confirmRecipe", { title: spec.title }))) return
       if (edit(() => result.history)) { setRecipeResult(result); setReport(undefined) }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -242,7 +242,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
     try {
       const next = runModelScript(script())
       const result = rebuild(next)
-      if (!window.confirm(`Replace the history of this part with the script's ${next.features.length} features?`)) return
+      if (!window.confirm(t("cad.param.confirmScript", { count: next.features.length }))) return
       if (edit(() => next)) {
         setReport(undefined)
         setScriptNote(`${next.features.length} features, ${result.bodies.length} body(ies), ${result.issues.filter((i) => i.severity === "error").length} error(s)`)
@@ -257,7 +257,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
   return (
     <PanelCard title={t("cad.ribbon.parametric")} testId="parametric-panel">
       <div>
-        <Show when={built()} fallback={<p class="text-sm text-red-600">The history could not be rebuilt.</p>}>{(result) =>
+        <Show when={built()} fallback={<p class="text-sm text-red-600">{t("cad.param.rebuildFailed")}</p>}>{(result) =>
           <p class="text-xs text-gray-600 dark:text-gray-300" data-testid="parametric-summary">
             {result().bodies.length} solid{result().bodies.length === 1 ? "" : "s"}, {format(historyVolume(result()) / 1000)} cm³
           </p>}
@@ -266,11 +266,11 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div>
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Parameters</h5>
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.customElements.parameters")}</h5>
         <div class="space-y-1">
           <For each={Object.entries(history().parameters)}>{([name, definition]) =>
             <div class="grid grid-cols-[6rem_1fr_auto] items-center gap-1" data-testid={`parameter-${name}`}>
-              <button type="button" class="truncate text-left text-sm font-mono text-blue-700 hover:underline disabled:no-underline" title="Rename" disabled={props.locked}
+              <button type="button" class="truncate text-left text-sm font-mono text-blue-700 hover:underline disabled:no-underline" title={t("projects.rename")} disabled={props.locked}
                 onClick={() => { const next = window.prompt(`Rename '${name}' to`, name); if (next && next !== name) edit((h) => renameParameter(h, name, next)) }}>{name}</button>
               <div>
                 <input class={INPUT} value={String(definition)} disabled={props.locked} aria-label={`Parameter ${name}`}
@@ -279,21 +279,21 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   <span class="text-xs text-red-600">{resolved().errors[name]}</span>
                 </Show>
               </div>
-              <button type="button" class={SMALL} disabled={props.locked} title={(() => { const u = usesOf(history(), name); return u.parameters.length + u.features.length > 0 ? `Used by ${[...u.parameters, ...u.features].join(", ")}` : "Delete" })()}
+              <button type="button" class={SMALL} disabled={props.locked} title={(() => { const u = usesOf(history(), name); return u.parameters.length + u.features.length > 0 ? `Used by ${[...u.parameters, ...u.features].join(", ")}` : t("cad.customElements.delete") })()}
                 onClick={() => edit((h) => removeParameter(h, name))}>✕</button>
             </div>}
           </For>
           <div class="grid grid-cols-[6rem_1fr_auto] items-center gap-1">
-            <input class={INPUT} placeholder="name" value={newName()} onInput={(event) => setNewName(event.currentTarget.value)} disabled={props.locked} aria-label="New parameter name" />
-            <input class={INPUT} placeholder="12 or width / 2" value={newValue()} onInput={(event) => setNewValue(event.currentTarget.value)} disabled={props.locked} aria-label="New parameter value"
+            <input class={INPUT} placeholder="name" value={newName()} onInput={(event) => setNewName(event.currentTarget.value)} disabled={props.locked} aria-label={t("cad.param.newName")} />
+            <input class={INPUT} placeholder={t("cad.param.valueExample")} value={newValue()} onInput={(event) => setNewValue(event.currentTarget.value)} disabled={props.locked} aria-label={t("cad.param.newValue")}
               onKeyDown={(event) => { if (event.key === "Enter") addParameter() }} />
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addParameter}>Add</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addParameter}>{t("cad.add")}</button>
           </div>
         </div>
       </div>
 
       <div>
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Features</h5>
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("subscription.features")}</h5>
         <ol class="space-y-3">
           <For each={history().features}>{(feature, index) => <>
             <li class={`rounded-md border border-gray-200 p-2 dark:border-gray-600 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
@@ -311,15 +311,15 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   </Show>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? "Release" : "Suppress"} ${feature.id}`}
+                  <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? t("cam.gen.kp.release") : "Suppress"} ${feature.id}`}
                     title={feature.suppressed === true ? "Release: build it again" : "Suppress: leave it, and what needs it, out of the model (nothing is deleted)"}
                     onClick={() => edit((h) => withSuppressed(h, [feature.id], feature.suppressed !== true))}>{feature.suppressed === true ? "◉" : "◌"}</button>
                   <button type="button" class={SMALL} disabled={props.locked || history().rollback === feature.id} aria-label={`Roll back to ${feature.id}`}
-                    title="Roll back here: build only up to this feature" onClick={() => edit((h) => withRollback(h, feature.id))}>⤒</button>
-                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title="Earlier">↑</button>
-                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title="Later">↓</button>
-                  <button type="button" class={SMALL} disabled={props.locked} title="Delete (with what depends on it)"
-                    onClick={() => { if (window.confirm(`Delete ${feature.id} and what depends on it?`)) edit((h) => removeFeature(h, feature.id)) }}>✕</button>
+                    title={t("cad.param.rollBack")} onClick={() => edit((h) => withRollback(h, feature.id))}>⤒</button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title={t("cad.param.earlier")}>↑</button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title={t("update.later")}>↓</button>
+                  <button type="button" class={SMALL} disabled={props.locked} title={t("cad.param.deleteDeps")}
+                    onClick={() => { if (window.confirm(t("cad.param.confirmDeleteFeature", { id: feature.id }))) edit((h) => removeFeature(h, feature.id)) }}>✕</button>
                 </div>
               </div>
               <Show when={feature.type === "extrude"}>
@@ -398,7 +398,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                       const sheet = feature as Feature & { type: "sheet" }
                       const dxf = flatPatternDxf(developed(), numeric(sheet.width), feature.id)
                       downloadFile({ name: `${feature.id}-flat-pattern.dxf`, data: dxf, mime: "application/dxf" })
-                    }}>Flat pattern DXF</button>
+                    }}>{t("cad.param.flatDxf")}</button>
                 </div>}
               </Show>
               <Show when={feature.type === "shell"}>
@@ -425,47 +425,47 @@ export default function ParametricPanel(props: { readonly element: Element; read
             </li>
             <Show when={history().rollback === feature.id}>
               <li class="flex items-center justify-between gap-2 rounded-md border-2 border-dashed border-sky-500 px-2 py-1 text-xs text-sky-700 dark:text-sky-300" data-testid="rollback-bar">
-                <span>Rolled back here: the features below are kept but not built</span>
-                <button type="button" class={SMALL} disabled={props.locked} onClick={() => edit((h) => withRollback(h, undefined))}>Roll to end</button>
+                <span>{t("cad.param.rolledBack")}</span>
+                <button type="button" class={SMALL} disabled={props.locked} onClick={() => edit((h) => withRollback(h, undefined))}>{t("cad.param.rollToEnd")}</button>
               </li>
             </Show>
           </>}
           </For>
         </ol>
         <div class="mt-2" data-testid="add-feature">
-          <span class="block text-xs text-gray-500">Add feature</span>
+          <span class="block text-xs text-gray-500">{t("cad.param.addFeature")}</span>
           <div class="mt-1 flex flex-wrap gap-1">
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "convex")}>Fillet all outside edges</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "vertical")}>Fillet vertical edges</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "top")}>Fillet top edges</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("chamfer", "convex")}>Chamfer all outside edges</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("chamfer", "top")}>Chamfer top edges</button>
-            <select class={SELECT} disabled={props.locked} aria-label="Shell target" value={shellTarget()} onChange={(event) => setShellTarget(event.currentTarget.value)}>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "convex")}>{t("cad.param.filletAllOutside")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "vertical")}>{t("cad.param.filletVertical")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "top")}>{t("cad.param.filletTop")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("chamfer", "convex")}>{t("cad.param.chamferAllOutside")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("chamfer", "top")}>{t("cad.param.chamferTop")}</button>
+            <select class={SELECT} disabled={props.locked} aria-label={t("cad.param.shellTarget")} value={shellTarget()} onChange={(event) => setShellTarget(event.currentTarget.value)}>
               <option value="">shell: newest solid</option>
               <For each={shellable()}>{(f) => <option value={f.id}>{`shell: ${f.type} ${f.id}`}</option>}</For>
             </select>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("top")}>Shell, open top</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("none")}>Shell, closed</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addGrid}>Grid pattern</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addCoil}>Coil</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addCopy}>Copy body</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addSplit}>Split body</button>
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addScale}>Scale</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("top")}>{t("cad.param.shellOpenTop")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("none")}>{t("cad.param.shellClosed")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addGrid}>{t("cad.param.gridPattern")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addCoil}>{t("cad.param.coil")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addCopy}>{t("cad.param.copyBody")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addSplit}>{t("cad.param.splitBody")}</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addScale}>{t("cad.scale")}</button>
           </div>
         </div>
       </div>
 
       <div class="panel-subsection" data-testid="dfm-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Manufacturability</h5>
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.manufacturability")}</h5>
         <div class="grid grid-cols-3 gap-1">
           <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">process</span>
-            <select class={SELECT} aria-label="Process" value={process()} onChange={(event) => setProcess(event.currentTarget.value as DfmProcess)}>
+            <select class={SELECT} aria-label={t("cad.param.process")} value={process()} onChange={(event) => setProcess(event.currentTarget.value as DfmProcess)}>
               <option value="mill">mill</option><option value="turn">turn</option><option value="print">print</option>
             </select></label>
           <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">cutter Ø (mm)</span>
-            <input class={INPUT} value={cutter()} aria-label="Cutter diameter" onInput={(event) => setCutter(event.currentTarget.value)} /></label>
+            <input class={INPUT} value={cutter()} aria-label={t("cad.param.cutterDia")} onInput={(event) => setCutter(event.currentTarget.value)} /></label>
           <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">material</span>
-            <select class={SELECT} aria-label="Material" value={material()} onChange={(event) => setMaterial(event.currentTarget.value as DfmMaterial)}>
+            <select class={SELECT} aria-label={t("cad.viewMaterial")} value={material()} onChange={(event) => setMaterial(event.currentTarget.value as DfmMaterial)}>
               <option value="metal">metal</option><option value="cast">cast</option><option value="plastic">plastic</option>
             </select></label>
         </div>
@@ -474,7 +474,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
           <div class="mt-2 space-y-1" data-testid="dfm-report">
             <p class={`text-xs font-medium ${r().ok ? "text-green-700" : "text-red-700"}`}>
               {r().ok ? "No errors" : `${issuesBy("error").length} error(s)`}, {issuesBy("warning").length} warning(s), {issuesBy("info").length} note(s)
-              <Show when={r().metrics.minWallMm !== null}> · thinnest wall {format(r().metrics.minWallMm ?? 0)} mm</Show>
+              <Show when={r().metrics.minWallMm !== null}> · thinnest wall {format(r().metrics.minWallMm ?? 0)} {t("cad.millimeters")}</Show>
             </p>
             <For each={["error", "warning", "info"]}>{(severity) =>
               <For each={issuesBy(severity)}>{(issue) =>
@@ -490,8 +490,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div class="panel-subsection" data-testid="recipes-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Recipes</h5>
-        <select class={SELECT} aria-label="Recipe" disabled={props.locked} value={recipeName()} onChange={(event) => { setRecipeName(event.currentTarget.value); setRecipeInput({}); setRecipeResult(undefined) }}>
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.recipes")}</h5>
+        <select class={SELECT} aria-label={t("cad.param.recipe")} disabled={props.locked} value={recipeName()} onChange={(event) => { setRecipeName(event.currentTarget.value); setRecipeInput({}); setRecipeResult(undefined) }}>
           <For each={RECIPES}>{(r) => <option value={r.name}>{r.title}</option>}</For>
         </select>
         <Show when={recipe()}>{(spec) =>
@@ -518,7 +518,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
             </div>
           </div>}
         </Show>
-        <button type="button" class={`${SMALL} mt-1`} disabled={props.locked} onClick={applyRecipe}>Replace with recipe</button>
+        <button type="button" class={`${SMALL} mt-1`} disabled={props.locked} onClick={applyRecipe}>{t("cad.param.replaceRecipe")}</button>
         <Show when={recipeResult()}>{(r) =>
           <div class="mt-1 text-xs text-gray-600 dark:text-gray-300" data-testid="recipe-result">
             <p>{r().summary}</p>
@@ -528,19 +528,19 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div class="panel-subsection" data-testid="script-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Script</h5>
-        <p class="text-xs text-gray-500">JavaScript against <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
-        <textarea class={`${INPUT} mt-1 h-40`} spellcheck={false} aria-label="Model script" disabled={props.locked} value={script()} onInput={(event) => setScript(event.currentTarget.value)} />
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.script")}</h5>
+        <p class="text-xs text-gray-500">{t("cad.param.jsAgainst")} <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
+        <textarea class={`${INPUT} mt-1 h-40`} spellcheck={false} aria-label={t("cad.param.modelScript")} disabled={props.locked} value={script()} onInput={(event) => setScript(event.currentTarget.value)} />
         <div class="mt-1 flex items-center gap-2">
-          <button type="button" class={SMALL} disabled={props.locked} onClick={runScript}>Run script</button>
-          <button type="button" class={SMALL} disabled={props.locked} onClick={() => setScript(SCRIPT_STARTER)}>Starter</button>
+          <button type="button" class={SMALL} disabled={props.locked} onClick={runScript}>{t("cad.param.runScript")}</button>
+          <button type="button" class={SMALL} disabled={props.locked} onClick={() => setScript(SCRIPT_STARTER)}>{t("cad.param.starter")}</button>
           <Show when={scriptNote()}><span class="text-xs text-gray-600 dark:text-gray-300" data-testid="script-result">{scriptNote()}</span></Show>
         </div>
       </div>
 
       <Show when={(built()?.issues.length ?? 0) > 0}>
         <div class="panel-subsection" data-testid="parametric-issues">
-          <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Problems</h5>
+          <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.problems")}</h5>
           <ul class="space-y-1">
             <For each={built()?.issues ?? []}>{(issue) =>
               <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`}><span class="font-medium">{issue.feature}</span>: {issue.message}</li>}

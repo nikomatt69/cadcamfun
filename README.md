@@ -272,7 +272,7 @@ Exports, logs, credentials and AI session history can live separately. A project
 
 The sidecar is the one telemetry edge. With `OTEL_EXPORTER_OTLP_ENDPOINT` set, Effect spans, metrics and logs are exported over OTLP/HTTP: the request span of every HTTP call (with the route template and the status), the `ai.turn` span of every assistant turn, and the metric catalogue of requests, AI turns and CAD surface operations. A client that sends a W3C `traceparent` header continues its own trace into the sidecar.
 
-Without a collector, the same numbers are readable on the loopback listener at `GET /metrics`, in the Prometheus exposition format. Telemetry carries shapes, never content: attributes whose key names a prompt, a payload or a credential are dropped before export. See [spec 66](specs/66-effect-opentelemetry.md) and [PRIVACY.md](PRIVACY.md).
+Without a collector, the same numbers are readable on the loopback listener at `GET /metrics`, in the Prometheus exposition format. Telemetry carries shapes, never content: attributes whose key names a prompt, a payload or a credential are dropped before export. See [spec 66](specs/completed/66-effect-opentelemetry.md) and [PRIVACY.md](PRIVACY.md).
 
 ### Security and privacy
 

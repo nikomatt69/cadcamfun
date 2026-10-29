@@ -9,6 +9,7 @@ import { Dynamic } from "solid-js/web"
 import type { cam } from "@cadcamfun/core"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Badge, Note } from "./ui.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 type Reference = NonNullable<cam.generator.ProgramRecord["cuttingData"]["reference"]>
 
@@ -40,9 +41,9 @@ const num = (v: number): string => (Number.isInteger(v) ? String(v) : String(Mat
 export function CuttingReferenceView(props: { readonly reference: Reference }): JSX.Element {
   return (
     <div class="text-[11px] leading-snug space-y-0.5" data-testid="cutting-reference">
-      <div><span class="font-medium">Source:</span> table {props.reference.table}, row <code>{props.reference.row}</code> ({props.reference.rowName})</div>
-      <div><span class="font-medium">Columns:</span> {Object.entries(props.reference.columns).map(([k, v]) => `${k} ${num(v)}`).join(" · ")}</div>
-      <div><span class="font-medium">Factors:</span> {Object.entries(props.reference.factors).map(([k, v]) => `${k} ×${num(v)}`).join(" · ")}</div>
+      <div><span class="font-medium">{t("cam.gen.ev.source")}</span> table {props.reference.table}, row <code>{props.reference.row}</code> ({props.reference.rowName})</div>
+      <div><span class="font-medium">{t("cam.gen.ev.columns")}</span> {Object.entries(props.reference.columns).map(([k, v]) => `${k} ${num(v)}`).join(" · ")}</div>
+      <div><span class="font-medium">{t("cam.gen.ev.factors")}</span> {Object.entries(props.reference.factors).map(([k, v]) => `${k} ×${num(v)}`).join(" · ")}</div>
       <div class="opacity-70">{props.reference.basis}</div>
     </div>
   )
@@ -57,12 +58,12 @@ export function EvidenceSection(): JSX.Element {
         <section class="panel-section" data-testid="program-evidence" data-open="true">
           <div class="panel-section__head" style={{ cursor: "default" }}>
             <ShieldCheck size={14} class="panel-section__icon" />
-            <h3 class="panel-section__title">Program evidence</h3>
+            <h3 class="panel-section__title">{t("cam.kernel.release")}</h3>
             <Badge tone={RESULT_TONE[e().result] ?? "warn"} testId="evidence-result">{e().result}</Badge>
           </div>
           <div class="panel-section__body">
             <Show when={gen.evidenceStale}>
-              <Note kind="warn" testId="evidence-stale">The NC was edited after generation: this record describes the generated program, not the current text. Generate again to check it.</Note>
+              <Note kind="warn" testId="evidence-stale">{t("cam.gen.ev.edited")}</Note>
             </Show>
             <ul class="panel-checks">
               <For each={e().checks}>
@@ -82,15 +83,15 @@ export function EvidenceSection(): JSX.Element {
               <div class="panel-group">
                 <div>
                   <strong>Cutting data: {e().cuttingData.status}</strong>
-                  <span class="panel-hint"> {e().process.rpm} rpm, F{e().process.feed}, plunge {e().process.plunge}, ap {e().process.stepdown} mm</span>
+                  <span class="panel-hint"> {e().process.rpm} rpm, F{e().process.feed}, plunge {e().process.plunge}, ap {e().process.stepdown} {t("cad.millimeters")}</span>
                   <Show when={e().cuttingData.recommended}>{(r) => <span class="panel-hint"> (kernel: {r().rpm} rpm, F{r().feed}, plunge {r().plunge}, ap {r().stepdown} mm)</span>}</Show>
                 </div>
                 <Show when={e().cuttingData.reference}>{(ref) => <CuttingReferenceView reference={ref()} />}</Show>
               </div>
             </Show>
             <div class="panel-mono">
-              <div>NC sha256 {e().program.sha256} · {e().program.lines} lines · {e().program.cutLength} mm {printer() ? "of bead" : "cut"} · {e().program.estimatedSeconds} s</div>
-              <div>inputs {e().inputs.digest} · {printer() ? "3D printer" : `${e().tool.type} Ø${e().tool.diameter} ${e().tool.flutes}F`} · {e().inputs.material}</div>
+              <div>NC sha256 {e().program.sha256} · {e().program.lines} lines · {e().program.cutLength} {t("cad.millimeters")} {printer() ? "of bead" : "cut"} · {e().program.estimatedSeconds} s</div>
+              <div>inputs {e().inputs.digest} · {printer() ? t("cam.gen.mach.printer") : `${e().tool.type} Ø${e().tool.diameter} ${e().tool.flutes}F`} · {e().inputs.material}</div>
             </div>
           </div>
         </section>

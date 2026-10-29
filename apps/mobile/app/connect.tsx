@@ -23,9 +23,9 @@ import { DividedRows, IconBadge, SheetSection, TILE_INSET } from "@/components/c
 const UNSUPPORTED = "Open the installed CADCAMFUN app to pair securely. Expo Go cannot use the CompanionNet module."
 
 const STEPS = [
-  { icon: MonitorSmartphone, title: "Open your desktop", detail: "Go to Settings → Mobile companion on your Mac." },
+  { icon: MonitorSmartphone, title: "Choose your workspace", detail: "Use your desktop's companion settings or a cloud pairing link." },
   { icon: QrCode, title: "Show the pairing code", detail: "Turn on the companion and display its QR code." },
-  { icon: ScanLine, title: "Scan it with this iPhone", detail: "Stay on the same Wi-Fi, Personal Hotspot or Tailscale network." },
+  { icon: ScanLine, title: "Scan or paste the link", detail: "For a local desktop, use the same Wi-Fi, Personal Hotspot or Tailscale. Cloud workspaces work over the internet." },
 ] as const
 
 /**
@@ -127,7 +127,7 @@ export default function ConnectScreen() {
       footer={(
         <>
           {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
-          <CapsuleButton label={busy ? "Connecting to your desktop…" : "Scan pairing code"} icon={<ScanLine size={19} color={palette.onAccent} strokeWidth={2.2} />} loading={busy} hint="Opens the camera to read the QR code on your Mac" onPress={openScanner} />
+          <CapsuleButton label={busy ? "Connecting to your workspace…" : "Scan pairing code"} icon={<ScanLine size={19} color={palette.onAccent} strokeWidth={2.2} />} loading={busy} hint="Opens the camera to read a workspace pairing QR code" onPress={openScanner} />
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
               <CapsuleButton variant="glass" label="Paste link" icon={<Link2 size={17} color={palette.ink} strokeWidth={2.2} />} disabled={busy} hint="Pairs with the link copied on your Mac" onPress={() => void paste()} />
@@ -144,7 +144,7 @@ export default function ConnectScreen() {
       </View>
       <View style={{ gap: 10 }}>
         <Text style={{ color: palette.accent, textAlign: "center", ...caps(12, { weight: "700" }) }}>Your work. With you.</Text>
-        <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(30, { weight: "700" }) }}>Pair with your Mac</Text>
+        <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(30, { weight: "700" }) }}>Connect your workspace</Text>
         <Text style={{ color: palette.soft, textAlign: "center", ...type(16, { leadingScale: 1.05 }) }}>Review designs, check toolpaths and work with your assistant, wherever you are.</Text>
       </View>
 
@@ -168,7 +168,7 @@ export default function ConnectScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 4 }}>
         <ShieldCheck size={18} color={palette.success} style={{ marginTop: 1 }} />
-        <Text style={{ flex: 1, color: palette.muted, ...type(12, { leadingScale: 1.1 }) }}>A private, encrypted connection to your Mac, pinned to its certificate. Nothing passes through a cloud service.</Text>
+        <Text style={{ flex: 1, color: palette.muted, ...type(12, { leadingScale: 1.1 }) }}>Local desktop connections are pinned to your Mac's certificate. Cloud workspaces use verified HTTPS and require your CADCAMFUN account.</Text>
       </View>
 
       <ManualSheet open={manualOpen} busy={busy} error={error} onClose={() => setManualOpen(false)} onPair={(link) => void pair(link)} />

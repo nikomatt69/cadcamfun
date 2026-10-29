@@ -9,6 +9,7 @@ import { useListTags } from "@/lib/use-list-tags"
 import { TagBadges, TagFilter, TagSheet } from "@/components/ui/ListTags"
 import type { AiSessionSummary } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
+import { pairingIdentity } from "@/lib/pairing"
 import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -55,7 +56,7 @@ export default function ConversationsScreen() {
   const router = useRouter()
   const { gutter, fontScale, onLayout } = useContentLayout()
   const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
-  const { collection, update } = useListTags(tagScope(config?.fingerprint ?? "", account?.subject ?? "local"))
+  const { collection, update } = useListTags(tagScope((config ? pairingIdentity(config) : ""), account?.subject ?? "local"))
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(false)
   const [taggingTarget, setTaggingTarget] = useState<string | null>(null)
@@ -84,7 +85,7 @@ export default function ConversationsScreen() {
       [client, projectId],
     ),
     `assistant:conversations:${projectId ?? "none"}`,
-    { cacheKey: `conversations:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}:${projectId ?? "none"}` },
+    { cacheKey: `conversations:${(config ? pairingIdentity(config) : "")}:${account?.subject ?? "local"}:${projectId ?? "none"}` },
   )
 
   const all = resource.data

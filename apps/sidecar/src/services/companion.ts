@@ -5,11 +5,13 @@ import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { getLocalPort, announced } from "../startup.ts"
 import {
-  defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingHosts, pairingLink, startGateway,
+  cloudPairingLink, defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingHosts, pairingLink, startGateway,
   type CompanionCertificate, type Gateway, type GatewayRequestLog, type TokenRecord,
 } from "./companion-gateway.ts"
 import { AuthTokens } from "./auth-tokens.ts"
 import { KvStore } from "./kv.ts"
+import { Identity } from "./identity.ts"
+import { flushHostedState } from "./cloud-checkpoint.ts"
 
 export class CompanionError extends Data.TaggedError("CompanionError")<{ readonly code: "unavailable" | "invalid" | "not-found"; readonly message: string }> {}
 
@@ -46,6 +48,8 @@ export class Companion extends Context.Service<Companion, {
     const config = yield* AppConfigService
     const kv = yield* KvStore
     const authTokens = yield* AuthTokens
+    const identity = yield* Identity
+    const hosted = config.runtime === "server"
     const dir = join(config.dataDir, "companion")
     let gateway: Gateway | undefined
     let certificate: CompanionCertificate | undefined
@@ -69,7 +73,7 @@ export class Companion extends Context.Service<Companion, {
 
     const settings = Effect.gen(function*() {
       const v = (yield* kv.get(SETTINGS))?.value as { enabled?: boolean; port?: number } | undefined
-      return { enabled: v?.enabled === true, port: typeof v?.port === "number" ? v.port : DEFAULT_PORT }
+      return { enabled: hosted || v?.enabled === true, port: hosted ? config.gatewayPort ?? 8080 : typeof v?.port === "number" ? v.port : DEFAULT_PORT }
     }).pipe(Effect.catchTag("KvError", (e) => Effect.logWarning("Unable to load companion settings", e).pipe(Effect.as({ enabled: false, port: DEFAULT_PORT }))))
     const tokens = Effect.gen(function*() {
       const records = (yield* kv.list(TOKEN_PREFIX)).map((e) => e.value as TokenRecord)
@@ -100,27 +104,59 @@ export class Companion extends Context.Service<Companion, {
         enabled: gateway !== undefined,
         port: gateway?.port ?? (s.enabled ? s.port : null),
         fingerprint: certificate?.fingerprint ?? null,
-        host: defaultHost(),
+        host: hosted && config.publicOrigin ? new URL(config.publicOrigin).hostname : defaultHost(),
         devices: list.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
       }
     })
 
+    const hostedOwner = Effect.fn("Companion.hostedOwner")(function*(token: string) {
+      const principal = yield* identity.verify(token)
+      // Resolve the local account only after the immutable subject matched: an unrelated first sign-in must not adopt it.
+      if (!config.cloudOwnerSubject || principal.subject !== config.cloudOwnerSubject) return yield* new CompanionError({ code: "invalid", message: "This account does not own the cloud workspace" })
+      return yield* identity.user(token)
+    })
+
+    const createPair = Effect.fn("Companion.pair")(function*(name: string, host?: string, user?: SessionUser) {
+      const label = name.trim()
+      if (!label || label.length > 60) return yield* new CompanionError({ code: "invalid", message: "Device name is required (up to 60 characters)" })
+      if (hosted && (!user || !config.publicOrigin || !config.workspaceId)) return yield* new CompanionError({ code: "invalid", message: "A cloud device must be enrolled by its signed-in owner" })
+      const { id, token } = newToken()
+      const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null, ...(user ? { userId: user.id } : {}) }
+      yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save the device token: ${e.operation}` })))
+      if (hosted && config.publicOrigin && config.workspaceId) return { id, link: cloudPairingLink({ origin: config.publicOrigin, workspaceId: config.workspaceId, token, name: label }) }
+      const cert = yield* loadCertificate
+      const s = yield* settings
+      const hosts = pairingHosts(host)
+      const primary = hosts[0] ?? "127.0.0.1"
+      return { id, link: pairingLink({ host: primary, port: gateway?.port ?? s.port, token, fingerprint: cert.fingerprint, name: label, hosts }) }
+    })
+
     const start = (port: number) =>
       Effect.gen(function*() {
-        const cert = yield* loadCertificate
+        const cert = hosted ? undefined : yield* loadCertificate
+        if (hosted && (!config.workspaceId || !config.cloudInternalToken)) return yield* new CompanionError({ code: "invalid", message: "The hosted gateway requires workspace and coordinator configuration" })
         const local = getLocalPort()
         if (local === undefined) return yield* new CompanionError({ code: "unavailable", message: "The sidecar is not listening yet" })
         gateway?.stop()
         // Tokens are read per request so a revoked device is refused immediately; `touch` only updates memory.
         gateway = yield* Effect.try({
           try: () => startGateway({
-            certificate: cert,
+            ...(cert ? { certificate: cert } : {}),
             port,
             upstream: () => ({ port: getLocalPort() ?? local, token: Redacted.value(config.token) }),
             tokens: () => runTokens(tokens),
             touch: (id) => void touches.set(id, new Date().toISOString()),
             session: (record) => record.userId === undefined ? undefined : authTokens.sign({ userId: record.userId, email: "", type: "session" }, SESSION_SECONDS),
             log: logRequest,
+            ...(hosted && config.workspaceId && config.cloudInternalToken ? {
+              hosted: {
+                workspaceId: config.workspaceId,
+                internalToken: Redacted.value(config.cloudInternalToken),
+                verifyIdentity: async (token: string) => ({ userId: (await runTokens(hostedOwner(token))).id }),
+                enroll: async (name: string, token: string) => runTokens(createPair(name, undefined, await runTokens(hostedOwner(token)))),
+                persist: () => flushHostedState(config),
+              },
+            } : {}),
           }),
           catch: (e) => new CompanionError({ code: "unavailable", message: `Could not start the gateway on port ${port}: ${String(e)}` }),
         })
@@ -143,11 +179,13 @@ export class Companion extends Context.Service<Companion, {
     return Companion.of({
       status: state,
       enable: (port) => Effect.gen(function*() {
+        if (hosted && port !== undefined && port !== (config.gatewayPort ?? 8080)) return yield* new CompanionError({ code: "invalid", message: "The hosted gateway port is configured at startup" })
         if (port !== undefined && (!Number.isInteger(port) || port < 1024 || port > 65535)) return yield* new CompanionError({ code: "invalid", message: "Port must be between 1024 and 65535" })
         yield* start(port ?? (yield* settings).port)
         return yield* state
       }),
       disable: Effect.gen(function*() {
+        if (hosted) return yield* new CompanionError({ code: "invalid", message: "Stop the hosted runtime to disable its gateway" })
         yield* kv.set(SETTINGS, { ...(yield* settings), enabled: false }).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save gateway settings: ${e.operation}` })))
         gateway?.stop()
         gateway = undefined
@@ -159,17 +197,7 @@ export class Companion extends Context.Service<Companion, {
           if (record.userId === undefined) yield* kv.set(entry.key, { ...record, userId: user.id })
         }
       }).pipe(Effect.catchTag("KvError", (e) => Effect.logWarning("Unable to assign companion devices", e))),
-      pair: (name, host, user) => Effect.gen(function*() {
-        const label = name.trim()
-        if (!label || label.length > 60) return yield* new CompanionError({ code: "invalid", message: "Device name is required (up to 60 characters)" })
-        const cert = yield* loadCertificate
-        const { id, token } = newToken()
-        const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null, ...(user ? { userId: user.id } : {}) }
-        yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save the device token: ${e.operation}` })))
-        const s = yield* settings
-        const hosts = pairingHosts(host)
-        return { id, link: pairingLink({ host: hosts[0]!, port: gateway?.port ?? s.port, token, fingerprint: cert.fingerprint, name: label, hosts }) }
-      }),
+      pair: createPair,
       revoke: (id) => Effect.gen(function*() {
         if (!(yield* kv.delete(`${TOKEN_PREFIX}${id}`).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not revoke the device token: ${e.operation}` }))))) return yield* new CompanionError({ code: "not-found", message: "Device not found" })
         touches.delete(id)

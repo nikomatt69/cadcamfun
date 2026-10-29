@@ -401,7 +401,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               <select
                 aria-label={t("cam.visualizer.machine")}
                 class="ml-1 rounded bg-slate-800 border border-slate-600 px-1 py-0.5"
-                value={choice().source === "override" ? choice().kind : "auto"}
+                value={choice().source === "override" ? choice().kind : t("cam.kernel.fromData")}
                 onChange={(event) => { const value = event.currentTarget.value; props.onMachineOverride?.(value === "auto" ? undefined : value as cam.MachineKind) }}
               >
                 <option value="auto">{t("cam.visualizer.machineAuto")}</option>
@@ -456,7 +456,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                     <div>{r().rapid ? "G0" : `F${Math.round(r().feed)}`} · S{Math.round(r().rpm)}{r().tool !== undefined ? ` · T${r().tool}` : ""} · <span class="text-white" data-testid="visualizer-move-class">{r().klass !== undefined ? moveLabel(r().klass!) : ""}</span></div>
                     <div>{t("cam.operations.current")}: <span class="text-white">{names()[r().operation] ?? ""}</span></div>
                     <Show when={joints()}>{(j) => (
-                      <div data-testid="visualizer-joints">{t("cam.visualizer.machineAxes")}: <span class="text-white">X{fmt(j().x)} Y{fmt(j().y)} Z{fmt(j().z)}{j().a !== undefined ? ` A${fmt(j().a!)}` : ""}{j().b !== undefined ? ` B${fmt(j().b!)}` : ""}{j().c !== undefined ? ` C${fmt(j().c!)}` : ""}</span></div>
+                      <div data-testid="visualizer-joints">{t("cam.visualizer.machineAxes")}: <span class="text-white">{t("cad.field.x")}{fmt(j().x)} {t("cad.field.y")}{fmt(j().y)} Z{fmt(j().z)}{j().a !== undefined ? ` A${fmt(j().a!)}` : ""}{j().b !== undefined ? ` B${fmt(j().b!)}` : ""}{j().c !== undefined ? ` C${fmt(j().c!)}` : ""}</span></div>
                     )}</Show>
                     <For each={collisions().slice(0, 4)}>{(e) => (
                       <button type="button" data-testid="visualizer-collision" class={`block text-left pointer-events-auto hover:underline ${e.severity === "error" ? "text-red-400" : "text-amber-300"}`} onClick={() => navigate(e.seconds)}>
@@ -584,7 +584,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                       <option value="all">{t("cam.visualizer.filterAll")}</option><option value="rapid">{t("cam.visualizer.filterRapid")}</option><option value="cut">{t("cam.visualizer.filterCut")}</option><option value="arc">{t("cam.visualizer.filterArc")}</option><option value="cycle">{t("cam.visualizer.filterCycle")}</option>
                     </select>
                   </label>
-                  <label class="block text-xs text-slate-200">{t("cam.visualizer.pointSize")} <span class="float-right text-slate-400">{pointSize().toFixed(1)} mm</span>
+                  <label class="block text-xs text-slate-200">{t("cam.visualizer.pointSize")} <span class="float-right text-slate-400">{pointSize().toFixed(1)} {t("cad.millimeters")}</span>
                     <input class="mt-1 w-full accent-blue-500" type="range" min="0.2" max="3" step="0.1" value={pointSize()} onInput={(event) => setPointSize(Number(event.currentTarget.value))} />
                   </label>
                 </Show>
@@ -593,13 +593,13 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.arcs")}</h4>
                 {toggle(t("cam.visualizer.showArcCenters"), showArcCenters, setShowArcCenters)}
                 {toggle(t("cam.visualizer.showArcRadii"), showArcRadii, setShowArcRadii)}
-                <label class="block text-xs text-slate-200">{t("cam.visualizer.arcTolerance")} <span class="float-right text-slate-400">{arcTolerance().toFixed(2)} mm</span>
+                <label class="block text-xs text-slate-200">{t("cam.visualizer.arcTolerance")} <span class="float-right text-slate-400">{arcTolerance().toFixed(2)} {t("cad.millimeters")}</span>
                   <input class="mt-1 w-full accent-blue-500" type="range" min="0.01" max="1" step="0.01" value={arcTolerance()} onInput={(event) => setArcTolerance(Number(event.currentTarget.value))} />
                 </label>
               </section>
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.tool")}</h4>
-                {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? "done" : "all"))}
+                {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? t("ai.tasks.status.completed") : t("cam.visualizer.allLayers")))}
                 {toggle(t("cam.visualizer.stopAtCollision"), stopAtCollision, setStopAtCollision)}
                 {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
                 <Show when={showTool()}>{toggle(t("cam.visualizer.showHolder"), showHolder, setShowHolder)}</Show>

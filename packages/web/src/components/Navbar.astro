@@ -1,10 +1,13 @@
 ---
 import Mark from "./Mark.astro"
+import LocaleSelector from "./LocaleSelector.astro"
+import { ui } from "../i18n/ui"
 
+const locale = Astro.locals.locale ?? "en"
 const navItems = [
-  { href: "/download", label: "Download" },
-  { href: "/docs", label: "Docs" },
-  { href: "/studio", label: "Studio" },
+  { href: "/download", label: ui(locale, "download") },
+  { href: "/docs", label: ui(locale, "docs") },
+  { href: "/studio", label: ui(locale, "studio") },
 ]
 
 const pathname = Astro.url.pathname.replace(/\/$/, "") || "/"
@@ -15,16 +18,16 @@ function active(href: string) {
 }
 ---
 
-<header class="sticky top-0 z-50 w-full" aria-label="Primary navigation">
+<header class="sticky top-0 z-50 w-full" aria-label={ui(locale, "primaryNav")}>
   <div class="field-mask h-[var(--nav-inset)]"></div>
   <div class="px-[var(--nav-inset)]">
   <div class="glass-bar mx-auto w-full max-w-[var(--content-max)]">
     <div class="page-shell flex h-[var(--topbar-height)] items-center justify-between gap-4">
-      <a href="/" class="pressable flex items-center" aria-label="CADCAMFUN home">
+      <a href="/" class="pressable flex items-center" aria-label={ui(locale, "home")}>
         <Mark class="h-8 w-auto sm:h-9" />
       </a>
 
-      <nav class="hidden items-center gap-2 md:flex" aria-label="Main">
+      <nav class="hidden items-center gap-2 md:flex" aria-label={ui(locale, "mainNav")}>
         <div class="glass-chip flex items-center gap-1 p-1">
           {navItems.map((item) => (
             <a
@@ -40,12 +43,13 @@ function active(href: string) {
           ))}
           <a href="https://github.com/nikomatt69/cadcamfun" class="pressable relative rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold text-terminal-muted" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
-        <a href="/download" class="pressable btn-fill rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold">Install</a>
+        <LocaleSelector locale={locale} />
+        <a href="/download" class="pressable btn-fill rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold">{ui(locale, "install")}</a>
         <button
           id="theme-toggle"
           type="button"
           class="pressable glass-chip flex h-9 w-9 items-center justify-center text-terminal-muted"
-          aria-label="Toggle color theme"
+          aria-label={ui(locale, "theme")}
         >
           <svg class="h-4 w-4 dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
@@ -54,13 +58,13 @@ function active(href: string) {
       </nav>
 
       <div class="flex items-center gap-2 md:hidden">
-        <button id="theme-toggle-mobile" type="button" class="pressable glass-chip flex h-9 w-9 items-center justify-center" aria-label="Toggle color theme">
+        <button id="theme-toggle-mobile" type="button" class="pressable glass-chip flex h-9 w-9 items-center justify-center" aria-label={ui(locale, "theme")}>
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
           </svg>
         </button>
         <button id="nav-toggle" type="button" class="pressable glass-chip flex h-9 items-center px-3 text-[13px] font-semibold" aria-expanded="false" aria-controls="mobile-nav">
-          Menu
+          {ui(locale, "menu")}
         </button>
       </div>
     </div>
@@ -70,7 +74,7 @@ function active(href: string) {
           <a href={item.href} class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{item.label}</a>
         ))}
         <a href="https://github.com/nikomatt69/cadcamfun" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href="/download" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">Install</a>
+        <a href="/download" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{ui(locale, "install")}</a>
       </nav>
     </div>
   </div>

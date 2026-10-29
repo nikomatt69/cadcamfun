@@ -183,14 +183,14 @@ export function ProjectsScreen(): JSX.Element {
       actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("projects.create")}</button>}
       rail={<>
         <label class="block">
-          <span class={RAIL_LABEL}>Search</span>
+          <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={15} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search projects..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("pages.search.projects")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
         <button type="button" class="inline-flex h-7 items-center gap-1 self-start rounded-[4px] px-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-45 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
-          <X size={13} aria-hidden="true" />Clear filters
+          <X size={13} aria-hidden="true" />{t("manuals.clear")}
         </button>
         <section aria-labelledby="recent-heading">
           <h2 id="recent-heading" class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
@@ -205,7 +205,7 @@ export function ProjectsScreen(): JSX.Element {
             </ul>
           </Show>
         </section>
-        <p class="mt-auto border-t border-slate-200 pt-2.5 text-[11px] tabular-nums text-slate-500 dark:border-slate-700 dark:text-slate-400" role="status">{filtered().length} of {rows().length} projects</p>
+        <p class="mt-auto border-t border-slate-200 pt-2.5 text-[11px] tabular-nums text-slate-500 dark:border-slate-700 dark:text-slate-400" role="status">{filtered().length} of {rows().length} {t("shell.projects")}</p>
       </>}
     >
       <Show when={mutationError()}>{(message) => <div class="mb-4"><StageError message={message()} /></div>}</Show>
@@ -215,9 +215,9 @@ export function ProjectsScreen(): JSX.Element {
         <Show
           when={filtered().length > 0}
           fallback={
-            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} title="No projects found" hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
+            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} title={t("profile.emptyProjects")} hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
               <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("projects.create")}</button>}>
-                <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>Clear filters</button>
+                <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
               </Show>
             </StageEmpty>
           }

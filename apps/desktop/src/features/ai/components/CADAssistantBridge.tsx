@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/index.ts"
 /**
  * Bridge between the CAD editor state and the AI assistant.
  *
@@ -47,7 +48,7 @@ export function CADAssistantBridge(props: Props): JSX.Element {
       <div
         class="hidden"
         data-assistant-context={JSON.stringify(bridgeData())}
-        data-ai-status={ai.aiStatus()?.host ?? "direct"}
+        data-ai-status={ai.aiStatus()?.host ?? t("ai.status.host.direct")}
       />
     </Show>
   )

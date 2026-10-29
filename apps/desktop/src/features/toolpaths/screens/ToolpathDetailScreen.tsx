@@ -26,7 +26,7 @@ import {
 
 type Tab = "details" | "gcode" | "versions" | "comments"
 const TABS: ReadonlyArray<WorkspaceTabItem<Tab>> = [
-  { id: "details", label: "Details" }, { id: "gcode", label: "G-code" }, { id: "versions", label: "Versions" }, { id: "comments", label: "Comments" }
+  { id: "details", get label() { return t("shell.details") } }, { id: "gcode", get label() { return t("ai.controls.mode.gcode") } }, { id: "versions", get label() { return t("pages.versions") } }, { id: "comments", get label() { return t("settings.notif.comments") } }
 ]
 
 interface VersionRow {
@@ -55,8 +55,8 @@ interface Draft {
 const draftOf = (row: ToolpathRow): Draft => ({
   name: row.name,
   description: row.description ?? "",
-  type: row.type ?? "mill",
-  operationType: row.operationType ?? "contour",
+  type: row.type ?? t("pages.mill"),
+  operationType: row.operationType ?? t("cam.strategy.contour"),
   isPublic: row.isPublic,
   gcode: row.gcode ?? ""
 })
@@ -110,7 +110,7 @@ export function ToolpathDetailScreen(): JSX.Element {
     try {
       setVersions(await run<ReadonlyArray<VersionRow>>(app.client.toolpathExtras.listVersions({ params: { id: params.id } })))
     } catch {
-      toast.error("Failed to load version history")
+      toast.error(t("pages.failed.to.load.version.history"))
     }
   }
 
@@ -118,7 +118,7 @@ export function ToolpathDetailScreen(): JSX.Element {
     try {
       setComments(await run<ReadonlyArray<CommentRow>>(app.client.toolpathExtras.listComments({ params: { id: params.id } })))
     } catch {
-      toast.error("Failed to load comments")
+      toast.error(t("pages.failed.to.load.comments"))
       setComments([])
     }
   }
@@ -165,11 +165,11 @@ export function ToolpathDetailScreen(): JSX.Element {
       setRow(updated)
       setEditing(false)
       setDraft(draftOf(updated))
-      toast.success("Toolpath saved successfully")
+      toast.success(t("pages.toolpath.saved.successfully"))
       invalidatePrefix(app.cache, "toolpaths")
       if (tab() === "versions") void loadVersions()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to save toolpath")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.save.toolpath"))
     } finally {
       setBusy(false)
     }
@@ -181,11 +181,11 @@ export function ToolpathDetailScreen(): JSX.Element {
     setBusy(true)
     try {
       await run(app.client.toolpaths.remove({ params: { id: current.id } }))
-      toast.success("Toolpath deleted successfully")
+      toast.success(t("pages.toolpath.deleted.successfully"))
       invalidatePrefix(app.cache, "toolpaths")
       navigate("/toolpaths")
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to delete toolpath")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.delete.toolpath"))
       setBusy(false)
     }
   }
@@ -198,10 +198,10 @@ export function ToolpathDetailScreen(): JSX.Element {
       const updated = await run<ToolpathRow>(app.client.toolpathExtras.restoreVersion({ params: { id: current.id }, payload: { versionId } }))
       setRow(updated)
       setDraft(draftOf(updated))
-      toast.success("Version restored successfully")
+      toast.success(t("pages.version.restored.successfully"))
       await loadVersions()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to restore version")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.restore.version"))
     } finally {
       setRestoring(undefined)
     }
@@ -215,10 +215,10 @@ export function ToolpathDetailScreen(): JSX.Element {
     try {
       await run(app.client.toolpathExtras.createComment({ params: { id: current.id }, payload: { content: text } }))
       setCommentText("")
-      toast.success("Comment added successfully")
+      toast.success(t("pages.comment.added.successfully"))
       await loadComments()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to add comment")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.add.comment"))
     }
   }
 
@@ -227,16 +227,16 @@ export function ToolpathDetailScreen(): JSX.Element {
     if (!current) return
     try {
       await run(app.client.toolpathExtras.removeComment({ params: { id: current.id, commentId } }))
-      toast.success("Comment deleted successfully")
+      toast.success(t("pages.comment.deleted.successfully"))
       await loadComments()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to delete comment")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.delete.comment"))
     }
   }
 
   const downloadGcode = (): void => {
     const current = row()
-    if (!current || !current.gcode) { toast.error("No G-code available for download"); return }
+    if (!current || !current.gcode) { toast.error(t("pages.no.g.code.available.for.download")); return }
     downloadFile({ name: `${current.name.replace(/[^a-z0-9]/gi, "_")}.gcode`, data: current.gcode, mime: "text/plain" })
   }
 
@@ -247,34 +247,34 @@ export function ToolpathDetailScreen(): JSX.Element {
     )
   }
 
-  const typeLabel = (value: string | null | undefined): string => TYPE_LABEL[value ?? "mill"] ?? value ?? "Unknown"
-  const operationLabel = (value: string | null | undefined): string => OPERATION_LABEL[value ?? "contour"] ?? value ?? "Unknown"
+  const typeLabel = (value: string | null | undefined): string => TYPE_LABEL[value ?? t("pages.mill")] ?? value ?? t("cam.explorer.unknown")
+  const operationLabel = (value: string | null | undefined): string => OPERATION_LABEL[value ?? t("cam.strategy.contour")] ?? value ?? t("cam.explorer.unknown")
 
   return (
     <>
     <WorkspaceDetail
-      title={row()?.name ?? "Toolpath"}
-      subtitle={row() === undefined ? "Toolpath" : `${typeLabel(row()?.type)} · ${operationLabel(row()?.operationType)}`}
+      title={row()?.name ?? t("cam.toolpath")}
+      subtitle={row() === undefined ? t("cam.toolpath") : `${typeLabel(row()?.type)} · ${operationLabel(row()?.operationType)}`}
       backHref="/toolpaths"
-      backLabel="Back to toolpaths"
+      backLabel={t("pages.back.to.toolpaths")}
       actions={
         <Show when={!editing()} fallback={<>
-          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy()}><Save size={14} aria-hidden="true" />Save</button>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={cancelEdit} disabled={busy()}>Cancel</button>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy()}><Save size={14} aria-hidden="true" />{t("common.save")}</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={cancelEdit} disabled={busy()}>{t("common.cancel")}</button>
         </>}>
-          <button type="button" class={TOOLBAR_PRIMARY} onClick={startEdit} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={downloadGcode} disabled={busy() || !row()?.gcode}><Download size={14} aria-hidden="true" />G-code</button>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={() => row() && handOffToCam(row()!, navigate)} disabled={busy() || row() === undefined}><Cpu size={14} aria-hidden="true" />Use in CAM</button>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setFormOpen(true)} disabled={busy() || row() === undefined}>Properties</button>
-          <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />Delete</button>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={startEdit} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />{t("cad.ribbon.edit")}</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={downloadGcode} disabled={busy() || !row()?.gcode}><Download size={14} aria-hidden="true" />{t("ai.controls.mode.gcode")}</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={() => row() && handOffToCam(row()!, navigate)} disabled={busy() || row() === undefined}><Cpu size={14} aria-hidden="true" />{t("pages.use.in.cam")}</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setFormOpen(true)} disabled={busy() || row() === undefined}>{t("cam.properties")}</button>
+          <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />{t("common.delete")}</button>
         </Show>
       }
     >
-          <Show when={!loading()} fallback={<StageLoading label="Loading toolpath..." />}>
+          <Show when={!loading()} fallback={<StageLoading label={t("pages.loading.toolpath")} />}>
             <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} onRetry={() => void load()} />}>
               <Show when={row()}>{(current) => (
                 <>
-                  <WorkspaceTabs class="mb-3" tabs={TABS} value={tab()} onChange={setTab} label="Toolpath sections" />
+                  <WorkspaceTabs class="mb-3" tabs={TABS} value={tab()} onChange={setTab} label={t("pages.toolpath.sections")} />
 
                   <Show when={tab() === "details"}>
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -282,17 +282,17 @@ export function ToolpathDetailScreen(): JSX.Element {
                         <Show when={editing() && draft()} fallback={
                           <div class="space-y-3">
                             <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{current().name}</h2>
-                            <Show when={current().description} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">No description provided</p>}>
+                            <Show when={current().description} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">{t("pages.no.description.provided")}</p>}>
                               <p class="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{current().description}</p>
                             </Show>
                             <div class="grid grid-cols-2 gap-2">
-                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">Machine Type</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{typeLabel(current().type)}</p></div>
-                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">Operation Type</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{operationLabel(current().operationType)}</p></div>
+                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("pages.machine.type")}</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{typeLabel(current().type)}</p></div>
+                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("pages.operation.type")}</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{operationLabel(current().operationType)}</p></div>
                             </div>
                             <ToolpathProgramDetails row={current()} drawing={drawing()} />
                             <Show when={current().data && Object.keys(current().data as object).length > 0}>
                               <div>
-                                <h3 class="mb-1.5 text-xs font-semibold text-slate-900 dark:text-white">Toolpath Settings</h3>
+                                <h3 class="mb-1.5 text-xs font-semibold text-slate-900 dark:text-white">{t("pages.toolpath.settings")}</h3>
                                 <div class="max-h-80 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900"><pre class="font-mono text-[11px] text-slate-800 dark:text-slate-200">{JSON.stringify(current().data, null, 2)}</pre></div>
                               </div>
                             </Show>
@@ -301,39 +301,39 @@ export function ToolpathDetailScreen(): JSX.Element {
                           {(value) => (
                             <form class="space-y-3" onSubmit={(event) => { event.preventDefault(); void save() }}>
                               <div>
-                                <label for="detail-name" class={LABEL}>Toolpath Name</label>
+                                <label for="detail-name" class={LABEL}>{t("pages.toolpath.name")}</label>
                                 <input id="detail-name" name="name" type="text" required class={INPUT} value={value().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
                               </div>
                               <div>
-                                <label for="detail-description" class={LABEL}>Description</label>
+                                <label for="detail-description" class={LABEL}>{t("save.description")}</label>
                                 <textarea id="detail-description" name="description" rows={4} class={INPUT} value={value().description} onInput={(e) => patch({ description: e.currentTarget.value })} />
                               </div>
                               <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label for="detail-type" class={LABEL}>Machine Type</label>
+                                  <label for="detail-type" class={LABEL}>{t("pages.machine.type")}</label>
                                   <select id="detail-type" name="type" class={INPUT} value={value().type} onChange={(e) => patch({ type: e.currentTarget.value })}>
-                                    <option value="mill">Mill</option><option value="lathe">Lathe</option><option value="3dprinter">3D Printer</option>
+                                    <option value="mill">{t("pages.mill")}</option><option value="lathe">{t("pages.lathe")}</option><option value="3dprinter">{t("pages.3d.printer")}</option>
                                   </select>
                                 </div>
                                 <div>
-                                  <label for="detail-operation" class={LABEL}>Operation Type</label>
+                                  <label for="detail-operation" class={LABEL}>{t("pages.operation.type")}</label>
                                   <select id="detail-operation" name="operationType" class={INPUT} value={value().operationType} onChange={(e) => patch({ operationType: e.currentTarget.value })}>
                                     <Show when={value().operationType === "multi-operation" || value().operationType === "kernel"}><option value={value().operationType}>{operationLabel(value().operationType)}</option></Show>
                                     <Show when={value().type === "mill"}>
-                                      <option value="contour">Contour</option><option value="pocket">Pocket</option><option value="drill">Drill</option><option value="engrave">Engrave</option><option value="profile">3D Profile</option><option value="threading">Threading</option>
+                                      <option value="contour">{t("cam.strategy.contour")}</option><option value="pocket">{t("cam.pocket")}</option><option value="drill">{t("cam.strategy.drill")}</option><option value="engrave">{t("cam.strategy.engrave")}</option><option value="profile">{t("pages.3d.profile")}</option><option value="threading">{t("cam.strategy.threadingOD")}</option>
                                     </Show>
                                     <Show when={value().type === "lathe"}>
-                                      <option value="turning">Turning</option><option value="facing">Facing</option><option value="boring">Boring</option><option value="threading">Threading</option><option value="grooving">Grooving</option><option value="parting">Parting</option>
+                                      <option value="turning">{t("cam.palette.catTurning")}</option><option value="facing">{t("cam.strategy.facing")}</option><option value="boring">{t("cam.strategy.boring")}</option><option value="threading">{t("cam.strategy.threadingOD")}</option><option value="grooving">{t("cam.strategy.grooving")}</option><option value="parting">{t("cam.strategy.parting")}</option>
                                     </Show>
                                     <Show when={value().type === "3dprinter"}>
-                                      <option value="standard">Standard Print</option><option value="vase">Vase Mode</option><option value="support">Support</option><option value="infill">Infill</option><option value="raft">Raft</option><option value="brim">Brim</option>
+                                      <option value="standard">{t("pages.standard.print")}</option><option value="vase">{t("pages.vase.mode")}</option><option value="support">{t("cam.strategy.printSupport")}</option><option value="infill">{t("cam.gen.pp.infill")}</option><option value="raft">{t("cam.strategy.printRaft")}</option><option value="brim">{t("cam.strategy.printBrim")}</option>
                                     </Show>
                                   </select>
                                 </div>
                               </div>
                               <div class="flex items-center gap-2">
                                 <input id="detail-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 border-slate-300 accent-blue-600 dark:border-slate-600" checked={value().isPublic} onChange={(e) => patch({ isPublic: e.currentTarget.checked })} />
-                                <label for="detail-public" class="text-xs text-slate-700 dark:text-slate-300">Make toolpath public (visible to all users)</label>
+                                <label for="detail-public" class="text-xs text-slate-700 dark:text-slate-300">{t("pages.make.toolpath.public.visible.to.all.users")}</label>
                               </div>
                             </form>
                           )}
@@ -341,18 +341,18 @@ export function ToolpathDetailScreen(): JSX.Element {
                       </div>
 
                       <aside class={`${PANEL} !p-3`}>
-                        <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Toolpath Information</h3>
+                        <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.toolpath.information")}</h3>
                         <dl class="panel-kv">
-                          <dt>Created</dt><dd>{formatDate(current().createdAt) || "-"}</dd>
-                          <dt>Last Updated</dt><dd>{formatDate(current().updatedAt) || "-"}</dd>
+                          <dt>{t("org.overview.created")}</dt><dd>{formatDate(current().createdAt) || "-"}</dd>
+                          <dt>{t("pages.last.updated")}</dt><dd>{formatDate(current().updatedAt) || "-"}</dd>
                           <dt>ID</dt><dd class="font-mono">{current().id.substring(0, 8)}…</dd>
-                          <dt>Visibility</dt><dd class={current().isPublic ? "text-green-700 dark:text-green-400" : ""}>{current().isPublic ? "Public" : "Private"}</dd>
-                          <dt>G-code Size</dt><dd>{current().gcode ? `${Math.ceil(current().gcode!.length / 1024)} KB` : "No G-code"}</dd>
+                          <dt>{t("pages.visibility")}</dt><dd class={current().isPublic ? "text-green-700 dark:text-green-400" : ""}>{current().isPublic ? t("save.publicProject") : t("pages.private")}</dd>
+                          <dt>{t("pages.g.code.size")}</dt><dd>{current().gcode ? `${Math.ceil(current().gcode!.length / 1024)} KB` : t("pages.no.g.code")}</dd>
                         </dl>
                         <div class="mt-3 grid gap-1.5">
-                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={downloadGcode} disabled={!current().gcode}><Download size={14} aria-hidden="true" />Download G-code</button>
-                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={() => handOffToCam(current(), navigate)}><Cpu size={14} aria-hidden="true" />Use in CAM</button>
-                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={share}><Share2 size={14} aria-hidden="true" />Share Toolpath</button>
+                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={downloadGcode} disabled={!current().gcode}><Download size={14} aria-hidden="true" />{t("cam.multi.downloadGcode")}</button>
+                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={() => handOffToCam(current(), navigate)}><Cpu size={14} aria-hidden="true" />{t("pages.use.in.cam")}</button>
+                          <button type="button" class={`${TOOLBAR_BUTTON} w-full justify-center`} onClick={share}><Share2 size={14} aria-hidden="true" />{t("pages.share.toolpath")}</button>
                         </div>
                       </aside>
                     </div>
@@ -361,26 +361,26 @@ export function ToolpathDetailScreen(): JSX.Element {
                   <Show when={tab() === "gcode"}>
                     <div class={`${PANEL} !p-3`}>
                       <div class="mb-2 flex items-center justify-between gap-2">
-                        <h3 class="text-[13px] font-semibold text-slate-900 dark:text-white">G-code</h3>
-                        <button type="button" class={TOOLBAR_BUTTON} onClick={downloadGcode} disabled={!current().gcode}><Download size={14} aria-hidden="true" />Download</button>
+                        <h3 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("ai.controls.mode.gcode")}</h3>
+                        <button type="button" class={TOOLBAR_BUTTON} onClick={downloadGcode} disabled={!current().gcode}><Download size={14} aria-hidden="true" />{t("cad.download")}</button>
                       </div>
                       <Show when={editing()} fallback={
                         <div class="h-[60vh] overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-                          <Show when={current().gcode} fallback={<div class="flex h-full items-center justify-center"><p class="text-xs text-slate-500 dark:text-slate-400">No G-code available</p></div>}>
+                          <Show when={current().gcode} fallback={<div class="flex h-full items-center justify-center"><p class="text-xs text-slate-500 dark:text-slate-400">{t("pages.no.g.code.available")}</p></div>}>
                             <pre class="whitespace-pre p-3 font-mono text-[11px] leading-relaxed text-slate-800 dark:text-slate-200">{current().gcode}</pre>
                           </Show>
                         </div>
                       }>
-                        <textarea class={`${INPUT} h-[60vh] font-mono`} placeholder="; Enter G-code here" value={draft()?.gcode ?? ""} onInput={(e) => patch({ gcode: e.currentTarget.value })} />
+                        <textarea class={`${INPUT} h-[60vh] font-mono`} placeholder={t("pages..enter.g.code.here")} value={draft()?.gcode ?? ""} onInput={(e) => patch({ gcode: e.currentTarget.value })} />
                       </Show>
                     </div>
                   </Show>
 
                   <Show when={tab() === "versions"}>
                     <div class={`${PANEL} !p-3`}>
-                      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Version History</h3>
+                      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.version.history")}</h3>
                       <Show when={versions().length > 0} fallback={
-                        <div class="py-8 text-center"><Layers size={24} class="mx-auto mb-2 text-slate-400 dark:text-slate-600" aria-hidden="true" /><p class="text-xs text-slate-500 dark:text-slate-400">No version history available</p></div>
+                        <div class="py-8 text-center"><Layers size={24} class="mx-auto mb-2 text-slate-400 dark:text-slate-600" aria-hidden="true" /><p class="text-xs text-slate-500 dark:text-slate-400">{t("pages.no.version.history.available")}</p></div>
                       }>
                         <div class="space-y-2">
                           <For each={versions()}>{(version) => (
@@ -388,11 +388,11 @@ export function ToolpathDetailScreen(): JSX.Element {
                               <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
                                   <div class="mb-1 flex items-center gap-1 text-[10.5px] text-slate-500 dark:text-slate-400"><Calendar size={12} aria-hidden="true" />{new Date(version.createdAt).toLocaleString()}</div>
-                                  <div class="text-xs font-medium text-slate-900 dark:text-white">{version.changeMessage || "No description"}</div>
+                                  <div class="text-xs font-medium text-slate-900 dark:text-white">{version.changeMessage || t("profile.noDescription")}</div>
                                 </div>
-                                <button type="button" class={TOOLBAR_BUTTON} disabled={restoring() !== undefined} onClick={() => void restore(version.id)}>Restore</button>
+                                <button type="button" class={TOOLBAR_BUTTON} disabled={restoring() !== undefined} onClick={() => void restore(version.id)}>{t("save.versions.restore")}</button>
                               </div>
-                              <div class="mt-1.5 text-[10.5px] text-slate-500 dark:text-slate-400">Created by {version.user?.name || "Unknown user"}</div>
+                              <div class="mt-1.5 text-[10.5px] text-slate-500 dark:text-slate-400">{t("cad.titleBlock.field.createdBy")} {version.user?.name || t("pages.unknown.user")}</div>
                             </div>
                           )}</For>
                         </div>
@@ -402,15 +402,15 @@ export function ToolpathDetailScreen(): JSX.Element {
 
                   <Show when={tab() === "comments"}>
                     <div class={`${PANEL} !p-3`}>
-                      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Comments</h3>
+                      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("settings.notif.comments")}</h3>
                       <form class="mb-3" onSubmit={(event) => void addComment(event)}>
-                        <textarea class={INPUT} rows={3} placeholder="Add a comment..." required value={commentText()} onInput={(e) => setCommentText(e.currentTarget.value)} />
+                        <textarea class={INPUT} rows={3} placeholder={t("pages.add.a.comment")} required value={commentText()} onInput={(e) => setCommentText(e.currentTarget.value)} />
                         <div class="mt-2 flex justify-end">
-                          <button type="submit" class={SUBMIT_BUTTON} disabled={commentText().trim() === ""}>Post Comment</button>
+                          <button type="submit" class={SUBMIT_BUTTON} disabled={commentText().trim() === ""}>{t("pages.post.comment")}</button>
                         </div>
                       </form>
                       <Show when={comments().length > 0} fallback={
-                        <div class="py-8 text-center"><MessageCircle size={24} class="mx-auto mb-2 text-slate-400 dark:text-slate-600" aria-hidden="true" /><p class="text-xs text-slate-500 dark:text-slate-400">No comments yet</p></div>
+                        <div class="py-8 text-center"><MessageCircle size={24} class="mx-auto mb-2 text-slate-400 dark:text-slate-600" aria-hidden="true" /><p class="text-xs text-slate-500 dark:text-slate-400">{t("pages.no.comments.yet")}</p></div>
                       }>
                         <div class="space-y-3">
                           <For each={comments()}>{(comment) => (
@@ -422,12 +422,12 @@ export function ToolpathDetailScreen(): JSX.Element {
                                   </Show>
                                 </div>
                                 <div class="min-w-0">
-                                  <div class="mb-0.5 flex flex-wrap items-center gap-2"><span class="text-xs font-medium text-slate-900 dark:text-white">{comment.user?.name || "Unknown user"}</span><span class="text-[10px] text-slate-500 dark:text-slate-400">{new Date(comment.createdAt).toLocaleString()}</span></div>
+                                  <div class="mb-0.5 flex flex-wrap items-center gap-2"><span class="text-xs font-medium text-slate-900 dark:text-white">{comment.user?.name || t("pages.unknown.user")}</span><span class="text-[10px] text-slate-500 dark:text-slate-400">{new Date(comment.createdAt).toLocaleString()}</span></div>
                                   <div class="text-xs text-slate-700 dark:text-slate-200">{comment.content}</div>
                                 </div>
                               </div>
                               <Show when={me.data()?.id === comment.userId}>
-                                <button type="button" class="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title="Delete comment" onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
+                                <button type="button" class="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title={t("pages.delete.comment")} onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
                               </Show>
                             </div>
                           )}</For>
@@ -457,21 +457,21 @@ export function ToolpathDetailScreen(): JSX.Element {
             setRow(updated)
             setDraft(draftOf(updated))
             setFormOpen(false)
-            toast.success("Toolpath updated successfully")
+            toast.success(t("pages.toolpath.updated.successfully"))
             invalidatePrefix(app.cache, "toolpaths")
           } catch (cause) {
-            toast.error(cause instanceof Error ? cause.message : "Failed to save toolpath")
+            toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.save.toolpath"))
           } finally {
             setBusy(false)
           }
         }}
       />
 
-      <Modal open={deleteOpen()} title="Delete toolpath" onClose={() => setDeleteOpen(false)}>
-        <p class="text-xs text-slate-600 dark:text-slate-300">Are you sure you want to delete this toolpath? This action cannot be undone.</p>
+      <Modal open={deleteOpen()} title={t("cam.deleteToolpath")} onClose={() => setDeleteOpen(false)}>
+        <p class="text-xs text-slate-600 dark:text-slate-300">{t("pages.are.you.sure.you.want.to.delete.this.toolpath.this.action.cannot.be.undone")}</p>
         <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
-          <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>Cancel</button>
-          <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void deleteToolpath()}>Delete</button>
+          <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</button>
+          <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void deleteToolpath()}>{t("common.delete")}</button>
         </div>
       </Modal>
     </>

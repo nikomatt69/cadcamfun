@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { deliverOutbox, outboxKey, type OfflineAssistantOp } from "../lib/assistant-outbox"
 import { CompanionError, type ChatRequest } from "../lib/client"
 import { isOfflineSendError } from "../lib/offline-errors"
+import { pairingScope, type Pairing } from "../lib/pairing"
 
 const entry = (id: string): OfflineAssistantOp => ({ id, type: "assistant-message", projectId: "p", text: id, queuedAt: 1, desktopFingerprint: "desktop" })
 
@@ -57,6 +58,20 @@ test("queued prompts for another paired desktop are never delivered", async () =
     client: { promptSession: async () => { throw new Error("Must not send") } },
   })
   expect(sent).toBe(0)
+})
+
+test("hosted queued mutations stay with their workspace and account across reconnects", async () => {
+  const cloud: Pairing = { baseUrl: "https://cloud.cadcam.fun", mode: "cloud", workspaceId: "workspace-1", name: "Cloud", token: "0123456789abcdef", fingerprint: "" }
+  const op = { ...entry("private-cloud-project"), desktopFingerprint: pairingScope(cloud, "owner") }
+  for (const scope of [pairingScope(cloud, "another-account"), pairingScope({ ...cloud, workspaceId: "workspace-2" }, "owner"), pairingScope(cloud)]) {
+    expect(await deliverOutbox([op], {
+      fingerprint: scope, active: () => true, session: () => undefined, remember() {}, save: async () => { throw new Error("Must stay queued") },
+      client: { promptSession: async () => { throw new Error("Must not send") } },
+    })).toBe(0)
+  }
+  const { state, deps } = harness([op])
+  expect(await deliverOutbox([op], { ...deps, fingerprint: pairingScope({ ...cloud, name: "Renamed after TLS renewal" }, "owner"), client: { promptSession: async () => ({ sessionId: "cloud-session", seq: 1 }) } })).toBe(1)
+  expect(state.queue).toEqual([])
 })
 
 test("a prompt refused because the session is busy (409) stays queued unsubmitted and holds back later ones", async () => {

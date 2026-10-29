@@ -183,7 +183,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                     <button
                       type="button"
                       class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                      onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}
+                      onClick={() => setChartType((previous) => (previous === "line" ? "bar" : t("cam.visualizer.line")))}
                     >
                       <BarChart2 class="mr-1 h-4 w-4" />
                       {chartType() === "line" ? t("admin.analytics.showBar") : t("admin.analytics.showLine")}
@@ -226,7 +226,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                             </div>
                           </div>
                           <div class="ml-4">
-                            <div class="text-sm font-medium text-gray-900 dark:text-white">User {index + 1}</div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{t("profile.userFallback")} {index + 1}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-300">user{index + 1}@example.com</div>
                           </div>
                         </div>

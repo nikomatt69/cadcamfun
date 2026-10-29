@@ -26,9 +26,9 @@ export default function LayerManager(): JSX.Element {
   }
 
   const remove = (id: string) => {
-    if (store.layers.length <= 1) { alert("Cannot delete the last layer"); return }
+    if (store.layers.length <= 1) { alert(t("cad.layers.cannotDeleteLast")); return }
     const count = elements.getElementsByLayerId(id).length
-    if (count > 0 && !confirm(`This layer contains ${count} elements. Delete anyway?`)) return
+    if (count > 0 && !confirm(t("cad.layers.confirmDelete", { count }))) return
     store.deleteLayer(id)
   }
 
@@ -42,7 +42,7 @@ export default function LayerManager(): JSX.Element {
     <SidebarSection id="cad-layers" title={t("cad.layers")} icon={Layers} summary={String(store.layers.length)}>
       <div class="sidebar-layers">
         <div class="flex justify-end">
-          <button type="button" onClick={() => setIsAdding(true)} class="panel-btn" disabled={isAdding()} aria-label="Add layer">
+          <button type="button" onClick={() => setIsAdding(true)} class="panel-btn" disabled={isAdding()} aria-label={t("cad.layers.addAria")}>
             <Plus size={14} />{t("cad.addLayer")}
           </button>
         </div>
@@ -50,12 +50,12 @@ export default function LayerManager(): JSX.Element {
         <Show when={isAdding()}>
           <div class="sidebar-layer-add">
               <input
-                type="text" placeholder="Layer name" value={newName()} onInput={(e) => setNewName(e.currentTarget.value)}
+                type="text" placeholder={t("cad.layerName")} value={newName()} onInput={(e) => setNewName(e.currentTarget.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") add() }}
                 class="panel-input" autofocus
               />
-              <button type="button" onClick={add} class="panel-btn panel-btn--primary">Add</button>
-              <button type="button" onClick={() => setIsAdding(false)} class="panel-btn">Cancel</button>
+              <button type="button" onClick={add} class="panel-btn panel-btn--primary">{t("cad.add")}</button>
+              <button type="button" onClick={() => setIsAdding(false)} class="panel-btn">{t("common.cancel")}</button>
           </div>
         </Show>
 
@@ -66,25 +66,25 @@ export default function LayerManager(): JSX.Element {
             >
               <Show when={editing() === layer.id} fallback={
                 <div class="flex items-center justify-between p-2">
-                  <button type="button" class="sidebar-layer__name" aria-pressed={store.activeLayer === layer.id} onClick={() => store.setActiveLayer(layer.id)} onDblClick={() => startEdit(layer)} title="Click to select, double-click to edit">
+                  <button type="button" class="sidebar-layer__name" aria-pressed={store.activeLayer === layer.id} onClick={() => store.setActiveLayer(layer.id)} onDblClick={() => startEdit(layer)} title={t("cad.layers.selectHint")}>
                     <div class="w-4 h-4 rounded-full" style={{ "background-color": layer.color }} />
                     <span class="font-medium">{layer.name}</span>
-                    <Show when={layer.locked}><span class="text-xs text-gray-500">(locked)</span></Show>
+                    <Show when={layer.locked}><span class="text-xs text-gray-500">{t("cad.layers.lockedTag")}</span></Show>
                   </button>
                   <div class="sidebar-layer__actions">
-                    <button type="button" class={ICON_BUTTON} title={layer.visible ? "Hide Layer" : "Show Layer"}
+                    <button type="button" class={ICON_BUTTON} title={layer.visible ? t("cad.layers.hide") : t("cad.layers.show")}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); store.updateLayer(layer.id, { visible: !layer.visible }) }}>
                       <Show when={layer.visible} fallback={<EyeOff size={16} />}><Eye size={16} /></Show>
                     </button>
-                    <button type="button" class={ICON_BUTTON} title={layer.locked ? "Unlock Layer" : "Lock Layer"}
+                    <button type="button" class={ICON_BUTTON} title={layer.locked ? t("cad.layers.unlock") : t("cad.layers.lock")}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); store.updateLayer(layer.id, { locked: !layer.locked }) }}>
                       <Show when={layer.locked} fallback={<Unlock size={16} />}><Lock size={16} /></Show>
                     </button>
-                    <button type="button" class={ICON_BUTTON} title="Edit Layer"
+                    <button type="button" class={ICON_BUTTON} title={t("cad.editLayer")}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); startEdit(layer) }}>
                       <Edit size={16} />
                     </button>
-                    <button type="button" class={ICON_BUTTON} title="Delete Layer" disabled={store.layers.length <= 1}
+                    <button type="button" class={ICON_BUTTON} title={t("cad.deleteLayer")} disabled={store.layers.length <= 1}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); remove(layer.id) }}>
                       <Trash2 size={16} class={store.layers.length <= 1 ? "text-gray-300" : "text-red-500"} />
                     </button>
@@ -97,8 +97,8 @@ export default function LayerManager(): JSX.Element {
                     <input type="text" value={editName()} onInput={(e) => setEditName(e.currentTarget.value)} class="flex-1 block border-gray-300 rounded-md shadow-sm dark:text-blue-400 focus:ring-blue-500 focus:border-blue-500 sm:text-xs" autofocus />
                   </div>
                   <div class="flex justify-end space-x-2">
-                    <button type="button" onClick={saveEdit} class="panel-icon-btn text-green-700" aria-label="Save layer"><Save size={14} /></button>
-                    <button type="button" onClick={() => setEditing(null)} class="panel-icon-btn text-red-600" aria-label="Cancel edit"><X size={14} /></button>
+                    <button type="button" onClick={saveEdit} class="panel-icon-btn text-green-700" aria-label={t("cad.layers.save")}><Save size={14} /></button>
+                    <button type="button" onClick={() => setEditing(null)} class="panel-icon-btn text-red-600" aria-label={t("cad.layers.cancelEdit")}><X size={14} /></button>
                   </div>
                 </div>
               </Show>
@@ -108,7 +108,7 @@ export default function LayerManager(): JSX.Element {
 
         <div class="sidebar-layer-summary">
           <span>{store.layers.length} layer{store.layers.length !== 1 ? "s" : ""}</span>
-          <span>Active: {store.layers.find((layer) => layer.id === store.activeLayer)?.name || "None"}</span>
+          <span>Active: {store.layers.find((layer) => layer.id === store.activeLayer)?.name || t("cad.transformNone")}</span>
         </div>
       </div>
     </SidebarSection>

@@ -7,6 +7,7 @@ import { ApiRoutes, DatabaseLive } from "./layers.ts"
 import { ObservabilityLive } from "./observability.ts"
 import { awaitShutdown } from "./shutdown.ts"
 import { markAnnounced, setLocalPort } from "./startup.ts"
+import { restoreHostedState } from "./services/cloud-checkpoint.ts"
 
 /** Prints the one-line ready event the Tauri shell waits for (specs/05 §1). */
 const Ready = Layer.effectDiscard(Effect.gen(function*() {
@@ -32,8 +33,7 @@ const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(
   // real Bun server so the port is reported but nothing ever accepts a connection.
   Layer.provide(BunServer()),
   Layer.provide(DatabaseLive),
-  Layer.provide(ObservabilityLive),
-  Layer.provide(AppConfigService.layer)
+  Layer.provide(ObservabilityLive)
 )
 
 // stdout is reserved for the ready/error events the shell parses; logs go to stderr.
@@ -63,13 +63,17 @@ const teardown: Runtime.Teardown = (exit, onExit) => {
 }
 
 Effect.gen(function*() {
+  const config = yield* AppConfigService
+  // Container disk is disposable; recover acknowledged state before SQLite or any service opens it.
+  yield* Effect.tryPromise({ try: () => restoreHostedState(config), catch: () => new Error("Could not restore durable cloud workspace state") })
   // Built first, so its release runs after the server has stopped taking requests: the kernel workers are stopped, not waited for
   // (the shell's kill deadline is 2 s).
   yield* Layer.build(KernelJobsLive)
   yield* Layer.build(Server)
-  yield* awaitShutdown
+  yield* config.runtime === "server" ? Effect.never : awaitShutdown
 }).pipe(
   Effect.scoped,
+  Effect.provide(AppConfigService.layer),
   Effect.provide(Logger.layer([Logger.withConsoleError(Logger.formatJson)])),
   Effect.provideService(Logger.LogToStderr, true),
   Effect.catchCause((cause) =>

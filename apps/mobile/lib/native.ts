@@ -1,9 +1,9 @@
 import { Platform } from "react-native"
 import CompanionNet from "@/modules/companion-net"
 import type { Pairing } from "./pairing"
-import { createFetchTransport, createPinnedTransport } from "../modules/companion-net/transport"
+import { createCloudTransport, createFetchTransport, createPinnedTransport } from "../modules/companion-net/transport"
 import type { Transport } from "./client"
-import { identityToken } from "./account"
+import { cloudIdentityToken, identityToken } from "./account"
 
 export { pairingStore } from "./storage"
 
@@ -44,7 +44,8 @@ export const warmLocalNetwork = (): void => {
 
 /** Never downgrade a native device to an unpinned browser connection. */
 export const pinnedTransport = (pairing: Pairing): Transport => {
-  if (Platform.OS === "web") return createFetchTransport(pairing, fetch, identityToken)
+  if (Platform.OS === "web") return createFetchTransport(pairing, fetch, pairing.mode === "cloud" ? cloudIdentityToken : identityToken)
   if (!nativeAvailable || !CompanionNet) throw new Error("Certificate pinning requires the CADCAMFUN iOS development build. Expo Go cannot connect to a paired desktop.")
+  if (pairing.mode === "cloud") return createCloudTransport(pairing, CompanionNet, cloudIdentityToken)
   return createPinnedTransport(pairing, CompanionNet, identityToken)
 }

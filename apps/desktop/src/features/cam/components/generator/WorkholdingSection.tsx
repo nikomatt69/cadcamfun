@@ -36,8 +36,8 @@ export function WorkholdingSection(): JSX.Element {
             <div>
               <label class={LABEL} for="vise-axis">{t("cam.workholding.jawAxis")}</label>
               <select id="vise-axis" class={INPUT} value={gen.settings.viseJawAxis} onChange={(event) => set("viseJawAxis", event.currentTarget.value as "x" | "y")}>
-                <option value="x">X</option>
-                <option value="y">Y</option>
+                <option value="x">{t("cad.field.x")}</option>
+                <option value="y">{t("cad.field.y")}</option>
               </select>
             </div>
             {number("clamp-depth", t("cam.workholding.clampDepth"), "clampDepth", 0)}
@@ -58,7 +58,7 @@ export function WorkholdingSection(): JSX.Element {
             <select id="chuck-type" class={INPUT} value={gen.settings.chuckType} onChange={(event) => set("chuckType", event.currentTarget.value as ToolpathSettings["chuckType"])}>
               <option value="3-jaw">3-jaw</option>
               <option value="4-jaw">4-jaw</option>
-              <option value="collet">Collet</option>
+              <option value="collet">{t("cam.gen.wh.collet")}</option>
             </select>
           </div>
           {number("grip-length", t("cam.workholding.gripLength"), "gripLength", 1)}
@@ -69,10 +69,10 @@ export function WorkholdingSection(): JSX.Element {
           <div>
             <label class={LABEL} for="printer-kinematics">{t("cam.workholding.kinematics")}</label>
             <select id="printer-kinematics" class={INPUT} value={gen.settings.printerKinematics} onChange={(event) => set("printerKinematics", event.currentTarget.value as ToolpathSettings["printerKinematics"])}>
-              <option value="cartesian">Cartesian (bed moves in Z)</option>
-              <option value="corexy">CoreXY (bed moves in Z)</option>
-              <option value="bed-slinger">Bed-slinger (bed moves in Y)</option>
-              <option value="delta">Delta (nozzle moves)</option>
+              <option value="cartesian">{t("cam.gen.wh.cartesian")}</option>
+              <option value="corexy">{t("cam.gen.wh.corexy")}</option>
+              <option value="bed-slinger">{t("cam.gen.wh.bedslinger")}</option>
+              <option value="delta">{t("cam.gen.wh.delta")}</option>
             </select>
           </div>
           {number("build-height", t("cam.workholding.buildHeight"), "buildHeight", 1)}

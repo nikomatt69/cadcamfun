@@ -2,8 +2,7 @@ List and read the mods (hook extensions) the assistant built here and what the h
 
 A mod is a small extension module (a nikcli mod) the assistant can author: it exports `register(on, options)` and hooks
 events such as `tool.call`, `tool.result`, `prompt.submit` and `session.start` to observe, rewrite, refuse or wrap a call, or to add
-prompt text. Mods keep a standing rule the user wants ("always ask before deleting", "note the units in every answer",
-"block G-code edits without verification") alive without repeating it in the conversation.
+prompt text. Mods keep a standing rule the user wants ("always ask before deleting", "note the units in every answer") alive without repeating it in the conversation.
 
 Actions
 - list: every mod the application stores, with the events the live host reports for it (empty when not loaded).
@@ -15,11 +14,10 @@ Parameters
 
 Result (JSON)
 - list: ok, mods[] — each entry has id, name, description, enabled, origin (assistant | user | plugin), createdAt,
-  updatedAt and events[] (the host's report for the mods its running instance loaded).
+  updatedAt and events[].
 - read: ok, the record, source (the module's text), events[] and tools[] of the live instance.
 - A plugin's own mod appears from `origin: "plugin"` with the events the host reports; it is managed with the plugin,
   not here. A missing mod answers ok:false with the ids that exist.
 
 Do not use it
 - To create, change, enable or remove one: mods_edit.
-- To change the open drawing, the CAM program or project memory: cad_edit, cam_edit, memory_edit.

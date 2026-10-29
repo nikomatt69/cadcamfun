@@ -1,0 +1,29 @@
+# Local runtime validation / persistent-volume hosting alternative.
+# Use `docker compose --env-file /dev/null` to avoid loading unused legacy .env files.
+services:
+  cadcamfun:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cadcamfun-cloud:local
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      CADCAMFUN_TOKEN: ${CADCAMFUN_TOKEN:?Provide the private runtime token}
+      CADCAMFUN_PUBLIC_ORIGIN: ${CADCAMFUN_PUBLIC_ORIGIN:?Provide the public HTTPS origin}
+      CADCAMFUN_WORKSPACE_ID: ${CADCAMFUN_WORKSPACE_ID:?Provide a stable workspace ID}
+      CADCAMFUN_CLOUD_OWNER_SUBJECT: ${CADCAMFUN_CLOUD_OWNER_SUBJECT:?Provide the owner identity subject}
+      CADCAMFUN_CLOUD_INTERNAL_TOKEN: ${CADCAMFUN_CLOUD_INTERNAL_TOKEN:?Provide the private coordinator token}
+      CADCAMFUN_IDENTITY_ISSUER: ${CADCAMFUN_IDENTITY_ISSUER:-https://auth.cadcam.fun}
+    volumes:
+      - workspace-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  workspace-data:

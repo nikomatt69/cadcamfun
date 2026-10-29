@@ -136,7 +136,7 @@ export default function ComponentCreationModal(props: ComponentCreationModalProp
           <section class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
             <h4 class="flex items-center gap-2 text-sm font-medium"><Blocks size={16} />{t("cad.createComponent.contents")}</h4>
             <p class="my-2 text-xs text-gray-500 dark:text-gray-400">{t("cad.createComponent.summary", { roots: selected().length, total: entries().length, nested: subcomponents() })}</p>
-            <Show when={bounds()}>{(value) => <p class="mb-2 font-mono text-xs">{t("cad.createComponent.size", { width: value().width.toFixed(2), height: value().height.toFixed(2), depth: value().depth.toFixed(2) })} mm</p>}</Show>
+            <Show when={bounds()}>{(value) => <p class="mb-2 font-mono text-xs">{t("cad.createComponent.size", { width: value().width.toFixed(2), height: value().height.toFixed(2), depth: value().depth.toFixed(2) })} {t("cad.millimeters")}</p>}</Show>
             <div class="max-h-56 overflow-auto" data-component-hierarchy>
               <For each={entries()}>{({ element, depth }) => <div class="flex justify-between gap-2 border-t border-gray-200 py-1.5 text-xs dark:border-gray-700" style={{ "padding-left": `${depth * 12}px` }}>
                 <span class="truncate">{element.name || element.type}</span><span class="text-gray-500">{element.type}</span>

@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Check, Edit2, Search, X } from "lucide-solid"
 import { useElementsStore } from "../../store/elementsStore.ts"
 import { PropertyEditorModal } from "./PropertyEditorModal.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 type ListType = "element" | "edge" | "face" | "opening"
 
@@ -146,7 +147,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search size={16} class="text-gray-400 dark:text-gray-500" /></div>
           <input
             type="text"
-            placeholder="Search by name or id..."
+            placeholder={t("cad.input.searchNameId")}
             value={term()}
             onInput={(event) => setTerm(event.currentTarget.value)}
             class="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400"
@@ -156,7 +157,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
         <div class="grid gap-4 lg:grid-cols-2">
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Available</h4>
+              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("plugins.available")}</h4>
               <span class="text-xs text-gray-500 dark:text-gray-400">{filtered().length} shown</span>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
@@ -185,9 +186,9 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
 
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Selected</h4>
+              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.status.selected")}</h4>
               <Show when={selected().length > 0}>
-                <button type="button" onClick={() => setSelected([])} class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Clear all</button>
+                <button type="button" onClick={() => setSelected([])} class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">{t("cad.input.clearAll")}</button>
               </Show>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
@@ -213,7 +214,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
                 )
               }}</For>
               <Show when={selected().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Nothing selected yet. Pick something on the left.</p>
+                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.nothingSelected")}</p>
               </Show>
               <Show when={selected().length > LIMIT}>
                 <p class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400">Showing the first {LIMIT} of {selected().length}. Clear some to see the rest.</p>

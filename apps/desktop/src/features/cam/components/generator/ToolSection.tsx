@@ -79,9 +79,9 @@ export function ToolSection(): JSX.Element {
     gen.flash(t("cam.tool.applied"))
   }
   return (
-    <Section id="tool" icon={Wrench} title="Tool" testId="tool-section">
+    <Section id="tool" icon={Wrench} title={t("cam.toolLabel")} testId="tool-section">
       <div>
-        <label class={LABEL}>Tool Type</label>
+        <label class={LABEL}>{t("cam.gen.tool.type")}</label>
         <select class={INPUT} value={gen.settings.toolType} onChange={select} data-testid="tool-type">
           <For each={offered()}>{([value, label]) => <option value={value}>{label}</option>}</For>
         </select>
@@ -108,16 +108,16 @@ export function ToolSection(): JSX.Element {
               <tbody>
                 <Show when={machine() !== "3dprinter"} fallback={
                   <>
-                    <tr><td class="py-1 text-gray-500">Nozzle Diameter:</td><td class="py-1 text-gray-800">{gen.settings.nozzleDiameter} mm</td></tr>
-                    <tr><td class="py-1 text-gray-500">Filament Diameter:</td><td class="py-1 text-gray-800">{gen.settings.filamentDiameter} mm</td></tr>
+                    <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.nozzleDia")}</td><td class="py-1 text-gray-800">{gen.settings.nozzleDiameter} {t("cad.millimeters")}</td></tr>
+                    <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.filamentDia")}</td><td class="py-1 text-gray-800">{gen.settings.filamentDiameter} {t("cad.millimeters")}</td></tr>
                   </>
                 }>
-                  <tr><td class="py-1 text-gray-500">Diameter:</td><td class="py-1 text-gray-800">{gen.settings.toolDiameter} mm</td></tr>
-                  <tr><td class="py-1 text-gray-500">Flutes:</td><td class="py-1 text-gray-800">{gen.settings.flutes}</td></tr>
+                  <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.diameter")}</td><td class="py-1 text-gray-800">{gen.settings.toolDiameter} {t("cad.millimeters")}</td></tr>
+                  <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.flutes")}</td><td class="py-1 text-gray-800">{gen.settings.flutes}</td></tr>
                 </Show>
-                <tr><td class="py-1 text-gray-500">Max Speed:</td><td class="py-1 text-gray-800">{gen.settings.rpm} RPM</td></tr>
+                <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.maxSpeed")}</td><td class="py-1 text-gray-800">{gen.settings.rpm} RPM</td></tr>
                 <Show when={gen.selectedLibraryTool?.material}>
-                  <tr><td class="py-1 text-gray-500">Material:</td><td class="py-1 text-gray-800">{gen.selectedLibraryTool?.material}</td></tr>
+                  <tr><td class="py-1 text-gray-500">{t("cad.explorer.material")}</td><td class="py-1 text-gray-800">{gen.selectedLibraryTool?.material}</td></tr>
                 </Show>
               </tbody>
             </table>
@@ -127,35 +127,35 @@ export function ToolSection(): JSX.Element {
 
       <Show when={machine() !== "3dprinter"}>
         <div>
-          <label class={LABEL}>Tool Diameter (mm)</label>
+          <label class={LABEL}>{t("cam.gen.tool.diameterMm")}</label>
           <NumberField min="0.1" step="0.1" value={gen.settings.toolDiameter} onValue={(value) => gen.updateSettings("toolDiameter", value)} />
         </div>
         <Show when={machine() === "mill"}>
           <div>
-            <label class={LABEL}>Number of Flutes</label>
+            <label class={LABEL}>{t("cam.gen.tool.fluteCount")}</label>
             <NumberField min="1" max="12" int value={gen.settings.flutes} onValue={(value) => gen.updateSettings("flutes", value)} />
           </div>
         </Show>
         <div>
-          <label class={LABEL}>Rotation Speed (RPM)</label>
+          <label class={LABEL}>{t("cam.gen.tool.rpm")}</label>
           <NumberField min="1000" step="500" int value={gen.settings.rpm} onValue={(value) => gen.updateSettings("rpm", value)} />
         </div>
         <div class="flex items-center">
           <input type="checkbox" id="coolant" class={CHECKBOX} checked={gen.settings.coolant} onChange={(event) => gen.updateSettings("coolant", event.currentTarget.checked)} />
-          <label for="coolant" class="ml-2 block text-sm text-gray-700">Activate Coolant</label>
+          <label for="coolant" class="ml-2 block text-sm text-gray-700">{t("cam.gen.tool.coolant")}</label>
         </div>
       </Show>
 
       <div class="mt-2 flex flex-col pt-2 border-t border-gray-200">
-        <label class={LABEL}>Select from Library</label>
+        <label class={LABEL}>{t("cam.gen.tool.fromLibrary")}</label>
         <select class={INPUT} value={gen.selectedLibraryTool?.id || gen.selectedLibraryTool?.name || ""} onChange={(event) => pick(event.currentTarget.value)}>
-          <option value="">Select a tool</option>
+          <option value="">{t("cam.gen.tool.selectOne")}</option>
           <optgroup label={t("cam.tool.predefined")}>
-            <For each={predefinedTools.filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.name}>{tool.name} - {tool.type} {tool.diameter}mm</option>}</For>
+            <For each={predefinedTools.filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.name}>{tool.name} - {tool.type} {tool.diameter}{t("cad.millimeters")}</option>}</For>
           </optgroup>
           <Show when={userTools().length > 0}>
             <optgroup label={t("cam.tool.local")}>
-              <For each={userTools().filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.id}>{tool.name} - {tool.type} {tool.diameter}mm</option>}</For>
+              <For each={userTools().filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.id}>{tool.name} - {tool.type} {tool.diameter}{t("cad.millimeters")}</option>}</For>
             </optgroup>
           </Show>
         </select>

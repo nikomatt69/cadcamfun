@@ -25,6 +25,8 @@ export type CompanionStreamHandle = SharedObject & {
 export type CompanionNetNative = {
   request(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null, fingerprint: string): Promise<PinnedResponse>
   streamStart(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null, fingerprint: string): Promise<CompanionStreamHandle>
+  cloudRequest?(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null): Promise<PinnedResponse>
+  cloudStreamStart?(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null): Promise<CompanionStreamHandle>
   launchPairLink(): string | null
   warmLocalNetwork?(): void
 }

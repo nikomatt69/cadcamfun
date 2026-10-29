@@ -8,6 +8,7 @@ import { useElementsStore } from "../../store/elementsStore.ts"
 import { useLayerStore } from "../../store/layerStore.ts"
 import { useSelectionStore } from "../../store/selectorStore.ts"
 import { bulkNext, isolate, renamed, showAll, type GroupMode } from "../../lib/browser.ts"
+import { t } from "../../../../i18n/index.ts"
 
 const MODE_KEY = "cad-browser-group-mode"
 
@@ -84,7 +85,7 @@ export const createBrowser = (): Browser => {
     },
     remove: (id) => {
       const element = find(id)
-      if (element === undefined || !window.confirm(`Delete "${String(element["name"] ?? element.type)}"?`)) return
+      if (element === undefined || !window.confirm(t("browser.confirmDelete", { name: String(element["name"] ?? element.type) }))) return
       elements.deleteElement(id)
       selection.deselectElement(id)
     },
@@ -117,14 +118,14 @@ export const createBrowser = (): Browser => {
       for (const item of section.items) elements.updateElement(item.id, flag === "visible" ? { visible: next } : { locked: next })
     },
     addLayer: () => {
-      layers.addLayer({ name: `Layer ${layers.layers.length + 1}`, visible: true, locked: false, color: "#1e88e5" })
+      layers.addLayer({ name: t("browser.layerName", { n: layers.layers.length + 1 }), visible: true, locked: false, color: "#1e88e5" })
       const created = layers.layers[layers.layers.length - 1]
       if (created !== undefined) layers.setActiveLayer(created.id)
     },
     deleteLayer: (id) => {
       const layer = layers.layers.find((candidate) => candidate.id === id)
       if (layer === undefined || layers.layers.length <= 1) return
-      if (elements.elements.some((element) => element.layerId === id) && !window.confirm(`Layer "${layer.name}" still has elements. Delete it anyway?`)) return
+      if (elements.elements.some((element) => element.layerId === id) && !window.confirm(t("browser.confirmDeleteLayer", { name: layer.name }))) return
       layers.deleteLayer(id)
     },
     hasHidden: () => elements.elements.some((element) => element.visible === false) || layers.layers.some((layer) => !layer.visible),

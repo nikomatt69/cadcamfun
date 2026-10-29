@@ -67,8 +67,8 @@ export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; reado
         moves += 1
       }
       return [
-        { label: "Cutting length", value: `${(cut / 1000).toFixed(2)} m` }, { label: "Rapid length", value: `${(rapid / 1000).toFixed(2)} m` },
-        { label: "Segments", value: String(moves) }, { label: "Estimated time", value: minutes(playback.duration) }
+        { get label() { return t("pages.cutting.length") }, value: `${(cut / 1000).toFixed(2)} m` }, { get label() { return t("pages.rapid.length") }, value: `${(rapid / 1000).toFixed(2)} m` },
+        { get label() { return t("pages.segments") }, value: String(moves) }, { get label() { return t("cam.post.panel.time") }, value: minutes(playback.duration) }
       ]
     } catch { return [] }
   })

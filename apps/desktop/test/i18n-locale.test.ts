@@ -37,6 +37,26 @@ describe("the language of the interface", () => {
     expect(document.documentElement.dir).toBe("ltr")
   })
 
+  test("a screen that renders a string follows the language", async () => {
+    // The translator reads the table from a signal: a screen that renders a
+    // string has to be redrawn when the language changes, not only on a reload.
+    const { createEffect, createRoot } = await import("solid-js")
+    const container = document.createElement("div")
+    document.body.append(container)
+    const dispose = createRoot((dispose) => {
+      createEffect(() => { container.textContent = t("settings.title") })
+      return dispose
+    })
+    expect(container.textContent).toBe("Settings")
+    await setLocale("it")
+    expect(container.textContent).toBe("Impostazioni")
+    await setLocale("de")
+    expect(container.textContent).toBe("Einstellungen")
+    await setLocale("en")
+    expect(container.textContent).toBe("Settings")
+    dispose()
+  })
+
   test("an unknown language is refused and leaves the app alone", async () => {
     await setLocale("en")
     await expect(setLocale("kl" as never)).rejects.toThrow()

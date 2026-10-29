@@ -26,6 +26,7 @@ import {
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { onCacheInvalidated } from "../../../shared/state/queries.ts"
+import { t } from "../../../i18n/index.ts"
 
 interface Project { readonly id: string; readonly name: string; readonly description: string | null; readonly updatedAt: string; readonly ownerId: string; readonly organizationId: string | null }
 interface Card { readonly id: string; readonly name: string; readonly description?: string | null; readonly thumbnail?: string | null; readonly updatedAt?: string; readonly gcode?: string | null; readonly operationType?: string | null }
@@ -33,7 +34,7 @@ type Tab = "drawings" | "components" | "toolpaths"
 type ModalKind = "edit" | "delete" | "drawing" | "component" | "toolpath" | undefined
 
 const TABS: ReadonlyArray<{ readonly id: Tab; readonly label: string }> = [
-  { id: "drawings", label: "Drawings" }, { id: "components", label: "Components" }, { id: "toolpaths", label: "Toolpaths" }
+  { id: "drawings", get label() { return t("settings.profile.drawings") } }, { id: "components", get label() { return t("library.tab.components") } }, { id: "toolpaths", get label() { return t("ai.controls.mode.toolpath") } }
 ]
 
 const formatDate = (iso: string | undefined): string => (iso === undefined ? "" : new Date(iso).toLocaleDateString())
@@ -95,7 +96,7 @@ export function ProjectDetailScreen(): JSX.Element {
 
   const update = (event: Event): Promise<void> => { event.preventDefault(); return attempt(async () => {
     const row = await run<Project>(app.client.projects.update({ params: { id: params.id }, payload: { name: form().name.trim(), description: form().description } }))
-    setProject((previous) => ({ ...(previous as Project), ...row })); setModal(undefined); flash("Project updated successfully")
+    setProject((previous) => ({ ...(previous as Project), ...row })); setModal(undefined); flash(t("pages.project.updated.successfully"))
     invalidatePrefix(app.cache, "projects")
   }) }
   /** Counts on the project cards and the library / toolpath lists change with the project's contents. */
@@ -125,12 +126,12 @@ export function ProjectDetailScreen(): JSX.Element {
   const duplicateDrawing = (row: Card): Promise<void> => attempt(async () => {
     const full = await run<{ data: unknown }>(app.client.drawings.get({ params: { id: row.id } }))
     const copy = await run<Card>(app.client.drawings.createForProject({ params: { id: params.id }, payload: { name: `${row.name} (copy)`, description: row.description ?? null, data: full.data } }))
-    touchContents(); setDrawings((previous) => [copy, ...previous]); flash("Drawing duplicated")
+    touchContents(); setDrawings((previous) => [copy, ...previous]); flash(t("pages.drawing.duplicated"))
   })
   const deleteDrawing = (row: Card): Promise<void> => attempt(async () => {
     if (!window.confirm(`Delete drawing "${row.name}"?`)) return
     await run(app.client.drawings.remove({ params: { id: row.id } }))
-    touchContents(); setDrawings((previous) => previous.filter((item) => item.id !== row.id)); flash("Drawing deleted")
+    touchContents(); setDrawings((previous) => previous.filter((item) => item.id !== row.id)); flash(t("pages.drawing.deleted"))
   })
   const downloadDrawing = (row: Card): Promise<void> => attempt(async () => {
     const full = await run<{ data: unknown }>(app.client.drawings.get({ params: { id: row.id } }))
@@ -140,7 +141,7 @@ export function ProjectDetailScreen(): JSX.Element {
   const stop = (action: () => void) => (event: MouseEvent): void => { event.stopPropagation(); action() }
   /** Version history of one item: the commits that touched its file in the project's repository. */
   const historyButton = (directory: "drawings" | "components" | "toolpaths", row: Card): JSX.Element => (
-    <button type="button" class={ICON_BUTTON} title="History" aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={16} /></button>
+    <button type="button" class={ICON_BUTTON} title={t("vcs.tab.history")} aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={16} /></button>
   )
 
   const empty = (icon: JSX.Element, title: string, text: string, label: string, kind: ModalKind): JSX.Element => (
@@ -160,7 +161,7 @@ export function ProjectDetailScreen(): JSX.Element {
             <div class="p-3">
               <h3 class="text-xs font-semibold text-slate-900 dark:text-white">{row.name}</h3>
               <Show when={row.description}><p class="mt-1 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
-              <Show when={showDate && row.updatedAt}><div class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">Updated {formatDate(row.updatedAt)}</div></Show>
+              <Show when={showDate && row.updatedAt}><div class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{t("projects.column.updated")} {formatDate(row.updatedAt)}</div></Show>
             </div>
             <Show when={actions}><div class="flex justify-end gap-1 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/30">{actions!(row)}</div></Show>
           </div>
@@ -171,28 +172,28 @@ export function ProjectDetailScreen(): JSX.Element {
 
   const submit = (label: string, pending: string): JSX.Element => (
     <div class="mt-3 flex justify-end gap-2">
-      <button type="button" class={CANCEL_BUTTON} onClick={() => setModal(undefined)}>Cancel</button>
+      <button type="button" class={CANCEL_BUTTON} onClick={() => setModal(undefined)}>{t("projects.cancel")}</button>
       <button type="submit" class={SUBMIT_BUTTON} disabled={busy() || form().name.trim() === ""}>{busy() ? pending : label}</button>
     </div>
   )
   const nameFields = (): JSX.Element => (
     <>
-      <Field label="Name" required>{(ids) => <TextInput id={ids.id} value={form().name} onInput={field("name")} />}</Field>
-      <Field label="Description">{(ids) => <Textarea id={ids.id} rows={3} value={form().description} onInput={field("description")} />}</Field>
+      <Field label={t("projects.column.name")} required>{(ids) => <TextInput id={ids.id} value={form().name} onInput={field("name")} />}</Field>
+      <Field label={t("projects.descriptionLabel")}>{(ids) => <Textarea id={ids.id} rows={3} value={form().description} onInput={field("description")} />}</Field>
     </>
   )
 
   return (
     <WorkspaceDetail
       testId="project-detail"
-      title={project()?.name ?? "Project"}
-      subtitle="Project"
+      title={project()?.name ?? t("cam.save.project")}
+      subtitle={t("cam.save.project")}
       backHref="/projects"
-      backLabel="Back to Projects"
+      backLabel={t("pages.back.to.projects")}
       actions={<Show when={project()}>
-        <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>Version control</button>
-        <button type="button" class={TOOLBAR_BUTTON} onClick={() => open("edit")}><Edit size={16} aria-hidden="true" />Edit</button>
-        <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} aria-hidden="true" />Delete</button>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>{t("vcs.title")}</button>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => open("edit")}><Edit size={16} aria-hidden="true" />{t("cad.ribbon.edit")}</button>
+        <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} aria-hidden="true" />{t("projects.delete")}</button>
       </Show>}
     >
       <div class="mx-auto w-full max-w-7xl">
@@ -202,10 +203,10 @@ export function ProjectDetailScreen(): JSX.Element {
           </div>
         </Show>
 
-        <Show when={!loading()} fallback={<StageLoading label="Loading project details..." />}>
+        <Show when={!loading()} fallback={<StageLoading label={t("pages.loading.project.details")} />}>
           <Show when={project()} fallback={
-            <StageEmpty icon={<File size={22} />} title="Project not found" hint="The project you are looking for doesn't exist or you don't have access to it.">
-              <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate("/projects")}>Back to Projects</button>
+            <StageEmpty icon={<File size={22} />} title={t("pages.project.not.found")} hint={t("pages.the.project.you.are.looking.for.doesn.t.exist.or.you.don.t.have.access.to.it")}>
+              <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate("/projects")}>{t("pages.back.to.projects")}</button>
             </StageEmpty>
           }>
             {(current) => (
@@ -216,27 +217,27 @@ export function ProjectDetailScreen(): JSX.Element {
                       <h2 class="truncate text-[13px] font-semibold text-slate-900 dark:text-white">{current().name}</h2>
                       <Show when={current().description}><p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{current().description}</p></Show>
                       <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-                        <div class="flex items-center gap-1"><Clock size={13} aria-hidden="true" /><span>Updated: {formatDate(current().updatedAt)}</span></div>
-                        <div class="flex items-center gap-1"><Users size={13} aria-hidden="true" /><span>{current().organizationId ? "Organization" : "Personal"}</span></div>
+                        <div class="flex items-center gap-1"><Clock size={13} aria-hidden="true" /><span>{t("plugins.detail.updatedLabel")} {formatDate(current().updatedAt)}</span></div>
+                        <div class="flex items-center gap-1"><Users size={13} aria-hidden="true" /><span>{current().organizationId ? t("shell.organization") : t("pages.personal")}</span></div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <WorkspaceTabs class="mb-3" tabs={TABS} value={tab()} onChange={setTab} label="Project sections" />
+                <WorkspaceTabs class="mb-3" tabs={TABS} value={tab()} onChange={setTab} label={t("pages.project.sections")} />
 
                 <Show when={tab() === "drawings"}>
                   <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">Project Drawings</h2>
-                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("drawing")}><Plus size={14} aria-hidden="true" />New Drawing</button>
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.drawings")}</h2>
+                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("drawing")}><Plus size={14} aria-hidden="true" />{t("pages.new.drawing")}</button>
                   </div>
                   <Show when={drawings().length > 0} fallback={empty(<File size={22} />, "No drawings yet", "Create your first drawing to start designing in the CAD editor.", "Create Drawing", "drawing")}>
                     {cards(drawings(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><Grid size={28} /></div>, (row) => navigate(`/cad?drawingId=${row.id}`), (row) => (
                       <>
                         {historyButton("drawings", row)}
-                        <button type="button" class={ICON_BUTTON} title="Duplicate" aria-label={`Duplicate ${row.name}`} onClick={stop(() => void duplicateDrawing(row))}><Copy size={16} /></button>
-                        <button type="button" class={ICON_BUTTON} title="Download" aria-label={`Download ${row.name}`} onClick={stop(() => void downloadDrawing(row))}><Download size={16} /></button>
-                        <button type="button" class={`${ICON_BUTTON} hover:!text-red-600`} title="Delete" aria-label={`Delete ${row.name}`} onClick={stop(() => void deleteDrawing(row))}><Trash2 size={16} /></button>
+                        <button type="button" class={ICON_BUTTON} title={t("browser.duplicate")} aria-label={`Duplicate ${row.name}`} onClick={stop(() => void duplicateDrawing(row))}><Copy size={16} /></button>
+                        <button type="button" class={ICON_BUTTON} title={t("cad.download")} aria-label={`Download ${row.name}`} onClick={stop(() => void downloadDrawing(row))}><Download size={16} /></button>
+                        <button type="button" class={`${ICON_BUTTON} hover:!text-red-600`} title={t("projects.delete")} aria-label={`Delete ${row.name}`} onClick={stop(() => void deleteDrawing(row))}><Trash2 size={16} /></button>
                       </>
                     ), true)}
                   </Show>
@@ -244,8 +245,8 @@ export function ProjectDetailScreen(): JSX.Element {
 
                 <Show when={tab() === "components"}>
                   <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">Project Components</h2>
-                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("component")}><Plus size={14} aria-hidden="true" />New Component</button>
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.components")}</h2>
+                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("component")}><Plus size={14} aria-hidden="true" />{t("pages.new.component")}</button>
                   </div>
                   <Show when={components().length > 0} fallback={empty(<File size={22} />, "No components yet", "Create reusable components to use across your CAD drawings.", "Create Component", "component")}>
                     {cards(components(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><File size={28} /></div>, (row) => navigate(`/components/${row.id}`), (row) => historyButton("components", row))}
@@ -254,8 +255,8 @@ export function ProjectDetailScreen(): JSX.Element {
 
                 <Show when={tab() === "toolpaths"}>
                   <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">Project Toolpaths</h2>
-                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("toolpath")}><Plus size={14} aria-hidden="true" />New Toolpath</button>
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.toolpaths")}</h2>
+                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("toolpath")}><Plus size={14} aria-hidden="true" />{t("pages.new.toolpath")}</button>
                   </div>
                   <Show when={toolpaths().length > 0} fallback={empty(<Wrench size={22} />, "No toolpaths yet", "Create toolpaths to generate G-code for your machine.", "Create Toolpath", "toolpath")}>
                     {cards(toolpaths(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><Wrench size={28} /></div>, openToolpath, (row) => historyButton("toolpaths", row), true)}
@@ -267,30 +268,30 @@ export function ProjectDetailScreen(): JSX.Element {
         </Show>
       </div>
 
-      <Modal open={modal() === "edit"} onClose={() => setModal(undefined)} title="Edit Project">
-        <form onSubmit={(event) => void update(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit("Save Changes", "Saving...")}</form>
+      <Modal open={modal() === "edit"} onClose={() => setModal(undefined)} title={t("pages.edit.project")}>
+        <form onSubmit={(event) => void update(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit(t("settings.profile.save"), "Saving...")}</form>
       </Modal>
-      <Modal open={modal() === "delete"} onClose={() => setModal(undefined)} title="Delete Project" size="sm">
-        <p class="text-slate-600 dark:text-slate-300">Delete <strong>{project()?.name}</strong> with all its drawings, components and toolpaths? This cannot be undone.</p>
+      <Modal open={modal() === "delete"} onClose={() => setModal(undefined)} title={t("pages.delete.project")} size="sm">
+        <p class="text-slate-600 dark:text-slate-300">{t("projects.delete")} <strong>{project()?.name}</strong> with all its drawings, components and toolpaths? This cannot be undone.</p>
         <Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>
         <div class="flex justify-end gap-2 mt-4">
-          <button type="button" class={CANCEL_BUTTON} onClick={() => setModal(undefined)}>Cancel</button>
-          <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>{busy() ? "Deleting..." : "Delete Project"}</button>
+          <button type="button" class={CANCEL_BUTTON} onClick={() => setModal(undefined)}>{t("projects.cancel")}</button>
+          <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>{busy() ? t("settings.account.deleting") : t("pages.delete.project")}</button>
         </div>
       </Modal>
-      <Modal open={modal() === "drawing"} onClose={() => setModal(undefined)} title="New Drawing">
+      <Modal open={modal() === "drawing"} onClose={() => setModal(undefined)} title={t("pages.new.drawing")}>
         <form onSubmit={(event) => void createDrawing(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit("Create Drawing", "Creating...")}</form>
       </Modal>
-      <Modal open={modal() === "component"} onClose={() => setModal(undefined)} title="New Component">
-        <form onSubmit={(event) => void createComponent(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit("Create Component", "Creating...")}</form>
+      <Modal open={modal() === "component"} onClose={() => setModal(undefined)} title={t("pages.new.component")}>
+        <form onSubmit={(event) => void createComponent(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit(t("pages.create.component"), "Creating...")}</form>
       </Modal>
-      <Modal open={modal() === "toolpath"} onClose={() => setModal(undefined)} title="New Toolpath">
+      <Modal open={modal() === "toolpath"} onClose={() => setModal(undefined)} title={t("pages.new.toolpath")}>
         <form onSubmit={(event) => void createToolpath(event)}>
           {nameFields()}
-          <Field label="Machine type">{(ids) => <Select id={ids.id} value={form().type} onChange={field("type")}><option value="mill">Mill</option><option value="lathe">Lathe</option><option value="3dprinter">3D printer</option></Select>}</Field>
-          <Field label="Operation">{(ids) => <Select id={ids.id} value={form().operationType} onChange={field("operationType")}><option value="contour">Contour</option><option value="pocket">Pocket</option><option value="drill">Drill</option><option value="engrave">Engrave</option></Select>}</Field>
+          <Field label={t("library.machine.type")}>{(ids) => <Select id={ids.id} value={form().type} onChange={field("type")}><option value="mill">{t("pages.mill")}</option><option value="lathe">{t("pages.lathe")}</option><option value="3dprinter">{t("cam.gen.mach.printer")}</option></Select>}</Field>
+          <Field label={t("cam.operations.current")}>{(ids) => <Select id={ids.id} value={form().operationType} onChange={field("operationType")}><option value="contour">{t("cam.strategy.contour")}</option><option value="pocket">{t("cam.pocket")}</option><option value="drill">{t("cam.strategy.drill")}</option><option value="engrave">{t("cam.strategy.engrave")}</option></Select>}</Field>
           <Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>
-          {submit("Create Toolpath", "Creating...")}
+          {submit(t("pages.create.toolpath"), "Creating...")}
         </form>
       </Modal>
     </WorkspaceDetail>

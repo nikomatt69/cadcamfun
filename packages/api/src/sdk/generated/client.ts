@@ -547,6 +547,30 @@ import type {
   WorkspaceToolpathPreviewOutput,
   WorkspaceLibraryInput,
   WorkspaceLibraryOutput,
+  CloudConnectionOutput,
+  CloudSetConnectionInput,
+  CloudSetConnectionOutput,
+  CloudDisconnectOutput,
+  CloudProjectsOutput,
+  CloudCloneInput,
+  CloudCloneOutput,
+  CloudStatusInput,
+  CloudStatusOutput,
+  CloudPublishInput,
+  CloudPublishOutput,
+  CloudFetchInput,
+  CloudFetchOutput,
+  CloudApplyInput,
+  CloudApplyOutput,
+  CloudSendInput,
+  CloudSendOutput,
+  CloudRemoteProjectsOutput,
+  CloudRemoteExportInput,
+  CloudRemoteExportOutput,
+  CloudRemoteImportInput,
+  CloudRemoteImportOutput,
+  CloudRemoteReceiptInput,
+  CloudRemoteReceiptOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -3909,6 +3933,7 @@ export function make(options: ClientOptions) {
               deburr: input["deburr"],
               tabs: input["tabs"],
               subprograms: input["subprograms"],
+              nativeCycles: input["nativeCycles"],
               smoothing: input["smoothing"],
               postDefinition: input["postDefinition"],
               print: input["print"],
@@ -3933,7 +3958,6 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
       verify: (input: ToolpathGeneratorVerifyInput, requestOptions?: RequestOptions) =>
-              nativeCycles: input["nativeCycles"],
         request<ToolpathGeneratorVerifyOutput>(
           {
             method: "POST",
@@ -4598,6 +4622,167 @@ export function make(options: ClientOptions) {
             path: `/api/projects/${encodeURIComponent(input.id)}/workspace/library`,
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    cloud: {
+      connection: (requestOptions?: RequestOptions) =>
+        request<CloudConnectionOutput>(
+          {
+            method: "GET",
+            path: `/api/cloud/connection`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setConnection: (input: CloudSetConnectionInput, requestOptions?: RequestOptions) =>
+        request<CloudSetConnectionOutput>(
+          {
+            method: "PUT",
+            path: `/api/cloud/connection`,
+            body: { origin: input["origin"], workspaceId: input["workspaceId"], token: input["token"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      disconnect: (requestOptions?: RequestOptions) =>
+        request<CloudDisconnectOutput>(
+          {
+            method: "DELETE",
+            path: `/api/cloud/connection`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projects: (requestOptions?: RequestOptions) =>
+        request<CloudProjectsOutput>(
+          {
+            method: "GET",
+            path: `/api/cloud/projects`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      clone: (input: CloudCloneInput, requestOptions?: RequestOptions) =>
+        request<CloudCloneOutput>(
+          {
+            method: "POST",
+            path: `/api/cloud/projects/${encodeURIComponent(input.id)}/clone`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      status: (input: CloudStatusInput, requestOptions?: RequestOptions) =>
+        request<CloudStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cloud/status`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      publish: (input: CloudPublishInput, requestOptions?: RequestOptions) =>
+        request<CloudPublishOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cloud/publish`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      fetch: (input: CloudFetchInput, requestOptions?: RequestOptions) =>
+        request<CloudFetchOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cloud/fetch`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      apply: (input: CloudApplyInput, requestOptions?: RequestOptions) =>
+        request<CloudApplyOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cloud/apply`,
+            body: { expectedHead: input["expectedHead"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      send: (input: CloudSendInput, requestOptions?: RequestOptions) =>
+        request<CloudSendOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cloud/send`,
+            body: { message: input["message"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remoteProjects: (requestOptions?: RequestOptions) =>
+        request<CloudRemoteProjectsOutput>(
+          {
+            method: "GET",
+            path: `/api/cloud/remote/projects`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remoteExport: (input: CloudRemoteExportInput, requestOptions?: RequestOptions) =>
+        request<CloudRemoteExportOutput>(
+          {
+            method: "GET",
+            path: `/api/cloud/remote/projects/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remoteImport: (input: CloudRemoteImportInput, requestOptions?: RequestOptions) =>
+        request<CloudRemoteImportOutput>(
+          {
+            method: "PUT",
+            path: `/api/cloud/remote/projects/${encodeURIComponent(input.id)}`,
+            body: { transfer: input["transfer"], expectedHead: input["expectedHead"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remoteReceipt: (input: CloudRemoteReceiptInput, requestOptions?: RequestOptions) =>
+        request<CloudRemoteReceiptOutput>(
+          {
+            method: "POST",
+            path: `/api/cloud/remote/projects/${encodeURIComponent(input.id)}/receipt`,
+            body: { head: input["head"], deviceId: input["deviceId"], state: input["state"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
             empty: false,
           },
           requestOptions,

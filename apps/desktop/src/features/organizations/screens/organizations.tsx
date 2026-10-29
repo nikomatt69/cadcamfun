@@ -95,14 +95,14 @@ export function OrganizationsScreen(): JSX.Element {
       actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("org.new")}</button>}
       rail={<>
         <label class="block">
-          <span class={RAIL_LABEL}>Search</span>
+          <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search organizations..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />Clear Filters</button>
-        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} organizations</p>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
+        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} {t("shell.organizations")}</p>
       </>}
       overlays={
         <Modal open={showModal()} title={t("org.modal.title")} onClose={() => { if (!isSubmitting()) setShowModal(false) }}>
@@ -133,7 +133,7 @@ export function OrganizationsScreen(): JSX.Element {
             fallback={
               <StageEmpty icon={<Building size={24} aria-hidden="true" />} title={search() !== "" ? "No organizations found" : t("org.empty.title")} hint={search() !== "" ? "No organizations match your search criteria." : t("org.empty.body")}>
                 <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("org.empty.cta")}</button>}>
-                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>Clear filters</button>
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
                 </Show>
               </StageEmpty>
             }

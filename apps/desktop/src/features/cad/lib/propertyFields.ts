@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/index.ts"
 /** What the property panel shows for each element type: one entry per editable field. */
 export interface PropertyField {
   name: string
@@ -38,97 +39,97 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x2", label: "X2", type: "number", step: 0.1 },
         { name: "y2", label: "Y2", type: "number", step: 0.1 },
         { name: "z2", label: "Z2", type: "number", step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "circle":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "rectangle":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "angle", label: "Angle (°)", type: "number", step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "cube":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "sphere":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "cylinder":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "cone":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "torus":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radius", label: "Outer Radius", type: "number", min: 0.1, step: 0.1 },
         { name: "tube", label: "Tube Radius", type: "number", min: 0.1, step: 0.1 },
         { name: "radialSegments", label: "Radial Segments", type: "number", min: 3, step: 1 },
         { name: "tubularSegments", label: "Tubular Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "polygon":
@@ -138,30 +139,30 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", label: "X (Center)", type: "number", step: 0.1 },
         { name: "y", label: "Y (Center)", type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "sides", label: "Number of Sides", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "sides", get label() { return t("cam.gen.op.sides") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "extrusion":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         {
           name: "shape",
           label: "Shape Type",
           type: "select",
           options: [
-            { value: "rect", label: "Rectangle" },
-            { value: "circle", label: "Circle" }
+            { value: "rect", get label() { return t("cad.rectangle") } },
+            { value: "circle", get label() { return t("cad.circle") } }
           ]
         },
         {
           name: "width",
-          label: "Width",
+          get label() { return t("cad.width") },
           type: "number",
           min: 0.1,
           step: 0.1,
@@ -169,7 +170,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         },
         {
           name: "height",
-          label: "Height",
+          get label() { return t("cad.height") },
           type: "number",
           min: 0.1,
           step: 0.1,
@@ -177,13 +178,13 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         },
         {
           name: "radius",
-          label: "Radius",
+          get label() { return t("cad.field.radius") },
           type: "number",
           min: 0.1,
           step: 0.1,
           showIf: (props: { shape: string }) => props.shape === "circle"
         },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 0.1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
         { name: "bevel", label: "Bevel", type: "checkbox" },
         {
           name: "bevelThickness",
@@ -201,9 +202,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
           step: 0.1,
           showIf: (props: { bevel: any }) => props.bevel
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
     case "tube":
       // For tube, we need a more complex editor for path points
@@ -213,9 +214,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "tubularSegments", label: "Segments Along Path", type: "number", min: 1, step: 1 },
         { name: "radialSegments", label: "Segments Around Tube", type: "number", min: 3, step: 1 },
         { name: "closed", label: "Closed Path", type: "checkbox" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" },
         { name: "path", label: "Path Points", type: "pointList", minPoints: 2 }
       ];
 
@@ -225,26 +226,26 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", label: "X (Center)", type: "number", step: 0.1 },
         { name: "y", label: "Y (Center)", type: "number", step: 0.1 },
         { name: "z", label: "Z (Center)", type: "number", step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "phiStart", label: "Start Angle (rad)", type: "number", step: 0.1 },
         { name: "phiLength", label: "Arc Length (rad)", type: "number", min: 0, max: 6.28, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" },
         { name: "points", label: "Profile Points", type: "pointList", minPoints: 2 }
       ];
 
     case "text":
     case "text3d":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "text", label: "Text Content", type: "text" },
-        { name: "size", label: "Font Size", type: "number", min: 1, step: 0.5 },
+        { name: "size", get label() { return t("cad.field.fontSize") }, type: "number", min: 1, step: 0.5 },
         { name: "depth", label: "Extrusion Depth", type: "number", min: 0, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "bevel", label: "Bevel", type: "checkbox" },
         {
           name: "font",
@@ -260,14 +261,14 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "grid":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "size", label: "Grid Size", type: "number", min: 1, step: 1 },
+        { name: "size", get label() { return t("cad.snap.gridSize") }, type: "number", min: 1, step: 1 },
         { name: "divisions", label: "Division Count", type: "number", min: 1, step: 1 },
         { name: "colorCenterLine", label: "Center Line Color", type: "color" },
         { name: "colorGrid", label: "Grid Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         {
           name: "plane",
           label: "Grid Plane",
@@ -282,27 +283,27 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "workpiece":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "material",
-          label: "Material",
+          get label() { return t("cad.viewMaterial") },
           type: "select",
           options: [
-            { value: "aluminum", label: "Aluminum" },
-            { value: "steel", label: "Steel" },
-            { value: "wood", label: "Wood" },
-            { value: "plastic", label: "Plastic" },
-            { value: "brass", label: "Brass" }
+            { value: "aluminum", get label() { return t("cam.explorer.materialName.aluminum") } },
+            { value: "steel", get label() { return t("cam.gen.mat.steel") } },
+            { value: "wood", get label() { return t("cam.gen.mat.wood") } },
+            { value: "plastic", get label() { return t("cam.gen.mat.plastic") } },
+            { value: "brass", get label() { return t("cam.gen.mat.brass") } }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "group":
@@ -312,44 +313,44 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", label: "X (Group Center)", type: "number", step: 0.1 },
         { name: "y", label: "Y (Group Center)", type: "number", step: 0.1 },
         { name: "z", label: "Z (Group Center)", type: "number", step: 0.1 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "elements", label: "Group Elements", type: "list", listType: "element" }
       ];
 
     // ======= PRIMITIVE AVANZATE =======
     case "pyramid":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "baseWidth", label: "Base Width", type: "number", min: 0.1, step: 0.1 },
         { name: "baseDepth", label: "Base Depth", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "prism":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "sides", label: "Sides", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "hemisphere":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         {
           name: "direction",
           label: "Direction",
@@ -359,84 +360,84 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "down", label: "Down" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "ellipsoid":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radiusX", label: "Radius X", type: "number", min: 0.1, step: 0.1 },
-        { name: "radiusY", label: "Radius Y", type: "number", min: 0.1, step: 0.1 },
+        { name: "radiusX", get label() { return t("cad.field.radiusX") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "radiusY", get label() { return t("cad.field.radiusY") }, type: "number", min: 0.1, step: 0.1 },
         { name: "radiusZ", label: "Radius Z", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "capsule":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "direction",
           label: "Direction",
           type: "select",
           options: [
-            { value: "x", label: "X" },
-            { value: "y", label: "Y" },
+            { value: "x", get label() { return t("cad.field.x") } },
+            { value: "y", get label() { return t("cad.field.y") } },
             { value: "z", label: "Z" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= ELEMENTI 2D AGGIUNTIVI =======
     case "ellipse":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radiusX", label: "Radius X", type: "number", min: 0.1, step: 0.1 },
-        { name: "radiusY", label: "Radius Y", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "radiusX", get label() { return t("cad.field.radiusX") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "radiusY", get label() { return t("cad.field.radiusY") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "arc":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
         { name: "startAngle", label: "Start Angle (rad)", type: "number", step: 0.1 },
         { name: "endAngle", label: "End Angle (rad)", type: "number", step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "triangle":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "points", label: "Vertices", type: "pointList", exactPoints: 3 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     // ======= CURVE AVANZATE =======
@@ -444,28 +445,28 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       return [
         { name: "points", label: "Control Points", type: "pointList", minPoints: 2 },
         { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "bezier":
       return [
         { name: "points", label: "Control Points", type: "pointList", minPoints: 4 },
         { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     case "nurbs":
       return [
         { name: "points", label: "Control Points", type: "pointList", minPoints: 4 },
-        { name: "degree", label: "Degree", type: "number", min: 1, max: 5, step: 1 },
+        { name: "degree", get label() { return t("cad.field.degree") }, type: "number", min: 1, max: 5, step: 1 },
         { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 10, step: 1 }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
       ];
 
     // ======= OPERAZIONI BOOLEANE =======
@@ -473,35 +474,35 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     case "boolean-subtract":
     case "boolean-intersect":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "operands", label: "Operand Elements", type: "list", listType: "element" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // A parametric part: its geometry comes from its history, edited in the parametric panel below the form.
     case "parametric":
     case "brep":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= OPERAZIONI DI TRASFORMAZIONE =======
     case "revolution":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "profile", label: "Profile Points", type: "pointList", minPoints: 2 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "angle", label: "Revolution Angle (rad)", type: "number", min: 0, max: 6.28, step: 0.1 },
         {
           name: "axis",
@@ -513,9 +514,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "z", label: "Z Axis" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "sweep":
@@ -523,10 +524,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "profile", label: "Cross Section", type: "pointList", minPoints: 3 },
         { name: "path", label: "Path Points", type: "pointList", minPoints: 2 },
         { name: "radius", label: "Path Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "loft":
@@ -534,18 +535,18 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "profiles", label: "Section Profiles", type: "pointList", minPoints: 3 },
         { name: "positions", label: "Section Positions", type: "pointList", minPoints: 2 },
         { name: "closed", label: "Closed", type: "checkbox" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= ELEMENTI INDUSTRIALI =======
     case "thread":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "diameter", label: "Diameter", type: "number", min: 0.1, step: 0.1 },
+        { name: "diameter", get label() { return t("library.tool.diameter") }, type: "number", min: 0.1, step: 0.1 },
         { name: "pitch", label: "Pitch", type: "number", min: 0.1, step: 0.1 },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
         {
@@ -559,75 +560,75 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         },
         {
           name: "standard",
-          label: "Standard",
+          get label() { return t("cad.material.standard") },
           type: "select",
           options: [
             { value: "metric", label: "Metric" },
             { value: "imperial", label: "Imperial" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "chamfer":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
         { name: "distance", label: "Chamfer Distance", type: "number", min: 0.1, step: 0.1 },
         { name: "edges", label: "Edges to Chamfer", type: "list", listType: "edge" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "fillet":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
         { name: "radius", label: "Fillet Radius", type: "number", min: 0.1, step: 0.1 },
         { name: "edges", label: "Edges to Fillet", type: "list", listType: "edge" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "gear":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "moduleValue", label: "Module", type: "number", min: 0.1, step: 0.1 },
         { name: "teeth", label: "Number of Teeth", type: "number", min: 3, step: 1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
         { name: "pressureAngle", label: "Pressure Angle (°)", type: "number", min: 0, max: 45, step: 1 },
         { name: "holeDiameter", label: "Center Hole Diameter", type: "number", min: 0, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "spring":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radius", label: "Spring Radius", type: "number", min: 0.1, step: 0.1 },
         { name: "wireRadius", label: "Wire Radius", type: "number", min: 0.1, step: 0.1 },
         { name: "turns", label: "Number of Turns", type: "number", min: 1, step: 0.5 },
         { name: "height", label: "Total Height", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= ELEMENTI DI ASSEMBLAGGIO =======
@@ -635,24 +636,24 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "bolt":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "size", label: "Size", type: "text" },
+        { name: "size", get label() { return t("cad.status.size") }, type: "text" },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
         { name: "thread", label: "Thread Specification", type: "text" },
         { name: "grade", label: "Material Grade", type: "text" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "nut":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "size", label: "Size", type: "text" },
+        { name: "size", get label() { return t("cad.status.size") }, type: "text" },
         { name: "thread", label: "Thread Specification", type: "text" },
         {
           name: "type",
@@ -664,166 +665,166 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "flange", label: "Flange Nut" }
           ]
         },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "washer":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "size", label: "Size", type: "text" },
+        { name: "size", get label() { return t("cad.status.size") }, type: "text" },
         { name: "outerDiameter", label: "Outer Diameter", type: "number", min: 0.1, step: 0.1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "rivet":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "diameter", label: "Diameter", type: "number", min: 0.1, step: 0.1 },
+        { name: "diameter", get label() { return t("library.tool.diameter") }, type: "number", min: 0.1, step: 0.1 },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= ELEMENTI ARCHITETTONICI =======
     case "wall":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
         { name: "openings", label: "Openings", type: "list", listType: "opening" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "floor":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "roof":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
         { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         {
           name: "style",
           label: "Roof Style",
           type: "select",
           options: [
-            { value: "flat", label: "Flat" },
+            { value: "flat", get label() { return t("browser.mode.flat") } },
             { value: "pitched", label: "Pitched" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "window":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
         {
           name: "style",
           label: "Window Style",
           type: "select",
           options: [
-            { value: "simple", label: "Simple" },
+            { value: "simple", get label() { return t("cam.gen.ai.simple") } },
             { value: "divided", label: "Divided Panes" }
           ]
         },
         { name: "frameColor", label: "Frame Color", type: "color" },
         { name: "color", label: "Glass Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "door":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
         {
           name: "style",
           label: "Door Style",
           type: "select",
           options: [
-            { value: "simple", label: "Simple" },
+            { value: "simple", get label() { return t("cam.gen.ai.simple") } },
             { value: "paneled", label: "Paneled" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "stair":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 1 },
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 1 },
         { name: "steps", label: "Number of Steps", type: "number", min: 1, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "column":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         {
           name: "style",
           label: "Column Style",
           type: "select",
           options: [
-            { value: "simple", label: "Simple" },
+            { value: "simple", get label() { return t("cam.gen.ai.simple") } },
             { value: "doric", label: "Doric" },
             { value: "ionic", label: "Ionic" },
             { value: "corinthian", label: "Corinthian" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= ELEMENTI SPECIALI =======
@@ -831,32 +832,32 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       return [
         { name: "points", label: "Path Points", type: "pointList", minPoints: 2 },
         { name: "radius", label: "Path Thickness", type: "number", min: 0.1, step: 0.1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "point-cloud":
       return [
-        { name: "points", label: "Points", type: "pointList", minPoints: 1 },
+        { name: "points", get label() { return t("cad.toolpanel.tool.point-cloud") }, type: "pointList", minPoints: 1 },
         { name: "pointSize", label: "Point Size", type: "number", min: 0.1, step: 0.1 },
         { name: "colors", label: "Point Colors", type: "colorList" },
         { name: "color", label: "Default Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "mesh":
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "vertices", label: "Vertices", type: "pointList", minPoints: 3 },
         { name: "faces", label: "Faces", type: "list", listType: "face" },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= STRUMENTI DI MISURAZIONE =======
@@ -880,17 +881,17 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
           label: "Unit",
           type: "select",
           options: [
-            { value: "mm", label: "mm" },
+            { value: "mm", get label() { return t("cad.millimeters") } },
             { value: "cm", label: "cm" },
             { value: "m", label: "m" },
             { value: "in", label: "in" }
           ]
         },
         { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 5, step: 0.5 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "angular-dimension":
@@ -900,10 +901,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "endPoint", label: "Second Line End", type: "point3d" },
         { name: "radius", label: "Arc Radius", type: "number", min: 1, step: 1 },
         { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 2, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 5, step: 0.5 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "radius-dimension":
@@ -911,10 +912,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "center", label: "Circle Center", type: "point3d" },
         { name: "pointOnCircle", label: "Point on Circle", type: "point3d" },
         { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 5, step: 0.5 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "diameter-dimension":
@@ -922,10 +923,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "center", label: "Circle Center", type: "point3d" },
         { name: "pointOnCircle", label: "Point on Circle", type: "point3d" },
         { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "linewidth", label: "Line Width", type: "number", min: 1, max: 5, step: 0.5 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     // ======= STRUMENTI DI DISEGNO =======
@@ -933,26 +934,26 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       return [
         { name: "points", label: "Pen Stroke Points", type: "pointList", minPoints: 2 },
         { name: "penSize", label: "Pen Size", type: "number", min: 1, max: 10, step: 0.5 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "drawing-highlighter":
       return [
         { name: "points", label: "Highlighter Stroke Points", type: "pointList", minPoints: 2 },
         { name: "highlighterSize", label: "Highlighter Size", type: "number", min: 1, max: 30, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "opacity", label: "Opacity", type: "number", min: 0.1, max: 1, step: 0.1 },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "opacity", get label() { return t("cad.material.opacity") }, type: "number", min: 0.1, max: 1, step: 0.1 },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "drawing-text":
       return [
-        { name: "position", label: "Text Position", type: "point3d" },
+        { name: "position", get label() { return t("cad.field.textPosition") }, type: "point3d" },
         { name: "text", label: "Text Content", type: "text" },
-        { name: "textSize", label: "Text Size", type: "number", min: 8, max: 72, step: 1 },
+        { name: "textSize", get label() { return t("cad.field.textSize") }, type: "number", min: 8, max: 72, step: 1 },
         {
           name: "font",
           label: "Font",
@@ -964,9 +965,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "Courier New", label: "Courier New" }
           ]
         },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "drawing-eraser":
@@ -974,8 +975,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "points", label: "Eraser Path Points", type: "pointList", minPoints: 2 },
         { name: "eraserSize", label: "Eraser Size", type: "number", min: 5, max: 50, step: 1 },
         { name: "showEraserPath", label: "Show Eraser Path", type: "checkbox" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "drawing-screenshot-area":
@@ -992,24 +993,24 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "svg", label: "SVG" }
           ]
         },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     default:
       // Fallback per qualsiasi tipo di elemento non gestito
       return [
-        { name: "x", label: "X", type: "number", step: 0.1 },
-        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "width", label: "Width", type: "number", min: 0.1, step: 1 },
-        { name: "height", label: "Height", type: "number", min: 0.1, step: 1 },
-        { name: "depth", label: "Depth", type: "number", min: 0.1, step: 1 },
-        { name: "radius", label: "Radius", type: "number", min: 0.1, step: 1 },
-        { name: "segments", label: "Segments", type: "number", min: 3, step: 1 },
-        { name: "color", label: "Color", type: "color" },
-        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
-        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+        { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
+        { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
+        { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 1 },
+        { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 1 },
+        { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
+        { name: "color", get label() { return t("library.color") }, type: "color" },
+        { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
+        { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
   }
 };

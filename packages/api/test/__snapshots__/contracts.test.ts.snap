@@ -18409,6 +18409,1553 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cloud/connection": {
+      "delete": {
+        "operationId": "cloud.disconnect",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                    },
+                    "deviceId": {
+                      "type": "string",
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+      "get": {
+        "operationId": "cloud.connection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                    },
+                    "deviceId": {
+                      "type": "string",
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+      "put": {
+        "operationId": "cloud.setConnection",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "type": "string",
+                  },
+                  "token": {
+                    "type": "string",
+                  },
+                  "workspaceId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                  "workspaceId",
+                  "token",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                    },
+                    "deviceId": {
+                      "type": "string",
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/projects": {
+      "get": {
+        "operationId": "cloud.projects",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "head": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "state": {
+                        "enum": [
+                          "local",
+                          "pending",
+                          "downloaded",
+                          "applied",
+                          "conflict",
+                        ],
+                        "type": "string",
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "head",
+                      "state",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/projects/{id}/clone": {
+      "post": {
+        "operationId": "cloud.clone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                  },
+                  {
+                    "type": "array",
+                  },
+                ],
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/remote/projects": {
+      "get": {
+        "operationId": "cloud.remoteProjects",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "head": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "state": {
+                        "enum": [
+                          "local",
+                          "pending",
+                          "downloaded",
+                          "applied",
+                          "conflict",
+                        ],
+                        "type": "string",
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "head",
+                      "state",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/remote/projects/{id}": {
+      "get": {
+        "operationId": "cloud.remoteExport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assets": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "body": {
+                            "type": "string",
+                          },
+                          "contentType": {
+                            "type": "string",
+                          },
+                          "fileName": {
+                            "type": "string",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "key": {
+                            "type": "string",
+                          },
+                          "objectId": {
+                            "type": "string",
+                          },
+                          "objectType": {
+                            "type": "string",
+                          },
+                          "sha256": {
+                            "type": "string",
+                          },
+                          "size": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "fileName",
+                          "key",
+                          "contentType",
+                          "objectId",
+                          "objectType",
+                          "size",
+                          "sha256",
+                          "body",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "branch": {
+                      "type": "string",
+                    },
+                    "head": {
+                      "type": "string",
+                    },
+                    "objects": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "body": {
+                            "type": "string",
+                          },
+                          "oid": {
+                            "type": "string",
+                          },
+                          "type": {
+                            "enum": [
+                              "blob",
+                              "tree",
+                              "commit",
+                            ],
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "oid",
+                          "type",
+                          "body",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "version": {
+                      "enum": [
+                        1,
+                      ],
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "version",
+                    "projectId",
+                    "branch",
+                    "head",
+                    "objects",
+                    "assets",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+      "put": {
+        "operationId": "cloud.remoteImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "expectedHead": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "transfer": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "assets": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "body": {
+                              "type": "string",
+                            },
+                            "contentType": {
+                              "type": "string",
+                            },
+                            "fileName": {
+                              "type": "string",
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "key": {
+                              "type": "string",
+                            },
+                            "objectId": {
+                              "type": "string",
+                            },
+                            "objectType": {
+                              "type": "string",
+                            },
+                            "sha256": {
+                              "type": "string",
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "fileName",
+                            "key",
+                            "contentType",
+                            "objectId",
+                            "objectType",
+                            "size",
+                            "sha256",
+                            "body",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      "branch": {
+                        "type": "string",
+                      },
+                      "head": {
+                        "type": "string",
+                      },
+                      "objects": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "body": {
+                              "type": "string",
+                            },
+                            "oid": {
+                              "type": "string",
+                            },
+                            "type": {
+                              "enum": [
+                                "blob",
+                                "tree",
+                                "commit",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "oid",
+                            "type",
+                            "body",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      "projectId": {
+                        "type": "string",
+                      },
+                      "version": {
+                        "enum": [
+                          1,
+                        ],
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "version",
+                      "projectId",
+                      "branch",
+                      "head",
+                      "objects",
+                      "assets",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "transfer",
+                  "expectedHead",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/remote/projects/{id}/receipt": {
+      "post": {
+        "operationId": "cloud.remoteReceipt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "deviceId": {
+                    "type": "string",
+                  },
+                  "head": {
+                    "type": "string",
+                  },
+                  "state": {
+                    "enum": [
+                      "downloaded",
+                      "applied",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "head",
+                  "deviceId",
+                  "state",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
     "/api/companion": {
       "get": {
         "operationId": "companion.status",
@@ -46805,6 +48352,826 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/projects/{id}/cloud/apply": {
+      "post": {
+        "operationId": "cloud.apply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "expectedHead": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/projects/{id}/cloud/fetch": {
+      "post": {
+        "operationId": "cloud.fetch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                  },
+                  {
+                    "type": "array",
+                  },
+                ],
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/projects/{id}/cloud/publish": {
+      "post": {
+        "operationId": "cloud.publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                  },
+                  {
+                    "type": "array",
+                  },
+                ],
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/projects/{id}/cloud/send": {
+      "post": {
+        "operationId": "cloud.send",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/projects/{id}/cloud/status": {
+      "get": {
+        "operationId": "cloud.status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean",
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "state": {
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
     "/api/projects/{id}/components": {
       "get": {
         "operationId": "components.listForProject",
@@ -58027,6 +60394,64 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "properties": {
                                         "_tag": {
                                           "enum": [
+                                            "CycleBegin",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "family": {
+                                          "anyOf": [
+                                            {
+                                              "enum": [
+                                                "heidenhain",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          ],
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                        "number": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "integer",
+                                        },
+                                        "params": {
+                                          "additionalProperties": {
+                                            "type": "number",
+                                          },
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "family",
+                                        "number",
+                                        "name",
+                                        "params",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "CycleEnd",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
                                             "Message",
                                           ],
                                           "type": "string",
@@ -58510,6 +60935,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "name": {
                     "minLength": 1,
                     "type": "string",
+                  },
+                  "nativeCycles": {
+                    "type": "boolean",
                   },
                   "operations": {
                     "items": {
@@ -60936,9 +63364,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "reprap",
                                   ],
                                   "type": "string",
-                  "nativeCycles": {
-                    "type": "boolean",
-                  },
                                 },
                                 "filament": {
                                   "additionalProperties": false,
@@ -61816,6 +64241,64 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               "required": [
                                                 "_tag",
                                                 "label",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "CycleBegin",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "family": {
+                                                  "anyOf": [
+                                                    {
+                                                      "enum": [
+                                                        "heidenhain",
+                                                      ],
+                                                      "type": "string",
+                                                    },
+                                                  ],
+                                                },
+                                                "name": {
+                                                  "minLength": 1,
+                                                  "type": "string",
+                                                },
+                                                "number": {
+                                                  "exclusiveMinimum": 0,
+                                                  "type": "integer",
+                                                },
+                                                "params": {
+                                                  "additionalProperties": {
+                                                    "type": "number",
+                                                  },
+                                                  "type": "object",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "family",
+                                                "number",
+                                                "name",
+                                                "params",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "CycleEnd",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
                                               ],
                                               "type": "object",
                                             },
@@ -63223,6 +65706,64 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "required": [
                                         "_tag",
                                         "label",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "CycleBegin",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "family": {
+                                          "anyOf": [
+                                            {
+                                              "enum": [
+                                                "heidenhain",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          ],
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                        "number": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "integer",
+                                        },
+                                        "params": {
+                                          "additionalProperties": {
+                                            "type": "number",
+                                          },
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "family",
+                                        "number",
+                                        "name",
+                                        "params",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "CycleEnd",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
                                       ],
                                       "type": "object",
                                     },
@@ -65058,6 +67599,64 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "required": [
                                       "_tag",
                                       "label",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "CycleBegin",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "family": {
+                                        "anyOf": [
+                                          {
+                                            "enum": [
+                                              "heidenhain",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "name": {
+                                        "minLength": 1,
+                                        "type": "string",
+                                      },
+                                      "number": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "integer",
+                                      },
+                                      "params": {
+                                        "additionalProperties": {
+                                          "type": "number",
+                                        },
+                                        "type": "object",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "family",
+                                      "number",
+                                      "name",
+                                      "params",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "CycleEnd",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
                                     ],
                                     "type": "object",
                                   },
@@ -74915,6 +77514,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
     },
     {
       "name": "workspace",
+    },
+    {
+      "name": "cloud",
     },
   ],
 }

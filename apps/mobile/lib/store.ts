@@ -106,7 +106,7 @@ export const useUIStore = create<UIState>()(
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
-      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId || (assistantDesktopId !== null && state.assistantDesktopId?.endsWith(`|${assistantDesktopId}`)) ? { assistantDesktopId } : { assistantDesktopId, assistantProjectId: null, assistantSessions: {}, assistantPreferences: {} }),
+      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId || (assistantDesktopId !== null && state.assistantDesktopId?.endsWith(`|${assistantDesktopId}`)) ? { assistantDesktopId } : { assistantDesktopId, assistantProjectId: null, assistantSessions: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null }),
       setAssistantProject: (assistantProjectId) => set({ assistantProjectId }),
       forgetMissingProjects: (existingIds) => set((state) => {
         const keep = new Set(existingIds)

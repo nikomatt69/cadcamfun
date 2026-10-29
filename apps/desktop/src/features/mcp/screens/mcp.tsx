@@ -329,10 +329,10 @@ export function McpConfigEditorScreen(): JSX.Element {
         <p class="mb-2">{t("mcp.editor.infoList")}</p>
         <ul class="mb-2 list-disc pl-5">
           <li><code>id</code>: {t("mcp.editor.infoId")}</li>
-          <li><code>name</code>: {t("mcp.editor.infoName")}</li>
-          <li><code>type</code>: {t("mcp.editor.infoType")}</li>
+          <li><code>{t("library.field.name")}</code>: {t("mcp.editor.infoName")}</li>
+          <li><code>{t("library.field.type")}</code>: {t("mcp.editor.infoType")}</li>
           <li><code>url</code>: {t("mcp.editor.infoUrl")}</li>
-          <li><code>enabled</code>: {t("mcp.editor.infoEnabled")}</li>
+          <li><code>{t("mcp.settings.enabled")}</code>: {t("mcp.editor.infoEnabled")}</li>
         </ul>
       </div>
       </div>

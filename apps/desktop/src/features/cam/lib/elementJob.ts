@@ -9,6 +9,7 @@
  */
 import { cam } from "@cadcamfun/core"
 import { toJsonSafeRecord } from "../../../shared/state/json-safe.ts"
+import { t } from "../../../i18n/index.ts"
 import { EXPLORER_MATERIALS, EXPLORER_TOOLS } from "./explorer.ts"
 import type { CadElement, Stock } from "./job.ts"
 
@@ -45,8 +46,8 @@ export const operationForElement = (type: string): ToolpathSettings["operationTy
 
 /** The alert the legacy explorer showed when generation was asked without both picks (or with an unknown id). */
 export const assignmentProblem = (toolId: string, materialId: string): string | undefined => {
-  if (!toolId || !materialId) return "Please assign both tool and material first"
-  if (EXPLORER_TOOLS[toolId] === undefined || EXPLORER_MATERIALS[materialId] === undefined) return "Invalid tool or material"
+  if (!toolId || !materialId) return t("cam.explorer.assignBoth")
+  if (EXPLORER_TOOLS[toolId] === undefined || EXPLORER_MATERIALS[materialId] === undefined) return t("cam.explorer.invalidAssignment")
   return undefined
 }
 
@@ -59,7 +60,7 @@ const round2 = (value: number): number => Math.round(value * 100) / 100
 export const settingsForElement = (base: ToolpathSettings, element: CadElement, assignment: ElementAssignment): ToolpathSettings => {
   const tool = EXPLORER_TOOLS[assignment.toolId]
   const material = EXPLORER_MATERIALS[assignment.materialId]
-  if (tool === undefined || material === undefined) throw new Error(assignmentProblem(assignment.toolId, assignment.materialId) ?? "Invalid tool or material")
+  if (tool === undefined || material === undefined) throw new Error(assignmentProblem(assignment.toolId, assignment.materialId) ?? t("cam.explorer.invalidAssignment"))
   const depth = assignment.params.depth
   return {
     ...base,

@@ -9,7 +9,7 @@ const migrations = new URL("../../../packages/db/drizzle", import.meta.url).path
 const token = "source-process-test-token"
 
 async function start(dataDir: string) {
-  const child = Bun.spawn([process.execPath, entry], {
+  const child = Bun.spawn([process.execPath, "--no-env-file", entry], {
     env: { ...process.env, CADCAMFUN_TOKEN: token, CADCAMFUN_DATA_DIR: dataDir, CADCAMFUN_MIGRATIONS_DIR: migrations, CADCAMFUN_AI_OFFLINE: "1" },
     stdin: "pipe", stdout: "pipe", stderr: "pipe"
   })

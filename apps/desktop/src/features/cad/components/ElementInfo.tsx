@@ -5,6 +5,7 @@ import { useElementsStore, type Element as CADElement } from "../store/elementsS
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { NumberField } from "./property-inputs/NumberField.tsx"
+import { t } from "../../../i18n/index.ts"
 
 interface ElementInfoProps { readonly elementId: string; onClose?: () => void }
 type Values = Record<string, any>
@@ -113,11 +114,11 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
             </h3>
             <div class="flex space-x-1 ml-2">
               <Show when={editMode()} fallback={<>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={startEditing} title="Edit properties"><Pencil size={16} /></button>
-                <Show when={props.onClose}><button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={props.onClose} title="Close panel"><X size={16} /></button></Show>
+                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={startEditing} title={t("cad.info.edit")}><Pencil size={16} /></button>
+                <Show when={props.onClose}><button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={props.onClose} title={t("cad.info.close")}><X size={16} /></button></Show>
               </>}>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-green-600 dark:text-green-400" onClick={saveChanges} title="Save changes"><Save size={16} /></button>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-500" onClick={cancelEditing} title="Cancel"><X size={16} /></button>
+                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-green-600 dark:text-green-400" onClick={saveChanges} title={t("cad.info.save")}><Save size={16} /></button>
+                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-500" onClick={cancelEditing} title={t("cad.assembly.cancel")}><X size={16} /></button>
               </Show>
             </div>
           </div>
@@ -127,7 +128,7 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
               {section("general", "General", () => (
                 <Show when={editMode()} fallback={<>
                   {property("Name", el().name || `${el().type}-${el().id.slice(0, 6)}`)}{property("Type", el().type)}
-                  {property("Layer", layer()?.name || "No Layer")}{property("Visible", el().visible !== false ? "Yes" : "No")}{property("Locked", el().locked ? "Yes" : "No")}
+                  {property("Layer", layer()?.name || "No Layer")}{property("Visible", el().visible !== false ? t("common.yes") : t("common.no"))}{property("Locked", el().locked ? t("common.yes") : t("common.no"))}
                 </>}>
                   {editable("Name", "name")}{editable("Type", "type", "text", [])}
                   {editable("Layer", "layerId", "select", layers.layers.map((l) => ({ value: l.id, label: l.name })))}
@@ -166,11 +167,11 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
               {section("appearance", "Appearance", () => (
                 <Show when={editMode()} fallback={<>
                   <div class="flex items-center justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Color</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">{t("library.color")}</span>
                     <div class="flex items-center"><div class="w-4 h-4 rounded mr-2" style={{ "background-color": el().color || "#1e88e5" }} /><span class="font-medium">{el().color || "#1e88e5"}</span></div>
                   </div>
                   <Show when={["line", "rectangle", "circle"].includes(el().type)}>{property("Line Width", formatNumber(el().linewidth), "px")}</Show>
-                  <Show when={el().type !== "line" && el().type !== "text"}>{property("Wireframe", el().wireframe ? "Yes" : "No")}</Show>
+                  <Show when={el().type !== "line" && el().type !== "text"}>{property("Wireframe", el().wireframe ? t("common.yes") : t("common.no"))}</Show>
                 </>}>
                   {editable("Color", "color", "color")}
                   <Show when={["line", "rectangle", "circle"].includes(el().type)}>{editable("Line Width", "linewidth", "number")}</Show>
@@ -205,19 +206,19 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
           <Show when={!editMode()}>
             <div class="p-3 border-t">
               <div class="flex flex-wrap gap-2">
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" title="Duplicate"
-                  onClick={() => { elements.duplicateElement(el().id); selection.clearSelection() }}><Copy size={12} class="mr-1" />Duplicate</button>
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title="Move"
+                <button class="flex items-center px-2.5 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" title={t("cad.ribbon.duplicate")}
+                  onClick={() => { elements.duplicateElement(el().id); selection.clearSelection() }}><Copy size={12} class="mr-1" />{t("cad.ribbon.duplicate")}</button>
+                <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title={t("cad.move")}
                   onClick={() => {
                     useCADStore.getState().setActiveTool("move")
                     if (!useSelectionStore.getState().selectedElementIds.includes(el().id)) useSelectionStore.getState().selectElement(el().id)
-                  }}><Move size={12} class="mr-1" />Move</button>
+                  }}><Move size={12} class="mr-1" />{t("cad.move")}</button>
                 <Show when={el().type === "component"}>
-                  <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title="Ungroup Component"
-                    onClick={() => selection.ungroupElement(el().id)}><Layers size={12} class="mr-1" />Ungroup</button>
+                  <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title={t("cad.info.ungroup")}
+                    onClick={() => selection.ungroupElement(el().id)}><Layers size={12} class="mr-1" />{t("browser.ungroup")}</button>
                 </Show>
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600" title="Delete"
-                  onClick={() => { elements.deleteElement(el().id); selection.clearSelection(); props.onClose?.() }}><Trash2 size={12} class="mr-1" />Delete</button>
+                <button class="flex items-center px-2.5 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600" title={t("cad.customElements.delete")}
+                  onClick={() => { elements.deleteElement(el().id); selection.clearSelection(); props.onClose?.() }}><Trash2 size={12} class="mr-1" />{t("cad.customElements.delete")}</button>
               </div>
             </div>
           </Show>

@@ -8,6 +8,7 @@ CADCAMFUN v6: native CAD/CAM desktop app. **Bun + Effect v4 (rc.112) + Drizzle (
 - `specs/01-conventions.md` — Effect v4 rules, DB rules, agent workflow. Effect is pinned to `4.0.0-rc.112` workspace-wide (required by nikcli `sdk-next`); its docs are in `packages/db/node_modules/effect/ai-docs/src/` (the API differs from v3; do not rely on memory).
 - The spec of the work package you are working on (`specs/02…14`).
 - **Roadmap (when cited):** `specs/roadmap/README.md` — ordered remaining work (RM-00–RM-11). See **Roadmap** below.
+- **Finished specs:** `specs/completed/` (index: `specs/completed/README.md`) must not be re-opened or extended. Real remaining work and stale headers: `specs/67-real-state-2026-10-29.md`.
 
 ## Roadmap
 

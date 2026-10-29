@@ -154,7 +154,7 @@ export default function CadRibbon(props: Props): JSX.Element {
           <select aria-label={t("cad.explode.direction")} value={cad.explodedView.axis} onChange={event => {
             const axis = event.currentTarget.value
             if (isExplodeAxis(axis)) cad.setExplodedView({ axis })
-          }}><option value="auto">{t("cad.explode.auto")}</option><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select>
+          }}><option value="auto">{t("cad.explode.auto")}</option><option value="x">{t("cad.field.x")}</option><option value="y">{t("cad.field.y")}</option><option value="z">Z</option></select>
           <label class="flex items-center gap-1 text-xs" title={t("cad.explode.separation")}>
             <input type="range" min="0" max="3" step="0.01" class="w-24" aria-label={t("cad.explode.separation")}
               value={cad.explodedView.amount} onInput={event => cad.setExplodedView({ amount: Number(event.currentTarget.value) })} />
@@ -171,9 +171,9 @@ export default function CadRibbon(props: Props): JSX.Element {
           <select aria-label={t("cad.section.axis")} value={cad.section.axis} onChange={event => {
             const axis = event.currentTarget.value
             if (isSectionAxis(axis)) cad.setSection({ axis })
-          }}><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select>
+          }}><option value="x">{t("cad.field.x")}</option><option value="y">{t("cad.field.y")}</option><option value="z">Z</option></select>
           <label class="cad-ribbon-position"><input type="number" aria-label={t("cad.section.constant")} value={cad.section.position} step="0.5"
-            onInput={event => { const position = event.currentTarget.valueAsNumber; if (Number.isFinite(position)) cad.setSection({ position }) }} /><span>mm</span></label>
+            onInput={event => { const position = event.currentTarget.valueAsNumber; if (Number.isFinite(position)) cad.setSection({ position }) }} /><span>{t("cad.millimeters")}</span></label>
           <Action label={t("cad.section.invert")} icon={<FlipHorizontal2 size={13} />} active={cad.section.inverted}
             onClick={() => cad.setSection({ inverted: !cad.section.inverted })} />
         </div>

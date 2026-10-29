@@ -6,6 +6,7 @@
  * selection rules are testable without a DOM or the stores' reactivity.
  */
 import type { CadElement } from "./job.ts"
+import { t, type Key } from "../../../i18n/index.ts"
 
 export interface ExplorerNode {
   readonly id: string
@@ -121,10 +122,10 @@ export const machinableSelection = (elements: ReadonlyArray<CadElement>, selecti
 /** What the generator will do with the elements, as one line for the explorer footer. */
 export const selectionSummary = (elements: ReadonlyArray<CadElement>, selection: ReadonlyArray<string>): string => {
   const ids = machinableSelection(elements, selection)
-  if (ids.length === 0) return "Select a CAD element to machine it"
+  if (ids.length === 0) return t("cam.explorer.summaryNone")
   const byId = new Map(elements.map(element => [idOf(element), element] as const))
   const first = elementName(byId.get(ids[0]!)!)
-  return ids.length === 1 ? `Machining: ${first}` : `Machining ${ids.length} elements, starting with ${first}`
+  return ids.length === 1 ? t("cam.explorer.summaryOne", { name: first }) : t("cam.explorer.summaryMany", { count: ids.length, name: first })
 }
 
 /** Tool / material presets of the explorer's per-element panels (legacy ids and parameters). */
@@ -140,4 +141,32 @@ export const EXPLORER_MATERIALS: Readonly<Record<string, { readonly name: string
   "wood-maple": { name: "Wood - Maple", hardness: "hard", feedrateFactor: 0.8 },
   "aluminum": { name: "Aluminum", hardness: "hard", feedrateFactor: 0.5 },
   "acrylic": { name: "Acrylic", hardness: "medium", feedrateFactor: 0.7 }
+}
+
+/** Display name of a preset tool in the current language; the English `name` stays the stored/data value. */
+export const toolLabel = (toolId: string): string => {
+  const key = `cam.explorer.toolName.${toolId}` as Key
+  const label = t(key)
+  return label === key ? (EXPLORER_TOOLS[toolId]?.name ?? toolId) : label
+}
+
+/** Display name of a preset material in the current language. */
+export const materialLabel = (materialId: string): string => {
+  const key = `cam.explorer.materialName.${materialId}` as Key
+  const label = t(key)
+  return label === key ? (EXPLORER_MATERIALS[materialId]?.name ?? materialId) : label
+}
+
+/** Tool type (`endmill`, `ballnose`, `v-bit`) in the current language. */
+export const toolTypeLabel = (type: string): string => {
+  const key = `cam.explorer.toolType.${type}` as Key
+  const label = t(key)
+  return label === key ? type : label
+}
+
+/** Material hardness (`medium`, `hard`) in the current language. */
+export const hardnessLabel = (hardness: string): string => {
+  const key = `cam.explorer.hardness.${hardness}` as Key
+  const label = t(key)
+  return label === key ? hardness : label
 }

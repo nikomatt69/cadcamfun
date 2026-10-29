@@ -162,6 +162,18 @@ export const COMPANION_ROUTES: readonly Rule[] = [
 export const isCompanionRoute = (method: string, pathname: string): boolean =>
   COMPANION_ROUTES.some((r) => r.methods.includes(method.toUpperCase()) && r.path.test(pathname))
 
+/** First-party transfer and delivery are available only on an explicitly hosted workspace. */
+export const CLOUD_ROUTES: readonly Rule[] = [
+  { methods: ["GET"], path: /^\/api\/cloud\/remote\/projects$/ },
+  { methods: ["GET", "PUT"], path: /^\/api\/cloud\/remote\/projects\/[^/]+$/ },
+  { methods: ["POST"], path: /^\/api\/cloud\/remote\/projects\/[^/]+\/receipt$/ },
+  { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/cloud\/status$/ },
+  { methods: ["POST"], path: /^\/api\/projects\/[^/]+\/cloud\/send$/ },
+]
+
+export const isCloudRoute = (method: string, pathname: string): boolean =>
+  CLOUD_ROUTES.some((rule) => rule.methods.includes(method.toUpperCase()) && rule.path.test(pathname))
+
 // ── tokens ──────────────────────────────────────────────────────────────────
 
 export interface TokenRecord {
@@ -205,6 +217,7 @@ export interface RoutePolicy {
 export const PROMPT_BODY_LIMIT = 36 * 1024 * 1024
 /** Every other write is a small JSON document (commit message, review, workflow YAML, a mark-read). */
 export const WRITE_BODY_LIMIT = 1024 * 1024
+export const CLOUD_TRANSFER_BODY_LIMIT = 64 * 1024 * 1024
 export const READ_TIMEOUT_MS = 60_000
 /** A merge runs its workflows before it answers, and a prompt waits up to a minute for the host to open the session. */
 export const WRITE_TIMEOUT_MS = 120_000
@@ -226,7 +239,9 @@ const READ_ONLY_POST_ROUTES: readonly RegExp[] = [/^\/api\/ai\/sessions\/state$/
 
 export const routePolicy = (method: string, pathname: string): RoutePolicy => {
   const upper = method.toUpperCase()
-  const body = PROMPT_ROUTES.test(pathname) ? PROMPT_BODY_LIMIT : WRITE_BODY_LIMIT
+  const body = upper === "PUT" && /^\/api\/cloud\/remote\/projects\/[^/]+$/u.test(pathname)
+    ? CLOUD_TRANSFER_BODY_LIMIT
+    : PROMPT_ROUTES.test(pathname) ? PROMPT_BODY_LIMIT : WRITE_BODY_LIMIT
   if (STREAM_ROUTES.some((r) => r.methods.includes(upper) && r.path.test(pathname))) return { kind: "stream", maxBody: upper === "GET" ? 0 : body, timeoutMs: undefined }
   if (upper === "GET" || upper === "HEAD") return { kind: "read", maxBody: 0, timeoutMs: READ_TIMEOUT_MS }
   // A read-only POST still carries a body, so it keeps a body limit; only the write token is spared.
@@ -294,7 +309,7 @@ export interface GatewayRequestLog {
 // ── server ──────────────────────────────────────────────────────────────────
 
 export interface GatewayOptions {
-  readonly certificate: CompanionCertificate
+  readonly certificate?: CompanionCertificate
   readonly port: number
   /** The loopback sidecar and its real bearer token. */
   readonly upstream: () => { readonly port: number; readonly token: string }
@@ -306,6 +321,27 @@ export interface GatewayOptions {
   readonly log?: (entry: GatewayRequestLog) => void
   /** Overrides the per-kind timeouts, for tests. */
   readonly timeouts?: { readonly readMs?: number; readonly writeMs?: number }
+  /** HTTP is confined to the private coordinator hop. Public clients still use platform-verified HTTPS. */
+  readonly hosted?: {
+    readonly workspaceId: string
+    readonly internalToken: string
+    /** Verifies the configured owner before resolving a local account. */
+    readonly verifyIdentity: (token: string) => Promise<{ readonly userId: string }>
+    readonly enroll: (name: string, identityToken: string) => Promise<{ readonly id: string; readonly link: string }>
+    /** Persists filesystem/session state as well as the database before externally acknowledging a mutation. */
+    readonly persist?: () => Promise<void>
+  }
+}
+
+export const CLOUD_INTERNAL_HEADER = "x-cadcamfun-cloud-internal"
+export const CLOUD_WORKSPACE_HEADER = "x-cadcamfun-workspace-id"
+export const CLOUD_DEVICE_HEADER = "x-cadcamfun-device-id"
+export const CLOUD_CLIENT_IP_HEADER = "x-cadcamfun-client-ip"
+
+const matchesSecret = (supplied: string | null, expected: string): boolean => {
+  if (supplied === null) return false
+  const left = Buffer.from(supplied), right = Buffer.from(expected)
+  return left.length === right.length && timingSafeEqual(left, right)
 }
 
 export interface Gateway {
@@ -371,7 +407,57 @@ const onBodyEnd = (response: Response, end: () => void): Response => {
   return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
 }
 
+/** An SSE event is acknowledged only after its associated workspace state is durable. */
+const durableFrames = (response: Response, persist: () => Promise<void>): Response => {
+  if (!response.body) return response
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  let pending = ""
+  let done = false
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        while (!done) {
+          const chunk = await reader.read()
+          done = chunk.done
+          pending += decoder.decode(chunk.value, { stream: !done })
+          if (pending.length > CLOUD_TRANSFER_BODY_LIMIT) throw new Error("Cloud event exceeds the frame limit")
+          let boundary = 0
+          for (const match of pending.matchAll(/\r?\n\r?\n/gu)) boundary = (match.index ?? 0) + match[0].length
+          if (done) boundary = pending.length
+          if (boundary > 0) {
+            await persist()
+            controller.enqueue(encoder.encode(pending.slice(0, boundary)))
+            pending = pending.slice(boundary)
+            if (done) controller.close()
+            return
+          }
+          if (done) {
+            await persist()
+            controller.close()
+          }
+        }
+      } catch (error) {
+        await reader.cancel().catch(() => undefined)
+        controller.error(error)
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason)
+      await persist()
+    },
+  })
+  const headers = new Headers(response.headers)
+  headers.set("x-cadcamfun-durable-stream", "1")
+  headers.delete("content-length")
+  return new Response(body, { status: response.status, statusText: response.statusText, headers })
+}
+
 export const startGateway = (options: GatewayOptions): Gateway => {
+  if (!options.hosted && !options.certificate) throw new Error("A local gateway requires its pinned TLS certificate")
+  if (options.hosted && options.hosted.internalToken.length < 32) throw new Error("The private cloud coordinator token is too short")
+  const tls = options.certificate ? { cert: options.certificate.cert, key: options.certificate.key } : undefined
   const limits = options.limits ?? DEFAULT_DEVICE_LIMITS
   const failures = new Map<string, { count: number; since: number }>()
   const buckets = new Map<string, { requests: TokenBucket; writes: TokenBucket; streams: number }>()
@@ -405,33 +491,77 @@ export const startGateway = (options: GatewayOptions): Gateway => {
   const server = Bun.serve({
     port: options.port,
     hostname: "0.0.0.0",
-    tls: { cert: options.certificate.cert, key: options.certificate.key },
+    ...(!options.hosted && tls ? { tls } : {}),
     // A model writing a long tool call is silent for a while; Bun's maximum idle timeout.
     idleTimeout: 255,
     // The hard ceiling; each route has its own, smaller limit below.
-    maxRequestBodySize: PROMPT_BODY_LIMIT,
+    maxRequestBodySize: options.hosted ? CLOUD_TRANSFER_BODY_LIMIT : PROMPT_BODY_LIMIT,
     async fetch(request, srv) {
       const started = Date.now()
-      const ip = srv.requestIP(request)?.address ?? "unknown"
+      const ip = options.hosted ? request.headers.get(CLOUD_CLIENT_IP_HEADER) ?? srv.requestIP(request)?.address ?? "unknown" : srv.requestIP(request)?.address ?? "unknown"
       const url = new URL(request.url)
       let device: string | null = null
       let kind: GatewayRequestLog["kind"] = "refused"
       const answer = (response: Response, reason?: GatewayRequestLog["reason"]): Response => {
+        if (options.hosted) {
+          const headers = new Headers(response.headers)
+          headers.set(CLOUD_WORKSPACE_HEADER, options.hosted.workspaceId)
+          if (device) headers.set(CLOUD_DEVICE_HEADER, device)
+          response = new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+        }
         options.log?.({ device, ip, method: request.method, path: url.pathname, status: response.status, ms: Date.now() - started, kind, ...(reason ? { reason } : {}) })
         return response
       }
       const refuse = (status: number, message: string, reason: GatewayRequestLog["reason"], headers?: Record<string, string>) =>
         answer(Response.json({ message }, { status, ...(headers ? { headers } : {}) }), reason)
 
+      if (options.hosted && !matchesSecret(request.headers.get(CLOUD_INTERNAL_HEADER), options.hosted.internalToken)) return refuse(401, "Unauthorized", "unauthorized")
+      if (options.hosted && request.method === "GET" && url.pathname === "/internal/ready") {
+        return answer(Response.json({ ready: true, workspaceId: options.hosted.workspaceId }))
+      }
       if (blocked(ip, started)) return refuse(429, "Too many failed attempts", "rate-limited")
+      const identityToken = request.headers.get(IDENTITY_HEADER)
+      let identityUser: { readonly userId: string } | undefined
+      if (options.hosted) {
+        if (!identityToken) {
+          fail(ip, started)
+          return refuse(401, "Sign in to the cloud workspace", "unauthorized")
+        }
+        try {
+          identityUser = await options.hosted.verifyIdentity(identityToken)
+        } catch {
+          fail(ip, started)
+          return refuse(401, "Identity session is invalid or expired", "unauthorized")
+        }
+        if (request.method === "POST" && url.pathname === "/internal/pair") {
+          const bytes = await readBody(request, WRITE_BODY_LIMIT)
+          if (!bytes) return refuse(413, "The enrollment request is too large", "too-large")
+          let name: string
+          try {
+            const input: unknown = JSON.parse(new TextDecoder().decode(bytes))
+            if (typeof input !== "object" || input === null || !("name" in input) || typeof input.name !== "string" || !input.name.trim() || input.name.trim().length > 60) return refuse(400, "Device name is required (up to 60 characters)", "forbidden")
+            name = input.name.trim()
+          } catch {
+            return refuse(400, "Invalid enrollment request", "forbidden")
+          }
+          try {
+            const enrolled = await options.hosted.enroll(name, identityToken)
+            await options.hosted.persist?.()
+            return answer(Response.json(enrolled, { status: 201 }))
+          } catch {
+            return refuse(503, "Could not persist device enrollment", "unavailable", { "x-cadcamfun-durability-failed": "1" })
+          }
+        }
+      }
       const bearer = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1]
       const record = bearer ? findToken(await options.tokens(), bearer) : undefined
       if (!record) {
         fail(ip, started)
         return refuse(401, "Unauthorized", "unauthorized")
       }
+      if (options.hosted && record.userId !== identityUser?.userId) return refuse(403, "This device is not enrolled for this account", "forbidden")
       device = record.id
-      if (!isCompanionRoute(request.method, url.pathname)) return refuse(403, "Not available to a companion device", "forbidden")
+      if (!isCompanionRoute(request.method, url.pathname) && !(options.hosted && isCloudRoute(request.method, url.pathname))) return refuse(403, "Not available to a companion device", "forbidden")
       const policy = routePolicy(request.method, url.pathname)
       kind = policy.kind
       const budget = budgetOf(record.id, started)
@@ -460,11 +590,15 @@ export const startGateway = (options: GatewayOptions): Gateway => {
       headers.delete("host")
       headers.delete("content-length")
       headers.delete("cookie")
+      headers.delete(CLOUD_INTERNAL_HEADER)
+      headers.delete(CLOUD_CLIENT_IP_HEADER)
+      headers.delete(CLOUD_WORKSPACE_HEADER)
+      headers.delete(CLOUD_DEVICE_HEADER)
       // Attribution for the audit trail; whatever the phone sent under this name is replaced, never trusted.
       headers.set(COMPANION_DEVICE_HEADER, record.id)
       // The device acts as the account that paired it, like the desktop webview, unless the phone signed in to its own.
       headers.delete(SESSION_HEADER)
-      const session = headers.has(IDENTITY_HEADER) ? undefined : options.session?.(record)
+      const session = options.hosted || headers.has(IDENTITY_HEADER) ? undefined : options.session?.(record)
       if (session) headers.set(SESSION_HEADER, session)
 
       const controller = new AbortController()
@@ -479,7 +613,7 @@ export const startGateway = (options: GatewayOptions): Gateway => {
         request.signal.removeEventListener("abort", abort)
       }
       try {
-        const response = await fetch(`http://127.0.0.1:${upstream.port}${url.pathname}${url.search}`, {
+        let response = await fetch(`http://127.0.0.1:${upstream.port}${url.pathname}${url.search}`, {
           method: request.method,
           headers,
           ...(body !== undefined ? { body } : {}),
@@ -487,6 +621,17 @@ export const startGateway = (options: GatewayOptions): Gateway => {
         })
         // The deadline covers the desktop's answer, not the time the phone takes to download it.
         clearTimeout(timer)
+        if (options.hosted?.persist) {
+          if (response.headers.get("content-type")?.includes("text/event-stream")) response = durableFrames(response, options.hosted.persist)
+          else if (write) {
+            try { await options.hosted.persist() }
+            catch {
+              await response.body?.cancel().catch(() => undefined)
+              release()
+              return refuse(503, "Cloud state could not be persisted. Reconnect before retrying.", "unavailable", { "x-cadcamfun-durability-failed": "1" })
+            }
+          }
+        }
         return answer(onBodyEnd(response, release))
       } catch {
         clearTimeout(timer)
@@ -509,6 +654,13 @@ export const pairingLink = (input: { host: string; port: number; token: string; 
   const extras = (input.hosts ?? []).filter((h) => h !== input.host)
   if (extras.length > 0) params.set("hosts", extras.map((h) => originFor(h, input.port)).join(","))
   return `cadcamfun://pair?${params}`
+}
+
+/** Public TLS certificates can rotate without changing a workspace or its cached project identity. */
+export const cloudPairingLink = (input: { origin: string; workspaceId: string; token: string; name: string }): string => {
+  const origin = new URL(input.origin)
+  if (origin.protocol !== "https:" || origin.origin !== input.origin.replace(/\/$/u, "")) throw new Error("Cloud pairing requires an HTTPS origin")
+  return `cadcamfun://pair?${new URLSearchParams({ mode: "cloud", workspace: input.workspaceId, host: origin.origin, token: input.token, name: input.name })}`
 }
 
 /** Best private address of this machine, the default host in the pairing link. */

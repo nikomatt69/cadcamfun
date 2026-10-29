@@ -10,7 +10,7 @@
  * wait for and nowhere to redirect to — the tabs render straight away. The account
  * deletion flow keeps the legacy confirm → DELETE → toast → sign-out → home sequence.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { Bell, Cpu, Globe, Keyboard, Lock, Shield, Smartphone, User } from "lucide-solid"
 import { LOCALE_CODES, localeInfo, t } from "../../../i18n/index.ts"
@@ -55,7 +55,8 @@ export function SettingsScreen(): JSX.Element {
   const [isDeleting, setIsDeleting] = createSignal(false)
   const [deleteError, setDeleteError] = createSignal<string | undefined>(undefined)
 
-  const tabs: readonly Tab[] = [
+  // A memo, not a plain array: the tab names follow the language of the app.
+  const tabs = createMemo<readonly Tab[]>(() => [
     { id: "profile", name: t("settings.tab.profile"), Icon: User },
     { id: "account", name: t("settings.tab.account"), Icon: Shield },
     { id: "security", name: t("settings.tab.security"), Icon: Lock },
@@ -64,7 +65,7 @@ export function SettingsScreen(): JSX.Element {
     { id: "devices", name: t("settings.tab.devices"), Icon: Smartphone },
     { id: "keyboard", name: t("settings.tab.keyboard"), Icon: Keyboard },
     { id: "language", name: t("settings.tab.language"), Icon: Globe }
-  ]
+  ])
 
   const handleDeleteAccount = async (): Promise<void> => {
     setDeleteError(undefined)
@@ -394,7 +395,7 @@ export function SettingsScreen(): JSX.Element {
           label={t("settings.title")}
           value={activeTab()}
           onChange={setActiveTab}
-          tabs={tabs.map((tab) => ({ id: tab.id, label: tab.name, icon: <tab.Icon size={14} /> }))}
+          tabs={tabs().map((tab) => ({ id: tab.id, label: tab.name, icon: <tab.Icon size={14} /> }))}
         />
 
         <div class={`${PANEL} !p-4 sm:!p-5`}>

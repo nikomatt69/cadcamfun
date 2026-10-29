@@ -12,6 +12,8 @@ Design specs (`specs/00` through `28`, plus `specs/ai/`) own contracts. This fol
 4. Do not start a later step until every `depends on` row is `done`, unless the request names that later step **and** its dependencies are already `done`.
 5. After the acceptance gate passes: set the row to `done`, append a Change log line on the step spec, and stop unless asked to continue.
 
+Cross-lane order (this index plus the kernel plan of spec 62, adapter windows, next ten items): [`70-integrated-next-steps-2026-10-29.md`](../70-integrated-next-steps-2026-10-29.md). For RM rows the order below stays authoritative; for anything that also involves the kernel lanes, spec 68 decides the interleaving.
+
 Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary in every step spec.
 
 ## Order
@@ -19,7 +21,7 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | # | Id | Spec | Status | Depends on | Owners |
 | --- | --- | --- | --- | --- | --- |
 | 0 | RM-00 | `00-how-to-follow.md` | **done** (rules) | — | agents |
-| 1 | RM-01 | `01-action-catalogue.md` | **in progress** | — | WP8 `packages/ai`, WP4 AI handler adapters, WP3 shared action schemas, WP6 AI tool consumers (scopes in step spec) |
+| 1 | RM-01 | `01-action-catalogue.md` | **in progress** (seam closed 2026-10-13; gate red: `tool-prompts.test.ts` 33 301 > 32 800 chars, checked 2026-10-29) | — | WP8 `packages/ai`, WP4 AI handler adapters, WP3 shared action schemas, WP6 AI tool consumers (scopes in step spec) |
 | 2 | RM-02 | `02-multi-op-setup.md` | **pending** | RM-01 for AI actions; RM-03 for persisted setup integration/completion (pure work may run in parallel) | WP2 `packages/core/src/cam`, WP3 `packages/api`, WP4 `apps/sidecar`, WP6 `apps/desktop/src/cam`, WP8 setup action bindings only |
 | 3 | RM-03 | `03-api-parity.md` | **pending** | — (parallel with RM-02 on disjoint groups; AI execution uses RM-01) | WP3 `packages/api`, WP4 `apps/sidecar`, WP0 revision/receipt migration only |
 | 4 | RM-04 | `04-desktop-parity.md` | **pending** | RM-03 for each vertical's routes | WP6 `apps/desktop` |
@@ -91,3 +93,4 @@ Same as `00-overview.md` §5, plus:
 - v1: created `specs/roadmap/`; ordered RM-00–RM-11 from current tree (API 121/195, spec 26 not landed, WP14 persistence missing) and architecture/Effect rules.
 - 2026-10-12: linked approved spec 28 and AI design increments; scoped cross-WP contract amendments for safe execution, receipts, context, durability and precision. Sequence and pending statuses unchanged; no implementation gate claimed.
 - 2026-10-12: reconciled RM-02 persistence behind independent RM-03 and explicitly gated RM-09 precision integration on RM-03/RM-06, with scoped pure-work parallelism. Documentation only; statuses unchanged.
+- 2026-10-29: RM-01 row annotated with the verified state (seam closed, prompt-size gate red); pointer to spec 70 for cross-lane order. Other rows unchanged: their statuses were not re-verified.

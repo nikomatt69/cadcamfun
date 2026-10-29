@@ -1,3 +1,4 @@
+import { t } from "./i18n/index.ts"
 import { render } from "solid-js/web"
 import { createSignal } from "solid-js"
 import { Effect } from "effect"
@@ -16,4 +17,4 @@ const api = createFakeApi()
 const state = createAppState({ client: api, runtime: { run: Effect.runPromise } as never })
 const [open, setOpen] = createSignal(true)
 const [cad, setCad] = createSignal(false)
-render(() => <AppProvider state={state}><div style={{ padding: "24px" }}><button onClick={() => setOpen(true)}>Open library</button><button onClick={() => { document.documentElement.classList.toggle("dark") }}>Toggle theme</button><button onClick={() => setCad(!cad())}>Switch CAD / CAM</button></div><UnifiedLibraryModal isOpen={open()} onClose={() => setOpen(false)}>{cad() ? <LibraryBrowser /> : <LibraryManager defaultTab="tools" onSelectTool={() => setOpen(false)} onSaveTool={() => undefined} />}</UnifiedLibraryModal></AppProvider>, document.getElementById("root")!)
+render(() => <AppProvider state={state}><div style={{ padding: "24px" }}><button onClick={() => setOpen(true)}>{t("keys.cmd.cam.library.open")}</button><button onClick={() => { document.documentElement.classList.toggle("dark") }}>Toggle theme</button><button onClick={() => setCad(!cad())}>Switch CAD / CAM</button></div><UnifiedLibraryModal isOpen={open()} onClose={() => setOpen(false)}>{cad() ? <LibraryBrowser /> : <LibraryManager defaultTab="tools" onSelectTool={() => setOpen(false)} onSaveTool={() => undefined} />}</UnifiedLibraryModal></AppProvider>, document.getElementById("root")!)

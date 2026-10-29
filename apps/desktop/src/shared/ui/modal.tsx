@@ -10,6 +10,7 @@ import { type JSX, Show, createEffect, onCleanup } from "solid-js"
 import { Portal } from "solid-js/web"
 import X from "lucide-solid/icons/x"
 import { prefersReducedMotion } from "./animated-section.tsx"
+import { t } from "../../i18n/index.ts"
 
 /** Reduced-motion users get the fade only — no slide/scale on either axis. */
 const reduced = prefersReducedMotion
@@ -121,7 +122,7 @@ export function Modal(props: ModalProps): JSX.Element {
               <header class={props.variant === "workspace" ? "px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center" : "ui-modal-header"}>
                 <h3 class={props.variant === "workspace" ? "text-lg font-medium text-gray-900 dark:text-white" : "ui-modal-title"}>{props.title}</h3>
                 <Show when={props.closable !== false}>
-                  <button type="button" class={props.variant === "workspace" ? "text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors" : "ui-modal-close"} aria-label="Close" onClick={() => props.onClose()}>
+                  <button type="button" class={props.variant === "workspace" ? "text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors" : "ui-modal-close"} aria-label={t("common.close")} onClick={() => props.onClose()}>
                     <X size={18} aria-hidden="true" />
                   </button>
                 </Show>
@@ -230,7 +231,7 @@ export function Sheet(props: SheetProps): JSX.Element {
           <Show when={props.title !== undefined}>
             <header class="ui-sheet-header">
               <h3 class="ui-sheet-title">{props.title}</h3>
-              <button type="button" class="ui-sheet-close" aria-label="Close" onClick={() => props.onClose()}>
+              <button type="button" class="ui-sheet-close" aria-label={t("common.close")} onClick={() => props.onClose()}>
                 <X size={18} aria-hidden="true" />
               </button>
             </header>

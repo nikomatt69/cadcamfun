@@ -59,6 +59,9 @@ declare namespace App {
   interface Locals {
     runtime?: {
       env: CloudflareEnv
+      cf?: { country?: string }
     }
+    /** Language of this request, set by `src/middleware.ts` (default `en`). */
+    locale?: import("./i18n/locales").Locale
   }
 }

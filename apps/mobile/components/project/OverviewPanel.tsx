@@ -18,6 +18,7 @@ import { useContentLayout } from "@/components/layout/use-content-layout"
 import { haptic } from "@/lib/haptics"
 import { FlatRow, RowSeparator, SectionTitle } from "./rows"
 import { caps, mono, type } from "@/lib/typography"
+import { CloudDeliveryPanel } from "./cloud-delivery-panel"
 
 const WORKSPACE = [
   { screen: "drawings", title: "Designs", detail: "Explore your geometry", Icon: DraftingCompass },
@@ -34,7 +35,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
 }) {
   const { palette } = useTheme()
   const { onLayout } = useContentLayout()
-  const { ai, connectivity } = useServer()
+  const { ai, connectivity, config } = useServer()
   const router = useRouter()
   const status = useResource(useCallback((signal) => client.status(projectId, signal), [client, projectId]), `status:${projectId}:${refreshKey}`)
   const branches = useResource(useCallback((signal) => client.branches(projectId, signal), [client, projectId]), `branches:${projectId}:${refreshKey}`)
@@ -46,6 +47,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
   return <PageScroll onLayout={onLayout} contentInsetAdjustmentBehavior="never" contentContainerStyle={{ gap: 4 }} refreshControl={<RefreshControl refreshing={status.loading && Boolean(vcs)} onRefresh={reload} tintColor={palette.accent} />}>
     {status.error ? <ErrorBanner message={status.error} actionLabel="Retry" onAction={reload} /> : null}
     {branches.error ? <ErrorBanner message={branches.error} actionLabel="Retry" onAction={() => void branches.reload()} /> : null}
+    {config?.mode === "cloud" ? <CloudDeliveryPanel client={client} projectId={projectId} refreshKey={refreshKey} /> : null}
     {status.loading && !vcs ? <Skeleton style={{ height: 160 }} /> : <SurfaceCard>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <IconTile><GitBranch size={22} color={palette.accent} /></IconTile>

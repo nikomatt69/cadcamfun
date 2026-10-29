@@ -32,7 +32,7 @@ export default function WorkpieceSetup(props: WorkpieceSetupProps): JSX.Element 
       </div>
       <Field label={t("cam.material")} for="cam-stock-material">
         <select id="cam-stock-material" class={INPUT} value={props.material} onChange={(event) => props.onChangeMaterial(event.currentTarget.value)}>
-          <option value="">Select…</option>
+          <option value="">{t("cam.selectOption")}</option>
           {MATERIALS.map((material) => <option value={material}>{material}</option>)}
         </select>
       </Field>

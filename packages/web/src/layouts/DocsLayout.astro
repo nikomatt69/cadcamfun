@@ -9,6 +9,9 @@ import DocsSidebar from "../components/docs/DocsSidebar.astro"
 import DocToc from "../components/docs/DocToc.astro"
 import Mark from "../components/Mark.astro"
 import DocAssistant from "../components/docs/DocAssistant.astro"
+import LocaleSelector from "../components/LocaleSelector.astro"
+import { LOCALE_CODES, localeInfo, localizePath, splitLocalePath } from "../i18n/locales"
+import { ui } from "../i18n/ui"
 
 interface TocItem {
   title: string
@@ -20,6 +23,7 @@ interface Props {
   subtitle?: string
   description?: string
   toc?: TocItem[]
+  locale?: import("../i18n/locales").Locale
 }
 const {
   title = "Documentation",
@@ -27,11 +31,14 @@ const {
   description = "CADCAMFUN architecture and developer documentation.",
   toc = [],
 } = Astro.props
-const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
+const locale = Astro.props.locale ?? Astro.locals.locale ?? "en"
+const { pathname: barePath } = splitLocalePath(Astro.url.pathname.replace(/\/$/, "") || "/docs")
+const pathname = barePath
+const dir = localeInfo(locale).dir
 ---
 
 <!doctype html>
-<html lang="en" class="docs-root">
+<html lang={locale} dir={dir} class="docs-root">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -40,6 +47,33 @@ const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
     <title>{title} — CADCAMFUN Docs</title>
     <meta name="description" content={description} />
     <SocialMeta title={`${title} — CADCAMFUN Docs`} description={description} />
+    {LOCALE_CODES.map((code) => <link rel="alternate" hreflang={code} href={new URL(localizePath(barePath, code), Astro.site ?? Astro.url.origin).toString()} />)}
+    <link rel="alternate" hreflang="x-default" href={new URL(barePath, Astro.site ?? Astro.url.origin).toString()} />
+    <script is:inline define:vars={{ locale, barePath }}>
+      // Static English pages are served as assets, before any Worker runs:
+      // apply the same choice > browser-language detection here so a first
+      // visit lands on the localized page. Country (CF-IPCountry) detection
+      // happens in middleware wherever the Worker serves the request.
+      (() => {
+        if (locale !== "en") return
+        if (!barePath.startsWith("/docs")) return
+        if (new URLSearchParams(location.search).has("lang")) return
+        const cookie = document.cookie.split(";").map((p) => p.trim()).find((p) => p.startsWith("cadcamfun_locale="))?.split("=")[1]
+        const codes = ["it", "de", "es", "fr", "pt", "ru", "ja", "hi", "ar"]
+        const fromTag = (tag) => {
+          if (!tag) return null
+          if (tag.toLowerCase().startsWith("zh")) return "zh-CN"
+          const primary = tag.split("-")[0].toLowerCase()
+          return codes.includes(primary) ? primary : null
+        }
+        const chosen = cookie && (cookie === "en" || cookie === "zh-CN" || codes.includes(cookie)) ? cookie : null
+        const detected = chosen ?? (navigator.languages ?? [navigator.language]).map(fromTag).find(Boolean) ?? "en"
+        if (detected !== "en") {
+          document.cookie = `cadcamfun_locale=${detected}; Path=/; Max-Age=31536000; SameSite=Lax`
+          location.replace(`/${detected}${barePath}${location.search}${location.hash}`)
+        }
+      })()
+    </script>
     <script is:inline>
       (() => {
         const stored = localStorage.getItem("theme")
@@ -49,14 +83,14 @@ const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
     </script>
   </head>
   <body class="flex min-h-screen flex-col">
-    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">Skip to content</a>
+    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">{ui(locale, "skip")}</a>
     <Navbar />
     <DocsSubnav />
     <div class="page-shell flex w-full flex-1 flex-col xl:flex-row xl:gap-8">
       <div class="glass-bar sticky top-[var(--chrome-top)] z-30 flex h-[var(--docs-mobilebar-height)] items-center justify-between px-3 xl:hidden">
-        <span class="text-sm font-semibold">Docs</span>
-        <button id="mobile-docs-toggle" type="button" class="pressable glass-chip px-3 py-1.5 text-sm font-semibold" aria-expanded="false" aria-controls="docs-sidebar">
-          Browse
+        <span class="text-sm font-semibold">{ui(locale, "docs")}</span>
+        <button id="mobile-docs-toggle" type="button" class="pressable glass-chip px-3 py-1.5 text-sm font-semibold" aria-expanded="false" aria-controls="docs-sidebar" data-browse={ui(locale, "browse")} data-close={ui(locale, "close")}>
+          {ui(locale, "browse")}
         </button>
       </div>
       <DocsSidebar />
@@ -65,7 +99,7 @@ const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
           <header class="not-prose mb-10">
             <p data-llm-exclude class="mb-4 inline-flex items-center gap-2 font-mono text-eyebrow uppercase text-terminal-accent">
               <img src="/brand/icon.png" alt="" width="16" height="16" class="h-4 w-4" />
-              Documentation
+              {ui(locale, "documentation")}
             </p>
             <h1 class="font-display text-page-title text-terminal-text">{title}</h1>
             {subtitle && <p class="mt-4 max-w-2xl text-page-subtitle text-terminal-muted">{subtitle}</p>}
@@ -88,7 +122,8 @@ const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
       <div class="glass-bar mx-auto w-full max-w-[var(--content-max)] py-6">
         <div class="page-shell flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <a href="/" aria-label="CADCAMFUN home"><Mark class="h-7 w-auto" /></a>
-          <p class="text-[13px] text-terminal-muted">CADCAMFUN · Architecture, workflows, and API reference.</p>
+          <p class="text-[13px] text-terminal-muted">CADCAMFUN · {ui(locale, "footer")}</p>
+          <LocaleSelector locale={locale} />
         </div>
       </div>
     </footer>
@@ -99,7 +134,7 @@ const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
       button?.addEventListener("click", () => {
         const open = button.getAttribute("aria-expanded") === "true"
         button.setAttribute("aria-expanded", open ? "false" : "true")
-        button.textContent = open ? "Browse" : "Close"
+        button.textContent = open ? button.dataset.browse ?? "Browse" : button.dataset.close ?? "Close"
         sidebar?.classList.toggle("hidden", open)
         sidebar?.classList.toggle("docs-rail-open", !open)
       })

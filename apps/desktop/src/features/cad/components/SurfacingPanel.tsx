@@ -220,7 +220,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
         <section class="strategy-palette__cat">
           <header class="strategy-palette__cat-head">
             <span class="strategy-palette__cat-bar" data-accent="blue" />
-            <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">Operations</span>
+            <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">{t("cam.operations")}</span>
           </header>
           <div class="strategy-palette__grid">
             <For each={OPS}>

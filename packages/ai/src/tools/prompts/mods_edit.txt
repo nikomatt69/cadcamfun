@@ -16,7 +16,7 @@ Actions
   running one; an absent flag keeps the current state. Replacing source you did not write: ask first.
 - set_enabled: arm or stop one mod; an armed mod is consent to run it.
 - remove: delete the module and its record. Not reversible.
-- Every call is confirmed by the person first (remove is destructive).
+- Every call is confirmed by the person first.
 
 Parameters
 - save: id (lower-case file name, up to 40 characters, e.g. `confirm_deletes`), name? (up to 60), description (what it hooks and why, up to 200), source (up to 20000 characters), enable?.

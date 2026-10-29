@@ -5,6 +5,7 @@ import { useRouter } from "expo-router"
 import { ArrowRight, Bell, BellOff, Box, CheckCheck, CircleCheck, CircleX, CloudOff, Funnel, FolderPlus, GitMerge, GitPullRequest, Mail, MessageSquare, MessageSquareText, Search, Sparkles, Trash2, Undo2, UserPlus, type LucideIcon } from "lucide-react-native"
 import type { NotificationRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
+import { pairingIdentity } from "@/lib/pairing"
 import { accountStore } from "@/lib/account"
 import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
@@ -74,7 +75,7 @@ export default function ActivityScreen() {
   const feed = useResource(
     useCallback((signal) => (client ? client.notifications({ limit: PAGE }, signal) : Promise.reject(new Error("Not connected"))), [client]),
     "notifications",
-    { cacheKey: `notifications:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}` },
+    { cacheKey: `notifications:${(config ? pairingIdentity(config) : "")}:${account?.subject ?? "local"}` },
   )
   // The feed belongs to no project, so no single stream covers it: it refreshes itself while it is open.
   usePoll(() => void feed.reload(), 25_000, connectivity === "online")

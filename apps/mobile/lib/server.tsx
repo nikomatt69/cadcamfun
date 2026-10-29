@@ -4,7 +4,7 @@ import { CompanionClient, CompanionError, type AiStatusInfo } from "./client"
 import { launchPairLink, nativeAvailable, pinnedTransport, warmLocalNetwork } from "./native"
 import { pairingStore } from "./storage"
 import { accountStore, restoreAccount } from "./account"
-import { desktopLabel, firstReachable, parsePairingLink, type Pairing } from "./pairing"
+import { desktopLabel, firstReachable, pairingScope, parsePairingLink, type Pairing } from "./pairing"
 import { drainQueueWith, refreshOfflineQueueCount } from "./offline-queue"
 import { uiPreferencesReady, useUIStore } from "./store"
 import { ServerContext, type Connectivity, type DesktopBootstrap, type ServerValue } from "./server-context"
@@ -66,7 +66,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
 
   const activate = useCallback((pairing: Pairing) => {
     // Wi-Fi, hotspot and VPN addresses can change while the desktop identity stays the same.
-    useUIStore.getState().setAssistantDesktop(pairing.fingerprint)
+    useUIStore.getState().setAssistantDesktop(pairingScope(pairing, accountStore.account()?.subject))
     setConfig(pairing)
   }, [])
 
@@ -97,7 +97,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       setConnectionError(null)
       probeError.current = null
       setBootstrapLoading(true)
-      warmLocalNetwork()
+      if (pairing.mode !== "cloud") warmLocalNetwork()
       const timeout = setTimeout(() => controller.abort(), 15_000)
       try {
         // A QR can list Wi-Fi + Personal Hotspot + Tailscale. Race them; keep the one that answers.
@@ -129,7 +129,9 @@ export function ServerProvider({ children }: PropsWithChildren) {
         setConnectivity(auth ? "auth-required" : "offline")
         const message =
           controller.signal.aborted
-            ? `The desktop at ${desktopLabel(pairing)} did not respond within 15 seconds. Allow Local Network access in iPhone Settings → Apps → CADCAMFUN, and join the same Wi-Fi or Personal Hotspot as the Mac, or use Tailscale.`
+            ? pairing.mode === "cloud"
+              ? `The cloud workspace at ${desktopLabel(pairing)} did not respond within 15 seconds. Check your internet connection and retry.`
+              : `The desktop at ${desktopLabel(pairing)} did not respond within 15 seconds. Allow Local Network access in iPhone Settings → Apps → CADCAMFUN, and join the same Wi-Fi or Personal Hotspot as the Mac, or use Tailscale.`
             : error instanceof Error
               ? error.message
               : "Cannot reach the desktop"
@@ -290,6 +292,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     if (seenRevision.current === accountRevision) return
     seenRevision.current = accountRevision
     setBootstrap(null)
+    if (configRef.current) useUIStore.getState().setAssistantDesktop(pairingScope(configRef.current, accountStore.account()?.subject))
     if (configRef.current) void checkRef.current(configRef.current)
   }, [accountRevision])
 

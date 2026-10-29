@@ -13,11 +13,11 @@ import { StatusPill } from "./StatusPill"
  * connection reads the same here, in the session line and in Settings. The words come from `connectionBanner`.
  */
 export function NetworkBanner({ accessory = false }: { accessory?: boolean }) {
-  const { connectivity, connectionError, recheck } = useServer()
+  const { connectivity, connectionError, recheck, config } = useServer()
   const { palette } = useTheme()
   const router = useRouter()
   const waiting = useUIStore((state) => state.offlineQueueCount)
-  const banner = connectionBanner({ connectivity, connectionError, waiting })
+  const banner = connectionBanner({ connectivity, connectionError, waiting, cloud: config?.mode === "cloud" })
 
   // VoiceOver ignores a view that merely appears or changes; say each state once, never the changing counter.
   const key = banner?.key

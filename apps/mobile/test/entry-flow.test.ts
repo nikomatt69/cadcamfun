@@ -105,6 +105,15 @@ describe("connection banner", () => {
     expect(connectivityStatus("auth-required").tone).toBe("danger")
     expect(connectivityStatus("disconnected").label).toBe("Not paired")
   })
+
+  test("cloud connectivity explains sign-in and internet recovery without claiming desktop revocation", () => {
+    const auth = connectionBanner({ ...base, connectivity: "auth-required", cloud: true })
+    expect(auth?.label).toContain("sign-in")
+    expect(auth?.label).not.toContain("revoked")
+    expect(auth?.action?.kind).toBe("settings")
+    expect(connectionBanner({ ...base, connectivity: "offline", cloud: true })?.label).toBe("Cloud workspace offline")
+    expect(connectionBanner({ ...base, connectivity: "connecting", cloud: true })?.announcement).toContain("cloud workspace")
+  })
 })
 
 describe("crash report", () => {

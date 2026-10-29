@@ -16,9 +16,23 @@ export interface Pairing {
   readonly name: string
   /** HTTPS origins to try, `baseUrl` first. Omitted on pairings saved before extra hosts existed. */
   readonly hosts?: readonly string[]
+  /** Omitted for legacy local pairings; cloud connections use system HTTPS trust. */
+  readonly mode?: "cloud"
+  /** Persistent hosted workspace identity, independent of its rotating HTTPS certificate. */
+  readonly workspaceId?: string
 }
 
 export class PairingError extends Error {}
+
+/** Legacy local queues keep their fingerprint identity; hosted queues never follow certificate rotation. */
+export const pairingIdentity = (pairing: Pairing): string => pairing.mode === "cloud"
+  ? `cloud:${pairing.baseUrl}:${pairing.workspaceId}`
+  : pairing.fingerprint
+
+/** Hosted assistant state and queued mutations also belong to the signed-in account. */
+export const pairingScope = (pairing: Pairing, accountSubject?: string): string => pairing.mode === "cloud"
+  ? `${pairingIdentity(pairing)}|account:${accountSubject ?? "signed-out"}`
+  : pairing.fingerprint
 
 const originOf = (raw: string): string => {
   let base: URL
@@ -60,8 +74,14 @@ export const parsePairingLink = (link: string): Pairing => {
   const host = url.searchParams.get("host") ?? ""
   const token = url.searchParams.get("token") ?? ""
   const fingerprint = (url.searchParams.get("fp") ?? "").toLowerCase()
+  const mode = url.searchParams.get("mode")
+  const workspaceId = url.searchParams.get("workspace")
   if (token.length < 16 || token.length > 4096 || /[\s\u0000-\u001f\u007f]/u.test(token)) throw new PairingError("Invalid token")
-  if (!/^[0-9a-f]{64}$/u.test(fingerprint)) throw new PairingError("Invalid certificate fingerprint")
+  if (mode !== null && mode !== "local" && mode !== "cloud") throw new PairingError("Invalid connection mode")
+  if (mode === "cloud") {
+    if (!workspaceId || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u.test(workspaceId)) throw new PairingError("Invalid cloud workspace identity")
+    if (fingerprint) throw new PairingError("Cloud pairing uses verified HTTPS instead of a certificate fingerprint")
+  } else if (!/^[0-9a-f]{64}$/u.test(fingerprint)) throw new PairingError("Invalid certificate fingerprint")
   const extras = (url.searchParams.get("hosts") ?? "").split(",").map((part) => part.trim()).filter(Boolean)
   const hosts: string[] = []
   const seen = new Set<string>()
@@ -80,7 +100,8 @@ export const parsePairingLink = (link: string): Pairing => {
   }
   if (hosts.length === 0) throw new PairingError("Invalid desktop address")
   const baseUrl = hosts[0]!
-  return { baseUrl, token, fingerprint, name: url.searchParams.get("name") || new URL(baseUrl).hostname, hosts }
+  if (mode === "cloud" && hosts.length !== 1) throw new PairingError("Cloud pairing must name one HTTPS origin")
+  return { baseUrl, token, fingerprint, name: url.searchParams.get("name") || new URL(baseUrl).hostname, hosts, ...(mode === "cloud" && workspaceId ? { mode, workspaceId } : {}) }
 }
 
 /** Validate persisted credentials with the same contract as newly scanned links. */
@@ -91,6 +112,11 @@ export const validatePairing = (value: unknown): Pairing => {
   const extra = Array.isArray(p.hosts) ? p.hosts.filter((h): h is string => typeof h === "string") : []
   const params = new URLSearchParams({ host: p.baseUrl as string, token: p.token as string, fp: p.fingerprint as string, name: p.name as string })
   if (extra.length > 0) params.set("hosts", extra.join(","))
+  if (p.mode !== undefined && p.mode !== "cloud") throw new PairingError("Invalid saved connection mode")
+  if (p.mode === "cloud") {
+    params.set("mode", "cloud")
+    if (typeof p.workspaceId === "string") params.set("workspace", p.workspaceId)
+  } else if (p.workspaceId !== undefined) throw new PairingError("Invalid saved connection mode")
   return parsePairingLink(`cadcamfun://pair?${params}`)
 }
 

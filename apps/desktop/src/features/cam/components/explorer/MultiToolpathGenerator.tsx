@@ -5,7 +5,7 @@ import { saveFile } from "../../../../shared/lib/save-file.ts"
  *
  * Left, the element selector (create / order / remove toolpaths). Right, the full generator panel to configure the
  * element being edited. "Genera Tutti" generates every toolpath that has no G-code yet through the sidecar,
- * "Visualizza" sends the combined program to the CAM viewport and "Scarica G-Code" downloads it.
+ * "View" sends the combined program to the CAM viewport and "Download G-code" downloads it.
  */
 import { Show, createSignal, onMount, type JSX } from "solid-js"
 import { Box, Download, Eye, EyeOff, Layers, Play, X, Zap } from "lucide-solid"
@@ -68,7 +68,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     const points = parseGCodeToPoints(gcode)
     store.updateToolpath(id, { toolpathSettings: settings })
     store.updateToolpathGCode(id, gcode, points, measured ?? measurePoints(points))
-    toast.success(`Toolpath generato per elemento ${nameOf(elementId)}`)
+    toast.success(t("cam.multi.elementGenerated", { name: nameOf(elementId) }))
   }
 
   // Embedded generator panel finished for the element being configured.
@@ -88,7 +88,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
   /** Generates one element's toolpath through the sidecar: its own tool / material win when both are assigned. */
   const generateToolpathForElement = async (elementId: string, settings: ToolpathSettings): Promise<void> => {
     const element = elements.elements.find(candidate => candidate["id"] === elementId)
-    if (element === undefined) { toast.error("Elemento non trovato"); return }
+    if (element === undefined) { toast.error(t("cam.multi.elementMissing")); return }
     const assignment = assignmentProblem(toolOf(elementId), materialOf(elementId)) === undefined ? assignmentOf(elementId) : undefined
     const input = { element, settings: store.getToolpathByElementId(elementId)?.toolpathSettings ?? settings, sources: job.sources(), ...(assignment ? { assignment } : {}) }
     try {
@@ -106,9 +106,9 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
       for (const toolpath of [...store.toolpaths]) {
         if (!toolpath.gcode) await generateToolpathForElement(toolpath.elementId, toolpath.toolpathSettings)
       }
-      toast.success("Tutti i toolpath sono stati generati")
+      toast.success(t("cam.multi.allGenerated"))
     } catch (error) {
-      toast.error("Failed to generate toolpaths")
+      toast.error(t("cam.multi.failed"))
       console.error(error)
     } finally {
       setIsGeneratingAll(false)
@@ -135,7 +135,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
       for (const result of results) camStore.upsertOperationResult(result)
       props.onGCodeGenerated(useCamStore.getState().gcode)
     } catch (cause) { toast.error(cause instanceof Error ? cause.message : String(cause)); return }
-    toast.success("G-code inviato al visualizzatore")
+    toast.success(t("cam.multi.sent"))
   }
 
   const stats = () => statistics(store.toolpaths)
@@ -147,11 +147,11 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-bold text-white flex items-center gap-2">
             <Layers size={24} />
-            Multi-Toolpath Generator
+            {t("cam.explorer.multiToolpath")}
           </h2>
 
           <div class="flex items-center gap-2">
-            <button onClick={() => setShowElementSelector(!showElementSelector())} class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title="Toggle selezione elementi">
+            <button onClick={() => setShowElementSelector(!showElementSelector())} class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title={t("cam.multi.toggleElements")}>
               {showElementSelector() ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
 
@@ -170,7 +170,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
               class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Play size={16} />
-              Visualizza
+              {t("cam.multi.view")}
             </button>
 
             <button
@@ -179,7 +179,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
               class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Download size={16} />
-              Scarica G-Code
+              {t("cam.multi.downloadGcode")}
             </button>
           </div>
         </div>
@@ -187,22 +187,22 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
         {/* Statistics */}
         <div class="grid grid-cols-4 gap-4 text-sm">
           <div class="bg-gray-800 rounded-lg p-3">
-            <div class="text-gray-400">Toolpath Totali</div>
+            <div class="text-gray-400">{t("cam.multi.statTotal")}</div>
             <div class="text-2xl font-bold text-white">{stats().totalToolpaths}</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
-            <div class="text-gray-400">Generati</div>
+            <div class="text-gray-400">{t("cam.multi.statGenerated")}</div>
             <div class="text-2xl font-bold text-green-400">{stats().generatedToolpaths}</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
-            <div class="text-gray-400">Distanza Totale</div>
+            <div class="text-gray-400">{t("cam.multi.statDistance")}</div>
             <div class="text-2xl font-bold text-blue-400">{(stats().totalDistance / 1000).toFixed(2)}m</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
-            <div class="text-gray-400">Tempo Stimato</div>
+            <div class="text-gray-400">{t("cam.multi.statTime")}</div>
             <div class="text-2xl font-bold text-yellow-400">{formatDuration(stats().totalTime)}</div>
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
                     <span class="text-white">Configurazione toolpath per: {elementId()}</span>
                   </div>
 
-                  <button onClick={() => setConfiguringElementId(null)} class="text-gray-400 hover:text-white transition-colors" aria-label="Close"><X size={14} /></button>
+                  <button onClick={() => setConfiguringElementId(null)} class="text-gray-400 hover:text-white transition-colors" aria-label={t("cam.explorer.close")}><X size={14} /></button>
                 </div>
 
                 <ToolpathGenerator

@@ -146,10 +146,11 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
         const files = yield* workingFiles(projectId)
         const repo = repoOf(projectId)
         const head = repo.head()
-        const tracked = head ? yield* vcs(() => repo.readFiles(repo.readCommit(head).tree)) : {}
+        // Old commits retain their original bytes; normalize only the comparison, without rewriting history.
+        const tracked = head ? yield* vcs(() => snapshotToFiles(filesToSnapshot(repo.readFiles(repo.readCommit(head).tree)))) : {}
         const changed = new Set<string>()
         for (const path of new Set([...Object.keys(files), ...Object.keys(tracked)].filter(isEntityPath))) {
-          if (files[path] !== (tracked[path] === undefined ? undefined : toText(tracked[path]))) changed.add(path)
+          if (files[path] !== tracked[path]) changed.add(path)
         }
         return [...changed].sort()
       })

@@ -64,7 +64,7 @@ export default function StatusBar(): JSX.Element {
           <Seg value={t("cad.status.axis")} tone="blue" pressed={cad.axisVisible} onClick={() => cad.toggleAxis()} title={t("cad.status.toggleAxis")} testId="status-axis" />
           <Seg value={t("cad.status.dims")} tone="amber" pressed={cad.showDimensions} onClick={() => cad.toggleDimensions()} title={t("cad.status.toggleDims")} testId="status-dims" />
           <Sep />
-          <Seg label={t("cad.status.layer")} value={layer()?.name ?? "—"} hideBelow="lg" title={t("cad.status.layerTitle")} />
+          <Seg label={t("cad.status.layer")} value={layer()?.name ?? t("dashboard.metric.unavailable")} hideBelow="lg" title={t("cad.status.layerTitle")} />
           <Seg label={t("cad.status.elements")} value={elements.elements?.length || 0} hideBelow="md" />
           <Show when={hidden() > 0}><Seg label={t("cad.status.hidden")} value={hidden()} tone="muted" hideBelow="lg" /></Show>
           <Show when={selectedCount() > 0}><Seg value={t("cad.selected", { count: selectedCount() })} tone="amber" /></Show>
@@ -79,8 +79,8 @@ export default function StatusBar(): JSX.Element {
       right={
         <>
           <span class="flex items-center gap-2 font-mono" title={t("cad.status.cursor")}>
-            <span class="text-blue-400">X</span><span class="text-blue-200">{mm(elements.mousePosition?.x)}</span>
-            <span class="text-fuchsia-400">Y</span><span class="text-fuchsia-200">{mm(elements.mousePosition?.y)}</span>
+            <span class="text-blue-400">{t("cad.field.x")}</span><span class="text-blue-200">{mm(elements.mousePosition?.x)}</span>
+            <span class="text-fuchsia-400">{t("cad.field.y")}</span><span class="text-fuchsia-200">{mm(elements.mousePosition?.y)}</span>
             <Show when={!is2D()}><span class="text-emerald-400">Z</span><span class="text-emerald-200">{mm(elements.mousePosition?.z)}</span></Show>
           </span>
           <span class="hidden text-gray-500 2xl:inline">{hint()}</span>

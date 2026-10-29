@@ -1,0 +1,31 @@
+---
+import { LOCALE_CODES, localeInfo, localizePath, splitLocalePath, type Locale } from "../i18n/locales"
+import { ui } from "../i18n/ui"
+
+interface Props { locale?: Locale }
+const locale: Locale = Astro.props.locale ?? Astro.locals.locale ?? "en"
+const { pathname: bare } = splitLocalePath(Astro.url.pathname.replace(/\/$/, "") || "/docs")
+const onDocs = bare === "/docs" || bare.startsWith("/docs/")
+---
+
+<label class="locale-selector pressable glass-chip flex h-9 items-center gap-1.5 px-2.5 text-terminal-muted" aria-label={ui(locale, "language")}>
+  <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z" /></svg>
+  <span class="sr-only">{ui(locale, "language")}</span>
+  <select data-locale-select aria-label={ui(locale, "language")} class="max-w-[7.5rem] cursor-pointer bg-transparent text-[13px] font-semibold text-terminal-muted outline-none">
+    {LOCALE_CODES.map((code) => (
+      <option value={code} selected={code === locale}>{localeInfo(code).endonym}</option>
+    ))}
+  </select>
+</label>
+
+<script define:vars={{ bare, onDocs }}>
+  document.querySelectorAll("[data-locale-select]").forEach((select) => {
+    select.addEventListener("change", () => {
+      const code = select.value
+      document.cookie = `cadcamfun_locale=${code}; Path=/; Max-Age=31536000; SameSite=Lax`
+      if (!onDocs) { window.location.reload(); return }
+      const target = code === "en" ? bare : `/${code}${bare}`
+      window.location.href = `${target}?lang=${encodeURIComponent(code)}`
+    })
+  })
+</script>

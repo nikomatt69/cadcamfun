@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { PairingError, desktopLabel, firstReachable, pairingCandidates, parsePairingLink, validatePairing } from "../lib/pairing"
+import { PairingError, desktopLabel, firstReachable, pairingCandidates, pairingIdentity, pairingScope, parsePairingLink, validatePairing } from "../lib/pairing"
 
 const link = (host = "https://192.168.1.7:8443", token = "0123456789abcdef", fp = "a".repeat(64), name = "MacBook", hosts?: string) => {
   const params = new URLSearchParams({ host, token, fp, name })
@@ -104,4 +104,31 @@ test("firstReachable keeps the first host that answers and aborts the rest", asy
 
 test("desktopLabel uses the host, not the phone name in the QR", () => {
   expect(desktopLabel(parsePairingLink(link()))).toBe("192.168.1.7:8443")
+})
+
+const cloudLink = (changes: Record<string, string> = {}) => `cadcamfun://pair?${new URLSearchParams({ host: "https://cloud.cadcam.fun", token: "0123456789abcdef", mode: "cloud", workspace: "workspace-123", name: "Cloud", ...changes })}`
+
+test("hosted pairing explicitly selects HTTPS trust and a stable workspace identity", () => {
+  const cloud = parsePairingLink(cloudLink())
+  expect(cloud.mode).toBe("cloud")
+  expect(cloud.workspaceId).toBe("workspace-123")
+  expect(cloud.fingerprint).toBe("")
+  expect(validatePairing(cloud)).toEqual(cloud)
+  expect(pairingIdentity(cloud)).toBe(pairingIdentity(parsePairingLink(cloudLink({ name: "Renamed after a certificate renewal" }))))
+  expect(pairingIdentity(cloud)).not.toBe(pairingIdentity(parsePairingLink(cloudLink({ workspace: "another-workspace" }))))
+  expect(pairingIdentity(cloud)).not.toBe(pairingIdentity(parsePairingLink(cloudLink({ host: "https://another.cadcam.fun" }))))
+  expect(pairingScope(cloud, "first-account")).not.toBe(pairingScope(cloud, "second-account"))
+  expect(pairingScope(cloud, "first-account")).not.toBe(pairingScope(cloud))
+  expect(pairingIdentity(parsePairingLink(link()))).toBe("a".repeat(64))
+})
+
+test("cloud pairing cannot silently downgrade a local pin or leak a grant to another origin", () => {
+  const invalid: Record<string, string>[] = [{ workspace: "" }, { workspace: "../private" }, { mode: "unknown" }, { fp: "a".repeat(64) }, { hosts: "https://another.cadcam.fun" }, { host: "http://cloud.cadcam.fun" }]
+  for (const changes of invalid) {
+    expect(() => parsePairingLink(cloudLink(changes))).toThrow(PairingError)
+  }
+  expect(() => parsePairingLink(link(undefined, undefined, ""))).toThrow(/fingerprint/i)
+  const cloud = parsePairingLink(cloudLink())
+  expect(() => validatePairing({ ...cloud, mode: undefined })).toThrow(PairingError)
+  expect(() => validatePairing({ ...cloud, workspaceId: undefined })).toThrow(PairingError)
 })

@@ -10,6 +10,7 @@
     "start": "bun src/main.ts"
   },
   "dependencies": {
+    "@cadcamfun/cloud": "workspace:*",
     "@cadcamfun/ai": "workspace:*",
     "@cadcamfun/api": "workspace:*",
     "@cadcamfun/core": "workspace:*",

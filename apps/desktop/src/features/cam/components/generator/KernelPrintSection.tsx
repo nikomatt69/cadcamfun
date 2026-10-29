@@ -18,6 +18,7 @@ import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
 import { formatDuration } from "./PrintResultSection.tsx"
 import { Badge, Field, INPUT, Note, Section, Stat } from "./ui.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 const CLAIM_LABEL: Readonly<Record<string, string>> = {
   "operations-complete": "Layers complete", "machine-limits": "Within the printer's limits", "bed-fit": "On the plate", "heated-start": "Heated before extruding",
@@ -95,38 +96,38 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
   const chosen = () => cam.kernel.findPrinter(printer())
   return (
     <Show when={gen.settings.machineType === "3dprinter"}>
-      <Section id="kernelPrint" icon={Cpu} title="Verified print" summary={artifact() ? RELEASE_LABEL[artifact()!.release] : undefined} testId="cam-kernel-print-section">
-        <Note>The kernel slices the part for a printer and checks the program it wrote: the plate, the heating, the layers, the walls and the first and last layer.</Note>
+      <Section id="kernelPrint" icon={Cpu} title={t("cam.gen.kp.verifiedPrint")} summary={artifact() ? RELEASE_LABEL[artifact()!.release] : undefined} testId="cam-kernel-print-section">
+        <Note>{t("cam.gen.kp.intro")}</Note>
         <div class="panel-group">
-          <Field label="Printer">
+          <Field label={t("cam.gen.kp.printer")}>
             <select class={INPUT} value={printer()} onChange={(event) => setPrinter(event.currentTarget.value)} data-testid="kernel-printer">
-              <optgroup label="Built-in printers">
+              <optgroup label={t("cam.gen.kp.builtIn")}>
                 <For each={cam.kernel.PRINTERS}>{(item) => <option value={item.id}>{item.name}</option>}</For>
               </optgroup>
               <Show when={saved().length > 0}>
-                <optgroup label="Your printers">
+                <optgroup label={t("cam.gen.kp.yours")}>
                   <For each={saved()}>{(item) => <option value={`config:${item.id}`}>{item.name}</option>}</For>
                 </optgroup>
               </Show>
             </select>
           </Field>
-          <Field label="Filament" hint="Set in the Material section">
+          <Field label={t("cam.gen.pp.filament")} hint="Set in the Material section">
             <input class={INPUT} readOnly value={cam.print.FILAMENTS.find((f) => f.id === gen.printer.filament)?.name ?? "PLA"} data-testid="kernel-filament" />
           </Field>
         </div>
         <Show when={chosen()}>
           {(machine) => (
             <dl class="panel-kv">
-              <dt>Plate</dt><dd>{machine().printer!.bed.width} x {machine().printer!.bed.depth} x {machine().printer!.buildHeight} mm</dd>
-              <dt>Nozzle</dt><dd>{machine().printer!.nozzle.diameter} mm, up to {machine().printer!.nozzle.maxTemperature} deg C</dd>
-              <dt>Firmware</dt><dd>{machine().printer!.flavor}</dd>
+              <dt>{t("cam.gen.kp.plate")}</dt><dd>{machine().printer!.bed.width} x {machine().printer!.bed.depth} x {machine().printer!.buildHeight} {t("cad.millimeters")}</dd>
+              <dt>{t("cam.gen.pp.nozzle")}</dt><dd>{machine().printer!.nozzle.diameter} mm, up to {machine().printer!.nozzle.maxTemperature} deg C</dd>
+              <dt>{t("cam.gen.pp.firmware")}</dt><dd>{machine().printer!.flavor}</dd>
             </dl>
           )}
         </Show>
         <button type="button" class="panel-btn panel-btn--primary panel-btn--block" disabled={!request() || gen.isGenerating} onClick={() => void generate()} data-testid="kernel-print-generate">
           {gen.isGenerating && controller ? "Slicing" : "Slice and verify"}
         </button>
-        <Show when={!request()}><p class="panel-hint">Select a solid in the CAD or in the explorer.</p></Show>
+        <Show when={!request()}><p class="panel-hint">{t("cam.gen.kp.selectSolid")}</p></Show>
         <Show when={error()}><Note kind="bad" role="alert">{error()}</Note></Show>
         <Show when={result()?.status === "failed" ? result() : undefined}>
           {(value) => <For each={(value() as Extract<CamKernelResult, { status: "failed" }>).issues}>{(issue) => <Note kind="bad" role="alert">{issue.message}</Note>}</For>}
@@ -134,14 +135,14 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
         <Show when={artifact()}>
           {(value) => (
             <div class="panel-group" data-testid="kernel-print-evidence">
-              <div class="panel-label"><span>Release</span><Badge tone={RELEASE_TONE[value().release]}>{RELEASE_LABEL[value().release]}</Badge></div>
+              <div class="panel-label"><span>{t("cam.gen.kp.release")}</span><Badge tone={RELEASE_TONE[value().release]}>{RELEASE_LABEL[value().release]}</Badge></div>
               <Show when={value().print}>
                 {(report) => (
                   <div class="panel-stats">
-                    <Stat label="Print time" value={formatDuration(report().timeSeconds)} />
-                    <Stat label="Filament" value={`${report().filamentGrams.toFixed(1)} g`} sub={`${(report().filamentMm / 1000).toFixed(2)} m`} />
-                    <Stat label="Layers" value={String(report().layers)} sub={`${report().layerHeight} mm`} />
-                    <Stat label="Size" value={`${report().size.x.toFixed(1)} x ${report().size.y.toFixed(1)} x ${report().size.z.toFixed(1)}`} sub="mm" />
+                    <Stat label={t("cam.gen.kp.printTime")} value={formatDuration(report().timeSeconds)} />
+                    <Stat label={t("cam.gen.pp.filament")} value={`${report().filamentGrams.toFixed(1)} g`} sub={`${(report().filamentMm / 1000).toFixed(2)} m`} />
+                    <Stat label={t("cam.layers")} value={String(report().layers)} sub={`${report().layerHeight} mm`} />
+                    <Stat label={t("cad.status.size")} value={`${report().size.x.toFixed(1)} x ${report().size.y.toFixed(1)} x ${report().size.z.toFixed(1)}`} sub="mm" />
                   </div>
                 )}
               </Show>
@@ -149,7 +150,7 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
                 <For each={value().claims}>
                   {(claim) => (
                     <li title={claim.detail} data-testid={`kernel-claim-${claim.id}`}>
-                      <Badge tone={claim.status === "passed" ? "ok" : claim.status === "failed" ? "bad" : "warn"}>{claim.status === "passed" ? "OK" : claim.status === "failed" ? "NO" : "?"}</Badge>
+                      <Badge tone={claim.status === "passed" ? "ok" : claim.status === "failed" ? "bad" : "warn"}>{claim.status === "passed" ? t("cam.status.verifyOk") : claim.status === "failed" ? "NO" : "?"}</Badge>
                       <span>{CLAIM_LABEL[claim.id] ?? claim.id}<span class="panel-hint">: {claim.detail}</span></span>
                     </li>
                   )}

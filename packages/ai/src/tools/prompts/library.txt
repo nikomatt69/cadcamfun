@@ -17,7 +17,6 @@ Result (JSON)
 
 Do not use it
 - To change a row: library_edit creates, replaces or removes materials, tools, machines and project defaults.
-- To place a saved part in the drawing: parts.insert, not this tool.
 
 After it
 - Use the returned ids in cam_edit (toolId, materialId) and report which values the user actually owns.

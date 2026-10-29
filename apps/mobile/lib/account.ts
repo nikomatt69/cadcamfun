@@ -89,6 +89,22 @@ export const identityToken = async (): Promise<string | undefined> => {
   }
 }
 
+/** Hosted access cannot fall back to a paired profile; surface refresh failure to connection and sign-in UI. */
+export const cloudIdentityToken = async (): Promise<string> => {
+  const at = revision
+  try {
+    const session = await manager.get()
+    if (at !== revision) throw new OAuthError("session_changed", "The account changed while connecting. Retry with the current account.")
+    if (!session) throw new OAuthError("sign_in_required", "Sign in to your CADCAMFUN account to connect to the cloud workspace.")
+    const info = accountFromSession(session)
+    if (!current || current.subject !== info.subject || current.issuer !== info.issuer) publish(info)
+    return session.tokens.access
+  } catch (error) {
+    if (at === revision && current) publish(null)
+    throw error
+  }
+}
+
 export class LoginCancelled extends Error { constructor() { super("Sign-in cancelled") } }
 
 export const signIn = async (issuerInput: string = DEFAULT_ISSUER): Promise<AccountInfo> => {

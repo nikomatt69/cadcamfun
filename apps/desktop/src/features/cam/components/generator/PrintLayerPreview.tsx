@@ -6,6 +6,7 @@ import { For, Show, createEffect, createMemo, createSignal, type JSX } from "sol
 import { cam } from "@cadcamfun/core"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Field } from "./ui.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 const COLOUR: Readonly<Record<string, string>> = {
   "WALL-OUTER": "#2557d6", "WALL-INNER": "#6b95f2", SKIN: "#1d9a6c", FILL: "#c58a1b", BRIDGE: "#8a55c8",
@@ -74,10 +75,10 @@ export function PrintLayerPreview(): JSX.Element {
     <Show when={beads()}>
       {(data) => (
         <div class="panel-group" data-testid="print-layer-preview">
-          <h4 class="panel-group__title">Layer preview</h4>
+          <h4 class="panel-group__title">{t("cam.gen.layerPreview")}</h4>
           <canvas ref={canvas} width={320} height={260} style={{ width: "100%", height: "auto", border: "1px solid var(--panel-border)", "border-radius": "4px", background: "var(--panel-bg)" }} />
           <Field label={`Layer ${Math.min(layer(), data().layers.length - 1) + 1} of ${data().layers.length}`}>
-            <input type="range" class="panel-range" min="0" max={Math.max(0, data().layers.length - 1)} value={layer()} aria-label="Layer" onInput={(event) => setLayer(parseInt(event.currentTarget.value))} />
+            <input type="range" class="panel-range" min="0" max={Math.max(0, data().layers.length - 1)} value={layer()} aria-label={t("cad.layer")} onInput={(event) => setLayer(parseInt(event.currentTarget.value))} />
           </Field>
           <div class="panel-hint" style={{ display: "flex", "flex-wrap": "wrap", gap: "6px 10px" }}>
             <For each={Object.entries(COLOUR).filter(([k]) => kinds().includes(LABEL[k] ?? k)).filter(([k], i, all) => all.findIndex(([j]) => LABEL[j] === LABEL[k]) === i)}>

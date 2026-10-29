@@ -8,7 +8,7 @@ Actions
 Parameters (mm, degrees)
 - save: ids (the elements to gather), name, description, type, isPublic.
 - insert: componentId, transform {move {x,y,z}, rotate {axis, degrees, about}, scale {factor, about}} - all parts optional.
-- delete: componentId, confirm (true, only when the user asked).
+- delete: componentId, confirm (true).
 
 Result (JSON)
 - ok; save the componentId and the number of children; insert the new ids and the elements; delete the removed id.

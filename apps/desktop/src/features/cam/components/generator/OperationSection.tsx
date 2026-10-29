@@ -9,7 +9,7 @@ import { useGeneratorStore, type GeometryType } from "../../store/generatorStore
 import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPreview.tsx"
 import { OperationExample } from "./ExamplePreview.tsx"
 import { Field, INPUT, LABEL, Note, NumberField, Section, Segmented } from "./ui.tsx"
-import { t } from "../../../../i18n/index.ts"
+import { t, type Key } from "../../../../i18n/index.ts"
 import { CadElementPicker } from "./CadElementPicker.tsx"
 import StrategyPalette, {
   paletteToCoreOperation,
@@ -24,8 +24,8 @@ function DepthBox(): JSX.Element {
   const gen = useGeneratorStore()
   return (
     <div class="mt-3">
-      <Field label="Machining depth" unit="mm">
-        <NumberField label="Machining depth" step="0.1" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
+      <Field label={t("cam.gen.op.machiningDepth")} unit="mm">
+        <NumberField label={t("cam.gen.op.machiningDepth")} step="0.1" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
       </Field>
     </div>
   )
@@ -49,7 +49,7 @@ function UseButtons(props: { readonly element: CadElement }): JSX.Element {
           gen.flash("Dimensions applied from CAD")
         }}
       >
-        Use XY Dimensions
+        {t("cam.gen.op.useXY")}
       </button>
       <Show when={threeD()}>
         <button
@@ -75,7 +75,7 @@ function PrinterElementSelection(): JSX.Element {
   const job = useJob()
   return (
     <div class="panel-group">
-      <h4 class="panel-group__title">Part</h4>
+      <h4 class="panel-group__title">{t("cad.drawing.part")}</h4>
       <CadElementPicker />
       <Show when={job.element()} fallback={<Note kind="warn">{t("cam.generator.selectCadElementHint")}</Note>}>
         {(element) => (
@@ -132,8 +132,8 @@ function SelectedElementPanel(): JSX.Element {
                 <Show when={job.selection().length > 1}> and {job.selection().length - 1} more</Show>
               </p>
               <div class="mt-2 border-t border-green-200 pt-2">
-                <p class="text-sm font-medium text-gray-700 mb-1">Element Dimensions:</p>
-                <Show when={rows().length > 0} fallback={<div class="text-sm text-gray-600">Details available for this element in the CAD Editor.</div>}>
+                <p class="text-sm font-medium text-gray-700 mb-1">{t("cam.gen.op.elementDims")}</p>
+                <Show when={rows().length > 0} fallback={<div class="text-sm text-gray-600">{t("cam.gen.op.elementDetails")}</div>}>
                   <div class="grid grid-cols-2 gap-2 text-sm">
                     <For each={rows().slice(0, -1)}>
                       {([label, value]) => (
@@ -141,25 +141,25 @@ function SelectedElementPanel(): JSX.Element {
                       )}
                     </For>
                     <div class="flex justify-between col-span-2 mt-2 border-t border-green-200 pt-2">
-                      <span class="text-gray-600 font-medium">Machining Depth:</span>
-                      <span class="font-medium text-blue-600">{gen.settings.depth} mm</span>
+                      <span class="text-gray-600 font-medium">{t("cam.gen.op.machiningDepthColon")}</span>
+                      <span class="font-medium text-blue-600">{gen.settings.depth} {t("cad.millimeters")}</span>
                     </div>
                   </div>
                 </Show>
               </div>
               <Show when={part().length > 0}>
                 <div class="mt-2 border-t border-green-200 pt-2" data-testid="part-size">
-                  <p class="text-sm font-medium text-gray-700 mb-1">Part size:</p>
+                  <p class="text-sm font-medium text-gray-700 mb-1">{t("cam.gen.op.partSize")}</p>
                   <div class="grid grid-cols-2 gap-2 text-sm">
                     <For each={part()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
                   </div>
                 </div>
               </Show>
               <div class="mt-2 border-t border-green-200 pt-2" data-testid="stock-size">
-                <p class="text-sm font-medium text-gray-700 mb-1">Stock:</p>
+                <p class="text-sm font-medium text-gray-700 mb-1">{t("cam.gen.op.stockColon")}</p>
                 <label class="flex items-center gap-2 text-xs text-gray-700 mb-1">
                   <input type="checkbox" checked={camStore.stockFollowsSelection} onChange={(event) => camStore.setStockFollowsSelection(event.currentTarget.checked)} />
-                  Stock follows the selected parts
+                  {t("cam.gen.op.stockFollows")}
                 </label>
                 <div class="grid grid-cols-2 gap-2 text-sm">
                   <For each={stock()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
@@ -179,7 +179,7 @@ function ThicknessField(props: { readonly class?: string }): JSX.Element {
   const gen = useGeneratorStore()
   return (
     <div class={props.class}>
-      <label class={LABEL}>Thickness (mm)(Z)</label>
+      <label class={LABEL}>{t("cam.gen.op.thicknessZ")}</label>
       <NumberField min="0.1" step="0.1" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
     </div>
   )
@@ -191,10 +191,10 @@ const SAMPLE = [
   "G0 Z5 ; Return to safe position", ""
 ].join("\n")
 
-const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT_SETTINGS.probeCycle; readonly label: string }> = [
-  { value: "zSurface", label: "Z zero on the top surface" }, { value: "edgeX", label: "X zero on an edge" }, { value: "edgeY", label: "Y zero on an edge" },
-  { value: "corner", label: "X and Y zero on a corner" }, { value: "bore", label: "Centre of a bore" }, { value: "boss", label: "Centre of a boss" },
-  { value: "toolLength", label: "Tool length (tool setter)" }
+const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT_SETTINGS.probeCycle; readonly label: Key }> = [
+  { value: "zSurface", label: "cam.gen.op.zeroZTop" }, { value: "edgeX", label: "cam.gen.op.zeroXEdge" }, { value: "edgeY", label: "cam.gen.op.zeroYEdge" },
+  { value: "corner", label: "cam.gen.op.zeroXYCorner" }, { value: "bore", label: "cam.gen.op.zeroBore" }, { value: "boss", label: "cam.gen.op.zeroBoss" },
+  { value: "toolLength", label: "cam.gen.op.toolLengthSetter" }
 ]
 
 /** The touch probe / tool setter: which cycle, how it approaches, the stylus, and the dialect of the control. */
@@ -206,44 +206,44 @@ function SurfaceSettings(): JSX.Element {
   return (
     <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="surface-settings">
       <div>
-        <label class={LABEL}>Surface strategy</label>
-        <select class={INPUT} aria-label="Surface strategy" value={s().surfaceStrategy} onChange={(event) => gen.updateSettings("surfaceStrategy", event.currentTarget.value as typeof gen.settings.surfaceStrategy)}>
-          <option value="roughing">Roughing (Z levels around the part)</option>
-          <option value="parallel">Parallel finishing (raster on the surface)</option>
-          <option value="waterline">Waterline finishing (constant Z contours)</option>
-          <option value="steep-shallow">Steep and shallow (waterline on walls, raster on flats)</option>
-          <option value="scallop">Constant scallop (3D offset, equal stepover on slopes)</option>
-          <option value="spiral">Spiral finishing (from the middle of the part)</option>
-          <option value="radial">Radial finishing (lines from the middle of the part)</option>
-          <option value="flat">Flat areas (horizontal faces at their exact height)</option>
+        <label class={LABEL}>{t("cam.gen.op.surfaceStrategy")}</label>
+        <select class={INPUT} aria-label={t("cam.gen.op.surfaceStrategy")} value={s().surfaceStrategy} onChange={(event) => gen.updateSettings("surfaceStrategy", event.currentTarget.value as typeof gen.settings.surfaceStrategy)}>
+          <option value="roughing">{t("cam.gen.op.stratRough")}</option>
+          <option value="parallel">{t("cam.gen.op.stratParallel")}</option>
+          <option value="waterline">{t("cam.gen.op.stratWaterline")}</option>
+          <option value="steep-shallow">{t("cam.gen.op.stratSteepShallow")}</option>
+          <option value="scallop">{t("cam.gen.op.stratScallop")}</option>
+          <option value="spiral">{t("cam.gen.op.stratSpiral")}</option>
+          <option value="radial">{t("cam.gen.op.stratRadial")}</option>
+          <option value="flat">{t("cam.gen.op.stratFlats")}</option>
         </select>
       </div>
       <Show when={s().surfaceStrategy === "steep-shallow"}>
-        <div><label class={LABEL}>Steep above (° from horizontal)</label><NumberField min="5" max="85" step="1" value={s().steepAngle} onValue={(value) => gen.updateSettings("steepAngle", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.steepAbove")}</label><NumberField min="5" max="85" step="1" value={s().steepAngle} onValue={(value) => gen.updateSettings("steepAngle", value)} /></div>
       </Show>
       <Show when={s().surfaceStrategy === "roughing"}>
         <div>
-          <label class={LABEL}>Clearing</label>
-          <select class={INPUT} aria-label="Clearing" value={s().surfaceClearing} onChange={(event) => gen.updateSettings("surfaceClearing", event.currentTarget.value as typeof gen.settings.surfaceClearing)}>
-            <option value="contour">Contour-parallel (stepover)</option>
-            <option value="adaptive">Adaptive (constant radial load)</option>
+          <label class={LABEL}>{t("cam.gen.op.clearing")}</label>
+          <select class={INPUT} aria-label={t("cam.gen.op.clearing")} value={s().surfaceClearing} onChange={(event) => gen.updateSettings("surfaceClearing", event.currentTarget.value as typeof gen.settings.surfaceClearing)}>
+            <option value="contour">{t("cam.gen.op.clearContour")}</option>
+            <option value="adaptive">{t("cam.gen.op.clearAdaptive")}</option>
           </select>
         </div>
         <Show when={s().surfaceClearing === "adaptive"}>
-          <div><label class={LABEL}>Radial engagement (% of tool diameter)</label><NumberField min="1" max="50" step="1" value={s().adaptiveEngagement} onValue={(value) => gen.updateSettings("adaptiveEngagement", value)} /></div>
+          <div><label class={LABEL}>{t("cam.gen.op.radialEngagement")}</label><NumberField min="1" max="50" step="1" value={s().adaptiveEngagement} onValue={(value) => gen.updateSettings("adaptiveEngagement", value)} /></div>
         </Show>
       </Show>
       <Show when={s().surfaceStrategy === "scallop" || s().surfaceStrategy === "spiral" || s().surfaceStrategy === "radial"}>
-        <div><label class={LABEL}>Cusp height (mm)</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.cuspHeight")}</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
       </Show>
       <Show when={raster()}>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class={LABEL}>Raster angle (°)</label><NumberField step="1" value={s().rasterAngle} onValue={(value) => gen.updateSettings("rasterAngle", value)} /></div>
-          <div><label class={LABEL}>Cusp height (mm)</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
+          <div><label class={LABEL}>{t("cam.gen.op.rasterAngle")}</label><NumberField step="1" value={s().rasterAngle} onValue={(value) => gen.updateSettings("rasterAngle", value)} /></div>
+          <div><label class={LABEL}>{t("cam.gen.op.cuspHeight")}</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
         </div>
         <label class="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={s().rasterOneWay} onChange={(event) => gen.updateSettings("rasterOneWay", event.currentTarget.checked)} />
-          Cut every line in the same direction
+          {t("cam.gen.op.sameDirection")}
         </label>
       </Show>
       <p class="text-xs text-gray-500">The selected solids are cut as one part: undercuts, holes and boolean results included. A ball nose cutter follows the surface exactly; a cusp height of 0 uses the stepover instead. Turn on the finishing pass to leave material in the roughing and finish it afterwards.</p>
@@ -258,23 +258,23 @@ function ThreadSettings(): JSX.Element {
     <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="thread-settings">
       <p class="text-xs text-gray-600">The selected circle or cylinder is the hole (or boss) to thread; its diameter is the nominal diameter, the depth is the thread length.</p>
       <div class="grid grid-cols-2 gap-3">
-        <div><label class={LABEL}>Pitch (mm)</label><NumberField min="0.05" step="0.05" value={s().threadPitch} onValue={(value) => gen.updateSettings("threadPitch", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.pitch")}</label><NumberField min="0.05" step="0.05" value={s().threadPitch} onValue={(value) => gen.updateSettings("threadPitch", value)} /></div>
         <div>
-          <label class={LABEL}>Thread</label>
-          <select class={INPUT} aria-label="Thread type" value={s().threadType} onChange={(event) => gen.updateSettings("threadType", event.currentTarget.value as typeof gen.settings.threadType)}>
-            <option value="internal">Internal (hole)</option>
-            <option value="external">External (boss)</option>
+          <label class={LABEL}>{t("cad.toolpanel.tool.thread")}</label>
+          <select class={INPUT} aria-label={t("cam.gen.op.threadType")} value={s().threadType} onChange={(event) => gen.updateSettings("threadType", event.currentTarget.value as typeof gen.settings.threadType)}>
+            <option value="internal">{t("cam.gen.op.internal")}</option>
+            <option value="external">{t("cam.gen.op.external")}</option>
           </select>
         </div>
         <div>
-          <label class={LABEL}>Hand</label>
-          <select class={INPUT} aria-label="Thread hand" value={s().threadHand} onChange={(event) => gen.updateSettings("threadHand", event.currentTarget.value as typeof gen.settings.threadHand)}>
-            <option value="right">Right-hand</option>
-            <option value="left">Left-hand</option>
+          <label class={LABEL}>{t("cam.gen.op.hand")}</label>
+          <select class={INPUT} aria-label={t("cam.gen.op.threadHand")} value={s().threadHand} onChange={(event) => gen.updateSettings("threadHand", event.currentTarget.value as typeof gen.settings.threadHand)}>
+            <option value="right">{t("cam.gen.op.rightHand")}</option>
+            <option value="left">{t("cam.gen.op.leftHand")}</option>
           </select>
         </div>
-        <div><label class={LABEL}>Radial passes</label><NumberField min="1" max="20" step="1" value={s().threadPasses} onValue={(value) => gen.updateSettings("threadPasses", Math.round(value))} /></div>
-        <div><label class={LABEL}>Spring passes</label><NumberField min="0" max="5" step="1" value={s().threadSpringPasses} onValue={(value) => gen.updateSettings("threadSpringPasses", Math.round(value))} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.radialPasses")}</label><NumberField min="1" max="20" step="1" value={s().threadPasses} onValue={(value) => gen.updateSettings("threadPasses", Math.round(value))} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.springPasses")}</label><NumberField min="0" max="5" step="1" value={s().threadSpringPasses} onValue={(value) => gen.updateSettings("threadSpringPasses", Math.round(value))} /></div>
       </div>
     </div>
   )
@@ -286,24 +286,24 @@ function ProbeSettings(): JSX.Element {
   return (
     <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="probe-settings">
       <div>
-        <label class={LABEL}>Probe cycle</label>
-        <select class={INPUT} aria-label="Probe cycle" value={s().probeCycle} onChange={(event) => gen.updateSettings("probeCycle", event.currentTarget.value as typeof gen.settings.probeCycle)}>
-          <For each={PROBE_CYCLES}>{(cycle) => <option value={cycle.value}>{cycle.label}</option>}</For>
+        <label class={LABEL}>{t("cam.gen.op.probeCycle")}</label>
+        <select class={INPUT} aria-label={t("cam.gen.op.probeCycle")} value={s().probeCycle} onChange={(event) => gen.updateSettings("probeCycle", event.currentTarget.value as typeof gen.settings.probeCycle)}>
+          <For each={PROBE_CYCLES}>{(cycle) => <option value={cycle.value}>{t(cycle.label)}</option>}</For>
         </select>
       </div>
       <div class="grid grid-cols-2 gap-3">
-        <div><label class={LABEL}>Probe feed (mm/min)</label><NumberField min="1" value={s().probeFeed} onValue={(value) => gen.updateSettings("probeFeed", value)} /></div>
-        <div><label class={LABEL}>Search distance (mm)</label><NumberField min="0.1" step="0.5" value={s().probeSearch} onValue={(value) => gen.updateSettings("probeSearch", value)} /></div>
-        <div><label class={LABEL}>Stylus tip Ø (mm)</label><NumberField min="0.1" step="0.1" value={s().probeStylus} onValue={(value) => gen.updateSettings("probeStylus", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.probeFeed")}</label><NumberField min="1" value={s().probeFeed} onValue={(value) => gen.updateSettings("probeFeed", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.searchDistance")}</label><NumberField min="0.1" step="0.5" value={s().probeSearch} onValue={(value) => gen.updateSettings("probeSearch", value)} /></div>
+        <div><label class={LABEL}>{t("cam.gen.op.stylusTip")}</label><NumberField min="0.1" step="0.1" value={s().probeStylus} onValue={(value) => gen.updateSettings("probeStylus", value)} /></div>
         <Show when={s().probeCycle === "bore" || s().probeCycle === "boss"}>
-          <div><label class={LABEL}>Nominal Ø (mm)</label><NumberField min="0.1" step="0.5" value={s().probeFeatureSize} onValue={(value) => gen.updateSettings("probeFeatureSize", value)} /></div>
+          <div><label class={LABEL}>{t("cam.gen.op.nominalDia")}</label><NumberField min="0.1" step="0.5" value={s().probeFeatureSize} onValue={(value) => gen.updateSettings("probeFeatureSize", value)} /></div>
         </Show>
       </div>
       <div>
-        <label class={LABEL}>Control dialect</label>
-        <select class={INPUT} aria-label="Probe dialect" value={s().probeDialect} onChange={(event) => gen.updateSettings("probeDialect", event.currentTarget.value as "linuxcnc" | "fanuc")}>
-          <option value="linuxcnc">LinuxCNC / Grbl style (G38.2, G10 L20)</option>
-          <option value="fanuc">Fanuc style (G31, macro variables)</option>
+        <label class={LABEL}>{t("cam.gen.op.controlDialect")}</label>
+        <select class={INPUT} aria-label={t("cam.gen.op.probeDialect")} value={s().probeDialect} onChange={(event) => gen.updateSettings("probeDialect", event.currentTarget.value as "linuxcnc" | "fanuc")}>
+          <option value="linuxcnc">{t("cam.gen.op.dialectLinux")}</option>
+          <option value="fanuc">{t("cam.gen.op.dialectFanuc")}</option>
         </select>
       </div>
       <p class="text-xs text-gray-500">The spindle stays off. The result is written to work offset {s().workOffset}; the stylus is a ball, so contact is half its diameter before the surface and the cycle corrects for it.</p>
@@ -334,9 +334,9 @@ export function OperationSection(): JSX.Element {
     gen.updateSettings("operationType", target as typeof gen.settings.operationType)
   }
   return (
-    <Section id="operation" icon={Play} title="Operation" summary={info().title} testId="operation-section">
+    <Section id="operation" icon={Play} title={t("cam.operations.current")} summary={info().title} testId="operation-section">
       <div class="panel-field">
-        <label class={LABEL}>Operation type</label>
+        <label class={LABEL}>{t("cam.operation")}</label>
         <Switch>
           <Match when={gen.settings.machineType === "mill" || gen.settings.machineType === "lathe"}>
             <StrategyPalette
@@ -348,7 +348,7 @@ export function OperationSection(): JSX.Element {
           <Match when={gen.settings.machineType === "3dprinter"}>
             <div class="panel-group">
               <Segmented
-                label="Print operation" testId="print-operations" value={gen.settings.operationType as string}
+                label={t("cam.gen.op.printOperation")} testId="print-operations" value={gen.settings.operationType as string}
                 options={[["standard", "Standard"], ["vase", "Vase"], ["support", "Support"], ["infill", "Solid"], ["raft", "Raft"], ["brim", "Brim"]]}
                 onChange={(value) => gen.updateSettings("operationType", value as typeof gen.settings.operationType)}
               />
@@ -378,13 +378,13 @@ export function OperationSection(): JSX.Element {
 
       <Show when={gen.settings.machineType === "mill"}>
         <div>
-          <label class={LABEL}>Geometry Type</label>
+          <label class={LABEL}>{t("cam.gen.op.geometryType")}</label>
           <select class={INPUT} value={gen.geometryType} onChange={(event) => gen.setGeometryType(event.currentTarget.value as GeometryType, job.element())}>
-            <option value="rectangle">Rectangle</option>
-            <option value="circle">Circle</option>
-            <option value="polygon">Polygon</option>
-            <option value="selected">From Selected Element</option>
-            <option value="custom">Custom</option>
+            <option value="rectangle">{t("cad.rectangle")}</option>
+            <option value="circle">{t("cad.circle")}</option>
+            <option value="polygon">{t("cad.polygon")}</option>
+            <option value="selected">{t("cam.gen.op.fromSelected")}</option>
+            <option value="custom">{t("cam.gen.op.custom")}</option>
           </select>
         </div>
 
@@ -395,11 +395,11 @@ export function OperationSection(): JSX.Element {
         <Show when={gen.geometryType === "rectangle"}>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class={LABEL}>Width (mm)(X)</label>
+              <label class={LABEL}>{t("cam.gen.op.widthX")}</label>
               <NumberField min="1" value={gen.rectangleWidth} onValue={(value) => gen.setRectangle(value, undefined)} />
             </div>
             <div>
-              <label class={LABEL}>Height (mm)(Y)</label>
+              <label class={LABEL}>{t("cam.gen.op.heightY")}</label>
               <NumberField min="1" value={gen.rectangleHeight} onValue={(value) => gen.setRectangle(undefined, value)} />
             </div>
             <ThicknessField class="col-span-2" />
@@ -410,7 +410,7 @@ export function OperationSection(): JSX.Element {
         <Show when={gen.geometryType === "circle"}>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class={LABEL}>Radius (mm)</label>
+              <label class={LABEL}>{t("cad.drawing.radius")}</label>
               <NumberField min="1" value={gen.circleRadius} onValue={(value) => gen.setCircleRadius(value)} />
             </div>
             <ThicknessField />
@@ -421,11 +421,11 @@ export function OperationSection(): JSX.Element {
         <Show when={gen.geometryType === "polygon"}>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class={LABEL}>Number of Sides</label>
+              <label class={LABEL}>{t("cam.gen.op.sides")}</label>
               <NumberField min="3" max="20" int accept={(value) => value >= 3} value={gen.polygonSides} onValue={(value) => gen.setPolygon(value, undefined)} />
             </div>
             <div>
-              <label class={LABEL}>Radius (mm)</label>
+              <label class={LABEL}>{t("cad.drawing.radius")}</label>
               <NumberField min="1" value={gen.polygonRadius} onValue={(value) => gen.setPolygon(undefined, value)} />
             </div>
             <ThicknessField class="col-span-2" />
@@ -441,7 +441,7 @@ export function OperationSection(): JSX.Element {
                 class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm h-32"
                 value={gen.customPath}
                 onInput={(event) => gen.setCustomPath(event.currentTarget.value)}
-                placeholder="Inserisci G-code personalizzato qui..."
+                placeholder={t("cam.gen.op.customGcodePlaceholder")}
               />
               <Show when={gen.settings.useAI && !gen.isAIProcessing}>
                 <button
@@ -480,7 +480,7 @@ export function OperationSection(): JSX.Element {
             </div>
             <div class="mt-3 grid grid-cols-2 gap-4">
               <div class="flex justify-start">
-                <button type="button" class="text-xs text-blue-600 hover:text-blue-800" onClick={() => gen.setCustomPath(SAMPLE)}>Insert example</button>
+                <button type="button" class="text-xs text-blue-600 hover:text-blue-800" onClick={() => gen.setCustomPath(SAMPLE)}>{t("cam.gen.op.insertExample")}</button>
               </div>
               <ThicknessField />
             </div>

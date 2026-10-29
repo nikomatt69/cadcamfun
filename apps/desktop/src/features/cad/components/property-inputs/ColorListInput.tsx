@@ -1,6 +1,7 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { Droplet, Plus, Trash2 } from "lucide-solid"
 import { PropertyEditorModal } from "./PropertyEditorModal.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 interface ColorValue { r: number; g: number; b: number }
 
@@ -52,7 +53,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
     <div class="mb-2">
       <div class={LABEL}>{props.label} ({value().length || 0} colors)</div>
       <button type="button" onClick={openDialog} disabled={props.disabled ?? false} class={TRIGGER} data-testid="edit-colors">
-        <span class="truncate">Edit colors</span>
+        <span class="truncate">{t("cad.input.editColors")}</span>
         <span class="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           {value().length}
           <Droplet size={16} />
@@ -63,7 +64,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
         open={open()}
         onClose={close}
         onSave={save}
-        title="Edit colors"
+        title={t("cad.input.editColors")}
         subtitle={`${props.label} · ${colors().length} ${colors().length === 1 ? "color" : "colors"}`}
         saveLabel="Save colors"
         size="lg"
@@ -71,7 +72,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
         <div class="grid gap-4 lg:grid-cols-2">
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Colors</h4>
+              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.input.colors")}</h4>
               <button
                 type="button"
                 onClick={() => { setCurrent(null); setCurrentHex("#000000") }}
@@ -99,20 +100,20 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
                 </div>}
               </For>
               <Show when={colors().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No colors yet. Pick one on the right.</p>
+                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.noColors")}</p>
               </Show>
             </div>
           </section>
 
           <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Picker</h4>
+            <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.input.picker")}</h4>
             <div class="space-y-3">
               <input
                 type="color"
                 value={currentHex()}
                 onInput={(event) => setCurrentHex(event.currentTarget.value)}
                 class="h-10 w-full cursor-pointer rounded border border-gray-300 p-1 dark:border-gray-600"
-                aria-label="Color"
+                aria-label={t("library.color")}
               />
               <div class="flex items-center gap-2">
                 <input
@@ -120,18 +121,18 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
                   value={currentHex()}
                   onInput={(event) => setCurrentHex(event.currentTarget.value)}
                   class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400"
-                  aria-label="Hex color"
+                  aria-label={t("cad.input.hexColor")}
                 />
                 <button
                   type="button"
                   onClick={add}
                   class="shrink-0 rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
                 >
-                  {current() !== null ? "Update" : "Add"}
+                  {current() !== null ? "Update" : t("cad.add")}
                 </button>
               </div>
               <div>
-                <div class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">Presets</div>
+                <div class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">{t("cad.input.presets")}</div>
                 <div class="grid grid-cols-8 gap-1">
                   <For each={PRESETS}>{(color) =>
                     <button

@@ -58,35 +58,35 @@ export function AiSection(): JSX.Element {
   }
 
   return (
-    <Section id="ai" icon={Cpu} title="AI Assistance" testId="ai-section">
-      <CheckRow id="useAI" checked={gen.settings.useAI} onChange={(checked) => gen.updateSettings("useAI", checked)}>Enable AI suggestions</CheckRow>
+    <Section id="ai" icon={Cpu} title={t("cam.gen.ai.title")} testId="ai-section">
+      <CheckRow id="useAI" checked={gen.settings.useAI} onChange={(checked) => gen.updateSettings("useAI", checked)}>{t("cam.gen.ai.enable")}</CheckRow>
 
       <Show when={gen.settings.useAI}>
         <div>
-          <label class={LABEL}>Project Complexity</label>
+          <label class={LABEL}>{t("cam.gen.ai.complexity")}</label>
           <select class={INPUT} value={gen.settings.aiDifficulty} onChange={(event) => gen.updateSettings("aiDifficulty", event.currentTarget.value as ToolpathSettings["aiDifficulty"])}>
-            <option value="simple">Simple</option>
-            <option value="moderate">Moderate</option>
-            <option value="complex">Complex</option>
+            <option value="simple">{t("cam.gen.ai.simple")}</option>
+            <option value="moderate">{t("cam.gen.ai.moderate")}</option>
+            <option value="complex">{t("cam.gen.ai.complex")}</option>
           </select>
         </div>
 
         <div>
           <label class={LABEL}>{t("cam.ai.optimizeFor")}</label>
           <select class={INPUT} value={gen.settings.aiOptimize} onChange={(event) => gen.updateSettings("aiOptimize", event.currentTarget.value as ToolpathSettings["aiOptimize"])}>
-            <option value="speed">Speed</option>
-            <option value="quality">Quality</option>
-            <option value="balance">Balance</option>
+            <option value="speed">{t("cam.timeline.speed")}</option>
+            <option value="quality">{t("cam.gen.pp.quality")}</option>
+            <option value="balance">{t("cam.gen.ai.balance")}</option>
           </select>
         </div>
 
         <div class="p-3 bg-blue-50 rounded-md">
-          <h4 class="text-sm font-medium text-blue-800 mb-2">AI Suggestions</h4>
+          <h4 class="text-sm font-medium text-blue-800 mb-2">{t("cam.gen.ai.suggestions")}</h4>
           <Show
             when={!gen.isAIProcessing}
-            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin h-5 w-5 text-blue-500 mr-2" /><span class="text-sm text-blue-600">Analyzing parameters...</span></div>}
+            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin h-5 w-5 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
           >
-            <Show when={gen.aiSuggestions.length > 0} fallback={<p class="text-sm text-blue-600">Enable AI suggestions to receive advice based on your machining parameters.</p>}>
+            <Show when={gen.aiSuggestions.length > 0} fallback={<p class="text-sm text-blue-600">{t("cam.gen.ai.enableHint")}</p>}>
               <ul class="space-y-2">
                 <For each={gen.aiSuggestions}>
                   {(suggestion) => (
@@ -99,7 +99,7 @@ export function AiSection(): JSX.Element {
         </div>
 
         <div class="mt-2 p-3 bg-gray-50 rounded-md">
-          <h4 class="text-sm font-medium text-gray-700 mb-2">Ask the AI</h4>
+          <h4 class="text-sm font-medium text-gray-700 mb-2">{t("cam.gen.ai.ask")}</h4>
           <div class="relative">
             <input
               type="text"

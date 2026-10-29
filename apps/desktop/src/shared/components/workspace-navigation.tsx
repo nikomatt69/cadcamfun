@@ -110,11 +110,11 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
       <div class="workstation-navigation border-t border-gray-200 dark:border-gray-700">
         <button type="button"
           onClick={() => setDropdown(!dropdown())}
-          aria-label="Quick Navigation"
+          aria-label={t("cad.quickNavigation")}
           aria-expanded={dropdown()}
           class="btn btn-outline flex min-h-8 w-full items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium"
         >
-          <span>{props.isOpen ? "Quick Navigation" : ""}</span>
+          <span>{props.isOpen ? t("cad.quickNavigation") : ""}</span>
           <Motion.svg class={`w-4 h-4 text-gray-500 ${props.isOpen ? "ml-2" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" animate={{ rotate: dropdown() ? 180 : 0 }} transition={{ duration: 0.3 }}>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </Motion.svg>

@@ -12,6 +12,7 @@ import TriangleAlert from "lucide-solid/icons/triangle-alert"
 import X from "lucide-solid/icons/x"
 import Info from "lucide-solid/icons/info"
 import { prefersReducedMotion } from "./animated-section.tsx"
+import { t } from "../../i18n/index.ts"
 
 /** Reduced-motion users get the fade only — no slide-in from the edge. */
 const reduced = prefersReducedMotion
@@ -68,7 +69,7 @@ const toneIcon = (tone: ToastTone): JSX.Element => {
 export function ToastViewport(): JSX.Element {
   return (
     <Portal>
-      <div class="ui-toast-viewport" role="region" aria-label="Notifications" aria-live="polite">
+      <div class="ui-toast-viewport" role="region" aria-label={t("shell.notifications")} aria-live="polite">
         <For each={items()}>{(item) => (
           <Motion.div
             class={toneClass(item.tone)}
@@ -79,7 +80,7 @@ export function ToastViewport(): JSX.Element {
           >
             <span class="ui-toast-icon">{toneIcon(item.tone)}</span>
             <span class="ui-toast-message">{item.message}</span>
-            <button type="button" class="ui-toast-close" aria-label="Dismiss" onClick={() => dismiss(item.id)}>
+            <button type="button" class="ui-toast-close" aria-label={t("ai.suggestions.dismiss")} onClick={() => dismiss(item.id)}>
               <X size={14} aria-hidden="true" />
             </button>
           </Motion.div>

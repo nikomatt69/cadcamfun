@@ -68,7 +68,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
   createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setFilletRadii({}); setNurbsMoves({}); setDraft(0); setNote(undefined) }))
   const exportStep = () => {
     const out = elementStep(props.element, props.all)
-    if (!("step" in out)) { alert(`No exact model: ${out.reason}`); return }
+    if (!("step" in out)) { alert(t("cad.exact.noModel", { reason: out.reason })); return }
     downloadFile({ name: `${String(props.element["name"] ?? props.element["type"] ?? "part")}.step`, data: out.step, mime: "application/step" })
   }
   return (
@@ -83,16 +83,16 @@ export default function ExactModelPanel(props: Props): JSX.Element {
               const v = ok() as Extract<ExactAnalysis, { ok: true }>
               return (
                 <dl class="panel-kv" data-testid="exact-stats">
-                  <dt>Volume</dt><dd>{fmt(v.volume)} mm³</dd>
-                  <dt>Surface area</dt><dd>{fmt(v.area)} mm²</dd>
-                  <dt>Centre of mass</dt><dd>{fmt(v.centroid.x)}, {fmt(v.centroid.y)}, {fmt(v.centroid.z)}</dd>
-                  <dt>Faces / edges / vertices</dt><dd>{v.faces} / {v.edges} / {v.vertices}</dd>
-                  <dt>Through-holes</dt><dd>{v.holes ?? "–"}</dd>
-                  <dt>Holes (recognised)</dt><dd data-testid="exact-drilled">{v.drilled.length === 0 ? "–" : v.drilled.map((h) => `Ø${fmt(h.diameter)}${h.form === "simple" ? "" : ` ${h.form}`} × ${fmt(h.depth)}`).join(", ")}</dd>
-                  <dt>CAM</dt>
+                  <dt>{t("cad.exact.volume")}</dt><dd>{fmt(v.volume)} mm³</dd>
+                  <dt>{t("cad.exact.surfaceArea")}</dt><dd>{fmt(v.area)} mm²</dd>
+                  <dt>{t("cad.exact.centreOfMass")}</dt><dd>{fmt(v.centroid.x)}, {fmt(v.centroid.y)}, {fmt(v.centroid.z)}</dd>
+                  <dt>{t("cad.exact.topology")}</dt><dd>{v.faces} / {v.edges} / {v.vertices}</dd>
+                  <dt>{t("cad.exact.throughHoles")}</dt><dd>{v.holes ?? "–"}</dd>
+                  <dt>{t("cad.exact.holesRecognised")}</dt><dd data-testid="exact-drilled">{v.drilled.length === 0 ? "–" : v.drilled.map((h) => `Ø${fmt(h.diameter)}${h.form === "simple" ? "" : ` ${h.form}`} × ${fmt(h.depth)}`).join(", ")}</dd>
+                  <dt>{t("cad.cam")}</dt>
                   <dd data-testid="exact-machining">{v.machining.prismatic ? `By features: ${v.machining.holes} holes, ${v.machining.pockets} pockets${v.machining.islands ? ` (${v.machining.islands} islands)` : ""}, ${v.machining.outlines} outlines${v.machining.sideHoles ? `; ${v.machining.sideHoles} holes along other axes are left to their own setup` : ""}${v.machining.hiddenFaces ? `; ${v.machining.hiddenFaces} faces hidden from above are left to their own setup` : ""}` : `3D surface job: ${v.machining.reason}`}</dd>
-                  <dt>Surfaces</dt><dd><For each={Object.entries(v.surfaces)}>{([k, n]) => <span class="mr-1">{k} {n}</span>}</For></dd>
-                  <dt>Valid solid</dt><dd class={v.valid ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{v.valid ? "yes" : `no: ${v.issues.join("; ")}`}</dd>
+                  <dt>{t("cad.exact.surfaces")}</dt><dd><For each={Object.entries(v.surfaces)}>{([k, n]) => <span class="mr-1">{k} {n}</span>}</For></dd>
+                  <dt>{t("cad.exact.validSolid")}</dt><dd class={v.valid ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{v.valid ? "yes" : `no: ${v.issues.join("; ")}`}</dd>
                 </dl>
               )
             }}
@@ -105,7 +105,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
             {(ok) => (
               <Show when={ok().drilled.length > 0 || ok().bosses.length > 0 || ok().fillets.length > 0 || ok().nurbsFaces.length > 0}>
                 <div class="mt-2 space-y-1 text-xs" data-testid="exact-hole-edit">
-                  <p class="font-medium">Edit a hole, a boss, a fillet or a free-form face (adds a new solid)</p>
+                  <p class="font-medium">{t("cad.exact.editHint")}</p>
                   <div class="space-y-0.5">
                     <div>Draft angle (°, 0 = straight)</div>
                     <div class="w-24"><NumberField id="exact-draft" value={draft()} accept={(x) => x >= 0 && x <= 30} onValue={setDraft} /></div>
@@ -115,8 +115,8 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div>Hole #{i() + 1} Ø{fmt(h.diameter)} × {fmt(h.depth)}</div>
                       <div class="flex items-center gap-1">
                       <div class="w-24"><NumberField id={`exact-hole-${i()}`} value={sizes()[i()] ?? h.diameter} onValue={(x) => setSizes({ ...sizes(), [i()]: x })} /></div>
-                      <button type="button" class="panel-btn" data-testid="exact-hole-resize" onClick={() => changeHole(i(), { kind: "resize", diameter: sizes()[i()] ?? h.diameter })}>Resize</button>
-                      <button type="button" class="panel-btn" data-testid="exact-hole-fill" onClick={() => changeHole(i(), { kind: "fill" })}>Fill</button>
+                      <button type="button" class="panel-btn" data-testid="exact-hole-resize" onClick={() => changeHole(i(), { kind: "resize", diameter: sizes()[i()] ?? h.diameter })}>{t("cad.exact.resize")}</button>
+                      <button type="button" class="panel-btn" data-testid="exact-hole-fill" onClick={() => changeHole(i(), { kind: "fill" })}>{t("cad.exact.fill")}</button>
                       </div>
                     </div>
                   )}</For>
@@ -125,7 +125,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div>Boss #{i() + 1} Ø{fmt(x.diameter)} × {fmt(x.length)}</div>
                       <div class="flex items-center gap-1">
                         <div class="w-24"><NumberField id={`exact-boss-${i()}`} value={bossSizes()[i()] ?? x.diameter} onValue={(d) => setBossSizes({ ...bossSizes(), [i()]: d })} /></div>
-                        <button type="button" class="panel-btn" data-testid="exact-boss-resize" onClick={() => changeBoss(i(), bossSizes()[i()] ?? x.diameter)}>Resize</button>
+                        <button type="button" class="panel-btn" data-testid="exact-boss-resize" onClick={() => changeBoss(i(), bossSizes()[i()] ?? x.diameter)}>{t("cad.exact.resize")}</button>
                       </div>
                     </div>
                   )}</For>
@@ -134,7 +134,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div>Fillet #{i() + 1} R{fmt(x.radius)}{x.convex ? "" : " (inside)"} × {fmt(x.length)}</div>
                       <div class="flex items-center gap-1">
                         <div class="w-24"><NumberField id={`exact-fillet-${i()}`} value={filletRadii()[i()] ?? x.radius} accept={(r) => r > 0} onValue={(r) => setFilletRadii({ ...filletRadii(), [i()]: r })} /></div>
-                        <button type="button" class="panel-btn" data-testid="exact-fillet-resize" onClick={() => changeFillet(i(), filletRadii()[i()] ?? x.radius)}>Set radius</button>
+                        <button type="button" class="panel-btn" data-testid="exact-fillet-resize" onClick={() => changeFillet(i(), filletRadii()[i()] ?? x.radius)}>{t("cad.exact.setRadius")}</button>
                       </div>
                     </div>
                   )}</For>
@@ -143,9 +143,9 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div>Free-form face #{i() + 1} (normal {fmt(x.normal.x)}, {fmt(x.normal.y)}, {fmt(x.normal.z)})</div>
                       <div class="flex items-center gap-1">
                         <div class="w-24"><NumberField id={`exact-nurbs-${i()}`} value={nurbsMoves()[i()] ?? 1} accept={(d) => d !== 0} onValue={(d) => setNurbsMoves({ ...nurbsMoves(), [i()]: d })} /></div>
-                        <button type="button" class="panel-btn" data-testid="exact-nurbs-move" onClick={() => changeNurbs(i(), nurbsMoves()[i()] ?? 1)}>Move</button>
-                        <button type="button" class="panel-btn" data-testid="exact-nurbs-offset" title="Along the normals; approximate" onClick={() => changeNurbs(i(), { mode: "offset", distance: nurbsMoves()[i()] ?? 1 })}>Offset</button>
-                        <button type="button" class="panel-btn" data-testid="exact-nurbs-draft" title="About z = 0 along +Z, with the draft angle above; approximate" disabled={draft() === 0} onClick={() => changeNurbs(i(), { mode: "draft", angle: draft() })}>Draft</button>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-move" onClick={() => changeNurbs(i(), nurbsMoves()[i()] ?? 1)}>{t("cad.move")}</button>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-offset" title={t("cad.exact.alongNormals")} onClick={() => changeNurbs(i(), { mode: "offset", distance: nurbsMoves()[i()] ?? 1 })}>{t("cad.offset")}</button>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-draft" title={t("cad.exact.aboutZ")} disabled={draft() === 0} onClick={() => changeNurbs(i(), { mode: "draft", angle: draft() })}>{t("cad.titleBlock.option.draft")}</button>
                       </div>
                     </div>
                   )}</For>

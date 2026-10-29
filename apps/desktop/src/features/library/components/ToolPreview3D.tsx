@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/index.ts"
 /**
  * The 3D tool of a tool resource (spec 31): its type and properties through `cam.toolModelOf`, drawn by `toolObject` — the
  * very object the CAM preview moves along the program. What the resource does not give is listed as assumed.
@@ -19,7 +20,7 @@ const numberOrNull = (value: unknown): number | null => {
 
 /** A resource row (stored or being edited) as the tool model reads it. */
 export const toolResourceOf = (row: Readonly<Record<string, unknown>>): cam.ToolResource => ({
-  type: String(row["type"] ?? "endmill"),
+  type: String(row["type"] ?? t("cam.explorer.toolType.endmill")),
   diameter: numberOrNull(row["diameter"]) ?? 0,
   numberOfFlutes: numberOrNull(row["numberOfFlutes"]),
   cuttingLength: numberOrNull(row["cuttingLength"]),

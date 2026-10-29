@@ -4,13 +4,29 @@
 .cam-panel-heading > svg { flex: none; color: var(--panel-text-muted); }
 .cam-editor { display: flex; flex-direction: column; gap: 10px; }
 .cam-editor .panel-header { margin: 0; padding-bottom: 8px; flex-wrap: wrap; }
-.cam-program-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--panel-border); border: 1px solid var(--panel-border); border-radius: 5px; overflow: hidden; }
-.cam-program-summary .panel-stat { min-width: 0; padding: 6px 8px; }
-.cam-program-summary .panel-stat__value { font-size: 12px; overflow-wrap: anywhere; }
-.panel .cam-editor__code { flex: 1; min-height: 180px; width: 100%; resize: none; border: 1px solid var(--panel-border-strong); border-radius: 4px; padding: 10px 12px; background: var(--panel-bg-inset); color: var(--panel-text); font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
-.panel .cam-editor__code:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -1px; }
+.cam-editor__facts { display: flex; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 11px; color: var(--panel-text-muted); font-variant-numeric: tabular-nums; }
+.cam-editor__body { display: flex; flex: 1; min-height: 180px; border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg-inset); overflow: hidden; font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.cam-editor__body:focus-within { outline: 2px solid var(--panel-accent); outline-offset: -1px; }
+.cam-editor__gutter { flex: none; overflow: hidden; border-right: 1px solid var(--panel-border); color: var(--panel-text-faint); text-align: right; user-select: none; }
+.cam-editor__gutter-lines, .cam-editor__paint-lines { position: relative; width: max-content; min-width: 100%; will-change: transform; }
+.cam-editor__gutter pre, .cam-editor__paint pre { margin: 0; font: inherit; white-space: pre; }
+.cam-editor__gutter pre { min-width: 3ch; padding: 10px 8px; }
+.cam-editor__paint pre { padding: 10px 12px; color: var(--panel-text); }
+.cam-editor__stack { position: relative; flex: 1; min-width: 0; }
+.cam-editor__paint { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.cam-editor__band { position: absolute; left: 0; right: 0; height: 20px; margin-top: 10px; background: var(--panel-accent-soft); opacity: 0.55; pointer-events: none; }
+.cam-editor__gutter .cam-editor__band { opacity: 0.9; }
+.panel .cam-editor__code { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; resize: none; border: 0; border-radius: 0; padding: 10px 12px; background: transparent; color: var(--panel-text); font: inherit; white-space: pre; overflow: auto; tab-size: 2; outline: none; }
+.panel .cam-editor__code--painted { color: transparent; caret-color: var(--panel-text); }
+.panel .cam-editor__code--painted::selection { background: color-mix(in srgb, var(--panel-accent) 28%, transparent); }
+.cam-editor .gc-g { color: var(--panel-accent); }
+.cam-editor .gc-m { color: var(--panel-warn); }
+.cam-editor .gc-tool { color: var(--panel-ok); }
+.cam-editor .gc-feed { color: var(--panel-text-muted); }
+.cam-editor .gc-seq, .cam-editor .gc-comment { color: var(--panel-text-faint); }
 .cam-editor__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .cam-editor__footer p { flex: 1 1 220px; }
+.cam-editor__cursor { font-variant-numeric: tabular-nums; }
 /* Post-processor: the conversion panel on the panel tokens (light and dark follow `.panel`). */
 .cam-post { overflow-y: auto; }
 .cam-post__content { display: grid; gap: 10px; max-width: 920px; margin: 0 auto; }
@@ -44,4 +60,4 @@
 .cam-post .panel-section { margin-bottom: 10px; }
 .cam-post .panel-note { margin: 0; }
 .panel .cam-post__code { max-height: 420px; white-space: pre; overflow: auto; }
-@media (max-width: 700px) { .cam-central-panel { padding: 8px; } .cam-program-summary { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .cam-central-panel { padding: 8px; } }

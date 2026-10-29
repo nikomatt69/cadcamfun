@@ -10,8 +10,16 @@ const Claims = Schema.Struct({
   client_id: Schema.Literals([DESKTOP_CLIENT_ID, MOBILE_CLIENT_ID]),
 })
 
+export interface VerifiedIdentity {
+  readonly subject: string
+  readonly issuer: string
+  readonly email: string
+}
+
 /** Only the configured issuer can select a user. Never discover keys from an untrusted JWT. */
 export class Identity extends Context.Service<Identity, {
+  /** Verifies credentials without creating or linking an installation account. */
+  verify(token: string): Effect.Effect<VerifiedIdentity, Unauthorized>
   user(token: string): Effect.Effect<SessionUser, Unauthorized>
 }>()("cadcamfun/Identity") {
   static readonly layer = Layer.effect(Identity, Effect.gen(function*() {
@@ -19,15 +27,20 @@ export class Identity extends Context.Service<Identity, {
     const repo = yield* AuthRepo
     const issuer = yield* Effect.try({ try: () => normalizeIssuer(config.identityIssuer ?? DEFAULT_ISSUER), catch: () => new Unauthorized({ message: "Invalid identity issuer configuration" }) })
     const keys = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`), { timeoutDuration: 10_000 })
-    return Identity.of({
-      user: Effect.fn("Identity.user")(function*(token) {
+    const verify = Effect.fn("Identity.verify")(function*(token: string) {
         const claims = yield* Effect.tryPromise({
           try: async () => (await jwtVerify(token, keys, { issuer, audience: IDENTITY_AUDIENCE, algorithms: ["ES256"], requiredClaims: ["sub", "email", "exp", "iat", "client_id"] })).payload,
           catch: () => new Unauthorized({ message: "Identity session is invalid or expired" }),
         })
         const identity = yield* Schema.decodeUnknownEffect(Claims)(claims).pipe(Effect.mapError(() => new Unauthorized({ message: "Invalid identity claims" })))
         if (!identity.sub || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.email)) return yield* new Unauthorized({ message: "Invalid identity account" })
-        const user = yield* repo.identityUser(issuer, identity.sub, identity.email).pipe(Effect.mapError(() => new Unauthorized({ message: "Could not resolve identity account" })))
+        return { subject: identity.sub, issuer, email: identity.email } satisfies VerifiedIdentity
+    })
+    return Identity.of({
+      verify,
+      user: Effect.fn("Identity.user")(function*(token) {
+        const identity = yield* verify(token)
+        const user = yield* repo.identityUser(identity.issuer, identity.subject, identity.email).pipe(Effect.mapError(() => new Unauthorized({ message: "Could not resolve identity account" })))
         return new SessionUser({ id: user.id, email: user.email, name: user.name })
       }),
     })

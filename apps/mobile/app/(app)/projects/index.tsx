@@ -10,6 +10,7 @@ import type { ProjectSummary } from "@/lib/client"
 import { useUIStore } from "@/lib/store"
 import { accountStore } from "@/lib/account"
 import { useServer } from "@/lib/server"
+import { pairingIdentity } from "@/lib/pairing"
 import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
 import { useTheme } from "@/lib/theme"
@@ -47,7 +48,7 @@ export default function ProjectsScreen() {
   const { gutter, onLayout } = useContentLayout()
   const router = useRouter()
   const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
-  const { collection, update } = useListTags(tagScope(config?.fingerprint ?? "", account?.subject ?? "local"))
+  const { collection, update } = useListTags(tagScope((config ? pairingIdentity(config) : ""), account?.subject ?? "local"))
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(false)
   const [taggingTarget, setTaggingTarget] = useState<string | null>(null)
@@ -68,7 +69,7 @@ export default function ProjectsScreen() {
 
   const resource = useResource(
     useCallback((signal) => client ? client.projects(signal) : Promise.reject(new Error("Not connected")), [client]), "projects",
-    { cacheKey: `projects:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}` },
+    { cacheKey: `projects:${(config ? pairingIdentity(config) : "")}:${account?.subject ?? "local"}` },
   )
   // The list spans every project, so no single project stream can keep it fresh.
   usePoll(() => void resource.reload(), 40_000, connectivity === "online")

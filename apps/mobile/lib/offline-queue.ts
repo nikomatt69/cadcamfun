@@ -1,7 +1,8 @@
 import { AppState } from "react-native"
 import { CompanionClient } from "./client"
 import { pinnedTransport } from "./native"
-import { validatePairing, type Pairing } from "./pairing"
+import { pairingScope, validatePairing, type Pairing } from "./pairing"
+import { accountStore } from "./account"
 import { mutateStored, readOfflineQueueRaw, writeOfflineQueueRaw } from "./storage"
 import { isOfflineSendError } from "./offline-errors"
 import { useUIStore } from "./store"
@@ -90,7 +91,7 @@ async function drainQueue(pairing: Pairing, onSent?: (sent: number) => void): Pr
   }
   const client = new CompanionClient(pinnedTransport(validated))
   const sent = await deliverOutbox(queue, {
-    client, fingerprint: validated.fingerprint,
+    client, fingerprint: pairingScope(validated, accountStore.account()?.subject),
     active: () => AppState.currentState === "active",
     session: (projectId) => useUIStore.getState().assistantSessions[projectId],
     remember: (projectId, sessionId) => useUIStore.getState().setAssistantSession(projectId, sessionId),

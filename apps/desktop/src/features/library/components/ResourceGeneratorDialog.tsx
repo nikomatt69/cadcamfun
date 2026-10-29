@@ -21,6 +21,7 @@ import {
   generationCount,
   type ResourceKind
 } from "../lib/resource-generation.ts"
+import { t } from "../../../i18n/index.ts"
 
 const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
 const LABEL = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
@@ -128,7 +129,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
         <div class="flex flex-col justify-end gap-1.5 text-sm text-slate-700 dark:text-slate-300">
           <label class="inline-flex items-center gap-2">
             <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" checked={makePublic()} onChange={(event) => setMakePublic(event.currentTarget.checked)} />
-            Make the new {spec.plural.toLowerCase()} public
+            Make the new {spec.plural.toLowerCase()} {t("save.publicProject")}
           </label>
           <Show when={props.kind !== "components"}>
             <label class="inline-flex items-center gap-2">
@@ -142,7 +143,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
       <div class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
         <button type="button" class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-700 dark:text-slate-200" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()}>
           <span>Parameters the assistant fills ({spec.parameters.length})</span>
-          <span class="text-slate-400">{showParameters() ? "Hide" : "Show"}</span>
+          <span class="text-slate-400">{showParameters() ? t("update.hide") : t("cad.createComponent.show")}</span>
         </button>
         <Show when={showParameters()}>
           <ul class="mt-2 space-y-1">
@@ -159,7 +160,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
       <p class="text-xs text-slate-500 dark:text-slate-400">{spec.note}</p>
 
       <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-        <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={props.onClose}>Cancel</button>
+        <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={props.onClose}>{t("common.cancel")}</button>
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"

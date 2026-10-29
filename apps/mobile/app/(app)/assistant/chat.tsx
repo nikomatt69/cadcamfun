@@ -6,6 +6,7 @@ import { Bot, CircleGauge, CloudOff, GitPullRequest, Route, Sparkles } from "luc
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
 import { useServer } from "@/lib/server"
+import { pairingIdentity } from "@/lib/pairing"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
@@ -163,8 +164,8 @@ export default function AssistantScreen() {
   logRef.current = log
   /** The transcript belongs to one conversation: each session keeps its own rows. */
   const logKeyFor = useCallback(
-    (sessionId: string | undefined) => `${config?.fingerprint ?? ""}|${projectId ?? ""}|${sessionId ?? "new"}`,
-    [config?.fingerprint, projectId],
+    (sessionId: string | undefined) => `${(config ? pairingIdentity(config) : "")}|${projectId ?? ""}|${sessionId ?? "new"}`,
+    [config, projectId],
   )
   /** The key the rows on screen belong to, so a switch saves them under the right conversation. */
   const logKeyRef = useRef("")
@@ -586,7 +587,7 @@ export default function AssistantScreen() {
     sessionRef.current = undefined
     setFollowed(undefined)
     useUIStore.getState().startAssistantConversation(projectId)
-    logs.current.delete(`${config?.fingerprint ?? ""}|${projectId}`)
+    logs.current.delete(`${(config ? pairingIdentity(config) : "")}|${projectId}`)
     setLog(emptyLog)
     setHistoryRows(emptyLog)
     setOlderBefore(null)

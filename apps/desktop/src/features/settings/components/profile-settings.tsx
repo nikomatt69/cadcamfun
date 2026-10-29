@@ -255,7 +255,7 @@ export function ProfileSettings(): JSX.Element {
       data.bio,
       data.location,
       data.title,
-      data.skills.length > 0 ? "skills" : "",
+      data.skills.length > 0 ? t("ai.context.category.skills") : "",
       profileImage()
     ]
     const completed = fields.filter((field) => field).length
@@ -329,7 +329,7 @@ export function ProfileSettings(): JSX.Element {
                       </div>
                     }
                   >
-                    <img src={profileImage() ?? undefined} alt="Profile" class="h-full w-full object-cover" />
+                    <img src={profileImage() ?? undefined} alt={t("settings.tab.profile")} class="h-full w-full object-cover" />
                   </Show>
                 </div>
 

@@ -151,7 +151,7 @@ export default function WorkpieceSetup(): JSX.Element {
       <div class="panel-grid panel-grid--3">{number("positionX", "Position X")}{number("positionY", "Position Y")}{number("positionZ", "Position Z")}</div>
       <div class="panel-grid panel-grid--2">
         <div>
-          <label class={LABEL}>Material</label>
+          <label class={LABEL}>{t("cad.viewMaterial")}</label>
           <select name="material" value={form().material} onChange={(e) => set("material", e.currentTarget.value)} class={`mt-1 ${FIELD}`}>
             <For each={MATERIALS}>{([value, label]) => <option value={value}>{label}</option>}</For>
           </select>
@@ -163,7 +163,7 @@ export default function WorkpieceSetup(): JSX.Element {
           <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
             <div>{t("cad.machineType")}: <span class="font-medium">{machineTypeLabel(machine())}</span></div>
             <Show when={machineEnvelopeOf(machine())}>{(volume) =>
-              <div>{t("cad.machineWorkVolume")}: <span class="font-medium">{volume().x}×{volume().y}×{volume().z} mm</span></div>}</Show>
+              <div>{t("cad.machineWorkVolume")}: <span class="font-medium">{volume().x}×{volume().y}×{volume().z} {t("cad.millimeters")}</span></div>}</Show>
             <Show when={machineSpindleOf(machine())}>{(rpm) =>
               <div>{t("cad.machineSpindle")}: <span class="font-medium">{rpm()} rpm</span></div>}</Show>
             <Show when={machineFeedOf(machine())}>{(feed) =>
@@ -174,8 +174,8 @@ export default function WorkpieceSetup(): JSX.Element {
         </div>)}
       </Show>
       <div class="pt-3 flex justify-between">
-        <button type="button" onClick={() => setForm(initial())} class="panel-btn">Reset</button>
-        <button type="button" onClick={apply} class="panel-btn panel-btn--primary">Apply Changes</button>
+        <button type="button" onClick={() => setForm(initial())} class="panel-btn">{t("cad.reset")}</button>
+        <button type="button" onClick={apply} class="panel-btn panel-btn--primary">{t("cad.canvas.applyChanges")}</button>
       </div>
       <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
         <p>The workpiece will be created in the default layer &quot;{layers.layers[0]?.name}&quot; and will be available for both CAD and CAM.</p>

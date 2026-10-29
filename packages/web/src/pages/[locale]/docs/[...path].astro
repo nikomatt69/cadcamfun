@@ -1,0 +1,55 @@
+---
+export const prerender = false
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import { docsFetcher, docsPaths, extractDocument, extractTitle } from "../../../lib/docsMarkdown"
+import { isLocale, localizePath, type Locale } from "../../../i18n/locales"
+import { translateArticleHtml, workersAiTranslator } from "../../../i18n/translate"
+import { ui } from "../../../i18n/ui"
+
+const rawLocale = Astro.params.locale ?? ""
+if (!isLocale(rawLocale) || rawLocale === "en") {
+  return Astro.redirect(`/docs/${Astro.params.path ?? ""}`.replace(/\/$/, "") || "/docs", 302)
+}
+const locale: Locale = rawLocale
+const bare = (`/docs/${Astro.params.path ?? ""}`).replace(/\/$/, "") || "/docs"
+if (!docsPaths.has(bare)) Astro.response.status = 404
+
+const env = Astro.locals.runtime?.env
+const translator = workersAiTranslator(env)
+let title = "Documentation"
+let articleHtml = ""
+let translated = false
+if (docsPaths.has(bare)) {
+  try {
+    const source = new URL(bare, Astro.url.origin)
+    const page = await docsFetcher(env).fetch(source.toString(), { headers: { Accept: "text/html", Cookie: "cadcamfun_locale=en" } })
+    if (!page.ok) throw new Error(`Could not load ${bare}: ${page.status}`)
+    const html = await page.text()
+    title = extractTitle(html)
+    const result = await translateArticleHtml(extractDocument(html), locale, translator)
+    articleHtml = result.html
+    translated = result.translated
+    if (translator && translated) {
+      const [nextTitle] = await translator([title], locale).catch(() => [title])
+      if (nextTitle) title = nextTitle
+    }
+  } catch {
+    Astro.response.status = 502
+  }
+}
+Astro.response.headers.set("Content-Language", locale)
+---
+
+<DocsLayout title={title} description={title} locale={locale}>
+  {docsPaths.has(bare) ? (
+    <>
+      <p class="not-prose mb-6 rounded-[6px] border border-terminal-border px-4 py-3 text-sm text-terminal-muted">
+        {translated ? ui(locale, "autoNote") : ui(locale, "translationPending")}{" "}
+        <a class="font-semibold text-terminal-accent underline" href={bare}>{ui(locale, "viewOriginal")}</a>
+      </p>
+      <Fragment set:html={articleHtml} />
+    </>
+  ) : (
+    <section class="doc-section"><h2>404</h2><p>{title}</p><p><a href={localizePath("/docs", locale)}>{ui(locale, "documentation")}</a></p></section>
+  )}
+</DocsLayout>

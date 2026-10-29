@@ -171,10 +171,10 @@ export default function PropertyPanel(): JSX.Element {
       <div class="workstation-properties">
         <PanelCard title={t("cad.elementProperties")} testId="property-panel" actions={<>
             <SaveElementToLibrary />
-            <button onClick={() => elements.duplicateElement(selected().id)} class="panel-icon-btn" title="Duplicate Element" disabled={locked()}>
+            <button onClick={() => elements.duplicateElement(selected().id)} class="panel-icon-btn" title={t("cad.duplicate")} disabled={locked()}>
               <Copy size={18} class={locked() ? "text-gray-400" : ""} />
             </button>
-            <button onClick={() => { if (window.confirm("Are you sure you want to delete this element?")) elements.deleteElement(selected().id) }} class="panel-icon-btn panel-icon-btn--danger" title="Delete Element" disabled={locked()}>
+            <button onClick={() => { if (window.confirm(t("cad.prop.confirmDelete"))) elements.deleteElement(selected().id) }} class="panel-icon-btn panel-icon-btn--danger" title={t("cad.deleteElement")} disabled={locked()}>
               <Trash2 size={18} class={locked() ? "text-gray-400" : ""} />
             </button>        </>}>
 
@@ -185,16 +185,16 @@ export default function PropertyPanel(): JSX.Element {
 
         <form onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape" && editing()) { event.preventDefault(); cancel() } }}>
           <div class="space-y-4">
-            <div><label for="name" class={LABEL}>Name</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></div>
+            <div><label for="name" class={LABEL}>{t("cad.field.name")}</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></div>
             <div><label for="id" class={LABEL}>ID</label><input type="text" id="id" name="id" class={READONLY} value={properties().id || ""} disabled /></div>
-            <div><label for="type" class={LABEL}>Type</label><input type="text" id="type" name="type" class={READONLY} value={properties().type || ""} disabled /></div>
+            <div><label for="type" class={LABEL}>{t("cad.machineType")}</label><input type="text" id="type" name="type" class={READONLY} value={properties().type || ""} disabled /></div>
             <div>
-              <label class={LABEL}>Layer</label>
+              <label class={LABEL}>{t("cad.layer")}</label>
               <div class="flex items-center">
                 <div class="w-4 h-4 rounded-full mr-2" style={{ "background-color": layer()?.color || "#cccccc" }} />
                 <span class="text-sm text-gray-700 dark:text-gray-300">
-                  {layer()?.name || "Unknown Layer"}
-                  <Show when={layer()?.locked}><span class="ml-2 text-xs text-gray-500">(locked)</span></Show>
+                  {layer()?.name || t("cad.explorer.unknownLayer")}
+                  <Show when={layer()?.locked}><span class="ml-2 text-xs text-gray-500">{t("cad.layers.lockedTag")}</span></Show>
                 </span>
               </div>
             </div>
@@ -211,7 +211,7 @@ export default function PropertyPanel(): JSX.Element {
             </Show>
 
             <Show when={tried() && Object.keys(errors()).length > 0}>
-              <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">Fix the highlighted values before applying.</p>
+              <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">{t("cad.prop.fixValues")}</p>
             </Show>
             <div class="panel-edit-actions">
               <Show when={editing()} fallback={
@@ -238,8 +238,8 @@ export default function PropertyPanel(): JSX.Element {
           <div class="panel-section panel-section__body">
             <p class="text-sm text-gray-600 dark:text-gray-300">Turn this {String(selected().type)} into a parametric part: its measures become named parameters you can edit or drive by a formula.</p>
             <div class="flex flex-wrap gap-2">
-              <button type="button" class="panel-btn panel-btn--primary" disabled={locked()} onClick={() => convert(false)}>Make parametric</button>
-              <button type="button" class="panel-btn" disabled={locked()} onClick={() => { if (window.confirm("Replace this element with its parametric twin?")) convert(true) }}>Replace with parametric</button>
+              <button type="button" class="panel-btn panel-btn--primary" disabled={locked()} onClick={() => convert(false)}>{t("cad.prop.makeParametric")}</button>
+              <button type="button" class="panel-btn" disabled={locked()} onClick={() => { if (window.confirm(t("cad.prop.confirmReplace"))) convert(true) }}>{t("cad.prop.replaceParametric")}</button>
             </div>
             <Show when={conversion() !== ""}><p class="text-xs text-gray-500 dark:text-gray-400">{conversion()}</p></Show>
           </div>

@@ -9,7 +9,7 @@ export interface DiagnosticsInput {
   readonly buildNumber?: string
   readonly platform: string
   readonly osVersion: string
-  readonly desktop?: { readonly name: string; readonly baseUrl: string; readonly hosts?: readonly string[]; readonly fingerprint: string }
+  readonly desktop?: { readonly name: string; readonly baseUrl: string; readonly hosts?: readonly string[]; readonly fingerprint: string; readonly mode?: "cloud"; readonly workspaceId?: string }
   readonly connectivity: string
   readonly connectionError?: string | null
   readonly ai?: { readonly configured: boolean; readonly host?: string; readonly tools?: number } | null
@@ -63,7 +63,10 @@ export const buildDiagnostics = (input: DiagnosticsInput): string => {
     lines.push(`Address: ${originOnly(input.desktop.baseUrl)}`)
     const others = (input.desktop.hosts ?? []).map(originOnly).filter((origin) => origin !== originOnly(input.desktop!.baseUrl))
     if (others.length) lines.push(`Other addresses: ${others.join(", ")}`)
-    lines.push(`Certificate: ${shortFingerprint(input.desktop.fingerprint)}`)
+    if (input.desktop.mode === "cloud") {
+      lines.push("Transport: verified HTTPS")
+      if (input.desktop.workspaceId) lines.push(`Cloud workspace: ${input.desktop.workspaceId}`)
+    } else lines.push(`Certificate: ${shortFingerprint(input.desktop.fingerprint)}`)
   } else {
     lines.push("Desktop: not paired")
   }

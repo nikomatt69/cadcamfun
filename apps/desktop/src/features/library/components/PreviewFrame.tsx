@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/index.ts"
 import { Show, type JSX } from "solid-js"
 import { Maximize2 } from "lucide-solid"
 
@@ -18,7 +19,7 @@ export function PreviewFrame(props: {
         {props.actions}
         <Show when={props.onFit}>
           <button type="button" class="workstation-toolbar-button inline-flex h-7 items-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white" onClick={() => props.onFit?.()}>
-            <Maximize2 size={12} aria-hidden="true" />{props.fitLabel ?? "Fit view"}
+            <Maximize2 size={12} aria-hidden="true" />{props.fitLabel ?? t("cam.resource.fit")}
           </button>
         </Show>
       </div>

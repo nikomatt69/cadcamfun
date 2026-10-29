@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Volumes/SSD/Development/cadcamfun/.codex/hooks/session-start.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

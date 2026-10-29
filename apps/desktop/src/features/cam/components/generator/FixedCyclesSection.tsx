@@ -59,7 +59,7 @@ export function FixedCycleEditor(props: { readonly line: string; readonly onAppl
                 class="apply-button px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-gray-800"
                 onClick={() => props.onApply?.(g.generateFixedCycleGCode(cycle().type, params()))}
               >
-                Apply Changes
+                {t("cam.gen.fc.apply")}
               </button>
             </div>
           </Show>
@@ -80,7 +80,7 @@ function FixedCycleInfoPanel(props: { readonly cycles: ReadonlyArray<PanelCycle>
             <div class="cycle-item" onClick={() => props.onSelect(index())}>
               <div class="cycle-position">X: {cycle.x?.toFixed(2)}, Y: {cycle.y?.toFixed(2)}</div>
               <div class="cycle-depth">Z: {cycle.z?.toFixed(2)} (R: {cycle.r?.toFixed(2)})</div>
-              <Show when={cycle.q}>{(q) => <div class="cycle-increment">Inc: {q().toFixed(2)}mm</div>}</Show>
+              <Show when={cycle.q}>{(q) => <div class="cycle-increment">Inc: {q().toFixed(2)}{t("cad.millimeters")}</div>}</Show>
             </div>
           )}
         </For>
@@ -123,12 +123,12 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
   }
 
   return (
-    <Section id="fixedCycles" icon={RotateCw} title="Fixed Cycles" testId="fixed-cycles-section">
+    <Section id="fixedCycles" icon={RotateCw} title={t("cam.ribbon.cycles")} testId="fixed-cycles-section">
       <div class="toolpath-generator-integration">
         <div class="fixed-cycles-actions">
-          <h3>Fixed Cycles</h3>
+          <h3>{t("cam.ribbon.cycles")}</h3>
           <div class="cycle-buttons">
-            <button onClick={fromSelection} disabled={job.selection().length === 0}>Generate Fixed Cycle from Selected Elements</button>
+            <button onClick={fromSelection} disabled={job.selection().length === 0}>{t("cam.gen.fc.generate")}</button>
           </div>
         </div>
         <Show when={cycles().length > 0}>
@@ -157,7 +157,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
       <Show when={gen.selectedCycle}>
         {(cycle) => (
           <div class="mt-4">
-            <h4 class="text-sm font-medium text-gray-800 mb-2">Modify Fixed Cycle</h4>
+            <h4 class="text-sm font-medium text-gray-800 mb-2">{t("cam.gen.fc.modify")}</h4>
             <FixedCycleEditor line={cycle().gcode} onApply={apply} />
           </div>
         )}
@@ -173,7 +173,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
             apply(g.drillingCycleAt(Number(element["x"]) || 0, Number(element["y"]) || 0, gen.settings.depth, gen.settings.feedrate))
           }}
         >
-          Create Fixed Cycle
+          {t("cam.gen.fc.create")}
         </button>
         <Show when={gen.detectedCycles.length > 0}>
           <button
@@ -186,7 +186,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
               props.onGCode(next)
             }}
           >
-            Remove All Fixed Cycles
+            {t("cam.gen.fc.removeAll")}
           </button>
         </Show>
       </div>

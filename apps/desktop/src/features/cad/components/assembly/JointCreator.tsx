@@ -34,8 +34,8 @@ const NEEDS_ANGLE: ReadonlySet<JointType> = new Set<JointType>(["revolute", "cyl
 const NEEDS_DISTANCE: ReadonlySet<JointType> = new Set<JointType>(["prismatic", "cylindrical", "planar"])
 
 const AXIS_PRESETS: ReadonlyArray<{ readonly label: string; readonly value: { x: number; y: number; z: number } }> = [
-  { label: "X", value: { x: 1, y: 0, z: 0 } },
-  { label: "Y", value: { x: 0, y: 1, z: 0 } },
+  { get label() { return t("cad.field.x") }, value: { x: 1, y: 0, z: 0 } },
+  { get label() { return t("cad.field.y") }, value: { x: 0, y: 1, z: 0 } },
   { label: "Z", value: { x: 0, y: 0, z: 1 } },
 ]
 
@@ -54,8 +54,8 @@ const NumberField = (props: { label: string; value: number; step?: number; onCha
 
 const VectorField = (props: { value: { x: number; y: number; z: number }; onChange: (value: { x: number; y: number; z: number }) => void }): JSX.Element => (
   <div class="grid grid-cols-3 gap-2">
-    <NumberField label="X" value={props.value.x} onChange={(x) => props.onChange({ ...props.value, x })} />
-    <NumberField label="Y" value={props.value.y} onChange={(y) => props.onChange({ ...props.value, y })} />
+    <NumberField label={t("cad.field.x")} value={props.value.x} onChange={(x) => props.onChange({ ...props.value, x })} />
+    <NumberField label={t("cad.field.y")} value={props.value.y} onChange={(y) => props.onChange({ ...props.value, y })} />
     <NumberField label="Z" value={props.value.z} onChange={(z) => props.onChange({ ...props.value, z })} />
   </div>
 )

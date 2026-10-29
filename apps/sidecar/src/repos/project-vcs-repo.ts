@@ -67,6 +67,105 @@ export const readProjectSnapshot = (db: Pick<Db, "select">, projectId: string): 
   } satisfies ProjectSnapshot
 }
 
+/** Synchronous application seam: cloud imports compose this with ref advancement in one transaction. */
+export const applyProjectSnapshot = (
+  tx: import("@cadcamfun/db").MutationTransaction,
+  projectId: string,
+  s: ProjectSnapshot,
+  userId: string,
+  options?: { readonly expectedRevision: string; readonly checkpointId: string }
+) => {
+  const P = schema.projectTable
+  if (options) {
+    const current = readProjectSnapshot(tx, projectId)
+    if (!current || projectSnapshotRevision(current) !== options.expectedRevision) throw new Error("CheckpointConflict: the project changed; inspect it before restoring.")
+  }
+  const p = s.project as { name?: string; description?: string | null; isPublic?: boolean }
+  tx.update(P).set({ ...(p.name && { name: p.name }), description: p.description ?? null, isPublic: p.isPublic ?? false }).where(eq(P.id, projectId)).run()
+  const date = (v: unknown): Date => (typeof v === "string" ? new Date(v) : new Date())
+  const dates = (e: Entity) => ({ createdAt: date(e.createdAt), updatedAt: date(e.updatedAt) })
+  const str = (v: unknown): string | null => (typeof v === "string" ? v : null)
+
+  // Library items first (toolpaths point at them). They are shared across projects: create what is missing and
+  // update an item only when this user owns it, so merging a project never rewrites someone else's library.
+  const upsertLibrary = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable, entities: readonly Entity[] | undefined, columns: (e: Entity) => Record<string, unknown>) => {
+    for (const e of entities ?? []) {
+      const existing = tx.select({ id: table.id, ownerId: table.ownerId }).from(table).where(eq(table.id, e.id)).get()
+      const values = { id: e.id, name: String(e.name ?? "Untitled"), isPublic: Boolean(e.isPublic), ...dates(e), ...columns(e) } as never
+      if (!existing) tx.insert(table).values({ ...(values as object), ownerId: userId } as never).run()
+      else if (existing.ownerId === null || existing.ownerId === userId) tx.update(table).set(values).where(eq(table.id, e.id)).run()
+    }
+  }
+  upsertLibrary(schema.materialTable, s.materials, (e) => ({ description: str(e.description), properties: e.properties ?? {} }))
+  upsertLibrary(schema.toolTable, s.tools, (e) => ({
+    type: String(e.type ?? "endmill"), diameter: Number(e.diameter ?? 0), material: String(e.material ?? ""), numberOfFlutes: (e.numberOfFlutes as number | null) ?? null,
+    maxRPM: (e.maxRPM as number | null) ?? null, coolantType: str(e.coolantType), cuttingLength: (e.cuttingLength as number | null) ?? null,
+    totalLength: (e.totalLength as number | null) ?? null, shankDiameter: (e.shankDiameter as number | null) ?? null, notes: str(e.notes),
+    cornerRadius: (e.cornerRadius as number | null) ?? null, tipAngle: (e.tipAngle as number | null) ?? null, threadPitch: (e.threadPitch as number | null) ?? null, holderDiameter: (e.holderDiameter as number | null) ?? null, holderLength: (e.holderLength as number | null) ?? null, stickout: (e.stickout as number | null) ?? null,
+  }))
+  upsertLibrary(schema.machineConfigTable, s.machineConfigs, (e) => ({ type: String(e.type ?? "mill"), description: str(e.description), config: e.config ?? {} }))
+
+  // A snapshot may only link what this project (a drawing) or this user (library rows, or unowned ones) can see.
+  const exists = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable | typeof schema.drawingTable, id: unknown): string | null => {
+    if (typeof id !== "string") return null
+    if (table === schema.drawingTable) return tx.select({ id: schema.drawingTable.id }).from(schema.drawingTable).where(and(eq(schema.drawingTable.id, id), eq(schema.drawingTable.projectId, projectId))).get() ? id : null
+    const lib = table as typeof schema.materialTable
+    const row = tx.select({ ownerId: lib.ownerId }).from(lib).where(eq(lib.id, id)).get()
+    return row && (row.ownerId === null || row.ownerId === userId) ? id : null
+  }
+  const sync = <T extends { id: unknown }>(table: typeof schema.drawingTable | typeof schema.componentTable | typeof schema.toolpathTable, entities: readonly Entity[], values: (e: Entity) => T) => {
+    const keep = new Set(entities.map((e) => e.id))
+    for (const row of tx.select({ id: table.id }).from(table).where(eq(table.projectId, projectId)).all()) {
+      if (!keep.has(row.id)) tx.delete(table).where(eq(table.id, row.id)).run()
+    }
+    for (const e of entities) {
+      // An id that already lives in another project is not ours to take over.
+      const taken = typeof e.id === "string" ? tx.select({ projectId: table.projectId }).from(table).where(eq(table.id, e.id)).get() : undefined
+      if (taken !== undefined && taken.projectId !== projectId) continue
+      const v = values(e) as never
+      tx.insert(table).values(v).onConflictDoUpdate({ target: table.id, set: v }).run()
+    }
+  }
+  const common = (e: Entity) => ({ id: e.id, name: String(e.name ?? "Untitled"), description: str(e.description), projectId, ...dates(e) })
+  sync(schema.drawingTable, s.drawings, (e) => ({ ...common(e), data: e.data ?? {} }))
+  sync(schema.componentTable, s.components, (e) => ({ ...common(e), data: e.data ?? {}, type: str(e.type), isPublic: Boolean(e.isPublic) }))
+  sync(schema.toolpathTable, s.toolpaths, (e) => ({
+    ...common(e),
+    data: options ? { ...(typeof e.data === "object" && e.data !== null ? e.data : {}), verification: null, sourceRevision: `checkpoint-restored:${options.checkpointId}`, checkpointRestore: { checkpointId: options.checkpointId, restoredAt: new Date().toISOString() } } : e.data ?? null,
+    type: str(e.type),
+    operationType: str(e.operationType),
+    gcode: str(e.gcode),
+    isPublic: Boolean(e.isPublic),
+    createdBy: typeof e.createdBy === "string" && tx.select({ id: schema.userTable.id }).from(schema.userTable).where(eq(schema.userTable.id, e.createdBy)).get() ? e.createdBy : userId,
+    drawingId: exists(schema.drawingTable, e.drawingId),
+    materialId: exists(schema.materialTable, e.materialId),
+    toolId: exists(schema.toolTable, e.toolId),
+    machineConfigId: exists(schema.machineConfigTable, e.machineConfigId),
+  }))
+
+  // Cost estimates belong to a toolpath: drop the ones whose estimate is gone from the tree, upsert the rest.
+  const C = schema.productionCostEstimateTable
+  const toolpathIds = tx.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, projectId)).all().map((r) => r.id)
+  const keepCosts = new Set((s.costs ?? []).map((c) => c.id))
+  for (const row of toolpathIds.length === 0 ? [] : tx.select({ id: C.id }).from(C).where(inArray(C.toolpathId, toolpathIds)).all()) {
+    if (!keepCosts.has(row.id)) tx.delete(C).where(eq(C.id, row.id)).run()
+  }
+  for (const c of s.costs ?? []) {
+    if (typeof c.toolpathId !== "string" || !toolpathIds.includes(c.toolpathId)) continue
+    const owner = tx.select({ toolpathId: C.toolpathId }).from(C).where(eq(C.id, c.id as string)).get()
+    if (owner !== undefined && !toolpathIds.includes(owner.toolpathId)) continue
+    const num = (k: string) => Number(c[k] ?? 0)
+    const v = {
+      id: c.id, toolpathId: c.toolpathId, materialCost: num("materialCost"), toolWearCost: num("toolWearCost"), machineTime: num("machineTime"), machineTimeCost: num("machineTimeCost"),
+      operatorTime: num("operatorTime"), operatorTimeCost: num("operatorTimeCost"), setupCost: num("setupCost"), totalCost: num("totalCost"),
+      currencyCode: String(c.currencyCode ?? "EUR"), details: c.details ?? {}, ownerId: userId, ...dates(c),
+    }
+    tx.insert(C).values(v).onConflictDoUpdate({ target: C.id, set: v }).run()
+  }
+  const restored = readProjectSnapshot(tx, projectId)
+  return { result: undefined, resourceId: projectId, ...(restored ? { revision: projectSnapshotRevision(restored) } : {}) }
+}
+
 /** `user.name` / `user.email` of a commit signature. */
 export interface GitIdentity {
   readonly name: string
@@ -108,94 +207,7 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
         apply: (projectId, s, userId, options) =>
           query("vcs.apply", (db) =>
             commitMutation(db, "vcs.apply", (tx) => {
-              if (options) {
-                const current = readProjectSnapshot(tx, projectId)
-                if (!current || projectSnapshotRevision(current) !== options.expectedRevision) throw new Error("CheckpointConflict: the project changed; inspect it before restoring.")
-              }
-              const p = s.project as { name?: string; description?: string | null; isPublic?: boolean }
-              tx.update(P).set({ ...(p.name && { name: p.name }), description: p.description ?? null, isPublic: p.isPublic ?? false }).where(eq(P.id, projectId)).run()
-              const date = (v: unknown): Date => (typeof v === "string" ? new Date(v) : new Date())
-              const dates = (e: Entity) => ({ createdAt: date(e.createdAt), updatedAt: date(e.updatedAt) })
-              const str = (v: unknown): string | null => (typeof v === "string" ? v : null)
-
-              // Library items first (toolpaths point at them). They are shared across projects: create what is missing and
-              // update an item only when this user owns it, so merging a project never rewrites someone else's library.
-              const upsertLibrary = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable, entities: readonly Entity[] | undefined, columns: (e: Entity) => Record<string, unknown>) => {
-                for (const e of entities ?? []) {
-                  const existing = tx.select({ id: table.id, ownerId: table.ownerId }).from(table).where(eq(table.id, e.id)).get()
-                  const values = { id: e.id, name: String(e.name ?? "Untitled"), isPublic: Boolean(e.isPublic), ...dates(e), ...columns(e) } as never
-                  if (!existing) tx.insert(table).values({ ...(values as object), ownerId: userId } as never).run()
-                  else if (existing.ownerId === null || existing.ownerId === userId) tx.update(table).set(values).where(eq(table.id, e.id)).run()
-                }
-              }
-              upsertLibrary(schema.materialTable, s.materials, (e) => ({ description: str(e.description), properties: e.properties ?? {} }))
-              upsertLibrary(schema.toolTable, s.tools, (e) => ({
-                type: String(e.type ?? "endmill"), diameter: Number(e.diameter ?? 0), material: String(e.material ?? ""), numberOfFlutes: (e.numberOfFlutes as number | null) ?? null,
-                maxRPM: (e.maxRPM as number | null) ?? null, coolantType: str(e.coolantType), cuttingLength: (e.cuttingLength as number | null) ?? null,
-                totalLength: (e.totalLength as number | null) ?? null, shankDiameter: (e.shankDiameter as number | null) ?? null, notes: str(e.notes),
-                cornerRadius: (e.cornerRadius as number | null) ?? null, tipAngle: (e.tipAngle as number | null) ?? null, threadPitch: (e.threadPitch as number | null) ?? null, holderDiameter: (e.holderDiameter as number | null) ?? null, holderLength: (e.holderLength as number | null) ?? null, stickout: (e.stickout as number | null) ?? null,
-              }))
-              upsertLibrary(schema.machineConfigTable, s.machineConfigs, (e) => ({ type: String(e.type ?? "mill"), description: str(e.description), config: e.config ?? {} }))
-
-              // A snapshot may only link what this project (a drawing) or this user (library rows, or unowned ones) can see.
-              const exists = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable | typeof schema.drawingTable, id: unknown): string | null => {
-                if (typeof id !== "string") return null
-                if (table === schema.drawingTable) return tx.select({ id: schema.drawingTable.id }).from(schema.drawingTable).where(and(eq(schema.drawingTable.id, id), eq(schema.drawingTable.projectId, projectId))).get() ? id : null
-                const lib = table as typeof schema.materialTable
-                const row = tx.select({ ownerId: lib.ownerId }).from(lib).where(eq(lib.id, id)).get()
-                return row && (row.ownerId === null || row.ownerId === userId) ? id : null
-              }
-              const sync = <T extends { id: unknown }>(table: typeof schema.drawingTable | typeof schema.componentTable | typeof schema.toolpathTable, entities: readonly Entity[], values: (e: Entity) => T) => {
-                const keep = new Set(entities.map((e) => e.id))
-                for (const row of tx.select({ id: table.id }).from(table).where(eq(table.projectId, projectId)).all()) {
-                  if (!keep.has(row.id)) tx.delete(table).where(eq(table.id, row.id)).run()
-                }
-                for (const e of entities) {
-                  // An id that already lives in another project is not ours to take over.
-                  const taken = typeof e.id === "string" ? tx.select({ projectId: table.projectId }).from(table).where(eq(table.id, e.id)).get() : undefined
-                  if (taken !== undefined && taken.projectId !== projectId) continue
-                  const v = values(e) as never
-                  tx.insert(table).values(v).onConflictDoUpdate({ target: table.id, set: v }).run()
-                }
-              }
-              const common = (e: Entity) => ({ id: e.id, name: String(e.name ?? "Untitled"), description: str(e.description), projectId, ...dates(e) })
-              sync(schema.drawingTable, s.drawings, (e) => ({ ...common(e), data: e.data ?? {} }))
-              sync(schema.componentTable, s.components, (e) => ({ ...common(e), data: e.data ?? {}, type: str(e.type), isPublic: Boolean(e.isPublic) }))
-              sync(schema.toolpathTable, s.toolpaths, (e) => ({
-                ...common(e),
-                data: options ? { ...(typeof e.data === "object" && e.data !== null ? e.data : {}), verification: null, sourceRevision: `checkpoint-restored:${options.checkpointId}`, checkpointRestore: { checkpointId: options.checkpointId, restoredAt: new Date().toISOString() } } : e.data ?? null,
-                type: str(e.type),
-                operationType: str(e.operationType),
-                gcode: str(e.gcode),
-                isPublic: Boolean(e.isPublic),
-                createdBy: typeof e.createdBy === "string" && tx.select({ id: schema.userTable.id }).from(schema.userTable).where(eq(schema.userTable.id, e.createdBy)).get() ? e.createdBy : userId,
-                drawingId: exists(schema.drawingTable, e.drawingId),
-                materialId: exists(schema.materialTable, e.materialId),
-                toolId: exists(schema.toolTable, e.toolId),
-                machineConfigId: exists(schema.machineConfigTable, e.machineConfigId),
-              }))
-
-              // Cost estimates belong to a toolpath: drop the ones whose estimate is gone from the tree, upsert the rest.
-              const C = schema.productionCostEstimateTable
-              const toolpathIds = tx.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, projectId)).all().map((r) => r.id)
-              const keepCosts = new Set((s.costs ?? []).map((c) => c.id))
-              for (const row of toolpathIds.length === 0 ? [] : tx.select({ id: C.id }).from(C).where(inArray(C.toolpathId, toolpathIds)).all()) {
-                if (!keepCosts.has(row.id)) tx.delete(C).where(eq(C.id, row.id)).run()
-              }
-              for (const c of s.costs ?? []) {
-                if (typeof c.toolpathId !== "string" || !toolpathIds.includes(c.toolpathId)) continue
-                const owner = tx.select({ toolpathId: C.toolpathId }).from(C).where(eq(C.id, c.id as string)).get()
-                if (owner !== undefined && !toolpathIds.includes(owner.toolpathId)) continue
-                const num = (k: string) => Number(c[k] ?? 0)
-                const v = {
-                  id: c.id, toolpathId: c.toolpathId, materialCost: num("materialCost"), toolWearCost: num("toolWearCost"), machineTime: num("machineTime"), machineTimeCost: num("machineTimeCost"),
-                  operatorTime: num("operatorTime"), operatorTimeCost: num("operatorTimeCost"), setupCost: num("setupCost"), totalCost: num("totalCost"),
-                  currencyCode: String(c.currencyCode ?? "EUR"), details: c.details ?? {}, ownerId: userId, ...dates(c),
-                }
-                tx.insert(C).values(v).onConflictDoUpdate({ target: C.id, set: v }).run()
-              }
-              const restored = readProjectSnapshot(tx, projectId)
-              return { result: undefined, resourceId: projectId, ...(restored ? { revision: projectSnapshotRevision(restored) } : {}) }
+              return applyProjectSnapshot(tx, projectId, s, userId, options)
             })),
         audit: (userId, projectId, action, details) =>
           query("vcs.audit", (db) => void db.insert(schema.activityLogTable).values({ userId, itemId: projectId, itemType: "project", action, details }).run()),

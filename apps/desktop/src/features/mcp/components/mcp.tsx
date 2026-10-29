@@ -116,7 +116,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
   const initial = () => props.initialValues ?? {}
   const [name, setName] = createSignal(initial().name ?? "")
   const [type, setType] = createSignal<"sse" | "stdio">(
-    (initial().type === "stdio" ? "stdio" : "sse")
+    (initial().type === "stdio" ? t("mcp.type.stdioShort") : t("mcp.type.sseShort"))
   )
   // Legacy seeds the URL from `initialValues.id` (not `.url`); kept bug for bug.
   const [url, setUrl] = createSignal(initial().id ?? "")
@@ -201,7 +201,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
         <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.serverType")}</label>
         <select
           value={type()}
-          onChange={(event) => setType(event.currentTarget.value === "stdio" ? "stdio" : "sse")}
+          onChange={(event) => setType(event.currentTarget.value === "stdio" ? t("mcp.type.stdioShort") : t("mcp.type.sseShort"))}
           class="w-full rounded border border-gray-300 p-2"
           disabled={busy() || initial().id !== undefined}
         >

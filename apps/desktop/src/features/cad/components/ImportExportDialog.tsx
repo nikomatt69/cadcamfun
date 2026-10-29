@@ -53,7 +53,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
       // The same exact solids (and the same skips) the STEP export reports, written as IGES 5.3.
       const result = sceneToIges(elements.elements as ReadonlyArray<Record<string, unknown>>)
       if (result.iges === undefined) {
-        alert(`Nothing to write as IGES: no solid in the drawing.${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
+        alert(`${t("cad.io.nothingIges")}${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
         return
       }
       if (!await download(result.iges, "model/iges", `${fileName()}.iges`)) return
@@ -70,7 +70,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
       // A real ISO 10303-21 (AP214) file: exact solids from the kernel, faceted ones only where an element has no exact model.
       const result = sceneToStep(elements.elements as ReadonlyArray<Record<string, unknown>>, { author: "CAD/CAM FUN" })
       if (result.step === undefined) {
-        alert(`Nothing to write as STEP: no solid in the drawing.${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
+        alert(`${t("cad.io.nothingStep")}${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
         return
       }
       if (!await download(result.step, "application/step", `${fileName()}.step`)) return
@@ -96,7 +96,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
     if (/\.(stl|obj|ply)$/i.test(file.name)) {
       void meshFileElements(file).then(
         (imported) => { useElementsStore.getState().addElements(imported.map((e) => ({ ...e }))); props.onClose() },
-        (cause: unknown) => { console.error("Error reading mesh file:", cause); alert(`Failed to read ${file.name} as a mesh: ${cause instanceof Error ? cause.message : String(cause)}`) }
+        (cause: unknown) => { console.error("Error reading mesh file:", cause); alert(t("cad.io.failMesh", { name: file.name, reason: cause instanceof Error ? cause.message : String(cause) })) }
       )
       return
     }
@@ -109,7 +109,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
         try {
           const imported = igesToElements(String(loaded.target?.result))
           if (imported.elements.length === 0) {
-            alert(`No solid found in ${file.name}.${imported.warnings.length > 0 ? `\n\n${imported.warnings.slice(0, 8).join("\n")}` : ""}`)
+            alert(`${t("cad.io.noSolid", { name: file.name })}${imported.warnings.length > 0 ? `\n\n${imported.warnings.slice(0, 8).join("\n")}` : ""}`)
             return
           }
           useElementsStore.getState().addElements(imported.elements.map((e) => ({ ...e })))
@@ -124,7 +124,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
           props.onClose()
         } catch (cause) {
           console.error("Error reading IGES file:", cause)
-          alert(`Failed to read ${file.name} as IGES: ${cause instanceof Error ? cause.message : String(cause)}`)
+          alert(t("cad.io.failIges", { name: file.name, reason: cause instanceof Error ? cause.message : String(cause) }))
         }
         return
       }
@@ -133,7 +133,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
         try {
           const imported = stepToElements(String(loaded.target?.result))
           if (imported.elements.length === 0) {
-            alert(`No solid found in ${file.name}.${imported.warnings.length > 0 ? `\n\n${imported.warnings.slice(0, 8).join("\n")}` : ""}`)
+            alert(`${t("cad.io.noSolid", { name: file.name })}${imported.warnings.length > 0 ? `\n\n${imported.warnings.slice(0, 8).join("\n")}` : ""}`)
             return
           }
           useElementsStore.getState().addElements(imported.elements.map((e) => ({ ...e })))
@@ -148,7 +148,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
           props.onClose()
         } catch (cause) {
           console.error("Error reading STEP file:", cause)
-          alert(`Failed to read ${file.name} as STEP: ${cause instanceof Error ? cause.message : String(cause)}`)
+          alert(t("cad.io.failStep", { name: file.name, reason: cause instanceof Error ? cause.message : String(cause) }))
         }
         return
       }
@@ -158,23 +158,23 @@ export default function ImportExportDialog(props: Props): JSX.Element {
           useElementsStore.getState().addElements(json.elements)
           if (json.selectedElementId) useElementsStore.getState().selectElement(json.selectedElementId)
           props.onClose()
-        } else alert("Invalid file format. Could not find elements array.")
+        } else alert(t("cad.io.badFormat"))
       } catch (cause) {
         console.error("Error parsing file:", cause)
-        alert("Failed to parse file. Make sure it is a valid JSON file.")
+        alert(t("cad.io.parseFailed"))
       }
     }
     reader.readAsText(file)
   }
 
   return <Show when={props.isOpen}>
-    <WorkspaceExportDialog open={props.mode === "export" && !showProject()} title="Export Drawing" name={fileName()} onName={setFileName}
+    <WorkspaceExportDialog open={props.mode === "export" && !showProject()} title={t("cad.io.exportDrawing")} name={fileName()} onName={setFileName}
       format={fileFormat()} onFormat={setFileFormat} formats={[
         { id: "json", label: t("cad.importExport.formatJson") }, { id: "stl", label: t("cad.importExport.formatStl") },
         { id: "obj", label: t("cad.importExport.formatObj") }, { id: "glb", label: t("cad.importExport.formatGlb") }, { id: "step", label: t("cad.importExport.formatStep") },
         { id: "iges", label: t("cad.importExport.formatIges") }, { id: "cad", label: t("cad.importExport.formatCad") }
       ]} projectBody={t("cad.importExport.saveAsProjectBody")} onProject={() => setShowProject(true)} onExport={exportFile} onClose={props.onClose} />
-    <Modal open={props.mode === "import"} variant="workspace" title="Import Drawing" onClose={props.onClose}>
+    <Modal open={props.mode === "import"} variant="workspace" title={t("cad.io.importDrawing")} onClose={props.onClose}>
       <div class="px-6 py-4">
         <label for="file-upload" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("cad.importExport.selectFile")}</label>
         <div class="mb-4 flex flex-col items-center gap-3 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-6 dark:border-gray-600 dark:bg-gray-700/50">

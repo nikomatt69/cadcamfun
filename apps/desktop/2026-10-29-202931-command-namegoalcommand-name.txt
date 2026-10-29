@@ -1,0 +1,268 @@
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Sonnet 5.5 · Claude Pro
+ ▝▝   ▝▝   /Volumes/SSD/Development/cadcamfun/apps/desktop
+
+
+❯ /goal voglio che il gcode editor sia minimalista come ora ma con migliorie    
+come lo miglioreresti a livello ui                                              
+  ⎿  Goal set: voglio che il gcode editor sia minimalista come ora ma con
+     migliorie come lo miglioreresti a livello ui
+
+⏺ Obiettivo: mantenere l'editor G-code minimalista, con miglioramenti UI mirati.
+  Parto guardando l'editor com'è adesso.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ refinire                                                                      
+
+❯ direi                                                                         
+
+⏺ Ricevuto: "refinire" lo leggo come rifinire l'editor, quindi continuo. Cerco
+  il codice dell'editor G-code.
+
+  Read 1 file, ran 3 shell commands (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ continua                                                                      
+
+  Searched for 1 pattern, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Write(src/features/cam/lib/gcode-tokens.ts)
+  ⎿  Wrote 40 lines to src/features/cam/lib/gcode-tokens.ts
+      1 /** Lexical colouring for the NC editor: it classifies words only
+         and says nothing about whether a program is valid. */
+      2 export type GCodeTokenKind = "comment" | "g" | "m" | "tool" | "fe
+        ed" | "seq" | "text"
+      3 
+      4 export interface GCodeToken {
+      5   readonly text: string
+      6   readonly kind: GCodeTokenKind
+      7 }
+      8 
+     … +32 lines (ctrl+o to expand)
+
+⏺ Sto scrivendo il componente dell'editor: gutter con numeri di riga, colori per
+  le parole G-code, riga attiva e posizione del cursore.
+
+⏺ Write(src/features/cam/components/GCodeEditor.tsx)
+  ⎿  Added 69 lines, removed 11 lines
+      1  /** The editable NC text uses the same panel vocabulary as the g
+         enerator; processing still belongs to the page. */
+      2 -import { Show, createMemo, type JSX } from "solid-js"           
+      2 +import { For, Show, createMemo, createSignal, type JSX } from "s
+        +olid-js"                                                        
+      3  import { Code, Play } from "lucide-solid"
+      4  import { t } from "../../../i18n/index.ts"
+      5 -import { Badge, Stat } from "../../../shared/components/panel/ui
+        -.tsx"                                                           
+      5  import { gcodeSummary } from "../lib/gcode-summary.ts"
+      6 +import { caretPosition, tokenizeGcodeLine } from "../lib/gcode-t
+        +okens.ts"                                                       
+      7  import "../../../styles/cam-panels.css"
+      8  
+      9  export interface GCodeEditorProps {
+     ...
+      12    readonly onProcess: () => void
+      13  }
+      14  
+      15 +/** Above this many lines the colouring is dropped so that typi
+         +ng in a huge program stays immediate. */                       
+      16 +const HIGHLIGHT_LIMIT = 4000                                   
+      17 +const INDENT = "  "                                            
+      18 +                                                               
+      19  export default function GCodeEditor(props: GCodeEditorProps): J
+          SX.Element {
+      20    const summary = createMemo(() => gcodeSummary(props.value))
+      21 +  const lines = createMemo(() => props.value.split("\n"))      
+      22 +  const colored = createMemo(() => lines().length <= HIGHLIGHT_
+         +LIMIT)                                                         
+      23 +  const [caret, setCaret] = createSignal(0)                    
+      24 +  const [scroll, setScroll] = createSignal({ top: 0, left: 0 })
+      25 +  const position = createMemo(() => caretPosition(props.value, 
+         +caret()))                                                      
+      26 +  const gutter = createMemo(() => lines().map((_, i) => i + 1).
+         +join("\n"))                                                    
+      27 +  const shift = () => `translate(${-scroll().left}px, ${-scroll
+         +().top}px)`                                                    
+      28 +  const shiftY = () => `translateY(${-scroll().top}px)`        
+      29 +  const bandTop = () => `${(position().line - 1) * 20}px`      
+      30 +                                                               
+      31 +  const track = (area: HTMLTextAreaElement) => setCaret(area.se
+         +lectionStart)                                                  
+      32 +  const edit = (area: HTMLTextAreaElement) => { props.onChange(
+         +area.value); track(area) }                                     
+      33 +                                                               
+      34 +  const onKeyDown: JSX.EventHandlerUnion<HTMLTextAreaElement, K
+         +eyboardEvent> = (event) => {                                   
+      35 +    const area = event.currentTarget                           
+      36 +    if (event.key === "Enter" && (event.metaKey || event.ctrlKe
+         +y)) {                                                          
+      37 +      event.preventDefault()                                   
+      38 +      if (summary().blocks > 0) props.onProcess()              
+      39 +    } else if (event.key === "Tab" && !event.shiftKey && !event
+         +.metaKey && !event.ctrlKey && !event.altKey) {                 
+      40 +      event.preventDefault()                                   
+      41 +      area.setRangeText(INDENT, area.selectionStart, area.selec
+         +tionEnd, "end")                                                
+      42 +      edit(area)                                               
+      43 +    }                                                          
+      44 +  }                                                            
+      45 +                                                               
+      46    return <section class="panel cam-editor cam-central-panel" da
+          ta-testid="gcode-editor-panel">
+      47      <header class="panel-header">
+      48        <div class="cam-panel-heading"><Code size={15} /><h3 clas
+          s="panel-header__title">{t("cam.editor")}</h3></div>
+      20 -      <Badge>{t("cam.lines", { count: summary().lines })}</Badg
+         -e>                                                             
+      49 +      <p class="cam-editor__facts" data-testid="editor-summary"
+         +>                                                              
+      50 +        <span title={t("cam.panel.blocks")}>{t("cam.lines", { c
+         +ount: summary().lines })}</span>                               
+      51 +        <Show when={summary().tools.length > 0}><span>{summary(
+         +).tools.map(n => `T${n}`).join(" ")}</span></Show>             
+      52 +        <Show when={summary().offsets.length > 0}><span>{summar
+         +y().offsets.join(" ")}</span></Show>                           
+      53 +      </p>                                                     
+      54      </header>
+      22 -    <div class="cam-program-summary" data-testid="editor-summar
+         -y">                                                            
+      23 -      <Stat label={t("cam.panel.blocks")} value={String(summary
+         -().blocks)} />                                                 
+      24 -      <Stat label={t("cam.panel.tools")} value={summary().tools
+         -.length ? summary().tools.map(n => `T${n}`).join(" · ") : t("ca
+         -m.panel.notSpecified")} />                                     
+      25 -      <Stat label={t("cam.panel.offsets")} value={summary().off
+         -sets.join(" · ") || t("cam.panel.notSpecified")} />            
+      55 +    <div class="cam-editor__body">                             
+      56 +      <div class="cam-editor__gutter" aria-hidden="true">      
+      57 +        <div class="cam-editor__gutter-lines" style={{ transfor
+         +m: shiftY() }}>                                                
+      58 +          <div class="cam-editor__band" style={{ top: bandTop()
+         + }} />                                                         
+      59 +          <pre>{gutter()}</pre>                                
+      60 +        </div>                                                 
+      61 +      </div>                                                   
+      62 +      <div class="cam-editor__stack">                          
+      63 +        <div class="cam-editor__paint" aria-hidden="true">     
+      64 +          <div class="cam-editor__paint-lines" style={{ transfo
+         +rm: shift() }}>                                                
+      65 +            <div class="cam-editor__band" style={{ top: bandTop
+         +() }} />                                                       
+      66 +            <pre>                                              
+      67 +              <Show when={colored()} fallback={props.value}>   
+      68 +                <For each={lines()}>{(line) => <>              
+      69 +                  <For each={tokenizeGcodeLine(line)}>{(token) 
+         +=> <span class={`gc-${token.kind}`}>{token.text}</span>}</For>{
+         +"\n"}                                                          
+      70 +                </>}</For>                                     
+      71 +              </Show>                                          
+      72 +            </pre>                                             
+      73 +          </div>                                               
+      74 +        </div>                                                 
+      75 +        <textarea aria-label={t("cam.editor")} class="cam-edito
+         +r__code" classList={{ "cam-editor__code--painted": colored() }}
+      76 +          value={props.value} spellcheck={false} wrap="off" aut
+         +ocapitalize="off" autocomplete="off"                           
+      77 +          onInput={(event) => edit(event.currentTarget)} onKeyD
+         +own={onKeyDown}                                                
+      78 +          onKeyUp={(event) => track(event.currentTarget)} onCli
+         +ck={(event) => track(event.currentTarget)}                     
+      79 +          onSelect={(event) => track(event.currentTarget)}     
+      80 +          onScroll={(event) => setScroll({ top: event.currentTa
+         +rget.scrollTop, left: event.currentTarget.scrollLeft })} />    
+      81 +      </div>                                                   
+      82      </div>
+      27 -    <textarea aria-label={t("cam.editor")} class="cam-editor__c
+         -ode" value={props.value} spellcheck={false}                    
+      28 -      autocapitalize="off" autocomplete="off" onInput={(event) 
+         -=> props.onChange(event.currentTarget.value)} />               
+      83      <footer class="cam-editor__footer">
+      30 -      <p class="panel-hint"><Show when={summary().blocks > 0} f
+         -allback={t("cam.importHint")}>{t("cam.panel.editorHint")}</Show
+         -></p>                                                          
+      31 -      <button type="button" class="panel-btn panel-btn--primary
+         -" disabled={summary().blocks === 0} onClick={() => props.onProc
+         -ess()}><Play size={14} />{t("cam.process")}</button>           
+      84 +      <p class="panel-hint">                                   
+      85 +        <span class="cam-editor__cursor">Ln {position().line}, 
+         +Col {position().column}</span>                                 
+      86 +        <Show when={summary().blocks === 0}> · {t("cam.importHi
+         +nt")}</Show>                                                   
+      87 +      </p>                                                     
+      88 +      <button type="button" class="panel-btn panel-btn--primary
+         +" title="Ctrl/⌘ + Enter" disabled={summary().blocks === 0}     
+      89 +        onClick={() => props.onProcess()}><Play size={14} />{t(
+         +"cam.process")}</button>                                       
+      90      </footer>
+      91    </section>
+      92  }
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ L'editor G-code resta minimalista e ha ora quattro migliorie. I test del
+  tokenizer passano (3 su 3) e il typecheck di apps/desktop è pulito. Non l'ho
+  aperto nell'app, quindi l'allineamento tra testo colorato e textarea non è
+  verificato a occhio.
+
+  Cosa è cambiato in GCodeEditor.tsx, cam-panels.css e nel nuovo
+  lib/gcode-tokens.ts:
+
+  - Numeri di riga: c'è una colonna a sinistra, sempre allineata allo scroll del
+    testo.
+  - Colori leggeri: le parole G sono blu (accento), M ambra, T verde, F/S
+    grigio, N e commenti più tenui. Uso solo i colori già nel pannello, quindi
+    tema chiaro e scuro funzionano come prima. Sopra 4000 righe il colore si
+    disattiva per non rallentare la digitazione.
+  - Riga attiva e posizione: la riga del cursore ha una fascia tenue, e nel
+    footer compare Ln 12, Col 4.
+  - Più compatto: le tre caselle di riepilogo sono diventate una riga
+    nell'header (N righe · T1 T2 · G54). Il suggerimento sull'elaborazione è
+    passato nel tooltip del pulsante, e nel footer resta solo la posizione del
+    cursore (più il messaggio di import se il programma è vuoto).
+  - Tastiera: Tab inserisce due spazi e Cmd/Ctrl+Enter elabora il programma. Con
+    Tab l'editor trattiene il focus; Shift+Tab lo lascia uscire.
+
+  Il tooltip del pulsante concatena la stringa tradotta con il testo fisso
+  "(Ctrl/⌘ + Enter)". "Ln/Col" è anch'esso testo fisso, non tradotto: ho evitato
+  nuove chiavi nelle 11 lingue.
+
+  Prima di dare il goal per chiuso conviene un controllo a occhio nell'app.
+  Dimmi se vuoi che lo faccia io (per esempio con uno screenshot) o se
+  preferisci aggiungere altro, come cerca (Cmd+F) o vai a riga.
+
+◯ Goal not yet met… continuing (ctrl+o to expand)
+
+⏺ Verifico a occhio nell'app. Prima leggo come si fanno gli screenshot dell'app
+  reale.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Cmd/Ctrl+Enter è già un comando globale "Elabora G-code" (il test dei tasti lo
+  usa). Il mio handler lo farebbe scattare due volte, quindi lo tolgo.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Il test dei tasti passa. Ora il controllo visivo: monto solo l'editor in una
+  pagina temporanea e lo fotografo.
+
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+⏺ Stop Task
+  ⎿  find / -type d -name "playwright*" -path "*node_modules*" -maxdepth 8
+     2>/dev/null | head -3; ls
+     ~/Library/Caches/ms-playwright/chromium_headless_shell-1234 · stopped
+
+  Listed 1 directory, ran 3 shell commands (ctrl+o to expand)
+  ⎿  You've hit your 5-hour limit · resets 11:30pm (Europe/Rome)
+
+⏺ Usage limit reached · continuing automatically at 11:30pm · esc to 
+  cancel
+
+⏺ Goal paused · usage limit reached · continues automatically when it 
+  resets
+
+✻ Sautéed for 8m 25s · done 8:24 PM
+
+❯ /export                                                                       
+  ⎿  Conversation copied to clipboard

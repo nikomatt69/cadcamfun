@@ -166,7 +166,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           <button
             onClick={openSimulation}
             class={`p-1.5 border shadow-sm rounded-md flex items-center transition-all duration-200 ${simulationPosition() ? "bg-orange-50 dark:bg-orange-900 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300" : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900 hover:border-orange-300 text-gray-700 dark:text-gray-300 hover:text-orange-700"}`}
-            title="Open FEA simulation"
+            title={t("cad.tb.openFea")}
           >
             <Activity size={16} />
           </button>
@@ -187,17 +187,17 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             class="px-4 py-2 backdrop-blur-sm bg-blue-50/90 dark:bg-blue-900/90 border border-blue-200/60 dark:border-blue-800/60 rounded-xl flex items-center shadow-md"
             initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}
           >
-            <span class="text-xs text-blue-700 dark:text-blue-300 mr-2">Component selected:</span>
-            <span class="text-sm font-medium">Ready for placement</span>
+            <span class="text-xs text-blue-700 dark:text-blue-300 mr-2">{t("cad.tb.componentSelected")}</span>
+            <span class="text-sm font-medium">{t("cad.tb.readyPlace")}</span>
             <Motion.button
               onClick={() => props.setIsPlacingComponent(true)}
               class="ml-3 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl flex items-center shadow-md transition-all duration-200"
-              title="Place component" hover={hover} press={press}
+              title={t("cad.tb.placeComponent")} hover={hover} press={press}
             >
               <MousePointer size={14} class="mr-1" />
-              <span class="text-xs font-medium">Place</span>
+              <span class="text-xs font-medium">{t("cad.tb.place")}</span>
             </Motion.button>
-            <Motion.button onClick={() => props.setSelectedLibraryComponent(null)} class="ml-2 p-1.5 rounded-xl hover:bg-blue-200/80 dark:hover:bg-blue-700/80 text-blue-700 dark:text-blue-300 transition-all duration-200" hover={hover} press={press} aria-label="Clear selected component">
+            <Motion.button onClick={() => props.setSelectedLibraryComponent(null)} class="ml-2 p-1.5 rounded-xl hover:bg-blue-200/80 dark:hover:bg-blue-700/80 text-blue-700 dark:text-blue-300 transition-all duration-200" hover={hover} press={press} aria-label={t("cad.tb.clearComponent")}>
               <X size={14} />
             </Motion.button>
           </Motion.div>
@@ -209,7 +209,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             class="px-4 py-2 border border-white/40 dark:border-gray-600/40 rounded-xl flex items-center backdrop-blur-sm bg-white/80 dark:bg-gray-800/80 hover:bg-white/90 dark:hover:bg-gray-700/90 cursor-pointer shadow-md transition-all duration-200"
             hover={hover} press={press}
           >
-            <span class="text-xs text-gray-500 dark:text-gray-400 mr-2">Elements:</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400 mr-2">{t("cad.tb.elementsColon")}</span>
             <span class="text-sm font-medium">{elements.elements.length}</span>
             <Show when={selectedCount() > 0}>
               <span class="ml-2 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full">{selectedCount()} selected</span>
@@ -229,13 +229,13 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
                 <Show when={selectedCount() > 0}>
                   <button onClick={createComponentFromSelection} class="px-2 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md flex items-center">
                     <SquarePlus size={14} class="mr-1" />
-                    Create Component
+                    {t("cad.createComponent.title")}
                   </button>
                 </Show>
               </div>
               <div class="max-h-48 overflow-y-auto p-2">
                 <Show when={selectedCount() > 0} fallback={
-                  <div class="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">No elements selected</div>
+                  <div class="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">{t("cad.tb.noneSelected")}</div>
                 }>
                   <div class="space-y-1">
                     <For each={selectedElements()}>{(element) =>
@@ -246,7 +246,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
                           <span class="ml-2 text-gray-500 dark:text-gray-400 font-mono">{element.id.substring(0, 12)}...</span>
                         </div>
                         <button
-                          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Copy ID"
+                          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t("cad.tb.copyId")}
                           onClick={() => { void copyText(element.id).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}
                         >
                           <Copy size={12} />
@@ -265,7 +265,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             class="px-4 py-2 border border-green-200/60 dark:border-green-800/60 rounded-xl flex items-center backdrop-blur-sm bg-green-50/90 dark:bg-green-900/90 shadow-md"
             initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}
           >
-            <span class="text-xs text-green-600 dark:text-green-300 mr-2">Selected:</span>
+            <span class="text-xs text-green-600 dark:text-green-300 mr-2">{t("cad.tb.selectedColon")}</span>
             <span class="text-sm font-medium">{selected().id.substring(0, 8)}...</span>
           </Motion.div>}
         </Show>
@@ -282,28 +282,28 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
               <div class="flex items-center space-x-3">
                 <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center"><Activity size={18} class="text-white" /></div>
                 <div>
-                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Integrated FEA Simulation</h2>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">Real-time structural, thermal, and coupled analysis</p>
+                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{t("cad.tb.feaTitle")}</h2>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">{t("cad.tb.feaSubtitle")}</p>
                 </div>
               </div>
               <div class="flex items-center space-x-2">
                 <div class="text-xs text-gray-500 dark:text-gray-400 mr-4">
-                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse" />System active</span>
+                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse" />{t("cad.tb.systemActive")}</span>
                 </div>
-                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label="Close"><X size={20} /></button>
+                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label={t("cad.drawing.close")}><X size={20} /></button>
               </div>
             </div>
             <div class="h-[calc(100%-4rem)] overflow-hidden"><CADCanvas width="100%" height="100%" allowDragDrop keyboard={false} /></div>
             <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-2">
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">
-                  <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />Simulation canvas active</span>
+                  <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />{t("cad.tb.simActive")}</span>
                   <span>⌨️ Ctrl+Shift+S: Toggle simulation</span>
                   <span>⌨️ F9: Switch mode</span>
                   <span>⌨️ Esc: Close</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
-                  <span>Advanced mode</span>
+                  <span>{t("cad.tb.advancedMode")}</span>
                   <div class="w-1 h-4 bg-gradient-to-t from-orange-400 to-red-500 rounded-full" />
                 </div>
               </div>

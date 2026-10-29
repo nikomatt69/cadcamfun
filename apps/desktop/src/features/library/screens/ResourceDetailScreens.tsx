@@ -37,10 +37,10 @@ type Row = Readonly<Record<string, unknown>>
 type DetailTab = "overview" | "details" | "raw" | "preview" | "structure"
 
 const CONFIG: Readonly<Record<Kind, { readonly title: string; readonly listPath: string; readonly icon: typeof Package; readonly plural: string }>> = {
-  materials: { title: "Material", listPath: "/materials", icon: Layers, plural: "materials" },
-  tools: { title: "Tool", listPath: "/tools", icon: Wrench, plural: "tools" },
-  machines: { title: "Machine", listPath: "/machine", icon: Cpu, plural: "machines" },
-  components: { title: "Component", listPath: "/components", icon: Box, plural: "components" }
+  materials: { get title() { return t("library.field.material") }, listPath: "/materials", icon: Layers, get plural() { return t("cam.ribbon.materials") } },
+  tools: { get title() { return t("cam.toolLabel") }, listPath: "/tools", icon: Wrench, get plural() { return t("ai.context.category.tools") } },
+  machines: { get title() { return t("cam.machine") }, listPath: "/machine", icon: Cpu, get plural() { return t("library.tab.machines") } },
+  components: { get title() { return t("cad.assembly.kindComponent") }, listPath: "/components", icon: Box, get plural() { return t("library.tab.components") } }
 }
 
 const str = (value: unknown): string => (value === null || value === undefined ? "" : String(value))
@@ -77,9 +77,9 @@ const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
   // the kernel reads, whichever shape the row was written in.
   if (kind === "machines") {
     const profile = cam.kernel.profileOfConfig(asRecord(form["config"]), str(form["type"]))
-    return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
+    return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
   }
-  return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
+  return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
 }
 
 /** The editable form derived from a stored row. */
@@ -110,7 +110,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [editing, setEditing] = createSignal(false)
-  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? "preview" : props.kind === "components" && urlParams.tab === "structure" ? "structure" : "overview")
+  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? t("preview") : props.kind === "components" && urlParams.tab === "structure" ? t("cam.resource.structure") : t("dash.tab.overview"))
   const [deleteOpen, setDeleteOpen] = createSignal(false)
 
   const load = async (): Promise<void> => {
@@ -187,7 +187,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       if (profile.spindle !== undefined) stored["maxSpindleSpeed"] = profile.spindle.maxRpm
       if (profile.feed !== undefined) stored["maxFeedRate"] = profile.feed.max
       const created = await run<unknown>(app.client.machineConfigs.create({ payload: {
-        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || "mill", description: str(current["description"]) || null, config: stored, isPublic: false
+        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || t("pages.mill"), description: str(current["description"]) || null, config: stored, isPublic: false
       } }))
       const id = str(asRecord(asRecord(created)["data"])["id"])
       toast.success("Machine duplicated")
@@ -223,8 +223,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const Icon = meta.icon
 
   const tabs = (): ReadonlyArray<WorkspaceTabItem<DetailTab>> => [
-    { id: "overview", label: "Overview" },
-    { id: "details", label: "Details" },
+    { id: "overview", get label() { return t("dash.tab.overview") } },
+    { id: "details", get label() { return t("shell.details") } },
     { id: "raw", label: "Raw data" },
     ...(props.kind === "components" ? [
       { id: "preview" as const, label: t("cam.resource.previewTab") },
@@ -241,15 +241,15 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       backLabel={`Back to ${meta.plural}`}
       actions={
         <Show when={!editing()} fallback={<>
-          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy() || str(form()["name"]).trim() === ""}><Save size={14} aria-hidden="true" />Save</button>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>Cancel</button>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy() || str(form()["name"]).trim() === ""}><Save size={14} aria-hidden="true" />{t("common.save")}</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>{t("common.cancel")}</button>
         </>}>
           <Show when={props.kind === "machines"}>
-            <button type="button" class={builtin() ? TOOLBAR_PRIMARY : TOOLBAR_BUTTON} onClick={() => void duplicate()} disabled={busy() || row() === undefined}><CopyPlus size={14} aria-hidden="true" />Duplicate</button>
+            <button type="button" class={builtin() ? TOOLBAR_PRIMARY : TOOLBAR_BUTTON} onClick={() => void duplicate()} disabled={busy() || row() === undefined}><CopyPlus size={14} aria-hidden="true" />{t("browser.duplicate")}</button>
           </Show>
           <Show when={!builtin()}>
-            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
-            <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />Delete</button>
+            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />{t("cad.ribbon.edit")}</button>
+            <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />{t("common.delete")}</button>
           </Show>
         </Show>
       }
@@ -257,8 +257,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
         <Modal open={deleteOpen()} title={`Delete ${meta.title.toLowerCase()}`} onClose={() => setDeleteOpen(false)}>
           <p class="text-xs text-slate-600 dark:text-slate-300">Are you sure you want to delete this {meta.title.toLowerCase()}? This action cannot be undone.</p>
           <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
-            <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>Cancel</button>
-            <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>Delete</button>
+            <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</button>
+            <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>{t("common.delete")}</button>
           </div>
         </Modal>
       }
@@ -278,7 +278,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                       <p class="text-[11px] text-slate-500 dark:text-slate-400">{meta.title}</p>
                     </div>
                   </div>
-                  <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">No description provided</p>}>
+                  <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">{t("pages.no.description.provided")}</p>}>
                     <p class="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{str(current()["description"] ?? current()["notes"])}</p>
                   </Show>
                   <Show when={props.kind === "components"}><div class="mt-3"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
@@ -291,10 +291,10 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                 <aside class={`${PANEL} !p-3`}>
                   <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Information</h3>
                   <dl class="panel-kv">
-                    <dt>Created</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
+                    <dt>{t("org.overview.created")}</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
                     <dt>Last updated</dt><dd>{formatDate(current()["updatedAt"]) || "-"}</dd>
                     <dt>ID</dt><dd class="font-mono">{str(current()["id"]).substring(0, 8)}…</dd>
-                    <dt>Visibility</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["builtin"] === true ? "Built-in preset" : current()["isPublic"] === true ? "Public" : "Private"}</dd>
+                    <dt>{t("pages.visibility")}</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["builtin"] === true ? "Built-in preset" : current()["isPublic"] === true ? t("save.publicProject") : t("pages.private")}</dd>
                   </dl>
                 </aside>
               </div>
@@ -366,22 +366,22 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
   if (kind === "materials") {
     const p = asRecord(row["properties"])
     const density = densityKgM3(num(p["density"]))
-    return [{ label: "Density", value: density > 0 ? `${density} kg/m³` : "-" }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: num(p["yieldStrength"]) > 0 ? `${str(p["yieldStrength"])} MPa` : "-" }, { label: "Color", value: hexColor(p["color"]) }]
+    return [{ get label() { return t("library.material.density") }, value: density > 0 ? `${density} kg/m³` : "-" }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: num(p["yieldStrength"]) > 0 ? `${str(p["yieldStrength"])} MPa` : "-" }, { get label() { return t("library.color") }, value: hexColor(p["color"]) }]
   }
   if (kind === "tools") {
-    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Diameter", value: `${str(row["diameter"]) || "-"} mm` }, { label: "Material", value: str(row["material"]) || "-" }, { label: "Flutes", value: str(row["numberOfFlutes"]) || "-" },
+    return [{ get label() { return t("library.field.type") }, value: str(row["type"]) || "-" }, { get label() { return t("library.tool.diameter") }, value: `${str(row["diameter"]) || "-"} mm` }, { get label() { return t("library.field.material") }, value: str(row["material"]) || "-" }, { get label() { return t("library.field.flutes") }, value: str(row["numberOfFlutes"]) || "-" },
       { label: "3D model", value: cam.describeTool(cam.toolModelOf(toolResourceOf(row), cam.toolMachineOf(str(row["type"])))) }]
   }
   if (kind === "machines") {
     // Read through the profile, so a configuration in any shape (the form's, the assistant's, the catalogue's) shows its figures.
     const c = asRecord(row["config"]), profile = cam.kernel.profileOfConfig(c, str(row["type"]))
-    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Controller", value: profile.controller ?? (str(c["controller"]) || "-") }, { label: "Status", value: str(c["status"]) || "-" },
+    return [{ get label() { return t("library.field.type") }, value: str(row["type"]) || "-" }, { get label() { return t("library.field.controller") }, value: profile.controller ?? (str(c["controller"]) || "-") }, { get label() { return t("subscription.status") }, value: str(c["status"]) || "-" },
       { label: "Max spindle speed", value: profile.spindle === undefined ? "-" : `${profile.spindle.maxRpm} rpm` }]
   }
   const elements = resourceElements(row["data"] ?? row)
   const kinds = [...new Set(componentEntries(elements).map(({ element }) => element.type))]
-  return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Visibility", value: row["isPublic"] === true ? "Public" : "Private" },
-    { label: "Elements", value: String(componentEntries(elements).length) }, { label: "Geometry", value: kinds.length > 0 ? kinds.join(", ") : "-" }]
+  return [{ get label() { return t("library.field.type") }, value: str(row["type"]) || "-" }, { get label() { return t("pages.visibility") }, value: row["isPublic"] === true ? t("save.publicProject") : t("pages.private") },
+    { get label() { return t("cad.status.elements") }, value: String(componentEntries(elements).length) }, { get label() { return t("cam.generator.preview.geometry") }, value: kinds.length > 0 ? kinds.join(", ") : "-" }]
 }
 
 /** The full list of the Details tab: every figure the resource carries, with its unit. */
@@ -394,8 +394,8 @@ const detailFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: str
       { label: "Poisson ratio", value: num(p["poissonRatio"]) > 0 ? str(p["poissonRatio"]) : "-" }, { label: "Thermal conductivity", value: withUnit(p["thermalConductivity"], "W/(m·K)") }]
   }
   if (kind === "tools") {
-    return [...summaryFields(kind, row), { label: "Max RPM", value: str(row["maxRPM"]) || "-" }, { label: "Coolant", value: str(row["coolantType"]) || "-" },
-      { label: "Cutting length", value: withUnit(row["cuttingLength"], "mm") }, { label: "Total length", value: withUnit(row["totalLength"], "mm") }, { label: "Shank diameter", value: withUnit(row["shankDiameter"], "mm") }]
+    return [...summaryFields(kind, row), { get label() { return t("library.field.maxRpm") }, value: str(row["maxRPM"]) || "-" }, { label: "Coolant", value: str(row["coolantType"]) || "-" },
+      { get label() { return t("pages.cutting.length") }, value: withUnit(row["cuttingLength"], "mm") }, { label: "Total length", value: withUnit(row["totalLength"], "mm") }, { label: "Shank diameter", value: withUnit(row["shankDiameter"], "mm") }]
   }
   return summaryFields(kind, row)
 }
@@ -422,7 +422,7 @@ function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined
 function MaterialBars(props: { readonly properties: Row }): JSX.Element {
   const value = (key: string): number => num(props.properties[key])
   return <div class="grid grid-cols-1 gap-2.5 rounded-[5px] border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
-    <PropertyBar label="Density" value={densityKgM3(value("density"))} max={9000} unit="kg/m³" />
+    <PropertyBar label={t("library.material.density")} value={densityKgM3(value("density"))} max={9000} unit="kg/m³" />
     <PropertyBar label="Yield strength" value={value("yieldStrength")} max={1800} unit="MPa" />
     <PropertyBar label="Ultimate strength" value={value("ultimateStrength")} max={2000} unit="MPa" />
     <PropertyBar label="Elastic modulus" value={value("elasticModulus")} max={400} unit="GPa" />
@@ -448,7 +448,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     <Show when={props.kind === "machines" || props.kind === "components"}>{input("res-type", "Type", "type")}</Show>
     <Show when={props.kind === "tools"}>
       <div>
-        <label for="res-type" class={LABEL}>Type</label>
+        <label for="res-type" class={LABEL}>{t("library.type")}</label>
         <select id="res-type" name="type" class={INPUT} value={str(props.form["type"])} onChange={(e) => props.onPatch("type", e.currentTarget.value)}>
           <Show when={str(props.form["type"]) !== "" && cam.toolMachineOf(str(props.form["type"])) === undefined}><option value={str(props.form["type"])}>{str(props.form["type"])} (drawn as an end mill)</option></Show>
           <For each={[["mill", "Milling"], ["lathe", "Turning"], ["3dprinter", "3D printing nozzle"]] as const}>{([machine, label]) => (
@@ -475,7 +475,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       {numeric("res-yield", "Yield strength (MPa)", "yieldStrength")}
       {numeric("res-ultimate", "Ultimate strength (MPa)", "ultimateStrength")}
       <div>
-        <label for="res-color" class={LABEL}>Color</label>
+        <label for="res-color" class={LABEL}>{t("library.color")}</label>
         <div class="flex items-center gap-2">
           <input id="res-color-picker" type="color" aria-label="Pick the colour" class="h-[34px] w-10 cursor-pointer rounded-[5px] border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" value={hexColor(props.form["color"]).length === 7 ? hexColor(props.form["color"]) : "#cccccc"} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
           <input id="res-color" name="color" type="text" class={INPUT} value={str(props.form["color"])} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
@@ -487,8 +487,8 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     </Show>
     <Show when={props.kind !== "materials"}>
       <div class="md:col-span-2">
-        <label for="res-description" class={LABEL}>{props.kind === "tools" ? "Notes" : "Description"}</label>
-        <textarea id="res-description" rows={3} class={INPUT} value={str(props.form["description"] ?? props.form["notes"])} onInput={(e) => props.onPatch(props.kind === "tools" ? "notes" : "description", e.currentTarget.value)} />
+        <label for="res-description" class={LABEL}>{props.kind === "tools" ? "Notes" : t("save.description")}</label>
+        <textarea id="res-description" rows={3} class={INPUT} value={str(props.form["description"] ?? props.form["notes"])} onInput={(e) => props.onPatch(props.kind === "tools" ? "notes" : t("save.description"), e.currentTarget.value)} />
       </div>
     </Show>
     <div class="flex items-center gap-2 md:col-span-2">
@@ -535,7 +535,7 @@ function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfi
   }
   return <>
     <div>
-      <label for="res-controller" class={LABEL}>Controller</label>
+      <label for="res-controller" class={LABEL}>{t("library.field.controller")}</label>
       <input id="res-controller" class={INPUT} value={profile().controller ?? ""} onInput={(e) =>
         patch((draft) => {
           const value = e.currentTarget.value.trim()

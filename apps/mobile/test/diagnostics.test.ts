@@ -28,3 +28,14 @@ test("fingerprints are grouped for side-by-side comparison", () => {
   expect(originOnly("cadcamfun://pair?token=x")).toBe("(withheld)")
   expect(originOnly("not a url")).toBe("(withheld)")
 })
+
+test("cloud diagnostics identify verified HTTPS and stable workspace instead of an empty certificate", () => {
+  const report = buildDiagnostics({
+    appVersion: "6.0.0", platform: "ios", osVersion: "27.0",
+    desktop: { name: "Cloud", baseUrl: "https://cloud.cadcam.fun", fingerprint: "", mode: "cloud", workspaceId: "workspace-123" },
+    connectivity: "online", offlineQueueCount: 0, security: { biometricsEnabled: false, lockAfterSeconds: 60, privacyCover: true }, now: new Date("2026-10-29T10:00:00Z"),
+  })
+  expect(report).toContain("Transport: verified HTTPS")
+  expect(report).toContain("Cloud workspace: workspace-123")
+  expect(report).not.toContain("Certificate:")
+})

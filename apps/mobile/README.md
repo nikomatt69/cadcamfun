@@ -1,8 +1,8 @@
 # CADCAMFUN companion (iOS)
 
-The iOS companion that pairs with a desktop CADCAMFUN, reviews its projects (history, pull requests, Actions) and talks to the AI assistant — the same agent the desktop runs, steered from the phone. Design and status: `specs/13-vcs-actions-mobile.md`.
+The iOS companion pairs with a local desktop or a hosted CADCAMFUN workspace, reviews its projects (history, pull requests, Actions) and talks to the workspace's AI assistant. Design and status: `specs/13-vcs-actions-mobile.md` and `specs/71-cloud-workspace.md`.
 
-Built with **Expo SDK 57** (React Native 0.86, New Architecture): Expo Router with native tabs and form sheets, NativeWind for theming, Reanimated 4 + Gesture Handler for motion, and a local native module (`modules/companion-net`) that performs every request over **pinned TLS** — the phone accepts exactly the certificate whose SHA-256 fingerprint is in the pairing QR code, holds only a scoped device token, and can reach only the companion gateway's route allow-list.
+Built with **Expo SDK 57** (React Native 0.86, New Architecture): Expo Router with native tabs and form sheets, NativeWind for theming, Reanimated 4 + Gesture Handler for motion, and a local native module (`modules/companion-net`). Local pairing uses **pinned TLS**: the phone accepts exactly the certificate whose SHA-256 fingerprint is in the QR code. Hosted pairing explicitly selects normal HTTPS certificate and hostname validation. Both modes hold a scoped device token and can reach only the gateway's route allow-list.
 
 ## Layout
 
@@ -16,7 +16,7 @@ Built with **Expo SDK 57** (React Native 0.86, New Architecture): Expo Router wi
 
 ## What the phone can do
 
-The phone is a thin client of the desktop that owns the data; every action it takes is a real action on the desktop.
+The phone is a thin client of the paired workspace that owns the data; every action changes that workspace. A hosted workspace can serve the phone while the local PC is off.
 
 - **The same conversations.** The conversation list is the desktop's own (`GET /api/ai/sessions`), so a chat that started on the Mac can be reopened on the phone, read back to its first page and continued there. The transcript keeps the stored past and the live turn apart, so a message is never shown twice.
 - **The same tools.** The assistant runs on the desktop with the desktop's tools and context; the phone steers it, answers its permission requests and questions, and stops the turn. A picture of the part on the bench can be attached to the message (the desktop's assistant already reads images).
@@ -52,6 +52,16 @@ Outside the home network the pairing address is whatever the phone can route to 
 If pairing fails, check **Settings → Apps → CADCAMFUN → Local Network** on the iPhone and keep the desktop's companion gateway enabled. Scan, paste and deep links report the underlying connection error. Changes to `modules/companion-net/ios` require rebuilding and reinstalling the native app; refreshing JavaScript cannot update an installed Release's Swift bridge. Expo injects a native `Promise` only as the last `AsyncFunction` argument.
 
 Tauri capabilities apply to desktop WebView IPC, so adding HTTP or remote-window capabilities does not open this gateway. A sandboxed macOS distribution separately needs the incoming-network server entitlement. The current direct-distribution desktop uses the Bun HTTPS listener on port 8443 and the iOS app's local-network permission.
+
+## Cloud workspace
+
+Sign in to your CADCAMFUN account on the connection screen, then scan or paste the cloud workspace's pairing link. A hosted link explicitly contains `mode=cloud` and `workspace=<stable workspace id>` alongside the HTTPS origin and device grant; it has no local certificate fingerprint. Missing or expired sign-in blocks hosted requests rather than falling back to a local profile. Connection settings and diagnostics identify verified HTTPS separately from a local certificate pin.
+
+Project Overview exposes **Send to PC** on hosted connections. It saves a durable version on the cloud workspace; delivery progresses through **Waiting for your PC**, **Downloaded to PC**, and **Applied on PC** according to desktop receipts. A PC that is off remains pending. Downloading and applying are separate operations, and local conflicts require review on the desktop.
+
+Cloud cache, assistant state and queued prompts use the stable workspace identity and account scope instead of a TLS leaf fingerprint, so certificate renewal preserves continuity. Cloud links name one HTTPS origin; alternative LAN addresses remain a local-pairing feature. The native transport never downgrades a pinned local connection to the cloud trust mode. An older installed bridge must be rebuilt before it can connect to a cloud workspace.
+
+The Swift bridge exposes `ETag` and `Retry-After` for both trust modes. Request cancellation and stream recovery retain the existing ownership rules. Source tests and JavaScript export do not establish physical-device PKI, cellular, certificate-renewal or delivery acceptance; those require a rebuilt app against a real hosted workspace.
 
 ## Design system
 

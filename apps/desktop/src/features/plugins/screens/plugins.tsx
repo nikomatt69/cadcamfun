@@ -105,22 +105,22 @@ export function PluginsScreen(): JSX.Element {
     actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}><Upload size={16} aria-hidden="true" />{t("plugins.install")}</button>}
     rail={<>
       <label class="block">
-        <span class={RAIL_LABEL}>Search</span>
+        <span class={RAIL_LABEL}>{t("legacy.search")}</span>
         <div class="relative">
           <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search plugins..." value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
         </div>
       </label>
       <label class="block">
-        <span class={RAIL_LABEL}>Status</span>
+        <span class={RAIL_LABEL}>{t("subscription.status")}</span>
         <select name="status" class={FIELD} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>
-          <option value="">All</option>
+          <option value="">{t("legacy.all")}</option>
           <option value="enabled">{t("plugins.enabled")}</option>
           <option value="disabled">{t("plugins.disabled")}</option>
         </select>
       </label>
-      <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
-      <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {plugins.data()?.length ?? 0} plugins</p>
+      <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
+      <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {plugins.data()?.length ?? 0} {t("shell.plugins")}</p>
     </>}
     overlays={<>
     <Show when={installOpen()}>
@@ -148,7 +148,7 @@ export function PluginsScreen(): JSX.Element {
       <Show
         when={filtered().length > 0}
         fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} title="No plugins found" hint={hasFilters() ? "No plugins match your search criteria." : t("plugins.empty")}>
-          <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}>{t("plugins.install")}</button>}><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button></Show>
+          <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}>{t("plugins.install")}</button>}><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("manuals.clear")}</button></Show>
         </StageEmpty>}
       >
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -159,7 +159,7 @@ export function PluginsScreen(): JSX.Element {
                 <h2 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{plugin.manifest.name || plugin.id}</h2>
                 <p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
                 <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <div class="flex justify-between"><span>Status:</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-slate-200/80 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
+                  <div class="flex justify-between"><span>{t("plugins.detail.statusLabel")}</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-slate-200/80 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
                   <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
                 </div>
               </div>
@@ -293,7 +293,7 @@ export function PluginDetailScreen(): JSX.Element {
             **Name:** ${manifest.name || "N/A"}
             **Version:** ${manifest.version || "N/A"}
             **Author:** ${manifest.author || "N/A"}
-            **Description:** ${manifest.description || "No description provided."}
+            **Description:** ${manifest.description || t("plugins.detail.noDescription")}
             ${manifest.repository ? `**Repository:** ${manifest.repository}` : ""}
             ${manifest.permissions.length > 0 ? `**Permissions Required:**\n${manifest.permissions.map((permission) => `- \`${permission}\``).join("\n")}` : ""}
             ${configurationKeys.length > 0 ? `**Configuration Options:** (Provides options like: ${configurationKeys.join(", ")})` : ""}

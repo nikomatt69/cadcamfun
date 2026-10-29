@@ -1,3 +1,4 @@
+import { t } from "../../../../i18n/index.ts"
 /**
  * The dialog every property editor opens: a wide modal centred on the window.
  *
@@ -44,8 +45,8 @@ export function PropertyEditorModal(props: PropertyEditorModalProps): JSX.Elemen
             <p class="min-w-0 flex-1 text-xs text-red-600 dark:text-red-400" role="alert">{props.error}</p>
           </Show>
           <div class="ml-auto flex shrink-0 items-center gap-2">
-            <button type="button" class={CANCEL} onClick={props.onClose}>{props.cancelLabel ?? "Cancel"}</button>
-            <button type="button" class={SAVE} disabled={props.saveDisabled ?? false} onClick={props.onSave}>{props.saveLabel ?? "Save"}</button>
+            <button type="button" class={CANCEL} onClick={props.onClose}>{props.cancelLabel ?? t("cad.assembly.cancel")}</button>
+            <button type="button" class={SAVE} disabled={props.saveDisabled ?? false} onClick={props.onSave}>{props.saveLabel ?? t("cad.titleBlock.save")}</button>
           </div>
         </div>
       }

@@ -1618,6 +1618,14 @@ export type ToolpathGeneratorVerifyPayload = {
               readonly b: JsonValue
             }
           }
+        | {
+            readonly _tag: "CycleBegin"
+            readonly family: "heidenhain"
+            readonly number: number
+            readonly name: string
+            readonly params: { readonly [x: string]: number }
+          }
+        | { readonly _tag: "CycleEnd" }
         | { readonly _tag: "Message"; readonly text: string }
       >
       readonly operation?: { readonly id: string; readonly name: string }
@@ -1836,6 +1844,48 @@ export type VcsDispatchPayload = { readonly ref?: string | undefined }
 export type CompanionEnablePayload = { readonly port?: number | undefined }
 
 export type CompanionPairPayload = { readonly name: string; readonly host?: string | undefined }
+
+export type CloudSetConnectionPayload = {
+  readonly origin: string
+  readonly workspaceId: string
+  readonly token: string
+}
+
+export type CloudApplyPayload = { readonly expectedHead?: string | undefined }
+
+export type CloudSendPayload = { readonly message?: string | undefined }
+
+export type CloudRemoteImportPayload = {
+  readonly transfer: {
+    readonly version: 1
+    readonly projectId: string
+    readonly branch: string
+    readonly head: string
+    readonly objects: ReadonlyArray<{
+      readonly oid: string
+      readonly type: "blob" | "tree" | "commit"
+      readonly body: string
+    }>
+    readonly assets: ReadonlyArray<{
+      readonly id: string
+      readonly fileName: string
+      readonly key: string
+      readonly contentType: string
+      readonly objectId: string
+      readonly objectType: string
+      readonly size: number
+      readonly sha256: string
+      readonly body: string
+    }>
+  }
+  readonly expectedHead: string | null
+}
+
+export type CloudRemoteReceiptPayload = {
+  readonly head: string
+  readonly deviceId: string
+  readonly state: "downloaded" | "applied"
+}
 
 export type HealthCheckOutput = {
   status: string
@@ -6241,6 +6291,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly tabs?: ToolpathGeneratorManufacturePayload["tabs"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
+  readonly nativeCycles?: ToolpathGeneratorManufacturePayload["nativeCycles"]
   readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]
   readonly print?: ToolpathGeneratorManufacturePayload["print"]
@@ -6291,7 +6342,6 @@ export type ToolpathGeneratorManufactureOutput =
             | "spot"
             | "chamfer"
             | "engrave"
-  readonly nativeCycles?: ToolpathGeneratorManufacturePayload["nativeCycles"]
             | "thread-mill"
             | "tap"
             | "ream"
@@ -6422,6 +6472,14 @@ export type ToolpathGeneratorManufactureOutput =
                   direction?: "auto" | "forward" | "backward"
                   condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
                 }
+              | {
+                  _tag: "CycleBegin"
+                  family: "heidenhain"
+                  number: number
+                  name: string
+                  params: { [x: string]: number }
+                }
+              | { _tag: "CycleEnd" }
               | { _tag: "Message"; text: string }
             >
             operation?: { id: string; name: string }
@@ -6682,6 +6740,8 @@ export type ToolpathGeneratorParseOutput = {
             direction?: "auto" | "forward" | "backward"
             condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
           }
+        | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+        | { _tag: "CycleEnd" }
         | { _tag: "Message"; text: string }
       >
       operation?: { id: string; name: string }
@@ -8082,4 +8142,165 @@ export type WorkspaceLibraryOutput = {
   tools: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
   machines: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
   components: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+}
+
+export type CloudConnectionOutput = {
+  configured: boolean
+  origin: string | null
+  workspaceId: string | null
+  deviceId: string
+}
+
+export type CloudSetConnectionInput = {
+  readonly origin: CloudSetConnectionPayload["origin"]
+  readonly workspaceId: CloudSetConnectionPayload["workspaceId"]
+  readonly token: CloudSetConnectionPayload["token"]
+}
+
+export type CloudSetConnectionOutput = {
+  configured: boolean
+  origin: string | null
+  workspaceId: string | null
+  deviceId: string
+}
+
+export type CloudDisconnectOutput = {
+  configured: boolean
+  origin: string | null
+  workspaceId: string | null
+  deviceId: string
+}
+
+export type CloudProjectsOutput = Array<{
+  id: string
+  name: string
+  description: string | null
+  head: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  updatedAt: string
+}>
+
+export type CloudCloneInput = { readonly id: { readonly id: string }["id"] }
+
+export type CloudCloneOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudStatusInput = { readonly id: { readonly id: string }["id"] }
+
+export type CloudStatusOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudPublishInput = { readonly id: { readonly id: string }["id"] }
+
+export type CloudPublishOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudFetchInput = { readonly id: { readonly id: string }["id"] }
+
+export type CloudFetchOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudApplyInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly expectedHead?: CloudApplyPayload["expectedHead"]
+}
+
+export type CloudApplyOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudSendInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly message?: CloudSendPayload["message"]
+}
+
+export type CloudSendOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudRemoteProjectsOutput = Array<{
+  id: string
+  name: string
+  description: string | null
+  head: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  updatedAt: string
+}>
+
+export type CloudRemoteExportInput = { readonly id: { readonly id: string }["id"] }
+
+export type CloudRemoteExportOutput = {
+  version: 1
+  projectId: string
+  branch: string
+  head: string
+  objects: Array<{ oid: string; type: "blob" | "tree" | "commit"; body: string }>
+  assets: Array<{
+    id: string
+    fileName: string
+    key: string
+    contentType: string
+    objectId: string
+    objectType: string
+    size: number
+    sha256: string
+    body: string
+  }>
+}
+
+export type CloudRemoteImportInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly transfer: CloudRemoteImportPayload["transfer"]
+  readonly expectedHead: CloudRemoteImportPayload["expectedHead"]
+}
+
+export type CloudRemoteImportOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
+}
+
+export type CloudRemoteReceiptInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly head: CloudRemoteReceiptPayload["head"]
+  readonly deviceId: CloudRemoteReceiptPayload["deviceId"]
+  readonly state: CloudRemoteReceiptPayload["state"]
+}
+
+export type CloudRemoteReceiptOutput = {
+  projectId: string
+  localHead: string | null
+  remoteHead: string | null
+  state: "local" | "pending" | "downloaded" | "applied" | "conflict"
+  dirty: boolean
 }

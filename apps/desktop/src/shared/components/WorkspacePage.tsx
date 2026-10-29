@@ -165,7 +165,7 @@ export function StageError(props: { readonly message: string; readonly onRetry?:
     <div class="workspace-alert" role="alert">
       <span class="min-w-0 break-words">{props.message}</span>
       <Show when={props.onRetry !== undefined}>
-        <button type="button" class={TOOLBAR_BUTTON} onClick={() => props.onRetry?.()}>Retry</button>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => props.onRetry?.()}>{t("boot.retry")}</button>
       </Show>
     </div>
   )

@@ -101,13 +101,13 @@ export function McpDirectoryScreen(): JSX.Element {
       actions={<A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Settings size={16} aria-hidden="true" />{t("mcp.directory.manage")}</A>}
       rail={<>
         <label class="block">
-          <span class={RAIL_LABEL}>Search</span>
+          <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search servers..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />Clear Filters</button>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
         <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{countLabel()}</p>
       </>}
     >
@@ -117,7 +117,7 @@ export function McpDirectoryScreen(): JSX.Element {
           when={visible().length > 0}
           fallback={
             <StageEmpty icon={<Database size={24} aria-hidden="true" />} title={servers().length === 0 ? t("mcp.directory.emptyTitle") : "No servers found"} hint={servers().length === 0 ? t("mcp.directory.emptyBody") : "No servers match your search criteria."}>
-              <Show when={servers().length === 0} fallback={<button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>Clear filters</button>}>
+              <Show when={servers().length === 0} fallback={<button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>}>
                 <A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Plus size={16} aria-hidden="true" />{t("mcp.settings.add")}</A>
               </Show>
             </StageEmpty>

@@ -3,6 +3,7 @@ import { SlidersVertical } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { Badge, CheckRow, Field, INPUT, NumberField, Section } from "./ui.tsx"
+import { t } from "../../../../i18n/index.ts"
 
 const BLUE = "#4B83F0"
 
@@ -16,35 +17,35 @@ export function CuttingSection(): JSX.Element {
   const stats = () => cam.generator.calculateCuttingStatistics(s())
   const effectiveStepover = () => (s().stepover / 100) * s().toolDiameter
   return (
-    <Section id="cutting" icon={SlidersVertical} title="Cutting Parameters" testId="cutting-section">
-      <Field label="Pass Depth (mm)">
+    <Section id="cutting" icon={SlidersVertical} title={t("cam.gen.cut.params")} testId="cutting-section">
+      <Field label={t("cam.gen.cut.passDepth")}>
         <NumberField min="0.1" step="0.1" value={s().stepdown} onValue={(value) => gen.updateSettings("stepdown", value)} />
-        <div class="panel-row"><span>Min: 0.1 mm</span><span class="panel-row__value">Max recommended: 3 mm</span></div>
+        <div class="panel-row"><span>{t("cam.gen.cut.min")}</span><span class="panel-row__value">{t("cam.gen.cut.maxRec")}</span></div>
       </Field>
 
-      <Field label="Feedrate (mm/min)">
+      <Field label={t("cam.explorer.param.feedrate")}>
         <NumberField min="1" int value={s().feedrate} onValue={(value) => gen.updateSettings("feedrate", value)} />
-        <div class="panel-row"><span>Chip load per flute: {chipLoad()} mm</span></div>
+        <div class="panel-row"><span>Chip load per flute: {chipLoad()} {t("cad.millimeters")}</span></div>
         <Show when={feedback()}>
           <Badge tone={feedback().startsWith("✓") ? "ok" : "warn"}>{feedback().replace(/^(?:✓|⚠️?)\s*/u, "")}</Badge>
         </Show>
       </Field>
 
-      <Field label="Entry Speed (mm/min)">
+      <Field label={t("cam.gen.cut.entrySpeed")}>
         <NumberField min="1" int value={s().plungerate} onValue={(value) => gen.updateSettings("plungerate", value)} />
         <div class="panel-row"><span>Recommended: {recommendedPlunge()} mm/min ({Math.round((recommendedPlunge() / s().feedrate) * 100)}% of feedrate)</span></div>
       </Field>
 
-      <Field label="Stepover (% of diameter)">
+      <Field label={t("cam.gen.cut.stepoverDia")}>
         <NumberField min="10" max="90" int accept={(value) => value >= 10 && value <= 90} value={s().stepover} onValue={(value) => gen.updateSettings("stepover", value)} />
-        <div class="panel-row"><span>Effective width: {effectiveStepover().toFixed(2)} mm</span></div>
+        <div class="panel-row"><span>Effective width: {effectiveStepover().toFixed(2)} {t("cad.millimeters")}</span></div>
       </Field>
 
-      <Field label="Tool Offset" for="toolOffset">
+      <Field label={t("cam.gen.cut.toolOffset")} for="toolOffset">
         <select id="toolOffset" class={INPUT} value={s().offset} onChange={(event) => gen.updateSettings("offset", event.currentTarget.value as ToolpathSettings["offset"])}>
-          <option value="outside">Outside</option>
-          <option value="inside">Inside</option>
-          <option value="center">Center</option>
+          <option value="outside">{t("cam.gen.cut.outside")}</option>
+          <option value="inside">{t("cam.gen.cut.inside")}</option>
+          <option value="center">{t("cad.field.center")}</option>
         </select>
         <div class="mt-2 flex justify-center">
           <div class="w-48 h-32 max-w-full relative">
@@ -72,10 +73,10 @@ export function CuttingSection(): JSX.Element {
         </div>
       </Field>
 
-      <Field label="Cutting Direction" for="cuttingDirection">
+      <Field label={t("cam.gen.cut.direction")} for="cuttingDirection">
         <select id="cuttingDirection" class={INPUT} value={s().direction} onChange={(event) => gen.updateSettings("direction", event.currentTarget.value as ToolpathSettings["direction"])}>
-          <option value="climb">Concordant (Climb)</option>
-          <option value="conventional">Discordant (Conventional)</option>
+          <option value="climb">{t("cam.gen.cut.climb")}</option>
+          <option value="conventional">{t("cam.gen.cut.conventional")}</option>
         </select>
         <div class="mt-2 flex justify-center">
           <div class="w-48 h-32 max-w-full relative">
@@ -98,21 +99,21 @@ export function CuttingSection(): JSX.Element {
         </div>
       </Field>
 
-      <CheckRow id="finishingPass" checked={s().finishingPass} onChange={(checked) => gen.updateSettings("finishingPass", checked)}>Add Finishing Pass</CheckRow>
+      <CheckRow id="finishingPass" checked={s().finishingPass} onChange={(checked) => gen.updateSettings("finishingPass", checked)}>{t("cam.gen.cut.addFinish")}</CheckRow>
 
       <Show when={s().finishingPass}>
-        <Field label="Finishing Allowance (mm)">
+        <Field label={t("cam.gen.cut.finishAllowance")}>
           <NumberField min="0.05" max="1" step="0.05" value={s().finishingAllowance} onValue={(value) => gen.updateSettings("finishingAllowance", value)} />
         </Field>
       </Show>
 
       <div class="panel-group">
-        <h4 class="panel-group__title">Cutting statistics</h4>
+        <h4 class="panel-group__title">{t("cam.gen.cut.stats")}</h4>
         <dl class="panel-kv">
-          <dt>Cutting speed</dt><dd>{stats().cuttingSpeed.toFixed(1)} m/min</dd>
-          <dt>Chip load per flute</dt><dd>{chipLoad()} mm</dd>
-          <dt>Material removal rate</dt><dd>{stats().materialRemovalRate.toFixed(2)} cm³/min</dd>
-          <dt>Effective stepover</dt><dd>{effectiveStepover().toFixed(2)} mm</dd>
+          <dt>{t("cam.gen.cut.speed")}</dt><dd>{stats().cuttingSpeed.toFixed(1)} m/min</dd>
+          <dt>{t("cam.gen.cut.chipLoad")}</dt><dd>{chipLoad()} {t("cad.millimeters")}</dd>
+          <dt>{t("cam.gen.cut.mrr")}</dt><dd>{stats().materialRemovalRate.toFixed(2)} cm³/min</dd>
+          <dt>{t("cam.gen.cut.effStepover")}</dt><dd>{effectiveStepover().toFixed(2)} {t("cad.millimeters")}</dd>
         </dl>
       </div>
     </Section>

@@ -51149,6 +51149,16 @@
                                                     }
                                                   },
                                                   "additionalProperties": false
+                                                },
+                                                "expr": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "x": {},
+                                                    "y": {},
+                                                    "z": {},
+                                                    "feed": {}
+                                                  },
+                                                  "additionalProperties": false
                                                 }
                                               },
                                               "required": [
@@ -51202,6 +51212,16 @@
                                                     "c": {
                                                       "type": "number"
                                                     }
+                                                  },
+                                                  "additionalProperties": false
+                                                },
+                                                "expr": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "x": {},
+                                                    "y": {},
+                                                    "z": {},
+                                                    "feed": {}
                                                   },
                                                   "additionalProperties": false
                                                 }
@@ -51409,9 +51429,387 @@
                                                 "_tag"
                                               ],
                                               "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Assign"
+                                                  ]
+                                                },
+                                                "variable": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "scope": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "local",
+                                                            "global",
+                                                            "system"
+                                                          ]
+                                                        },
+                                                        "index": {
+                                                          "type": "integer",
+                                                          "minimum": 0
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "scope",
+                                                        "index"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "name": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "name"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  ]
+                                                },
+                                                "value": {}
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "variable",
+                                                "value"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "MacroCall"
+                                                  ]
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "args": {
+                                                  "type": "object",
+                                                  "patternProperties": {
+                                                    "^[A-Za-z]$": {}
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "name",
+                                                "args"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "If"
+                                                  ]
+                                                },
+                                                "condition": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "cmp": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge"
+                                                      ]
+                                                    },
+                                                    "a": {},
+                                                    "b": {}
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "condition"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Else"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "EndIf"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "While"
+                                                  ]
+                                                },
+                                                "condition": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "cmp": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge"
+                                                      ]
+                                                    },
+                                                    "a": {},
+                                                    "b": {}
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "condition"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "EndWhile"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Label"
+                                                  ]
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z0-9_]+$"
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "name"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Goto"
+                                                  ]
+                                                },
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z0-9_]+$"
+                                                },
+                                                "direction": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "auto",
+                                                    "forward",
+                                                    "backward"
+                                                  ]
+                                                },
+                                                "condition": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "cmp": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge"
+                                                      ]
+                                                    },
+                                                    "a": {},
+                                                    "b": {}
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "label"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "CycleBegin"
+                                                  ]
+                                                },
+                                                "family": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "heidenhain"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "number": {
+                                                  "type": "integer",
+                                                  "exclusiveMinimum": 0
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "params": {
+                                                  "type": "object",
+                                                  "additionalProperties": {
+                                                    "type": "number"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "family",
+                                                "number",
+                                                "name",
+                                                "params"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "CycleEnd"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Message"
+                                                  ]
+                                                },
+                                                "text": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "text"
+                                              ],
+                                              "additionalProperties": false
                                             }
                                           ]
                                         }
+                                      },
+                                      "operation": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -52931,6 +53329,47 @@
                             },
                             "finish": {
                               "type": "boolean"
+                            },
+                            "tabs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "position": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "width": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "height": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "position",
+                                  "width",
+                                  "height"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "maxItems": 64
+                            },
+                            "leadIn": {
+                              "type": "string",
+                              "enum": [
+                                "direct",
+                                "arc",
+                                "ramp",
+                                "helix"
+                              ]
+                            },
+                            "leadRadius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
                             }
                           },
                           "required": [
@@ -53967,7 +54406,36 @@
                     "exclusiveMinimum": 0,
                     "maximum": 5
                   },
+                  "tabs": {
+                    "type": "object",
+                    "properties": {
+                      "count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 64
+                      },
+                      "width": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 100
+                      },
+                      "height": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 50
+                      }
+                    },
+                    "required": [
+                      "count",
+                      "width",
+                      "height"
+                    ],
+                    "additionalProperties": false
+                  },
                   "subprograms": {
+                    "type": "boolean"
+                  },
+                  "nativeCycles": {
                     "type": "boolean"
                   },
                   "smoothing": {
@@ -54367,6 +54835,16 @@
                                             }
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "expr": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                            "feed": {}
+                                          },
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -54420,6 +54898,16 @@
                                             "c": {
                                               "type": "number"
                                             }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        "expr": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                            "feed": {}
                                           },
                                           "additionalProperties": false
                                         }
@@ -54627,9 +55115,387 @@
                                         "_tag"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Assign"
+                                          ]
+                                        },
+                                        "variable": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "scope": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "local",
+                                                    "global",
+                                                    "system"
+                                                  ]
+                                                },
+                                                "index": {
+                                                  "type": "integer",
+                                                  "minimum": 0
+                                                }
+                                              },
+                                              "required": [
+                                                "scope",
+                                                "index"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                                }
+                                              },
+                                              "required": [
+                                                "name"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "value": {}
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "variable",
+                                        "value"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "MacroCall"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "args": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^[A-Za-z]$": {}
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                        "args"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "If"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Else"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "EndIf"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "While"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "EndWhile"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Label"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$"
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Goto"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$"
+                                        },
+                                        "direction": {
+                                          "type": "string",
+                                          "enum": [
+                                            "auto",
+                                            "forward",
+                                            "backward"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "label"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CycleBegin"
+                                          ]
+                                        },
+                                        "family": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "heidenhain"
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        "number": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "params": {
+                                          "type": "object",
+                                          "additionalProperties": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "family",
+                                        "number",
+                                        "name",
+                                        "params"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CycleEnd"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Message"
+                                          ]
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
+                              },
+                              "operation": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -57033,6 +57899,16 @@
                                             }
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "expr": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                            "feed": {}
+                                          },
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -57086,6 +57962,16 @@
                                             "c": {
                                               "type": "number"
                                             }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        "expr": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                            "feed": {}
                                           },
                                           "additionalProperties": false
                                         }
@@ -57293,9 +58179,387 @@
                                         "_tag"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Assign"
+                                          ]
+                                        },
+                                        "variable": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "scope": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "local",
+                                                    "global",
+                                                    "system"
+                                                  ]
+                                                },
+                                                "index": {
+                                                  "type": "integer",
+                                                  "minimum": 0
+                                                }
+                                              },
+                                              "required": [
+                                                "scope",
+                                                "index"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                                }
+                                              },
+                                              "required": [
+                                                "name"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "value": {}
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "variable",
+                                        "value"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "MacroCall"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "args": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^[A-Za-z]$": {}
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                        "args"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "If"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Else"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "EndIf"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "While"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "EndWhile"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Label"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$"
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Goto"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$"
+                                        },
+                                        "direction": {
+                                          "type": "string",
+                                          "enum": [
+                                            "auto",
+                                            "forward",
+                                            "backward"
+                                          ]
+                                        },
+                                        "condition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "cmp": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge"
+                                              ]
+                                            },
+                                            "a": {},
+                                            "b": {}
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "label"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CycleBegin"
+                                          ]
+                                        },
+                                        "family": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "heidenhain"
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        "number": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "params": {
+                                          "type": "object",
+                                          "additionalProperties": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "family",
+                                        "number",
+                                        "name",
+                                        "params"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CycleEnd"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Message"
+                                          ]
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
+                              },
+                              "operation": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -57898,6 +59162,16 @@
                                           }
                                         },
                                         "additionalProperties": false
+                                      },
+                                      "expr": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {},
+                                          "y": {},
+                                          "z": {},
+                                          "feed": {}
+                                        },
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -57951,6 +59225,16 @@
                                           "c": {
                                             "type": "number"
                                           }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "expr": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {},
+                                          "y": {},
+                                          "z": {},
+                                          "feed": {}
                                         },
                                         "additionalProperties": false
                                       }
@@ -58158,9 +59442,387 @@
                                       "_tag"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Assign"
+                                        ]
+                                      },
+                                      "variable": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "scope": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "local",
+                                                  "global",
+                                                  "system"
+                                                ]
+                                              },
+                                              "index": {
+                                                "type": "integer",
+                                                "minimum": 0
+                                              }
+                                            },
+                                            "required": [
+                                              "scope",
+                                              "index"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "name": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "name"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      "value": {}
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "variable",
+                                      "value"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "MacroCall"
+                                        ]
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "args": {
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[A-Za-z]$": {}
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "name",
+                                      "args"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "If"
+                                        ]
+                                      },
+                                      "condition": {
+                                        "type": "object",
+                                        "properties": {
+                                          "cmp": {
+                                            "type": "string",
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge"
+                                            ]
+                                          },
+                                          "a": {},
+                                          "b": {}
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "condition"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Else"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "EndIf"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "While"
+                                        ]
+                                      },
+                                      "condition": {
+                                        "type": "object",
+                                        "properties": {
+                                          "cmp": {
+                                            "type": "string",
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge"
+                                            ]
+                                          },
+                                          "a": {},
+                                          "b": {}
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "condition"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "EndWhile"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Label"
+                                        ]
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^[A-Za-z0-9_]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Goto"
+                                        ]
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^[A-Za-z0-9_]+$"
+                                      },
+                                      "direction": {
+                                        "type": "string",
+                                        "enum": [
+                                          "auto",
+                                          "forward",
+                                          "backward"
+                                        ]
+                                      },
+                                      "condition": {
+                                        "type": "object",
+                                        "properties": {
+                                          "cmp": {
+                                            "type": "string",
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge"
+                                            ]
+                                          },
+                                          "a": {},
+                                          "b": {}
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "label"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "CycleBegin"
+                                        ]
+                                      },
+                                      "family": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "heidenhain"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "number": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "params": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "number"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "family",
+                                      "number",
+                                      "name",
+                                      "params"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "CycleEnd"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Message"
+                                        ]
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "text"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
+                            },
+                            "operation": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -71982,6 +73644,2608 @@
           }
         }
       }
+    },
+    "/api/cloud/connection": {
+      "get": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.connection",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deviceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.setConnection",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deviceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "origin",
+                  "workspaceId",
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "delete": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.disconnect",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deviceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cloud/enroll": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.enroll",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deviceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "setupCode": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "origin",
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cloud/pair": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.pair",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "link": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "link"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cloud/projects": {
+      "get": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.projects",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "head": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "local",
+                          "pending",
+                          "downloaded",
+                          "applied",
+                          "conflict"
+                        ]
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "head",
+                      "state",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cloud/projects/{id}/clone": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.clone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/cloud/status": {
+      "get": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/cloud/publish": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.publish",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/cloud/fetch": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.fetch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/cloud/apply": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.apply",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedHead": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/projects/{id}/cloud/send": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.send",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cloud/remote/projects": {
+      "get": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.remoteProjects",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "head": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "local",
+                          "pending",
+                          "downloaded",
+                          "applied",
+                          "conflict"
+                        ]
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "head",
+                      "state",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cloud/remote/projects/{id}": {
+      "get": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.remoteExport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    },
+                    "objects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "oid": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "blob",
+                              "tree",
+                              "commit"
+                            ]
+                          },
+                          "body": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "oid",
+                          "type",
+                          "body"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "fileName": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "contentType": {
+                            "type": "string"
+                          },
+                          "objectId": {
+                            "type": "string"
+                          },
+                          "objectType": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "body": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "fileName",
+                          "key",
+                          "contentType",
+                          "objectId",
+                          "objectType",
+                          "size",
+                          "sha256",
+                          "body"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "projectId",
+                    "branch",
+                    "head",
+                    "objects",
+                    "assets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.remoteImport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transfer": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "number",
+                        "enum": [
+                          1
+                        ]
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "branch": {
+                        "type": "string"
+                      },
+                      "head": {
+                        "type": "string"
+                      },
+                      "objects": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "oid": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "blob",
+                                "tree",
+                                "commit"
+                              ]
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "oid",
+                            "type",
+                            "body"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "assets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "fileName": {
+                              "type": "string"
+                            },
+                            "key": {
+                              "type": "string"
+                            },
+                            "contentType": {
+                              "type": "string"
+                            },
+                            "objectId": {
+                              "type": "string"
+                            },
+                            "objectType": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "sha256": {
+                              "type": "string"
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "fileName",
+                            "key",
+                            "contentType",
+                            "objectId",
+                            "objectType",
+                            "size",
+                            "sha256",
+                            "body"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "projectId",
+                      "branch",
+                      "head",
+                      "objects",
+                      "assets"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "expectedHead": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "transfer",
+                  "expectedHead"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cloud/remote/projects/{id}/receipt": {
+      "post": {
+        "tags": [
+          "cloud"
+        ],
+        "operationId": "cloud.remoteReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "localHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "remoteHead": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "pending",
+                        "downloaded",
+                        "applied",
+                        "conflict"
+                      ]
+                    },
+                    "dirty": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "localHead",
+                    "remoteHead",
+                    "state",
+                    "dirty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "head": {
+                    "type": "string"
+                  },
+                  "deviceId": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "downloaded",
+                      "applied"
+                    ]
+                  }
+                },
+                "required": [
+                  "head",
+                  "deviceId",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
     }
   },
   "components": {
@@ -73482,6 +77746,9 @@
     },
     {
       "name": "workspace"
+    },
+    {
+      "name": "cloud"
     }
   ]
 }

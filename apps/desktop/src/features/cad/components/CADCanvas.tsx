@@ -1307,24 +1307,24 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
         <div class="cad-viewport-tools">
           <div class="cad-viewport-actions">
-            <button type="button" onClick={() => { setShowElementInfo(false); setShowPerformance(false); setShowElementsList((open) => !open) }} class="cad-viewport-button" title="Toggle Elements List" aria-label="Toggle Elements List" aria-expanded={showElementsList()}><Layers size={18} /></button>
+            <button type="button" onClick={() => { setShowElementInfo(false); setShowPerformance(false); setShowElementsList((open) => !open) }} class="cad-viewport-button" title={t("cad.canvas.toggleList")} aria-label={t("cad.canvas.toggleList")} aria-expanded={showElementsList()}><Layers size={18} /></button>
             <Show when={singleSelected() !== undefined}>
-              <button type="button" onClick={() => { setShowElementsList(false); setShowPerformance(false); setShowElementInfo((open) => !open) }} class="cad-viewport-button" title="Show Element Properties" aria-label="Show Element Properties" aria-expanded={showElementInfo()}><Sliders size={18} /></button>
+              <button type="button" onClick={() => { setShowElementsList(false); setShowPerformance(false); setShowElementInfo((open) => !open) }} class="cad-viewport-button" title={t("cad.canvas.showProps")} aria-label={t("cad.canvas.showProps")} aria-expanded={showElementInfo()}><Sliders size={18} /></button>
             </Show>
-            <button type="button" onClick={() => { refreshMemory(); setShowElementsList(false); setShowElementInfo(false); setShowPerformance((open) => !open) }} class="cad-viewport-button" title="Performance Settings" aria-label="Performance Settings" aria-expanded={showPerformance()}><Cog size={18} /></button>
+            <button type="button" onClick={() => { refreshMemory(); setShowElementsList(false); setShowElementInfo(false); setShowPerformance((open) => !open) }} class="cad-viewport-button" title={t("cad.canvas.performance")} aria-label={t("cad.canvas.performance")} aria-expanded={showPerformance()}><Cog size={18} /></button>
           </div>
           <Show when={selectedIds().length > 0 && !explosionActive() && !cad.explodedView.enabled}>
             <div class="cad-viewport-transforms" role="group" aria-label={t("cad.viewport.transforms")}>
-              <button onClick={() => setMode("translate")} class="cad-viewport-button" aria-pressed={transformMode() === "translate"}><Move size={14} />Move (G)</button>
-              <button onClick={() => setMode("rotate")} class="cad-viewport-button" aria-pressed={transformMode() === "rotate"}><RotateCw size={14} />Rotate (R)</button>
-              <button onClick={() => setMode("scale")} class="cad-viewport-button" aria-pressed={transformMode() === "scale"}><Maximize2 size={14} />Scale (S)</button>
-              <button onClick={() => transformControls.resetToOrigin()} class="cad-viewport-button" title="Reset Position">Reset</button>
-              <button onClick={() => transformControls.alignToGrid()} class="cad-viewport-button" title="Align to Grid">Grid</button>
-              <button onClick={() => transformControls.duplicateInPlace()} class="cad-viewport-button" title="Duplicate">Dup</button>
+              <button onClick={() => setMode("translate")} class="cad-viewport-button" aria-pressed={transformMode() === "translate"}><Move size={14} />{t("cad.canvas.move")}</button>
+              <button onClick={() => setMode("rotate")} class="cad-viewport-button" aria-pressed={transformMode() === "rotate"}><RotateCw size={14} />{t("cad.canvas.rotate")}</button>
+              <button onClick={() => setMode("scale")} class="cad-viewport-button" aria-pressed={transformMode() === "scale"}><Maximize2 size={14} />{t("cad.canvas.scale")}</button>
+              <button onClick={() => transformControls.resetToOrigin()} class="cad-viewport-button" title={t("cad.canvas.resetPosition")}>{t("cad.reset")}</button>
+              <button onClick={() => transformControls.alignToGrid()} class="cad-viewport-button" title={t("cad.canvas.alignGrid")}>{t("cad.status.grid")}</button>
+              <button onClick={() => transformControls.duplicateInPlace()} class="cad-viewport-button" title={t("cad.ribbon.duplicate")}>{t("cad.canvas.dup")}</button>
               <For each={[
-                { op: "union" as const, title: "Boolean Union (Ctrl+U)", extra: "" },
-                { op: "subtract" as const, title: "Boolean Subtract (Ctrl+Shift+S)", extra: "M2 2l20 20" },
-                { op: "intersect" as const, title: "Boolean Intersect (Ctrl+I)", extra: "M8 14a6 6 0 0 0 8-8" }
+                { op: "union" as const, title: t("cad.canvas.boolUnion"), extra: "" },
+                { op: "subtract" as const, title: t("cad.canvas.boolSubtract"), extra: "M2 2l20 20" },
+                { op: "intersect" as const, title: t("cad.canvas.boolIntersect"), extra: "M8 14a6 6 0 0 0 8-8" }
               ]}>{(entry) =>
                 <button onClick={() => runBoolean(entry.op)} class="cad-viewport-button" title={entry.title} disabled={selectedIds().length < 2} classList={{ "opacity-40": selectedIds().length < 2 }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1344,19 +1344,19 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           </Show>
           <Show when={showPerformance()}>
             <div class="cad-viewport-popover p-3">
-              <h3 class="text-lg font-semibold mb-3">Performance & Events</h3>
+              <h3 class="text-lg font-semibold mb-3">{t("cad.canvas.perfEvents")}</h3>
               <div class="mb-4" data-testid="look-tier">
-                <h4 class="text-sm font-medium mb-2">Visual quality</h4>
-                <div class="flex gap-1" role="radiogroup" aria-label="Visual quality">
+                <h4 class="text-sm font-medium mb-2">{t("cad.canvas.visualQuality")}</h4>
+                <div class="flex gap-1" role="radiogroup" aria-label={t("cad.canvas.visualQuality")}>
                   <For each={LOOK_TIERS}>{(tier) =>
                     <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
                       class={`flex-1 text-xs px-2 py-1 rounded capitalize ${lookTier() === tier ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>{tier}</button>}
                   </For>
                 </div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Low: plain lights. Balanced: the classic look, refined. Standard: studio reflections and tone mapping. High: sharper reflections.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("cad.canvas.qualityHint")}</p>
               </div>
               <div class="mb-4">
-                <h4 class="text-sm font-medium mb-2">Memory Usage</h4>
+                <h4 class="text-sm font-medium mb-2">{t("cad.canvas.memory")}</h4>
                 <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">
                   <div>JS Heap: {(memory().used / 1024 / 1024).toFixed(1)}MB</div>
                   <div>Total Heap: {(memory().total / 1024 / 1024).toFixed(1)}MB</div>
@@ -1364,20 +1364,20 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
                   <div>Textures: {memory().textures}</div>
                 </div>
                 <div class="mt-2 space-x-2">
-                  <button onClick={cleanupMemory} class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Cleanup Memory</button>
-                  <button onClick={refreshMemory} class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">Refresh</button>
+                  <button onClick={cleanupMemory} class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">{t("cad.canvas.cleanup")}</button>
+                  <button onClick={refreshMemory} class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">{t("aiDash.refresh")}</button>
                 </div>
               </div>
-              <button onClick={() => setShowPerformance(false)} class="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">Close</button>
+              <button onClick={() => setShowPerformance(false)} class="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">{t("cad.drawing.close")}</button>
             </div>
           </Show>
         </div>
       </div>
       <Show when={transformControls.isTransforming}>
         <div style="position:absolute;bottom:20px;left:20px;background-color:rgba(0,0,0,0.9);color:white;padding:12px 16px;border-radius:8px;font-size:12px;font-family:monospace;z-index:1002">
-          <div>Mode: {transformStore.mode.toUpperCase()}</div>
-          <div>Elements: {selectedIds().length}</div>
-          <div style="font-size:10px;margin-top:4px;color:#9ca3af">Press ENTER to confirm, ESC to cancel</div>
+          <div>{t("cad.mode")} {transformStore.mode.toUpperCase()}</div>
+          <div>{t("cad.tb.elementsColon")} {selectedIds().length}</div>
+          <div style="font-size:10px;margin-top:4px;color:#9ca3af">{t("cad.canvas.enterEsc")}</div>
         </div>
       </Show>
 
@@ -1414,7 +1414,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       <Show when={isPlacing()}>
         <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-md shadow-lg z-100">
-          <p class="text-sm font-medium">Click to place the component or press ESC to cancel</p>
+          <p class="text-sm font-medium">{t("cad.canvas.placeComponent")}</p>
         </div>
       </Show>
       <Show when={isDraggingComponent()}><DragDropIndicator position={dropPosition()} screenPosition={dropScreen()} /></Show>

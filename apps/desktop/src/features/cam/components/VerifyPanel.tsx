@@ -146,8 +146,8 @@ export default function VerifyPanel(): JSX.Element {
             <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs" data-testid="verify-stats">
               <dt class="text-gray-500">{t("cam.verify.removed")}</dt><dd>{mm3(report().stats.removedVolume)}</dd>
               <dt class="text-gray-500">{t("cam.verify.remaining")}</dt><dd>{mm3(report().stats.remainingVolume)}</dd>
-              <dt class="text-gray-500">{t("cam.verify.airCut")}</dt><dd>{report().stats.airCutLength.toFixed(1)} mm</dd>
-              <dt class="text-gray-500">{t("cam.verify.resolution")}</dt><dd>{report().stats.cellSize.toFixed(2)} mm</dd>
+              <dt class="text-gray-500">{t("cam.verify.airCut")}</dt><dd>{report().stats.airCutLength.toFixed(1)} {t("cad.millimeters")}</dd>
+              <dt class="text-gray-500">{t("cam.verify.resolution")}</dt><dd>{report().stats.cellSize.toFixed(2)} {t("cad.millimeters")}</dd>
             </dl>
 
             <div>

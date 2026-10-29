@@ -6,6 +6,7 @@
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { ChevronUp, Info } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
+import { t } from "../../../i18n/index.ts"
 
 const v = cam.viewer
 
@@ -187,7 +188,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
         <Show when={!props.gcode}>
           <div class="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80">
             <div class="text-center p-6 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white rounded-lg shadow-md">
-              <h3 class="text-lg font-medium text-gray-900 mb-2">No G-Code loaded</h3>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">{t("cam.gen.viewer.noGcode")}</h3>
               <p class="text-gray-600">
                 Import a G-Code file or generate one with the toolpath generator to display here.
               </p>
@@ -197,7 +198,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
 
         <div class="absolute top-4 left-4 p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white bg-opacity-80 rounded-md shadow-sm">
           <Show when={toolPath().length > 0}>
-            <p class="text-sm font-medium">Current Position (mm):</p>
+            <p class="text-sm font-medium">{t("cam.gen.viewer.position")}</p>
             <Show when={position()}>
               {(point) => (
                 <p class="text-xs text-gray-600">
@@ -215,7 +216,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
           <button
             class="p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white rounded-md shadow-sm hover:bg-gray-100 block"
             onClick={fit}
-            title="Reset View"
+            title={t("cam.gen.viewer.resetView")}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -240,15 +241,15 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
           <div class="absolute bottom-4 left-4 right-4 p-3 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white bg-opacity-90 rounded-md shadow-sm text-xs">
             <div class="flex justify-between items-center">
               <div>
-                <span class="font-medium">Dimensions:</span> X: {stats().minX.toFixed(2)} -{" "}
+                <span class="font-medium">{t("cam.gen.viewer.dimensions")}</span> X: {stats().minX.toFixed(2)} -{" "}
                 {stats().maxX.toFixed(2)}, Y: {stats().minY.toFixed(2)} -{" "}
                 {stats().maxY.toFixed(2)}, Z: {stats().minZ.toFixed(2)} -{" "}
                 {stats().maxZ.toFixed(2)}
               </div>
               <div class="flex space-x-4">
-                <div><span class="font-medium">Rapids:</span> {path().rapidMoves}</div>
-                <div><span class="font-medium">Linear:</span> {path().linearMoves}</div>
-                <div><span class="font-medium">Circular:</span> {path().circularMoves}</div>
+                <div><span class="font-medium">{t("cam.gen.viewer.rapidsColon")}</span> {path().rapidMoves}</div>
+                <div><span class="font-medium">{t("cam.gen.viewer.linearColon")}</span> {path().linearMoves}</div>
+                <div><span class="font-medium">{t("cam.gen.viewer.circularColon")}</span> {path().circularMoves}</div>
               </div>
             </div>
 
@@ -263,49 +264,49 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
       {/* Dettagli statistici avanzati */}
       <Show when={toolPath().length > 0}>
         <div class="bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white shadow-md rounded-md p-4 mt-4 mx-2 mb-2">
-          <h3 class="text-lg font-medium text-gray-900 mb-2">Detailed Analysis</h3>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">{t("cam.gen.viewer.analysis")}</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="p-3 bg-gray-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">Total Points</p>
+              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.totalPoints")}</p>
               <p class="text-xl font-bold text-blue-600">{toolPath().length}</p>
             </div>
             <div class="p-3 bg-blue-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">Rapids</p>
+              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.rapids")}</p>
               <p class="text-xl font-bold text-blue-600">{path().rapidMoves}</p>
             </div>
             <div class="p-3 bg-green-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">Linear</p>
+              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.linear")}</p>
               <p class="text-xl font-bold text-green-600">{path().linearMoves}</p>
             </div>
             <div class="p-3 bg-purple-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">Circular</p>
+              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.circular")}</p>
               <p class="text-xl font-bold text-purple-600">{path().circularMoves}</p>
             </div>
           </div>
 
           <div class="mt-4 p-3 bg-gray-50 rounded-md">
-            <h4 class="text-sm font-medium text-gray-700 mb-2">Work Dimensions</h4>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">{t("cam.gen.viewer.workDims")}</h4>
             <div class="grid grid-cols-3 gap-2 text-sm">
-              <div><span class="font-medium">Width:</span> {(stats().maxX - stats().minX).toFixed(2)}{" "}mm</div>
-              <div><span class="font-medium">Height:</span>{" "}{(stats().maxY - stats().minY).toFixed(2)} mm</div>
-              <div><span class="font-medium">Depth:</span> {(stats().maxZ - stats().minZ).toFixed(2)}{" "}mm</div>
+              <div><span class="font-medium">{t("cad.explorer.width")}</span> {(stats().maxX - stats().minX).toFixed(2)}{" "}{t("cad.millimeters")}</div>
+              <div><span class="font-medium">{t("cad.explorer.height")}</span>{" "}{(stats().maxY - stats().minY).toFixed(2)} {t("cad.millimeters")}</div>
+              <div><span class="font-medium">{t("cam.gen.viewer.depthColon")}</span> {(stats().maxZ - stats().minZ).toFixed(2)}{" "}{t("cad.millimeters")}</div>
             </div>
           </div>
 
           <div class="mt-4 p-3 bg-yellow-50 rounded-md">
-            <h4 class="text-sm font-medium text-gray-700 mb-2">Navigation Tips</h4>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">{t("cam.gen.viewer.tips")}</h4>
             <div class="flex flex-wrap gap-4 text-xs text-gray-600">
               <div class="flex items-center">
                 <div class="w-4 h-4 bg-blue-100 mr-1 border border-blue-200"></div>
-                <span>Move: Click and Drag</span>
+                <span>{t("cam.gen.viewer.tipMove")}</span>
               </div>
               <div class="flex items-center">
                 <div class="w-4 h-4 bg-green-100 mr-1 border border-green-200"></div>
-                <span>Zoom: Wheel</span>
+                <span>{t("cam.gen.viewer.tipZoom")}</span>
               </div>
               <div class="flex items-center">
                 <div class="w-4 h-4 bg-purple-100 mr-1 border border-purple-200"></div>
-                <span>Reset View: Home Button</span>
+                <span>{t("cam.gen.viewer.tipReset")}</span>
               </div>
             </div>
           </div>
@@ -317,7 +318,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
         <button
           onClick={() => container?.scrollTo({ top: 0, behavior: "smooth" })}
           class="fixed bottom-6 right-6 p-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none transition-all duration-300 z-10"
-          aria-label="Torna all'inizio"
+          aria-label={t("cam.gen.viewer.toStart")}
         >
           <ChevronUp size={20} />
         </button>

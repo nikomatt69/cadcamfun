@@ -134,10 +134,10 @@ export function ToolpathsScreen(): JSX.Element {
       const current = editing()
       if (current) {
         await run(app.client.toolpaths.update({ params: { id: current.id }, payload: value }))
-        toast.success("Toolpath updated successfully")
+        toast.success(t("pages.toolpath.updated.successfully"))
       } else {
         const created = await run<ToolpathRow>(app.client.toolpaths.create({ payload: { ...value, data: {}, gcode: "", isPublic: value.isPublic } }))
-        toast.success("Toolpath created successfully")
+        toast.success(t("pages.toolpath.created.successfully"))
         setFormOpen(false)
         refresh()
         navigate(`/toolpaths/${created.id}`)
@@ -146,7 +146,7 @@ export function ToolpathsScreen(): JSX.Element {
       setFormOpen(false)
       refresh()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to save toolpath")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.save.toolpath"))
     } finally {
       setBusy(false)
     }
@@ -158,11 +158,11 @@ export function ToolpathsScreen(): JSX.Element {
     setBusy(true)
     try {
       await run(app.client.toolpaths.remove({ params: { id: row.id } }))
-      toast.success("Toolpath deleted successfully")
+      toast.success(t("pages.toolpath.deleted.successfully"))
       setDeleting(undefined)
       refresh()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to delete toolpath")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.delete.toolpath"))
     } finally {
       setBusy(false)
     }
@@ -170,18 +170,18 @@ export function ToolpathsScreen(): JSX.Element {
 
   const useLibraryItem = async (item: LibraryPick): Promise<void> => {
     const projectId = filters().projectId
-    if (!projectId) { toast.error("Please select a project first"); return }
+    if (!projectId) { toast.error(t("pages.please.select.a.project.first")); return }
     setBusy(true)
     try {
       const created = await run<ToolpathRow>(app.client.toolpaths.create({
         payload: { name: item.name, description: item.description, type: item.type, operationType: item.operationType, projectId, data: (item.data ?? {}) as Record<string, unknown>, gcode: item.gcode, isPublic: false }
       }))
-      toast.success("Toolpath created from library successfully")
+      toast.success(t("pages.toolpath.created.from.library.successfully"))
       setLibraryOpen(false)
       refresh()
       navigate(`/toolpaths/${created.id}`)
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to create toolpath from library")
+      toast.error(cause instanceof Error ? cause.message : t("pages.failed.to.create.toolpath.from.library"))
     } finally {
       setBusy(false)
     }
@@ -197,22 +197,22 @@ export function ToolpathsScreen(): JSX.Element {
   return (
     <>
     <WorkspacePage
-      title="Toolpaths Library"
+      title={t("pages.toolpaths.library")}
       actions={<>
-        <A href="/cam" class={TOOLBAR_BUTTON}><Cpu size={16} aria-hidden="true" />Toolpath Generator</A>
-        <button type="button" class={TOOLBAR_BUTTON} onClick={() => setLibraryOpen(true)}><Book size={16} aria-hidden="true" />Standard Library</button>
-        <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />New Toolpath</button>
+        <A href="/cam" class={TOOLBAR_BUTTON}><Cpu size={16} aria-hidden="true" />{t("cam.generator")}</A>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => setLibraryOpen(true)}><Book size={16} aria-hidden="true" />{t("library.standard")}</button>
+        <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("pages.new.toolpath")}</button>
       </>}
       rail={<>
         <label class="block">
-          <span class={RAIL_LABEL}>Search</span>
+          <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               name="search"
               class={`${FIELD} pl-8`}
-              placeholder="Search toolpaths..."
+              placeholder={t("pages.search.toolpaths")}
               value={filters().search}
               onInput={(event) => update({ search: event.currentTarget.value })}
             />
@@ -220,56 +220,56 @@ export function ToolpathsScreen(): JSX.Element {
         </label>
 
         <label class="block">
-          <span class={RAIL_LABEL}>Machine type</span>
+          <span class={RAIL_LABEL}>{t("library.machine.type")}</span>
           <select name="type" class={FIELD} value={filters().type} onChange={(event) => update({ type: event.currentTarget.value })}>
-            <option value="">All Types</option>
+            <option value="">{t("pages.all.types")}</option>
             <For each={["mill", "lathe", "3dprinter"]}>{(value) => <option value={value}>{TYPE_LABEL[value] ?? value}</option>}</For>
           </select>
         </label>
 
         <label class="block">
-          <span class={RAIL_LABEL}>Operation</span>
+          <span class={RAIL_LABEL}>{t("cam.operations.current")}</span>
           <select name="operationType" class={FIELD} value={filters().operationType} onChange={(event) => update({ operationType: event.currentTarget.value })}>
-            <option value="">All Operations</option>
+            <option value="">{t("pages.all.operations")}</option>
             <For each={Object.keys(OPERATION_LABEL)}>{(value) => <option value={value}>{OPERATION_LABEL[value]}</option>}</For>
           </select>
         </label>
 
         <label class="block">
-          <span class={RAIL_LABEL}>Project</span>
+          <span class={RAIL_LABEL}>{t("cam.save.project")}</span>
           <select name="projectId" class={FIELD} value={filters().projectId} onChange={(event) => update({ projectId: event.currentTarget.value })}>
-            <option value="">All Projects</option>
+            <option value="">{t("shell.allProjects")}</option>
             <For each={projects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
           </select>
         </label>
 
         <div class="flex items-center justify-between gap-2 pt-1">
           <button type="button" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:text-white" onClick={clearFilters} disabled={!hasFilters()}>
-            <X size={13} aria-hidden="true" />Clear Filters
+            <X size={13} aria-hidden="true" />{t("pages.clear.filters")}
           </button>
-          <div class="workspace-view-toggle" role="group" aria-label="View">
-            <button type="button" class="workspace-view-toggle__btn" title="Grid View" aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
-            <button type="button" class="workspace-view-toggle__btn" title="List View" aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
+          <div class="workspace-view-toggle" role="group" aria-label={t("cam.multi.view")}>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.grid.view")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.list.view")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
           </div>
         </div>
       </>}
     >
-            <Show when={!loading()} fallback={<StageLoading label="Loading toolpaths..." />}>
+            <Show when={!loading()} fallback={<StageLoading label={t("pages.loading.toolpaths")} />}>
               <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} />}>
                 <Show
                   when={rows().length > 0}
                   fallback={
                     <StageEmpty
                       icon={<Code size={20} aria-hidden="true" />}
-                      title="No toolpaths found"
-                      hint={hasFilters() ? "No toolpaths match your search criteria." : "Create your first toolpath to get started or choose from our standard library."}
+                      title={t("profile.emptyToolpaths")}
+                      hint={hasFilters() ? t("pages.no.toolpaths.match.your.search.criteria") : t("pages.create.your.first.toolpath.to.get.started.or.choose.from.our.standard.library")}
                     >
                       <Show when={hasFilters()} fallback={<>
-                        <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>Create Toolpath</button>
-                        <button type="button" class={TOOLBAR_BUTTON} onClick={() => setLibraryOpen(true)}>Use Standard Library</button>
-                        <A href="/cam" class={TOOLBAR_BUTTON}>Generate Toolpath</A>
+                        <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("pages.create.toolpath")}</button>
+                        <button type="button" class={TOOLBAR_BUTTON} onClick={() => setLibraryOpen(true)}>{t("pages.use.standard.library")}</button>
+                        <A href="/cam" class={TOOLBAR_BUTTON}>{t("cam.explorer.generateToolpath")}</A>
                       </>}>
-                        <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button>
+                        <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("manuals.clear")}</button>
                       </Show>
                     </StageEmpty>
                   }
@@ -281,12 +281,12 @@ export function ToolpathsScreen(): JSX.Element {
                         <table>
                           <thead>
                             <tr>
-                              <th scope="col">Name</th>
-                              <th scope="col">Type / Operation</th>
-                              <th scope="col">Project</th>
-                              <th scope="col">Updated</th>
+                              <th scope="col">{t("orgs.name")}</th>
+                              <th scope="col">{t("pages.type.operation")}</th>
+                              <th scope="col">{t("cam.save.project")}</th>
+                              <th scope="col">{t("org.overview.updated")}</th>
                               <th scope="col">ID</th>
-                              <th scope="col"><span class="sr-only">Actions</span></th>
+                              <th scope="col"><span class="sr-only">{t("vcs.tab.actions")}</span></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -302,18 +302,18 @@ export function ToolpathsScreen(): JSX.Element {
                                   </div>
                                 </td>
                                 <td>
-                                  <span class={`${BADGE} mr-1`}>{TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? "Mill"}</span>
-                                  <span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? "Contour"}</span>
+                                  <span class={`${BADGE} mr-1`}>{TYPE_LABEL[row.type ?? t("pages.mill")] ?? row.type ?? t("pages.mill")}</span>
+                                  <span class={BADGE}>{OPERATION_LABEL[row.operationType ?? t("cam.strategy.contour")] ?? row.operationType ?? t("cam.strategy.contour")}</span>
                                 </td>
                                 <td class="text-slate-500 dark:text-slate-400">{projectName(row.projectId)}</td>
                                 <td class="text-slate-500 dark:text-slate-400">{formatDate(row.updatedAt)}</td>
                                 <td class="font-mono text-[11px] text-slate-500 dark:text-slate-400">{row.id.substring(0, 8)}...</td>
                                 <td onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
-                                    <button type="button" class={ICON_BUTTON} title="Use in CAM" onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title="Download G-code" onClick={() => navigate(`/toolpaths/${row.id}?download=true`)}><Download size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cam.multi.downloadGcode")} onClick={() => navigate(`/toolpaths/${row.id}?download=true`)}><Download size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
                                   </div>
                                 </td>
                               </tr>
@@ -328,23 +328,23 @@ export function ToolpathsScreen(): JSX.Element {
                         <div class={CARD} onClick={() => openDetail(row)} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") openDetail(row) }}>
                           <CardBanner
                             icon={<Wrench size={18} aria-hidden="true" />}
-                            badge={TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? "Mill"}
-                            leftBadge={row.isPublic ? "Public" : undefined}
+                            badge={TYPE_LABEL[row.type ?? t("pages.mill")] ?? row.type ?? t("pages.mill")}
+                            leftBadge={row.isPublic ? t("save.publicProject") : undefined}
                           />
                           <div class="flex flex-1 flex-col gap-1.5 p-3">
                             <h3 class="text-xs font-semibold text-slate-900 dark:text-white">{row.name}</h3>
                             <Show when={row.description}><p class="line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
                             <div class="mt-auto space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                              <div class="flex items-center justify-between gap-2"><span>Operation</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? "Contour"}</span></div>
+                              <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? t("cam.strategy.contour")] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>
                               <div class="flex items-center justify-between gap-2"><span>ID</span><code class="font-mono text-[10px] text-slate-400 dark:text-slate-500">{row.id.substring(0, 8)}...</code></div>
                             </div>
                           </div>
                           <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 dark:border-slate-700/70">
-                            <span class="text-[11px] text-slate-500 dark:text-slate-400">Updated {formatDate(row.updatedAt)}</span>
+                            <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(row.updatedAt)}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                              <button type="button" class={ICON_BUTTON} title="Use in CAM" onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => openDetail(row)}><Edit size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => openDetail(row)}><Edit size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
                             </div>
                           </div>
                         </div>
@@ -373,11 +373,11 @@ export function ToolpathsScreen(): JSX.Element {
         onSelect={(item) => void useLibraryItem(item)}
       />
 
-      <Modal open={deleting() !== undefined} title="Delete toolpath" onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-gray-700 dark:text-gray-300">Are you sure you want to delete this toolpath?</p>
+      <Modal open={deleting() !== undefined} title={t("cam.deleteToolpath")} onClose={() => setDeleting(undefined)}>
+        <p class="text-sm text-gray-700 dark:text-gray-300">{t("pages.are.you.sure.you.want.to.delete.this.toolpath")}</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
-          <button type="button" class="rounded-[5px] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>Delete</button>
+          <button type="button" class="rounded-[5px] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
         </div>
       </Modal>
     </>

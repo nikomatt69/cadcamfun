@@ -24,36 +24,36 @@ export function OriginSection(): JSX.Element {
     </div>
   )
   return (
-    <Section id="origin" icon={Target} title="Origin" summary={gen.settings.machineType === "mill" ? gen.settings.workOffset : undefined} testId="origin-section">
+    <Section id="origin" icon={Target} title={t("cam.ribbon.group.origin")} summary={gen.settings.machineType === "mill" ? gen.settings.workOffset : undefined} testId="origin-section">
       <Switch>
         <Match when={gen.settings.machineType === "lathe"}>
-          <MachineZero setting="latheZero" machine="lathe" label="Z zero" />
+          <MachineZero setting="latheZero" machine="lathe" label={t("cam.gen.or.zZero")} />
         </Match>
         <Match when={gen.settings.machineType === "3dprinter"}>
-          <MachineZero setting="bedOrigin" machine="3dprinter" label="Plate origin" />
+          <MachineZero setting="bedOrigin" machine="3dprinter" label={t("cam.gen.or.plateOrigin")} />
           <div class="panel-grid panel-grid--2">
-            <div class="panel-field"><label class="panel-label">Plate width (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedWidth} onValue={(value) => gen.updateSettings("bedWidth", value)} /></div>
-            <div class="panel-field"><label class="panel-label">Plate depth (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
+            <div class="panel-field"><label class="panel-label">{t("cam.gen.or.plateWidth")}</label><NumberField min="10" class={FIELD} value={gen.settings.bedWidth} onValue={(value) => gen.updateSettings("bedWidth", value)} /></div>
+            <div class="panel-field"><label class="panel-label">{t("cam.gen.or.plateDepth")}</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
           </div>
-          <CheckRow id="center-on-bed" checked={gen.settings.centerOnBed} onChange={(checked) => gen.updateSettings("centerOnBed", checked)}>Centre the part on the plate</CheckRow>
-          <p class="text-xs text-gray-500">The part is always set down on the plate: its bottom is Z0, so the first layer prints one layer height above it.</p>
+          <CheckRow id="center-on-bed" checked={gen.settings.centerOnBed} onChange={(checked) => gen.updateSettings("centerOnBed", checked)}>{t("cam.gen.or.centrePart")}</CheckRow>
+          <p class="text-xs text-gray-500">{t("cam.gen.or.plateNote")}</p>
         </Match>
         <Match when={gen.settings.machineType === "mill"}>
       <div>
-        <label class="panel-label">Work offset</label>
-        <select class={FIELD} aria-label="Work offset" data-testid="origin-work-offset" value={gen.settings.workOffset} onChange={(event) => gen.updateSettings("workOffset", event.currentTarget.value as typeof gen.settings.workOffset)}>
+        <label class="panel-label">{t("cam.status.wcsTitle")}</label>
+        <select class={FIELD} aria-label={t("cam.status.wcsTitle")} data-testid="origin-work-offset" value={gen.settings.workOffset} onChange={(event) => gen.updateSettings("workOffset", event.currentTarget.value as typeof gen.settings.workOffset)}>
           <For each={cam.ORIGINS.mill.offsets ?? []}>{(offset) => <option value={offset}>{offset}{offset === "G54" ? " (default)" : ""}</option>}</For>
         </select>
-        <p class="text-xs text-gray-500 mt-1">The zero of the part on the machine table. Probing and machining use the same one.</p>
+        <p class="text-xs text-gray-500 mt-1">{t("cam.gen.or.originNote")}</p>
       </div>
       <div>
-        <label class="panel-label">Origin Type</label>
+        <label class="panel-label">{t("cam.gen.or.originType")}</label>
         <select class={FIELD} value={origin()} onChange={(event) => gen.updateSettings("originType", event.currentTarget.value as typeof gen.settings.originType)}>
-          <option value="workpiece-center">Workpiece Center</option>
-          <option value="workpiece-corner">Workpiece Corner (bottom left)</option>
-          <option value="workpiece-corner2">Workpiece Corner (top left)</option>
-          <option value="machine-zero">Machine Zero</option>
-          <option value="custom">Custom Coordinates</option>
+          <option value="workpiece-center">{t("cam.gen.or.center")}</option>
+          <option value="workpiece-corner">{t("cam.gen.or.cornerBL")}</option>
+          <option value="workpiece-corner2">{t("cam.gen.or.cornerTL")}</option>
+          <option value="machine-zero">{t("cam.gen.or.machineZero")}</option>
+          <option value="custom">{t("cam.gen.or.customCoords")}</option>
         </select>
       </div>
 

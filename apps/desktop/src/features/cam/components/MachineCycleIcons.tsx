@@ -292,7 +292,44 @@ const PlungeMillingIcon = (): JSX.Element => (
   </svg>
 )
 
-export const cycleIcons: Record<cam.cycles.CycleIconName, () => JSX.Element> = {
+const stroke = { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", class: "w-full h-full" } as const
+
+const ProbeIcon = (): JSX.Element => (
+  <svg {...stroke}>
+    <path d="M12 3v11" />
+    <circle cx="12" cy="17" r="3" />
+    <path d="M4 21h16" />
+  </svg>
+)
+
+const PatternIcon = (): JSX.Element => (
+  <svg {...stroke}>
+    <circle cx="6" cy="6" r="2" />
+    <circle cx="18" cy="6" r="2" />
+    <circle cx="6" cy="18" r="2" />
+    <circle cx="18" cy="18" r="2" />
+  </svg>
+)
+
+const TransformIcon = (): JSX.Element => (
+  <svg {...stroke}>
+    <path d="M4 12h16M16 8l4 4-4 4M8 8l-4 4 4 4" />
+  </svg>
+)
+
+const MacroIcon = (): JSX.Element => (
+  <svg {...stroke}>
+    <path d="M9 4C6 4 7 9 5 12c2 3 1 8 4 8M15 4c3 0 2 5 4 8-2 3-1 8-4 8" />
+  </svg>
+)
+
+/** The icon of a template or macro by key; keys without an icon of their own get the generic cycle symbol. */
+export const cycleIconFor = (name: string): JSX.Element => {
+  const icon = (cycleIcons as Record<string, (() => JSX.Element) | undefined>)[name]
+  return icon ? icon() : <CycleIcon class="w-full h-full" />
+}
+
+export const cycleIcons: Record<cam.cycles.CycleIconName | "probe" | "pattern" | "transform" | "macro", () => JSX.Element> = {
   "drill": DrillIcon,
   "pocket": PocketIcon,
   "contour": ContourIcon,
@@ -310,4 +347,8 @@ export const cycleIcons: Record<cam.cycles.CycleIconName, () => JSX.Element> = {
   "chamfer": ChamferIcon,
   "peck-drill": PeckDrillIcon,
   "plunge-milling": PlungeMillingIcon,
+  "probe": ProbeIcon,
+  "pattern": PatternIcon,
+  "transform": TransformIcon,
+  "macro": MacroIcon,
 }

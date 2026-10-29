@@ -1,6 +1,6 @@
 # RM-01 — Action catalogue (deepen the tool seam)
 
-Status: **in progress**. Current step. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/features/ai/lib` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
+Status: **in progress**. Current step. Seam closed 2026-10-13 (see Change log); open on 2026-10-29: the prompt-size gate (`packages/ai/test/tool-prompts.test.ts`, 33 301 against a 32 800-character ceiling) and the "Required integration checks" that have no test yet. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/features/ai/lib` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
 
 ## Why this is first
 
@@ -94,3 +94,4 @@ These are future implementation acceptance requirements, not results of this doc
 - v1: first remaining step — deepen tools into one catalogue.
 - 2026-10-12: published AI-01 contract amendments and narrow cross-WP scopes; cad_grep registration already exists. Implementation and Verify remain pending.
 - 2026-10-12: expanded Verify across AI/API/sidecar/desktop for authorization, cancellation, conflict/receipt propagation and consolidated consumers; clarified cad_grep preservation. Documentation only; no gate claimed.
+- 2026-10-29: recorded the red prompt-size gate and the open integration checks; scheduled in spec 70 (step 0, parallel list). No completion claimed.

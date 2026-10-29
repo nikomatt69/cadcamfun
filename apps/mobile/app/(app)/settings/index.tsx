@@ -81,7 +81,7 @@ export default function SettingsScreen() {
 
   const diagnostics = () => buildDiagnostics({
     appVersion: APP_VERSION, buildNumber: BUILD_NUMBER, platform: Platform.OS, osVersion: String(Platform.Version),
-    desktop: config ? { name: config.name, baseUrl: config.baseUrl, hosts: config.hosts, fingerprint: config.fingerprint } : undefined,
+    desktop: config ? { name: config.name, baseUrl: config.baseUrl, hosts: config.hosts, fingerprint: config.fingerprint, mode: config.mode, workspaceId: config.workspaceId } : undefined,
     connectivity, connectionError, ai: ai ? { configured: ai.configured, host: ai.host, tools: ai.tools?.length } : null,
     offlineQueueCount, security, now: new Date(),
   })
@@ -141,14 +141,14 @@ export default function SettingsScreen() {
           <NavRow icon={Layers3} title="Materials, tools & machines" description="Search, create and edit your resources — synced with the desktop" onPress={() => router.push("/settings/resources")} />
         </SettingsSection>
 
-        <SettingsSection title="Desktop">
+        <SettingsSection title={config?.mode === "cloud" ? "Cloud workspace" : "Desktop"}>
           <NavRow icon={MonitorSmartphone} title={config?.name ?? "Not paired"} {...(config?.baseUrl ? { description: config.baseUrl } : {})} active={connectivity === "online"}
             trailing={<Text style={{ color: palette.accent, ...type(14, { weight: "600" }) }}>Reconnect</Text>} hint="Checks the connection to the desktop again" onPress={() => void recheck()} />
           {offlineQueueCount > 0 ? (
             <NavRow icon={Inbox} tone="warning" active title="Queued messages" description={`${offlineQueueCount === 1 ? "1 message sends" : `${offlineQueueCount} messages send`} when the desktop reconnects`}
               trailing={<Text style={{ color: palette.danger, ...type(14, { weight: "600" }) }}>Discard</Text>} hint="Discards the messages waiting for the desktop" onPress={clearQueue} />
           ) : null}
-          {config ? (
+          {config?.mode === "cloud" ? <NavRow icon={Network} title="Verified HTTPS" description={`Workspace ${config.workspaceId}`} chevron={false} /> : config ? (
             <NavRow icon={Fingerprint} title="Certificate fingerprint" description={formatFingerprint(config.fingerprint)} chevron={false}
               trailing={<ClipboardCopy size={17} color={palette.muted} strokeWidth={2} />} label={`Certificate fingerprint ${config.fingerprint.split("").join(" ")}`}
               hint="Copies the fingerprint. It matches the one under the QR code on your Mac." onPress={() => void copy(config.fingerprint, "Fingerprint copied")} />

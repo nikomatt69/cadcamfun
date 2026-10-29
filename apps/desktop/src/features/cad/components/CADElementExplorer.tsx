@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { Motion, Presence } from "solid-motionone"
 import { Box, ChevronDown, ChevronRight, Circle, Copy, Eye, EyeOff, Folder, List, Lock, Square, Trash2, Unlock, X } from "lucide-solid"
+import { t } from "../../../i18n/index.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -100,7 +101,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
 
   const deleteSelected = () => {
     const count = selection.selectedElementIds.length
-    if (count === 0 || !window.confirm(`Delete ${count} selected element(s)?`)) return
+    if (count === 0 || !window.confirm(t("cad.explorer.confirmDelete", { count }))) return
     selection.deleteSelection()
   }
 
@@ -148,12 +149,12 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     return {
       name: element.name || `${element.type}-${element.id.slice(0, 6)}`,
       type: element.type,
-      layer: layers.layers.find((layer) => layer.id === element.layerId)?.name || "Unknown Layer",
+      layer: layers.layers.find((layer) => layer.id === element.layerId)?.name || t("cad.explorer.unknownLayer"),
       visible: element.visible !== false,
       locked: !!element.locked,
       position: { x: element.x || 0, y: element.y || 0, z: element.z || 0 },
       width: element.width as number | undefined, height: element.height as number | undefined, radius: element.radius as number | undefined,
-      material: (element.material as string | undefined) || "Default",
+      material: (element.material as string | undefined) || t("cad.explorer.defaultMaterial"),
       color: typeof element.color === "string" ? element.color : "#1e88e5",
       opacity: (element.opacity as number | undefined) || 1
     }
@@ -167,7 +168,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
       <div class="p-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center">
           <List size={18} class="text-gray-600 dark:text-gray-400 mr-2" />
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Elements</h3>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("cad.explorer.title")}</h3>
           <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{elements.elements.length}</span>
         </div>
       </div>
@@ -175,15 +176,15 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
       <div class="p-3 border-b border-gray-200 dark:border-gray-700">
         <div class="relative">
           <input
-            type="text" placeholder="Search elements..." value={query()} onInput={(event) => setQuery(event.currentTarget.value)}
+            type="text" placeholder={t("cad.explorer.search")} value={query()} onInput={(event) => setQuery(event.currentTarget.value)}
             class="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       </div>
 
       <div class="flex justify-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-4 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={expandAll}>Expand All</button>
-        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>Collapse All</button>
+        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-4 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={expandAll}>{t("cad.explorer.expandAll")}</button>
+        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>{t("cad.explorer.collapseAll")}</button>
       </div>
 
       <OriginBlock />
@@ -191,20 +192,20 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
 
       <Show when={selection.selectedElementIds.length > 0}>
         <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm text-center font-medium">
-          {selection.selectedElementIds.length} {selection.selectedElementIds.length === 1 ? "element" : "elements"} selected
+          {t(selection.selectedElementIds.length === 1 ? "cad.explorer.selectedOne" : "cad.explorer.selectedMany", { count: selection.selectedElementIds.length })}
         </div>
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div class="grid grid-cols-2 gap-2">
-            <button class={ACTION} onClick={() => setMultiSelect(!multiSelect())} title={multiSelect() ? "Disable Multi-select" : "Enable Multi-select"}>
+            <button class={ACTION} onClick={() => setMultiSelect(!multiSelect())} title={multiSelect() ? t("cad.explorer.multiOff") : t("cad.explorer.multiOn")}>
               <span class="w-3 h-3 rounded-sm border mr-2 border-gray-400 dark:border-gray-500 flex items-center justify-center">
                 <Show when={multiSelect()}><span class="w-2 h-2 bg-blue-500 rounded-sm" /></Show>
               </span>
-              Multi
+              {t("cad.explorer.multi")}
             </button>
-            <button class={ACTION} onClick={hideSelected} title="Hide selected elements"><EyeOff size={14} class="mr-1" />Hide</button>
-            <button class={ACTION} onClick={() => selection.duplicateSelection()} title="Duplicate selected elements"><Copy size={14} class="mr-1" />Copy</button>
-            <button class="p-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md text-red-600 dark:text-red-400 flex items-center justify-center text-xs border border-red-200 dark:border-red-800 transition-colors" onClick={deleteSelected} title="Delete selected elements">
-              <Trash2 size={14} class="mr-1" />Delete
+            <button class={ACTION} onClick={hideSelected} title={t("cad.explorer.hideSelected")}><EyeOff size={14} class="mr-1" />{t("browser.hide")}</button>
+            <button class={ACTION} onClick={() => selection.duplicateSelection()} title={t("cad.explorer.copyTitle")}><Copy size={14} class="mr-1" />{t("cad.explorer.copy")}</button>
+            <button class="p-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md text-red-600 dark:text-red-400 flex items-center justify-center text-xs border border-red-200 dark:border-red-800 transition-colors" onClick={deleteSelected} title={t("cad.explorer.deleteSelected")}>
+              <Trash2 size={14} class="mr-1" />{t("browser.delete")}
             </button>
           </div>
         </div>
@@ -212,10 +213,10 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
 
       <div class="flex-1 overflow-y-auto">
         <Show when={filtered().length > 0 || browser.mode() === "layer"} fallback={
-          <div class="p-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">{query() ? "No elements match your search" : "No elements found in project"}</div>
+          <div class="p-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">{query() ? t("cad.explorer.noMatch") : t("cad.explorer.noneInProject")}</div>
         }>
           <div class="py-1">
-            <BrowserSections roots={filtered()} browser={browser} renderNode={(node) => <Node node={node} depth={0} />} emptyText="No elements found in project" />
+            <BrowserSections roots={filtered()} browser={browser} renderNode={(node) => <Node node={node} depth={0} />} emptyText={t("cad.explorer.noneInProject")} />
           </div>
         </Show>
       </div>
@@ -223,20 +224,20 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
       <Show when={showProperties() ? properties() : null}>{(info) =>
         <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div class="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
-            <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Properties</h4>
-            <button onClick={() => setShowProperties(false)} class="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Close properties"><X size={14} /></button>
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("cad.properties")}</h4>
+            <button onClick={() => setShowProperties(false)} class="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label={t("cad.explorer.closeProperties")}><X size={14} /></button>
           </div>
           <div class="p-3 max-h-64 overflow-y-auto space-y-3">
             <div>
-              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Basic Information</h5>
+              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{t("cad.explorer.basic")}</h5>
               <div class="space-y-2 text-xs">
-                <Row label="Name:"><span class="font-medium">{info().name}</span></Row>
-                <Row label="Type:">{info().type}</Row>
-                <Row label="Layer:">{info().layer}</Row>
+                <Row label={t("cad.explorer.name")}><span class="font-medium">{info().name}</span></Row>
+                <Row label={t("cad.explorer.type")}>{info().type}</Row>
+                <Row label={t("cad.explorer.layer")}>{info().layer}</Row>
               </div>
             </div>
             <div>
-              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Transform</h5>
+              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{t("cad.explorer.transform")}</h5>
               <div class="grid grid-cols-3 gap-2 text-xs">
                 <div><span class="text-gray-500 block">X:</span><span class={STAT}>{info().position.x.toFixed(2)}</span></div>
                 <div><span class="text-gray-500 block">Y:</span><span class={STAT}>{info().position.y.toFixed(2)}</span></div>
@@ -245,45 +246,45 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
             </div>
             <Show when={info().width || info().height || info().radius}>
               <div>
-                <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Dimensions</h5>
+                <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{t("cad.explorer.dimensions")}</h5>
                 <div class="space-y-2 text-xs">
-                  <Show when={info().width}><Row label="Width:"><span class={STAT}>{info().width!.toFixed(2)}</span></Row></Show>
-                  <Show when={info().height}><Row label="Height:"><span class={STAT}>{info().height!.toFixed(2)}</span></Row></Show>
-                  <Show when={info().radius}><Row label="Radius:"><span class={STAT}>{info().radius!.toFixed(2)}</span></Row></Show>
+                  <Show when={info().width}><Row label={t("cad.explorer.width")}><span class={STAT}>{info().width!.toFixed(2)}</span></Row></Show>
+                  <Show when={info().height}><Row label={t("cad.explorer.height")}><span class={STAT}>{info().height!.toFixed(2)}</span></Row></Show>
+                  <Show when={info().radius}><Row label={t("cad.explorer.radius")}><span class={STAT}>{info().radius!.toFixed(2)}</span></Row></Show>
                 </div>
               </div>
             </Show>
             <div>
-              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Appearance</h5>
+              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{t("cad.explorer.appearance")}</h5>
               <div class="space-y-2 text-xs">
-                <Row label="Material:">{info().material}</Row>
+                <Row label={t("cad.explorer.material")}>{info().material}</Row>
                 <div class="flex justify-between items-center">
-                  <span class="text-gray-500">Color:</span>
+                  <span class="text-gray-500">{t("cad.explorer.color")}</span>
                   <div class="flex items-center space-x-2">
                     <div class="w-4 h-4 rounded border border-gray-300" style={{ "background-color": info().color }} />
                     <span class={STAT}>{info().color}</span>
                   </div>
                 </div>
-                <Row label="Opacity:"><span class={STAT}>{(info().opacity * 100).toFixed(0)}%</span></Row>
+                <Row label={t("cad.explorer.opacity")}><span class={STAT}>{(info().opacity * 100).toFixed(0)}%</span></Row>
               </div>
             </div>
             <div>
-              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Status</h5>
+              <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{t("cad.explorer.status")}</h5>
               <div class="flex space-x-4 text-xs">
                 <div class="flex items-center space-x-1">
                   <Show when={info().visible} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} class="text-green-500" /></Show>
-                  <span class={info().visible ? "text-green-700 dark:text-green-400" : "text-gray-500"}>{info().visible ? "Visible" : "Hidden"}</span>
+                  <span class={info().visible ? "text-green-700 dark:text-green-400" : "text-gray-500"}>{info().visible ? t("cad.explorer.visible") : t("cad.explorer.hidden")}</span>
                 </div>
                 <div class="flex items-center space-x-1">
                   <Show when={info().locked} fallback={<Unlock size={12} class="text-gray-400" />}><Lock size={12} class="text-orange-500" /></Show>
-                  <span class={info().locked ? "text-orange-700 dark:text-orange-400" : "text-gray-500"}>{info().locked ? "Locked" : "Unlocked"}</span>
+                  <span class={info().locked ? "text-orange-700 dark:text-orange-400" : "text-gray-500"}>{info().locked ? t("cad.explorer.locked") : t("cad.explorer.unlocked")}</span>
                 </div>
               </div>
             </div>
             <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
               <div class="grid grid-cols-2 gap-2">
-                <button class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">Edit</button>
-                <button onClick={() => selection.duplicateSelection()} class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">Duplicate</button>
+                <button class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">{t("cad.explorer.edit")}</button>
+                <button onClick={() => selection.duplicateSelection()} class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">{t("browser.duplicate")}</button>
               </div>
             </div>
           </div>

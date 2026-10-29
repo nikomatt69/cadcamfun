@@ -3471,6 +3471,112 @@ const adaptGroup34 = (raw: RawClient["workspace"]) => ({
   library: Endpoint34_7(raw),
 })
 
+const Endpoint35_0 = (raw: RawClient["cloud"]) => () => raw["connection"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_1Request = Parameters<RawClient["cloud"]["setConnection"]>[0]
+type Endpoint35_1Input = {
+  readonly origin: Endpoint35_1Request["payload"]["origin"]
+  readonly workspaceId: Endpoint35_1Request["payload"]["workspaceId"]
+  readonly token: Endpoint35_1Request["payload"]["token"]
+}
+const Endpoint35_1 = (raw: RawClient["cloud"]) => (input: Endpoint35_1Input) =>
+  raw["setConnection"]({
+    payload: { origin: input["origin"], workspaceId: input["workspaceId"], token: input["token"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+const Endpoint35_2 = (raw: RawClient["cloud"]) => () => raw["disconnect"]({}).pipe(Effect.mapError(mapClientError))
+
+const Endpoint35_3 = (raw: RawClient["cloud"]) => () => raw["projects"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_4Request = Parameters<RawClient["cloud"]["clone"]>[0]
+type Endpoint35_4Input = { readonly id: Endpoint35_4Request["params"]["id"] }
+const Endpoint35_4 = (raw: RawClient["cloud"]) => (input: Endpoint35_4Input) =>
+  raw["clone"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_5Request = Parameters<RawClient["cloud"]["status"]>[0]
+type Endpoint35_5Input = { readonly id: Endpoint35_5Request["params"]["id"] }
+const Endpoint35_5 = (raw: RawClient["cloud"]) => (input: Endpoint35_5Input) =>
+  raw["status"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_6Request = Parameters<RawClient["cloud"]["publish"]>[0]
+type Endpoint35_6Input = { readonly id: Endpoint35_6Request["params"]["id"] }
+const Endpoint35_6 = (raw: RawClient["cloud"]) => (input: Endpoint35_6Input) =>
+  raw["publish"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_7Request = Parameters<RawClient["cloud"]["fetch"]>[0]
+type Endpoint35_7Input = { readonly id: Endpoint35_7Request["params"]["id"] }
+const Endpoint35_7 = (raw: RawClient["cloud"]) => (input: Endpoint35_7Input) =>
+  raw["fetch"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_8Request = Parameters<RawClient["cloud"]["apply"]>[0]
+type Endpoint35_8Input = {
+  readonly id: Endpoint35_8Request["params"]["id"]
+  readonly expectedHead?: Endpoint35_8Request["payload"]["expectedHead"]
+}
+const Endpoint35_8 = (raw: RawClient["cloud"]) => (input: Endpoint35_8Input) =>
+  raw["apply"]({ params: { id: input["id"] }, payload: { expectedHead: input["expectedHead"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint35_9Request = Parameters<RawClient["cloud"]["send"]>[0]
+type Endpoint35_9Input = {
+  readonly id: Endpoint35_9Request["params"]["id"]
+  readonly message?: Endpoint35_9Request["payload"]["message"]
+}
+const Endpoint35_9 = (raw: RawClient["cloud"]) => (input: Endpoint35_9Input) =>
+  raw["send"]({ params: { id: input["id"] }, payload: { message: input["message"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+const Endpoint35_10 = (raw: RawClient["cloud"]) => () => raw["remoteProjects"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_11Request = Parameters<RawClient["cloud"]["remoteExport"]>[0]
+type Endpoint35_11Input = { readonly id: Endpoint35_11Request["params"]["id"] }
+const Endpoint35_11 = (raw: RawClient["cloud"]) => (input: Endpoint35_11Input) =>
+  raw["remoteExport"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_12Request = Parameters<RawClient["cloud"]["remoteImport"]>[0]
+type Endpoint35_12Input = {
+  readonly id: Endpoint35_12Request["params"]["id"]
+  readonly transfer: Endpoint35_12Request["payload"]["transfer"]
+  readonly expectedHead: Endpoint35_12Request["payload"]["expectedHead"]
+}
+const Endpoint35_12 = (raw: RawClient["cloud"]) => (input: Endpoint35_12Input) =>
+  raw["remoteImport"]({
+    params: { id: input["id"] },
+    payload: { transfer: input["transfer"], expectedHead: input["expectedHead"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint35_13Request = Parameters<RawClient["cloud"]["remoteReceipt"]>[0]
+type Endpoint35_13Input = {
+  readonly id: Endpoint35_13Request["params"]["id"]
+  readonly head: Endpoint35_13Request["payload"]["head"]
+  readonly deviceId: Endpoint35_13Request["payload"]["deviceId"]
+  readonly state: Endpoint35_13Request["payload"]["state"]
+}
+const Endpoint35_13 = (raw: RawClient["cloud"]) => (input: Endpoint35_13Input) =>
+  raw["remoteReceipt"]({
+    params: { id: input["id"] },
+    payload: { head: input["head"], deviceId: input["deviceId"], state: input["state"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup35 = (raw: RawClient["cloud"]) => ({
+  connection: Endpoint35_0(raw),
+  setConnection: Endpoint35_1(raw),
+  disconnect: Endpoint35_2(raw),
+  projects: Endpoint35_3(raw),
+  clone: Endpoint35_4(raw),
+  status: Endpoint35_5(raw),
+  publish: Endpoint35_6(raw),
+  fetch: Endpoint35_7(raw),
+  apply: Endpoint35_8(raw),
+  send: Endpoint35_9(raw),
+  remoteProjects: Endpoint35_10(raw),
+  remoteExport: Endpoint35_11(raw),
+  remoteImport: Endpoint35_12(raw),
+  remoteReceipt: Endpoint35_13(raw),
+})
+
 const adaptClient = (raw: RawClient) => ({
   health: adaptGroup0(raw["health"]),
   system: adaptGroup1(raw["system"]),
@@ -3507,6 +3613,7 @@ const adaptClient = (raw: RawClient) => ({
   events: adaptGroup32(raw["events"]),
   companion: adaptGroup33(raw["companion"]),
   workspace: adaptGroup34(raw["workspace"]),
+  cloud: adaptGroup35(raw["cloud"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

@@ -10,7 +10,7 @@ import { For, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { Card } from "../../../shared/ui/card.tsx"
 import { Field, TextInput } from "../../../shared/ui/field.tsx"
-import { t } from "../../../i18n/index.ts"
+import { t, type Key } from "../../../i18n/index.ts"
 import { useCamStore } from "../store/camStore.ts"
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
@@ -19,12 +19,12 @@ const press = { scale: 0.96 }
 
 export type OperationId = "profile" | "pocket" | "engrave" | "drill" | "face"
 
-const OPERATIONS: ReadonlyArray<{ readonly id: OperationId; readonly label: string }> = [
-  { id: "profile", label: t("cam.profile") },
-  { id: "pocket", label: t("cam.pocket") },
-  { id: "engrave", label: t("cam.engrave") },
-  { id: "drill", label: "Drill" },
-  { id: "face", label: "Face" }
+const OPERATIONS: ReadonlyArray<{ readonly id: OperationId; readonly label: Key }> = [
+  { id: "profile", label: "cam.profile" },
+  { id: "pocket", label: "cam.pocket" },
+  { id: "engrave", label: "cam.engrave" },
+  { id: "drill", label: "cam.gen.panel.drill" },
+  { id: "face", label: "cam.gen.panel.face" }
 ]
 
 const DEFAULTS: Readonly<Record<OperationId, { readonly stepDown: number; readonly feed: number; readonly plunge: number }>> = {
@@ -70,7 +70,7 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
                   hover={cam.operation === op.id ? hover : { scale: 1.02 }}
                   press={press}
                 >
-                  {op.label}
+                  {t(op.label)}
                 </Motion.button>
               )}
             </For>
@@ -78,7 +78,7 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
         </div>
 
         <div class="mt-4 space-y-3">
-          <Field label="Step-down (mm)">
+          <Field label={t("cam.gen.panel.stepdown")}>
             {(ids) => (
               <TextInput
                 id={ids.id}
@@ -90,7 +90,7 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
               />
             )}
           </Field>
-          <Field label="Feed (mm/min)">
+          <Field label={t("cam.gen.panel.feed")}>
             {(ids) => (
               <TextInput
                 id={ids.id}
@@ -102,7 +102,7 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
               />
             )}
           </Field>
-          <Field label="Plunge (mm/min)">
+          <Field label={t("cam.explorer.param.plungerate")}>
             {(ids) => (
               <TextInput
                 id={ids.id}
@@ -122,7 +122,7 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
           hover={{ scale: 1.02 }}
           press={{ scale: 0.97 }}
         >
-          Generate toolpath
+          {t("cam.gen.panel.generate")}
         </Motion.button>
       </Card>
     </Motion.div>

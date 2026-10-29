@@ -29,6 +29,7 @@ import { VcsGroup } from "./groups/vcs.ts"
 import { CompanionGroup } from "./groups/companion.ts"
 import { EventsGroup } from "./groups/events.ts"
 import { WorkspaceGroup } from "./groups/workspace.ts"
+import { CloudGroup } from "./groups/cloud.ts"
 
 export * from "./errors.ts"
 export * from "./ai-actions.ts"
@@ -62,6 +63,7 @@ export * from "./groups/vcs.ts"
 export * from "./groups/companion.ts"
 export * from "./groups/events.ts"
 export * from "./groups/workspace.ts"
+export * from "./groups/cloud.ts"
 export * from "./groups/materials.ts"
 export * from "./groups/tools.ts"
 export * from "./groups/drawings.ts"
@@ -111,6 +113,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(EventsGroup.middleware(Authorization))
   .add(CompanionGroup.middleware(Authorization))
   .add(WorkspaceGroup.middleware(Authorization))
+  .add(CloudGroup.middleware(Authorization))
   .annotateMerge(OpenApi.annotations({ title: "CADCAMFUN sidecar API" }))
 {}
 

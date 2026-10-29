@@ -72,11 +72,11 @@ const machineFacts = (row: Row): ReadonlyArray<Fact> => {
   const envelope = volume !== undefined ? `${volume.x}×${volume.y}×${volume.z} mm` : ""
   const axes = profile.axisTable?.filter((axis) => axis.kind === "linear").length
   return [
-    { label: "Controller", value: dash(profile.controller ?? profile.post) },
+    { get label() { return t("library.field.controller") }, value: dash(profile.controller ?? profile.post) },
     { label: "Max spindle", value: `${dash(profile.spindle?.maxRpm)} rpm` },
     { label: "Max feed", value: `${dash(profile.feed?.max)} mm/min` },
-    ...(axes === undefined ? [] : [{ label: "Axes", value: String(axes) }]),
-    ...(envelope === "" ? [] : [{ label: "Envelope", value: envelope }])
+    ...(axes === undefined ? [] : [{ get label() { return t("cam.axes") }, value: String(axes) }]),
+    ...(envelope === "" ? [] : [{ get label() { return t("cam.machine.facts.envelope") }, value: envelope }])
   ]
 }
 
@@ -87,27 +87,27 @@ const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
 
 const RESOURCES: Readonly<Record<ResourceKind, ResourceMeta>> = {
   materials: {
-    singular: "Material", plural: "Materials", path: "/materials", icon: Layers,
+    get singular() { return t("library.field.material") }, get plural() { return t("cam.ribbon.materials") }, path: "/materials", icon: Layers,
     badge: () => "Material",
     facts: (row) => {
       const p = asRecord(row["properties"])
-      return [{ label: "Density", value: `${dash(p["density"])} kg/m³` }, { label: "Hardness", value: dash(p["hardness"]) }]
+      return [{ get label() { return t("library.material.density") }, value: `${dash(p["density"])} kg/m³` }, { label: "Hardness", value: dash(p["hardness"]) }]
     }
   },
   tools: {
-    singular: "Tool", plural: "Tools", path: "/tools", icon: Wrench,
-    badge: (row) => cap(str(row["type"])) || "Tool",
-    facts: (row) => [{ label: "Diameter", value: `${dash(row["diameter"])} mm` }, { label: "Material", value: cap(dash(row["material"])) }]
+    get singular() { return t("cam.toolLabel") }, get plural() { return t("cam.ribbon.tools") }, path: "/tools", icon: Wrench,
+    badge: (row) => cap(str(row["type"])) || t("cam.toolLabel"),
+    facts: (row) => [{ get label() { return t("library.tool.diameter") }, value: `${dash(row["diameter"])} mm` }, { get label() { return t("library.field.material") }, value: cap(dash(row["material"])) }]
   },
   machines: {
-    singular: "Configuration", plural: "Configurations", path: "/machine", icon: Cpu,
-    badge: (row) => MACHINE_TYPES[str(row["type"])] ?? (cap(str(row["type"])) || "Machine"),
+    singular: "Configuration", get plural() { return t("shell.configurations") }, path: "/machine", icon: Cpu,
+    badge: (row) => MACHINE_TYPES[str(row["type"])] ?? (cap(str(row["type"])) || t("cam.machine")),
     facts: machineFacts
   },
   components: {
-    singular: "Component", plural: "Components", path: "/components", icon: Box,
-    badge: (row) => cap(str(row["type"])) || "Component",
-    facts: (row) => [{ label: "Visibility", value: row["isPublic"] === true ? "Public" : "Private" }]
+    get singular() { return t("cad.assembly.kindComponent") }, get plural() { return t("library.tab.components") }, path: "/components", icon: Box,
+    badge: (row) => cap(str(row["type"])) || t("cad.assembly.kindComponent"),
+    facts: (row) => [{ get label() { return t("pages.visibility") }, value: row["isPublic"] === true ? t("save.publicProject") : t("pages.private") }]
   }
 }
 
@@ -254,7 +254,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     if (kind === "materials") return app.client.materials.create({ payload: { name, description, isPublic, properties: { density: Number(form.get("density")) || 0, color: str(form.get("color")) || "#cccccc" } } })
     if (kind === "tools") return app.client.tools.create({ payload: { name, notes: description, isPublic, type: str(form.get("type")), diameter: Number(form.get("diameter")) || 0, material: str(form.get("material")), numberOfFlutes: Number(form.get("numberOfFlutes")) || null } })
     if (kind === "machines") {
-      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || "mill", config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || "grbl" } } })
+      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || t("pages.mill"), config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || t("cam.post.target.grbl.label") } } })
     }
     return app.client.components.createForProject({ params: { id: str(form.get("projectId")) }, payload: { name, description, isPublic, type: str(form.get("type")) || null, data: {} } })
   }
@@ -287,12 +287,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       title={`${meta.plural} Library`}
       description={t("library.description", { type: lower })}
       actions={<>
-            <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate</button>
-            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />New {meta.singular}</button>
+            <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />{t("cam.explorer.generate")}</button>
+            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />{t("ai.sessions.new")} {meta.singular}</button>
       </>}
       rail={<>
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Search</span>
+                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("legacy.search")}</span>
                 <div class="relative">
                   <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={`Search ${lower}...`} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
@@ -301,28 +301,28 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
 
               <Show when={typeOptions().length > 0}>
                 <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Type</span>
+                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("library.type")}</span>
                   <select name="type" class={FIELD} value={type()} onChange={(event) => setType(event.currentTarget.value)}>
-                    <option value="">All Types</option>
+                    <option value="">{t("pages.all.types")}</option>
                     <For each={typeOptions()}>{(value) => <option value={value}>{MACHINE_TYPES[value] ?? cap(value)}</option>}</For>
                   </select>
                 </label>
               </Show>
 
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Visibility</span>
+                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("pages.visibility")}</span>
                 <select name="visibility" class={FIELD} value={visibility()} onChange={(event) => setVisibility(event.currentTarget.value)}>
-                  <option value="">All</option>
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
+                  <option value="">{t("legacy.all")}</option>
+                  <option value="public">{t("legacy.public")}</option>
+                  <option value="private">{t("pages.private")}</option>
                 </select>
               </label>
 
               <Show when={props.kind === "components"}>
                 <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Project</span>
+                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("cam.save.project")}</span>
                   <select name="projectId" class={FIELD} value={projectId()} onChange={(event) => setProjectId(event.currentTarget.value)}>
-                    <option value="">All Projects</option>
+                    <option value="">{t("shell.allProjects")}</option>
                     <For each={projects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
                   </select>
                 </label>
@@ -343,42 +343,42 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       <Modal open={createOpen()} title={`Create New ${meta.singular}`} onClose={() => setCreateOpen(false)}>
         <form class="space-y-4" onSubmit={(event) => { event.preventDefault(); void create(new FormData(event.currentTarget)) }}>
           <div>
-            <label for="resource-name" class={LABEL}>{meta.singular} Name</label>
+            <label for="resource-name" class={LABEL}>{meta.singular} {t("library.field.name")}</label>
             <input id="resource-name" name="name" type="text" class={INPUT} required />
           </div>
           <div>
-            <label for="resource-description" class={LABEL}>Description (optional)</label>
+            <label for="resource-description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
             <textarea id="resource-description" name="description" rows={2} class={INPUT} />
           </div>
           <Show when={props.kind === "materials"}>
             <div class="grid grid-cols-2 gap-3">
-              <div><label for="resource-density" class={LABEL}>Density (kg/m³)</label><input id="resource-density" name="density" type="number" step="any" min="0" class={INPUT} value="2700" /></div>
-              <div><label for="resource-color" class={LABEL}>Color</label><input id="resource-color" name="color" type="color" class={`${INPUT} h-[38px] p-1`} value="#cccccc" /></div>
+              <div><label for="resource-density" class={LABEL}>{t("library.field.density")}</label><input id="resource-density" name="density" type="number" step="any" min="0" class={INPUT} value="2700" /></div>
+              <div><label for="resource-color" class={LABEL}>{t("library.color")}</label><input id="resource-color" name="color" type="color" class={`${INPUT} h-[38px] p-1`} value="#cccccc" /></div>
             </div>
           </Show>
           <Show when={props.kind === "tools"}>
             <div class="grid grid-cols-2 gap-3">
-              <div><label for="resource-tool-type" class={LABEL}>Type</label><input id="resource-tool-type" name="type" type="text" class={INPUT} required value="endmill" /></div>
-              <div><label for="resource-tool-material" class={LABEL}>Material</label><input id="resource-tool-material" name="material" type="text" class={INPUT} required value="carbide" /></div>
-              <div><label for="resource-diameter" class={LABEL}>Diameter (mm)</label><input id="resource-diameter" name="diameter" type="number" step="any" min="0.01" class={INPUT} required value="6" /></div>
-              <div><label for="resource-flutes" class={LABEL}>Flutes</label><input id="resource-flutes" name="numberOfFlutes" type="number" min="1" class={INPUT} value="3" /></div>
+              <div><label for="resource-tool-type" class={LABEL}>{t("library.type")}</label><input id="resource-tool-type" name="type" type="text" class={INPUT} required value="endmill" /></div>
+              <div><label for="resource-tool-material" class={LABEL}>{t("library.material")}</label><input id="resource-tool-material" name="material" type="text" class={INPUT} required value="carbide" /></div>
+              <div><label for="resource-diameter" class={LABEL}>{t("library.diameter")}</label><input id="resource-diameter" name="diameter" type="number" step="any" min="0.01" class={INPUT} required value="6" /></div>
+              <div><label for="resource-flutes" class={LABEL}>{t("library.tool.flutes")}</label><input id="resource-flutes" name="numberOfFlutes" type="number" min="1" class={INPUT} value="3" /></div>
             </div>
           </Show>
           <Show when={props.kind === "machines"}>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label for="resource-machine-type" class={LABEL}>Machine Type</label>
+                <label for="resource-machine-type" class={LABEL}>{t("pages.machine.type")}</label>
                 <select id="resource-machine-type" name="type" class={INPUT}><For each={Object.keys(MACHINE_TYPES)}>{(value) => <option value={value}>{MACHINE_TYPES[value]}</option>}</For></select>
               </div>
-              <div><label for="resource-controller" class={LABEL}>Controller</label><input id="resource-controller" name="controller" type="text" class={INPUT} value="grbl" /></div>
+              <div><label for="resource-controller" class={LABEL}>{t("library.field.controller")}</label><input id="resource-controller" name="controller" type="text" class={INPUT} value="grbl" /></div>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">Work volume and limits start with defaults; adjust them on the machine page.</p>
           </Show>
           <Show when={props.kind === "components"}>
             <div>
-              <label for="resource-project" class={LABEL}>Project</label>
+              <label for="resource-project" class={LABEL}>{t("cam.save.project")}</label>
               <select id="resource-project" name="projectId" class={INPUT} required>
-                <option value="">Select a project</option>
+                <option value="">{t("legacy.selectProject")}</option>
                 <For each={projects()}>{(project) => <option value={project.id} selected={project.id === projectId()}>{project.name}</option>}</For>
               </select>
             </div>
@@ -390,7 +390,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
           </div>
           <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
             <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={() => setCreateOpen(false)}>{t("common.cancel")}</button>
-            <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy()}>{busy() ? "Saving..." : "Create"}</button>
+            <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy()}>{busy() ? t("mcp.form.saving") : t("keys.group.create")}</button>
           </div>
         </form>
       </Modal>
@@ -399,7 +399,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
         <p class="text-sm text-slate-700 dark:text-slate-300">Are you sure you want to delete this {meta.singular.toLowerCase()}? This action cannot be undone.</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-700" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
-          <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>Delete</button>
+          <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
         </div>
       </Modal>
 
@@ -411,7 +411,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       />
       </>}
     >
-            <Show when={!loading()} fallback={<p class="p-8 text-center text-sm text-slate-500 dark:text-slate-400" role="status">Loading {lower}...</p>}>
+            <Show when={!loading()} fallback={<p class="p-8 text-center text-sm text-slate-500 dark:text-slate-400" role="status">{t("common.loading")} {lower}...</p>}>
               <Show when={error() === undefined} fallback={<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{error()}</div>}>
                 <Show
                   when={filtered().length > 0}
@@ -422,10 +422,10 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                       hint={hasFilters() ? `No ${lower} match your search criteria.` : `Create your first ${meta.singular.toLowerCase()} to get started.`}
                     >
                         <Show when={hasFilters()} fallback={<>
-                          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>Create {meta.singular}</button>
+                          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>{t("keys.group.create")} {meta.singular}</button>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate with AI</button>
                         </>}>
-                          <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button>
+                          <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("library.reset")}</button>
                         </Show>
                     </StageEmpty>
                   }
@@ -437,12 +437,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                         <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                           <thead class="bg-slate-50 dark:bg-slate-900">
                             <tr>
-                              <th scope="col" class={TH}>Name</th>
-                              <th scope="col" class={TH}>Type</th>
-                              <th scope="col" class={TH}>Details</th>
-                              <th scope="col" class={TH}>Updated</th>
+                              <th scope="col" class={TH}>{t("library.field.name")}</th>
+                              <th scope="col" class={TH}>{t("library.type")}</th>
+                              <th scope="col" class={TH}>{t("shell.details")}</th>
+                              <th scope="col" class={TH}>{t("org.overview.updated")}</th>
                               <th scope="col" class={TH}>ID</th>
-                              <th scope="col" class="relative px-4 py-2.5"><span class="sr-only">Actions</span></th>
+                              <th scope="col" class="relative px-4 py-2.5"><span class="sr-only">{t("vcs.tab.actions")}</span></th>
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
@@ -464,10 +464,10 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                 <td class="whitespace-nowrap px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
                                     <Show when={row["builtin"] === true} fallback={<>
-                                      <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                                      <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                                      <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                      <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                                     </>}>
-                                      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Built-in</span>
+                                      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{t("cad.library.builtIn")}</span>
                                     </Show>
                                   </div>
                                 </td>
@@ -481,7 +481,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                     <div class="workspace-resource-grid">
                       <For each={filtered()}>{(row) => (
                         <div class={`${CARD} cursor-pointer`} onClick={() => navigate(detailPath(row))} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") navigate(detailPath(row)) }}>
-                          <CardBanner icon={<Icon size={22} />} badge={meta.badge(row)} leftBadge={row["builtin"] === true ? "Built-in" : row["isPublic"] === true ? "Public" : undefined} />
+                          <CardBanner icon={<Icon size={22} />} badge={meta.badge(row)} leftBadge={row["builtin"] === true ? t("cad.library.builtIn") : row["isPublic"] === true ? t("save.publicProject") : undefined} />
                           <div class="flex flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
                             <Show when={str(row["description"] ?? row["notes"])}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{str(row["description"] ?? row["notes"])}</p></Show>
@@ -496,13 +496,13 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                             </div>
                           </div>
                           <div class="flex items-center justify-between border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30">
-                            <span class="text-xs text-slate-500 dark:text-slate-400">Updated {formatDate(str(row["updatedAt"]))}</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(str(row["updatedAt"]))}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
                               <Show when={row["builtin"] === true} fallback={<>
-                                <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                                <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                                <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                               </>}>
-                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Built-in</span>
+                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{t("cad.library.builtIn")}</span>
                               </Show>
                             </div>
                           </div>

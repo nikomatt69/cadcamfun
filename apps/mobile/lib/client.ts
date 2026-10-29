@@ -5,6 +5,7 @@ import type { CalculateEstimateBody, CalculatedEstimate, EstimateCreate, Estimat
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
+import { cloudProjectStatus } from "./cloud-delivery"
 
 /**
  * `GET /api/ai/status` as the phone can rely on it. The current API always sends `providers` and `host`; `host` stays
@@ -207,6 +208,8 @@ export class CompanionClient {
   renameProject = (id: string, name: string) => this.request<ProjectSummary>("PUT", this.projectPath(id), { name })
   deleteProject = (id: string) => this.request<{ message: string }>("DELETE", this.projectPath(id))
   project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
+  cloudStatus = (id: string, signal?: AbortSignal) => this.request<unknown>("GET", `${this.projectPath(id)}/cloud/status`, undefined, signal).then((value) => cloudProjectStatus(value, id))
+  sendToDesktop = (id: string, message?: string) => this.request<unknown>("POST", `${this.projectPath(id)}/cloud/send`, message?.trim() ? { message: message.trim() } : {}).then((value) => cloudProjectStatus(value, id))
 
   // ── Production costs (shared schema types, no Effect runtime on the phone) ──
 

@@ -7,6 +7,7 @@ import { Download, Search } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { Modal, OPERATION_LABEL, TYPE_LABEL } from "./shared.tsx"
+import { t } from "../../../i18n/index.ts"
 
 export interface LibraryPick {
   readonly id: string
@@ -42,36 +43,36 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
     setLoading(true)
     void run<ReadonlyArray<LibraryPick>>(app.client.toolpathExtras.library({
       query: {
-        projectId: props.projectId || "none",
+        projectId: props.projectId || t("cam.workholding.none"),
         type: type() || undefined,
         operationType: operation() || undefined,
         search: search() || undefined
       }
     }))
       .then((list) => setItems(list))
-      .catch(() => { setItems([]); toast.error("Failed to load toolpath library") })
+      .catch(() => { setItems([]); toast.error(t("pages.failed.to.load.toolpath.library")) })
       .finally(() => setLoading(false))
   }))
 
   return (
-    <Modal open={props.open} title="Standard Library" onClose={props.onClose} wide>
+    <Modal open={props.open} title={t("library.standard")} onClose={props.onClose} wide>
       <div class="flex flex-wrap gap-2">
         <div class="relative min-w-[12rem] flex-1">
           <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" class={`${FIELD} w-full pl-8`} placeholder="Search toolpaths..." value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
+          <input type="text" class={`${FIELD} w-full pl-8`} placeholder={t("pages.search.toolpaths")} value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
         </div>
-        <select class={FIELD} aria-label="Machine type" value={type()} onChange={(e) => setType(e.currentTarget.value)}>
-          <option value="">All Types</option>
+        <select class={FIELD} aria-label={t("library.machine.type")} value={type()} onChange={(e) => setType(e.currentTarget.value)}>
+          <option value="">{t("pages.all.types")}</option>
           <For each={Object.keys(TYPE_LABEL)}>{(value) => <option value={value}>{TYPE_LABEL[value]}</option>}</For>
         </select>
-        <select class={FIELD} aria-label="Operation" value={operation()} onChange={(e) => setOperation(e.currentTarget.value)}>
-          <option value="">All Operations</option>
+        <select class={FIELD} aria-label={t("cam.operations.current")} value={operation()} onChange={(e) => setOperation(e.currentTarget.value)}>
+          <option value="">{t("pages.all.operations")}</option>
           <For each={Object.keys(OPERATION_LABEL)}>{(value) => <option value={value}>{OPERATION_LABEL[value]}</option>}</For>
         </select>
       </div>
 
-      <Show when={!loading()} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading library...</p>}>
-        <Show when={items().length > 0} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No toolpaths match your filters.</p>}>
+      <Show when={!loading()} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400" role="status">{t("pages.loading.library")}</p>}>
+        <Show when={items().length > 0} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("pages.no.toolpaths.match.your.filters")}</p>}>
           <ul class="max-h-[60vh] divide-y divide-gray-200 overflow-y-auto dark:divide-gray-700">
             <For each={items()}>{(item) => (
               <li class="flex items-start justify-between gap-3 py-3">
@@ -84,7 +85,7 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
                   </div>
                 </div>
                 <button type="button" class="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50" disabled={props.projectId === ""} onClick={() => props.onSelect(item)}>
-                  <Download size={14} aria-hidden="true" />Use
+                  <Download size={14} aria-hidden="true" />{t("ai.suggestions.apply")}
                 </button>
               </li>
             )}</For>
@@ -92,7 +93,7 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
         </Show>
       </Show>
       <Show when={props.projectId === ""}>
-        <p class="text-xs text-amber-700 dark:text-amber-400">Select a project in the filters first; a library toolpath is created inside it.</p>
+        <p class="text-xs text-amber-700 dark:text-amber-400">{t("pages.select.a.project.in.the.filters.first.a.library.toolpath.is.created.inside.it")}</p>
       </Show>
     </Modal>
   )

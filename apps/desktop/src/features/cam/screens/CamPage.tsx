@@ -415,7 +415,7 @@ export default function CamPage(): JSX.Element {
           type="file"
           class="hidden"
           accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
-          aria-label="Import G-Code"
+          aria-label={t("cam.import")}
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]
             if (file) importGCode(file)

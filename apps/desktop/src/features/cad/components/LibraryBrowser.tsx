@@ -4,7 +4,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
 import { loadComponentCatalogue } from "../lib/component-catalogue.ts"
-import { t } from "../../../i18n/index.ts"
+import { t, type Key } from "../../../i18n/index.ts"
 
 export interface LibraryComponent extends Record<string, unknown> { readonly data?: unknown; readonly id: string; readonly name: string; readonly description?: string | undefined; readonly origin: "built-in" | "local" | "project" }
 
@@ -13,11 +13,11 @@ interface Props { onSelectComponent?: (component: LibraryComponent) => void }
 /** What the library row is, in the words the assistant uses (`lib_lookup_material`, `lib_lookup_tool`, `lib_lookup_machine_config`). */
 type Kind = "components" | "materials" | "tools" | "machines"
 
-const KINDS: ReadonlyArray<{ readonly id: Kind; readonly label: string; readonly icon: typeof Package }> = [
-  { id: "components", label: "Components", icon: Package },
-  { id: "materials", label: "Materials", icon: Layers },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "machines", label: "Machines", icon: Cpu }
+const KINDS: ReadonlyArray<{ readonly id: Kind; readonly label: Key; readonly icon: typeof Package }> = [
+  { id: "components", label: "cad.lib.components", icon: Package },
+  { id: "materials", label: "cad.lib.materials", icon: Layers },
+  { id: "tools", label: "cad.lib.tools", icon: Wrench },
+  { id: "machines", label: "cad.lib.machines", icon: Cpu }
 ]
 
 type Row = Record<string, unknown>

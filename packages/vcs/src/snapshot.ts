@@ -39,12 +39,16 @@ export type SnapshotList = (typeof LISTS)[number][0]
 export const ENTITY_DIRECTORIES: readonly string[] = LISTS.map(([, dir]) => dir)
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
 
+/** Content identity is portable; database clocks and installation-local account IDs are not model edits. */
+export const portableEntity = (entity: Readonly<Record<string, unknown>>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(entity).filter(([key]) => !["createdAt", "updatedAt", "createdBy", "ownerId", "organizationId"].includes(key)))
+
 export const snapshotToFiles = (s: ProjectSnapshot): Record<string, string> => {
   const files: Record<string, string> = { ...s.extra, "project.json": canonicalJson(s.project) }
   for (const [list, dir] of LISTS) {
     for (const entity of s[list] ?? []) {
       if (!SAFE_ID.test(entity.id)) throw new Error(`Unsafe entity id ${JSON.stringify(entity.id)}`)
-      files[`${dir}/${entity.id}.json`] = canonicalJson(entity)
+      files[`${dir}/${entity.id}.json`] = canonicalJson(portableEntity(entity))
     }
   }
   return files

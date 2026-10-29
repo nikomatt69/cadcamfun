@@ -21,7 +21,12 @@ private func sha256Hex(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
-private func accept(_ challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void, fingerprint: String) {
+private func accept(_ challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void, fingerprint: String?) {
+  // Only the explicit cloud ABI passes nil. URLSession then verifies PKI trust and the requested hostname.
+  guard let fingerprint else {
+    completionHandler(.performDefaultHandling, nil)
+    return
+  }
   guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
     let trust = challenge.protectionSpace.serverTrust,
     let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
@@ -44,12 +49,14 @@ struct CompanionNetError: Error, LocalizedError {
 }
 
 private final class PinnedDelegate: NSObject, URLSessionDelegate, URLSessionDataDelegate {
-  let fingerprint: String
+  let fingerprint: String?
+  var onResponse: ((Int, [String: String]) -> Void)?
   var onData: ((Data) -> Void)?
   var onComplete: ((Error?) -> Void)?
   var status: Int?
+  var headers: [String: String] = [:]
 
-  init(fingerprint: String) {
+  init(fingerprint: String?) {
     self.fingerprint = fingerprint
   }
 
@@ -58,7 +65,15 @@ private final class PinnedDelegate: NSObject, URLSessionDelegate, URLSessionData
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-    status = (response as? HTTPURLResponse)?.statusCode
+    if let response = response as? HTTPURLResponse {
+      status = response.statusCode
+      for (key, value) in response.allHeaderFields {
+        guard let name = key as? String else { continue }
+        let lower = name.lowercased()
+        if lower == "etag" || lower == "retry-after" { headers[lower] = String(describing: value) }
+      }
+      onResponse?(response.statusCode, headers)
+    }
     completionHandler(.allow)
   }
 
@@ -90,7 +105,7 @@ enum PinnedTransport {
    * Mixing the async convenience API with a `URLSessionDataDelegate` drops
    * the challenge on some iOS versions and pairing then fails as "did not answer".
    */
-  static func request(baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String) async throws -> [String: Any] {
+  static func request(baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String?) async throws -> [String: Any] {
     var request = try makeRequest(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body)
     request.timeoutInterval = 30
 
@@ -111,12 +126,12 @@ enum PinnedTransport {
       delegate.onData = { bodyData.append($0) }
       delegate.onComplete = { error in
         if let error {
-          finish(.failure(CompanionNetError(message: friendly(error))))
+          finish(.failure(CompanionNetError(message: friendly(error, cloud: fingerprint == nil))))
           return
         }
         finish(.success([
           "status": delegate.status ?? 0,
-          "headers": [:] as [String: String],
+          "headers": delegate.headers,
           "body": String(decoding: bodyData, as: UTF8.self),
         ]))
       }
@@ -144,19 +159,22 @@ enum PinnedTransport {
     return request
   }
 
-  private static func friendly(_ error: Error) -> String {
+  private static func friendly(_ error: Error, cloud: Bool) -> String {
     let code = (error as NSError).code
     let message = error.localizedDescription
     if code == NSURLErrorCancelled {
       return "Connection closed"
     }
     if code == NSURLErrorCannotFindHost || code == NSURLErrorCannotConnectToHost || code == NSURLErrorNetworkConnectionLost || code == NSURLErrorNotConnectedToInternet || code == NSURLErrorTimedOut {
+      if cloud { return "Cannot reach the cloud workspace. Check your internet connection and retry." }
       return "Cannot reach the desktop. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address."
     }
     if code == NSURLErrorSecureConnectionFailed || code == NSURLErrorServerCertificateUntrusted || code == NSURLErrorServerCertificateHasBadDate || code == NSURLErrorServerCertificateNotYetValid || code == NSURLErrorServerCertificateHasUnknownRoot {
+      if cloud { return "The cloud workspace's HTTPS certificate could not be verified." }
       return "Certificate does not match the pairing QR code"
     }
     if message.contains("The certificate for this server is invalid") {
+      if cloud { return "The cloud workspace's HTTPS certificate could not be verified." }
       return "Certificate does not match the pairing QR code"
     }
     return message
@@ -171,9 +189,10 @@ public class CompanionStreamHandle: SharedObject {
   private var finished = false
   private var error: Error?
   private var status: Int?
+  private var responseHeaders: [String: String] = [:]
   private var waiters: [CheckedContinuation<[String: Any], Never>] = []
 
-  public func start(baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String) throws {
+  public func start(baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String?) throws {
     let request: URLRequest
     do {
       request = try PinnedTransport.makeRequest(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body)
@@ -185,6 +204,14 @@ public class CompanionStreamHandle: SharedObject {
     let session = URLSession(configuration: PinnedTransport.sessionConfiguration(), delegate: delegate, delegateQueue: nil)
     self.session = session
 
+    delegate.onResponse = { [weak self] status, headers in
+      guard let self else { return }
+      self.lock.lock()
+      self.status = status
+      self.responseHeaders = headers
+      self.lock.unlock()
+    }
+
     delegate.onData = { [weak self] data in
       guard let self else { return }
       self.lock.lock()
@@ -193,8 +220,9 @@ public class CompanionStreamHandle: SharedObject {
       if text.isEmpty { self.lock.unlock(); return }
       if !self.waiters.isEmpty {
         let waiter = self.waiters.removeFirst()
+        let value = self.chunkValue(text)
         self.lock.unlock()
-        waiter.resume(returning: ["done": false, "data": text])
+        waiter.resume(returning: value)
       } else {
         self.chunks.append(text)
         self.lock.unlock()
@@ -227,8 +255,9 @@ public class CompanionStreamHandle: SharedObject {
       lock.lock()
       if !chunks.isEmpty {
         let chunk = chunks.removeFirst()
+        let value = chunkValue(chunk)
         lock.unlock()
-        continuation.resume(returning: ["done": false, "data": chunk])
+        continuation.resume(returning: value)
         return
       }
       if finished {
@@ -276,13 +305,19 @@ public class CompanionStreamHandle: SharedObject {
   }
 
   private func doneValue() -> [String: Any] {
-    var value: [String: Any] = ["done": true]
+    var value: [String: Any] = ["done": true, "headers": responseHeaders]
     if let status {
       value["status"] = status
     }
     if let error {
       value["error"] = error.localizedDescription
     }
+    return value
+  }
+
+  private func chunkValue(_ text: String) -> [String: Any] {
+    var value: [String: Any] = ["done": false, "data": text, "headers": responseHeaders]
+    if let status { value["status"] = status }
     return value
   }
 
@@ -328,6 +363,23 @@ public class CompanionNetModule: Module {
     Function("streamStart") { (baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String) throws -> CompanionStreamHandle in
       let handle = CompanionStreamHandle()
       try handle.start(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body, fingerprint: fingerprint)
+      return handle
+    }
+
+    AsyncFunction("cloudRequest") { (baseUrl: String, path: String, method: String, headers: [String: String], body: String?, promise: Promise) in
+      Task {
+        do {
+          let result = try await PinnedTransport.request(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body, fingerprint: nil)
+          promise.resolve(result)
+        } catch {
+          promise.reject(error)
+        }
+      }
+    }
+
+    Function("cloudStreamStart") { (baseUrl: String, path: String, method: String, headers: [String: String], body: String?) throws -> CompanionStreamHandle in
+      let handle = CompanionStreamHandle()
+      try handle.start(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body, fingerprint: nil)
       return handle
     }
 

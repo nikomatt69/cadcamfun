@@ -191,7 +191,7 @@ export function SessionManagement(): JSX.Element {
         <div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
           <div>
             <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.sessions.device")}</span>
-            <p class="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{deviceInfo.browser} on {deviceInfo.os}</p>
+            <p class="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{deviceInfo.browser} {t("shell.snapOn")} {deviceInfo.os}</p>
           </div>
           <div>
             <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.sessions.loginMethod")}</span>
@@ -221,7 +221,7 @@ export function SessionManagement(): JSX.Element {
                   <DeviceIcon deviceInfo={session.deviceInfo} />
                   <div>
                     <h5 class="flex items-center font-medium text-slate-900 dark:text-white">
-                      {session.deviceInfo.browser} on {session.deviceInfo.os}
+                      {session.deviceInfo.browser} {t("shell.snapOn")} {session.deviceInfo.os}
                       <Show when={session.isCurrent}>
                         <span class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {t("settings.sessions.currentBadge")}

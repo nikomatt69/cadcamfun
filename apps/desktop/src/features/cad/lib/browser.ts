@@ -4,6 +4,8 @@
  * snapshots, so the rules are testable without a DOM; the explorer only renders their result.
  */
 
+import { t, type Key } from "../../../i18n/index.ts"
+
 export type BrowserKind = "bodies" | "sketches" | "components"
 export type GroupMode = "kind" | "layer" | "flat"
 
@@ -18,7 +20,9 @@ export const classify = (type: string): BrowserKind => {
   return "sketches"
 }
 
-export const KIND_LABEL: Readonly<Record<BrowserKind, string>> = { bodies: "Bodies", sketches: "Sketches", components: "Components" }
+const KIND_KEY: Readonly<Record<BrowserKind, Key>> = { bodies: "browser.kind.bodies", sketches: "browser.kind.sketches", components: "browser.kind.components" }
+/** Section title of a kind in the current language (read at call time, so a language switch reaches it). */
+export const kindLabel = (kind: BrowserKind): string => t(KIND_KEY[kind])
 const KIND_ORDER: ReadonlyArray<BrowserKind> = ["bodies", "sketches", "components"]
 
 export interface BrowserItem {
@@ -42,15 +46,15 @@ export const partition = <T extends BrowserItem>(
   mode: GroupMode,
   layers: ReadonlyArray<{ readonly id: string; readonly name: string }>
 ): ReadonlyArray<BrowserSection<T>> => {
-  if (mode === "flat") return [{ id: "all", label: "Elements", items }]
+  if (mode === "flat") return [{ id: "all", label: t("browser.section.elements"), items }]
   if (mode === "layer") {
     const known = new Set(layers.map((layer) => layer.id))
     const sections = layers.map((layer) => ({ id: layer.id, label: layer.name, items: items.filter((item) => item.layerId === layer.id) }))
     const orphans = items.filter((item) => !known.has(item.layerId))
-    return orphans.length > 0 ? [...sections, { id: "orphans", label: "No layer", items: orphans }] : sections
+    return orphans.length > 0 ? [...sections, { id: "orphans", label: t("browser.section.noLayer"), items: orphans }] : sections
   }
   return KIND_ORDER
-    .map((kind) => ({ id: kind, label: KIND_LABEL[kind], items: items.filter((item) => classify(item.type) === kind) }))
+    .map((kind) => ({ id: kind, label: kindLabel(kind), items: items.filter((item) => classify(item.type) === kind) }))
     .filter((section) => section.items.length > 0)
 }
 

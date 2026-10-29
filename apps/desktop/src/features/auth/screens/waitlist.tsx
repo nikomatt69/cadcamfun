@@ -33,7 +33,7 @@ export function WaitlistScreen(): JSX.Element {
         </Field>
         <Button tone="primary" type="submit" block disabled={pending() || !email().trim()}>{t("waitlist.submit")}</Button>
         <Show when={done()}><Notice tone="ok">{done()}</Notice></Show>
-        <Show when={error()}><Notice tone="bad">{t("common.error")} — {error()}</Notice></Show>
+        <Show when={error()}><Notice tone="bad">{t("common.error")} {t("dashboard.metric.unavailable")} {error()}</Notice></Show>
       </form>
     </div>
   </div>

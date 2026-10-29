@@ -5,6 +5,7 @@ import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore, type SelectionBounds } from "../store/selectorStore.ts"
+import { t } from "../../../i18n/index.ts"
 
 interface SelectionControlsProps {
   readonly isSelectionMode: boolean
@@ -44,7 +45,7 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
         <button class={`flex items-center px-3 py-1.5 rounded text-sm w-full ${props.isSelectionMode ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
           onClick={() => props.onSelectionModeChange(!props.isSelectionMode)}>
           <Wrench size={16} class="mr-2" />
-          Selection Tool
+          {t("cad.sel.tool")}
         </button>
       </div>
 
@@ -60,7 +61,7 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
       <div class="mb-2 flex items-center">
         <button class={`flex items-center px-2 py-1 rounded text-xs ${props.isMultiSelectMode ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
           onClick={props.onMultiSelectModeToggle}>
-          <Show when={props.isMultiSelectMode} fallback={<><ToggleLeft size={14} class="mr-1" />Multi-select Off</>}>
+          <Show when={props.isMultiSelectMode} fallback={<><ToggleLeft size={14} class="mr-1" />{t("cad.sel.multiOff")}</>}>
             <ToggleRight size={14} class="mr-1" />Multi-select On
           </Show>
         </button>
@@ -70,19 +71,19 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
         <div class="space-y-1">
           <div class="flex space-x-1">
             <button class={ACTION} onClick={toggleVisibility} title={allVisible() ? "Hide selected" : "Show selected"}>
-              <Show when={allVisible()} fallback={<><Eye size={12} class="mr-1" />Show</>}><EyeOff size={12} class="mr-1" />Hide</Show>
+              <Show when={allVisible()} fallback={<><Eye size={12} class="mr-1" />{t("cad.createComponent.show")}</>}><EyeOff size={12} class="mr-1" />{t("cad.createComponent.hide")}</Show>
             </button>
             <button class={ACTION} onClick={toggleLocked} title={allLocked() ? "Unlock selected" : "Lock selected"}>
-              <Show when={allLocked()} fallback={<><Lock size={12} class="mr-1" />Lock</>}><Unlock size={12} class="mr-1" />Unlock</Show>
+              <Show when={allLocked()} fallback={<><Lock size={12} class="mr-1" />{t("cad.lock")}</>}><Unlock size={12} class="mr-1" />{t("browser.unlock")}</Show>
             </button>
           </div>
           <div class="flex space-x-1">
-            <button class={ACTION} onClick={props.onDuplicateSelected} title="Duplicate selected elements"><Copy size={12} class="mr-1" />Duplicate</button>
-            <button class={ACTION} onClick={() => useCADStore.getState().setActiveTool("move")} title="Move selected elements"><Move size={12} class="mr-1" />Move</button>
+            <button class={ACTION} onClick={props.onDuplicateSelected} title={t("cad.explorer.copyTitle")}><Copy size={12} class="mr-1" />{t("cad.ribbon.duplicate")}</button>
+            <button class={ACTION} onClick={() => useCADStore.getState().setActiveTool("move")} title={t("cad.sel.move")}><Move size={12} class="mr-1" />{t("cad.move")}</button>
           </div>
           <div class="relative">
             <button class="w-full flex items-center justify-center px-2 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs"
-              onClick={() => setShowLayerDropdown(!showLayerDropdown())} title="Move to layer">
+              onClick={() => setShowLayerDropdown(!showLayerDropdown())} title={t("cad.sel.moveToLayer")}>
               <Layers size={12} class="mr-1" />Move to Layer
             </button>
             <Show when={showLayerDropdown()}>
@@ -96,12 +97,12 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
             </Show>
           </div>
           <Show when={count() > 1}>
-            <button class="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-xs" onClick={props.onCreateComponent} title="Create component from selection">
-              <Box size={12} class="mr-1" />Create Component
+            <button class="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-xs" onClick={props.onCreateComponent} title={t("cad.sel.createComponent")}>
+              <Box size={12} class="mr-1" />{t("cad.createComponent.title")}
             </button>
           </Show>
-          <button class="w-full flex items-center justify-center px-2 py-1.5 bg-red-500 text-white hover:bg-red-600 rounded text-xs" onClick={props.onDeleteSelected} title="Delete selected elements">
-            <Trash2 size={12} class="mr-1" />Delete
+          <button class="w-full flex items-center justify-center px-2 py-1.5 bg-red-500 text-white hover:bg-red-600 rounded text-xs" onClick={props.onDeleteSelected} title={t("cad.explorer.deleteSelected")}>
+            <Trash2 size={12} class="mr-1" />{t("cad.customElements.delete")}
           </button>
         </div>
       </Show>

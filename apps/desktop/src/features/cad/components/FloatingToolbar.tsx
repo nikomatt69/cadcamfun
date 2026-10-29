@@ -127,11 +127,11 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         </Show>
       }>
         <div class="cad-floating-transforms">
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Move Element")} onClick={() => transform.setMode("translate")}><Move size={16} class="mb-1" /><span>Move</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Rotate Element")} onClick={() => transform.setMode("rotate")}><RotateCcw size={16} class="mb-1" /><span>Rotate</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Scale Element")} onClick={() => transform.setMode("scale")}><Maximize2 size={16} class="mb-1" /><span>Scale</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Duplicate Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.duplicateElement(selected.id) }}><Copy size={16} class="mb-1" /><span>Copy</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Delete Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.deleteElement(selected.id) }}><Trash2 size={16} class="mb-1" /><span>Delete</span></button>
+          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Move Element")} onClick={() => transform.setMode("translate")}><Move size={16} class="mb-1" /><span>{t("cad.move")}</span></button>
+          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Rotate Element")} onClick={() => transform.setMode("rotate")}><RotateCcw size={16} class="mb-1" /><span>{t("cad.rotate")}</span></button>
+          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Scale Element")} onClick={() => transform.setMode("scale")}><Maximize2 size={16} class="mb-1" /><span>{t("cad.scale")}</span></button>
+          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Duplicate Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.duplicateElement(selected.id) }}><Copy size={16} class="mb-1" /><span>{t("cad.ribbon.copy")}</span></button>
+          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Delete Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.deleteElement(selected.id) }}><Trash2 size={16} class="mb-1" /><span>{t("cad.customElements.delete")}</span></button>
           <button class={TOOL_BUTTON} title={`Switch to ${nextView()} View`} onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}><Sliders size={16} class="mb-1" /><span>{nextView()}</span></button>
         </div>
       </Show>
@@ -152,12 +152,12 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         on:pointerdown={start} on:pointermove={move} on:pointerup={stop} on:pointercancel={stop}
         on:lostpointercapture={() => { pointerId = undefined; setDragging(false) }} on:keydown={moveWithKeys}>
         <div class="flex items-center space-x-1">
-          <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={expanded() ? "Collapse" : "Expand"}>
+          <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={expanded() ? t("cad.collapse") : t("cad.expand")}>
             <Show when={expanded()} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
           </Motion.button>
-          <span class="text-xs font-medium text-gray-700 dark:text-gray-200">CAD Tools</span>
+          <span class="text-xs font-medium text-gray-700 dark:text-gray-200">{t("cad.tb.cadTools")}</span>
         </div>
-        <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Close"><X size={14} /></Motion.button>
+        <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={t("cad.drawing.close")}><X size={14} /></Motion.button>
       </div>
 
       <Show when={expanded()}>
@@ -167,7 +167,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
               <Motion.button
                 aria-pressed={mode() === tab} onClick={() => setMode(tab)} hover={{ scale: 1.05 }} press={{ scale: 0.95 }}
                 class={`flex-1 px-2 py-1 text-xs font-medium rounded-md ${mode() === tab ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
-              >{tab === "ai" ? "AI" : tab.charAt(0).toUpperCase() + tab.slice(1)}</Motion.button>}
+              >{tab === "ai" ? t("cad.ai") : tab.charAt(0).toUpperCase() + tab.slice(1)}</Motion.button>}
             </For>
           </div>
           <div class="cad-floating-content">{panel()}</div>

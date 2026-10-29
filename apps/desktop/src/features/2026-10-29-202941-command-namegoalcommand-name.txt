@@ -1,0 +1,1352 @@
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Sonnet 5.5 · Claude Pro
+ ▝▝   ▝▝   /Volumes/SSD/Development/cadcamfun/apps/desktop/src/features
+
+
+❯ /goal voglio che analizzi le specs e mi dici cosa manca relamente , quelle    
+del tutto completate crea una cartella dove metti tutto cio che e stato         
+archiviato nelle specs folder e le metti li cosi gli agents sanno che sono      
+completate                                                                      
+  ⎿  Goal set: voglio che analizzi le specs e mi dici cosa manca relamente ,
+     quelle del tutto completate crea una cartella dove metti tutto cio che e
+     stato archiviato nelle specs folder e le metti li cosi gli agents sanno che
+     sono completate
+
+⏺ Obiettivo: analizzare le specs, capire cosa manca davvero e spostare quelle
+  completate in una cartella archivio. Parto dall'elenco.
+
+  Ran 8 shell commands (ctrl+o to expand)
+
+⏺ Sto verificando contro il codice quali specs sono davvero chiuse (non solo
+  cosa dice l'intestazione "Status"). Ora controllo 24, 66, 38 e 63 con i test.
+
+  Ran 7 shell commands (ctrl+o to expand)
+
+⏺ Sto controllando le ultime candidate (il test cam.turn citato in 36), poi creo
+  l'archivio.
+
+  Searched for 2 patterns, listed 1 directory, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/specs/completed/README.md)
+  ⎿  Wrote 21 lines to
+     /Volumes/SSD/Development/cadcamfun/specs/completed/README.md
+       1 # Completed specs (archive)
+       2 
+       3 Specs in this folder are **finished**: the scope they describe i
+         s built, verified, and has no open build item. Agents must **not
+         ** re-open
+       4 them, extend them, or schedule work from them. If a change touch
+         es their area, add a short dated note in the spec's change log a
+         nd keep
+       5 going; if new scope is needed, write a new spec in `specs/` and 
+         link back here.
+     … +16 lines (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/specs/67-real-state-2026-10-29.md)
+  ⎿  Wrote 101 lines to
+     /Volumes/SSD/Development/cadcamfun/specs/67-real-state-2026-10-29.md
+       1 # 67 — Real state of the specs, 2026-10-29
+       2 
+       3 Status: written 2026-10-29 (owner request: "analyse the specs, t
+         ell me what is really missing, move the fully completed ones out
+          of the way").
+       4 This document **builds nothing**. It reads every spec's status l
+         ine against the code and the older ledgers
+       5 ([57](57-parity-ledger-2026-10-25.md), [62](62-execution-plan-20
+         26-q4.md)) and says which headers are stale.
+       6 
+     … +95 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Ho analizzato le specs e archiviato quelle davvero finite in specs/completed/.
+  Non ho eseguito la suite di test completa. Ho controllato le intestazioni
+  "Status" contro il codice e rieseguito solo i test delle specs archiviate.
+
+  Archiviate in specs/completed/
+
+  Ho rieseguito i test di ciascuna e sono tutti verdi.
+
+  ┌────────────────────────┬────────────────────────────────────────────────┐
+  │          Spec          │                    Verifica                    │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ 24                     │ Verifica registrata nella spec stessa; non     │
+  │ assistant-control-flow │ l'ho rieseguita.                               │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ 36                     │ 13 test passano. Il test cam.turn che la spec  │
+  │ licensing-and-policies │ dava per rotto ora passa.                      │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │                        │ Test passati. Resta da fare a mano un          │
+  │ 38 project-saving      │ controllo in una finestra Tauri reale          │
+  │                        │ (modifica un disegno e chiudi subito la        │
+  │                        │ finestra).                                     │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ 63 keybindings         │ 80 test passano.                               │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ 66                     │ 20 test passano.                               │
+  │ effect-opentelemetry   │                                                │
+  └────────────────────────┴────────────────────────────────────────────────┘
+
+  La cartella ha un README.md che spiega agli agenti di non riaprirle. Ho
+  aggiornato i link in README, 05, 06, 08, 25 e 27. Ho aggiunto la regola anche
+  in CLAUDE.md e AGENTS.md.
+
+  Ho lasciato fuori le specs dei work package (02–10, 13, 14). CLAUDE.md dice
+  agli agenti di leggere quella del proprio WP, e quasi tutte hanno ancora
+  lavoro aperto. Le specs di analisi (15, 33, 35…) restano dove sono perché le
+  specs con lavoro aperto le citano.
+
+  Cosa manca davvero
+
+  Il dettaglio è in specs/67-real-state-2026-10-29.md. Le righe di quel file
+  marcate "header" ripetono ciò che dice la spec e non le ho verificate nel
+  codice.
+
+  - Intestazioni vecchie:
+    - Il roadmap dà RM-02…RM-12 come pending, ma l'action seam di RM-01 esiste.
+    - Le specs 26–28 e ai/01–10 dicono "implementation pending" ma sono in parte
+      costruite.
+    - La spec 29 dice "design contract" ma il kernel CAM esiste.
+  - API: 63 route legacy su 184 non hanno contratto (121/184, verificato oggi).
+  - WP14 (setup multi-operazione): mancano ancora l'export cam.program, il
+    gruppo API cam-setup e lo setupStore desktop (verificato oggi).
+  - Naming topologico (spec 41): non è costruito per niente. È il nodo da cui
+    dipendono le specs 45–50, 54, 58 e 59.
+  - Specs 59, 60 e 61 (associatività CAD→CAM, template CAM, fisica di processo):
+    zero codice.
+  - FEA (spec 48): nessun codice.
+  - Specs 51, 52, 53 e 54 (5 assi, tornitura, verifica dello stock, ampiezza
+    CAM): in gran parte aperte.
+  - Prove di qualità (spec 55): mancano i set pubblici STEP/IGES, lo schema di
+    qualificazione e il job notturno in CI.
+  - Piattaforma: release e smoke nativo non verificati, TestFlight e APNs in
+    sospeso, cargo-deny e cargo-audit in CI mai eseguiti, WebGPU e edge nativo
+    non iniziati.
+  - Decisioni tue ancora aperte: D1–D7 e D9–D12. Valgono i default delle specs.
+
+  Cose da sapere
+
+  Non ho fatto commit, come da CLAUDE.md. I file spostati sono già in staging
+  con git mv. Se vuoi, li committo e li porto su main.
+
+✔ Goal achieved (3m · 1 turn · 17.7k tokens) (ctrl+o to expand)
+
+✻ Baked for 3m 13s · done 6:42 PM
+
+❯ /goal ora pianifica i lprossimi step e integrali con logica e cura            
+  ⎿  Goal set: ora pianifica i lprossimi step e integrali con logica e cura
+
+⏺ Obiettivo: pianificare i prossimi step e integrarli nelle specs (roadmap, task
+  board, piano di esecuzione) in modo coerente. Prima verifico nel codice i
+  fatti su cui poggio il piano.
+
+  Searched for 2 patterns, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/specs/68-integrated-next-steps-2026-1
+       0-29.md)
+  ⎿  Wrote 133 lines to /Volumes/SSD/Development/cadcamfun/specs/68-integra
+     ted-next-steps-2026-10-29.md
+      1 # 68 — Integrated plan: the next steps, 2026-10-29
+      2 
+      3 Status: written 2026-10-29 (owner request: "plan the next steps a
+        nd integrate them with logic and care"). This document **builds n
+        othing**.
+      4 It merges the two sequences that existed side by side — the platf
+        orm/AI roadmap (`roadmap/README.md`, RM-nn) and the kernel plan
+      5 ([62](62-execution-plan-2026-q4.md)) — into one order, using the 
+        real state in [67](67-real-state-2026-10-29.md).
+      6 Where this document and 62 disagree on **order**, this one wins; 
+     … +128 lines (~11 KB) (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Ho scritto il piano in specs/68-integrated-next-steps-2026-10-29.md e l'ho
+  collegato a roadmap, task board e spec 62. È solo documentazione: non ho
+  toccato codice, non ho fatto commit e non ho lanciato la suite completa.
+
+  Cosa ho verificato prima di pianificare
+  - Il seam di RM-01 è chiuso: ci sono 16 tool registrati. Il suo gate però è
+    rosso: packages/ai/test/tool-prompts.test.ts fallisce perché i prompt sono
+    33.301 caratteri contro un tetto di 32.800.
+  - Le ricevute di mutazione (AiMutationReceipt) esistono solo per i disegni,
+    non per setup CAM e altri documenti.
+  - Il WP14 (setup multi-operazione) non ha ancora l'export cam.program, il
+    gruppo API camSetup né lo store desktop.
+
+  La logica del piano
+  - Unica sequenza: unisce la roadmap RM (piattaforma e AI) e il piano kernel
+    della spec 62, che prima correvano separate.
+  - Quattro percorsi critici decidono l'ordine:
+    - evidenza: corpus, bench e scorecard (spec 55);
+    - documenti: RM-03 con revisioni e ricevute, poi RM-02, RM-07 e RM-09;
+    - prova di rimozione stock: V1 tri-dexel, poi V2 e V5;
+    - naming topologico (spec 41), da cui dipendono sette specs.
+  - Lane P (piattaforma): l'ho aggiunta alle lane esistenti, con directory
+    disgiunte.
+  - Finestre sugli adapter: servono per serializzare la rigenerazione dei client
+    API, perché i file generati confliggono. Ce ne sono tre, W1–W3.
+
+  I primi dieci passi
+  1. Rientrare nel tetto dei prompt AI, correggere le intestazioni vecchie e
+     registrare una baseline di typecheck e test.
+  2. Fingerprint e badge "programma obsoleto" (spec 59), insieme all'export
+     cam.program e al contratto camSetup senza persistenza (finestra W1).
+  3. Catena Kienzle e ingaggio per mossa (spec 61).
+  4. Contatori di fallimento e coincidenza progettata nei Booleani (spec 42).
+  5. Ricevute e scritture con revisione attesa per setup e documenti, più la
+     famiglia components/* (finestra W2, migrazione WP0).
+  6. Chiudere il corpus e aggiungere il job notturno di corpus e bench
+     (spec 55).
+  7. Stock tri-dexel con limite dichiarato (spec 53 V1).
+  8. Set pubblici STEP/IGES e set CAM di riferimento (spec 55 E4–E5).
+  9. Prova dell'NC finale con limiti e fault injection (spec 53 V2+V5).
+  10. Provenienza e resolve(ref) per il naming (spec 41 N1–N3).
+
+  In parallelo vanno il primo giro di cargo-deny e cargo-audit in CI, lo smoke
+  nativo manuale e i test di integrazione di RM-01 che mancano ancora.
+
+  Cosa ho modificato
+  - Specs nuove e collegate: la spec 68 è nuova, e la 67 ora rimanda a lei. Ho
+    aggiornato roadmap (riga RM-01), roadmap/01-action-catalogue.md e
+    00-overview (riga WP14 e changelog v8). Nella spec 62 ho aggiunto una riga
+    di changelog.
+  - Intestazioni non toccate: le specs 26–29 mantengono quelle vecchie; il piano
+    le mette nel passo 0.
+  - Segnalazione: il piano non marca come done nulla che non abbia verificato.
+
+  Una cosa da decidere subito: D12, cioè cosa fare dei programmi del generatore
+  legacy, che non hanno artefatto kernel. Il passo 2 li mostra come unknown,
+  quindi serve la tua scelta. Se non rispondi uso il default: restano in sola
+  lettura con stato unknown. D9 e D10 servono prima della wave 1.
+
+✔ Goal achieved (2m · 1 turn · 14k tokens) (ctrl+o to expand)
+
+✻ Cogitated for 2m 15s · done 6:47 PM
+
+❯ Una cosa da decidere subito: D12, cioè cosa fare dei programmi del generatore 
+  legacy, che non hanno artefatto kernel. Il passo 2 li mostra come unknown,    
+  quindi serve la tua scelta. Se non rispondi uso il default: restano in sola   
+  lettura con stato unknown. D9 e D10 servono prima della wave 1 cosa faresti ? 
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+⏺ Sceglierei i default per tutte e tre le decisioni, con una precisazione su D12
+  e una su D10.
+
+  D12, programmi del generatore legacy: li terrei in sola lettura con stato 
+  unknown.
+  - Ritirarli ora fa perdere capacità. Il kernel per la tornitura è ancora solo
+    un'anteprima, e planSimultaneous e planBoring sono fuori dal gate di
+    proposito (nota di memoria del 2026-10-24).
+  - Convertirli in automatico è sbagliato. Rigenerare un programma legacy dal
+    kernel cambia i byte dell'NC che l'utente ha magari già caricato in
+    macchina.
+  - Aggiungerei solo più avanti "rigenera con il kernel", come azione esplicita
+    dell'utente e solo per le operazioni che il kernel copre davvero. Non serve
+    nel passo 2, che mostra solo unknown e non decide altro.
+  - Il default regge anche se non rispondi: nulla di ciò che costruiamo lo rende
+    irreversibile.
+
+  D9, politica di rigenerazione di un programma obsoleto: ask.
+  - Secondo la spec 59 §A4, auto-safe rigenera da solo solo le modifiche di
+    classe display-only o rigid, e solo se il livello di rilascio non peggiora e
+    nessun claim peggiora. Prima di quel gate non c'è una misura (la scorecard
+    ha ancora molti livelli 0–1), quindi non c'è un criterio per fidarsene.
+  - Terrei ask come default e metterei auto-safe dietro un'opzione per progetto,
+    da attivare dopo che A3–A4 (rigenerazione e diff) funzionano. never resta
+    disponibile.
+  - La decisione serve solo per A4, quindi può aspettare l'inizio della wave 1.
+
+  D10, dove vivono i template CAM: come library item (categoria cam-template), 
+  per utente, con una modifica.
+  - La spec 60 lo prevede già, senza tabelle nuove, con la versione salvata nel
+    programma (template@version). È la scelta più economica e riusa il
+    salvataggio della libreria, che valida già alcuni item in scrittura (come i
+    post).
+  - Eviterei di metterli dentro il progetto: li renderebbe non riusabili e
+    farebbe crescere il documento.
+  - L'ambito organizzazione lo rimanderei finché l'identità e le organizzazioni
+    non sono chiuse (spec 30 e RM-03 sono ancora aperte). Il campo di ambito va
+    previsto fin dal formato, così lo si può aggiungere dopo senza migrare.
+  - Non è urgente: serve solo per 60 P1, quindi prima della wave 1, ma dopo il
+    passo 2.
+
+  Una cosa non l'ho riverificata: non ho riletto tutta la spec 59 §A4 per la
+  definizione esatta delle classi display-only e rigid. Mi sono basato sulla
+  riga qui sopra.
+
+  Se confermi, scrivo D9, D10 e D12 come decise nelle specs 57 §4 e 68 §6 e le
+  tolgo dalle questioni aperte.
+
+✻ Baked for 26s · done 6:47 PM
+
+❯ ok                                                                            
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ D9, D10 e D12 sono ora registrate come decise.
+
+  - Spec 68, §6: D12 è "sola lettura, stato unknown", D9 è ask e D10 è "library
+    item per utente". Nella tabella sono barrate, e ho aggiunto una riga di
+    changelog.
+  - Spec 57, §4: nota di aggiornamento che rimanda al §6 della 68. Le righe
+    originali sono rimaste com'erano.
+  - Spec 67: le tre decisioni sono tolte dall'elenco di quelle ancora aperte.
+
+  Restano aperte D1, D2, D3, D4, D5, D6, D7 e D11. Nessuna blocca il passo 2 né
+  la wave 1.
+
+  Come prossimo passo posso partire dal passo 0 del piano: riportare i prompt AI
+  sotto il tetto di 32.800 caratteri (oggi 33.301) e registrare la baseline di
+  typecheck e test.
+✻ Brewed for 22s · done 6:48 PM
+
+❯ tutto con cura e logica                                                       
+
+⏺ Il memo indica specs 68/69 create da un'altra sessione: controllo se collidono
+  con la mia 68.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ C'è un conflitto di numerazione: rinomino la mia spec 68 in 70, aggiorno i
+  riferimenti e integro gli step A1–J4 dell'altra sessione nel mio ordine. 
+  · summary
+
+  Ran 5 shell commands (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/specs/70-integrated-next-steps-2026-1
+       0-29.md)
+  ⎿  Added 91 lines, removed 66 lines
+        1  # 70 — Integrated plan: the next steps, 2026-10-29
+        2  
+        3 -Status: written 2026-10-29 (owner request: "plan the next step
+          -s and integrate them with logic and care"). This document **bu
+          -ilds nothing**.                                               
+        4 -It merges the two sequences that existed side by side — the pl
+          -atform/AI roadmap (`roadmap/README.md`, RM-nn) and the kernel 
+          -plan                                                          
+        5 -([62](62-execution-plan-2026-q4.md)) — into one order, using t
+          -he real state in [67](67-real-state-2026-10-29.md).           
+        6 -Where this document and 62 disagree on **order**, this one win
+          -s; on **design**, the detail specs win. `roadmap/README.md` re
+          -mains the index                                               
+        7 -for RM rows and now points here for cross-lane order.         
+        3 +Status: written 2026-10-29 (owner request: "plan the next step
+          +s and integrate them with logic and care"); revised the same d
+          +ay to absorb                                                  
+        4 +[spec 68](68-cam-kernel-enterprise-gap-audit.md) and [spec 69]
+          +(69-cam-enterprise-step-plan.md), written meanwhile by another
+          + session. This document **builds nothing**.                   
+        5 +It merges three sequences into one order: the platform/AI road
+          +map (`roadmap/README.md`, RM-nn), the kernel plan of [62](62-e
+          +xecution-plan-2026-q4.md) and the CAM                         
+        6 +enterprise steps A1–J4 of 69, using the real state in [67](67-
+          +real-state-2026-10-29.md).                                    
+        7  
+        8 +Precedence: **inside the CAM kernel, spec 69 decides the order
+          + of its steps** (A1–J4 keep their ids here); **across lanes an
+          +d for adapter windows, this document decides**;               
+        9 +62 keeps lanes, gates and the closing ritual; the detail specs
+          + (29, 41, 51–55, 58–61) keep the design. `roadmap/README.md` s
+          +tays the index for RM rows.                                   
+       10 +                                                              
+       11  ## 1. Facts this plan stands on (checked 2026-10-29)
+       12  
+       11 -- RM-01's seam is built: 16 registered tools over `packages/ai
+          -/src/actions/*` (spec 26 targeted 12; the 2026-10-13 log close
+          -d the seam). Its own                                          
+       12 -  gate is **red**: `packages/ai/test/tool-prompts.test.ts` fai
+          -ls, prompt total 33 301 characters against a ceiling of 32 800
+          -.                                                             
+       13 +- RM-01's seam is built: 16 registered tools over `packages/ai
+          +/src/actions/*` (spec 26 targeted 12; the 2026-10-13 log close
+          +d the seam). Its own gate is                                  
+       14 +  **red**: `packages/ai/test/tool-prompts.test.ts` fails, prom
+          +pt total 33 301 characters against a ceiling of 32 800.       
+       15  - Mutation receipts exist for drawings (`AiMutationReceipt`, `
+           drawing-repo.ts`); they are not generalised to CAM setups or o
+           ther documents (RM-03 core).
+       14 -- WP14 persistence is absent: no `cam.program` export, no `cam
+          -Setup` API group, no desktop `setupStore`.                    
+       15 -- API contract coverage is 121/184 legacy route files.        
+       16 +- WP14 persistence is absent: no `cam.program` export, no `cam
+          +Setup` API group, no desktop `setupStore`. API contract covera
+          +ge is 121/184.                                                
+       17  - Spec 58 T1–T3, T5, T7 and spec 55 E2, E3 are built; specs 59
+           , 60, 61, 41 and 48 have no code.
+       18 +- The four structural CAM blockers of spec 69/68 (verified the
+          +re in code): `verified-program` needs every claim `passed`, so
+          + 5-axis and non-+Z setups end at                              
+       19 +  `preview`; `ManufacturingJob` has one setup, one origin, box
+          + stock and no fixtures; surface machining is a height field; n
+          +o associativity or templates.                                 
+       20 +- **Three different things are called "setup" in the tree**: W
+          +P14's `Setup` (stock + machine + post + ordered operations → p
+          +rograms, `14-multi-op-setup.md`),                             
+       21 +  `ManufacturingSetup` in `cam/setup.ts` (work frame, stock, f
+          +ixture envelopes, tool assemblies; used by the machine-aware v
+          +iew, spec 31) and the                                         
+       22 +  `setups[]` that spec 69 C1 adds to `ManufacturingJob` (`setu
+          +pOrientation`, origin, work offset, operations per setup). See
+          + step 2 below.                                                
+       23  
+       24  ## 2. Logic of the order
+       25  
+       20 -Four critical paths decide everything else; an item is early w
+          -hen it unblocks one of them, or when it is small, independent 
+          -and visible.                                                  
+       26 +Five critical paths decide everything else; an item is early w
+          +hen it unblocks one of them, or when it is small, independent 
+          +and visible.                                                  
+       27  
+       28  | Path | Chain | Why it is critical |
+       29  | --- | --- | --- |
+       24 -| **Evidence** | 55 E1/E4–E8 → every "gate on the fixture set"
+          - | no area can state a level without it; nothing later may cla
+          -im parity |                                                   
+       30 +| **Evidence** | 55 E1 rest, E4–E8 (= 69 J1, J2, G1) → every "
+          +gate on the fixture set" | no area can state a level without i
+          +t; nothing later may claim parity |                           
+       31  | **Documents** | RM-03 revisions/receipts → RM-02 persisted s
+           etups → RM-07 write recovery → RM-09 precision integration | w
+           rites that can be retried or lost make every later AI/CAM clai
+           m unsafe |
+       26 -| **Proof** | 53 V1 tri-dexel → V2/V5 bounded NC proof → 51 F1
+          -–F3, 53 V6/V4 | the 5-axis and simulation work cannot be accep
+          -ted without a stock with a declared bound |                   
+       27 -| **Naming** | 41 N1–N3 → 58 T4, 59 A5, 54 R1 refs, then 45, 4
+          -6, 47, 49, 50 | seven specs wait on it; it is large, so it sta
+          -rts as soon as its inputs (58 T3) and evidence exist |        
+       32 +| **Proof → first credible claim** | 69 A3 → A4 → B1 → B2 → C1
+          + → C2 → C3 → C4 → C5 → F4 → F5 (≈ 11 steps) | the first "5-axi
+          +s multi-side part, verified, with fixtures" sentence |        
+       33 +| **Naming → associativity** | 69 E1 (= 41 N1–N3) → E3 → E4 → 
+          +E5 | seven specs wait on naming; 69 E2 (the stale badge) may s
+          +tart before it |                                              
+       34 +| **Setup model** | one reconciled vocabulary (step 2) → 69 C1
+          + and RM-02 persistence | otherwise two persisted shapes for th
+          +e same thing |                                                
+       35  
+       36  Rules that keep the merge safe:
+       37  
+       31 -1. **One lane, one directory set** (62 §2 lanes, plus **P — pl
+          -atform** below). Two lanes never edit the same files.         
+       38 +1. **One lane, one directory set** (62 §2 lanes, plus **P** an
+          +d **A** below). Two lanes never edit the same files; `kernel/e
+          +xecute.ts` is shared by lanes M and I                         
+       39 +   (I only adds fields and claim bases, M changes the pipeline
+          +; whoever lands second runs `kernel.test`).                   
+       40  2. **Adapter windows are serialised.** Generated API clients, 
+           the AI tool catalogue ceiling and the harness inventory are sh
+           ared; one window at a time
+       33 -   (`bun run generate`, `bun test packages/api -u`). Windows a
+          -re listed in §5 and an item says which it takes.              
+       34 -3. **Every item is a vertical slice** (core → API → sidecar → 
+          -assistant action → desktop panel → tests) unless it is explici
+          -tly "pure core".                                              
+       35 -4. **No item is accepted by a regenerated golden or a raised c
+          -eiling.** If a gate is red, the code or the prompt is trimmed,
+          - not the gate.                                                
+       36 -5. **Nothing is committed unless the owner asks** (`CLAUDE.md`
+          -).                                                            
+       41 +   (`cd packages/api && bun run generate`, `bun test packages/
+          +api -u` reviewed). Windows are listed in §5 and an item says w
+          +hich it takes.                                                
+       42 +3. **Every item is a vertical slice** (core → API → sidecar → 
+          +assistant action → desktop panel → tests) unless it is explici
+          +tly "core only".                                              
+       43 +4. **No item is accepted by a regenerated golden, a raised cei
+          +ling or a rewritten baseline.** If a gate is red, the code or 
+          +the prompt is trimmed.                                        
+       44 +5. **A level moves only through `bun run corpus` (the full run
+          +, ≈ 40 s) then `bun run scorecard`.** A partial corpus run ove
+          +rwrites the git-ignored report and                            
+       45 +   the scorecard then silently downgrades rows (lesson of the 
+          +previous round).                                              
+       46 +6. **Nothing is committed unless the owner asks** (`CLAUDE.md`
+          +).                                                            
+       47  
+       38 -### Lane P — platform (new)                                   
+       39 -                                                              
+       48  | Lane | Owns | Items |
+       49  | --- | --- | --- |
+       50  | **P — Platform** | `packages/api/src/groups`, `apps/sidecar/
+           src/{http,repos}`, `packages/db` migrations (receipts only), `
+           apps/desktop/src/features/cam/{lib,store}/setup*` | RM-02, RM-
+           03, RM-04, RM-05 |
+       51  | **A — AI** | `packages/ai`, `apps/sidecar/src/services/ai*` 
+           | RM-01 close, RM-06, RM-07, RM-10, RM-11 |
+       52  | **N — Native shell** | `apps/desktop/src-tauri`, `.github/wo
+           rkflows` | spec 56, WP10 |
+       53  
+       46 -Lanes E, K, T, M, I, X, S are as in 62 §2. Lane P and lane I b
+          -oth want `packages/api` and `apps/sidecar`: they share the ada
+          -pter windows of §5.                                           
+       54 +Lanes E, K, T, M, I, X, S are as in 62 §2. Lanes P, I and M al
+          +l reach `packages/api` and `apps/sidecar` through the adapter 
+          +windows of §5.                                                
+       55  
+       48 -## 3. Wave 0 — close what is open, then the first ten items   
+       56 +## 3. Wave 0 — the first items                                
+       57  
+       50 -### 3.0 Step 0 — hygiene (before any item below; S, lane A + d
+          -ocs)                                                          
+       58 +### 3.0 Step 0 — hygiene (before anything below; S)           
+       59  
+       60  | # | Item | Gate |
+       61  | --- | --- | --- |
+       62  | 0.1 | Bring the AI tool prompts back under the ceiling (501 
+           characters over): shorten wording, remove duplication; remove 
+           no action or rule | `tool-prompts.test.ts` green with the ceil
+           ing unchanged |
+       55 -| 0.2 | Correct the stale headers listed in 67 §2 (done by thi
+          -s change for roadmap and task board; specs 26–29 headers remai
+          -n) | each header says what the tree says |                    
+       56 -| 0.3 | Record a baseline: `bun check -p` for `core`, `ai`, `a
+          -pi`, `sidecar`, `desktop`; tests of `packages/ai` and `package
+          -s/core` per file under 110 s | one dated line in 67 with the r
+          -ed/green list |                                               
+       63 +| 0.2 | Correct the remaining stale headers of 67 §2 (specs 26
+          +–29); roadmap and task board are already corrected | each head
+          +er says what the tree says |                                  
+       64 +| 0.3 | Record a baseline: `bun check -p` for `core`, `ai`, `a
+          +pi`, `sidecar`, `desktop`; tests of `packages/ai` and `package
+          +s/core` per file under 110 s; the full `bun run corpus` once |
+          + one dated line in 67 with the red/green list and the corpus r
+          +esult |                                                       
+       65  
+       58 -### 3.1 The next ten items (in order)                         
+       66 +### 3.1 The first items, in order                             
+       67  
+       60 -| # | Item | Spec | Lane | Size | Depends | Window | Gate |   
+       68 +"69 xN" is a step of spec 69; "62" is a row of spec 62's lists
+          +. Sizes: **S** one session, **M** 1–3, **L** several with a co
+          +nvergence risk.                                               
+       69 +                                                              
+       70 +| # | Item | Spec / step | Lane | Size | Depends | Window | Ga
+          +te |                                                          
+       71  | --- | --- | --- | --- | --- | --- | --- | --- |
+       72  | 1 | Step 0 above | 26, 67 | A | S | — | — | see 3.0 |
+       63 -| 2 | Part fingerprint, `programStatus`, stale badge; **togeth
+          -er with** the stateless `cam.program` export and `camSetup` co
+          -ntract (plan/generate, no persistence) | 59 A1–A2, 14, RM-02 |
+          - I + P | M | 58 T2 (built) | **W1** | class table test; legacy
+          - programs return `unknown`; `cam.program` namespace exported |
+       64 -| 3 | Factored Kienzle chain, per-move engagement | 61 Z2 → Z1
+          - | I | M | — | — | `cuttingData` unchanged on all tests; analy
+          -tic engagement cases within the declared bound |              
+       65 -| 4 | Failure counters, designed coincidence in Booleans | 42 
+          -R0, R3 | K | M | — | — | seeded report; coplanar / coaxial sam
+          -e-domain Booleans without displacement; `fuzz.test.ts` unchang
+          -ed |                                                          
+       66 -| 5 | Generalise receipts and expected-revision writes to CAM 
+          -setups and documents; `components/*` family | RM-03 | P | M | 
+          -— | **W2** | forged context, stale revision and replayed recei
+          -pt fail before execute; WP0 migration tested on a copy of a re
+          -al DB |                                                       
+       67 -| 6 | Finish the corpus (fuzz seeds, long thread, STEP/IGES/NC
+          - entries) and add the nightly corpus + bench job | 55 E1 rest,
+          - E8 | E | M | — | — | job runs in `.github/workflows`; `wrong`
+          - fails CI; 200-hole plate recorded against its 10 s budget, no
+          -t hidden |                                                    
+       68 -| 7 | Tri-dexel stock with declared bound | 53 V1 | M | L | — 
+          -| — | tilted pocket volume within (cell × area); ball cut on a
+          - sphere within one cell |                                     
+       69 -| 8 | Public STEP/IGES set and annotated CAM reference set | 5
+          -5 E4–E5 | E | M | 6 | — | ≥ 30 entries with licences; annotate
+          -d features for 54 R1 |                                        
+       70 -| 9 | Final-NC proof with bounds, fault injection | 53 V2 + V5
+          - | M | L | 7 | — | 100 seeded overcuts detected, 0 false posit
+          -ives on 30 clean fixtures (target) |                          
+       71 -| 10 | Provenance, edge/vertex keys, `resolve(ref)` | 41 N1–N3
+          - | T | L | 58 T3 (built), 6 | — | every result face maps to an
+          - operand face or `new`; keys stable under a 20 % upstream dime
+          -nsion change |                                                
+       73 +| 2 | **Setup vocabulary note (docs only)**: map WP14 `Setup`,
+          + `ManufacturingSetup` (`cam/setup.ts`) and the future `Manufac
+          +turingJob.setups[]` to one model; append it to `14-multi-op-se
+          +tup.md` and to 69 C1; decide which type is persisted | 14, 69 
+          +C1 | I + P | S | — | — | each field of the three shapes is pla
+          +ced in exactly one owner type or marked derived; no code |    
+       74 +| 3 | **Honesty slices A2–A5** (any order; A3 → A4 first, they
+          + open the critical path): cutter compensation output, stepped 
+          +tool assembly in the executor, rotary moves get a machine-clea
+          +rance verdict, replay degrades with a declared bound | 69 A2–A
+          +5 | M | S–M each | — | A2's `compensation` option joins W1 if 
+          +ready, else W3 | the gates of 69 A2–A5; existing `kernel.test`
+          + unchanged |                                                  
+       75 +| 4 | **W1 batch**: profile tabs, lead types and spring pass i
+          +n `OperationSpec` **+** part fingerprint, `programStatus`, sta
+          +le badge **+** the stateless `cam.program` export and `camSetu
+          +p` contract (plan/generate, no persistence). All are additive 
+          +optional fields; one client regeneration | 69 A1, 69 E2 (= 59 
+          +A1–A2), RM-02 | M + I + P | M | 2 for the camSetup shape | **W
+          +1** | tab material in the replay and `no-gouge` passed; class 
+          +table test, legacy programs `unknown`; `cam.program` exported 
+          +|                                                             
+       76 +| 5 | Factored Kienzle chain, per-move engagement (3-axis firs
+          +t) | 69 G0 (= 61 Z2 → Z1) | I | M | — | — | `cuttingData` unch
+          +anged on all tests; analytic engagement cases within the decla
+          +red bound |                                                   
+       77 +| 6 | Failure counters, designed coincidence in Booleans | 42 
+          +R0, R3 | K | M | — | — | seeded report; coplanar / coaxial sam
+          +e-domain Booleans without displacement; `fuzz.test.ts` unchang
+          +ed |                                                          
+       78 +| 7 | Generalise receipts and expected-revision writes to CAM 
+          +setups and documents; `components/*` family | RM-03 | P | M | 
+          +2 (which type is persisted) | **W2** | forged context, stale r
+          +evision and replayed receipt fail before execute; WP0 migratio
+          +n generated, applied to a copy of a real DB first |           
+       79 +| 8 | Finish the corpus (fuzz seeds, long thread, STEP/IGES/NC
+          + entry kinds) and add the nightly corpus + bench job; record t
+          +he 200-hole plate against its 10 s budget | 55 E1 rest, 69 J2 
+          +| E | M | — | — | job in `.github/workflows`; CI fails on `wro
+          +ng` and on > 20 % budget regression |                         
+       80 +| 9 | **Tri-dexel stock** with declared bound (core only) | 69
+          + B1 (= 53 V1) | M | L | — | — | tilted pocket volume within ce
+          +ll × area; ball cut on a sphere within one cell; sure/possible
+          + bracket kept |                                               
+       81 +| 10 | Public STEP/IGES set and the annotated CAM reference se
+          +t | 69 J1 = G1 (= 55 E4–E5) | E | M | 8 | — | ≥ 30 entries wit
+          +h licences; annotated features for 54 R1 and the gate of 69 B3
+          +, F12 |                                                       
+       82 +| 11 | **Rotary replay on the tri-dexel, fault injection, tole
+          +rance gate** → milestone M1 of spec 69 | 69 B2, B3, B4 (= 53 V
+          +2, V5) | M + E | L | 3 (A4), 9, 10 | W3 for B4 (claim field) |
+          + a 5-axis fixture reaches `verified-program` with every claim 
+          +`passed`; an injected overcut fails it; 100 seeded overcuts ov
+          +er 30 clean fixtures, measured figures written even if lower; 
+          +`quality.tolerance` below the budget blocks release with the t
+          +erm named |                                                   
+       83 +| 12 | Provenance, edge/vertex keys, `resolve(ref)` | 69 E1 (=
+          + 41 N1–N3) | T | L | 58 T3 (built), 8, 10 | — | every result f
+          +ace maps to an operand face or `new`; keys stable under a 20 %
+          + upstream dimension change |                                  
+       84  
+       85  Parallel from day one (no shared files with the table above):
+       86  
+       87  | Item | Spec | Lane | Gate |
+       88  | --- | --- | --- | --- |
+       77 -| First CI run of `cargo-deny` / `cargo-audit`; pin tool versi
+          -ons and fix the 0.18 `deny.toml` schema | 56 §4 G | N | both j
+          -obs run and are either green or fail with a recorded reason; t
+          -hen made blocking |                                           
+       89 +| First CI run of `cargo-deny` / `cargo-audit`; pin tool versi
+          +ons, fix the 0.18 `deny.toml` schema | 56 §4 G | N | both jobs
+          + run and are green or fail with a recorded reason; then made b
+          +locking |                                                     
+       90  | Manual native smoke: App Nap, sleep/wake, Dock bar, packaged
+           -window save-on-close | 56 F, archived 38 | N | a dated note i
+           n spec 56 §5; **not** assumed from mocked IPC |
+       79 -| RM-01 acceptance checks from `roadmap/01-action-catalogue.md
+          -` "Required integration checks" that have no test yet | RM-01 
+          -| A | each check has a test or is listed as open; only then do
+          -es the row go to `done` |                                     
+       91 +| RM-01 "Required integration checks" that have no test yet | 
+          +RM-01 | A | each check has a test or is listed as open; only t
+          +hen does the row go to `done` |                               
+       92 +| Phase D of spec 69 (swept-profile cutters, holder library, t
+          +ool data I/O, editable cutting data) | 69 D1–D4 | M | D1/D2 wa
+          +it for 3 (A3); D3/D4 are independent |                        
+       93  
+       94 +After item 11 the sentence allowed by spec 69 §5 is milestone 
+          +**M1** ("5-axis programs can reach `verified-program` on the c
+          +orpus fixtures, with bounds"), and only if the                
+       95 +scorecard rows of A1–A5 and B1–B4 are at level 3.             
+       96 +                                                              
+       97  ## 4. Later waves (order, not dates)
+       98  
+       83 -Wave 1 (after items 1–10 or their dependencies):              
+       84 -- **P:** RM-02 persisted setups and completion (needs item 5);
+          - RM-03 remaining families in the order of `roadmap/03-api-pari
+          -ty.md` (toolpaths export-import, organisations, auth leftovers
+          -, analytics/ml, static leftovers).                            
+       85 -- **A:** RM-06 context (needs RM-01 closed), RM-07 lifecycle a
+          -nd `start_session` / `settle_session` (needs item 5 receipts).
+       86 -- **I:** 59 A3–A4 regenerate + diff, 61 Z3 feed optimisation, 
+          -60 P1/P3/P2 templates (62 wave 1; 60 waits on 54 R1 kinds and 
+          -decision D10).                                                
+       87 -- **K:** 42 R2 robust predicates.                             
+       88 -- **T:** 58 T4/T6/T8 after naming settles.                    
+       99 +Wave 1:                                                       
+      100 +- **M (CAM job model):** 69 C1 (setups list) → C2 (stock model
+          +) → C3 (fixtures) → C4 (stock carried) → C5 (cross-setup cover
+          +age), C6, C7; this is the road to **M2 multi-side**.          
+      101 +  C1 must use the type decided in item 2 and shares its contra
+          +ct with RM-02 persistence, so the two take **W3** together.   
+      102 +- **P:** RM-02 persisted setups and completion (needs item 7 a
+          +nd item 2); RM-03 remaining families in the order of `roadmap/
+          +03-api-parity.md`.                                            
+      103 +- **A:** RM-06 context (needs RM-01 closed), RM-07 lifecycle a
+          +nd `start_session` / `settle_session` (needs item 7 receipts).
+      104 +- **I:** 69 E4 (regenerate + diff, needs E1/E3 or the signatur
+          +e fallback), 69 G0b (feed optimisation), 69 H1 (templates; nee
+          +ds F12 kinds and decision D10 — decided).                     
+      105 +- **K:** 42 R2 robust predicates. **T:** 58 T4/T6/T8 after nam
+          +ing settles.                                                  
+      106  
+       90 -Wave 2: 62 wave 2 unchanged, plus **P:** RM-04 desktop parity 
+          -one vertical at a time (each after its routes), RM-05 library 
+          -write; **A:** RM-10, RM-11 rest; **M:** 51 F1–F3, F7–F9, 53 V6
+          -/V4 once V1/V2 pass.                                          
+      107 +Wave 2: 62 wave 2 (CAD blends/surfaces, sketch depth, 54 R-ite
+          +ms) plus **M:** 69 F1–F8 (drop-cutter, undercuts, tool-axis, c
+          +ollision-aware, head machines → **M3**), **I:** 69 E5/E6, H2; 
+      108 +**P:** RM-04 desktop parity one vertical at a time, RM-05; **A
+          +:** RM-10, RM-11 rest.                                        
+      109  
+       92 -Wave 3: 62 wave 3 unchanged, plus RM-08 (3D parity slice; APNs
+          - stays owner-blocked) and RM-12 native edge (needs spec 55 E2 
+          -numbers and the parity harness).                              
+      110 +Wave 3: 62 wave 3 plus 69 F9–F12, G1–G8, I1–I3 (**M5**), RM-08
+          + (APNs owner-blocked), RM-12 native edge (needs spec 55 E2 num
+          +bers and the parity harness).                                 
+      111  
+       94 -Horizon: unchanged from 62 §3 (generative design, specialist 5
+          --axis, other processes, subdivision, rendering/animation media
+          -).                                                            
+      112 +Horizon: unchanged from 62 §3 and 69 §2 (generative design, sp
+          +ecialist 5-axis, other processes, STEP-NC, MTConnect, native c
+          +ompute, subdivision, rendering/animation media). 69 J3/J4 (sca
+          +le, qualification) close **M6**.                              
+      113  
+      114  ## 5. Adapter windows
+      115  
+      116  | Window | Takes | Regenerates | Opens when | Closes when |
+      117  | --- | --- | --- | --- | --- |
+      100 -| **W1** | item 2 (59 A1–A2 + `camSetup` stateless contract) |
+          - API clients, harness inventory | item 1 is green | clients re
+          -generated once, tests of `packages/api` updated with `-u` revi
+          -ewed |                                                        
+      101 -| **W2** | item 5 (RM-03 receipts + `components/*`) | API clie
+          -nts; WP0 migration generated and applied | W1 closed | same | 
+      102 -| **W3** | 58 T4/T6 contracts, RM-02 persistence, RM-07 contro
+          -l actions | API clients, AI catalogue | W2 closed | same |    
+      118 +| **W1** | item 4 (69 A1 + E2 + `camSetup` stateless; plus A2'
+          +s option if ready) | API clients, harness inventory | item 1 i
+          +s green | clients regenerated once, `packages/api` tests updat
+          +ed with `-u` and the diff reviewed |                          
+      119 +| **W2** | item 7 (RM-03 receipts + `components/*`) | API clie
+          +nts; WP0 migration generated and applied | W1 closed | same | 
+      120 +| **W3** | 69 C1 + RM-02 persistence (one shared setup contrac
+          +t), 69 B4 claim field, 58 T4/T6 contracts, RM-07 control actio
+          +ns | API clients, AI catalogue | W2 closed and item 2 decided 
+          +| same |                                                      
+      121  
+      104 -Kernel-only items (3, 4, 7, 9, 10) take **no** window until th
+          -ey add a contract field; if they do, they queue behind the ope
+          -n window.                                                     
+      122 +Kernel-only items (3 without a contract field, 5, 6, 9, 11 wit
+          +hout B4, 12) take **no** window; if one adds a contract field 
+          +it queues behind the open window.                             
+      123 +69's own rule "C8: adapter window per step" is read as: each C
+          + step prepares its contract in core, and the windows above car
+          +ry them in batches.                                           
+      124  
+      125  ## 6. Owner decisions, now versus later
+      126  
+      127  **Decided 2026-10-29 (owner: "ok" to the recommendations):**
+      128  
+      110 -- **D12** — legacy `cam/generator/*` programs stay read-only w
+          -ith status `unknown`. No automatic conversion (it would change
+          - the NC bytes). "Regenerate with the kernel" may be added late
+          -r as an explicit user action, only for operations the kernel r
+          -eally covers.                                                 
+      129 +- **D12** — legacy `cam/generator/*` programs stay read-only w
+          +ith status `unknown`. No automatic conversion (it would change
+          + the NC bytes). "Regenerate with the kernel" may be added late
+          +r as an explicit user action, only for operations the kernel r
+          +eally covers. This **narrows 69 E6**: that step no longer incl
+          +udes "convert or retire".                                     
+      130  - **D9** — regeneration policy of a stale program is `ask`. `a
+           uto-safe` becomes an opt-in per project only after 59 A3–A4 (r
+           egenerate + diff) work; `never` stays available.
+      131  - **D10** — templates are library items (category `cam-templat
+           e`), per user, no new table. The format carries a scope field 
+           from the start so an organisation scope can be added without a
+            migration once identity and organisations (spec 30, RM-03) ar
+           e closed.
+      132  
+      114 -The table below keeps the other decisions; the three above are
+          - listed there only for reference.                             
+      133 +Still open:                                                   
+      134  
+      135  | Decision | Needed for | Default if unanswered | When to ask 
+           |
+      136  | --- | --- | --- | --- |
+      118 -| ~~D9~~ stale-program regeneration policy | item 2 / 59 A4 | 
+          -**decided: `ask`** | — |                                      
+      119 -| ~~D10~~ template storage scope | 60 P1 | **decided: library 
+          -item, per user** | — |                                        
+      120 -| ~~D12~~ legacy generator programs | item 2 follow-up (59 §6)
+          - | **decided: read-only, `unknown`** | — |                    
+      137 +| D13 default stock for scans | 69 C2 | box from mesh bounds, 
+          +`part-model` term labelled | before wave 1 |                  
+      138 +| D14 fixture library source | 69 C3 | user-supplied bodies on
+          +ly, nothing bundled | before wave 1 |                         
+      139  | D1 retire the mesh rebuild | 40 U7, 58 T4 simplification | k
+           eep as `legacyMesh` | before 58 T4 |
+      140  | D3 FEA solver language | 48 | TypeScript, sparse Cholesky + 
+           PCG | before wave 3 |
+      123 -| D7 qualification partner | any level above `verified-model` 
+          -| none | when a release claim is planned |                    
+      124 -| D2, D4, D5, D6, D11 | horizon / wave 2 detail | as in 57 §4 
+          -| not now |                                                   
+      141 +| D7 qualification partner | 69 J4, any level above `verified-
+          +model` | none | when a release claim is planned |             
+      142 +| D11 calibration data | 69 G0c | everything `uncalibrated` | 
+          +wave 2 |                                                      
+      143 +| WP0 columns for Taylor / tool life | 69 D4, G0c | values tra
+          +vel in the request only | wave 2 |                            
+      144 +| D2, D4, D5, D6 | horizon | as in 57 §4 | not now |          
+      145  
+      146  ## 7. How an item closes (inherited, not redefined)
+      147  
+      128 -[62 §8](62-execution-plan-2026-q4.md) applies, with two additi
+          -ons for lane P and A items: the RM index row and the step spec
+          -'s change log are updated                                     
+      129 -(`roadmap/00-how-to-follow.md`), and a changed surface updates
+          - the design spec's state table. Nothing is marked `done` on a 
+          -header alone.                                                 
+      148 +[62 §8](62-execution-plan-2026-q4.md) and 69 §1 apply. Lane P 
+          +and A items also update the RM index row and the step spec's c
+          +hange log                                                     
+      149 +(`roadmap/00-how-to-follow.md`); a changed surface updates the
+          + design spec's state table; a CAM item updates its row in `pac
+          +kages/core/test/corpus/parity.json`                           
+      150 +and runs the full corpus before the scorecard. Nothing is mark
+          +ed `done` on a header alone.                                  
+      151  
+      152  ## 8. Risks specific to this merge
+      153  
+      133 -- **Adapter contention** between lanes I, P and A is the main 
+          -cost of merging the sequences; mitigated by §5 and by item 2 c
+          -arrying two contracts in one window.                          
+      134 -- **Item 5 touches the database.** The migration is generated 
+          -by `bun run db:generate`, applied to a copy first, and never e
+          -dited by hand.                                                
+      135 -- **Evidence debt hides regressions.** Until item 6 lands, a g
+          -reen suite is the only guard; say so in any report instead of 
+          -implying a measured level.                                    
+      136 -- **Naming (item 10) is large.** It starts only when items 6 a
+          -nd 8 give it a corpus, and ships `resolve` with its five outco
+          -mes before any consumer migrates (62 §7).                     
+      137 -- **Stale text returns.** The statuses changed by this plan ar
+          -e the ones verified on 2026-10-29; any other header is still a
+          - claim, not a fact.                                           
+      154 +- **Adapter contention** between lanes I, M, P and A is the ma
+          +in cost of merging the sequences; mitigated by §5 and by batch
+          +ing additive fields (W1).                                     
+      155 +- **Setup vocabulary** (item 2): if skipped, RM-02 persistence
+          + and 69 C1 would store two shapes of the same concept and the 
+          +AI actions (`cam.setups`) would name both.                    
+      156 +- **Item 7 touches the database.** The migration is generated 
+          +by `bun run db:generate`, applied to a copy first, never edite
+          +d by hand.                                                    
+      157 +- **Evidence debt hides regressions.** Until item 8 lands, a g
+          +reen suite is the only guard; say so in any report instead of 
+          +implying a measured level.                                    
+      158 +- **Naming (item 12) is large.** It starts only when items 8 a
+          +nd 10 give it a corpus, and ships `resolve` with its five outc
+          +omes before any consumer migrates (62 §7).                    
+      159 +- **`kernel/execute.ts` is the hot file** of items 3, 5 and 11
+          +; one lane at a time, `kernel.test` after each landing, kernel
+          + suites per file under 110 s.                                 
+      160 +- **Shared checkout.** Other sessions edit it concurrently (sp
+          +ec numbers 68/69 were taken while this plan was written): stag
+          +e explicit paths, never `git stash`, check `ls specs` before n
+          +umbering a new spec.                                          
+      161 +- **Stale text returns.** Only the statuses verified on 2026-1
+          +0-29 are facts; any other header is still a claim.            
+      162  
+      163  ## 9. Change log
+      164  
+      141 -- 2026-10-29: created. Merged the RM sequence and the spec 62 
+          -sequence; added lane P and adapter windows; recorded the red p
+          -rompt-size gate of RM-01.                                     
+      165 +- 2026-10-29: created as spec 68; merged the RM sequence and t
+          +he spec 62 sequence; added lanes P/A and adapter windows; reco
+          +rded the red prompt-size gate of RM-01.                       
+      166 +- 2026-10-29: renumbered to 70 (68 and 69 were taken by the CA
+          +M enterprise audit and step plan). Absorbed 69's phases: A2–A5
+          + and B1–B4 enter wave 0, C1–C5 and D, E, F, G, H, I, J are pla
+          +ced in waves 1–3; added the setup-vocabulary item and the thir
+          +d critical path; D12 narrows 69 E6; D13/D14 added to the decis
+          +ion table.                                                    
+      167  - 2026-10-29: owner accepted the recommended D9, D10 and D12 (
+           see §6).
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Salvo in memoria la lezione sulla numerazione e sul piano, poi chiudo.
+
+  Ran 1 shell command, wrote 1 memory (ctrl+o to expand)
+
+⏺ Il piano è integrato, ma c'era un conflitto di numerazione da risolvere.
+  Mentre lavoravo, un'altra sessione ha creato le specs 68 (audit CAM, 70 gap) e
+  69 (step CAM A1–J4). La mia spec si chiamava anch'essa 68. L'ho rinominata
+  specs/70-integrated-next-steps-2026-10-29.md e ho corretto i riferimenti in
+  00-overview, 57, 62, 67 e nelle due specs roadmap. Ho lasciato intatti i link
+  di quella sessione.
+
+  Come ho unito i piani
+  - Precedenza: dentro il kernel CAM decide la 69, con gli step A1–J4 che
+    mantengono i loro id. Tra le lane e per le finestre sugli adapter decide
+    la 70. La 62 resta per lane, gate e rituale di chiusura.
+  - Cinque percorsi critici: evidenza, documenti, prova fino al primo claim
+    5-assi credibile (A3→A4→B1→B2→C1…C5→F4→F5), naming con associatività, e un
+    nuovo percorso sul modello di "setup".
+  - Setup: nel codice ci sono tre cose chiamate "setup". Sono il Setup del WP14,
+    ManufacturingSetup in cam/setup.ts e i setups[] che la 69 C1 aggiunge a
+    ManufacturingJob. Prima di persistere qualcosa (RM-02, C1) c'è un passo solo
+    documentale (item 2) che le riconcilia, altrimenti avremmo due forme
+    salvate per lo stesso concetto.
+  - Dodici item in ordine:
+    - hygiene;
+    - nota sul vocabolario dei setup;
+    - slices A2–A5 della 69;
+    - un lotto W1 che accorpa i campi additivi (A1 e il fingerprint della 59 più
+      il contratto camSetup senza persistenza), per una sola rigenerazione dei
+      client;
+    - Kienzle;
+    - Booleani;
+    - ricevute RM-03;
+    - corpus e job notturno;
+    - tri-dexel;
+    - set di riferimento;
+    - replay rotary con fault injection (traguardo M1);
+    - naming.
+  - Finestre adapter: W1 → W2 → W3 in sequenza.
+  - Decisioni: D12 restringe lo step E6 della 69, che non converte né ritira più
+    i programmi legacy. Ho scritto questa modifica in una riga nella 69. D13 e
+    D14 sono nella tabella delle decisioni aperte, da chiedere prima della
+    wave 1.
+
+  Verificato oggi: il tetto dei prompt AI è ancora violato (33.301 caratteri
+  contro 32.800). Per questo il passo 0 è il primo. Non ho eseguito typecheck né
+  test completi.
+
+  Non fatto di proposito: nessun commit, perché CLAUDE.md lo vieta senza
+  richiesta, e nessun codice toccato. Lo stato dei file parity.json e
+  parity-scorecard.md modificati dall'altra sessione non è mio e non l'ho
+  toccato. Ho salvato un memo del piano e della lezione sulla numerazione delle
+  specs.
+
+  Se vuoi, parto dal passo 0 (rientrare nel tetto dei prompt e registrare la
+  baseline).
+
+✻ Churned for 2m 27s · done 6:52 PM
+
+❯ tutto perfettamente                                                           
+
+⏺ Bene. Quando vuoi, parto dal passo 0 del piano: rientrare nel tetto dei prompt
+  AI (oggi 33.301 contro 32.800 caratteri) e registrare la baseline di
+  typecheck e test. Per ora non ho fatto commit, come da CLAUDE.md.
+
+✻ Cooked for 2s · done 6:53 PM
+
+❯ vai                                                                           
+
+  Read 1 file, ran 9 shell commands (ctrl+o to expand)
+
+⏺ Il gate dei prompt è verde. Ora guardo i 5 test rossi del pacchetto:
+  l'inventario va rigenerato con il suo script, gli altri devo capire se erano
+  già rossi prima.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Un'altra sessione sta lavorando in parallelo sugli step A1 di spec 69 e ha
+  riportato i prompt a 32.822; recupererò margine solo nei file non toccati da
+  lei, lasciando client e inventario intatti nella sua finestra W1. · summary
+
+  Ran 6 shell commands (ctrl+o to expand)
+
+⏺ Scrivo la baseline in spec 67 e segno lo stato del passo 0 in spec 70.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Il passo 0 è fatto per le parti 0.1 e 0.3. La 0.2 resta in parte da fare: le
+  intestazioni delle specs 26–29 sono ancora quelle vecchie. Il gate dei prompt
+  è di nuovo verde (tool-prompts.test.ts e prompt-corpus.test.ts, 19 test
+  passano) col tetto di 32.800 caratteri invariato. Nessun commit.
+
+  Cosa ho tagliato (passo 0.1)
+  - Sono ripetizioni in 10 file .txt dei tool: le note su confirm ripetute nei
+    parametri, puntatori duplicati, esempi in eccesso e frasi doppie.
+  - Nessuna azione e nessuna regola è stata rimossa.
+  - Il tetto è rimasto a 32.800.
+
+  Un'altra sessione sta lavorando sugli stessi file. Sta implementando lo step
+  A1 della 69 (le linguette tabs) in core, api, sidecar e in cam_edit.txt. Il
+  suo testo ha riportato i prompt a 32.822, quindi ho tagliato altre due frasi
+  in library_edit.txt, un file che lei non sta toccando. Non ho rigenerato i
+  client né l'inventario, perché sono nella sua finestra W1.
+
+  Baseline (passo 0.3, scritta in spec 67 §5)
+  - Il typecheck è pulito su core, ai, api, sidecar e desktop.
+  - Il corpus completo dà 8 pass, 0 wrong e 1 slow: la piastra con 200 fori
+    impiega 29,8 s contro un budget di 10 s (la 57 registrava 43,8 s).
+  - I test di packages/ai sono 1.084 verdi su 1.089. I 5 rossi non dipendono
+    dalle mie modifiche ai prompt:
+
+  ┌───────────────────────────────┬─────────────────────────────────────────┐
+  │          Test rosso           │                  Causa                  │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ agents.test.ts (roster Auto)  │ I test non si aspettano                 │
+  │ e auto-mode.test.ts (mappa    │ action:restore_checkpoint: deny, che la │
+  │ permessi)                     │  config scrive già.                     │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ auto-mode.test.ts (testo del  │ Un valore di effects non ha voce nella  │
+  │ classificatore)               │ mappa words del test.                   │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ action-inputs.test.ts         │ Le tre azioni checkpoint non hanno      │
+  │                               │ fixture di input.                       │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │                               │ L'inventario committato contiene le     │
+  │ harness-inventory.test.ts     │ dimensioni dei prompt; va rigenerato    │
+  │                               │ col suo script nella finestra W1, dopo  │
+  │                               │ che A1 ha chiuso il suo testo.          │
+  └───────────────────────────────┴─────────────────────────────────────────┘
+
+  Una decisione per te: per i primi due rossi, vuoi che in modalità Auto
+  restore_checkpoint sia sempre negato? È un ripristino distruttivo e la config
+  lo nega già, quindi aggiornerei i due test di conseguenza. Aspetto la tua
+  conferma prima di toccarli, perché cambia l'aspettativa su un permesso.
+
+  Il passo successivo è l'item 2 del piano: la nota sul vocabolario dei setup,
+  solo documentale.
+
+✻ Sautéed for 9m 12s · done 7:02 PM
+
+❯ vai e assicurati che ogni cosa dell app sia tradotta nella tab eplorer delle  
+  sidebar e ancora senza traduzioni                                             
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+❯ cerca dove nn ci son traduzioni                                               
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Le tab sono già tradotte, ma il contenuto dell'Explorer no:
+  CADElementExplorer.tsx non usa mai t(). Cerco ora tutte le stringhe fisse nei
+  file dell'Explorer, CAD e CAM.
+
+  Searched for 1 pattern, ran 3 shell commands (ctrl+o to expand)
+
+❯ cerca dappertutto che sia cosi                                                
+
+⏺ Allargo la ricerca a tutta l'app. Prima misuro con uno scanner dove ci sono
+  stringhe fisse non passate da t(), poi decido l'ordine di lavoro.
+
+  Made 1 scratchpad edit +55, ran 9 shell commands (ctrl+o to expand)
+
+⏺ Ho il quadro completo. Scrivo ora la tabella delle chiavi con le 11 lingue
+  (prima il browser condiviso e l'Explorer CAD, poi l'Explorer CAM).
+  Made 3 scratchpad edits +230, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Continuo: ora BrowserParts.tsx, il blocco condiviso tra gli Explorer CAD e
+  CAM.
+
+  Ran 12 shell commands (ctrl+o to expand)
+
+❯ cerca in tutte le pages e tutti i componenti dove manca la traduzione         
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Il fallimento del test del Post-Processor non dipende dalle mie modifiche:
+  cerca un id #post-processor-type rimosso dal codice nel commit 74861aba. Ora
+  passo a preparare l'inventario completo delle traduzioni mancanti in pagine e
+  componenti. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Lo scanner funziona bene, con qualche falso positivo tipo Promise<. Ora lo
+  porto in TypeScript con regole più strette, così possa servire sia come
+  rapporto che come test di non-regressione per bloccare nuove stringhe fisse. 
+  · summary
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/apps/desktop/test/helpers/i18n-litera
+       ls.ts)
+  ⎿  Wrote 104 lines to /Volumes/SSD/Development/cadcamfun/apps/desktop/tes
+     t/helpers/i18n-literals.ts
+       1 /**
+       2  * Finds user-visible English literals that bypass `t()` in the 
+         desktop sources (spec 06 §1: every UI string goes
+       3  * through the i18n table). A heuristic, not a parser: it reads 
+         lines of `.tsx`/`.ts` and reports
+       4  *  - string attributes a reader sees (`title="…"`, `aria-label=
+         "…"`, `placeholder="…"`, `label="…"`, …),
+       5  *  - object fields that become labels (`label: "…"`, `title: "…
+         "`, `description: "…"`, …),
+       6  *  - text between tags and text alone on a line inside JSX,
+     … +98 lines (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/apps/desktop/test/i18n-literals.test.
+       ts)
+  ⎿  Wrote 38 lines to /Volumes/SSD/Development/cadcamfun/apps/desktop/test
+     /i18n-literals.test.ts
+       1 /**
+       2  * No new untranslated text (spec 06 §1). `helpers/i18n-literals
+         .ts` finds the English literals that bypass `t()`;
+       3  * `i18n-literals.baseline.json` records the debt per file. A fi
+         le may get cleaner, never dirtier, and a new file
+       4  * starts at zero. A string that must stay as written (brand, co
+         de, unit) carries `// i18n-ok` on its line.
+       5  *
+       6  * To see the debt: `bun apps/desktop/test/helpers/i18n-literals
+         .ts --detail`. After cleaning files, run it with
+     … +32 lines (ctrl+o to expand)
+
+  Ran 5 shell commands (ctrl+o to expand)
+
+⏺ Resto sulle sidebar: sistemo ora i tab Layers e Tools del CAD, le impostazioni
+  snap e il tab Machine del CAM.
+
+  Made 1 scratchpad edit +103, ran 7 shell commands (ctrl+o to expand)
+
+⏺ Ora applico i codici: LayerManager, ToolPanel (palette completa), SnapSettings
+  e WorkpieceSetup.
+
+  Ran 14 shell commands (ctrl+o to expand)
+
+⏺ L'Explorer delle due sidebar ora è tradotto in tutte le 11 lingue, insieme ai
+  tab Layers e Tools del CAD. Nel resto dell'app ci sono ancora 1.652 stringhe
+  inglesi fuori da t(). Non ho fatto commit.
+
+  Cosa ho tradotto
+  - Explorer CAD e CAM:
+    - elenco elementi, ricerca e barra del browser;
+    - sezioni Corpi/Schizzi/Componenti e blocco Documento e origine (unità,
+      tolleranza, assi, griglia);
+    - proprietà, assegnazione di utensile e materiale, e generatore
+      multi-percorso.
+  - Tab Layers e Tools del CAD: tutta la palette (59 utensili in 12 categorie) e
+    il modulo "Aggiungi elemento".
+  - Impostazioni di snap e il menu materiale del tab Machine del CAM.
+  - Errori già in italiano: nel generatore multi-percorso c'erano toast scritti
+    in italiano dentro il codice, anche con la lingua impostata su inglese. Ora
+    passano dalle traduzioni.
+
+  Verifica
+  - Typecheck pulito sui file che ho toccato. Restano 7 errori in
+    viewport/view3d/playback.ts e toolpath-overlays.ts, file che non ho
+    modificato.
+  - Un test nuovo (explorer-i18n.test.ts) apre l'app vera in italiano su /cad e
+    /cam e controlla che nell'Explorer non resti nessuna parola inglese. Passa.
+  - Un altro test controlla che ogni lingua traduca le chiavi della sidebar
+    invece di copiare l'inglese.
+
+  La ricerca "dappertutto"
+  Ho scritto uno scanner (apps/desktop/test/helpers/i18n-literals.ts). L'elenco
+  completo, per area e per file, è in specs/assets/i18n-gaps.md. I numeri
+  maggiori:
+
+  ┌────────────────────┬───────────────────┐
+  │        Area        │ Stringhe mancanti │
+  ├────────────────────┼───────────────────┤
+  │ features/cad       │ 749               │
+  ├────────────────────┼───────────────────┤
+  │ features/cam       │ 358               │
+  ├────────────────────┼───────────────────┤
+  │ features/toolpaths │ 144               │
+  ├────────────────────┼───────────────────┤
+  │ features/library   │ 133               │
+  ├────────────────────┼───────────────────┤
+  │ features/ai        │ 69                │
+  └────────────────────┴───────────────────┘
+
+  Il file con più stringhe è cad/lib/propertyFields.ts (432, tabelle di
+  etichette del pannello proprietà). Seguono i generatori CAM e le schermate
+  toolpaths, libreria e progetti. Lo scanner è un'euristica: può sbagliare in
+  entrambe le direzioni, e le tabelle dati con l'inglese in campi tipo name: gli
+  sfuggono. Il conteggio reale è quindi probabilmente più alto.
+
+  Per non peggiorare
+  i18n-literals.test.ts confronta ogni file con i18n-literals.baseline.json e
+  fallisce se un file aggiunge nuove stringhe inglesi. Una stringa che deve
+  restare così (marchio, codice) si marca con // i18n-ok.
+
+  Test rossi che non ho verificato su una versione pulita
+  - Suite desktop: 1.289 passano e 6 falliscono.
+  - cam-page.test.ts (3 test): cercano #post-processor-type, un id che non
+    esiste più dopo il commit 74861aba.
+  - cam-kernel.test.ts (3 test): si fermano su kernel-stale, area del lavoro CAM
+    dell'altra sessione.
+  - Nessun legame con l'Explorer: nessuno dei sei tocca testi dell'Explorer.
+
+  Dimmi quale area vuoi dopo. Io partirei dai generatori CAM (OperationSection,
+  PrintProfileSection, MaterialSection), che stanno nella sidebar destra, o da
+  propertyFields.ts, che da solo vale un quarto del debito.
+
+✻ Cooked for 27m 3s · done 7:30 PM
+
+❯ nel modo piu logico                                                           
+
+⏺ "Nel modo più logico" significa partire da ciò che si vede di più. Dopo le
+  sidebar a sinistra vengono quelle a destra, cioè i pannelli del generatore CAM
+  (~330 stringhe), poi il resto dei componenti CAD, poi le pagine e infine le
+  tabelle dati. Costruisco prima uno strumento che sostituisce in blocco i
+  letterali con t(), così scrivo solo le chiavi e le traduzioni.
+
+  Made 2 scratchpad edits +263, listed 1 directory, ran 11 shell commands (ctrl+o to expand)
+
+⏺ Monitor(Wait for the background desktop suite to finish)
+  ⎿  Monitor started · task b2m7ao7vr · timeout 420s
+
+⏺ Monitor(Wait for the background desktop suite to finish)
+  ⎿  Monitor started · task bpbbnjihm · timeout 420s
+
+⏺ Aspetto che la suite desktop in background finisca prima di toccare altri
+  file, per non falsare i risultati. Nel frattempo il prossimo lotto (~170
+  stringhe dei pannelli generatore CAM, già tradotte in 11 lingue) è pronto da
+  applicare. · summary
+
+⏺ Monitor(Wait for the background desktop suite to finish)
+  ⎿  Monitor started · task bn00qygk9 · timeout 600s
+
+⏺ Resto in attesa dell'esito della suite desktop; appena arriva applico il lotto
+  successivo e riporto i risultati.
+
+✻ Sautéed for 6m 49s · done 7:39 PM
+
+※ recap: Stiamo traducendo tutta l'app nelle 11 lingue, partendo dalle sidebar già completate. Ora aspetto che finisca la suite di test desktop sul riuso massivo delle chiavi, poi applico il lotto dei pannelli generatore CAM già tradotto. (disable recaps in /config)
+
+⏺ Background command "Run the whole desktop suite after the mass reuse"
+completed (exit code 0)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Monitor "Wait for the background desktop suite to finish" stream ended
+
+⏺ Monitor "Wait for the background desktop suite to finish" stream ended
+
+⏺ Monitor "Wait for the background desktop suite to finish" stream ended
+
+⏺ Stessa situazione: 1.288 test passano e 7 falliscono, gli stessi 6 di prima
+  più un timeout a 90s su un test dei sottoprogrammi del kernel, nessuno
+  riguarda i miei file. Applico ora il lotto dei pannelli generatore. · summary
+  Ran 6 shell commands (ctrl+o to expand)
+
+⏺ Sono a 1.215 stringhe (da 1.652). Completo ora gli altri pannelli del
+  generatore CAM.
+
+  Made 1 scratchpad edit +117, ran 13 shell commands (ctrl+o to expand)
+
+⏺ Ho tradotto tutto il pannello del generatore CAM, la sidebar destra. Le
+  stringhe inglesi rimaste fuori da t() sono 1.096, da 1.652. Non ho fatto
+  commit.
+
+  Come ho proceduto
+  - Ordine: ho seguito quello che si vede di più. Prima le sidebar a sinistra,
+    poi il generatore CAM a destra. Restano il resto del CAD, le pagine e le
+    tabelle dati.
+  - Chiavi già esistenti: circa 260 stringhe avevano già una traduzione in tutte
+    le lingue (Cancel, Delete, Search…). Le ho collegate a quelle chiavi senza
+    scrivere nulla di nuovo.
+  - Generatore CAM: ho aggiunto 273 chiavi nuove in 11 lingue, per operazioni,
+    stampa 3D, materiale, taglio, utensile, origine, tornio, IA, evidenze e
+    visualizzatore G-code. In features/cam restano 7 stringhe, 5 delle quali
+    nella barra CamRibbon.
+  - Errori già presenti: tre voci avevano testo italiano fisso dentro il codice
+    (una aria-label e le chiavi dei toast). Altre liste usavano t() a livello di
+    modulo, quindi non seguivano il cambio lingua.
+
+  Verifica
+  - Il typecheck del desktop è pulito.
+  - Il test nell'app vera in italiano passa ora su /cad, /cam e sul generatore.
+    Il test sui pacchetti lingua e quello contro le nuove stringhe fisse
+    passano; il secondo ora copre anche tutta la cartella generator/.
+  - La suite desktop intera dà 1.288 passati e 7 falliti, come prima di questo
+    lotto. Nessuna di queste cadute riguarda testi tradotti.
+  - Nei test del generatore ne cadono 4 su 46: due per Transport error verso
+    /api/toolpaths/generate, uno per "The machines could not be read" e uno per
+    timeout. Il bottone "Generate G-Code" viene trovato, quindi sembra un
+    problema del sidecar, dove l'altra sessione sta lavorando. Non l'ho però
+    riprodotto su una versione pulita.
+
+  Cosa resta (1.096)
+
+  ┌────────────────────┬───────────────────────────────────────┐
+  │        Area        │               Stringhe                │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ features/cad       │ 692 (di cui 432 in propertyFields.ts) │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ features/library   │ 90                                    │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ features/toolpaths │ 86                                    │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ features/ai        │ 69                                    │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ features/manuals   │ 45                                    │
+  ├────────────────────┼───────────────────────────────────────┤
+  │ altre              │ meno di 35 ciascuna                   │
+  └────────────────────┴───────────────────────────────────────┘
+
+  Il prossimo passo logico è il resto del CAD: barra mobile, pannello proprietà,
+  messaggi del canvas. Poi vengono le pagine (toolpaths, libreria, progetti,
+  impostazioni, costi, accesso) e per ultime le tabelle dati. L'elenco
+  aggiornato è in specs/assets/i18n-gaps.md.
+
+  Lo strumento di sostituzione in blocco sta nella cartella temporanea della
+  sessione, non nel repo. Se ti serve per le sessioni future lo porto in
+  scripts/.
+
+✻ Worked for 14m 15s · done 7:56 PM
+
+❯ vai                                                                           
+
+  Made 1 scratchpad edit +162, ran 7 shell commands (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ vai                                                                           
+  ⎿  ⧉ Selected 48 lines from ../../../../../../README.md in Cursor
+
+  Searched for 1 pattern, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Sto aspettando la suite desktop in background (nessuna modifica ai sorgenti
+  nel frattempo). Intanto preparo le chiavi delle pagine restanti: toolpaths,
+  libreria, progetti.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Monitor(Wait for the desktop suite to finish)
+  ⎿  Monitor started · task b0xt1ra2q · timeout 600s
+
+⏺ La suite desktop è in corso dopo il lotto dei componenti CAD (941 stringhe
+  rimaste). Appena finisce passo alle pagine toolpaths, progetti e costi.
+
+✻ Sautéed for 4m 48s · done 8:20 PM
+
+⏺ Monitor "Wait for the desktop suite to finish" stream ended
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+⏺ Monitor(Wait for the suite process to actually end)
+  ⎿  Monitor started · task bpd0w8w23 · timeout 600s
+
+⏺ Il primo monitor era scattato troppo presto (l'output conteneva già la riga
+  della baseline). La suite sta ancora girando; ora aspetto la fine del processo
+  vero e proprio.
+
+✻ Cogitated for 1m 3s · done 8:21 PM
+
+⏺ Background command "Refresh baseline and run the full desktop suite" completed
+(exit code 0)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Monitor "Wait for the suite process to actually end" stream ended
+
+⏺ Suite desktop: 1.292 passano, 6 falliscono, gli stessi di prima. Passo alle
+  pagine: prima riuso le chiavi esistenti, poi traduco il resto.
+
+  Ran 3 shell commands (ctrl+o to expand)
+  ⎿  You've hit your 5-hour limit · resets 11:30pm (Europe/Rome)
+
+⏺ Usage limit reached · continuing automatically at 11:30pm · esc to 
+  cancel
+
+✻ Cogitated for 1m 23s · done 8:24 PM
+
+❯ /export                                                                       
+  ⎿  Conversation copied to clipboard

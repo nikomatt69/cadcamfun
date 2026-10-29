@@ -1,6 +1,6 @@
 # 27 — Everything via nikcli: the full CAD/CAM action surface
 
-Status: proposed. Owners: WP8 (`packages/ai` — catalogue, agent surface, mod), WP3/WP4 (`packages/api`, `apps/sidecar` — HTTP parity and tokens), WP9 (`packages/plugin-sdk` — AI-tool contributions). This spec records the B+C decision for the agent: cadcamfun must expose **every action it can perform — CAD/CAM first — through nikcli**, both in-process (the embedded host behind the assistant, via `Tool.define` natives and one app-owned mod) and out-of-process (a standalone `nikcli` driving a running instance, via a typed HttpApi bridge). It builds on `08-ai.md`, `15-ai-agent-analysis.md`, `16-cadcam-agent-blueprint.md`, `21-integration-master-plan.md`, `23-ai-runtime-architecture.md`, `24-assistant-control-flow.md`, `25-project-ai-context.md` and `26-tool-consolidation.md`. No database migration.
+Status: proposed. Owners: WP8 (`packages/ai` — catalogue, agent surface, mod), WP3/WP4 (`packages/api`, `apps/sidecar` — HTTP parity and tokens), WP9 (`packages/plugin-sdk` — AI-tool contributions). This spec records the B+C decision for the agent: cadcamfun must expose **every action it can perform — CAD/CAM first — through nikcli**, both in-process (the embedded host behind the assistant, via `Tool.define` natives and one app-owned mod) and out-of-process (a standalone `nikcli` driving a running instance, via a typed HttpApi bridge). It builds on `08-ai.md`, `15-ai-agent-analysis.md`, `16-cadcam-agent-blueprint.md`, `21-integration-master-plan.md`, `23-ai-runtime-architecture.md`, `completed/24-assistant-control-flow.md`, `25-project-ai-context.md` and `26-tool-consolidation.md`. No database migration.
 
 ## 1. Why
 
@@ -80,7 +80,7 @@ Derivation rules (each enforced by a test that derives from the catalogue, never
 - **Coverage.** The catalogue starts from the union of what exists: the 31 built-in tools + sidecar specs (`LIBRARY_TOOL_IDS`, `VCS_TOOL_IDS`, `BACKGROUND_TOOL_IDS` in `packages/ai/src/tools/project-tools.ts`) + the stateless suggestion endpoints (`/api/ai/{title, design-analysis, machining-parameters, gcode-optimization, design-suggestions, analyze-gcode, toolpath-analysis}`). Actions that stay HTTP-only (upload/download, organizations, billing, analytics, waitlist) are declared `kind: "read" | "write"` with `tool: false` and do not enter the model's catalogue — but they still appear in the parity map, so the surface is inventoried, not accidental.
 - **Plugin actions.** Contributions that add tools (§4.2) are validated against the same `ActionSpec` shape at install time; a plugin action cannot widen a capability it was not granted (§6).
 
-The prompt budget of spec 26 survives: the model sees the consolidated tool catalogue (≤ 24 000 characters, acceptance §6.6), not the full action list; `search_tools`/deferred loading (enabled for the agent and specialists, `specs/24-assistant-control-flow.md`) covers the tail.
+The prompt budget of spec 26 survives: the model sees the consolidated tool catalogue (≤ 24 000 characters, acceptance §6.6), not the full action list; `search_tools`/deferred loading (enabled for the agent and specialists, `specs/completed/24-assistant-control-flow.md`) covers the tail.
 
 ## 4. Via B — the agent surface
 

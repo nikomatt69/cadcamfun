@@ -13,7 +13,6 @@ Result (JSON)
 
 Do not use it
 - To save a note or change the standing rules: memory_edit.
-- Notes are historical evidence: reconcile them with the document you are working on before acting on them.
 
 After it
-- Use what you read; if it contradicts the live drawing, the drawing wins.
+- Use what you read as historical evidence; if it contradicts the live drawing, the drawing wins.
