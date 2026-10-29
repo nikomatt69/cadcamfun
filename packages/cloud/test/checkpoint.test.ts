@@ -5,7 +5,7 @@ import { checkpointRevision, sha256, validateFiles, type CheckpointFile, type Ch
 const fixture = () => {
   let epoch = "first-process"
   let manifest: CheckpointManifest | null = null
-  const chunks = new Map<string, Uint8Array>()
+  const chunks = new Map<string, Uint8Array<ArrayBuffer>>()
   const state: CheckpointState = {
     epoch: async () => epoch,
     manifest: async () => manifest,
@@ -19,7 +19,7 @@ const fixture = () => {
   }
   const bucket: ChunkBucket = {
     exists: async (hash) => chunks.has(hash),
-    put: async (hash, bytes) => { chunks.set(hash, bytes) },
+    put: async (hash, bytes) => { chunks.set(hash, new Uint8Array(bytes)) },
     get: async (hash) => { const bytes = chunks.get(hash); return bytes ? new Response(bytes).body : null },
   }
   const store = new CheckpointStore(state, bucket)
@@ -27,7 +27,7 @@ const fixture = () => {
   return { store, state, chunks, call, nextEpoch: () => { epoch = "next-process" } }
 }
 
-const fileFor = async (text: string): Promise<{ bytes: Uint8Array; file: CheckpointFile }> => {
+const fileFor = async (text: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; file: CheckpointFile }> => {
   const bytes = new TextEncoder().encode(text)
   const hash = await sha256(bytes)
   return { bytes, file: { path: "cadcamfun.db", size: bytes.length, sha256: hash, chunks: [{ hash, size: bytes.length }] } }
@@ -43,7 +43,7 @@ describe("durable cloud checkpoint publication", () => {
     expect((await f.call(`objects/${file.sha256}`, { method: "PUT", body: bytes })).status).toBe(204)
     const response = await f.call("commit", { method: "POST", body })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ revision: await checkpointRevision([file]) })
+    expect(await response.json<{ revision: string }>()).toEqual({ revision: await checkpointRevision([file]) })
     expect((await f.call("commit", { method: "POST", body })).status).toBe(200)
     expect(await (await f.call(`objects/${file.sha256}`)).text()).toBe("real checkpoint bytes")
   })

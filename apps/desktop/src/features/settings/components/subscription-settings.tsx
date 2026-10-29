@@ -40,7 +40,7 @@ export function SubscriptionSettings(): JSX.Element {
   const app = useApp()
   const subscription = useRead((client) => client.billing.current())
   const info = subscription.data
-  const features = () => planFeatures(info()?.plan ?? t("subscription.free"))
+  const features = () => planFeatures(info()?.plan ?? "FREE")
   const isOnTrial = () => info()?.isOnTrial === true
   const trialDaysLeft = (): number | null => {
     const end = info()?.trialEnd
@@ -49,8 +49,8 @@ export function SubscriptionSettings(): JSX.Element {
   }
   const formattedPeriodEnd = (): string | null => (info()?.periodEnd ? formatDate(info()!.periodEnd!) : null)
   const formattedTrialEnd = (): string | null => (info()?.trialEnd ? formatDate(info()!.trialEnd!) : null)
-  const showManageBilling = () => (info()?.plan ?? t("subscription.free")) !== "FREE" && !isOnTrial()
-  const showUpgradeLink = () => ((info()?.plan ?? t("subscription.free")) === "FREE" && !isOnTrial()) || isOnTrial()
+  const showManageBilling = () => (info()?.plan ?? "FREE") !== "FREE" && !isOnTrial()
+  const showUpgradeLink = () => ((info()?.plan ?? "FREE") === "FREE" && !isOnTrial()) || isOnTrial()
 
   const [billingPending, setBillingPending] = createSignal(false)
   const [billingError, setBillingError] = createSignal<string>()
@@ -71,7 +71,7 @@ export function SubscriptionSettings(): JSX.Element {
     <div class={CARD}>
       <div class="px-4 py-5 sm:p-6">
         <div class="mb-6 flex items-center space-x-3">
-          <PlanIcon plan={info()?.plan ?? t("subscription.free")} />
+          <PlanIcon plan={info()?.plan ?? "FREE"} />
           <h3 class="text-base font-medium leading-6 text-slate-900 dark:text-white">{t("subscription.card.title")}</h3>
         </div>
 

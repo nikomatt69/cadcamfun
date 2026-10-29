@@ -25,7 +25,7 @@ const announce = (name: string, detail: unknown): void => {
 }
 
 export default function LibraryManager(props: LibraryManagerProps): JSX.Element {
-  const [activeTab, setActiveTab] = createSignal<Tab>(props.defaultTab ?? t("library.tab.components"))
+  const [activeTab, setActiveTab] = createSignal<Tab>(props.defaultTab ?? "components")
   const id = createUniqueId()
   const source = (): LibrarySource => props.defaultSource ?? "api"
   const selectComponent = (item: ComponentLibraryItem): void => { props.onSelectComponent?.(item); announce("libraryComponentSelected", item) }

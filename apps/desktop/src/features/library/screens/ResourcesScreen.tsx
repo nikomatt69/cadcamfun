@@ -254,7 +254,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     if (kind === "materials") return app.client.materials.create({ payload: { name, description, isPublic, properties: { density: Number(form.get("density")) || 0, color: str(form.get("color")) || "#cccccc" } } })
     if (kind === "tools") return app.client.tools.create({ payload: { name, notes: description, isPublic, type: str(form.get("type")), diameter: Number(form.get("diameter")) || 0, material: str(form.get("material")), numberOfFlutes: Number(form.get("numberOfFlutes")) || null } })
     if (kind === "machines") {
-      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || t("pages.mill"), config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || t("cam.post.target.grbl.label") } } })
+      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || "mill", config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || "grbl" } } })
     }
     return app.client.components.createForProject({ params: { id: str(form.get("projectId")) }, payload: { name, description, isPublic, type: str(form.get("type")) || null, data: {} } })
   }
