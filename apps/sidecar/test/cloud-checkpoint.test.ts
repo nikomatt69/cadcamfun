@@ -22,7 +22,7 @@ const storage = () => {
   }, {
     exists: async (hash) => objects.has(hash),
     put: async (hash, bytes) => { objects.set(hash, bytes) },
-    get: async (hash) => { const bytes = objects.get(hash); return bytes ? new Response(bytes).body : null },
+    get: async (hash) => { const bytes = objects.get(hash); return bytes ? new Response(new Uint8Array(bytes)).body : null },
   })
   const transport = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => fail ? new Response(null, { status: 503 }) : store.fetch(new Request(input, init)), { preconnect: () => {} })
   return { transport, fail: () => { fail = true }, manifest: () => manifest, objects }
