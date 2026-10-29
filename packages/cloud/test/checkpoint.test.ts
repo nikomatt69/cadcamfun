@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { CheckpointStore, type CheckpointState, type ChunkBucket } from "../src/checkpoint-store.ts"
 import { checkpointRevision, sha256, validateFiles, type CheckpointFile, type CheckpointManifest } from "../src/checkpoint-protocol.ts"
 
+/** workerd types `Uint8Array` as `Uint8Array<ArrayBufferLike>`, which is not a `BodyInit`. */
+const asBody = (bytes: Uint8Array): Uint8Array<ArrayBuffer> => new Uint8Array(bytes)
+
 const fixture = () => {
   let epoch = "first-process"
   let manifest: CheckpointManifest | null = null
@@ -20,7 +23,7 @@ const fixture = () => {
   const bucket: ChunkBucket = {
     exists: async (hash) => chunks.has(hash),
     put: async (hash, bytes) => { chunks.set(hash, bytes) },
-    get: async (hash) => { const bytes = chunks.get(hash); return bytes ? new Response(bytes).body : null },
+    get: async (hash) => { const bytes = chunks.get(hash); return bytes ? new Response(asBody(bytes)).body : null },
   }
   const store = new CheckpointStore(state, bucket)
   const call = (path: string, init?: RequestInit, process = epoch) => store.fetch(new Request(`https://cloud.example/__cadcamfun/state/${path}`, { ...init, headers: { ...init?.headers, "x-cadcamfun-cloud-epoch": process } }))
@@ -40,7 +43,7 @@ describe("durable cloud checkpoint publication", () => {
     const body = JSON.stringify({ epoch: "first-process", expectedRevision: null, files: [file] })
     expect((await f.call("commit", { method: "POST", body })).status).toBe(409)
     expect(await (await f.call("boot")).json()).toBeNull()
-    expect((await f.call(`objects/${file.sha256}`, { method: "PUT", body: bytes })).status).toBe(204)
+    expect((await f.call(`objects/${file.sha256}`, { method: "PUT", body: asBody(bytes) })).status).toBe(204)
     const response = await f.call("commit", { method: "POST", body })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ revision: await checkpointRevision([file]) })
@@ -52,14 +55,14 @@ describe("durable cloud checkpoint publication", () => {
     const f = fixture()
     const first = await fileFor("first")
     const second = await fileFor("second")
-    for (const { file, bytes } of [first, second]) await f.call(`objects/${file.sha256}`, { method: "PUT", body: bytes })
+    for (const { file, bytes } of [first, second]) await f.call(`objects/${file.sha256}`, { method: "PUT", body: asBody(bytes) })
     const commit = (file: CheckpointFile, expectedRevision: string | null) => f.call("commit", { method: "POST", body: JSON.stringify({ epoch: "first-process", expectedRevision, files: [file] }) })
     expect((await commit(first.file, null)).status).toBe(200)
     expect((await commit(second.file, null)).status).toBe(409)
     expect((await f.state.manifest())?.files[0]?.sha256).toBe(first.file.sha256)
     f.nextEpoch()
     expect((await f.call("boot", undefined, "first-process")).status).toBe(409)
-    expect((await f.call(`objects/${second.file.sha256}`, { method: "PUT", body: second.bytes }, "first-process")).status).toBe(409)
+    expect((await f.call(`objects/${second.file.sha256}`, { method: "PUT", body: asBody(second.bytes) }, "first-process")).status).toBe(409)
   })
 
   test("refuses tampered objects and hostile restore paths", async () => {
