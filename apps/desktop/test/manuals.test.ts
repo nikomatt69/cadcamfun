@@ -15,7 +15,7 @@ describe("default CAD/CAM manuals catalogue", () => {
       expect(findManuals({ query: controller, category: "", publisher: "" }).length).toBeGreaterThan(0)
     }
     expect(manuals.filter((entry) => entry.kind === "manual").length).toBeGreaterThan(15)
-    const trusted = new Set(["www.fanucamerica.com", "www.heidenhain.com", "content.heidenhain.de", "support.industry.siemens.com", "cache.industry.siemens.com", "www.mazak.com", "www.okuma.com", "haascnc.com", "www.haascnc.com", "linuxcnc.org", "marlinfw.org", "www.klipper3d.org", "www.freecad.org", "wiki.freecad.org", "docs.blender.org", "openscad.org", "help.autodesk.com", "cad.onshape.com", "docs.mcneel.com", "cadquery.readthedocs.io", "build123d.readthedocs.io", "help.prusa3d.com", "www.sandvik.coromant.com", "www.secotools.com", "dev.opencascade.org", "occt3d.com", "3mf.io"])
+    const trusted = new Set(["www.fanucamerica.com", "www.heidenhain.com", "content.heidenhain.de", "support.industry.siemens.com", "cache.industry.siemens.com", "www.mazak.com", "www.okuma.com", "www.mitsubishielectric.com", "machinetool.global.brother", "haascnc.com", "www.haascnc.com", "linuxcnc.org", "marlinfw.org", "www.klipper3d.org", "www.freecad.org", "wiki.freecad.org", "docs.blender.org", "openscad.org", "help.autodesk.com", "cad.onshape.com", "docs.mcneel.com", "cadquery.readthedocs.io", "build123d.readthedocs.io", "help.prusa3d.com", "www.sandvik.coromant.com", "www.secotools.com", "dev.opencascade.org", "occt3d.com", "3mf.io"])
     for (const entry of manuals) {
       const url = new URL(entry.url)
       expect(url.protocol).toBe("https:")
