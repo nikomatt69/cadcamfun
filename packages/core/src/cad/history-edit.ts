@@ -117,8 +117,6 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
       f.near.forEach((c, i) => add(`near.${i}`, `face point ${"xyz"[i]}`, c))
       break
     case "combine": break
-    // An imported body is frozen geometry: it has no parameters to edit.
-    case "imported": break
     case "pattern":
       add("count", "count", f.count)
       if (f.kind === "grid") {

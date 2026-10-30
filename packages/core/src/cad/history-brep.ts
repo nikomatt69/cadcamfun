@@ -651,6 +651,16 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   const active = timelinePlan(history).states
   const dim = (d: Dimension): number => dimensionValue(d, values)
   const bodies: Array<{ id: string; feature: string; exact: Exact }> = []
+  // Imported solids (`History.bases`) are the bodies the replay starts from. The healed body is the exact model as stored; it is
+  // checked again, because a stored body can have been edited by hand or come from an older kernel, and a Boolean on an
+  // invalid solid fails far from the cause. The mesh replay skipped a base that has no B-rep, so only the ones it kept are seeded.
+  for (const base of history.bases ?? []) {
+    if (!result.bodies.some((b) => b.id === base.id)) continue
+    const rep = validateBrep(base.brep, { skipVolume: true })
+    if (!rep.valid || !rep.manifoldSolid) { bodies.push({ id: base.id, feature: base.id, exact: no(`the imported body is not a valid closed solid: ${rep.issues.slice(0, 3).map((i) => i.message).join("; ") || "an open shell"}`) }); continue }
+    bodies.push({ id: base.id, feature: base.id, exact: ok(base.brep) })
+    if (base.brep.faces.some((face) => face.loose === true)) warnings.push(`${base.id}: the imported body is loose (largest tolerance ${(rep.maxTolerance ?? 0).toExponential(1)} mm); results built on it carry that tolerance and STEP export refuses them unless allowed`)
+  }
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
   // What a shell needs of an extrusion: its exact (corner-treated) loops, sketch frame and extent along the normal.
   const extrusions = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly frame: { readonly origin: Vec3; readonly n: Vec3; readonly u: Vec3 }; readonly from: number; readonly to: number }>()
@@ -885,23 +895,6 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
             else {
               const turn = f.rotation?.map(dim)
               exact = ok(turn === undefined || turn.every((a) => a === 0) ? built.brep : transformBrep(built.brep, gizmo(turn[0]!, turn[1]!, turn[2]!, built.centre)))
-            }
-            tools.set(f.id, { exact: [exact], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-            apply(f.id, exact, f.operation, f.targets, f.id)
-            break
-          }
-          case "imported": {
-            // The healed body of an import is the exact model as stored. It is checked again: a stored body can have been edited
-            // by hand or come from an older kernel, and a Boolean on an invalid solid fails far from the cause.
-            let exact: Exact
-            if (f.brep === undefined || !Array.isArray(f.brep.faces) || f.brep.faces.length === 0) exact = no("the imported feature carries no B-rep")
-            else {
-              const rep = validateBrep(f.brep, { skipVolume: true })
-              if (!rep.valid || !rep.manifoldSolid) exact = no(`the imported body is not a valid closed solid: ${rep.issues.slice(0, 3).map((i) => i.message).join("; ") || "an open shell"}`)
-              else {
-                exact = ok(f.brep)
-                if (f.brep.faces.some((face) => face.loose === true)) warnings.push(`${f.id}: the imported body is loose (largest tolerance ${(rep.maxTolerance ?? 0).toExponential(1)} mm); results built on it carry that tolerance and STEP export refuses them unless allowed`)
-              }
             }
             tools.set(f.id, { exact: [exact], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
             apply(f.id, exact, f.operation, f.targets, f.id)

@@ -29,7 +29,7 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
   test("an exploded STEP with sub-tolerance gaps is healed into an imported feature that accepts a hole and a pocket", () => {
     const imp = importStepToHistory(explodedStep())
     expect(imp.refused).toEqual([])
-    expect(imp.features.length).toBe(1)
+    expect(imp.bases.length).toBe(1)
     expect(imp.report[0]!.status).toBe("healed")
     expect(imp.report[0]!.healed!.verticesTightened).toBeGreaterThan(0)
     expect(imp.report[0]!.loose).toBe(false)
@@ -37,7 +37,7 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
 
     const base = withImported(history([]), imp)
     // A through hole of diameter 4 down from the top face, and a blind pocket of radius 2 and depth 12 from the same face.
-    const hole = history([...base.features, { id: "h1", type: "hole", plane: "XY", offset: 30, at: [5, 10], diameter: 4, depth: 30 }])
+    const hole: History = { ...base, features: [{ id: "h1", type: "hole", plane: "XY", offset: 30, at: [5, 10], diameter: 4, depth: 30 }] }
     const exact = rebuildExact(hole)
     expect(exact.result.issues.filter((i) => i.severity === "error")).toEqual([])
     const body = exact.bodies[0]!
@@ -45,11 +45,13 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
     expect(validateBrep(body.brep!).issues.map((i) => i.message)).toEqual([])
     expect(rel(massProperties(body.brep!).volume, 6000 - PI * 4 * 30)).toBeLessThan(1e-9)
 
-    const pocket = history([
-      ...base.features,
-      circle("s1", "XY", 5, 10, 2, 30),
-      { id: "pocket", type: "extrude", sketch: "s1", depth: 12, direction: "down", operation: "subtract" }
-    ])
+    const pocket: History = {
+      ...base,
+      features: [
+        circle("s1", "XY", 5, 10, 2, 30),
+        { id: "pocket", type: "extrude", sketch: "s1", depth: 12, direction: "down", operation: "subtract" }
+      ]
+    }
     const exactPocket = rebuildExact(pocket)
     expect(exactPocket.result.issues.filter((i) => i.severity === "error")).toEqual([])
     expect(rel(massProperties(exactPocket.bodies[0]!.brep!).volume, 6000 - PI * 4 * 12)).toBeLessThan(1e-9)
@@ -74,26 +76,26 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
     const imp = importStepToHistory(text)
     expect(imp.report[0]!.status).toBe("exact")
     expect(imp.report[0]!.healed).toBeUndefined()
-    expect(imp.features[0]!.source?.name).toBe("block")
+    expect(imp.bases[0]!.source?.name).toBe("block")
   })
 
-  test("a body with a gap above the healing tolerance is refused with the gap, and no feature is made", () => {
+  test("a body with a gap above the healing tolerance is refused with the gap, and no body is made", () => {
     const imp = importStepToHistory(explodedStep(3e-3), { heal: { tol: 1e-5 } })
-    expect(imp.features).toEqual([])
+    expect(imp.bases).toEqual([])
     expect(imp.refused.length).toBe(1)
     const r = imp.refused[0]!
     expect(r.status).toBe("refused")
     expect(r.diagnostics.some((d) => d.includes("above the healing tolerance"))).toBe(true)
     expect(r.diagnostics.some((d) => d.includes("needs a healing tolerance of at least"))).toBe(true)
     // The same file heals when the tolerance covers the gap.
-    expect(importStepToHistory(explodedStep(3e-3), { heal: { tol: 2e-2 } }).features.length).toBe(1)
+    expect(importStepToHistory(explodedStep(3e-3), { heal: { tol: 2e-2 } }).bases.length).toBe(1)
   })
 
   test("a missing face is refused with the open edges, not passed on to fail a later Boolean", () => {
     const exploded = explodeWithGaps(makeBox(10, 10, 10), 0)
     const open = { ...exploded, faces: exploded.faces.slice(0, 5), shells: [{ faces: [0, 1, 2, 3, 4], closed: true }] }
     const imp = importStepToHistory(writeStepBreps([{ name: "lid-less", brep: open }]))
-    expect(imp.features).toEqual([])
+    expect(imp.bases).toEqual([])
     expect(imp.refused[0]!.diagnostics.join(" ")).toContain("face")
   })
 
@@ -101,8 +103,8 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
     const imp = importStepToHistory(explodedStep())
     const once = withImported(history([]), imp)
     const twice = withImported(once, imp)
-    expect(new Set(twice.features.map((f) => f.id)).size).toBe(twice.features.length)
-    expect(twice.features.length).toBe(2)
+    expect(new Set(twice.bases!.map((b) => b.id)).size).toBe(2)
+    expect(twice.bases!.length).toBe(2)
   })
 
   test("a loose imported body is accepted, said to be loose, and what is built on it cannot be exported silently", () => {
