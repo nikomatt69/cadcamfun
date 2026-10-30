@@ -53,6 +53,11 @@ export interface Face {
   readonly loops: ReadonlyArray<Loop>
   /** Optional name of the feature/face (persistent naming for the history, colours, CAM selections). */
   readonly name?: string
+  /**
+   * Set by `healBrep` when a repair moved the face's boundary by more than the loose limit: the face is within a tolerance
+   * larger than the model's, so an exact consumer (STEP export, offsets) may want to know. Absent on every exact face.
+   */
+  readonly loose?: true
 }
 
 export interface Shell {

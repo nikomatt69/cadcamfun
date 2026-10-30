@@ -51,6 +51,8 @@ export interface BrepReport {
   /** Genus from Euler–Poincaré (number of through-holes) when the counts allow it. */
   readonly genus: number | undefined
   readonly volume: number | undefined
+  /** The largest vertex or edge tolerance of the body, mm: how loose the geometry is allowed to be (spec 42 R6). */
+  readonly maxTolerance?: number
 }
 
 export interface ValidateOptions {
@@ -153,5 +155,8 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
     } else volume = massProperties(b).volume
     if (!(volume > 0)) issues.push({ kind: "orientation", message: `closed shell encloses a non-positive volume (${volume}); faces point inwards` })
   }
-  return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume }
+  let maxTolerance = 0
+  for (const v of b.vertices) maxTolerance = Math.max(maxTolerance, v.tol)
+  for (const e of b.edges) maxTolerance = Math.max(maxTolerance, e.tol)
+  return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume, maxTolerance }
 }
