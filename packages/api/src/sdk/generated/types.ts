@@ -1823,6 +1823,8 @@ export type CadExactHolePayload = {
   readonly fill?: boolean
 }
 
+export type CadExactRebuildPayload = { readonly history: JsonValue; readonly budgetMs?: number }
+
 export type CamSetupPlanPayload = {
   readonly setup: {
     readonly id: string
@@ -7753,6 +7755,33 @@ export type CadExactHoleOutput =
       valid: boolean
     }
   | { ok: false; error: string }
+
+export type CadExactRebuildInput = {
+  readonly history: CadExactRebuildPayload["history"]
+  readonly budgetMs?: CadExactRebuildPayload["budgetMs"]
+}
+
+export type CadExactRebuildOutput = {
+  ok: boolean
+  parameters: { [x: string]: number }
+  bodies: Array<{
+    id: string
+    exact: boolean
+    reason?: string
+    valid?: boolean
+    volume?: number
+    area?: number
+    centroid?: { x: number; y: number; z: number }
+    genus?: number
+    faces?: number
+    edges?: number
+    vertices?: number
+    surfaces?: { [x: string]: number }
+  }>
+  digest: string
+  issues: Array<{ feature: string; severity: "error" | "warning"; message: string; remedy?: string }>
+  warnings: Array<string>
+}
 
 export type CamSetupPlanInput = { readonly setup: CamSetupPlanPayload["setup"] }
 

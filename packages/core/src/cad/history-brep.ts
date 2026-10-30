@@ -16,6 +16,7 @@
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
+import { digestOf } from "../cam/kernel/identity.ts"
 import { timelinePlan } from "./history-timeline.ts"
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
@@ -1647,6 +1648,21 @@ export const exactSummary = (ex: ExactRebuild): ReadonlyArray<ExactBodySummary> 
       valid: rep.valid
     }
   })
+
+/**
+ * A digest of what the exact model says about each body: the id and, rounded to a micro-unit, volume, area, centroid, the counts of
+ * faces, edges and vertices, the face kinds and validity. Two rebuilds of the same history (in the desktop, the sidecar or the assistant)
+ * agree on it exactly when the summaries do, so a client without the kernel can tell that a server-side rebuild is the one it has.
+ */
+export const exactDigest = (summary: ReadonlyArray<ExactBodySummary>): string => {
+  const r = (x: number | undefined): number | null => (x === undefined ? null : Math.round(x * 1e6) / 1e6)
+  return digestOf("cad/exact-rebuild@1", summary.map((b) => ({
+    id: b.id, exact: b.exact, valid: b.valid ?? null, volume: r(b.volume), area: r(b.area),
+    centroid: b.centroid === undefined ? null : [r(b.centroid.x), r(b.centroid.y), r(b.centroid.z)],
+    genus: b.genus ?? null, faces: b.faces ?? null, edges: b.edges ?? null, vertices: b.vertices ?? null,
+    surfaces: Object.entries(b.surfaces ?? {}).sort(([x], [y]) => (x < y ? -1 : 1))
+  })))
+}
 
 export interface HistoryStep {
   /** ISO 10303-21 text (AP214), or undefined when no body has an exact model. */

@@ -461,6 +461,8 @@ import type {
   CadExactSetupsOutput,
   CadExactHoleInput,
   CadExactHoleOutput,
+  CadExactRebuildInput,
+  CadExactRebuildOutput,
   CamSetupPlanInput,
   CamSetupPlanOutput,
   CamSetupValidateInput,
@@ -4082,6 +4084,18 @@ export function make(options: ClientOptions) {
               taper: input["taper"],
               fill: input["fill"],
             },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      rebuild: (input: CadExactRebuildInput, requestOptions?: RequestOptions) =>
+        request<CadExactRebuildOutput>(
+          {
+            method: "POST",
+            path: `/api/cad/exact/rebuild`,
+            body: { history: input["history"], budgetMs: input["budgetMs"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,

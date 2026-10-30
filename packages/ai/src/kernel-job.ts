@@ -131,7 +131,7 @@ const active = new Set<() => void>()
 let closing = false
 
 /** The jobs whose result is a pure function of the input, so an identical request can share a run or take the last result. */
-const CACHEABLE: ReadonlySet<KernelJobName> = new Set(["cam-manufacture", "cam-plan", "cam-generate", "cad-analyze", "cad-step", "cad-setups", "cad-hole", "cad-assembly", "cad-sheet"])
+const CACHEABLE: ReadonlySet<KernelJobName> = new Set(["cam-manufacture", "cam-plan", "cam-generate", "cad-analyze", "cad-step", "cad-setups", "cad-hole", "cad-assembly", "cad-rebuild", "cad-sheet"])
 
 /** What a result holds in memory, roughly: the program text dominates (the IR and the claims weigh a few times its size). */
 const bytesOf = (name: KernelJobName, value: unknown): number => {

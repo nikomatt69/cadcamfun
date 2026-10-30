@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, Forbidden, InternalError, NotFound } from "../errors.ts"
-import { CadAssemblyReport, CadAssemblyRequest, CadExactAnalysis, CadExactRequest, CadExactStep, CadExactStepRequest, CadHoleReport, CadHoleRequest, CadSetupsReport, CadSetupsRequest } from "../cad-exact.ts"
+import { CadAssemblyReport, CadAssemblyRequest, CadExactAnalysis, CadExactRequest, CadExactStep, CadExactStepRequest, CadHoleReport, CadHoleRequest, CadRebuildReport, CadRebuildRequest, CadSetupsReport, CadSetupsRequest } from "../cad-exact.ts"
 
 /**
  * The exact B-rep kernel (`@cadcamfun/core` `brep`) behind HTTP, so the sidecar, plugins and the assistant read the drawing the
@@ -14,6 +14,7 @@ export class CadExactGroup extends HttpApiGroup.make("cadExact")
     HttpApiEndpoint.post("step", "/api/cad/exact/step", { payload: CadExactStepRequest, success: CadExactStep, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.post("assembly", "/api/cad/exact/assembly", { payload: CadAssemblyRequest, success: CadAssemblyReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.post("setups", "/api/cad/exact/setups", { payload: CadSetupsRequest, success: CadSetupsReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
-    HttpApiEndpoint.post("hole", "/api/cad/exact/hole", { payload: CadHoleRequest, success: CadHoleReport, error: [BadRequest, Forbidden, NotFound, InternalError] })
+    HttpApiEndpoint.post("hole", "/api/cad/exact/hole", { payload: CadHoleRequest, success: CadHoleReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
+    HttpApiEndpoint.post("rebuild", "/api/cad/exact/rebuild", { payload: CadRebuildRequest, success: CadRebuildReport, error: [BadRequest, Forbidden, NotFound, InternalError] })
   )
 {}

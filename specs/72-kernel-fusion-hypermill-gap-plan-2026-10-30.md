@@ -289,4 +289,9 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `apps/sidecar/test/cam-setup.test.ts`) and in the desktop (setup description, service, store, download path). Gate met for one setup with two
   tools: one header, one `M30`, `T1 M6` .. `T2 M6`, `perTool` emits N numbered files. Open for 1.1: stock of setup 2 = residual stock of setup 1 (the
   program layer is the legacy generator's, not the kernel's: no stock carry-over), persistence (RM-03), AI actions (RM-01), UI controls.
+- 2026-10-30 (build, step 1.3): `POST /api/cad/exact/rebuild` (group `cadExact`, kernel job `cad-rebuild` in the same worker/queue/cache as the other CAD
+  routes): a parametric history in, the exact summary of each body, issues, warnings and `digest` out (`exactDigest` in `history-brep.ts`: ids, volume, area,
+  centroid rounded to a micro-unit, counts and face kinds). Gate met: `apps/sidecar/test/cad-rebuild.test.ts` compares the route's digest with the one of a
+  local `rebuildExact`. The request carries `history: Json` (the generated clients cannot port `ParametricHistory`'s checks); the handler decodes it and
+  answers 400 with the refused fields. Open for P1-3: desktop and AI do not call the route yet (they rebuild locally).
 

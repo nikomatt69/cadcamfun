@@ -63562,6 +63562,232 @@
         }
       }
     },
+    "/api/cad/exact/rebuild": {
+      "post": {
+        "tags": [
+          "cadExact"
+        ],
+        "operationId": "cadExact.rebuild",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "bodies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "exact": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "valid": {
+                            "type": "boolean"
+                          },
+                          "volume": {
+                            "type": "number"
+                          },
+                          "area": {
+                            "type": "number"
+                          },
+                          "centroid": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              },
+                              "z": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "genus": {
+                            "type": "integer"
+                          },
+                          "faces": {
+                            "type": "integer"
+                          },
+                          "edges": {
+                            "type": "integer"
+                          },
+                          "vertices": {
+                            "type": "integer"
+                          },
+                          "surfaces": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "exact"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "digest": {
+                      "type": "string"
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "feature": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "remedy": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "feature",
+                          "severity",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "parameters",
+                    "bodies",
+                    "digest",
+                    "issues",
+                    "warnings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "history": {},
+                  "budgetMs": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 120000
+                  }
+                },
+                "required": [
+                  "history"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/cam/setups/plan": {
       "post": {
         "tags": [

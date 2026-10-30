@@ -17702,6 +17702,232 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cad/exact/rebuild": {
+      "post": {
+        "operationId": "cadExact.rebuild",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "budgetMs": {
+                    "maximum": 120000,
+                    "minimum": 100,
+                    "type": "integer",
+                  },
+                  "history": {},
+                },
+                "required": [
+                  "history",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bodies": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "area": {
+                            "type": "number",
+                          },
+                          "centroid": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                          "edges": {
+                            "type": "integer",
+                          },
+                          "exact": {
+                            "type": "boolean",
+                          },
+                          "faces": {
+                            "type": "integer",
+                          },
+                          "genus": {
+                            "type": "integer",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "reason": {
+                            "type": "string",
+                          },
+                          "surfaces": {
+                            "additionalProperties": {
+                              "type": "integer",
+                            },
+                            "type": "object",
+                          },
+                          "valid": {
+                            "type": "boolean",
+                          },
+                          "vertices": {
+                            "type": "integer",
+                          },
+                          "volume": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "exact",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "digest": {
+                      "type": "string",
+                    },
+                    "issues": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "feature": {
+                            "type": "string",
+                          },
+                          "message": {
+                            "type": "string",
+                          },
+                          "remedy": {
+                            "type": "string",
+                          },
+                          "severity": {
+                            "enum": [
+                              "error",
+                              "warning",
+                            ],
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "feature",
+                          "severity",
+                          "message",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "ok": {
+                      "type": "boolean",
+                    },
+                    "parameters": {
+                      "additionalProperties": {
+                        "type": "number",
+                      },
+                      "type": "object",
+                    },
+                    "warnings": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "ok",
+                    "parameters",
+                    "bodies",
+                    "digest",
+                    "issues",
+                    "warnings",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
     "/api/cad/exact/setups": {
       "post": {
         "operationId": "cadExact.setups",

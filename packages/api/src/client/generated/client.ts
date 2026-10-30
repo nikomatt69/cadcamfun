@@ -2973,12 +2973,23 @@ const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) 
     },
   }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint28_5Request = Parameters<RawClient["cadExact"]["rebuild"]>[0]
+type Endpoint28_5Input = {
+  readonly history: Endpoint28_5Request["payload"]["history"]
+  readonly budgetMs?: Endpoint28_5Request["payload"]["budgetMs"]
+}
+const Endpoint28_5 = (raw: RawClient["cadExact"]) => (input: Endpoint28_5Input) =>
+  raw["rebuild"]({ payload: { history: input["history"], budgetMs: input["budgetMs"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
 const adaptGroup28 = (raw: RawClient["cadExact"]) => ({
   analyze: Endpoint28_0(raw),
   step: Endpoint28_1(raw),
   assembly: Endpoint28_2(raw),
   setups: Endpoint28_3(raw),
   hole: Endpoint28_4(raw),
+  rebuild: Endpoint28_5(raw),
 })
 
 type Endpoint29_0Request = Parameters<RawClient["camSetup"]["plan"]>[0]

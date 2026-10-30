@@ -1,6 +1,6 @@
 import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
-import { featureEditOf } from "@cadcamfun/ai"
+import { decodeHistory, featureEditOf } from "@cadcamfun/ai"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -75,6 +75,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         const edit = featureEditOf(payload)
         if (typeof edit === "string") return yield* new BadRequest({ message: edit })
         return yield* kernelRun("cad-hole", { elements, edit }, "Failed to edit the feature")
+      }))
+    .handle("rebuild", ({ payload }) =>
+      Effect.gen(function*() {
+        // The history is checked here, at the boundary, so a malformed one is a 400 that names each refused field and not a worker fault.
+        const decoded = decodeHistory(payload.history)
+        if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
+        return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
       }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {
