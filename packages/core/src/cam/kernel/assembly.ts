@@ -44,18 +44,18 @@ const arc = (cr: number, cz: number, radius: number, from: number, to: number, s
   })
 
 /** The cutting zone from the tip (on the axis) to the top of the flutes at the cutting radius. */
-const cuttingZone = (c: Cutter): ProfilePoint[] => {
+const cuttingZone = (c: Cutter, steps: number): ProfilePoint[] => {
   const R = c.diameter / 2
   const top = Math.max(c.fluteLength, 1e-3)
   switch (c.kind) {
     case "ball": {
-      const pts = arc(0, R, R, -Math.PI / 2, 0)
+      const pts = arc(0, R, R, -Math.PI / 2, 0, steps)
       return [...pts, { r: R, z: Math.max(top, R) }]
     }
     case "bull": {
       const rc = Math.min(Math.max(c.cornerRadius ?? 0, 0), R)
       if (rc <= 1e-9) return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: top }]
-      return [{ r: 0, z: 0 }, ...arc(R - rc, rc, rc, -Math.PI / 2, 0), { r: R, z: Math.max(top, rc) }]
+      return [{ r: 0, z: 0 }, ...arc(R - rc, rc, rc, -Math.PI / 2, 0, steps), { r: R, z: Math.max(top, rc) }]
     }
     case "chamfer":
     case "spot":
@@ -93,7 +93,7 @@ export const genericHolder = (c: Cutter): { readonly diameter: number; readonly 
   ({ diameter: Math.round(Math.max(c.shankDiameter * 1.6 + 12, 22)), length: 45 })
 
 /** The half-section of a tool assembly. */
-export const assemblyProfile = (c: Cutter, options: { readonly assumeHolder?: boolean } = {}): AssemblyProfile => {
+export const assemblyProfile = (c: Cutter, options: { readonly assumeHolder?: boolean; readonly arcSteps?: number } = {}): AssemblyProfile => {
   const points: ProfilePoint[] = []
   const parts: AssemblyPart[] = []
   const push = (p: ProfilePoint, part: AssemblyPart): void => {
@@ -102,7 +102,7 @@ export const assemblyProfile = (c: Cutter, options: { readonly assumeHolder?: bo
     if (last !== undefined) parts.push(part)
     points.push({ r: Math.max(0, p.r), z: p.z })
   }
-  for (const p of cuttingZone(c)) push(p, "cutting")
+  for (const p of cuttingZone(c, Math.max(2, Math.round(options.arcSteps ?? ARC_STEPS)))) push(p, "cutting")
   const R = c.diameter / 2
   const Rs = Math.max(c.shankDiameter / 2, 1e-3)
   const fluteTop = points[points.length - 1]!.z

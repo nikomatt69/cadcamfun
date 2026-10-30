@@ -5,6 +5,7 @@
 import { HeightField } from "../../src/cam/verify/heightfield.ts"
 import { verifyToolpath } from "../../src/cam/verify/verify.ts"
 import { sampleNodes } from "../../src/cam/operations/surface-field.ts"
+import { TRIDEXEL_WORKLOADS } from "./tridexel-workloads.ts"
 
 export const CAM_STOCK = { minX: -25, maxX: 25, minY: -20, maxY: 20, minZ: -12, maxZ: 0 }
 
@@ -18,6 +19,7 @@ export const CAM_GCODE_LINES = gcode.length
 const program = gcode.join("\n")
 
 export const CAM_WORKLOADS: Readonly<Record<string, () => number>> = {
+  ...TRIDEXEL_WORKLOADS,
   "stock-removal": () => {
     const field = new HeightField(500, 400, -25, -20, 50, 40, -12, 0)
     const cutter = { radius: 3, flat: false, profile: (r: number) => 3 - Math.sqrt(Math.max(0, 9 - r * r)) }
