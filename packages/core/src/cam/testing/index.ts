@@ -2,3 +2,4 @@
 export * from "./gcode-interpreter.ts"
 export * from "./header-tools.ts"
 export * from "./tool-words.ts"
+export * from "./tip-control.ts"

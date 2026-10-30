@@ -126,6 +126,9 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     // Tilted plane: the datum shift (cycle 7, absolute to the preset) is read as the local shift G52, the plane word goes to the replay as
     // it is (`PLANE SPATIAL` / `PLANE RESET`; the interpreter turns the frame).
     if (/^PLANE (?:SPATIAL|RESET)\b/.test(line)) return line
+    // Tool-centre-point mode written as a function (`FUNCTION TCPM F TCP AXIS POS PATHCTRL AXIS`, `FUNCTION RESET TCPM`): the interpreter's M128 / M129.
+    if (/^FUNCTION RESET TCPM\b/.test(line)) return "M129"
+    if (/^FUNCTION TCPM\b/.test(line)) return "M128"
     if (line === "CYCL DEF 7.0 DATUM SHIFT") return ""
     const shift = new RegExp(`^CYCL DEF 7\\.([1-3]) ([XYZ])(${NUMBER})$`).exec(line)
     if (shift) return "XYZ"[Number(shift[1]) - 1] === shift[2] ? `G52 ${shift[2]}${shift[3]}` : bad()

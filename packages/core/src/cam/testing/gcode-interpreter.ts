@@ -45,7 +45,7 @@ export interface P3 {
 }
 
 export type GSegment =
-  | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly subLine?: number; readonly rotary?: RotaryAngles }
+  | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly subLine?: number; readonly rotary?: RotaryAngles; readonly tcp?: true }
   | {
       readonly kind: "arc"
       readonly from: P3
@@ -57,6 +57,7 @@ export type GSegment =
       readonly feed: number
       readonly line: number
       readonly subLine?: number
+      readonly tcp?: true
     }
   | { readonly kind: "dwell"; readonly seconds: number; readonly line: number; readonly subLine?: number }
 
@@ -98,6 +99,13 @@ export interface InterpretOptions {
    * own segments.
    */
   readonly discard?: boolean
+  /**
+   * Blocks that switch the control's tool-centre-point mode on and off, for a post definition whose words are not built in (the
+   * built-in ones are read without this: Fanuc / Mazak `G43.4`, Haas `G234`, `M128` / `M129`, Siemens `TRAORI` / `TRAFOOF`). A block
+   * matches when its text, upper-cased with spaces collapsed, equals one of the strings. While the mode is on, every segment carries
+   * `tcp: true`: its X Y Z are the tool tip in part coordinates, not machine-axis positions (`tip-control.ts` carries them across).
+   */
+  readonly tipControl?: { readonly on: ReadonlyArray<string>; readonly off: ReadonlyArray<string> }
 }
 
 /** Largest chord sagitta of a G18/G19 arc, mm (the IR's `Arc` lies in XY, so other planes are replayed as chords). */
@@ -162,6 +170,8 @@ export interface InterpretResult {
   readonly unsupported: ReadonlyArray<{ readonly line: number; readonly word: string }>
   /** With `track`: the machine state of each segment, aligned with `segments`. */
   readonly states?: ReadonlyArray<MotionSample>
+  /** Motions read while the control's tool-centre-point mode was on (their coordinates are the tool tip in part coordinates). */
+  readonly tipControlSegments: number
 }
 
 interface Word {
@@ -262,6 +272,15 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   let retracted = false
   let homed = false
   const shift = { x: 0, y: 0, z: 0 }
+  // Tool-centre-point mode (G43.4 / G234 / M128 / TRAORI ...): while on, the segments' coordinates are the tool tip in part coordinates.
+  // A mode word that acts at the end of its block (Heidenhain M129) takes effect when the next block starts.
+  let tcpActive = false
+  let tcpOffAfterBlock = false
+  let tcpSegments = 0
+  const tcpBlock = (t: string): string => t.toUpperCase().replace(/\s+/g, " ").trim()
+  const tcpOn = new Set((options.tipControl?.on ?? []).map(tcpBlock))
+  const tcpOff = new Set((options.tipControl?.off ?? []).map(tcpBlock))
+  const tcpMark = (): { readonly tcp?: true } => { if (!tcpActive) return {}; tcpSegments++; return { tcp: true } }
 
   const note = (p: P3): void => {
     if (p.z < minZ) minZ = p.z
@@ -303,7 +322,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const angles = rotaryOf()
     if (dist(pos, to) < 1e-12 && !turned(angles)) return
     turned(angles)
-    segments.push(angles === undefined ? { kind: "rapid", from: pos, to, feed, line, ...inSub() } : { kind: "rapid", from: pos, to, feed, line, ...inSub(), rotary: angles })
+    segments.push(angles === undefined ? { kind: "rapid", from: pos, to, feed, line, ...inSub(), ...tcpMark() } : { kind: "rapid", from: pos, to, feed, line, ...inSub(), rotary: angles, ...tcpMark() })
     sample(line, to)
     rapidLength += dist(pos, to)
     pos = to
@@ -313,7 +332,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const angles = rotaryOf()
     if (dist(pos, to) < 1e-12 && !turned(angles)) return
     turned(angles)
-    segments.push(angles === undefined ? { kind: "linear", from: pos, to, feed: rate, line, ...inSub() } : { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), rotary: angles })
+    segments.push(angles === undefined ? { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), ...tcpMark() } : { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), rotary: angles, ...tcpMark() })
     sample(line, to)
     cutLength += dist(pos, to)
     pos = to
@@ -420,7 +439,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
     if (Math.hypot(target.x - pos.x, target.y - pos.y) < 1e-9 || sweep < 1e-12) sweep = 2 * Math.PI
     const length = Math.hypot(radiusStart * sweep, target.z - pos.z)
-    segments.push({ kind: "arc", from: pos, to: target, center, clockwise, radiusStart, radiusEnd, feed: rate, line, ...inSub() })
+    segments.push({ kind: "arc", from: pos, to: target, center, clockwise, radiusStart, radiusEnd, feed: rate, line, ...inSub(), ...tcpMark() })
     sample(line, target)
     cutLength += length
     pos = target
@@ -580,6 +599,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (keyword === "PLANE") { klartextPlane(code.toUpperCase()); return true }
     // Siemens `SPOS=<degrees>`: the spindle stops in position control at that angle.
     if (keyword === "SPOS") { orientSpindle(Number(/SPOS\s*=\s*([-+]?(?:\d+\.?\d*|\.\d+))/.exec(upper)?.[1] ?? 0)); return true }
+    if (keyword === "TRAORI") { tcpActive = true; return true }
+    if (keyword === "TRAFOOF") { tcpActive = false; return true }
     if (SILENT_STATEMENTS.has(keyword)) return true
     if (tokenize(code).some((w) => "XYZABCIJKRE".includes(w.letter)) || called !== null) {
       errors.push(`line ${physical}: unsupported ${keyword}`)
@@ -623,6 +644,12 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const lineNo = site ?? physical
     const code = stripLine(raw)
     if (code === "" || code.startsWith("%")) return "next"
+    if (tcpOffAfterBlock) { tcpActive = false; tcpOffAfterBlock = false }
+    if (tcpOn.size > 0 || tcpOff.size > 0) {
+      const block = tcpBlock(code)
+      if (tcpOn.has(block)) tcpActive = true
+      else if (tcpOff.has(block)) tcpActive = false
+    }
     if (statement(raw, code)) return "next"
     let words = tokenize(code)
     if (words[0]?.letter === "O") words = words.slice(1)
@@ -698,6 +725,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 113 || g === 13.1) { polar = false; pos = { ...pos, y: 0 }; if (progPos) progPos = { ...progPos, y: 0 } }
         // Brother Speedio tool change `G100 T<n> M6`: the T and M6 on the line do the work; G100 alone (Fanuc tool-data setting) is not read.
         else if (g === 100 && words.some((v) => v.letter === "M" && Math.round(v.value) === 6)) { /* tool change block */ }
+        else if (g === 43.4 || g === 234) tcpActive = true
+        else if (g === 43 || g === 49) tcpActive = false
         else if (ACCEPTED_G.includes(g)) {
           // Accepted modal words without geometric effect here (tool length, exact stop / blending, look-ahead, TCP, G53.1).
         } else { errors.push(`line ${physical}: unsupported G${g}`); unsupported.push({ line: physical, word: `G${g}` }) }
@@ -722,6 +751,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (m === 9) coolant = "off"
         else if (m === 82) eAbsolute = true
         else if (m === 83) eAbsolute = false
+        else if (m === 128) tcpActive = true
+        else if (m === 129) tcpOffAfterBlock = true
         if ([104, 109, 140, 190, 106, 107, 141, 191].includes(m)) sIsParameter = true
       } else if (w.letter === "T") {
         const n = Math.round(w.value)
@@ -1064,7 +1095,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   flushComp()
   drain()
 
-  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, orients, unsupported, ...(states !== undefined ? { states } : {}) }
+  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, orients, unsupported, tipControlSegments: tcpSegments, ...(states !== undefined ? { states } : {}) }
 }
 
 // -- frame maths ----------------------------------------------------------------------------------------------------------

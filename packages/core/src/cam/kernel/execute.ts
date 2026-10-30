@@ -47,6 +47,7 @@ import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/c
 import { compileDefinition, dialectOf, getPost } from "../post/index.ts"
 import { genericPost } from "../post/generic.ts"
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
+import { carryTipControl, type TipKinematic } from "../testing/tip-control.ts"
 import type { Stock } from "../tool.ts"
 import { HeightField } from "../verify/heightfield.ts"
 import { forEachSample, pathFromProgram, type PathSegment } from "../verify/path.ts"
@@ -798,9 +799,23 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const written = job.post?.definition === undefined ? undefined : compileDefinition(job.post.definition)
   const post = written?.ok === true ? written.post : getPost(machine.post) ?? genericPost
   let nc = ""
+  // Tool-centre-point output (`post.options.tcp: true`): the toolpaths are in machine coordinates (the table has turned), the post writes the
+  // tip in part coordinates under the control's own word, and the replay carries it back (`carryTipControl`). Refused, never approximated,
+  // when the dialect has no such word or the machine has no table kinematics to carry it through.
+  const postDialect = written?.ok === true ? written.dialect : dialectOf(post.id)
+  const wantsTcp = job.post?.options?.tcp === true
+  let tcpKinematics = job.post?.options?.kinematics
+  let tcpRefusal: string | undefined
+  if (wantsTcp && tcpKinematics === undefined) {
+    const five = machine.fiveAxis
+    if (postDialect?.tcp === undefined) tcpRefusal = `post ${post.id} has no tool-centre-point word: post with tcp false (machine coordinates), or choose a post with G43.4, G234, M128 or TRAORI`
+    else if (five === undefined) tcpRefusal = `${machine.name} has no five-axis table: tool-centre-point output needs the table kinematics (layout, pivot) to carry the tip to machine coordinates`
+    else tcpKinematics = fiveAxisKinematic({ layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) }, pivot: five.pivot, tcp: "program" })
+  }
+  if (tcpRefusal !== undefined) issues.push(issue("UnsupportedCapability", "post", `tcp: true refused: ${tcpRefusal}`))
   try {
     // The kernel writes machine coordinates (indexed setups): no tip-control word unless the caller asks for one.
-    nc = toolpaths.length === 0 ? "" : post.emit(program, { tcp: false, ...job.post?.options, toolNumbers: numbers, retractBeforeToolChange: true })
+    nc = toolpaths.length === 0 || tcpRefusal !== undefined ? "" : post.emit(program, { tcp: false, ...job.post?.options, ...(wantsTcp && tcpKinematics !== undefined ? { kinematics: tcpKinematics } : {}), toolNumbers: numbers, retractBeforeToolChange: true })
   } catch (error) {
     issues.push(issue("GenerationFailed", "post", `Post ${post.id}: ${error instanceof Error ? error.message : String(error)}`))
   }
@@ -828,7 +843,25 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const initial = { x: 0, y: 0, z: CLEARANCE + 10 }
   // The replay reads dwells in the post's unit (Fanuc and Haas write milliseconds on `G4 P`).
   const radiusOfNumber = new Map(Object.entries(numbers).map(([id, number]) => [number, toolOf(id).diameter / 2] as const))
-  const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds", okuma: post.id === "okuma" })
+  // The words of a definition's own tool-centre-point mode, for every tool number (the built-in words are read without this).
+  const tipWords = ((): { readonly on: string[]; readonly off: string[] } | undefined => {
+    const code = postDialect?.tcp
+    if (code === undefined) return undefined
+    const tools = Object.values(numbers)
+    return typeof code === "string"
+      ? { on: tools.map((n) => `${code} H${n}`), off: tools.map((n) => `G43 H${n}`) }
+      : { on: tools.map((n) => code.on(n, job.post?.options?.tcpTransformation)), off: tools.flatMap((n) => [code.off(n), ...(code.end !== undefined ? [code.end(n)] : [])]) }
+  })()
+  const read = nc === "" ? undefined : interpretGcode(nc, { start: initial, toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
+  // Spec 72 step 0.2: motions read under the control's tool-centre-point mode are the tip in part coordinates. Every check below reads machine
+  // coordinates with the angles in force, so they are carried across once, here, through the machine's table (or the caller's kinematics).
+  const carryKinematic: TipKinematic | undefined = machine.fiveAxis ?? (tcpKinematics !== undefined ? { layout: tcpKinematics.layout, pivot: tcpKinematics.pivot } : undefined)
+  const carry = read === undefined || read.tipControlSegments === 0 || carryKinematic === undefined ? undefined : carryTipControl(read.segments, carryKinematic, { tolerance: job.post?.options?.tolerance ?? 0.01 })
+  if (read !== undefined && read.tipControlSegments > 0 && carryKinematic === undefined) {
+    issues.push(issue("UnsupportedCapability", "replay", `${read.tipControlSegments} NC motions run under tool-centre-point control, but ${machine.name} has no table kinematics to carry the tool tip to machine coordinates: they are not replayed`))
+  }
+  if (carry !== undefined && carry.unconverged > 0) issues.push(issue("ReplayMismatch", "replay", `${carry.unconverged} tool-centre-point motions turn the table faster than the replay can follow within ${(job.post?.options?.tolerance ?? 0.01)} mm: reduce the angle step of the toolpath`, { severity: "warning" }))
+  const interpreted = read === undefined || carry === undefined ? read : { ...read, segments: carry.segments }
   // The replay cell: the one the stock was generated at, coarsened by doubling (at most three times) while the replay of this
   // NC would pass its work budget. The coarser cell is a declared term of the tolerance budget (`stock-replay`) and a warning, so
   // the claims keep their meaning with a wider bound instead of being halted (spec 69 A5). Only a program that is still over
@@ -1127,15 +1160,21 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   // Independent replay versus the planned motion.
   const planned = pathFromProgram(program, initial)
+  // A control that keeps the tip only on feed moves (Haas G234) gets its rapids that turn the table as feed moves from the post: they are cuts to the
+  // replay and rapids to the plan, so for that post the extent is taken over every move on both sides.
+  const rapidsAsFeed = carry !== undefined && postDialect?.tcpLimits?.noRapidRotary === true
   const extent = (segs: ReadonlyArray<{ readonly rapid: boolean; readonly to: { x: number; y: number; z: number } }>) => {
     let minZ = Infinity, minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const s of segs) { if (s.rapid) continue; minZ = Math.min(minZ, s.to.z); minX = Math.min(minX, s.to.x); maxX = Math.max(maxX, s.to.x); minY = Math.min(minY, s.to.y); maxY = Math.max(maxY, s.to.y) }
+    for (const s of segs) { if (s.rapid && !rapidsAsFeed) continue; minZ = Math.min(minZ, s.to.z); minX = Math.min(minX, s.to.x); maxX = Math.max(maxX, s.to.x); minY = Math.min(minY, s.to.y); maxY = Math.max(maxY, s.to.y) }
     return [minX, maxX, minY, maxY, minZ]
   }
   const decimals = job.post?.options?.decimals ?? 3
-  const rounding = 2 * Math.pow(10, -decimals) + 1e-9
+  // Tool-centre-point output adds two declared terms: the rounding of each rotary angle (written to the same decimals) acts on the lever from the
+  // pivot, and the pieces that follow the tip path are within the post's splitting tolerance of the planned machine-axis line.
+  const tcpTerm = carry === undefined ? 0 : carry.maxRadius * (Math.PI / 180) * Math.pow(10, -decimals) + (job.post?.options?.tolerance ?? 0.01)
+  const rounding = 2 * Math.pow(10, -decimals) + 1e-9 + tcpTerm
   const plannedExtent = extent(planned.segments)
-  const replayedExtent = interpreted === undefined ? [] : extent(interpreted.segments.filter((s): s is Exclude<GSegment, { kind: "dwell" }> => s.kind !== "dwell").map((s) => ({ rapid: s.kind === "rapid", to: s.to })))
+  const replayedExtent = interpreted === undefined ? [] : extent(interpreted.segments.filter((s): s is Exclude<GSegment, { kind: "dwell" }> => s.kind !== "dwell" && carry?.interior.has(s) !== true).map((s) => ({ rapid: s.kind === "rapid", to: s.to })))
   const extentAgrees = replayedExtent.length === plannedExtent.length && plannedExtent.every((v, i) => Math.abs(v - replayedExtent[i]!) <= rounding)
   if (interpreted !== undefined && interpreted.errors.length > 0) issues.push(issue("ReplayMismatch", "replay", `The NC interpreter could not model: ${interpreted.errors.slice(0, 3).join("; ")}`))
   if (interpreted !== undefined && !extentAgrees) issues.push(issue("ReplayMismatch", "replay", `The replayed NC reaches [${replayedExtent.map((v) => v.toFixed(3)).join(", ")}], the planned motion [${plannedExtent.map((v) => v.toFixed(3)).join(", ")}]`))
