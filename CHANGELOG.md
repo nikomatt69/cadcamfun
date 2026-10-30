@@ -3,6 +3,56 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.47 (October 2026)
+
+## Core
+
+- Tolerance limit scales with body size (3e-6), Boolean validates with the operands' slack
+- Keep the recorded derivation on the result that carries the tolerances
+- Scene export skips loose bodies
+- Fuzz residual seeds 81/116 solved exactly, seed 33 named; Halton oracle
+- Imported solids are History.bases, not a new Feature kind
+- Imported base feature - a healed STEP body accepts later history features (spec 72 step 2.2)
+- Tolerance rules across Booleans, STEP export refuses loose bodies, circle refit in healBrep (spec 42 R6)
+- Re-parametrise a bare sphere or torus operand before any displacement (spec 42 R3/R4)
+- HTTP parametric rebuild with an exact-model digest, cadExact.rebuild (spec 72 step 1.3)
+- Multi-operation setups over HTTP, camSetup plan/validate/generate (spec 14 §4, spec 72 step 1.2)
+- Multi-operation setups as a core module, cam.program (spec 14, spec 72 step 1.1): planPrograms, tool table, one emit per program, validation
+- Typed face operation in the three-axis tcp refusal test
+- Tcp true gives the machine-coordinate verdicts on dome and swarf for five dialects; wrong pivot, refusals, custom blocks
+- Replay carries tool-centre-point motions to machine coordinates, tcp opt-in builds the table kinematics (spec 72 step 0.2)
+- Spindle orientation through every post, refusal, replay and convertNc; spec 72 note; regenerate API types
+- SpindleOrient IR move with per-dialect words; back-boring emits it instead of M19 comments
+- Exact rapid, shank and holder contacts on the tri-dexel for moves with the table turned (spec 72 step 0.5, part 1)
+- Expose job breadth (hole cycles, tilted drilling, named features) through the contract, sidecar and AI prompts
+- Run hole cycles and breadth planning in jobs (spec 72 P2-5 wiring)
+- Move geometry within tolerance, loose flag, gap diagnostics (spec 42 R6)
+- Solve designed coincidence and tangent contact in place (spec 42 R3/R4)
+- Exact orient2d/orient3d/incircle predicates for point-in-face winding (spec 42 R2)
+- Planner rules for hole cycles and named features, each decision names its rule
+- Named feature recognition on the exact B-rep (slots, steps, grooves, chamfer and fillet bands)
+- Countersink, deep-hole, back-bore and tilted drilling cycles
+- Countersink, boring bar, T-slot and dovetail cutters
+- Mitsubishi MELDAS and Brother Speedio vendor dialects with golden NC and documented differences
+- Five-axis frame conversion, TCP on/off by machine, rotary rate limit and inverse-time feed
+- Tilted work planes (Fanuc G68.2+G53.1, Siemens CYCLE800, Heidenhain PLANE SPATIAL) with replay-proven tool-tip positions
+- Tri-dexel replay for jobs with the table turned, fault-injection set, verifyNc (spec 72 steps 0.3, 0.4, 0.6)
+
+## Desktop
+
+- Multi-operation setup description, camSetup service and store; the panel downloads through camSetup.generate (spec 14, spec 72 step 1.2)
+
+## API
+
+- OpenAPI snapshot carries the SpindleOrient move
+
+## Documentation
+
+- Spec 42 tolerance slack note
+- Spec 42 6.1 and spec 72 change log for the kernel remainder (fuzz 1-240, tolerance, import)
+- Spec 72 log for tip-control replay and kernel tcp
+- Spec 42 status and spec 72 change log for Wave 2 steps 2.1/2.2
+
 ## v0.1.46 (October 2026)
 
 ## Core
