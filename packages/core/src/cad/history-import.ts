@@ -11,7 +11,7 @@
  * The bodies go into a history with `withImported` (`History.bases`); every later feature (hole, pocket, fillet, move, mirror,
  * pattern) then acts on the imported body as on a body the history built itself, in the mesh replay and in the exact replay.
  */
-import { healBrep, readStepBreps, validateBrep, type Brep, type HealOptions, type HealReport } from "./brep/index.ts"
+import { BREP_LIMITS, MAX_BASES, MAX_BASES_BYTES, brepFromJson, brepToJson, formatPath, healBrep, readStepBreps, validateBrep, type Brep, type BrepLimits, type HealOptions, type HealReport } from "./brep/index.ts"
 import { looseFaceIndices, toleranceLimit } from "./brep/tolerance.ts"
 import type { History, ImportedBase } from "./history.ts"
 
@@ -46,6 +46,21 @@ export interface HistoryImportOptions {
   readonly heal?: HealOptions
   /** Body id prefix (default `imported`). */
   readonly idPrefix?: string
+  /** What one stored body may weigh (default `BREP_LIMITS`); a body above it is refused with the reason. */
+  readonly limits?: BrepLimits
+}
+
+/**
+ * Why a body cannot be stored as a base: too many faces or characters (`BrepLimits`), or a shape the JSON form refuses (a number
+ * that is not finite, an index that points nowhere). Undefined when it can be stored.
+ */
+export const baseStorageProblem = (brep: Brep, limits: BrepLimits = BREP_LIMITS): string | undefined => {
+  let json: ReturnType<typeof brepToJson>
+  try { json = brepToJson(brep) } catch (error) { return error instanceof Error ? error.message : String(error) }
+  const decoded = brepFromJson(json, limits)
+  if (decoded.ok) return undefined
+  const first = decoded.problems[0]!
+  return `${formatPath(first.path)}: ${first.message}`
 }
 
 /** Reads a STEP file into base bodies. Never throws for a bad body: it is reported as refused. */
@@ -82,6 +97,14 @@ export const importStepToHistory = (text: string, options: HistoryImportOptions 
         return
       }
     }
+    const stored = baseStorageProblem(brep, options.limits)
+    if (stored !== undefined || bases.length >= MAX_BASES) {
+      report.push({
+        name, status: "refused", faces: brep.faces.length, maxTolerance: validateBrep(brep).maxTolerance ?? 0, limit: toleranceLimit(brep), loose: false,
+        diagnostics: [stored !== undefined ? `too large or not storable as a base body: ${stored}` : `a history holds at most ${MAX_BASES} imported bodies`]
+      })
+      return
+    }
     const rep = validateBrep(brep)
     const limit = toleranceLimit(brep)
     const maxTol = rep.maxTolerance ?? 0
@@ -113,4 +136,17 @@ export const withImported = (history: History, imported: HistoryImport | Readonl
     return id === b.id ? b : { ...b, id }
   })
   return { ...history, bases: [...(history.bases ?? []), ...fresh] }
+}
+
+/** The history with each base body in its JSON form (version tag), the form the API, the store and the desktop carry. */
+export const historyToJson = (history: History): History =>
+  history.bases === undefined ? history : { ...history, bases: history.bases.map((b) => ({ ...b, brep: brepToJson(b.brep) })) }
+
+/** Why the bases of `history` cannot be stored together (their sum is above `MAX_BASES_BYTES`), or undefined. */
+export const basesStorageProblem = (history: History): string | undefined => {
+  const bases = history.bases ?? []
+  if (bases.length > MAX_BASES) return `a history holds at most ${MAX_BASES} imported bodies, this one has ${bases.length}`
+  let total = 0
+  for (const b of bases) total += JSON.stringify(b.brep).length
+  return total > MAX_BASES_BYTES ? `the imported bodies are ${total} characters of JSON together, above the limit of ${MAX_BASES_BYTES}` : undefined
 }
