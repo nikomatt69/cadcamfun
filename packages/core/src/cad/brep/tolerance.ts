@@ -80,5 +80,12 @@ export const inheritTolerance = (result: Brep, report: BrepReport, operands: Rea
   return { brep, maxTolerance: maxTolerance(brep), inherited, limit: bound, looseFaces }
 }
 
+/** Why a body is loose (a face flagged, or a tolerance above `limit`, default `toleranceLimit`), or undefined when it is not. */
+export const looseReason = (b: Brep, limit?: number): { readonly why: string; readonly maxTolerance: number; readonly limit: number; readonly looseFaces: ReadonlyArray<number> } | undefined => {
+  const tol = maxTolerance(b), bound = limit ?? toleranceLimit(b), flagged = looseFaceIndices(b)
+  if (flagged.length === 0 && tol <= bound) return undefined
+  return { why: `${flagged.length > 0 ? `${flagged.length} face(s) flagged loose, ` : ""}largest tolerance ${tol.toExponential(2)} mm against the limit ${bound.toExponential(1)} mm`, maxTolerance: tol, limit: bound, looseFaces: flagged }
+}
+
 /** Faces of `b` flagged loose. */
 export const looseFaceIndices = (b: Brep): ReadonlyArray<number> => b.faces.flatMap((f, i) => (f.loose === true ? [i] : []))

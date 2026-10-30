@@ -38,6 +38,7 @@ import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 import { exactReplay, type ExactReplay } from "./history-brep.ts"
 import { bodyCreator, bodyRefs, declaredNeeds, timelinePlan } from "./history-timeline.ts"
+import type { Brep } from "./brep/topology.ts"
 import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
 import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
@@ -497,6 +498,30 @@ export interface PrimitiveFeature {
   readonly targets?: ReadonlyArray<string>
 }
 
+/**
+ * A solid brought in from outside the history: a STEP (or IGES) body read and healed by `importStepToHistory`, kept as the exact
+ * B-rep it was healed to. It is a base feature like a primitive: `new` makes a body (the usual case), `union` / `subtract` /
+ * `intersect` combine it with the bodies so far, and every later feature (hole, pocket, fillet, move, mirror) acts on it as on a
+ * body the history built itself. The B-rep is stored in millimetres where the file placed it; a `move` feature relocates it.
+ * Changing a parameter never changes it: it has no parameters, it is the frozen result of the import.
+ */
+export interface ImportedFeature {
+  readonly id: string
+  readonly type: "imported"
+  readonly brep: Brep
+  readonly operation: Operation
+  readonly targets?: ReadonlyArray<string>
+  /** Where it came from and what the import did to it (display and audit; the replay never reads it). */
+  readonly source?: {
+    readonly format: "step" | "iges"
+    readonly name?: string
+    /** Vertices and edges welded, and vertices moved, by the healing pass. */
+    readonly healed?: { readonly verticesWelded: number; readonly edgesWelded: number; readonly verticesTightened: number; readonly maxMove: number }
+    /** The largest vertex or edge tolerance of the stored body, mm. */
+    readonly maxTolerance?: number
+  }
+}
+
 /** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name` and `group` are display. */
 export interface FeatureMeta {
   /** Left out of the model together with everything that needs it; nothing is deleted. */
@@ -507,7 +532,7 @@ export interface FeatureMeta {
   readonly group?: string
 }
 
-export type Feature = (SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature | RibFeature | SheetFeature | ThreadFeature | TextFeature | PushPullFeature | DraftFeature | MateFeature | PlaneFeature) & FeatureMeta
+export type Feature = (SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature | RibFeature | SheetFeature | ThreadFeature | TextFeature | PushPullFeature | DraftFeature | MateFeature | PlaneFeature | ImportedFeature) & FeatureMeta
 
 /** A named fold of the timeline (display only: a group never changes a replay). */
 export interface TimelineGroup { readonly id: string; readonly name: string; readonly collapsed?: boolean }
@@ -1422,6 +1447,17 @@ export const rebuild = (history: History): RebuildResult => {
           const built = elementMesh(fields)
           if (built === undefined) { issues.push({ feature: f.id, severity: "error", message: `The ${f.element} cannot be built from these measures${f.element === "extrusion" || f.element === "revolution" ? " (it needs a profile of points; a revolution needs them on one side of the axis)" : ""}` }); break }
           const tool: Mesh = { positions: Float32Array.from(built.positions), indices: built.indices }
+          tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "imported": {
+          if (f.brep === undefined || !Array.isArray(f.brep.faces) || f.brep.faces.length === 0) { issues.push({ feature: f.id, severity: "error", message: "The imported feature carries no B-rep" }); break }
+          const t = tessellateBrep(f.brep, { chordTol: 0.01 })
+          if (t.indices.length === 0) { issues.push({ feature: f.id, severity: "error", message: "The imported body gives no triangles: its faces cannot be meshed" }); break }
+          const defects = meshEdgeDefects(t.indices)
+          if (t.warnings.length > 0 || defects.open + defects.nonManifold + defects.misoriented > 0) issues.push({ feature: f.id, severity: "warning", message: `The mesh of the imported body is not a checked closed shell (${[...t.warnings, `${defects.open} open, ${defects.nonManifold} non-manifold, ${defects.misoriented} misoriented edges`].join("; ")}); the exact model is unaffected` })
+          const tool: Mesh = { positions: Float32Array.from(t.positions), indices: t.indices }
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break

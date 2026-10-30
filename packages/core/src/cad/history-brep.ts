@@ -890,6 +890,23 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
             apply(f.id, exact, f.operation, f.targets, f.id)
             break
           }
+          case "imported": {
+            // The healed body of an import is the exact model as stored. It is checked again: a stored body can have been edited
+            // by hand or come from an older kernel, and a Boolean on an invalid solid fails far from the cause.
+            let exact: Exact
+            if (f.brep === undefined || !Array.isArray(f.brep.faces) || f.brep.faces.length === 0) exact = no("the imported feature carries no B-rep")
+            else {
+              const rep = validateBrep(f.brep, { skipVolume: true })
+              if (!rep.valid || !rep.manifoldSolid) exact = no(`the imported body is not a valid closed solid: ${rep.issues.slice(0, 3).map((i) => i.message).join("; ") || "an open shell"}`)
+              else {
+                exact = ok(f.brep)
+                if (f.brep.faces.some((face) => face.loose === true)) warnings.push(`${f.id}: the imported body is loose (largest tolerance ${(rep.maxTolerance ?? 0).toExponential(1)} mm); results built on it carry that tolerance and STEP export refuses them unless allowed`)
+              }
+            }
+            tools.set(f.id, { exact: [exact], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, exact, f.operation, f.targets, f.id)
+            break
+          }
           case "move": {
             const shift = f.translate?.map(dim)
             let tr: Transform = { m: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: { x: 0, y: 0, z: 0 } }

@@ -17,6 +17,7 @@ import {
   readStepBreps,
   transformBrep,
   translation,
+  looseReason,
   validateBrep,
   writeIgesBreps,
   writeStepBreps,
@@ -266,7 +267,19 @@ const collectSceneBreps = (elements: ReadonlyArray<Element>, options: SceneStepO
  * kernel has a model, faceted otherwise.
  */
 export const sceneToStep = (elements: ReadonlyArray<Element>, options: SceneStepOptions = {}): SceneStep => {
-  const { breps, parts, skipped } = collectSceneBreps(elements, options)
+  const collected = collectSceneBreps(elements, options)
+  // A loose body (spec 42 R6) is not written unless the caller allows it: it is skipped with its tolerance and the limit, not
+  // allowed to fail the whole file or to pass as a sound solid.
+  const loose = new Set<string>()
+  const skipped = [...collected.skipped]
+  const breps = collected.breps.filter((p) => {
+    const l = options.allowLoose === true ? undefined : looseReason(p.brep, options.maxTolerance)
+    if (l === undefined) return true
+    loose.add(p.name)
+    skipped.push({ id: collected.parts.find((x) => x.name === p.name)?.id ?? p.name, name: p.name, reason: `loose body, not written (${l.why}); heal it with a tighter fit or export with allowLoose` })
+    return false
+  })
+  const parts = collected.parts.map((p) => (loose.has(p.name) ? { ...p, note: `${p.note === undefined ? "" : `${p.note}; `}loose: not written` } : p))
   return breps.length === 0 ? { parts, skipped } : { step: writeStepBreps(breps, options), parts, skipped }
 }
 

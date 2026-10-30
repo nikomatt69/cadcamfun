@@ -16,8 +16,7 @@
 import { compose, cross3, dot3, frame, IDENTITY, length3, neg3, normalize3, sub3, type Frame, type Transform, type Vec3 } from "./math.ts"
 import { curvePeriod, curvePoint, curveProject, curveRange, type Curve3, type Surface } from "./geom.ts"
 import type { NurbsCurveData, NurbsSurfaceData } from "./nurbs.ts"
-import { looseFaceIndices, toleranceLimit } from "./tolerance.ts"
-import { maxTolerance } from "./validate.ts"
+import { looseReason } from "./tolerance.ts"
 import { BrepBuilder, transformBrep, type Brep, type Coedge, type Shell } from "./topology.ts"
 
 // ================================================================ parser
@@ -805,12 +804,11 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
   const looseNotes: string[] = []
   let worstTolerance = 1e-6
   for (const part of parts) {
-    const tol = maxTolerance(part.brep), limit = options.maxTolerance ?? toleranceLimit(part.brep), flagged = looseFaceIndices(part.brep)
-    if (flagged.length === 0 && tol <= limit) continue
-    const why = `${flagged.length > 0 ? `${flagged.length} face(s) flagged loose, ` : ""}largest tolerance ${tol.toExponential(2)} mm against the limit ${limit.toExponential(1)} mm`
-    if (options.allowLoose !== true) throw new StepExportError(`STEP export refused for "${part.name}": the body is loose (${why}); heal it with a tighter fit, or export with allowLoose`, part.name, tol, limit, flagged)
-    looseNotes.push(`LOOSE ${part.name}: ${why}`)
-    worstTolerance = Math.max(worstTolerance, tol)
+    const loose = looseReason(part.brep, options.maxTolerance)
+    if (loose === undefined) continue
+    if (options.allowLoose !== true) throw new StepExportError(`STEP export refused for "${part.name}": the body is loose (${loose.why}); heal it with a tighter fit, or export with allowLoose`, part.name, loose.maxTolerance, loose.limit, loose.looseFaces)
+    looseNotes.push(`LOOSE ${part.name}: ${loose.why}`)
+    worstTolerance = Math.max(worstTolerance, loose.maxTolerance)
   }
   const w = new StepWriter()
   const P = (p: Vec3) => w.add(`CARTESIAN_POINT('',(${num(p.x)},${num(p.y)},${num(p.z)}))`)
