@@ -127,3 +127,40 @@ describe("aligned fuzz residuals are solved in place or named (spec 42 gate 1)",
     expect(Math.abs(vol(out.i) - mc) / mc).toBeLessThan(0.02)
   })
 })
+
+describe("generic fuzz residuals (spec 42 gate 1, seeds 61-200)", () => {
+  test("generic seed 133: a cylinder cut by a torus where the plane cut meets the rim at 8 degrees is solved, not refused", () => {
+    // Before: every union and difference was refused ("face 1 gives no triangle"): at the validation's coarse chord (0.05 mm)
+    // the polylines of the cap's rim and of the torus section cross near their shared vertex, so the cap did not mesh and the
+    // solid was called incomplete. The solid was right; the validation now retries a face that does not mesh at finer chords.
+    const [A, B] = fuzzPair(133, false)
+    resetBooleanCounters()
+    const u = booleanBrep(A, B, "union"), i = booleanBrep(A, B, "intersect"), d = booleanBrep(A, B, "subtract")
+    for (const x of [u, i, d]) expect(validateBrep(x.brep).issues.map((m) => m.message)).toEqual([])
+    expect(booleanCounters().recoveredByDisplacement).toBe(0)
+    expect([...u.warnings, ...i.warnings, ...d.warnings]).toEqual([])
+    identities(A, B, { u: u.brep, i: i.brep, d: d.brep, warnings: [], counters: booleanCounters() }, 1e-9)
+    // Oracle: the two analytic solids in their own frames.
+    const c = A.faces[0]!.surface, t = B.faces[0]!.surface
+    if (c.kind !== "cylinder" || t.kind !== "torus") throw new Error("unexpected operands")
+    const axial = (p: Vec3) => (p.x - c.frame.origin.x) * c.frame.z.x + (p.y - c.frame.origin.y) * c.frame.z.y + (p.z - c.frame.origin.z) * c.frame.z.z
+    let h0 = Infinity, h1 = -Infinity
+    for (const v of A.vertices) { h0 = Math.min(h0, axial(v.point)); h1 = Math.max(h1, axial(v.point)) }
+    const inC = (p: Vec3) => {
+      const h = axial(p)
+      const qx = p.x - c.frame.origin.x - h * c.frame.z.x, qy = p.y - c.frame.origin.y - h * c.frame.z.y, qz = p.z - c.frame.origin.z - h * c.frame.z.z
+      return h > h0 && h < h1 && qx * qx + qy * qy + qz * qz < c.radius * c.radius
+    }
+    const inT = (p: Vec3) => {
+      const dx = p.x - t.frame.origin.x, dy = p.y - t.frame.origin.y, dz = p.z - t.frame.origin.z
+      const h = dx * t.frame.z.x + dy * t.frame.z.y + dz * t.frame.z.z
+      const px = dx - h * t.frame.z.x, py = dy - h * t.frame.z.y, pz = dz - h * t.frame.z.z
+      return (Math.hypot(px, py, pz) - t.major) ** 2 + h * h < t.minor * t.minor
+    }
+    const lo = { x: -8, y: -8, z: -8 }, hi = { x: 10, y: 10, z: 5 }
+    const mcI = sampledVolume(lo, hi, (p) => inC(p) && inT(p))
+    const mcU = sampledVolume(lo, hi, (p) => inC(p) || inT(p))
+    expect(Math.abs(vol(i.brep) - mcI) / mcI).toBeLessThan(0.03)
+    expect(Math.abs(vol(u.brep) - mcU) / mcU).toBeLessThan(0.01)
+  })
+})

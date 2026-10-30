@@ -12,10 +12,21 @@ import { tessellateBrep } from "./tessellate.ts"
 
 /** Signed volume of a coarse watertight tessellation (divergence theorem over its triangles). */
 const coarseVolume = (b: Brep): { readonly volume: number; readonly empty: ReadonlyArray<number> } => {
-  const t = tessellateBrep(b, { chordTol: 0.05, angleTolDeg: 30 })
-  // A face with a boundary that gives no triangle at all drops its share of the volume without any other sign.
-  const meshed = new Set(t.faces.filter((f) => f.indices.length > 0).map((f) => f.face))
-  const empty = b.faces.map((f, i) => (f.loops.length > 0 && !meshed.has(i) ? i : -1)).filter((i) => i >= 0)
+  // A face with a boundary that gives no triangle at all drops its share of the volume without any other sign. A coarse
+  // polyline can cross itself where two edges meet at a shallow angle (a plane cut by a torus meeting the rim at 8 degrees:
+  // the chords of the two edges cross at 0.05 mm, not at 0.01 mm), so a face that does not mesh coarsely is tried with finer
+  // tolerances before the solid is called incomplete.
+  let t = tessellateBrep(b, { chordTol: 0.05, angleTolDeg: 30 })
+  const emptyOf = (m: typeof t) => {
+    const meshed = new Set(m.faces.filter((f) => f.indices.length > 0).map((f) => f.face))
+    return b.faces.map((f, i) => (f.loops.length > 0 && !meshed.has(i) ? i : -1)).filter((i) => i >= 0)
+  }
+  let empty = emptyOf(t)
+  for (const [chordTol, angleTolDeg] of [[0.01, 15], [0.002, 8]] as const) {
+    if (empty.length === 0) break
+    t = tessellateBrep(b, { chordTol, angleTolDeg })
+    empty = emptyOf(t)
+  }
   const p = t.positions, ix = t.indices
   let v = 0
   for (let i = 0; i < ix.length; i += 3) {
