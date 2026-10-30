@@ -285,3 +285,8 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `M19` on the Fanuc family and Okuma, and the Heidenhain cycle-13 block order (whether `CYCL CALL` is needed), are from memory and
   not qualified on a control. Post definitions inherit the base's word; a definition cannot yet set its own (`PostDefinitionSchema`
   has no field). Tests: `test/cam/spindle-orient.test.ts` (32).
+- 2026-10-30 (build, steps 1.1 and 1.2 partial): `cam.program` (spec 14) built in core, over HTTP (`camSetup` plan/validate/generate, tests in
+  `apps/sidecar/test/cam-setup.test.ts`) and in the desktop (setup description, service, store, download path). Gate met for one setup with two
+  tools: one header, one `M30`, `T1 M6` .. `T2 M6`, `perTool` emits N numbered files. Open for 1.1: stock of setup 2 = residual stock of setup 1 (the
+  program layer is the legacy generator's, not the kernel's: no stock carry-over), persistence (RM-03), AI actions (RM-01), UI controls.
+

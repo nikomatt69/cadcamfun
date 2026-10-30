@@ -14,6 +14,10 @@ import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useSelectionStore } from "../../../cad/store/selectorStore.ts"
 import { useApp } from "../../../../shared/state/context.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
+import { makeSetupService } from "../../api/setup.ts"
+import { stockOf } from "../../lib/job.ts"
+import { elementsOfSetup, programFileName, setupOfToolpaths } from "../../lib/setup.ts"
+import { useSetupStore } from "../../store/setupStore.ts"
 import { effectiveSettings, generateForElement } from "../../lib/elementGenerate.ts"
 import { assignmentProblem, type ToolpathSettings } from "../../lib/elementJob.ts"
 import { formatDuration, measurePoints, parseGCodeToPoints, statistics } from "../../lib/multiToolpath.ts"
@@ -115,9 +119,21 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     }
   }
 
+  // The multi-operation setup (spec 14): the toolpaths become one program with tool changes (or one file per tool / operation, by the
+  // setup store's grouping), written by the post of the sidecar's `camSetup` group, not by joining the toolpaths' texts.
   const downloadCombinedGCode = (): void => {
-    void saveFile({ name: `multi-toolpath-${new Date().toISOString().slice(0, 10)}.nc`, data: store.generateCombinedGCode(), mime: "text/plain" })
-      .then((saved) => { if (saved) toast.success(t("cam.multi.downloaded")) })
+    const setup = setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices)
+    const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock: stockOf(job.sources()) }
+    void app.runtime.run(makeSetupService(app.client).generate(request))
+      .then(async (result) => {
+        useSetupStore.getState().setResult(result)
+        for (const issue of result.issues) toast(issue.message)
+        for (const warning of result.warnings) toast(warning)
+        if (result.programs.length === 0) { toast.error(t("cam.multi.failed")); return }
+        let saved = false
+        for (const program of result.programs) saved = (await saveFile({ name: programFileName(program), data: program.gcode, mime: "text/plain" })) || saved
+        if (saved) toast.success(t("cam.multi.downloaded"))
+      })
       .catch(() => toast.error(t("shell.export.failed", { name: "G-code", reason: t("common.error") })))
   }
 
