@@ -33,13 +33,16 @@ describe("Boolean fuzzing: valid results and inclusion-exclusion", () => {
   for (const aligned of [true, false]) {
     test(`${CASES} seeded pairs, ${aligned ? "aligned to the coordinate grid" : "generic placements"}`, () => {
       const failures: string[] = []
+      let displacedCases = 0
       for (let seed = 1; seed <= CASES; seed++) {
         const r = rng(seed * (aligned ? 7919 : 104729))
         const A = primitive(r, aligned), B = primitive(r, aligned)
         try {
           const u = booleanBrep(A, B, "union"), i = booleanBrep(A, B, "intersect"), d = booleanBrep(A, B, "subtract")
           for (const x of [u, i, d]) if (x.brep.faces.length > 0 && validateBrep(x.brep).issues.length > 0) throw new Error("invalid result")
-          const displaced = [u, i, d].some((x) => x.warnings.length > 0)
+          // A tangent or edge contact kept in place is exact (it only carries a note); only a displaced operand loosens the balance.
+          const displaced = [u, i, d].some((x) => x.warnings.some((w) => w.includes("degenerate alignment")))
+          if (displaced) displacedCases++
           const tol = displaced ? 1e-3 : 1e-6
           const va = volume(A), vb = volume(B)
           const e1 = Math.abs(volume(u.brep) + volume(i.brep) - va - vb) / (va + vb)
@@ -52,6 +55,8 @@ describe("Boolean fuzzing: valid results and inclusion-exclusion", () => {
       }
       if (failures.length > 0) console.log(failures.join("\n"))
       expect(failures).toEqual([])
+      // Displacement is the reported last resort (spec 42 gate 1: at most 1 % of cases); none of these seeds needs it.
+      expect(displacedCases).toBe(0)
     })
   }
 })

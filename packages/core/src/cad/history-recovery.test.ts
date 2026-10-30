@@ -11,11 +11,11 @@ const plate = (tangent: boolean) => {
 }
 
 describe("parametric Boolean recovery provenance", () => {
-  test("a tangent hole retains the recovery warning with its feature id", () => {
+  test("a tangent hole retains the contact note (kept in place, nothing displaced) with its feature id", () => {
     const result = rebuildExact(plate(true))
     expect(result.bodies[0]!.brep).toBeDefined()
     expect(validateBrep(result.bodies[0]!.brep!).valid).toBe(true)
-    expect(result.warnings.some((warning) => warning.startsWith("bore:") && warning.includes("displaced"))).toBe(true)
+    expect(result.warnings.some((warning) => warning.startsWith("bore:") && warning.includes("kept in place"))).toBe(true)
     expect(result.warnings).toEqual(rebuildExact(plate(true)).warnings)
   })
 
@@ -23,7 +23,7 @@ describe("parametric Boolean recovery provenance", () => {
     const result = historyToStep(plate(true), "tangent plate")
     expect(result.exported).toEqual(["tangent plate"])
     expect(result.skipped).toEqual([])
-    expect(result.warnings.some((warning) => warning.includes("bore:") && warning.includes("displaced"))).toBe(true)
+    expect(result.warnings.some((warning) => warning.includes("bore:") && warning.includes("kept in place"))).toBe(true)
     const imported = readStepBreps(result.step!).parts
     expect(imported).toHaveLength(1)
     expect(validateBrep(imported[0]!.brep).valid).toBe(true)

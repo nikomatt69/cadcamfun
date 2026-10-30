@@ -35,21 +35,29 @@ describe("degenerate alignments (R1-R5)", () => {
   test("R4b torus - cylinder through the tube centre line", () => {
     valid(makeTorus(10, 3), makeCylinder(2, 10, at(10, 0, -5)), "subtract")
   })
-  test("R5 box - cylinder tangent to a wall: the contact is a non-manifold edge, so the cylinder is displaced and the result says so", () => {
+  test("R5 box - cylinder tangent to a wall: the pinch edge is kept in place as two coincident edges, no operand is displaced", () => {
     const r = booleanBrep(makeBox(10, 10, 10), makeCylinder(2, 10, at(2, 5, 0)), "subtract")
     expect(validateBrep(r.brep).issues).toEqual([])
-    expect(r.warnings.some((w) => w.includes("degenerate alignment"))).toBe(true)
-    expect(Math.abs(massProperties(r.brep).volume - (1000 - PI * 4 * 10)) / 874).toBeLessThan(1e-5)
+    expect(r.warnings.some((w) => w.includes("degenerate alignment"))).toBe(false)
+    expect(r.warnings.some((w) => w.includes("kept in place"))).toBe(true)
+    expect(Math.abs(massProperties(r.brep).volume - (1000 - PI * 4 * 10)) / 874).toBeLessThan(1e-12)
   })
 
-  test("a Boolean that cannot be repaired reports its stage and a remedy; the strict form reports without recovery", () => {
+  test("a Boolean on an operand that is not a solid reports its stage and a remedy; the strict form reports without recovery", () => {
+    const box = makeBox(10, 10, 10)
+    const open = { ...box, faces: box.faces.slice(0, 5), shells: [{ faces: [0, 1, 2, 3, 4], closed: true }] }
     let e: unknown
-    try { booleanStrict(makeBox(10, 10, 10), makeCylinder(2, 10, at(2, 5, 0)), "subtract") } catch (x) { e = x }
+    try { booleanStrict(open, makeCylinder(2, 10, at(5, 5, 0)), "subtract") } catch (x) { e = x }
     expect(e).toBeInstanceOf(BooleanError)
     const d = (e as BooleanError).diagnostic!
     expect(d.stage).toBe("validate")
     expect(d.hint.length).toBeGreaterThan(10)
     expect(d.attempts).toEqual([])
+    // The recovery tries the displacements and still reports the failure, with what it tried.
+    let e2: unknown
+    try { booleanBrep(open, makeCylinder(2, 10, at(5, 5, 0)), "subtract") } catch (x) { e2 = x }
+    expect(e2).toBeInstanceOf(BooleanError)
+    expect((e2 as BooleanError).diagnostic!.attempts.length).toBe(4)
   })
 
   test("seed 114: a torus and a sphere overlapping by 0.07 mm return their lens (the coarse volume had the wrong sign)", () => {

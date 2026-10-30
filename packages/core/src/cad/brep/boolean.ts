@@ -38,6 +38,8 @@ import {
 } from "./intersect.ts"
 import { validateBrep, type BrepIssue } from "./validate.ts"
 import { recordDerivation, type FaceOrigin } from "./lineage-record.ts"
+import { separateContacts, separateTouchingVertices } from "./contact.ts"
+import { orient2d } from "./predicates.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
@@ -83,15 +85,17 @@ export interface BooleanCounters {
   readonly emptyResult: number
   /** A pole or apex on the other solid sent the call straight to the recovery. */
   readonly poleContact: number
+  /** Solved by the plain pipeline with a tangent, edge or point contact kept in place (a warning says so; no operand moved). */
+  readonly inPlaceContact: number
   /** Failures by the stage that gave up. */
   readonly byStage: Readonly<Record<BooleanStage, number>>
 }
 
-const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
+const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, inPlaceContact: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
 
 export const booleanCounters = (): BooleanCounters => ({ ...COUNTERS, byStage: { ...COUNTERS.byStage } })
 export const resetBooleanCounters = (): void => {
-  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0
+  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0; COUNTERS.inPlaceContact = 0
   COUNTERS.byStage = { prepare: 0, arrange: 0, validate: 0 }
 }
 
@@ -728,7 +732,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
       for (const ring of rings) {
         // Expand: each step i → i+1 runs along `out` of sample i (undefined: a pole line). Split vertices of that edge
         // are inserted between the two samples.
-        type RS = { u: number; v: number; vid?: number; out?: number; tOut?: number; tIn?: number }
+        type RS = { u: number; v: number; vid?: number; out?: number; tOut?: number; tIn?: number; inserted?: true }
         const ex: RS[] = []
         const n = ring.length
         for (let i = 0; i < n; i++) {
@@ -758,9 +762,17 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
               const q = surfaceProject(surf, P, { u: a.u, v: a.v })
               const uu = per.u !== undefined ? unwrapNear(q.u, a.u, per.u) : q.u
               const vv = per.v !== undefined ? unwrapNear(q.v, a.v, per.v) : q.v
-              ex.push({ u: uu, v: vv, vid: x.vid, out: a.edge, tOut: x.t, tIn: x.t })
+              ex.push({ u: uu, v: vv, vid: x.vid, out: a.edge, tOut: x.t, tIn: x.t, inserted: true })
             }
           }
+        }
+        // A contact point on a boundary sample (a tangent sphere touching a seam at the equator) is found twice: as the sample and as
+        // the inserted split vertex a few ulps from it. One node, or the ring gets a zero-length piece that no cycle closes.
+        for (let i = 0; i < ex.length && ex.length > 2; i++) {
+          const a = ex[i]!, j = (i + 1) % ex.length, b = ex[j]!
+          if (a.vid === undefined || a.vid !== b.vid || Math.hypot((a.u - b.u) * su, (a.v - b.v) * sv) > 1e-6) continue
+          ex.splice(a.inserted === true || b.inserted !== true ? i : j, 1)
+          i--
         }
         const cutIdx = ex.map((p, i) => (p.vid !== undefined ? i : -1)).filter((i) => i >= 0)
         if (cutIdx.length === 0) throw new BooleanError(`face ${fi}: boundary ring without vertices`, [], { stage: "arrange", operand: s === 0 ? "A" : "B", face: fi, hint: DEGENERATE_HINT, attempts: [] })
@@ -979,7 +991,18 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   const stats = { intersectionCurves: ssis.length, splitPoints: reg.pts.length, fragments: fragments.length, keptFaces: faces.length }
   // Nothing kept: the intersection of solids that are apart or only touch, or a subtraction that removes everything.
   if (faces.length === 0) return { brep: EMPTY_BREP, warnings, stats }
-  let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
+  // A designed contact along a curve (a tangent cylinder, boxes sharing an edge) leaves an edge four fragments meet at: it is
+  // kept in place as two coincident edges, one per wedge of material (contact.ts), and the answer is checked against the operands.
+  let sewnFaces: Face[] = faces
+  let contactNote: string | undefined
+  const contact = separateContacts(vertices, edges, faces)
+  if (contact !== undefined) {
+    vertices.splice(0, vertices.length, ...contact.vertices)
+    edges.splice(0, edges.length, ...contact.edges)
+    sewnFaces = contact.faces
+    contactNote = `tangent or edge contact kept in place: ${contact.separatedEdges} coincident edge(s) separate the wedges of material`
+  }
+  let result: Brep = shellsByConnectivity({ vertices, edges, faces: sewnFaces, shells: [] })
   // Provenance (spec 41 N1): each kept fragment is a piece of one operand face. `split` and `merged` are decided when the table is read (`provenanceOf`).
   const wholeFace = (fr: Fragment): boolean => {
     if (fr.loops.length !== S[fr.solid].brep.faces[fr.face]!.loops.length) return false
@@ -1011,7 +1034,22 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const exact = validateBrep(result)
     if (exact.valid) report = exact
   }
+  // Shells that meet in a point (a cavity tangent to the outer wall, spheres tangent outside) share one vertex, which Euler-Poincare
+  // cannot count: one vertex per shell makes the topology honest, and the point contact stays where it is.
+  if (!report.valid && report.issues.length > 0 && report.issues.every((i) => i.kind === "euler")) {
+    const touching = separateTouchingVertices(result.vertices, result.edges, result.faces)
+    if (touching !== undefined) {
+      const split = shellsByConnectivity({ vertices: touching.vertices, edges: touching.edges, faces: touching.faces, shells: [] })
+      const again = validateBrep(split, { coarseVolume: true })
+      if (again.valid) { result = split; report = again; contactNote = `point contact kept in place: ${touching.splitVertices} vertex(es) split between shells` }
+    }
+  }
   if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues, { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
+  if (contactNote !== undefined) {
+    // The separated contact must still be the operands' answer: a sampled volume check against exact point location.
+    if (!agreesWithOperands(A, B, op, result)) throw new BooleanError(`Boolean ${op}: the separated contact disagrees with the operands`, [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
+    warnings.push(contactNote)
+  }
   return {
     brep: result,
     warnings,
@@ -1039,8 +1077,8 @@ const windingPoly = (poly: ReadonlyArray<Vec2>, u: number, v: number): number =>
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i]!, b = poly[(i + 1) % poly.length]!
     if (a.y <= v) {
-      if (b.y > v && (b.x - a.x) * (v - a.y) - (u - a.x) * (b.y - a.y) > 0) w++
-    } else if (b.y <= v && (b.x - a.x) * (v - a.y) - (u - a.x) * (b.y - a.y) < 0) w--
+      if (b.y > v && orient2d(a.x, a.y, b.x, b.y, u, v) > 0) w++
+    } else if (b.y <= v && orient2d(a.x, a.y, b.x, b.y, u, v) < 0) w--
   }
   return w
 }
@@ -1080,7 +1118,11 @@ const insidePolys = (polys: ReadonlyArray<ReadonlyArray<Vec2>>, x: number, y: nu
   let crossings = 0
   for (const p of polys) for (let i = 0; i < p.length; i++) {
     const a = p[i]!, b = p[(i + 1) % p.length]!
-    if ((a.y > y) !== (b.y > y) && x < a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y)) crossings++
+    if ((a.y > y) !== (b.y > y)) {
+      // The point is left of an upward edge (right of a downward one) exactly when the crossing is east of it.
+      const o = orient2d(a.x, a.y, b.x, b.y, x, y)
+      if (b.y > a.y ? o > 0 : o < 0) crossings++
+    }
   }
   return crossings % 2 === 1
 }
@@ -1142,8 +1184,34 @@ const samePlane = (a: Face, b: Face): boolean => {
 }
 
 /**
- * Merges faces on the same plane (same orientation) that share edges: the shared edges disappear and the remaining
- * coedges are re-chained into loops.
+ * Whether two faces lie on the same cylinder or cone with the same parametrisation (same axis direction and reference
+ * direction, same radius, same apex) and the same orientation: fragments of one analytic surface that the intersection split
+ * (a stack of coaxial cylinders of one radius) are one face again. A different reference direction would put the seam
+ * elsewhere, so such a pair is left alone.
+ */
+const sameCurvedDomain = (a: Face, b: Face): boolean => {
+  if (a.reversed !== b.reversed) return false
+  const sa = a.surface, sb = b.surface
+  if (sa.kind === "cylinder" && sb.kind === "cylinder") {
+    const t = 1e-9 * (1 + sa.radius)
+    return Math.abs(sa.radius - sb.radius) <= t && dot3(sa.frame.z, sb.frame.z) > 1 - 1e-12 && dot3(sa.frame.x, sb.frame.x) > 1 - 1e-12 && length3(cross3(sub3(sb.frame.origin, sa.frame.origin), sa.frame.z)) <= t
+  }
+  if (sa.kind === "cone" && sb.kind === "cone") {
+    const tan = Math.tan(sa.semiAngle)
+    if (Math.abs(tan) < 1e-12) return false
+    const apex = (s: typeof sa) => sub3(s.frame.origin, scale3(s.frame.z, s.radius / tan))
+    const t = 1e-9 * (1 + sa.radius)
+    return Math.abs(sa.semiAngle - sb.semiAngle) <= 1e-12 && dot3(sa.frame.z, sb.frame.z) > 1 - 1e-12 && dot3(sa.frame.x, sb.frame.x) > 1 - 1e-12 && dist3(apex(sa), apex(sb)) <= t
+  }
+  return false
+}
+
+/** A closed circle: the ring where stacked fragments of one cylinder or cone meet. Merging across any other edge (a helical groove) is not attempted. */
+const isRing = (e: Edge): boolean => e.curve.kind === "circle" && e.v0 === e.v1
+
+/**
+ * Merges faces on the same plane, cylinder or cone (same orientation) that share edges: the shared edges disappear and the
+ * remaining coedges are re-chained into loops (spec 42 R3, same-domain merge).
  */
 const mergeCoplanarFaces = (b: Brep): { readonly brep: Brep; readonly from: ReadonlyArray<ReadonlyArray<number>> } => {
   const uses = edgeUses({ ...b, shells: [{ faces: b.faces.map((_, i) => i), closed: true }] })
@@ -1153,7 +1221,7 @@ const mergeCoplanarFaces = (b: Brep): { readonly brep: Brep; readonly from: Read
     const u = uses[ei]!
     if (u.length !== 2 || u[0]!.face === u[1]!.face) return
     const fa = b.faces[u[0]!.face]!, fb = b.faces[u[1]!.face]!
-    if (samePlane(fa, fb)) parent[find(u[1]!.face)] = find(u[0]!.face)
+    if (samePlane(fa, fb) || (isRing(b.edges[ei]!) && sameCurvedDomain(fa, fb))) parent[find(u[1]!.face)] = find(u[0]!.face)
   })
   const groups = new Map<number, number[]>()
   b.faces.forEach((_, i) => { const r = find(i); const l = groups.get(r) ?? []; l.push(i); groups.set(r, l) })
@@ -1168,7 +1236,8 @@ const mergeCoplanarFaces = (b: Brep): { readonly brep: Brep; readonly from: Read
     const all: Coedge[] = g.flatMap((fi) => b.faces[fi]!.loops.flatMap((l) => l.coedges))
     // Internal edges: used by two faces of the group.
     const internal = new Set<number>()
-    for (const c of all) { const u = uses[c.edge]!; if (u.length === 2 && inGroup.has(u[0]!.face) && inGroup.has(u[1]!.face)) internal.add(c.edge) }
+    // A seam (an edge both uses of which belong to one face) stays: it is the boundary of the merged face's parametrisation.
+    for (const c of all) { const u = uses[c.edge]!; if (u.length === 2 && u[0]!.face !== u[1]!.face && inGroup.has(u[0]!.face) && inGroup.has(u[1]!.face)) internal.add(c.edge) }
     const rest = all.filter((c) => !internal.has(c.edge))
     const startOf = (c: Coedge) => (c.reversed ? b.edges[c.edge]!.v1 : b.edges[c.edge]!.v0)
     const endOf = (c: Coedge) => (c.reversed ? b.edges[c.edge]!.v0 : b.edges[c.edge]!.v1)
@@ -1181,8 +1250,10 @@ const mergeCoplanarFaces = (b: Brep): { readonly brep: Brep; readonly from: Read
       while (k >= 0 && !usedC[k]) {
         usedC[k] = true
         loop.push(rest[k]!)
-        const e = endOf(rest[k]!)
-        k = rest.findIndex((c, j) => !usedC[j] && startOf(c) === e)
+        const e = endOf(rest[k]!), here = rest[k]!.edge
+        // At a vertex where a seam is split, the way back along the edge just used is not the way on: take another edge first.
+        k = rest.findIndex((c, j) => !usedC[j] && startOf(c) === e && c.edge !== here)
+        if (k < 0) k = rest.findIndex((c, j) => !usedC[j] && startOf(c) === e)
       }
       loops.push({ coedges: loop })
     }
@@ -1206,19 +1277,29 @@ void refineSurfaceSurface
 // ================================================================ degenerate alignments
 
 /**
- * Boolean with a recovery for degenerate alignments. The first attempt is the plain pipeline. If it does not give a valid
- * solid, the second operand is nudged by a few parts per
- * million of the model size, which breaks an exact tangency; that last result is reported in `warnings`.
+ * Boolean for aligned, tangent and coincident operands. Designed contacts are solved in place by the plain pipeline: coincident
+ * faces, tangent or edge contacts kept as coincident edges (contact.ts), poles on planes and on equal spheres. Only if the plain
+ * pipeline does not give a valid solid that agrees with the operands (or a pole sits on a curved face it cannot yet handle
+ * exactly), the second operand is nudged by a few parts per million of the model size, which breaks the contact; that last
+ * resort is reported in `warnings` and counted in `recoveredByDisplacement`.
  */
 export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
-  // A pole of a sphere or the apex of a cone on the other solid's surface is a degenerate contact the pipeline can get wrong
-  // without noticing (a sphere's south pole on a torus left the union 0.1 % too big and still valid): go straight to the recovery.
-  const poleContact = poleOnOther(A, B) || poleOnOther(B, A)
+  // A pole of a sphere or the apex of a cone on a curved surface of the other solid is a degenerate contact the pipeline can get
+  // wrong without noticing (a sphere's south pole on a torus left the union 0.1 % too big and still valid): go straight to the
+  // recovery. On a plane or on a coincident sphere the contact is designed and the plain pipeline is exact; its answer is still
+  // checked against the operands by a sampled volume.
+  const kindAB = poleContactKind(A, B), kindBA = poleContactKind(B, A)
+  const poleKind = kindAB === "hard" || kindBA === "hard" ? "hard" : kindAB === "designed" || kindBA === "designed" ? "designed" : "none"
+  const poleContact = poleKind === "hard"
   COUNTERS.calls++
   try {
     if (poleContact) { COUNTERS.poleContact++; throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] }) }
     const done = booleanStrict(A, B, op, options)
+    if (poleKind === "designed" && done.brep.faces.length > 0 && !agreesWithOperands(A, B, op, done.brep)) {
+      throw new BooleanError("the exact result of a pole contact disagrees with the operands", [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
+    }
     COUNTERS.exact++
+    if (done.warnings.some((w) => w.includes("kept in place"))) COUNTERS.inPlaceContact++
     if (done.brep.faces.length === 0) COUNTERS.emptyResult++
     return done
   } catch (e) {
@@ -1256,29 +1337,61 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   }
 }
 
-/** Poles of spheres and apexes of cones of `a` (the points where a surface's parametrisation degenerates). */
-const poles = (a: Brep): Vec3[] => {
-  const out: Vec3[] = []
+/** Poles of spheres and apexes of cones of `a` (the points where a surface's parametrisation degenerates), with their surface. */
+const poles = (a: Brep): Array<{ readonly p: Vec3; readonly surface: Surface }> => {
+  const out: Array<{ readonly p: Vec3; readonly surface: Surface }> = []
   const seen = new Set<string>()
   for (const f of a.faces) {
     const sf = f.surface
-    const add = (p: Vec3) => { const k = `${p.x.toFixed(6)},${p.y.toFixed(6)},${p.z.toFixed(6)}`; if (!seen.has(k)) { seen.add(k); out.push(p) } }
+    const add = (p: Vec3) => { const k = `${p.x.toFixed(6)},${p.y.toFixed(6)},${p.z.toFixed(6)}`; if (!seen.has(k)) { seen.add(k); out.push({ p, surface: sf }) } }
     if (sf.kind === "sphere") { add(add3(sf.frame.origin, scale3(sf.frame.z, sf.radius))); add(add3(sf.frame.origin, scale3(sf.frame.z, -sf.radius))) }
-    else if (sf.kind === "cone" && Math.abs(Math.tan(sf.semiAngle)) > 1e-12) add(add3(sf.frame.origin, scale3(sf.frame.z, -sf.radius / Math.tan(sf.semiAngle))))
+    else if (sf.kind === "cone" && Math.abs(Math.tan(sf.semiAngle)) > 1e-12) {
+      // The apex is a degenerate point of the body only when the cone reaches it: a truncated cone ends before it, and its apex is not on the solid.
+      const apex = add3(sf.frame.origin, scale3(sf.frame.z, -sf.radius / Math.tan(sf.semiAngle)))
+      if (a.vertices.some((v) => dist3(v.point, apex) <= 1e-7 * (1 + sf.radius))) add(apex)
+    }
   }
   return out
 }
 
-/** Whether a pole of `a` lies on the boundary of `b`. */
-const poleOnOther = (a: Brep, b: Brep): boolean => {
+/** Whether two analytic surfaces are the same surface (spheres of one centre and radius, cones of one axis, apex and angle). */
+const sameAnalytic = (a: Surface, b: Surface): boolean => {
+  if (a.kind === "sphere" && b.kind === "sphere") {
+    const t = 1e-9 * (1 + a.radius)
+    return Math.abs(a.radius - b.radius) <= t && dist3(a.frame.origin, b.frame.origin) <= t
+  }
+  if (a.kind === "cone" && b.kind === "cone") {
+    const t = 1e-9 * (1 + a.radius)
+    return Math.abs(a.semiAngle - b.semiAngle) <= 1e-12 && Math.abs(a.radius - b.radius) <= t && Math.abs(Math.abs(dot3(a.frame.z, b.frame.z)) - 1) <= 1e-12 && length3(cross3(sub3(b.frame.origin, a.frame.origin), a.frame.z)) <= t
+  }
+  return false
+}
+
+/**
+ * How the poles of `a` meet the boundary of `b`: "hard" when one lies on (or within a margin of) a curved face of `b` that is
+ * not the pole's own surface (the intersection curve passes through the pole's neighbourhood: strict results were seen 0.8 % off
+ * for a pole 1e-5 mm from the surface of a 17 mm model, and sound from 1e-4 mm; the margin is 2e-4 of the model's size),
+ * "designed" when every contact is with a plane or with the same sphere or cone, "none" when no pole is near.
+ */
+const poleContactKind = (a: Brep, b: Brep): "none" | "designed" | "hard" => {
   const ps = poles(a)
-  if (ps.length === 0) return false
+  if (ps.length === 0) return "none"
   const loc = brepLocator(b)
-  // On, or so near that the intersection curve passes through the pole's neighbourhood: strict results were seen 0.8 % off for a pole
-  // 1e-5 mm from the surface of a 17 mm model, and sound from 1e-4 mm; the margin is 2e-4 of the model's size.
-  const box = boxOf(ps.concat(b.vertices.map((v) => v.point)))
+  const box = boxOf(ps.map((x) => x.p).concat(b.vertices.map((v) => v.point)))
   const near = 2e-4 * Math.max(1, dist3(box.lo, box.hi))
-  return ps.some((p) => loc.closest(p).distance < near)
+  let kind: "none" | "designed" | "hard" = "none"
+  for (const { p, surface } of ps) {
+    const c = loc.closest(p)
+    if (c.distance >= near) continue
+    // Faces of b at the closest point: the face itself, or those around an edge or vertex.
+    const faces: number[] = []
+    if (c.face !== undefined) faces.push(c.face)
+    else b.faces.forEach((f, fi) => { if (f.loops.some((l) => l.coedges.some((ce) => (c.edge !== undefined ? ce.edge === c.edge : b.edges[ce.edge]!.v0 === c.vertex || b.edges[ce.edge]!.v1 === c.vertex)))) faces.push(fi) })
+    const designed = faces.length > 0 && faces.every((fi) => b.faces[fi]!.surface.kind === "plane" || sameAnalytic(surface, b.faces[fi]!.surface))
+    if (!designed) return "hard"
+    kind = "designed"
+  }
+  return kind
 }
 
 /**
