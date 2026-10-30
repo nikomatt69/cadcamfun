@@ -241,7 +241,7 @@ export const DEFAULT_CUTTERS: ReadonlyArray<Cutter> = [
   ...REAMER_SIZES.map(reamer),
   ...DRILL_SIZES.map(drill),
   ...[[12, 90], [16, 90], [20, 90], [16, 82], [20, 100]].map(([d, a]): Cutter => countersink(d!, a!)),
-  // A back-boring bar for a Ø8-Ø12 pilot: 3 mm insert on a Ø6 body; T-slot and dovetail cutters for undercut channels.
+  // A back-boring bar for a pilot of Ø12 or more: 3 mm insert on a Ø6 body; T-slot and dovetail cutters for undercut channels.
   { id: "boringbar-b16", name: "Back-boring bar Ø16 on Ø6 body", kind: "boringbar", diameter: 16, flutes: 1, material: "carbide", coating: "tin", neckDiameter: 6, headHeight: 3, fluteLength: 40, shankDiameter: 6, stickout: 60, holder: HOLDER },
   { id: "tslot-12x4", name: "T-slot cutter Ø12 x 4", kind: "tslot", diameter: 12, flutes: 4, material: "carbide", coating: "altin", neckDiameter: 5, headHeight: 4, fluteLength: 12, shankDiameter: 6, stickout: 30, holder: HOLDER },
   { id: "tslot-20x6", name: "T-slot cutter Ø20 x 6", kind: "tslot", diameter: 20, flutes: 6, material: "carbide", coating: "altin", neckDiameter: 8, headHeight: 6, fluteLength: 16, shankDiameter: 10, stickout: 40, holder: HOLDER },

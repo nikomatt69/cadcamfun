@@ -40,6 +40,20 @@ export const CutterSchema = Schema.Struct({
   maxRpm: Schema.optionalKey(positive), number: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999 })))
 })
 
+/** A hole-making cycle (`HoleCycle` in `contracts.ts`). */
+export const HoleCycleSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("countersink"), diameter: positive }),
+  Schema.Struct({
+    kind: Schema.Literal("deep"), peck: positive, retract: Schema.Literals(["full", "chip-break"]), peckReduction: Schema.optionalKey(nonNegative), minPeck: Schema.optionalKey(positive),
+    chipBreakRetract: Schema.optionalKey(positive), fullRetractEvery: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))), dwell: Schema.optionalKey(nonNegative)
+  }),
+  Schema.Struct({ kind: Schema.Literal("back-bore"), diameter: positive, pilotDiameter: positive, face: Schema.Finite }),
+  Schema.Struct({
+    kind: Schema.Literal("tilted"), peck: Schema.optionalKey(nonNegative), chipBreak: Schema.optionalKey(Schema.Boolean),
+    sites: Schema.Array(Schema.Struct({ entry: vec3, direction: vec3, depth: positive })).check(Schema.isMinLength(1), Schema.isMaxLength(5000))
+  })
+])
+
 const overrides = {
   id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))), tool: id,
   rpm: Schema.optionalKey(positive), feed: Schema.optionalKey(positive), plungeFeed: Schema.optionalKey(positive),
@@ -59,7 +73,7 @@ export const OperationSpecSchema = Schema.Union([
     leadIn: Schema.optionalKey(Schema.Literals(PROFILE_LEAD_INS)), leadRadius: Schema.optionalKey(positive)
   }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("bore"), center: point, diameter: positive, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative) }),
-  Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot", "tap", "ream"])) }),
+  Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot", "tap", "ream"])), cycle: Schema.optionalKey(HoleCycleSchema) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("thread"), center: point, diameter: positive, pitch: positive, internal: Schema.Boolean, top: Schema.Finite, length: positive, rightHand: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("engrave"), paths: Schema.Array(Schema.Struct({ points: Schema.Array(point).check(Schema.isMinLength(2)), closed: Schema.Boolean })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, depth: positive }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("chamfer"), loops: Schema.Array(Schema.Struct({ points: ring, side: Schema.Literals(["outside", "inside"]) })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, width: positive, tipOffset: Schema.optionalKey(nonNegative) }),

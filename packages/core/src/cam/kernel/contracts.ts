@@ -145,6 +145,31 @@ export interface RegionSpec {
   readonly islands?: ReadonlyArray<ReadonlyArray<Vec2>>
 }
 
+/**
+ * What a hole-making operation does beyond the plain cycle (`operations/hole-cycles.ts`). Carried by a `drill` operation; an
+ * operation without it is the ordinary spot / drill / tap / ream cycle. A host that does not know a `cycle` must refuse the
+ * operation, never run it as a plain drill.
+ */
+export type HoleCycle =
+  /** A countersink cutter's cone to the finished `diameter` at the surface: `bottom` is `top` less `countersinkDepth(tool, diameter)`. */
+  | { readonly kind: "countersink"; readonly diameter: number }
+  /**
+   * Deep-hole / gun-drill style pecking: first peck `peck`, each next one `peckReduction` shorter down to `minPeck`; `retract`
+   * `full` goes back to the R plane after every peck, `chip-break` lifts `chipBreakRetract` mm and does a full retract every
+   * `fullRetractEvery` pecks (0 = never). `dwell` seconds at the bottom.
+   */
+  | { readonly kind: "deep"; readonly peck: number; readonly retract: "full" | "chip-break"; readonly peckReduction?: number; readonly minPeck?: number; readonly chipBreakRetract?: number; readonly fullRetractEvery?: number; readonly dwell?: number }
+  /**
+   * Back-boring from the far side: the bar goes through the Ø`pilotDiameter` hole, the cutter is brought to the bore axis below
+   * the face at work Z `face` and bores up `top - face` mm to Ø`diameter`; `bottom` is the lowest the tool tip goes.
+   */
+  | { readonly kind: "back-bore"; readonly diameter: number; readonly pilotDiameter: number; readonly face: number }
+  /**
+   * Drilling along other axes than Z on an indexed (3+2) machine: each site is entered at `entry` (CAD world mm) and goes
+   * `depth` mm along the unit `direction` into the material. `peck` as the plain cycle.
+   */
+  | { readonly kind: "tilted"; readonly sites: ReadonlyArray<{ readonly entry: Vec3; readonly direction: Vec3; readonly depth: number }>; readonly peck?: number; readonly chipBreak?: boolean }
+
 export type OperationSpec =
   | (OperationBase & { readonly strategy: "face"; readonly bottom: number })
   | (OperationBase & { readonly strategy: "adaptive"; readonly region: RegionSpec; readonly top: number; readonly bottom: number; readonly allowance?: number })
@@ -159,7 +184,7 @@ export type OperationSpec =
    * Holes at points: drilled (peck / chip break from the cutting data), spotted, rigid-tapped with a `tap` cutter (the feed is its
    * pitch x speed; the post needs G84) or reamed with a `reamer` (fed in and out). `bottom` is the tip's lowest point.
    */
-  | (OperationBase & { readonly strategy: "drill"; readonly points: ReadonlyArray<Vec2>; readonly top: number; readonly bottom: number; readonly cut?: "drill" | "spot" | "tap" | "ream" })
+  | (OperationBase & { readonly strategy: "drill"; readonly points: ReadonlyArray<Vec2>; readonly top: number; readonly bottom: number; readonly cut?: "drill" | "spot" | "tap" | "ream"; readonly cycle?: HoleCycle })
   | (OperationBase & { readonly strategy: "thread"; readonly center: Vec2; readonly diameter: number; readonly pitch: number; readonly internal: boolean; readonly top: number; readonly length: number; readonly rightHand?: boolean })
   | (OperationBase & { readonly strategy: "engrave"; readonly paths: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly closed: boolean }>; readonly top: number; readonly depth: number })
   | (OperationBase & { readonly strategy: "chamfer"; readonly loops: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly side: "outside" | "inside" }>; readonly top: number; readonly width: number; readonly tipOffset?: number })
