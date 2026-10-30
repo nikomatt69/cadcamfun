@@ -222,5 +222,14 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
 
 - 2026-10-30: created from six parallel source audits plus integrating-agent checks (scorecard, API coverage,
   release-gate grep, targeted kernel tests). No code changed.
-
-
+- 2026-10-30 (build, local main): **0.3 done for jobs with the table turned** (`cam/kernel/tri-replay.ts`, `execute.ts`): `no-gouge` and
+  `material-removed` come from the tri-dexel replay of every move, with the declared error as threshold; the kernel's own five-axis dome
+  finish is now a failed claim and a `Gouge` error (the ball at the dome foot cuts its flank), the swarf cone passes. 3-axis jobs stay on the
+  height field. Not done: the `voxelStock` bracket still backs rapid/holder contacts and `stock.fiveAxis`; no structured `triDexel` field in
+  `StockSummary` (needs the API schema + generated clients); declared removal (blind drills, chamfers, threads) and tabs leave the verdict
+  `unresolved`. `PartDexels` now casts overlapping closed meshes as their union; `comparePart` gouge depth reads single-sided layers.
+  **0.4 partial**: `tri-fault-injection.test.ts` (100 seeded overcuts of walls and domes all found, 30 clean fixtures pass) at the replay level;
+  the tolerance budget is still not a release gate and whole kernel jobs have no fault set. **0.6 kernel level**: `verifyNc` (`cam/kernel/verify-nc.ts`)
+  replays foreign NC against part, stock, tools, travel, reports the first gouging NC line (bisection), rapids through stock (flutes + shank + holder);
+  no API/sidecar route yet. **0.1**: `.github/workflows/evidence.yml` (nightly corpus, bench, scorecard); the "7 green nights" gate and scorecard
+  levels from passing gates are still open. Open in Wave 0: 0.2 (corpus sets b/d), 0.5 (fixtures, release of 5-axis / multi-orientation jobs).
