@@ -110,7 +110,13 @@ export interface CadImportStepInput {
  */
 export const cadImportStep = ({ step, history, idPrefix, tolerance, keepAccepted }: CadImportStepInput) => {
   const base: History | undefined = history === undefined ? undefined : parseHistory(history)
-  const imported = cad.importStepToHistory(step, { ...(idPrefix !== undefined ? { idPrefix } : {}), ...(tolerance !== undefined ? { heal: { tol: tolerance } } : {}) })
+  let imported: ReturnType<typeof cad.importStepToHistory>
+  try {
+    imported = cad.importStepToHistory(step, { ...(idPrefix !== undefined ? { idPrefix } : {}), ...(tolerance !== undefined ? { heal: { tol: tolerance } } : {}) })
+  } catch (error) {
+    // A file that is not STEP at all (no DATA section, a broken entity table) is the caller's mistake, not a worker fault.
+    return { ok: false, bodies: [], bases: [], problems: [`The file could not be read as STEP: ${error instanceof Error ? error.message : String(error)}`], warnings: [] as string[] } as const
+  }
   const problems: string[] = []
   const accepted = imported.refused.length === 0 || keepAccepted === true ? imported.bases : []
   let ok = accepted.length > 0
