@@ -43,3 +43,5 @@ export { planTurning, type TurnPoint, type TurnStock, type TurningJob, type Turn
 export { planBoring, type BoringJob, type BorePass, type BoringPlan } from "./turning.ts"
 export { checkNcClearance, ARC_SAGITTA, type ClearanceFinding, type ClearanceResult, type TableGeometry } from "./machine-clearance.ts"
 export { hullDistance, cylinderPrism, boxVertices, type HullDistance } from "./convex.ts"
+export * from "./engagement.ts"
+export * from "./feed-optimise.ts"

@@ -295,10 +295,14 @@ export const deflection = (c: Cutter, force: number): number => {
 const round = (v: number, step: number): number => Math.round(v / step) * step
 const r3 = (v: number): number => Math.round(v * 1000) / 1000
 
-interface Load { readonly kc: number; readonly hm: number; readonly powerKw: number; readonly torqueNm: number; readonly forceN: number }
+/** Kienzle load of one cut: the specific cutting force `kc`, the mean chip `hm`, power at the cut, spindle torque and tangential force. */
+export interface Load { readonly kc: number; readonly hm: number; readonly powerKw: number; readonly torqueNm: number; readonly forceN: number }
 
-/** Kienzle load of a milling cut. */
-const millingLoad = (mat: WorkpieceMaterial, c: Cutter, deff: number, ap: number, ae: number, fz: number, feed: number, rpm: number, vc: number): Load => {
+/**
+ * Kienzle load of a milling cut. One function for the nominal cut (`cuttingData`) and for every move of a program
+ * (`engagement.ts` `moveLoads`), so the two cannot drift: the nominal result is the per-move result at constant engagement.
+ */
+export const millingLoad = (mat: WorkpieceMaterial, c: Cutter, deff: number, ap: number, ae: number, fz: number, feed: number, rpm: number, vc: number): Load => {
   const phi = engagementAngle(ae, deff)
   const sinK = c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" ? Math.sin(((c.angle ?? 90) * Math.PI) / 360) : 1
   const hm = phi > 1e-9 ? (2 * Math.min(ae, deff) * fz * sinK) / (deff * phi) : fz

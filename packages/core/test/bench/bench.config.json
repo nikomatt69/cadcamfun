@@ -14,6 +14,8 @@
     "step.read-flange": 300,
     "cam.stock-removal": 300,
     "cam.drop-cutter-grid": 300,
-    "cam.gcode-verification": 1000
+    "cam.gcode-verification": 1000,
+    "cam.engagement-pocket": 250,
+    "cam.feed-optimise-pocket": 150
   }
 }
