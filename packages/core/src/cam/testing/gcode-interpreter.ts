@@ -228,6 +228,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   let css = false
   let maxRpm: number | undefined
   let feedRev = false
+  /** `G93` inverse-time feed: F is 1 / minutes of the block, so the feed along the written axes is F times the block's length. */
+  let inverse = false
   let coolant: "off" | "flood" | "mist" = "off"
   let tool: number | undefined
   let eAbsolute = true
@@ -550,12 +552,28 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const keyword = called?.[1] ?? /^([A-Z_]{2,}[A-Z0-9_]*)\b/.exec(code.toUpperCase())?.[1]
     if (keyword === undefined) return false
     if (keyword === "CYCLE800") { cycle800(called?.[2] ?? ""); return true }
+    if (keyword === "PLANE") { klartextPlane(code.toUpperCase()); return true }
     if (SILENT_STATEMENTS.has(keyword)) return true
     if (tokenize(code).some((w) => "XYZABCIJKRE".includes(w.letter)) || called !== null) {
       errors.push(`line ${physical}: unsupported ${keyword}`)
       unsupported.push({ line: physical, word: keyword })
     }
     return true
+  }
+  /**
+   * Heidenhain `PLANE SPATIAL SPA SPB SPC ...` (rotations about the fixed X, Y, Z axes in that order: M = Rz(SPC) Ry(SPB) Rx(SPA)) and
+   * `PLANE RESET`. The plane's origin is the datum (cycle 7, read as a G52 shift); the positioning words (TURN, MB, FMAX, SEQ) do not
+   * change what the program's coordinates mean.
+   */
+  const klartextPlane = (code: string): void => {
+    flushComp()
+    if (/^PLANE RESET\b/.test(code)) { frame = undefined; return }
+    const angle = (name: string): number | undefined => { const m = new RegExp(`\\b${name}([+-]?(?:\\d+\\.?\\d*|\\.\\d+))`).exec(code); return m === null ? undefined : Number(m[1]) }
+    const spa = angle("SPA"), spb = angle("SPB"), spc = angle("SPC")
+    if (!/^PLANE SPATIAL\b/.test(code) || spa === undefined || spb === undefined || spc === undefined) {
+      errors.push(`line ${physical}: unsupported ${code.split(/\s+/).slice(0, 2).join(" ")}`); unsupported.push({ line: physical, word: "PLANE" }); return
+    }
+    frame = { m: mulM3(mulM3(rot3("z", spc), rot3("y", spb)), rot3("x", spa)), t: { x: 0, y: 0, z: 0 }, planar: false }
   }
   /** Siemens CYCLE800 swivel plane: axis-by-axis rotation (the mode's bit pairs name the axes, first in the low bits). */
   const cycle800 = (args: string): void => {
@@ -630,8 +648,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 17 || g === 18 || g === 19) plane = g
         else if (g === 7) xMode = "diameter"
         else if (g === 8) xMode = "radius"
-        else if (g === 94) feedRev = false
-        else if (g === 95) feedRev = true
+        else if (g === 93) { inverse = true; feedRev = false }
+        else if (g === 94) { feedRev = false; inverse = false }
+        else if (g === 95) { feedRev = true; inverse = false }
         else if (g === 96) css = true
         else if (g === 97) css = false
         else if (g === 92) setting = "g92"
@@ -679,7 +698,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         if (!usesToolChange) { tools.push(n); tool = n }
       } else if (w.letter === "F") {
         // In a dwell block F is the time (Siemens `G4 F<s>`), never the feed: the modal feed stays.
-        if (!words.some((v) => v.letter === "G" && Math.round(v.value * 10) === 40)) feed = w.value * unit
+        if (!words.some((v) => v.letter === "G" && Math.round(v.value * 10) === 40)) feed = inverse ? w.value : w.value * unit
       } else if ((w.letter === "A" || w.letter === "B" || w.letter === "C") && !(polar && w.letter === "C")) {
         // Rotary angles are degrees in both unit systems; they persist until changed. Under G112 C is a length (face Y).
         rotary = { ...rotary, [w.letter.toLowerCase()]: w.value }
@@ -821,7 +840,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       }
       progPos = target
     } else if (motion === 0 && hasAxis) rapid(target, lineNo)
-    else if (motion === 1 && hasAxis) linear(target, lineNo, feedNow(false))
+    else if (motion === 1 && hasAxis) linear(target, lineNo, inverse ? feed * dist(start, target) : feedNow(false))
     else if (motion === 32 && hasAxis) linear(target, lineNo, feedNow(true))
     else if (motion === 38 && hasAxis) linear(target, lineNo, feedNow(false))
     else if ((motion === 2 || motion === 3) && hasAxis && (plane !== 17 || (frame !== undefined && !frame.planar))) {

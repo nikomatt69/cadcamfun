@@ -1,6 +1,7 @@
 import { emitProgram } from "./emitter.ts"
 import type { Program } from "../ir.ts"
 import type { Dialect, Post } from "./types.ts"
+import { fanucTiltedPlane } from "./workplane.ts"
 
 /**
  * Fanuc-style dialect: `%` program delimiters, an `O` program number, a safe
@@ -37,6 +38,9 @@ export const fanucDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G43.4",
+  // Tilted working plane indexing (G68.2 + G53.1, workplane.ts) and inverse-time feed (G93, back with G94).
+  tiltedPlane: fanucTiltedPlane,
+  inverseTime: { on: "G93", off: "G94" },
   // AI contour control (AICC II / AI APC): the precision level and tolerance are the machine's parameters, not words of the block.
   smoothing: { on: () => ["G5.1 Q1"], off: ["G5.1 Q0"] },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],

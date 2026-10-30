@@ -25,7 +25,9 @@ import {
   isFullCircle,
   moveTarget
 } from "../ir.ts"
-import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from "./types.ts"
+import { type ArcMode, type Dialect, type PlaneCall, type PostOptions, type TiltedPlane, defaultPostOptions } from "./types.ts"
+import { prepareFiveAxis, tipMinutesOf } from "./five-axis-frame.ts"
+import { frameMatrix, isIdentityPlane } from "./workplane.ts"
 import { assertCycleSafe } from "../cycle-safety.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
@@ -43,6 +45,9 @@ export const formatNumber = (value: number, decimals: number): string => {
 
 const formatFeed = (feed: number, decimals: number): string =>
   Math.abs(feed - Math.round(feed)) < 1e-9 ? String(Math.round(feed)) : formatNumber(feed, decimals)
+
+/** Inverse-time feed word (1 / minutes): six significant digits, never rounded to zero by a coarse output format. */
+const formatFeedPerMinute = (value: number): string => String(Number(value.toPrecision(6)))
 
 /** ASCII-only comment text without parentheses, which would end the comment early. */
 export const sanitizeComment = (text: string, upper: boolean): string => {
@@ -136,6 +141,10 @@ class Writer {
   private tcpOn = false
   /** High-speed smoothing (`PostOptions.smoothing`) switched on. */
   private smoothingOn = false
+  /** The tilted work plane in force (`PostOptions.workPlanes`), if any. */
+  plane: TiltedPlane | undefined
+  /** Inverse-time feed (`G93`) switched on. */
+  private inverse = false
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
   /**
    * Incremental output (`G91`) for the body of a subprogram: the axis words are the change of the rounded position, which
@@ -285,6 +294,7 @@ class Writer {
       // The tip is kept only on feed moves: the same straight line, as G1.
       const feed = this.options.tcpRapidFeed ?? 5000
       if (!(Number.isFinite(feed) && feed > 0)) throw new RangeError(`tcpRapidFeed must be a positive feed, not ${feed}`)
+      this.leaveInverse()
       this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
       this.motion = "G1"
       this.commit(to, a.x, a.y, a.z)
@@ -299,7 +309,7 @@ class Writer {
     this.commit(to, a.x, a.y, a.z)
   }
 
-  linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr): void {
+  linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr, source?: Move): void {
     this.endCycle()
     const a = this.axes(to)
     this.withExpr(a, expr)
@@ -309,6 +319,17 @@ class Writer {
       this.ir = { ...to }
       return
     }
+    // Inverse-time feed (`PostOptions.inverseTimeFeed`): the move's tip time is known, the word is 1 / minutes and not modal.
+    const minutes = this.options.inverseTimeFeed === true && source !== undefined ? tipMinutesOf(source) : undefined
+    if (minutes !== undefined && minutes > 0) {
+      if (!this.inverse) { this.block(this.dialect.inverseTime!.on); this.inverse = true }
+      this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, `F${formatFeedPerMinute(1 / minutes)}`)
+      this.motion = "G1"
+      this.feed = undefined
+      this.commit(to, a.x, a.y, a.z)
+      return
+    }
+    this.leaveInverse()
     let feedWord = this.feedWord(feed)
     if (expr?.feed !== undefined) {
       const w = this.macro.word("F", expr.feed)
@@ -319,6 +340,75 @@ class Writer {
     this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, feedWord)
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
+  }
+
+  /** Back to feed per minute (`G94`) when inverse-time feed is on. */
+  leaveInverse(): void {
+    if (!this.inverse) return
+    this.block(this.dialect.inverseTime!.off)
+    this.inverse = false
+    this.feed = undefined
+  }
+
+  /** Switches tool-centre-point control off (before a tool change or a plane change); a no-op when it is off. */
+  closeTcp(): void {
+    this.ensureTcp(false)
+  }
+
+  private planeCall(plane: TiltedPlane): PlaneCall {
+    const decimals = this.options.angleDecimals ?? 4
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw new RangeError("angleDecimals must be an integer from 0 to 6")
+    const o = plane.frame.origin
+    return {
+      plane, matrix: frameMatrix(plane.frame), tool: this.tool, ...(this.options.swivel !== undefined ? { swivel: this.options.swivel } : {}),
+      origin: { x: this.num(o.x), y: this.num(o.y), z: this.num(o.z) },
+      angle: (degrees) => formatNumber(degrees, decimals),
+      number: (value) => this.num(value),
+      rotaryAxes: plane.layout === undefined ? [] : plane.layout === "table-AC" ? ["A", "C"] : ["B", "C"]
+    }
+  }
+
+  private planeLines(lines: ReadonlyArray<string>): void {
+    for (const line of lines) {
+      if (line.startsWith(KLARTEXT_PREFIX)) this.lines.push(line)
+      else this.block(line)
+    }
+  }
+
+  /**
+   * Puts a tilted work plane into effect with the control's words. The control turns the rotary axes, so what the writer knew about the
+   * position, the motion mode and the rotary words is gone: the next move states everything again.
+   */
+  applyPlane(plane: TiltedPlane): void {
+    const codes = this.dialect.tiltedPlane
+    if (codes === undefined) throw new RangeError(`${this.dialect.id}: this control has no tilted-plane words`)
+    this.endCycle()
+    this.closeTcp()
+    this.leaveInverse()
+    const call = this.planeCall(plane)
+    const z = plane.frame.zAxis
+    this.comment(`TILTED PLANE: TOOL AXIS ${z.x.toFixed(4)} ${z.y.toFixed(4)} ${z.z.toFixed(4)} AT ${call.origin.x} ${call.origin.y} ${call.origin.z}`)
+    this.planeLines(codes.set(call))
+    this.plane = plane
+    this.forgetModalState()
+    this.ir = undefined
+    for (const letter of Object.keys(this.rotary)) delete this.rotary[letter]
+  }
+
+  /** Cancels the tilted work plane, if one is in force; the control's reset also brings the rotary axes home where it can. */
+  cancelPlane(): void {
+    const plane = this.plane
+    if (plane === undefined) return
+    this.endCycle()
+    this.closeTcp()
+    this.leaveInverse()
+    const call = this.planeCall(plane)
+    this.planeLines(this.dialect.tiltedPlane!.reset(call))
+    this.plane = undefined
+    this.forgetModalState()
+    this.ir = undefined
+    for (const letter of Object.keys(this.rotary)) delete this.rotary[letter]
+    for (const letter of call.rotaryAxes) this.rotary[letter] = formatNumber(0, this.options.decimals)
   }
 
   /** Rotary words of a move, only the axes whose rounded angle changed. */
@@ -350,7 +440,7 @@ class Writer {
         throw new RangeError(`${this.dialect.id}: tool-centre-point control must be switched on with the rotary axes at 0, they stand at ${turned.map(([l, t]) => `${l}${t}`).join(" ")}: position them at 0 first, or post with tcp: false`)
       }
       if (typeof code === "string") this.block(code, `H${this.tool}`)
-      else this.block(code.on(this.tool))
+      else this.block(code.on(this.tool, this.options.tcpTransformation))
       this.tcpOn = true
     } else {
       if (typeof code === "string") this.block("G43", `H${this.tool}`)
@@ -386,6 +476,7 @@ class Writer {
 
   arc(move: ArcMove): void {
     this.endCycle()
+    this.leaveInverse()
     const from = this.ir
     if (from === undefined) {
       throw new RangeError("Arc requires a known start position")
@@ -511,6 +602,7 @@ class Writer {
 
   cycleMove(move: CycleMove): void {
     assertCycleSafe(move)
+    this.leaveInverse()
     const from = this.ir ?? { x: move.to.x, y: move.to.y, z: move.retractHeight }
     const klartext = this.dialect.klartextCycles === true && this.scale === 1
     if (move.cycle === "tap" && !klartext && (!this.options.useCannedCycles || !this.dialect.canned || this.dialect.rigidTap === undefined)) {
@@ -598,7 +690,7 @@ class Writer {
         this.rapid(move.to, move.rotary, move.expr)
         break
       case "Linear":
-        this.linear(move.to, move.feed, move.rotary, move.expr)
+        this.linear(move.to, move.feed, move.rotary, move.expr, move)
         break
       case "Arc":
         this.arc(move)
@@ -738,9 +830,33 @@ const rejectUnwritable = (program: Program, dialect: Dialect): void => {
   }
 }
 
+/** Tilted planes the program asks for, refused when the control has no word for them or the toolpath is in another frame already. */
+const planesOf = (program: Program, options: Partial<PostOptions>, dialect: Dialect): ReadonlyMap<string, TiltedPlane> => {
+  const wanted = options.workPlanes
+  const out = new Map<string, TiltedPlane>()
+  if (wanted === undefined) return out
+  const ids = new Set(program.toolpaths.map((tp) => tp.id))
+  for (const id of Object.keys(wanted)) if (!ids.has(id)) throw new RangeError(`workPlanes names toolpath "${id}", which the program does not have: the plane would be dropped silently`)
+  for (const tp of program.toolpaths) {
+    const plane = wanted[tp.id]
+    if (plane === undefined || isIdentityPlane(plane.frame)) continue
+    if (dialect.tiltedPlane === undefined) throw new RangeError(`${dialect.id}: this control has no tilted-plane words (G68.2, CYCLE800, PLANE SPATIAL); toolpath "${tp.name}" would cut in the wrong place: post it in machine coordinates (indexToolpath) or use a post that has them`)
+    if (tp.moves.some((m) => m._tag === "Orient")) throw new RangeError(`Toolpath "${tp.name}" is positioned in machine coordinates (Orient) and also names a tilted plane: use one of the two`)
+    if (tp.moves.some(carriesRotary)) throw new RangeError(`Toolpath "${tp.name}" turns the rotary axes and also names a tilted plane: the two frames do not compose`)
+    out.set(tp.id, plane)
+  }
+  return out
+}
+
+const planeKey = (p: TiltedPlane | undefined): string | undefined =>
+  p === undefined ? undefined : JSON.stringify([p.frame.origin, p.frame.xAxis, p.frame.yAxis, p.frame.zAxis, p.layout ?? null, p.solution ?? null])
+
 export const emitProgram = (program: Program, userOptions: Partial<PostOptions>, dialect: Dialect): string => {
   rejectUnwritable(program, dialect)
-  const options: PostOptions = { ...defaultPostOptions, ...userOptions }
+  const planes = planesOf(program, userOptions, dialect)
+  const prepared = prepareFiveAxis(program, userOptions, dialect)
+  program = prepared.program
+  const options: PostOptions = { ...defaultPostOptions, ...prepared.options }
   const w = new Writer(options, dialect, resolveArcMode(options.arcMode, dialect), program.units)
   const numbers = toolNumbers(program, options.toolNumbers)
   const spec = options.subprograms === true ? dialect.subprograms : undefined
@@ -794,6 +910,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     if (n !== w.tool) {
       w.finishMotion()
       w.smoothing(false)
+      // The tool-length word of the new tool replaces the tip-control word (G43.4 -> G43): say so before the changer, not after.
+      w.closeTcp()
+      w.leaveInverse()
       // A changer pulls the tool out of the spindle: it must be above the deepest point the
       // program has already reached, not inside the previous operation's cut.
       if (options.retractBeforeToolChange && w.ir !== undefined && w.ir.z < zMax - 1e-9) w.rapid({ x: w.ir.x, y: w.ir.y, z: zMax })
@@ -805,6 +924,8 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
         w.block("M9")
         w.coolant = "off"
       }
+      // A changer works in the machine's frame: the tilted plane is cancelled first and set again for the next operation.
+      if (w.plane !== undefined) { w.cancelPlane(); zMax = -Infinity }
       for (const b of dialect.toolChange(n, first)) w.block(b)
       w.tool = n
     }
@@ -821,6 +942,12 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       if (tp.coolant === "mist" && dialect.noMist === true) w.comment("MIST REQUESTED: THIS CONTROL HAS FLOOD COOLANT M8 ONLY")
       if (tp.coolant !== "off") w.block(tp.coolant === "flood" || dialect.noMist === true ? "M8" : "M7")
       w.coolant = tp.coolant
+    }
+    const wantedPlane = planes.get(tp.id)
+    if (planeKey(w.plane) !== planeKey(wantedPlane)) {
+      w.cancelPlane()
+      zMax = -Infinity
+      if (wantedPlane !== undefined) w.applyPlane(wantedPlane)
     }
     w.smoothing(true)
     const call = plan?.callOf.get(ti)
@@ -854,6 +981,8 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
   if (w.macro.open > 0) throw new RangeError(`The program leaves ${w.macro.open} If or While open: every If needs its EndIf and every While its EndWhile`)
   w.endTcp()
+  w.leaveInverse()
+  w.cancelPlane()
   w.smoothing(false)
   w.block("M5")
   if (w.coolant !== "off") w.block("M9")

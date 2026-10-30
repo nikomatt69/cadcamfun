@@ -31,6 +31,7 @@ export const haasDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G234",
+  inverseTime: { on: "G93", off: "G94" },
   // Haas G234 page: "The rotary axes must be at 0 before commanding G234"; "Do not program rapid moves while TCPC is active".
   tcpLimits: { rotaryZeroAtOn: true, noRapidRotary: true },
   // G187 accuracy control: P1 rough / P2 medium / P3 finish, E the corner tolerance; a bare G187 restores setting 191.

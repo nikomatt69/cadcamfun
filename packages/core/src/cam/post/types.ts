@@ -1,5 +1,8 @@
 /** Post-processor contract (spec 04-core-cam.md §4). */
+import type { FiveAxisKinematic } from "../five-axis.ts"
+import type { RotaryLayout } from "../indexing.ts"
 import type { CycleMove, Program, WorkOffset } from "../ir.ts"
+import type { WorkFrame } from "../setup.ts"
 
 export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
 
@@ -64,6 +67,86 @@ export interface PostOptions {
    * feed moves (`Dialect.tcpLimits.noRapidRotary`, Haas). Default 5000; the control clamps it to its own maximum cutting feed.
    */
   readonly tcpRapidFeed?: number
+  /**
+   * Tilted work planes (3+2 written with the control's own swivel words), by toolpath id: the toolpath is in the plane's own
+   * coordinates (what an ordinary 3-axis operation computes) and the post writes the control's plane word before it
+   * (`Dialect.tiltedPlane`: Fanuc `G68.2` + `G53.1`, Siemens `CYCLE800`, Heidenhain `PLANE SPATIAL`) and cancels it before a tool change,
+   * before another plane and at the end. A toolpath that is not listed runs in the work offset itself. A post whose control has no such
+   * word refuses the program (it would otherwise cut in the wrong place).
+   */
+  readonly workPlanes?: Readonly<Record<string, TiltedPlane>>
+  /** Swivel data of the Siemens machine (`CYCLE800`): required by a Siemens program with `workPlanes`. */
+  readonly swivel?: SwivelSettings
+  /** Decimals of the plane angles (degrees). Default 4; a Fanuc with IS-B least input increment keeps 3, set it to 3 there. */
+  readonly angleDecimals?: number
+  /**
+   * The five-axis machine the toolpaths with rotary moves were made for (`fiveAxisKinematic`). It says which frame their linear words
+   * are in (`tcp: "control"`: part coordinates, `"program"`: machine coordinates) and lets the post write them in the frame the output
+   * needs: `tcp` true (default for a `"control"` machine on a dialect that has a tip-control word) keeps the tip in part coordinates under
+   * the control's tool-centre-point word; `tcp` false writes machine coordinates and no word. A move that turns the rotary axes is split
+   * where the straight machine-axis line would leave the tip path by more than `tolerance`. Absent: the toolpaths are written as they are.
+   */
+  readonly kinematics?: FiveAxisKinematic
+  /**
+   * Limit of a rotary axis' speed, degrees/min (needs `kinematics`). A feed move that would turn an axis faster is slowed to the
+   * speed that holds the limit, so the tip speed drops instead of the axis being clipped by the control.
+   */
+  readonly rotaryMaxRate?: number
+  /**
+   * Inverse-time feed (needs `kinematics`; the dialect's `inverseTime` words, `G93` / `G94`): a simultaneous move is written with `F` =
+   * 1 / minutes the move takes at the tool tip, whatever the frame of its words, and `G94` is restored after the section.
+   */
+  readonly inverseTimeFeed?: boolean
+  /** Siemens: the number of the kinematic transformation `TRAORI(n)` (default: the machine's first, a bare `TRAORI`). */
+  readonly tcpTransformation?: number
+}
+
+/** A work plane tilted against the work offset, as the setup defines it (`WorkFrame`: z is the tool axis, x and y lie in the plane). */
+export interface TiltedPlane {
+  /** Origin and axes in the coordinates of the program's work offset, millimetres. */
+  readonly frame: WorkFrame
+  /** Rotary layout of the machine: names the axes the control turns back to 0 when the plane is cancelled (Fanuc). */
+  readonly layout?: RotaryLayout
+  /** Which of the two rotary solutions the control takes: `1` / `-1` (Siemens `_DIR`, Heidenhain `SEQ+` / `SEQ-`). Absent: the control's own pick. */
+  readonly solution?: 1 | -1
+}
+
+/** Siemens `CYCLE800` settings that belong to the machine, not to the part. */
+export interface SwivelSettings {
+  /** Name of the swivel data record (`_TC`), as set up by the machine builder. */
+  readonly dataRecord: string
+  /** Retraction before swivelling (`_FR`): 0 none, 1 Z axis to its maximum, 2 Z then X / Y to their maximum, 4 Z by `retractDistance`. Default 1. */
+  readonly retraction?: 0 | 1 | 2 | 4
+  /** Retraction distance for `retraction: 4` (`_FR_I`), mm. Default 100. */
+  readonly retractDistance?: number
+  /** Status word (`_ST`), as the control's swivel screen writes it; the units digit 1 adds to the active swivel. Default 0. */
+  readonly status?: number
+}
+
+/** What a dialect needs to write a tilted plane. Numbers are formatted by the writer in output units. */
+export interface PlaneCall {
+  readonly plane: TiltedPlane
+  /** Plane origin in output units, formatted (X, Y, Z). */
+  readonly origin: { readonly x: string; readonly y: string; readonly z: string }
+  /** Rotation of the plane: columns are the frame axes (row-major 3x3). */
+  readonly matrix: readonly [number, number, number, number, number, number, number, number, number]
+  /** Formats an angle in degrees. */
+  readonly angle: (degrees: number) => string
+  /** Formats a coordinate in output units. */
+  readonly number: (value: number) => string
+  readonly swivel?: SwivelSettings
+  /** Number of the tool in the spindle. */
+  readonly tool: number
+  /** Rotary axes that the plane's layout turns, in machine order (empty when unknown). */
+  readonly rotaryAxes: ReadonlyArray<"A" | "B" | "C">
+}
+
+/** The control's words for a tilted work plane (spec 72 P4-6). */
+export interface TiltedPlaneCodes {
+  /** Blocks that put the plane into effect; the control turns the rotary axes. Each string is one block. */
+  readonly set: (call: PlaneCall) => ReadonlyArray<string>
+  /** Blocks that cancel the plane (and send the rotary axes home where the control needs it). */
+  readonly reset: (call: PlaneCall) => ReadonlyArray<string>
 }
 
 export const defaultPostOptions: PostOptions = {
@@ -81,7 +164,7 @@ export interface Post {
 
 /** The blocks that switch tool-centre-point control on and off, for a control that has no tool-length-offset form of it. */
 export interface TcpCodes {
-  readonly on: (tool: number) => string
+  readonly on: (tool: number, transformation?: number) => string
   readonly off: (tool: number) => string
   /** Written at the end of the program when the section is still open (default: `off`). */
   readonly end?: (tool: number) => string
@@ -171,6 +254,10 @@ export interface Dialect {
     /** Block that returns to the caller (`M99`). */
     readonly end: string
   }
+  /** The control's tilted-plane words; absent: a program with `workPlanes` is refused. */
+  readonly tiltedPlane?: TiltedPlaneCodes
+  /** Inverse-time feed mode (`PostOptions.inverseTimeFeed`): the words that switch it on and back to feed per minute. */
+  readonly inverseTime?: { readonly on: string; readonly off: string }
   /** Final program-end block (`M30`, `M2`). */
   readonly end: string
   /** Lines after the end block, unnumbered (e.g. `%`). */

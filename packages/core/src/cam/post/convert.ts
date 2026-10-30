@@ -239,7 +239,7 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
   if (!klartext && codes.some((c) => word(c, "G", [73, 81, 82, 83, 85, 86, 89]))) notes.push("Canned drilling cycles were replayed as moves; the target writes its own cycles only where it has them and the IR keeps the hole")
   if (codes.some((c) => /(?:^|[^A-Z])M0*98(?![\d.])/.test(c) || /\bCALL LBL\b/.test(c))) notes.push("Subprogram calls were expanded; the `subprograms` option writes repeated toolpaths as subprograms of the target again")
   if (codes.some((c) => word(c, "G", [41, 42]))) notes.push("Cutter radius compensation was applied: the output is the tool-centre path for the compensated radius")
-  if (codes.some((c) => word(c, "G", [68]) || /G0*68\.2/.test(c) || /CYCLE800/.test(c))) notes.push("Rotated and tilted frames were applied: the output is in the work offset's own axes")
+  if (codes.some((c) => word(c, "G", [68]) || /G0*68\.2/.test(c) || /CYCLE800/.test(c) || /(?:^|\s)PLANE SPATIAL\b/.test(c))) notes.push("Rotated and tilted frames were applied: the output is in the work offset's own axes")
   if (states.some((s) => s.plane !== 17)) notes.push("Arcs in the G18 / G19 planes were replayed as chords within 0.01 mm")
   if (states.every((s) => s.tool === undefined)) notes.push("The input selects no tool: the output calls tool 1")
 

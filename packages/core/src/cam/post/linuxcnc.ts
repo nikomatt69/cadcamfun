@@ -25,6 +25,7 @@ export const linuxcncDialect: Dialect = {
   dwell: "seconds",
   uppercaseComments: false,
   rotary: true,
+  inverseTime: { on: "G93", off: "G94" },
   smoothing: { on: (tol) => [`G64 P${tol}`], off: ["G61"] },
   begin: () => ["%"],
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],

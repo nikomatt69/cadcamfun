@@ -20,6 +20,8 @@ export const mazakDialect: Dialect = {
   rigidTap: {},
   cycleCodes: { tap: "G84.2" },
   tcp: "G43.4",
+  // Mazak's tilted-plane words are not the Fanuc G68.2 ones and are not documented here: refused, not guessed.
+  tiltedPlane: undefined,
   smoothing: undefined
 }
 

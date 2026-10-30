@@ -10,6 +10,7 @@ export const genericDialect: Dialect = {
   dwell: "seconds",
   uppercaseComments: false,
   rotary: true,
+  inverseTime: { on: "G93", off: "G94" },
   begin: () => [],
   setup: ["G90", "G17", "G94"],
   toolChange: (n) => [`T${n} M6`],

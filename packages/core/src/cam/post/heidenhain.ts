@@ -3,11 +3,13 @@ import { emitProgram } from "./emitter.ts"
 import { KLARTEXT_PREFIX } from "./macro-syntax.ts"
 import { genericDialect } from "./generic.ts"
 import type { Dialect, Post, PostOptions } from "./types.ts"
+import { klartextTiltedPlane } from "./workplane.ts"
 
 /**
  * Native Klartext (TNC 640 / TNC7 conversational): `L` lines, circles as a centre `CC` and a `C` block, tool calls, dwell
  * (cycle 9), smoothing (cycle 32), expanded drilling. A simultaneous five-axis section is bracketed by `M128` (tool tip
- * positioning kept by the control) and `M129`. No tilted planes. Repeated toolpaths become label subprograms (`CALL LBL n`,
+ * positioning kept by the control) and `M129`. A tilted work plane (`PostOptions.workPlanes`) is cycle 7 (datum at the plane's
+ * origin) plus `PLANE SPATIAL ... TURN MB MAX FMAX`, cancelled with `PLANE RESET` (`workplane.ts`). Repeated toolpaths become label subprograms (`CALL LBL n`,
  * `LBL n` … `LBL 0` after `M30`), their bodies in incremental `IX IY IZ`.
  *
  * Klartext has no block of its own for a miscellaneous function: an M function rides on a positioning block. One that acts at
@@ -25,7 +27,9 @@ import type { Dialect, Post, PostOptions } from "./types.ts"
  */
 export const heidenhainDialect: Dialect = {
   ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
-  commentStyle: "semicolon", tcp: { on: () => "M128", off: () => "M129" }
+  commentStyle: "semicolon", tcp: { on: () => "M128", off: () => "M129" },
+  // Klartext feeds are tip feeds under M128; there is no inverse-time word.
+  inverseTime: undefined
 }
 
 /**
@@ -76,6 +80,7 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
   // Retain the shared writer's arc validation, cycle expansion, rounding and protective tool-change retractions.
   const writer: Dialect = {
     ...dialect, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false }, canned: false, klartextCycles: inch ? undefined : true, smoothing: klartextSmoothing,
+    tiltedPlane: klartextTiltedPlane,
     workOffset: (offset) => `PRESET ${Number(offset.slice(1)) - 53}`,
     subprograms: options.subprograms === true ? klartextLabels : undefined
   }
@@ -87,6 +92,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
   /** Feed word: inch programs take F in 1/10 inch/min. */
   const feedWord = (f: string): string => (inch ? String(Number((Number(f) * 10).toFixed(3))) : f)
   let motion: Motion = "G0", incremental = false, tool = 1, pendingTool = false
+  /** A tilted plane was set or cancelled since the last positioning block: the height `z` belongs to another frame. */
+  let frameChanged = false
   /** Absolute height of the tool in the main program, once a Z has been written. */
   let z: number | undefined
   /** Start-of-block M functions waiting for the next positioning block. */
@@ -103,6 +110,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
   const endFunction = (m: string): void => {
     const previous = lines[lastMove]
     if (lastMove >= 0 && lastMove === lastBlock && (previous!.match(/\bM\d+/g)?.length ?? 0) < 4) { lines[lastMove] = `${previous} ${m}`; return }
+    // After a plane word the last height is in another frame, so no positioning block may be invented: the TNC takes an M function in a block of its own.
+    if (frameChanged && z === undefined && !incremental) { block(m); return }
     if (z === undefined || incremental) throw new RangeError(`Klartext cannot place ${m}: no positioning block to carry it`)
     move(`L Z${signed(z.toFixed(decimals))} R0 FMAX ${m}`)
   }
@@ -118,6 +127,7 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     if (line.startsWith(KLARTEXT_PREFIX)) {
       const text = line.slice(KLARTEXT_PREFIX.length)
       // A cycle parameter row ("  Q200=+2 ;..") is a continuation of its `CYCL DEF`, with no block number of its own.
+      if (/^PLANE (?:SPATIAL|RESET)\b/.test(text)) { frameChanged = true; z = undefined; lastMove = -1 }
       if (text.startsWith(";") || text.startsWith("  ")) lines.push(text)
       else if (/\bM99$/.test(text)) move(text)
       else block(text)
@@ -163,7 +173,7 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     const axis = (w: string) => `${incremental ? "I" : ""}${w[0]}${signed(w.slice(1))}`
     const feed = value("F")
     const zWord = value("Z")
-    if (zWord !== undefined && !incremental) z = Number(zWord)
+    if (zWord !== undefined && !incremental) { z = Number(zWord); frameChanged = false }
     if (value("I") !== undefined || value("J") !== undefined) {
       if (motion !== "G2" && motion !== "G3") throw new RangeError(`Klartext cannot express block: ${raw}`)
       if (zWord !== undefined || words.some((w) => "ABC".includes(w[0]!))) throw new RangeError(`Klartext C blocks are planar: ${raw}`)
@@ -179,7 +189,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     move(`L ${axes.join(" ")} R0${motion === "G0" ? " FMAX" : feed !== undefined ? ` F${feedWord(feed)}` : ""}`)
   }
   if (pendingTool) toolCall()
-  if (pending.length > 0) {
+  if (pending.length > 0 && frameChanged && z === undefined) block(pending.join(" "))
+  else if (pending.length > 0) {
     if (z === undefined) throw new RangeError(`Klartext cannot place ${pending.join(" ")}: no positioning block follows`)
     move(`L Z${signed(z.toFixed(decimals))} R0 FMAX`)
   }

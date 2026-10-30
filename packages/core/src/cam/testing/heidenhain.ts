@@ -122,6 +122,12 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     const end = /^END PGM ([A-Z0-9_]+) (MM|INCH)$/.exec(line)
     if (end) return end[1] !== name || (end[2] === "INCH") !== inch ? bad() : ended ? "" : "M30"
     if (/^CYCL DEF 247 (?:PRESETTING|DATUM SETTING)$/.test(line)) { datum = true; return "" }
+    // Tilted plane: the datum shift (cycle 7, absolute to the preset) is read as the local shift G52, the plane word goes to the replay as
+    // it is (`PLANE SPATIAL` / `PLANE RESET`; the interpreter turns the frame).
+    if (/^PLANE (?:SPATIAL|RESET)\b/.test(line)) return line
+    if (line === "CYCL DEF 7.0 DATUM SHIFT") return ""
+    const shift = new RegExp(`^CYCL DEF 7\\.([1-3]) ([XYZ])(${NUMBER})$`).exec(line)
+    if (shift) return "XYZ"[Number(shift[1]) - 1] === shift[2] ? `G52 ${shift[2]}${shift[3]}` : bad()
     const header = /^CYCL DEF (200|201|202|203|205|206|207|208|262|267)\b/.exec(line)
     if (header) { defining = { number: Number(header[1]), q: new Map() }; if (!continued) { cycle = defining; defining = undefined } return "" }
     const param = /^Q(\d+)=([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(line)
