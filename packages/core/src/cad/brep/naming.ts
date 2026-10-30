@@ -41,17 +41,30 @@ const uniqueNames = (b: Brep): Brep => {
   b.faces.forEach((f, i) => { if (f.name !== undefined) groups.set(f.name, [...(groups.get(f.name) ?? []), i]) })
   if ([...groups.values()].every((g) => g.length === 1)) return b
   const names = b.faces.map((f) => f.name)
-  for (const [name, members] of groups) {
-    if (members.length === 1) continue
-    // 1. by the neighbours' names
-    const keys = members.map((fi) => [...new Set(adjacentFaces(b, fi).map((n) => b.faces[n]!.name ?? "?"))].sort().join("+"))
-    if (new Set(keys).size === members.length) { members.forEach((fi, k) => { names[fi] = `${name}@${keys[k]}` }); continue }
+  const pending = new Map([...groups].filter(([, m]) => m.length > 1))
+  const neighbourKey = (fi: number) => [...new Set(adjacentFaces(b, fi).map((n) => names[n] ?? "?"))].sort().join("+")
+  // Rounds: every group is tried against the names as they stood at the start of the round, so the result does not depend on
+  // the order of the groups. A group that a neighbour's rename can still help (the corner patches between blends, which are
+  // named once the blends are) waits; when a whole round resolves nothing, the first waiting group is told apart by position.
+  while (pending.size > 0) {
+    const resolved: Array<[string, number[], string[]]> = []
+    const keyed = new Map<string, string[]>()
+    for (const [name, members] of pending) {
+      const keys = members.map(neighbourKey)
+      keyed.set(name, keys)
+      if (new Set(keys).size === members.length) resolved.push([name, members, keys])
+    }
+    for (const [name, members, keys] of resolved) { members.forEach((fi, k) => { names[fi] = `${name}@${keys[k]}` }); pending.delete(name) }
+    if (resolved.length > 0) continue
     // 2. by position: the faces ordered by the centre of their edges, quantised so rounding noise does not reorder them.
+    const [name, members] = pending.entries().next().value as [string, number[]]
+    const keys = keyed.get(name)!
     const q = (v: number) => Math.round(v * 1e5)
     const order = members
       .map((fi) => ({ fi, c: centre(b, fi), key: keys[members.indexOf(fi)]! }))
       .sort((p, r) => p.key.localeCompare(r.key) || q(p.c.x) - q(r.c.x) || q(p.c.y) - q(r.c.y) || q(p.c.z) - q(r.c.z))
     order.forEach((o, k) => { names[o.fi] = `${name}#${k}` })
+    pending.delete(name)
   }
   return recordRelabel({ ...b, faces: b.faces.map((f, i) => (names[i] === f.name ? f : { ...f, name: names[i]! })) }, "unique-names", b)
 }

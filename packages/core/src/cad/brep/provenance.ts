@@ -49,20 +49,28 @@ const strongest = (a: FaceRelation, b: FaceRelation): FaceRelation => (RANK[a] >
 
 type Table = ReadonlyArray<ReadonlyArray<FaceOrigin>>
 
+/** A body renamed by `uniqueFaceNames` is the same body: an operand given in its renamed form is matched by the raw one. */
+const rawOf = (b: Brep): Brep => {
+  for (let step = STEPS.get(b); step !== undefined && step.op === "unique-names"; step = STEPS.get(b)) b = step.sources[0]!
+  return b
+}
+
 /** The faces of `b` expressed in the faces of `operands` (memoised per call). */
-const trace = (b: Brep, operands: ReadonlyArray<Brep>, memo: Map<Brep, Table>): Table => {
+const trace = (b: Brep, operands: ReadonlyArray<Brep>, memo: Map<Brep, Table>, roots: ReadonlyArray<Brep> = operands.map(rawOf)): Table => {
   const done = memo.get(b)
   if (done !== undefined) return done
   let out: Table
-  const at = operands.indexOf(b)
+  let at = operands.indexOf(b)
+  if (at < 0) at = roots.indexOf(b)
   if (at >= 0) out = b.faces.map((_, i) => [{ operand: at, face: i, relation: "same" as const }])
   else {
     const step = STEPS.get(b)
     if (step === undefined) out = b.faces.map(() => [])
     else {
-      const parents = step.sources.map((s) => trace(s, operands, memo))
+      const parents = step.sources.map((s) => trace(s, operands, memo, roots))
       out = step.faces.map((from) => {
         const acc = new Map<string, FaceOrigin>()
+        const multi = from.filter((o) => o.relation !== "new").length > 1
         for (const o of from) {
           if (o.relation === "new") continue
           // A step own split or merged is not carried: those are decided on the composed table (a split undone later is a trim).
@@ -72,7 +80,8 @@ const trace = (b: Brep, operands: ReadonlyArray<Brep>, memo: Map<Brep, Table>): 
             const flipped = (o.flipped === true) !== (p.flipped === true)
             const key = `${p.operand}:${p.face}`
             const prev = acc.get(key)
-            const merged: FaceOrigin = { operand: p.operand, face: p.face, relation: prev === undefined ? relation : strongest(prev.relation, relation), ...(flipped ? { flipped: true as const } : {}) }
+            const joined = multi || o.absorbed === true || p.absorbed === true || prev?.absorbed === true
+            const merged: FaceOrigin = { operand: p.operand, face: p.face, relation: prev === undefined ? relation : strongest(prev.relation, relation), ...(flipped ? { flipped: true as const } : {}), ...(joined ? { absorbed: true as const } : {}) }
             acc.set(key, merged)
           }
         }
@@ -97,7 +106,7 @@ export const provenanceOf = (result: Brep, operands: ReadonlyArray<Brep>): Prove
     const many = from.length > 1
     const list = from.map((o): FaceOrigin => {
       let relation = o.relation
-      if (many) relation = "merged"
+      if (many || o.absorbed === true) relation = "merged"
       else if ((kids[o.operand]!.get(o.face)?.length ?? 0) > 1) relation = "split"
       return relation === o.relation ? o : { ...o, relation }
     })
@@ -124,20 +133,28 @@ export interface EntityLineage {
  */
 export const edgeLineage = (result: Brep, operands: ReadonlyArray<Brep>, p: Provenance): ReadonlyArray<EntityLineage> => {
   const ruse = edgeUses(result)
-  const ouse = operands.map((o) => edgeUses(o))
+  // Per operand: its edges by the (sorted) pair of faces they separate, so a result edge looks its ancestors up instead of scanning.
+  const byPair = operands.map((o) => {
+    const m = new Map<string, number[]>()
+    edgeUses(o).forEach((uses, oe) => {
+      if (uses.length === 0) return
+      const a = uses[0]!.face, b = uses[1]?.face ?? a
+      const k = a <= b ? `${a},${b}` : `${b},${a}`
+      const l = m.get(k) ?? []
+      l.push(oe)
+      m.set(k, l)
+    })
+    return m
+  })
   return result.edges.map((_, ei): EntityLineage => {
     const faces = [...new Set(ruse[ei]!.map((u) => u.face))]
     const from: Array<{ operand: number; index: number }> = []
+    if (faces.length === 0) return { from, isNew: true }
     for (let k = 0; k < operands.length; k++) {
-      const anc = faces.map((f) => new Set(p.faces[f]!.from.filter((o) => o.operand === k).map((o) => o.face)))
-      if (anc.some((s) => s.size === 0)) continue
-      const first = anc[0]!, second = anc[1] ?? anc[0]!
-      operands[k]!.edges.forEach((_, oe) => {
-        const fs = ouse[k]![oe]!.map((u) => u.face)
-        if (fs.length === 0) return
-        const a = fs[0]!, b = fs[1] ?? fs[0]!
-        if ((first.has(a) && second.has(b)) || (first.has(b) && second.has(a))) from.push({ operand: k, index: oe })
-      })
+      const first = p.faces[faces[0]!]!.from.filter((o) => o.operand === k).map((o) => o.face)
+      const second = (faces.length > 1 ? p.faces[faces[1]!]!.from : p.faces[faces[0]!]!.from).filter((o) => o.operand === k).map((o) => o.face)
+      const seen = new Set<number>()
+      for (const a of first) for (const b of second) for (const oe of byPair[k]!.get(a <= b ? `${a},${b}` : `${b},${a}`) ?? []) if (!seen.has(oe)) { seen.add(oe); from.push({ operand: k, index: oe }) }
     }
     return { from, isNew: from.length === 0 }
   })

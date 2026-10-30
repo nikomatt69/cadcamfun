@@ -14,6 +14,8 @@ export interface FaceOrigin {
   readonly relation: FaceRelation
   /** True when the result face points the opposite way of the operand face (the tool faces of a subtraction). */
   readonly flipped?: true
+  /** True when the step that made the result face joined this ancestor with another face (possibly of a body outside the operands). */
+  readonly absorbed?: true
 }
 
 /** A recorded step: result face -> faces of the step's sources. */

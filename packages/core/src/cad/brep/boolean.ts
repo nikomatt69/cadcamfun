@@ -954,10 +954,11 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const original = S[fr.solid].brep.faces[fr.face]!.loops.reduce((n, l) => n + l.coedges.length, 0)
     if (fr.loops.reduce((n, l) => n + l.length, 0) !== original) return false
     return fr.loops.every((l) => l.every((h) => {
-      const m = /^E\d+\.(\d+)\.\d+$/.exec(h.piece)
-      return m !== null && edgePieces[fr.solid]![Number(m[1])]!.length === 1
+      const m = /^E(\d+)\.(\d+)\.\d+$/.exec(h.piece)
+      return m !== null && Number(m[1]) === fr.solid && edgePieces[fr.solid]![Number(m[2])]?.length === 1
     }))
   }
+  // The lineage is advisory: a defect in it must never turn a valid Boolean into a failure (provenance.test.ts guards the table).
   const origins: FaceOrigin[][] = kept.map(({ fr, flip }) => [{
     operand: fr.solid,
     face: fr.face,
@@ -968,7 +969,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   result = merged.brep
   const compacted = compactBrepMapped(result)
   result = compacted.brep
-  recordDerivation(result, `boolean ${op}`, [A, B], compacted.order.map((m) => merged.from[m]!.flatMap((k) => origins[k]!)))
+  try { recordDerivation(result, `boolean ${op}`, [A, B], compacted.order.map((m) => merged.from[m]!.flatMap((k) => origins[k]!))) } catch { /* advisory */ }
   options.debug?.("result", result)
   let report = validateBrep(result, { coarseVolume: true })
   // A lens thinner than the coarse chord (seed 114: a 0.07 mm torus/sphere overlap) tessellates with the wrong sign, so a

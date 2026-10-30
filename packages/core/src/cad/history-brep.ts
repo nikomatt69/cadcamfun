@@ -223,6 +223,20 @@ export interface ExactRebuild {
   /** One entry per body of `result.bodies`, same ids, same order. */
   readonly bodies: ReadonlyArray<ExactBody>
   readonly warnings: ReadonlyArray<string>
+  /**
+   * The exact bodies after each feature the replay reached (`at[k]` = after the first k features): the chain a reference is
+   * resolved along (`history-naming.ts`, spec 41 N3). Raw bodies, as the replay holds them; `uniqueFaceNames` of one is the
+   * body the person sees.
+   */
+  readonly timeline?: ReadonlyArray<ExactSnapshot>
+}
+
+export interface ExactSnapshot {
+  /** Number of features applied (0 = before the first). */
+  readonly after: number
+  /** The feature whose replay produced this state (undefined for the empty start). */
+  readonly feature?: string
+  readonly bodies: ReadonlyArray<{ readonly id: string; readonly brep: Brep }>
 }
 
 type Exact = { readonly brep: Brep; readonly reason?: undefined } | { readonly brep?: undefined; readonly reason: string }
@@ -697,8 +711,15 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   }
 
   let next = 0
+  // The bodies after each feature (see `ExactRebuild.timeline`): captured when a feature is about to run, and once more at the end.
+  const timeline: ExactSnapshot[] = []
+  const capture = (): void => {
+    if (timeline.length > next) return
+    timeline[next] = { after: next, ...(next > 0 ? { feature: history.features[next - 1]!.id } : {}), bodies: bodies.flatMap((b) => (b.exact.brep === undefined ? [] : [{ id: b.id, brep: b.exact.brep }])) }
+  }
   const advance = (end: number): void => {
     while (next < end && stopped === undefined) {
+      capture()
       const f = history.features[next++]!
       if (active[f.id]?.state !== "active" || failed(f.id) || result.states?.[f.id]?.state === "skipped") continue
       featureId = f.id
@@ -1545,6 +1566,7 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
         for (const b of bodies) if (b.feature === f.id) b.exact = no(`exact model of ${f.id} failed: ${e instanceof Error ? e.message : String(e)}`)
       }
     }
+    capture()
   }
   // Align with the mesh bodies by id.
   const snapshot = (meshBodies: RebuildResult["bodies"]): ExactRebuild => {
@@ -1554,7 +1576,7 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
       if (b === undefined) return { id: mb.id, feature: mb.feature, reason: stopped ?? "the exact replay has no body of this id" }
       return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: uniqueFaceNames(b.exact.brep) } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
     })
-    return { result: meshBodies === result.bodies ? result : { ...result, bodies: meshBodies }, bodies: out, warnings: [...warnings] }
+    return { result: meshBodies === result.bodies ? result : { ...result, bodies: meshBodies }, bodies: out, warnings: [...warnings], timeline: [...timeline] }
   }
   return {
     at: (index, meshBodies, options = {}) => {
