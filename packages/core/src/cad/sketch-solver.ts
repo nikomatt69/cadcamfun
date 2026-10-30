@@ -18,6 +18,7 @@
  *   that basin: the minimal set is reported for the geometry the sketch started from.
  */
 import type { Vec2 } from "./vec.ts"
+import { minimalUnsatisfiable } from "./sketch/deletion-filter.ts"
 import { compileSketch, type CompiledEquations, type Eq } from "./sketch-equations.ts"
 import { SketchError, type Sketch, type SketchDiagnostics, type SketchEntity, type SolveOptions, type SolveResult, type SolveStatus } from "./sketch-model.ts"
 
@@ -421,26 +422,12 @@ const minimalConflict = (
   const { eqs } = sys.compiled
   const candidates = [...new Set([...comp.eqs].map((e) => eqs[e]!.constraint).filter((c) => c >= 0))].sort((a, b) => a - b)
   const skip = new Uint8Array(sys.compiled.constraintNames.length)
-  let spent = 0
-  const unsat = (): boolean => {
-    spent++
-    const x = Float64Array.from(x0)
-    return solveComponent(sys, comp, x, tol, maxIterations, [], skip, signal).residual > SOLVED
-  }
-  let current = candidates
-  let minimal = true
-  for (let chunk = Math.ceil(current.length / 2); chunk >= 1; chunk = chunk === 1 ? 0 : Math.ceil(chunk / 2)) {
-    let i = 0
-    while (i < current.length) {
-      if (spent >= budget || signal?.aborted) { minimal = false; break }
-      const block = current.slice(i, i + chunk)
-      for (const c of block) skip[c] = 1
-      if (unsat()) current = current.filter((c) => !block.includes(c))
-      else { for (const c of block) skip[c] = 0; i += chunk }
-    }
-    if (!minimal) break
-  }
-  return { constraints: current, minimal }
+  const found = minimalUnsatisfiable(candidates, (active) => {
+    skip.fill(0)
+    for (const c of candidates) if (!active.has(c)) skip[c] = 1
+    return solveComponent(sys, comp, Float64Array.from(x0), tol, maxIterations, [], skip, signal).residual > SOLVED
+  }, budget, signal)
+  return { constraints: found.items, minimal: found.minimal }
 }
 
 /** Solves the sketch; throws `SketchError` for a malformed one. */
