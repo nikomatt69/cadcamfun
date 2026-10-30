@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, frame, makeBox, makeCylinder, makeSphere, massProperties, validateBrep, type Brep } from "./index.ts"
+import { booleanBrep, BooleanError, frame, makeBox, makeCylinder, makeSphere, massProperties, validateBrep, type Brep } from "./index.ts"
 import { agreesWithOperands, booleanCounters, booleanStrict, resetBooleanCounters, VERIFY_FACES } from "./boolean.ts"
 import { fuzzPair } from "./fuzz-sweep.ts"
 
@@ -82,5 +82,38 @@ describe("valid-but-wrong detection (spec 42 R7)", () => {
     }
     expect(booleanCounters().verifyRejected).toBe(0)
     expect(booleanCounters().verified).toBe(checked)
+  })
+
+  test("a sphere 1e-6 mm inside a cylinder wall: the dropped intersection curves no longer give an empty intersection", () => {
+    // Before: 44 "intersection curve could not be refined" warnings, intersection = nothing (113.1 mm3 expected), difference =
+    // the whole cylinder (169.6 mm3 expected), every result valid and every one wrong. A result that follows a dropped curve is
+    // now always checked; this one fails the check and is solved by re-parametrising the sphere (no operand moves).
+    const A = makeCylinder(3, 10, at(0, 0, 0)), r = 3 - 1e-6
+    const B = makeSphere(r, at(0, 0, 5))
+    const vs = (4 / 3) * Math.PI * r ** 3, vc = Math.PI * 9 * 10
+    resetBooleanCounters()
+    const u = booleanBrep(A, B, "union"), i = booleanBrep(A, B, "intersect"), d = booleanBrep(A, B, "subtract")
+    for (const x of [u, i, d]) expect(validateBrep(x.brep).issues).toEqual([])
+    expect(vol(u.brep)).toBeCloseTo(vc, 6)
+    expect(vol(i.brep)).toBeCloseTo(vs, 6)
+    expect(vol(d.brep)).toBeCloseTo(vc - vs, 6)
+    expect(booleanCounters().verified).toBeGreaterThan(0)
+    expect(booleanCounters().recoveredByDisplacement).toBe(0)
+  })
+
+  test("a sphere 1e-6 mm outside a cylinder wall: a typed result or refusal, never a thrown RangeError", () => {
+    const A = makeCylinder(3, 10, at(0, 0, 0)), B = makeSphere(3 + 1e-6, at(0, 0, 5))
+    for (const op of ["union", "intersect", "subtract"] as const) {
+      try {
+        const r = booleanBrep(A, B, op)
+        expect(validateBrep(r.brep).issues).toEqual([])
+        // Moved operand or not, the answer is the operands' to within the distance the warning names.
+        const vs = (4 / 3) * Math.PI * 27, vc = Math.PI * 90
+        const want = op === "union" ? vc : op === "intersect" ? vs : vc - vs
+        expect(Math.abs(vol(r.brep) - want) / want).toBeLessThan(1e-3)
+      } catch (e) {
+        expect(e).toBeInstanceOf(BooleanError)
+      }
+    }
   })
 })

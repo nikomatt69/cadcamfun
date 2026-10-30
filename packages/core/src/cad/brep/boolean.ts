@@ -628,7 +628,15 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
       const pieceClosed = v0 === v1
       const ptsP = seg.map((m) => m.q)
       if (ptsP.length >= 2 && !(ptsP.length === 2 && v0 === v1)) {
-        const fit = fitCurve(pieceClosed ? ptsP.slice(0, -1).map((q) => q.p) : ptsP.map((q) => q.p), pieceClosed, Math.max(tol * 10, fitTol / 10), conicOf(sa, sb))
+        let fit: FittedCurve
+        try {
+          fit = fitCurve(pieceClosed ? ptsP.slice(0, -1).map((q) => q.p) : ptsP.map((q) => q.p), pieceClosed, Math.max(tol * 10, fitTol / 10), conicOf(sa, sb))
+        } catch (err) {
+          // Samples that collapse onto each other (two surfaces tangent within the tolerance leave an intersection "curve" of
+          // repeated points) have no interpolating curve: a refusal the recovery can answer, not a crash.
+          if (!(err instanceof RangeError)) throw err
+          throw new BooleanError(`the intersection curve of faces ${c.fa}x${c.fb} has degenerate samples (${err.message}); the surfaces are tangent within the tolerance`, [], { stage: "arrange", hint: DEGENERATE_HINT, attempts: [] })
+        }
         const params = pieceClosed ? [...fit.params, fit.t1] : [...fit.params]
         ssiPieces.push({
           key: `C${ci}.${ssiPieces.length}`,
@@ -1334,7 +1342,10 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   try {
     if (poleContact) { COUNTERS.poleContact++; throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] }) }
     const done = booleanStrict(A, B, op, options)
-    const mode = options.verify ?? (A.faces.length + B.faces.length >= VERIFY_FACES ? "sampled" : "off")
+    // An intersection curve the pipeline dropped (could not be refined, ends away from the boundary) leaves a result that is
+    // closed and oriented but may be missing a piece: it is always checked, whatever the size and whatever `verify` says.
+    const dropped = done.warnings.some((w) => w.includes("could not be refined") || w.includes("ends away from any boundary"))
+    const mode = options.verify === "identities" ? "identities" : dropped ? "sampled" : options.verify ?? (A.faces.length + B.faces.length >= VERIFY_FACES ? "sampled" : "off")
     if (mode !== "off" && poleKind !== "designed") {
       // Valid is not right: a solid can close, orient and still be wrong. A result the operands do not support is not returned.
       const wrong = !agreesWithOperands(A, B, op, done.brep, mode === "identities" ? 3000 : 1200) || (mode === "identities" && !identitiesOfPair(A, B, options))
