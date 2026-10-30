@@ -1619,6 +1619,7 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly pitch?: number
           }
         | { readonly _tag: "Orient"; readonly a?: number; readonly b?: number; readonly c?: number }
+        | { readonly _tag: "SpindleOrient"; readonly angle?: number }
         | {
             readonly _tag: "Assign"
             readonly variable:
@@ -6500,6 +6501,7 @@ export type ToolpathGeneratorManufactureOutput =
                   pitch?: number
                 }
               | { _tag: "Orient"; a?: number; b?: number; c?: number }
+              | { _tag: "SpindleOrient"; angle?: number }
               | {
                   _tag: "Assign"
                   variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
@@ -6771,6 +6773,7 @@ export type ToolpathGeneratorParseOutput = {
             pitch?: number
           }
         | { _tag: "Orient"; a?: number; b?: number; c?: number }
+        | { _tag: "SpindleOrient"; angle?: number }
         | {
             _tag: "Assign"
             variable: { scope: "local" | "global" | "system"; index: number } | { name: string }

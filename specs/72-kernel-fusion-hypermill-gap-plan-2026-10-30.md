@@ -272,3 +272,16 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   along the tilted axis through the stock rim). Still open for 0.5: fixture bodies in the job model, `part-coverage` and `setup-workholding` for non-+Z
   setups, and a roughed-then-finished five-axis fixture that reaches `verified-program`.
 
+- 2026-10-30 (agent B, branch worktree-agent-a5e588f37a0cfd14b): **spindle orientation is an IR move.** `SpindleOrient { angle? }`
+  (degrees, default 0, validated 0..360; not `Orient`, which turns the table) is in `ir.ts` (endpoint, length, `estimateTime` +2 s,
+  validation), the timeline/playback (a stationary beat), `indexToolpath` (passed through), subprogram candidates (excluded) and the
+  panel's `movesToGcode`. `generateBackBore` emits it before the shift and before the withdrawal instead of the `M19` comments.
+  Posts (`post/spindle-orient.ts`, `Dialect.spindleOrient`): Fanuc / Mitsubishi / Mazak / Brother / Okuma / generic `M19` (no angle:
+  a non-zero angle is refused, never dropped), Haas `M19 P<deg>` / `R<deg>`, Siemens `SPOS=<deg>`, LinuxCNC `M19 R<deg> Q10`,
+  Heidenhain cycle 13 (`CYCL DEF 13.0 ORIENTATION`, `13.1 ANGLE`, `CYCL CALL`), GRBL refuses with a reason. The writer restarts
+  the stopped spindle (`M3 S`) before the next feed move. The NC interpreter reads `M19` / `SPOS` / cycle 13 as a non-moving event
+  (`InterpretResult.orients`, `MotionSample.oriented`), so the kernel replay is unchanged; `convertNc` turns it back into
+  `SpindleOrient` and keeps the operation whole. Basis: Haas `P`/`R`, Siemens `SPOS`, LinuxCNC `R`/`Q` are documented words; plain
+  `M19` on the Fanuc family and Okuma, and the Heidenhain cycle-13 block order (whether `CYCL CALL` is needed), are from memory and
+  not qualified on a control. Post definitions inherit the base's word; a definition cannot yet set its own (`PostDefinitionSchema`
+  has no field). Tests: `test/cam/spindle-orient.test.ts` (32).

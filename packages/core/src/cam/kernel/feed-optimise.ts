@@ -13,7 +13,7 @@
  * lie on the line, the pieces of an arc on the arc, and the last piece ends where the move ended. `mode: "off"` returns the very same
  * move list. Moves of a program with a rotary axis are `unresolved` and keep the feed they were programmed with.
  */
-import { arcSweepBetween, expandMoves, isFullCircle, moveLength, type Move } from "../ir.ts"
+import { SPINDLE_ORIENT_SECONDS, arcSweepBetween, expandMoves, isFullCircle, moveLength, type Move } from "../ir.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import type { HeightField } from "../verify/heightfield.ts"
 import type { Cutter } from "./cutters.ts"
@@ -189,6 +189,7 @@ const rapidSeconds = (moves: ReadonlyArray<Move>, rate: number, start: Vec3): nu
   for (const mv of moves) {
     if (mv._tag === "Rapid") seconds += (moveLength(mv, at) / rate) * 60
     if (mv._tag === "Dwell") seconds += mv.seconds
+    if (mv._tag === "SpindleOrient") seconds += SPINDLE_ORIENT_SECONDS
     if (mv._tag === "Rapid" || mv._tag === "Linear" || mv._tag === "Arc") at = mv.to
   }
   return seconds
