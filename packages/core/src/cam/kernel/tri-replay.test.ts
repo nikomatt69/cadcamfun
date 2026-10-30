@@ -79,4 +79,26 @@ describe("tri-dexel replay of a program: gouge and left verdicts", () => {
     expect(triCellFor({ x: 10, y: 10, z: 10 }, 0.1)).toBe(0.1)
     expect(triCellFor({ x: 2000, y: 2000, z: 100 }, 0.1)).toBeGreaterThan(2)
   })
+
+  test("contact: the shank in the wall is found with its depth, a shank that follows the cleared ring is not, and a rapid across the block is", () => {
+    // A tool whose flutes are short and whose shank is wider than the cleared channel: the flutes clear a 6 mm channel along the wall, the
+    // 12 mm holder above them sits in material when it follows the same path.
+    const stubby: Cutter = { ...flat(6), fluteLength: 4, stickout: 8, holder: { diameter: 14, length: 30 } }
+    const r = replay()
+    const path = ring(3, 0)
+    r.cut(stubby, path)
+    const bad = r.contact(stubby, ["shank", "holder"], path, undefined, 0.2)
+    expect(bad).toBeDefined()
+    expect(bad!.overlap).toBeGreaterThan(0.2)
+    expect(bad!.at).toBeDefined()
+    // The same path with a slender tool whose shank is the flute diameter stays in its own cut.
+    const slender = flat(6)
+    const r2 = replay()
+    r2.cut(slender, path)
+    expect(r2.contact(slender, ["shank", "holder"], path, undefined, 0.2)).toBeUndefined()
+    // A rapid across the block is a contact for the flutes, before anything is cut.
+    const r3 = replay()
+    expect(r3.contact(slender, ["cutting", "shank", "holder"], [{ x: 10, y: 10, z: 15 }, { x: 10, y: 10, z: 5 }], undefined, 0.2)).toBeDefined()
+    expect(r3.replayed).toBe(true)
+  })
 })

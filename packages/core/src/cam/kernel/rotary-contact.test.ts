@@ -66,8 +66,13 @@ describe("the turned moves of a five-axis program are checked on the voxel stock
 
   test("the default cutter is not reported as colliding, and the claims never pass what was not proven", () => {
     const r = runJob(job(ball))
-    expect(claim("holder-clearance", r).status).not.toBe("failed")
-    expect(claim("no-rapid-in-stock", r).status).not.toBe("failed")
+    // The finish runs on the raw stock, 9 mm of it standing around the dome above the base: the Ø10 shank leaning at the dome is in that
+    // material, which the tri-dexel probes find (the voxel bracket only ever said "possible"). The retract along the tilted axis at the
+    // stock's rim goes through uncut corner material too: both claims are verdicts of the tri-dexel with its declared error.
+    expect(claim("holder-clearance", r).status).toBe("failed")
+    expect(claim("holder-clearance", r).detail).toMatch(/tri-dexel/)
+    expect(claim("no-rapid-in-stock", r).status).toBe("failed")
+    expect(claim("no-rapid-in-stock", r).detail).toMatch(/tri-dexel/)
     // The cut is compared with the part on the tri-dexel replay (spec 72 step 0.3): the ball standing at the foot of the dome reaches
     // into its flank by about half a millimetre, which the old "unresolved" never said.
     expect(claim("no-gouge", r).status).toBe("failed")

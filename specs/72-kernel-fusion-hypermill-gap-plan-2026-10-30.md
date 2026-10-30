@@ -266,3 +266,9 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   program's part coordinates as machine coordinates and reports `ReplayMismatch` / `HolderCollision` that the machine-coordinate
   program does not have: the replay must understand the tip-control word first. A spindle-orient move (`M19`) is still a comment;
   it needs an IR move and every post/interpreter/viewer switch. The desktop has no control for `breadth` yet.
+- 2026-10-30 (build, step 0.5 part 1): rapids, shank and holder contacts for moves with the table turned are now exact probes on the tri-dexel
+  (`TriReplay.contact`), declared error as threshold; the voxel bracket only decides when the replay did not see every move. Real consequences on
+  the kernel's own raw-stock five-axis dome job: `holder-clearance` and `no-rapid-in-stock` fail (the Ø10 shank in 9 mm of uncut stock; a retract
+  along the tilted axis through the stock rim). Still open for 0.5: fixture bodies in the job model, `part-coverage` and `setup-workholding` for non-+Z
+  setups, and a roughed-then-finished five-axis fixture that reaches `verified-program`.
+

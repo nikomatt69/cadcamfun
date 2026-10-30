@@ -920,6 +920,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const turned = { rapidSure: 0, rapidPossible: 0, holderSure: 0, holderPossible: 0, unchecked: 0 }
   let turnedVoxels: VoxelStock | undefined
   let tri: TriReplay | undefined
+  // Contacts of the rapids, shank and holder with the stock for moves with the table turned: the tri-dexel probes are exact within
+  // the declared error and decide the claims when the replay saw every move; the voxel bracket (sure / possible) decides otherwise.
+  const triContacts = { rapid: 0, holder: 0 }
+  const triFindings = new Map<string, CamIssue>()
+  const voxelFindings = new Map<string, CamIssue>()
   const firstFinding = new Map<string, CamIssue>()
   const finding = (key: string, make: () => CamIssue): void => { if (!firstFinding.has(key)) firstFinding.set(key, make()) }
   let gougeColumns = 0, gougeDepth = 0
@@ -974,6 +979,17 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         const tips = poses.map((q) => q.tip), axes = poses.map((q) => q.axis)
         const rapid = s.kind === "rapid"
         if (!rapid) tri?.cut(cutter, tips, axes)
+        if (tri !== undefined) {
+          const hit = tri.contact(cutter, rapid ? ["cutting", "shank", "holder"] : ["shank", "holder"], tips, axes, prepared.tolerance + tri.stock.errorBound)
+          if (hit !== undefined) {
+            const op = opAtLine[s.line]
+            if (rapid) triContacts.rapid++; else triContacts.holder++
+            const key = rapid ? "turned-rapid" : "turned-holder"
+            if (!triFindings.has(key)) triFindings.set(key, issue(rapid ? "RapidInStock" : "HolderCollision", "replay",
+              rapid ? `Rapid move through material at NC line ${s.line} with the table turned (${cutter.name}, ${hit.overlap.toFixed(3)} mm into the stock on the tri-dexel)` : `Shank or holder of ${cutter.name} is ${hit.overlap.toFixed(3)} mm into material at NC line ${s.line} with the table turned (tri-dexel)`,
+              { line: s.line, ...(hit.at !== undefined ? { point: hit.at } : {}), ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
+          }
+        }
         // A feed move cuts with the flutes first; the shank and holder then follow through what the flutes removed.
         if (!rapid) removeTipPath(turnedStock, cutter, tips, axes)
         const parts = rapid ? (["cutting", "shank", "holder"] as const) : (["shank", "holder"] as const)
@@ -984,7 +1000,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (hit.sure !== undefined) {
             sure = true
             const op = opAtLine[s.line]
-            finding(rapid ? "turned-rapid" : "turned-holder", () => issue(rapid ? "RapidInStock" : "HolderCollision", "replay",
+            const key = rapid ? "turned-rapid" : "turned-holder"
+            if (!voxelFindings.has(key)) voxelFindings.set(key, issue(rapid ? "RapidInStock" : "HolderCollision", "replay",
               rapid ? `Rapid move through material at NC line ${s.line} with the table turned (${cutter.name})` : `Shank or holder of ${cutter.name} touches material at NC line ${s.line} with the table turned`,
               { line: s.line, point: q.machine, ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
             break
@@ -1047,6 +1064,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     checkGouges(lastOp)
   }
   issues.push(...firstFinding.values())
+  const triContactsDecide = tri !== undefined && tri.replayed
+  issues.push(...(triContactsDecide ? triFindings : voxelFindings).values())
   for (const [op, g] of gougeByOp) {
     const outcome = outcomes[opOfToolpath[op]!]
     issues.push(issue("Gouge", "replay", `${outcome?.id ?? `operation ${op + 1}`} cuts up to ${g.depth.toFixed(3)} mm below the part over ${g.columns} cells (${(g.columns * hf.cellArea).toFixed(2)} mm²)`, { ...(outcome ? { operationId: outcome.id } : {}) }))
@@ -1185,19 +1204,23 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     },
     {
       id: "no-rapid-in-stock",
-      status: interpreted === undefined ? "unresolved" : rapidHits > 0 || turned.rapidSure > 0 ? "failed" : turned.unchecked > 0 || turned.rapidPossible > 0 ? "unresolved" : "passed",
-      detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material` : turned.rapidSure > 0 ? `${turned.rapidSure} rapid moves with the table turned pass through material (voxel stock)`
-        : turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
-        : turned.rapidPossible > 0 ? `${turned.rapidPossible} rapid moves with the table turned come within a voxel of material that may remain`
-        : turnedMoves > 0 ? `No rapid touches the stock as replayed (${turnedMoves} moves with the table turned on the voxel stock)` : "No rapid move touches the stock as replayed"
+      status: interpreted === undefined ? "unresolved" : rapidHits > 0 || (triContactsDecide ? triContacts.rapid : turned.rapidSure) > 0 ? "failed" : !triContactsDecide && (turned.unchecked > 0 || turned.rapidPossible > 0) ? "unresolved" : "passed",
+      detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material`
+        : triContactsDecide && triContacts.rapid > 0 ? `${triContacts.rapid} rapid moves with the table turned pass through material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
+        : !triContactsDecide && turned.rapidSure > 0 ? `${turned.rapidSure} rapid moves with the table turned pass through material (voxel stock)`
+        : !triContactsDecide && turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
+        : !triContactsDecide && turned.rapidPossible > 0 ? `${turned.rapidPossible} rapid moves with the table turned come within a voxel of material that may remain`
+        : turnedMoves > 0 ? `No rapid touches the stock as replayed (${turnedMoves} moves with the table turned on the ${triContactsDecide ? `tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : "voxel stock"})` : "No rapid move touches the stock as replayed"
     },
     {
       id: "holder-clearance",
-      status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 || turned.holderSure > 0 ? "failed" : turned.unchecked > 0 || turned.holderPossible > 0 ? "unresolved" : "passed",
-      detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock` : turned.holderSure > 0 ? `${turned.holderSure} moves with the table turned bring the shank or holder into material (voxel stock)`
-        : turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
-        : turned.holderPossible > 0 ? `${turned.holderPossible} moves with the table turned bring the shank or holder within a voxel of material that may remain`
-        : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, voxel stock for ${turnedMoves} moves with the table turned)` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
+      status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 || (triContactsDecide ? triContacts.holder : turned.holderSure) > 0 ? "failed" : !triContactsDecide && (turned.unchecked > 0 || turned.holderPossible > 0) ? "unresolved" : "passed",
+      detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock`
+        : triContactsDecide && triContacts.holder > 0 ? `${triContacts.holder} moves with the table turned bring the shank or holder into material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
+        : !triContactsDecide && turned.holderSure > 0 ? `${turned.holderSure} moves with the table turned bring the shank or holder into material (voxel stock)`
+        : !triContactsDecide && turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
+        : !triContactsDecide && turned.holderPossible > 0 ? `${turned.holderPossible} moves with the table turned bring the shank or holder within a voxel of material that may remain`
+        : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, ${triContactsDecide ? `tri-dexel for ${turnedMoves} moves with the table turned, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : `voxel stock for ${turnedMoves} moves with the table turned`})` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
     },
     {
       id: "no-gouge",
