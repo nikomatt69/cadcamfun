@@ -81,7 +81,7 @@ export interface CamRibbonProps {
 
 /** Ribbon chip colour per post (the controls of one family share a colour). */
 const POST_ACCENT: Record<PostProcessorType, RibbonAction["accent"]> = {
-  fanuc: "blue", haas: "blue", mazak: "blue", siemens: "cyan", okuma: "cyan", heidenhain: "purple", linuxcnc: "green", grbl: "amber", generic: "neutral"
+  fanuc: "blue", haas: "blue", mazak: "blue", mitsubishi: "blue", brother: "blue", siemens: "cyan", okuma: "cyan", heidenhain: "purple", linuxcnc: "green", grbl: "amber", generic: "neutral"
 }
 
 const SVG = (path: string) => (size = 18, klass = ""): JSX.Element => (

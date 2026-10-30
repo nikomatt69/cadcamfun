@@ -39,6 +39,8 @@ export interface KernelSnapshot {
   readonly smoothing?: number
   /** Write the control's own fixed cycle where the program marks one (Heidenhain bore milling 208; spec 69 G4c.2). */
   readonly nativeCycles?: boolean
+  /** Tool-centre-point output (`PostOptions.tcp`): the kernel builds the table kinematics from the machine; refused without a rotary table or a tip-control word. */
+  readonly tcp?: boolean
   /** A post definition that writes the NC in place of the machine's built-in post (spec 54 C1). Inline, so a stored program re-runs with the post it was made with. */
   readonly postDefinition?: unknown
   /** How a printer job is sliced (read only when the machine is a printer). */
@@ -80,9 +82,9 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
-      ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.postDefinition !== undefined
+      ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true || s.postDefinition !== undefined
         ? { post: {
-          ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}), ...(s.nativeCycles === true ? { nativeCycles: true } : {}) } } : {}),
+          ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}), ...(s.nativeCycles === true ? { nativeCycles: true } : {}), ...(s.tcp === true ? { tcp: true } : {}) } } : {}),
           ...(s.postDefinition !== undefined ? { definition: s.postDefinition } : {})
         } }
         : {}),

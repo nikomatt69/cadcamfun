@@ -65,6 +65,8 @@ export const CamManufactureInput = Schema.Struct({
   subprograms: Schema.optionalKey(Schema.Boolean),
   /** Write the control's own fixed cycle where the kernel has one (Heidenhain: bore milling cycle 208) instead of the moves that do the same. */
   nativeCycles: Schema.optionalKey(Schema.Boolean),
+  /** Tool-centre-point output for a five-axis machine: part coordinates and the control's tip-control word (G43.4, G234, TRAORI, M128). Refused with an issue on a machine without a rotary table and on a post without such a word (Okuma, generic, LinuxCNC). */
+  tcp: Schema.optionalKey(Schema.Boolean),
   /** High-speed contour smoothing with this tolerance, mm (Fanuc AICC G5.1, Haas G187, Siemens CYCLE832, Heidenhain cycle 32, LinuxCNC G64 P); ignored by a control without it. */
   smoothing: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))),
   /** A post definition (spec 54 C1) that writes the NC in place of the machine's post: inline, or the id of a library item (category "post"), or the `postDefinitionId` of the machine configuration. */
@@ -114,7 +116,7 @@ export const CamManufactureOperationInput = Schema.Struct({
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr, tabs: CamManufactureInput.fields.tabs, breadth: CamManufactureInput.fields.breadth,
-  subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
+  subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, tcp: CamManufactureInput.fields.tcp, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

@@ -8,7 +8,7 @@ import { StockSchema, type Tool } from "../tool.ts"
 import { OperationSchema, type Operation } from "./op.ts"
 
 export const PostConfigSchema = Schema.Struct({
-  postId: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"]),
+  postId: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"]),
   decimals: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
   useCannedCycles: Schema.Boolean,
   arcMode: Schema.Literals(["ijk", "radius", "linearize"]),

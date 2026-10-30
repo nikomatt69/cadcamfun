@@ -26,8 +26,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- |
 | `cad` | read | 30 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3936 |
 | `cad_edit` | destructive | 18 | primary:build, editor, modeler | 3808 |
-| `cam` | read | 16 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3743 |
-| `cam_edit` | write | 7 | primary:build, machinist, optimizer | 2715 |
+| `cam` | read | 16 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3762 |
+| `cam_edit` | write | 7 | primary:build, machinist, optimizer | 2697 |
 | `library` | read | 5 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1311 |
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1361 |
 | `library_edit` | destructive | 7 | primary:build, machinist | 3482 |
@@ -118,7 +118,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cam.materials` | read | — | query | handler `machines` → `apps/sidecar/src/http/workspace.ts:284`, `apps/sidecar/src/services/ai.ts:1218` | yes | declared | cam-kernel-actions.test.ts, ai-cam-chain.test.ts |
 | `cam.cutting_data` | read | — | material*, cut*, tool*, machine, depth, ae, ap, scallop | handler `machine` → `apps/sidecar/src/http/workspace.ts:79` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
 | `cam.turn` | read | — | profile*, stock*, stepdown, allowance, feedMmRev, rpm, machine, machineConfig | local (core cam.kernel.findMachine, core cam.kernel.kernelMachineOfConfig, core cam.kernel.planTurning) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
-| `cam.manufacture` | read | — | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, breadth, tabs, subprograms, nativeCycles, smoothing, postDefinition, postDefinitionId, print | handler `manufacture` → `apps/sidecar/src/services/ai.ts:373` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, ai-cam-chain.test.ts, cam-subprograms.test.ts |
+| `cam.manufacture` | read | — | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, breadth, tabs, subprograms, nativeCycles, tcp, smoothing, postDefinition, postDefinitionId, print | handler `manufacture` → `apps/sidecar/src/services/ai.ts:373` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, ai-cam-chain.test.ts, cam-subprograms.test.ts |
 | `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:1483` | yes | declared | ai-cam-chain.test.ts |
 
 ### `cam_edit`
@@ -126,7 +126,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `cam_edit.turn` | write | operation, program | profile*, stock*, stepdown, allowance, feedMmRev, rpm, machine, machineConfig, expectedRevision | handler `turnOperation` → `apps/sidecar/src/services/ai.ts:327` | yes | declared | cam-kernel.test.ts |
-| `cam_edit.manufacture` | write | operation, program | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, expectedRevision, operations, tools, deburr, tabs, breadth, subprograms, nativeCycles, smoothing, print | handler `manufactureOperation` → `apps/sidecar/src/services/ai.ts:404` | yes | declared | cam-wire.test.ts, cam-kernel.test.ts |
+| `cam_edit.manufacture` | write | operation, program | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, expectedRevision, operations, tools, deburr, tabs, breadth, subprograms, nativeCycles, tcp, smoothing, print | handler `manufactureOperation` → `apps/sidecar/src/services/ai.ts:404` | yes | declared | cam-wire.test.ts, cam-kernel.test.ts |
 | `cam_edit.create` (was `cam_create_operation`) | write | operation | type*, params, expectedRevision | handler `createOperation` → `apps/sidecar/src/services/ai.ts:997` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
 | `cam_edit.update` (was `cam_update_operation`) | write | operation | operationId*, params*, expectedRevision | handler `updateOperation` → `apps/sidecar/src/services/ai.ts:1036` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-workspace.test.ts |
 | `cam_edit.generate` (was `cam_generate_gcode`) | write | program | operationId, maxLines | handler `generateGcode` → `apps/sidecar/src/services/ai.ts:1093` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, post-edit-diagnostics.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
@@ -262,8 +262,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1540 | ai-specialists.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3936 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3808 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3743 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2715 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3762 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2697 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1478 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1311 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3482 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |

@@ -1532,6 +1532,7 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly breadth?: { readonly holeCycles?: boolean; readonly tilted?: boolean; readonly namedFeatures?: boolean }
   readonly subprograms?: boolean
   readonly nativeCycles?: boolean
+  readonly tcp?: boolean
   readonly smoothing?: number
   readonly postDefinition?: JsonValue
   readonly print?: {
@@ -1847,7 +1848,18 @@ export type CamSetupPlanPayload = {
       readonly material: string
     }
     readonly post: {
-      readonly postId: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
+      readonly postId:
+        | "generic"
+        | "fanuc"
+        | "grbl"
+        | "linuxcnc"
+        | "haas"
+        | "siemens"
+        | "heidenhain"
+        | "okuma"
+        | "mazak"
+        | "mitsubishi"
+        | "brother"
       readonly decimals: number
       readonly useCannedCycles: boolean
       readonly arcMode: "ijk" | "radius" | "linearize"
@@ -2036,7 +2048,18 @@ export type CamSetupValidatePayload = {
       readonly material: string
     }
     readonly post: {
-      readonly postId: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
+      readonly postId:
+        | "generic"
+        | "fanuc"
+        | "grbl"
+        | "linuxcnc"
+        | "haas"
+        | "siemens"
+        | "heidenhain"
+        | "okuma"
+        | "mazak"
+        | "mitsubishi"
+        | "brother"
       readonly decimals: number
       readonly useCannedCycles: boolean
       readonly arcMode: "ijk" | "radius" | "linearize"
@@ -2225,7 +2248,18 @@ export type CamSetupGeneratePayload = {
       readonly material: string
     }
     readonly post: {
-      readonly postId: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
+      readonly postId:
+        | "generic"
+        | "fanuc"
+        | "grbl"
+        | "linuxcnc"
+        | "haas"
+        | "siemens"
+        | "heidenhain"
+        | "okuma"
+        | "mazak"
+        | "mitsubishi"
+        | "brother"
       readonly decimals: number
       readonly useCannedCycles: boolean
       readonly arcMode: "ijk" | "radius" | "linearize"
@@ -6932,6 +6966,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly breadth?: ToolpathGeneratorManufacturePayload["breadth"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
   readonly nativeCycles?: ToolpathGeneratorManufacturePayload["nativeCycles"]
+  readonly tcp?: ToolpathGeneratorManufacturePayload["tcp"]
   readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]
   readonly print?: ToolpathGeneratorManufacturePayload["print"]
@@ -6948,7 +6983,18 @@ export type ToolpathGeneratorManufactureOutput =
         machine: {
           id: string
           name: string
-          post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
+          post:
+            | "generic"
+            | "fanuc"
+            | "grbl"
+            | "linuxcnc"
+            | "haas"
+            | "siemens"
+            | "heidenhain"
+            | "okuma"
+            | "mazak"
+            | "mitsubishi"
+            | "brother"
         }
         setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
         origin: { x: number; y: number; z: number }

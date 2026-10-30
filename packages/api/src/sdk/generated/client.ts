@@ -3949,6 +3949,7 @@ export function make(options: ClientOptions) {
               breadth: input["breadth"],
               subprograms: input["subprograms"],
               nativeCycles: input["nativeCycles"],
+              tcp: input["tcp"],
               smoothing: input["smoothing"],
               postDefinition: input["postDefinition"],
               print: input["print"],

@@ -4,11 +4,11 @@ import type { RotaryLayout } from "../indexing.ts"
 import type { CycleMove, Program, WorkOffset } from "../ir.ts"
 import type { WorkFrame } from "../setup.ts"
 
-export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
+export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak" | "mitsubishi" | "brother"
 
 /**
- * Vendor dialects written as thin layers over a base post (`mitsubishi.ts`, `brother.ts`). They are kept out of `PostId` on purpose: that
- * union is listed exhaustively by the API schemas, the machine profile and the desktop post pickers, which own their own lists.
+ * Vendor dialects written as thin layers over a base post (`mitsubishi.ts`, `brother.ts`). They are full `PostId`s (the API schemas, the
+ * machine profile and the desktop pickers list them); this subset names the ones that are layers over another dialect.
  */
 export type VendorPostId = "mitsubishi" | "brother"
 
@@ -192,7 +192,7 @@ export interface SpindleOrientCodes {
 
 /** What differs between G-code dialects; the emitter is shared. */
 export interface Dialect {
-  readonly id: PostId | VendorPostId
+  readonly id: PostId
   /** Whether the control has canned drilling cycles. */
   readonly canned: boolean
   /** Klartext: a drilling move is the control's own fixed cycle (`CYCL DEF 200` …, called with `M99`), not an ISO code and not an expansion (`klartext-cycles.ts`). */

@@ -8,6 +8,7 @@ import { captureEditorOwner } from "../../../ai/lib/editor-sync.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { kernelRequestOf } from "../../lib/job.ts"
+import { tcpRefusal } from "../../lib/kernel-tcp.ts"
 import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
@@ -108,7 +109,9 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   let disposed = false
   const request = createMemo(() => {
     try {
-      return kernelRequestOf(job.sources(), { ...settings(), tolerance: gen.settings.tolerance, workOffset: gen.settings.workOffset })
+      // Tip control is only asked of a machine that can write it; the switch says why it cannot (the kernel would refuse the job).
+      const { tcp, ...rest } = settings()
+      return kernelRequestOf(job.sources(), { ...rest, ...(tcp === true && tcpRefusal(rest) === undefined ? { tcp } : {}), tolerance: gen.settings.tolerance, workOffset: gen.settings.workOffset })
     } catch { return undefined }
   })
   const artifact = createMemo<CamKernelArtifact | undefined>(() => {
@@ -136,7 +139,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements }) ||
-      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.tabs ?? null, current.nativeCycles ?? false, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
+      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.breadth ?? null, source.tcp ?? false, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.tabs ?? null, current.breadth ?? null, current.tcp ?? false, current.nativeCycles ?? false, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
   }
   const requestId = createMemo(() => request()?.id)
   createEffect(() => {
@@ -324,6 +327,37 @@ export function KernelMachineControls(): JSX.Element {
   )
 }
 
+/** Hole and feature breadth for the planner, and tool-centre-point output: each off unless asked, with what it needs said next to it. */
+function KernelBreadthControls(): JSX.Element {
+  const gen = useGeneratorStore()
+  const settings = useKernel().settings
+  const breadth = () => settings().breadth ?? {}
+  const setBreadth = (key: "holeCycles" | "tilted" | "namedFeatures", on: boolean): void => {
+    const next = { ...breadth(), [key]: on ? true : undefined }
+    const kept = Object.fromEntries(Object.entries(next).filter(([, value]) => value === true))
+    gen.patchKernelSettings({ breadth: Object.keys(kept).length > 0 ? kept : undefined })
+  }
+  const refusal = createMemo(() => tcpRefusal(settings()))
+  return (
+    <>
+      <fieldset class="space-y-1" data-testid="kernel-breadth">
+        <legend class="text-sm">{t("cam.kernel.breadth")}</legend>
+        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthHoleCyclesHint")}><input type="checkbox" checked={breadth().holeCycles === true} onChange={(event) => setBreadth("holeCycles", event.currentTarget.checked)} data-testid="kernel-breadth-hole-cycles" />{t("cam.kernel.breadthHoleCycles")}</label>
+        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthTiltedHint")}><input type="checkbox" checked={breadth().tilted === true} onChange={(event) => setBreadth("tilted", event.currentTarget.checked)} data-testid="kernel-breadth-tilted" />{t("cam.kernel.breadthTilted")}</label>
+        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthNamedHint")}><input type="checkbox" checked={breadth().namedFeatures === true} onChange={(event) => setBreadth("namedFeatures", event.currentTarget.checked)} data-testid="kernel-breadth-named" />{t("cam.kernel.breadthNamed")}</label>
+        <p class="text-xs text-gray-500" data-testid="kernel-breadth-hint">{t("cam.kernel.breadthHint")}</p>
+      </fieldset>
+      <div class="space-y-0.5">
+        <label class="flex items-center gap-2 text-sm" title={refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}>
+          <input type="checkbox" checked={settings().tcp === true && refusal() === undefined} disabled={refusal() !== undefined} onChange={(event) => gen.patchKernelSettings({ tcp: event.currentTarget.checked ? true : undefined })} data-testid="kernel-tcp" />
+          {t("cam.kernel.tcp")}
+        </label>
+        <p class="text-xs text-gray-500" data-testid="kernel-tcp-hint">{refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}</p>
+      </div>
+    </>
+  )
+}
+
 /** Plan, quality and the cutters the plan uses. Mounted inside the generator's operation section. */
 export function KernelOperationControls(): JSX.Element {
   const gen = useGeneratorStore()
@@ -341,6 +375,7 @@ export function KernelOperationControls(): JSX.Element {
           <label class={LABEL}>{t("cam.kernel.tabs")}<NumberField id="kernel-tabs" min="0" max="64" step="1" value={settings().tabs?.count ?? 0} accept={(value) => Number.isInteger(value) && value >= 0 && value <= 64} onValue={(value) => gen.patchKernelSettings({ tabs: value > 0 ? { count: value, width: 4, height: 2 } : undefined })} /></label>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().subprograms === true} onChange={(event) => gen.patchKernelSettings({ subprograms: event.currentTarget.checked ? true : undefined })} data-testid="kernel-subprograms" />{t("cam.kernel.subprograms")}</label>
           <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.nativeCyclesHint")}><input type="checkbox" checked={settings().nativeCycles === true} onChange={(event) => gen.patchKernelSettings({ nativeCycles: event.currentTarget.checked ? true : undefined })} data-testid="kernel-native-cycles" />{t("cam.kernel.nativeCycles")}</label>
+          <KernelBreadthControls />
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().smoothing !== undefined} onChange={(event) => gen.patchKernelSettings({ smoothing: event.currentTarget.checked ? 0.01 : undefined })} data-testid="kernel-smoothing" />{t("cam.kernel.smoothing")}</label>
           <Show when={settings().smoothing !== undefined}><label class={LABEL}>{t("cam.kernel.smoothingTolerance")}<NumberField id="kernel-smoothing-tolerance" min="0.001" max="1" step="0.001" value={settings().smoothing ?? 0.01} accept={(value) => Number.isFinite(value) && value > 0 && value <= 1} onValue={(value) => gen.patchKernelSettings({ smoothing: value })} /></label></Show>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().resolution === undefined} onChange={(event) => gen.patchKernelSettings({ resolution: event.currentTarget.checked ? undefined : 0.25 })} data-testid="kernel-auto-resolution" />{t("cam.kernel.autoResolution")}</label>
@@ -468,6 +503,12 @@ export function KernelRunControls(): JSX.Element {
           <For each={value().operations}>{(operation) => <div class="border-t border-gray-200 dark:border-gray-700 pt-1"><span class="font-medium">{operation.name}</span><span class="block text-gray-500">{operation.strategy} · {operation.toolId}{operation.cutting ? ` · ${operation.cutting.rpm.toFixed(0)} rpm · ${operation.cutting.feed.toFixed(0)} mm/min` : ""}</span></div>}</For>
           <For each={value().claims}>{(claim) => <div class="flex justify-between gap-2" title={claim.detail}><span>{claim.id}</span><span>{claim.status}</span></div>}</For>
           <For each={value().issues}>{(issue) => <p class={issue.severity === "error" ? "text-red-600" : "text-amber-600"}>{issue.message}</p>}</For>
+          <Show when={value().notes.length > 0}>
+            <div class="space-y-0.5" data-testid="kernel-notes">
+              <p class="font-medium">{t("cam.kernel.notes")}</p>
+              <For each={value().notes}>{(note) => <p class="text-gray-500">{note}</p>}</For>
+            </div>
+          </Show>
           <p class="text-gray-500">{t("cam.kernel.scope")}</p>
         </div>
       )}</Show>

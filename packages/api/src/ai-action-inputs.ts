@@ -93,7 +93,7 @@ export const LibraryMachineConfigInput = Schema.Struct({
   /** The control, in the shop's words ("Fanuc 0i-MD", "Heidenhain TNC7"). */
   controller: Schema.optionalKey(Schema.String),
   /** The post that writes the NC, when the controller's name does not decide it. */
-  post: Schema.optionalKey(Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"])),
+  post: Schema.optionalKey(Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"])),
   /** How many axes the machine has. */
   axes: Schema.optionalKey(Schema.Literals([3, 4, 5, 6])),
   /** Each axis and its travel: the linear ones in millimetres, the rotary ones in degrees. */

@@ -89,6 +89,18 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
     table: { length: 800, width: 500, gap: 30 }, rapidFeed: 30000, toolChangeSeconds: 5
   },
   {
+    // Fanuc-compatible G-code list of a MELDAS M80 / M800 control (post "mitsubishi"): no rigid tapping word is written, see post/mitsubishi.ts.
+    id: "mitsubishi-vmc", name: "Mitsubishi MELDAS vertical mill (BT40, 12 000 rpm, 11 kW)", kind: "mill", post: "mitsubishi",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 800, width: 450, gap: 30 }, rapidFeed: 30000, toolChangeSeconds: 6
+  },
+  {
+    // Brother Speedio class compact tapping centre (post "brother"): `G100 T<n> M6` tool change, see post/brother.ts.
+    id: "brother-speedio", name: "Brother Speedio class compact mill (BT30, 16 000 rpm, 5.5 kW)", kind: "mill", post: "brother",
+    limits: { maxRpm: 16000, minRpm: 100, maxFeed: 50000, powerKw: 5.5, torqueNm: 24, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 20 }, rapidFeed: 50000, toolChangeSeconds: 1.2
+  },
+  {
     id: "hsc-mill", name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)", kind: "mill", post: "generic",
     limits: { maxRpm: 30000, minRpm: 3000, maxFeed: 20000, powerKw: 7, torqueNm: 8, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 }, rapidFeed: 40000, toolChangeSeconds: 5

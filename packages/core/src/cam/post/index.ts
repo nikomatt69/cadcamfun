@@ -42,7 +42,9 @@ export const posts: Readonly<Record<PostId, Post>> = {
   siemens: siemensPost,
   heidenhain: heidenhainPost,
   okuma: okumaPost,
-  mazak: mazakPost
+  mazak: mazakPost,
+  mitsubishi: mitsubishiPost,
+  brother: brotherPost
 }
 
 /** Vendor dialects over a base post (`VendorPostId`), by id. */
@@ -55,4 +57,4 @@ export const getPost =(id: PostId): Post | undefined => posts[id] as Post | unde
 
 /** The dialect of an implemented post: what its control can do (canned cycles, rigid tapping, rotary axes). */
 export const dialectOf = (id: PostId): Dialect | undefined =>
-  ({ generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, grbl: grblDialect, haas: haasDialect, siemens: siemensDialect, heidenhain: heidenhainDialect, okuma: okumaDialect, mazak: mazakDialect } as Partial<Record<PostId, Dialect>>)[id]
+  ({ generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, grbl: grblDialect, haas: haasDialect, siemens: siemensDialect, heidenhain: heidenhainDialect, okuma: okumaDialect, mazak: mazakDialect, mitsubishi: mitsubishiDialect, brother: brotherDialect } as Partial<Record<PostId, Dialect>>)[id]

@@ -17,7 +17,7 @@ import type { PostId } from "../post/types.ts"
 import type { Rigidity } from "./cutting-data.ts"
 
 /** The post ids the kernel can write; the controller's name picks one when the profile does not name it. */
-export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"] as const
+export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"] as const
 
 /**
  * The controllers the kernel has a post for, and the control families that speak one of them. A controller's name picks
@@ -28,7 +28,9 @@ const POSTS: Readonly<Record<string, (typeof POST_IDS)[number]>> = {
   haas: "haas", grbl: "grbl", linuxcnc: "linuxcnc", emc2: "linuxcnc", generic: "generic", iso: "generic",
   sinumerik: "siemens", "840d": "siemens", siemens: "siemens",
   osp: "okuma", okuma: "okuma", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
-  heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain"
+  heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain",
+  mitsubishi: "mitsubishi", meldas: "mitsubishi", m70: "mitsubishi", m700: "mitsubishi", m80: "mitsubishi", m800: "mitsubishi",
+  brother: "brother", speedio: "brother", c00: "brother"
 }
 
 /** The post a controller's name asks for; an unknown control gets the plain ISO post, never a silent mismatch. */

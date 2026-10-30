@@ -2749,6 +2749,7 @@ type Endpoint27_0Input = {
   readonly breadth?: Endpoint27_0Request["payload"]["breadth"]
   readonly subprograms?: Endpoint27_0Request["payload"]["subprograms"]
   readonly nativeCycles?: Endpoint27_0Request["payload"]["nativeCycles"]
+  readonly tcp?: Endpoint27_0Request["payload"]["tcp"]
   readonly smoothing?: Endpoint27_0Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint27_0Request["payload"]["postDefinition"]
   readonly print?: Endpoint27_0Request["payload"]["print"]
@@ -2779,6 +2780,7 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       breadth: input["breadth"],
       subprograms: input["subprograms"],
       nativeCycles: input["nativeCycles"],
+      tcp: input["tcp"],
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],
