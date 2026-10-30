@@ -53,6 +53,20 @@ export interface BrepReport {
   readonly volume: number | undefined
   /** The largest vertex or edge tolerance of the body, mm: how loose the geometry is allowed to be (spec 42 R6). */
   readonly maxTolerance?: number
+  /**
+   * Measured fit (spec 42 R6), mm: for each edge the largest distance of five samples from the surfaces of the faces that use
+   * it, for each vertex the largest distance from the ends of the curves that meet there. What a tolerance has to cover.
+   */
+  readonly edgeDeviation?: ReadonlyArray<number>
+  readonly vertexGap?: ReadonlyArray<number>
+}
+
+/** The largest vertex or edge tolerance of a body, mm (0 for an empty body). */
+export const maxTolerance = (b: Brep): number => {
+  let m = 0
+  for (const v of b.vertices) m = Math.max(m, v.tol)
+  for (const e of b.edges) m = Math.max(m, e.tol)
+  return m
 }
 
 export interface ValidateOptions {
@@ -81,9 +95,13 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
   b.shells.forEach((s, si) => s.faces.forEach((fi) => { if (b.faces[fi] === undefined) issues.push({ kind: "index", message: `shell ${si} references missing face ${fi}` }) }))
   if (issues.length > 0) return { valid: false, issues, manifoldSolid: false, genus: undefined, volume: undefined }
   // Vertices on their edges' curves.
+  const vertexGap = b.vertices.map(() => 0)
+  const edgeDeviation = b.edges.map(() => 0)
   b.edges.forEach((e, ei) => {
     const d0 = dist3(curvePoint(e.curve, e.t0), b.vertices[e.v0]!.point)
     const d1 = dist3(curvePoint(e.curve, e.t1), b.vertices[e.v1]!.point)
+    vertexGap[e.v0] = Math.max(vertexGap[e.v0]!, d0)
+    vertexGap[e.v1] = Math.max(vertexGap[e.v1]!, d1)
     const lim = tol + e.tol + Math.max(b.vertices[e.v0]!.tol, b.vertices[e.v1]!.tol)
     if (d0 > lim) issues.push({ kind: "vertex-off-curve", edge: ei, vertex: e.v0, message: `edge ${ei} starts ${d0.toExponential(2)} mm from vertex ${e.v0}` })
     if (d1 > lim) issues.push({ kind: "vertex-off-curve", edge: ei, vertex: e.v1, message: `edge ${ei} ends ${d1.toExponential(2)} mm from vertex ${e.v1}` })
@@ -130,6 +148,7 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
       const e = b.edges[c.edge]!
       let worst = 0
       for (let k = 0; k <= 4; k++) worst = Math.max(worst, surfaceDistance(f.surface, curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 4)))
+      edgeDeviation[c.edge] = Math.max(edgeDeviation[c.edge]!, worst)
       if (worst > tol + e.tol) issues.push({ kind: "edge-off-surface", face: fi, edge: c.edge, message: `edge ${c.edge} lies ${worst.toExponential(2)} mm off the surface of face ${fi}` })
     }
   })
@@ -155,8 +174,5 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
     } else volume = massProperties(b).volume
     if (!(volume > 0)) issues.push({ kind: "orientation", message: `closed shell encloses a non-positive volume (${volume}); faces point inwards` })
   }
-  let maxTolerance = 0
-  for (const v of b.vertices) maxTolerance = Math.max(maxTolerance, v.tol)
-  for (const e of b.edges) maxTolerance = Math.max(maxTolerance, e.tol)
-  return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume, maxTolerance }
+  return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume, maxTolerance: maxTolerance(b), edgeDeviation, vertexGap }
 }

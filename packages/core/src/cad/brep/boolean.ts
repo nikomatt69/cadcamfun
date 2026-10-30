@@ -41,6 +41,7 @@ import { recordDerivation, type FaceOrigin } from "./lineage-record.ts"
 import { separateContacts, separateTouchingVertices } from "./contact.ts"
 import { orient2d } from "./predicates.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
+import { inheritTolerance } from "./tolerance.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
@@ -115,6 +116,11 @@ export interface BooleanOptions {
    * coarser seed.
    */
   readonly seedAngleDeg?: number
+  /**
+   * The declared tolerance limit, mm (default `toleranceLimit`: 10 x the model tolerance, or ten millionths of the body's size). A
+   * result whose tolerance passes it has the affected faces marked `loose` and carries a warning; the Boolean is not refused.
+   */
+  readonly maxTolerance?: number
 }
 
 export interface BooleanStats {
@@ -122,6 +128,8 @@ export interface BooleanStats {
   readonly splitPoints: number
   readonly fragments: number
   readonly keptFaces: number
+  /** The largest vertex or edge tolerance of the result, mm: the largest operand tolerance plus the fit measured on the result (spec 42 R6). */
+  readonly maxTolerance?: number
 }
 
 export interface BooleanResult {
@@ -989,7 +997,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     // Arrangements use the surface's natural orientation, including for reversed input faces. Restore the
     // outward loop orientation when sewing; a subtraction's flip is already included in `reversed`.
     if (reversed) loops = loops.map((l) => ({ coedges: [...l.coedges].reverse().map((c) => ({ edge: c.edge, reversed: !c.reversed })) }))
-    return orig.name === undefined ? { surface: orig.surface, reversed, loops } : { surface: orig.surface, reversed, loops, name: orig.name }
+    return { surface: orig.surface, reversed, loops, ...(orig.name !== undefined ? { name: orig.name } : {}), ...(orig.loose === true ? { loose: true as const } : {}) }
   })
   const stats = { intersectionCurves: ssis.length, splitPoints: reg.pts.length, fragments: fragments.length, keptFaces: faces.length }
   // Nothing kept: the intersection of solids that are apart or only touch, or a subtraction that removes everything.
@@ -1053,10 +1061,15 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     if (!agreesWithOperands(A, B, op, result)) throw new BooleanError(`Boolean ${op}: the separated contact disagrees with the operands`, [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
     warnings.push(contactNote)
   }
+  // Tolerance (spec 42 R6): the result's tolerances are the operands' largest plus the fit measured on the result.
+  const fit = inheritTolerance(result, report, [A, B], options.maxTolerance)
+  if (fit.looseFaces.length > 0) {
+    warnings.push(`tolerance grew to ${fit.maxTolerance.toExponential(1)} mm (operands ${fit.inherited.toExponential(1)} mm), above the declared limit ${fit.limit.toExponential(1)} mm: ${fit.looseFaces.length} face(s) are marked loose and STEP export refuses them`)
+  }
   return {
-    brep: result,
+    brep: fit.brep,
     warnings,
-    stats
+    stats: { ...stats, maxTolerance: fit.maxTolerance }
   }
 }
 

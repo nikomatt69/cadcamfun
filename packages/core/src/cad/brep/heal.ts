@@ -17,10 +17,11 @@
  * far geometry moved, the largest tolerance left and, for a body that is still not a solid, why (the nearest unmatched edges
  * and the gap between them), so a caller can refuse it instead of working on it.
  */
-import { dist3, dot3, MODEL_TOL, scale3, sub3, type Vec3 } from "./math.ts"
+import { dist3, dot3, scale3, sub3, unwrapNear, type Vec3 } from "./math.ts"
 import { curvePoint, surfaceDistance, surfaceNormal, surfacePoint, surfaceProject, type Surface } from "./geom.ts"
 import { compactBrep, edgePointAt, type Brep, type Coedge, type Edge, type Face, type Loop, type Vertex } from "./topology.ts"
 import { validateBrep, type BrepReport } from "./validate.ts"
+import { LOOSE_TOLERANCE } from "./tolerance.ts"
 
 export interface HealOptions {
   /** Welding tolerance, mm (default 1e-5 × model size, at least 1e-6). Geometry never moves further than this. */
@@ -41,6 +42,12 @@ export interface HealReport {
   readonly verticesTightened: number
   /** Straight edges refitted through their moved end vertices. */
   readonly edgesRefitted: number
+  /** Circle edges (arcs and full circles) moved to pass through their moved end vertices. */
+  readonly circlesRefitted: number
+  /** The furthest any refitted circle's centre moved, mm (never above `tol`). */
+  readonly curveMove: number
+  /** Edges that could not be refitted and why (a move above the tolerance, a degenerate arc); the body keeps them with the larger tolerance. */
+  readonly refitNotes: ReadonlyArray<string>
   /** The furthest any vertex of the input ended from where it was written, mm (never above `tol`). */
   readonly maxMove: number
   /** The largest vertex or edge tolerance of the healed body, mm. */
@@ -107,7 +114,7 @@ export const healBrep = (b: Brep, options: HealOptions = {}): HealResult => {
   }
   const size = b.vertices.length === 0 ? 1 : Math.max(1e-3, dist3(lo, hi))
   const tol = options.tol ?? Math.max(1e-6, size * 1e-5)
-  const looseTol = options.looseTol ?? 10 * MODEL_TOL
+  const looseTol = options.looseTol ?? LOOSE_TOLERANCE
 
   // 1. vertices, bucketed on a grid of one tolerance so the welding is linear.
   const cell = (p: Vec3) => `${Math.floor(p.x / tol)},${Math.floor(p.y / tol)},${Math.floor(p.z / tol)}`
@@ -192,6 +199,9 @@ export const healBrep = (b: Brep, options: HealOptions = {}): HealResult => {
   // 5. tighten: re-project the welded vertices onto the faces around them, refit the straight edges, measure again.
   let verticesTightened = 0
   let edgesRefitted = 0
+  let circlesRefitted = 0
+  let curveMove = 0
+  const refitNotes: string[] = []
   if (options.tighten !== false) {
     const around = new Map<number, Surface[]>()
     faces.forEach((f, fi) => {
@@ -216,6 +226,43 @@ export const healBrep = (b: Brep, options: HealOptions = {}): HealResult => {
       const origin = sub3(P0, scale3(dir, e.t0))
       edges1[i] = { ...e, curve: { kind: "line", origin, dir }, t1: e.t0 + L }
       edgesRefitted++
+    }
+    // Circles: an arc is moved (radius and plane stay) to the nearer of the two circles of its radius through both end
+    // vertices; a full circle is moved to pass through its one vertex. Only inside the tolerance; a larger move is reported.
+    for (const i of liveEdges) {
+      const e = edges1[i]!
+      if (e.curve.kind !== "circle") continue
+      const c = e.curve, f = c.frame, r = c.radius
+      const local = (p: Vec3) => { const d = sub3(p, f.origin); return { x: dot3(d, f.x), y: dot3(d, f.y) } }
+      let centre: { x: number; y: number } | undefined
+      if (e.v0 !== e.v1) {
+        const a = local(pos[e.v0]!), b = local(pos[e.v1]!)
+        const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy)
+        if (d < 1e-12 || d > 2 * r) { refitNotes.push(`circle edge ${i}: its end vertices ${d < 1e-12 ? "coincide" : `are ${d.toExponential(2)} mm apart, further than its diameter`}; not refitted`); continue }
+        const h = Math.sqrt(Math.max(0, r * r - (d / 2) * (d / 2)))
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2
+        const c1 = { x: mx - (h * dy) / d, y: my + (h * dx) / d }, c2 = { x: mx + (h * dy) / d, y: my - (h * dx) / d }
+        centre = Math.hypot(c1.x, c1.y) <= Math.hypot(c2.x, c2.y) ? c1 : c2
+      } else {
+        const a = local(pos[e.v0]!), L = Math.hypot(a.x, a.y)
+        if (L < 1e-12) continue
+        centre = { x: (a.x * (L - r)) / L, y: (a.y * (L - r)) / L }
+      }
+      const move = Math.hypot(centre.x, centre.y)
+      if (move < 1e-15 * size) continue
+      if (move > tol) { refitNotes.push(`circle edge ${i}: fitting it through its end vertices needs a move of ${move.toExponential(2)} mm, above the healing tolerance ${tol.toExponential(1)} mm; kept as written with the larger tolerance`); continue }
+      const origin = { x: f.origin.x + f.x.x * centre.x + f.y.x * centre.y, y: f.origin.y + f.x.y * centre.x + f.y.y * centre.y, z: f.origin.z + f.x.z * centre.x + f.y.z * centre.y }
+      const angle = (p: Vec3) => { const d = sub3(p, origin); return Math.atan2(dot3(d, f.y), dot3(d, f.x)) }
+      const TAU = 2 * Math.PI
+      const t0 = unwrapNear(angle(pos[e.v0]!), e.t0, TAU)
+      let t1: number
+      if (e.v0 === e.v1) t1 = t0 + (e.t1 - e.t0)
+      else { t1 = unwrapNear(angle(pos[e.v1]!), e.t1, TAU); if (t1 <= t0) t1 += TAU }
+      // The sweep must stay what it was (a different arc of the circle is a different edge).
+      if (Math.abs((t1 - t0) - (e.t1 - e.t0)) > 0.05 * Math.max(1e-6, e.t1 - e.t0) + 1e-3) { refitNotes.push(`circle edge ${i}: the refitted arc would sweep ${(t1 - t0).toFixed(4)} rad instead of ${(e.t1 - e.t0).toFixed(4)}; not refitted`); continue }
+      edges1[i] = { ...e, curve: { kind: "circle", frame: { ...f, origin }, radius: r }, t0, t1 }
+      circlesRefitted++
+      curveMove = Math.max(curveMove, move)
     }
   }
 
@@ -257,7 +304,7 @@ export const healBrep = (b: Brep, options: HealOptions = {}): HealResult => {
   return {
     brep: healed,
     report: {
-      verticesWelded, edgesWelded, degenerateUsesDropped, duplicateFacesDropped: dropped.size, verticesTightened, edgesRefitted, maxMove, maxTolerance,
+      verticesWelded, edgesWelded, degenerateUsesDropped, duplicateFacesDropped: dropped.size, verticesTightened, edgesRefitted, circlesRefitted, curveMove, refitNotes, maxMove, maxTolerance,
       looseFaces, tol, diagnostics, ...(closestOpenGap !== undefined ? { closestOpenGap } : {}), before, after
     }
   }

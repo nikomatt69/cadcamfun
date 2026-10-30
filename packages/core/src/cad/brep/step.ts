@@ -16,6 +16,8 @@
 import { compose, cross3, dot3, frame, IDENTITY, length3, neg3, normalize3, sub3, type Frame, type Transform, type Vec3 } from "./math.ts"
 import { curvePeriod, curvePoint, curveProject, curveRange, type Curve3, type Surface } from "./geom.ts"
 import type { NurbsCurveData, NurbsSurfaceData } from "./nurbs.ts"
+import { looseFaceIndices, toleranceLimit } from "./tolerance.ts"
+import { maxTolerance } from "./validate.ts"
 import { BrepBuilder, transformBrep, type Brep, type Coedge, type Shell } from "./topology.ts"
 
 // ================================================================ parser
@@ -780,10 +782,36 @@ export interface StepWriteOptions {
   readonly organization?: string
   /** File timestamp (ISO 8601); default now. Fixed in tests. */
   readonly timestamp?: string
+  /**
+   * Write loose bodies anyway (spec 42 R6). A body is loose when a face is flagged `loose` or a vertex or edge tolerance passes
+   * the limit. By default such a body is refused with a `StepExportError`; with this set it is written, the file's uncertainty is
+   * the largest tolerance, and the file description says which parts are loose and by how much.
+   */
+  readonly allowLoose?: boolean
+  /** The tolerance limit, mm (default `toleranceLimit` of each part: 10 x the model tolerance, or ten millionths of its size). */
+  readonly maxTolerance?: number
 }
 
-/** Writes parts as an AP214 STEP file (millimetres, radians). */
+/** A body that is too loose for exchange (spec 42 R6): the part, its largest tolerance, the limit and the faces flagged loose. */
+export class StepExportError extends Error {
+  constructor(message: string, readonly part: string, readonly maxTolerance: number, readonly limit: number, readonly looseFaces: ReadonlyArray<number>) {
+    super(message)
+    this.name = "StepExportError"
+  }
+}
+
+/** Writes parts as an AP214 STEP file (millimetres, radians). Throws `StepExportError` for a loose body unless `allowLoose` is set. */
 export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; readonly brep: Brep }>, options: StepWriteOptions = {}): string => {
+  const looseNotes: string[] = []
+  let worstTolerance = 1e-6
+  for (const part of parts) {
+    const tol = maxTolerance(part.brep), limit = options.maxTolerance ?? toleranceLimit(part.brep), flagged = looseFaceIndices(part.brep)
+    if (flagged.length === 0 && tol <= limit) continue
+    const why = `${flagged.length > 0 ? `${flagged.length} face(s) flagged loose, ` : ""}largest tolerance ${tol.toExponential(2)} mm against the limit ${limit.toExponential(1)} mm`
+    if (options.allowLoose !== true) throw new StepExportError(`STEP export refused for "${part.name}": the body is loose (${why}); heal it with a tighter fit, or export with allowLoose`, part.name, tol, limit, flagged)
+    looseNotes.push(`LOOSE ${part.name}: ${why}`)
+    worstTolerance = Math.max(worstTolerance, tol)
+  }
   const w = new StepWriter()
   const P = (p: Vec3) => w.add(`CARTESIAN_POINT('',(${num(p.x)},${num(p.y)},${num(p.z)}))`)
   const D = (d: Vec3) => { const u = normalize3(d); return w.add(`DIRECTION('',(${num(u.x)},${num(u.y)},${num(u.z)}))`) }
@@ -801,7 +829,7 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
   const mm = w.add(`(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.))`)
   const rad = w.add(`(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.))`)
   const sr = w.add(`(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT())`)
-  const unc = w.add(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-06),#${mm},'distance_accuracy_value','confusion accuracy')`)
+  const unc = w.add(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(${worstTolerance === 1e-6 ? "1.E-06" : num(worstTolerance)}),#${mm},'distance_accuracy_value','confusion accuracy')`)
   const ctx = w.add(`(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#${unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((#${mm},#${rad},#${sr}))REPRESENTATION_CONTEXT('Context #1','3D Context with UNIT and UNCERTAINTY'))`)
   for (const part of parts) {
     const b = part.brep
@@ -903,7 +931,7 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
   return [
     "ISO-10303-21;",
     "HEADER;",
-    `FILE_DESCRIPTION(('CADCAMFUN exact B-rep'),'2;1');`,
+    `FILE_DESCRIPTION((${["CADCAMFUN exact B-rep", ...looseNotes].map(str).join(",")}),'2;1');`,
     `FILE_NAME(${str(name)},${str(ts)},(${str(options.author ?? "")}),(${str(options.organization ?? "")}),'CADCAMFUN B-rep kernel','CADCAMFUN','');`,
     `FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));`,
     "ENDSEC;",
