@@ -6,6 +6,12 @@ import type { WorkFrame } from "../setup.ts"
 
 export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
 
+/**
+ * Vendor dialects written as thin layers over a base post (`mitsubishi.ts`, `brother.ts`). They are kept out of `PostId` on purpose: that
+ * union is listed exhaustively by the API schemas, the machine profile and the desktop post pickers, which own their own lists.
+ */
+export type VendorPostId = "mitsubishi" | "brother"
+
 export type ArcMode = "ijk" | "radius" | "linearize"
 
 export interface PostOptions {
@@ -162,6 +168,12 @@ export interface Post {
   emit(program: Program, options?: Partial<PostOptions>): string
 }
 
+/** A post of a vendor dialect (`VendorPostId`): the same `emit` as any post. */
+export interface VendorPost {
+  readonly id: VendorPostId
+  emit(program: Program, options?: Partial<PostOptions>): string
+}
+
 /** The blocks that switch tool-centre-point control on and off, for a control that has no tool-length-offset form of it. */
 export interface TcpCodes {
   readonly on: (tool: number, transformation?: number) => string
@@ -172,7 +184,7 @@ export interface TcpCodes {
 
 /** What differs between G-code dialects; the emitter is shared. */
 export interface Dialect {
-  readonly id: PostId
+  readonly id: PostId | VendorPostId
   /** Whether the control has canned drilling cycles. */
   readonly canned: boolean
   /** Klartext: a drilling move is the control's own fixed cycle (`CYCL DEF 200` …, called with `M99`), not an ISO code and not an expansion (`klartext-cycles.ts`). */

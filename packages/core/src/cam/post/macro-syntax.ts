@@ -405,7 +405,7 @@ export class MacroEmitter {
 
 export const familyOf = (id: string): MacroFamily => {
   switch (id) {
-    case "fanuc": case "haas": case "mazak": case "generic": return "fanuc"
+    case "fanuc": case "haas": case "mazak": case "mitsubishi": case "brother": case "generic": return "fanuc"
     case "okuma": return "okuma"
     case "siemens": return "siemens"
     case "heidenhain": return "heidenhain"

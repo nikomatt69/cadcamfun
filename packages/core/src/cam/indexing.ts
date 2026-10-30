@@ -19,8 +19,12 @@
  * Each normal has two solutions (tilt one way with one C, or the other way with C + 180 degrees); the first inside the limits is
  * taken, the smaller tilt first. Positive angles follow the right-hand rule about the machine axis.
  *
- * Not covered: a machine whose HEAD tilts (the pivot moves with the tool; needs the tool length), RTCP / tilted-plane controller
- * cycles (G68.2, CYCLE800: here the coordinates are transformed in the program instead), and simultaneous 5-axis motion.
+ * This module writes the program in machine coordinates (the coordinates are transformed here, the post only writes them). The other way
+ * to post 3+2, where the control's own tilted-plane words do the transformation (G68.2 + G53.1, CYCLE800, PLANE SPATIAL), is
+ * `PostOptions.workPlanes` in `post/workplane.ts`: the toolpath then stays in the work frame and the post is given the frame.
+ *
+ * Not covered: a machine whose HEAD tilts (the pivot moves with the tool; needs the tool length), and simultaneous 5-axis motion
+ * (`five-axis.ts`, `post/five-axis-frame.ts`).
  */
 import { cross3, dot3, length3, type Vec3 } from "../cad/vec.ts"
 import type { Move, Toolpath } from "./ir.ts"

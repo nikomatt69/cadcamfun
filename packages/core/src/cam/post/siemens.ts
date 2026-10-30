@@ -11,7 +11,9 @@ import { siemensTiltedPlane } from "./workplane.ts"
  * What it deliberately leaves out: no canned cycle (`CYCLE81..` take parameter lists of their own, so drilling is written as
  * moves, with pecking), no rigid tapping (`G331` / `G332` need `SPOS` and a thread-specific block: the planner mills the thread),
  * no subprograms (a Siemens subprogram is a separate `_SPF` file). A simultaneous five-axis section is opened with `TRAORI` (the
- * machine's first kinematic transformation; a machine with several needs its own `TRAORI(n)`) and closed with `TRAFOOF`. A shop
+ * machine's first kinematic transformation; a machine with several sets `PostOptions.tcpTransformation` for `TRAORI(n)`) and closed with
+ * `TRAFOOF`. A tilted work plane (`PostOptions.workPlanes`, needs `PostOptions.swivel`) is `CYCLE800` with its 16 parameters
+ * (`workplane.ts`); inverse-time feed is `G93` / `G94`. A shop
  * that needs the rest enters its own post; none of this is qualified on a real control.
  */
 export const siemensProgramName = (program: Program): string => {

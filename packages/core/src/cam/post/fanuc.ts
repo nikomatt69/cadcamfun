@@ -11,7 +11,8 @@ import { fanucTiltedPlane } from "./workplane.ts"
  *
  * A simultaneous five-axis section is opened with `G43.4 H<n>` (tool tip control, a Fanuc option the machine builder enables) and closed
  * with `G43 H<n>`, like Haas does with `G234`; the program is then in the work offset, the control keeps the tool tip on the path.
- * The `smoothing` option switches AI contour control on per operation (`G5.1 Q1`) and off before each tool change (`G5.1 Q0`).
+ * A tilted work plane (`PostOptions.workPlanes`) is `G68.2` (Euler angles) + `G53.1`, cancelled with `G69` and the rotary axes sent to 0
+ * (`workplane.ts`); `inverseTimeFeed` writes `G93` / `G94`. The `smoothing` option switches AI contour control on per operation (`G5.1 Q1`) and off before each tool change (`G5.1 Q0`).
  */
 /** The program number of the main program (`metadata.programNumber`, default 1000). */
 export const fanucProgramNumber = (program: Program): number => {

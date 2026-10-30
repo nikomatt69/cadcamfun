@@ -8,7 +8,9 @@ import { heidenhainDialect, heidenhainPost } from "./heidenhain.ts"
 import { linuxcncDialect, linuxcncPost } from "./linuxcnc.ts"
 import { okumaDialect, okumaPost } from "./okuma.ts"
 import { mazakDialect, mazakPost } from "./mazak.ts"
-import type { Dialect, Post, PostId } from "./types.ts"
+import { mitsubishiDialect, mitsubishiPost } from "./mitsubishi.ts"
+import { brotherDialect, brotherPost } from "./brother.ts"
+import type { Dialect, Post, PostId, VendorPost, VendorPostId } from "./types.ts"
 
 export * from "./types.ts"
 export { convertNc, programOfNc, type ConvertOptions, type ConvertResult, type NcFigures } from "./convert.ts"
@@ -22,6 +24,10 @@ export { heidenhainDialect, heidenhainPost } from "./heidenhain.ts"
 export { linuxcncDialect, linuxcncPost } from "./linuxcnc.ts"
 export { okumaDialect, okumaPost } from "./okuma.ts"
 export { mazakDialect, mazakPost } from "./mazak.ts"
+export { mitsubishiDialect, mitsubishiPost } from "./mitsubishi.ts"
+export { brotherDialect, brotherPost } from "./brother.ts"
+export { frameMatrix, eulerZXZ, eulerXYZ, spatialAngles, fanucTiltedPlane, siemensTiltedPlane, klartextTiltedPlane } from "./workplane.ts"
+export { prepareFiveAxis, resolveTcp, machineToPart, partToMachinePoint } from "./five-axis-frame.ts"
 export { PostDefinitionSchema, BASE_POSTS, compileDefinition, definitionIssues, type PostDefinition, type DefinitionIssue } from "./definition.ts"
 export { samplePostProgram } from "./sample.ts"
 export { BUILTIN_DEFINITIONS, GENERIC_DEFINITION, FANUC_DEFINITION, HAAS_DEFINITION, GRBL_DEFINITION, LINUXCNC_DEFINITION } from "./builtin-definitions.ts"
@@ -39,7 +45,13 @@ export const posts: Readonly<Record<PostId, Post>> = {
   mazak: mazakPost
 }
 
-export const getPost = (id: PostId): Post | undefined => posts[id] as Post | undefined
+/** Vendor dialects over a base post (`VendorPostId`), by id. */
+export const vendorPosts: Readonly<Record<VendorPostId, VendorPost>> = { mitsubishi: mitsubishiPost, brother: brotherPost }
+
+/** The dialect of a vendor post. */
+export const vendorDialectOf = (id: VendorPostId): Dialect => (id === "mitsubishi" ? mitsubishiDialect : brotherDialect)
+
+export const getPost =(id: PostId): Post | undefined => posts[id] as Post | undefined
 
 /** The dialect of an implemented post: what its control can do (canned cycles, rigid tapping, rotary axes). */
 export const dialectOf = (id: PostId): Dialect | undefined =>

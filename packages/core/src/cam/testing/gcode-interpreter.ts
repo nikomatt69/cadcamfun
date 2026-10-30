@@ -17,7 +17,9 @@
  * Spec 32 §4.3: tapping and boring cycles `G84 G74 G85 G86 G76 G87 G88 G89` (the tap's spindle reverses in the track),
  * cutter radius compensation `G41/G42 D` / `G40` (`cutter-comp.ts`; the radius from `toolRadius`, `G10 L12` or the header),
  * frames: `G52` local shift, `G10 L2` + `G54-G59` work offsets, `G68` rotation, `G68.2` / `CYCLE800` tilted planes
- * (`G69` cancels), `G90.1` absolute arc centres, `G53` (machine coordinates: like `G28`, no drawn motion); lathe
+ * (`G69` cancels; Heidenhain `PLANE SPATIAL` / `PLANE RESET` with the cycle 7 datum read as a `G52` shift), `G93` inverse-time feed
+ * (F = 1 / minutes of the block: the feed along the written axes is F times the block's length), `G100 T<n> M6` (Brother tool
+ * change), `G90.1` absolute arc centres, `G53` (machine coordinates: like `G28`, no drawn motion); lathe
  * repetitive cycles `G70-G76` (`lathe-cycles.ts`), `U`/`W` incremental addresses, `G112/G113` polar interpolation (C is the
  * face's Y); Siemens keywords and cycle calls are statements (only `CYCLE800` moves anything), never misread as words.
  * Anything else with an effect on motion is reported in `errors` (and `unsupported`). Output units are always millimetres.
@@ -669,6 +671,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 91.1) arcCentreAbsolute = false
         else if (g === 112 || g === 12.1) polar = true
         else if (g === 113 || g === 13.1) { polar = false; pos = { ...pos, y: 0 }; if (progPos) progPos = { ...progPos, y: 0 } }
+        // Brother Speedio tool change `G100 T<n> M6`: the T and M6 on the line do the work; G100 alone (Fanuc tool-data setting) is not read.
+        else if (g === 100 && words.some((v) => v.letter === "M" && Math.round(v.value) === 6)) { /* tool change block */ }
         else if (ACCEPTED_G.includes(g)) {
           // Accepted modal words without geometric effect here (tool length, exact stop / blending, look-ahead, TCP, G53.1).
         } else { errors.push(`line ${physical}: unsupported G${g}`); unsupported.push({ line: physical, word: `G${g}` }) }
