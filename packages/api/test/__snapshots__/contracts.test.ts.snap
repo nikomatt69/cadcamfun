@@ -60345,6 +60345,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "properties": {
                                         "_tag": {
                                           "enum": [
+                                            "SpindleOrient",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "angle": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
                                             "Assign",
                                           ],
                                           "type": "string",
@@ -64432,6 +64450,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               "properties": {
                                                 "_tag": {
                                                   "enum": [
+                                                    "SpindleOrient",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "angle": {
+                                                  "type": "number",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
                                                     "Assign",
                                                   ],
                                                   "type": "string",
@@ -65884,6 +65920,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "type": "number",
                                         },
                                         "c": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "SpindleOrient",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "angle": {
                                           "type": "number",
                                         },
                                       },
@@ -67777,6 +67831,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "type": "number",
                                       },
                                       "c": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "SpindleOrient",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "angle": {
                                         "type": "number",
                                       },
                                     },
