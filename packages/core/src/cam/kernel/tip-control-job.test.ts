@@ -156,7 +156,7 @@ describe("tcp: true is refused, never approximated", () => {
 
   test("a three-axis machine and a three-axis job: refused too, the option says what the caller wants", () => {
     const vmc = findMachine("vmc-standard")!
-    const a = run({ ...domeJob("fanuc", { tcp: true }, vmc), operations: [{ id: "face", strategy: "face", tool: flat.id, top: 17, depth: 1, stepover: 50 } as OperationSpec], tools: [flat] })
+    const a = run({ ...domeJob("fanuc", { tcp: true }, vmc), operations: [{ id: "face", strategy: "face", tool: flat.id, bottom: 16, stepover: 50 }], tools: [flat] })
     expect(refused(a)).toMatch(/has no five-axis table/)
   })
 })
