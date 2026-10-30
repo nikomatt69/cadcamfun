@@ -4,7 +4,7 @@
  * G43 H<n> M3 S...`) between toolpaths; nothing here concatenates text.
  */
 import { analyseGcode } from "../generator/analysis.ts"
-import { decodeGenerateRequest, generateToolpath, type GeometryInput, type GcodeStats } from "../generator/index.ts"
+import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GeometryInput, type GcodeStats } from "../generator/index.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { getPost } from "../post/index.ts"
 import type { Operation } from "./op.ts"
@@ -40,6 +40,16 @@ export interface GeneratedSetup {
 }
 
 const round = (value: number): number => Math.round(value * 1000) / 1000
+
+/**
+ * The geometry of an operation from the elements the caller resolved (`elements` by id): the operation's element ids in order, as
+ * the "selected" geometry of the generator. An id with no element is an error the caller must show, so it throws with the ids.
+ */
+export const geometryFor = (operation: Operation, elements: Readonly<Record<string, Readonly<Record<string, unknown>>>>, stock?: GeometryInput["stock"]): GeometryInput => {
+  const missing = operation.elementIds.filter((id) => elements[id] === undefined)
+  if (missing.length > 0) throw new RangeError(`${operation.name}: no element for ${missing.join(", ")}`)
+  return { ...DEFAULT_GEOMETRY, geometryType: "selected", selectedElements: operation.elementIds.map((id) => elements[id]!), ...(stock !== undefined ? { stock } : {}) }
+}
 
 export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) => GeometryInput): GeneratedSetup => {
   const plan: SetupPlan = planPrograms(setup)

@@ -461,6 +461,12 @@ import type {
   CadExactSetupsOutput,
   CadExactHoleInput,
   CadExactHoleOutput,
+  CamSetupPlanInput,
+  CamSetupPlanOutput,
+  CamSetupValidateInput,
+  CamSetupValidateOutput,
+  CamSetupGenerateInput,
+  CamSetupGenerateOutput,
   LibraryListInput,
   LibraryListOutput,
   LibraryCreateInput,
@@ -4078,6 +4084,44 @@ export function make(options: ClientOptions) {
             },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    camSetup: {
+      plan: (input: CamSetupPlanInput, requestOptions?: RequestOptions) =>
+        request<CamSetupPlanOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/setups/plan`,
+            body: { setup: input["setup"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      validate: (input: CamSetupValidateInput, requestOptions?: RequestOptions) =>
+        request<CamSetupValidateOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/setups/validate`,
+            body: { setup: input["setup"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      generate: (input: CamSetupGenerateInput, requestOptions?: RequestOptions) =>
+        request<CamSetupGenerateOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/setups/generate`,
+            body: { setup: input["setup"], elements: input["elements"], stock: input["stock"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
             empty: false,
           },
           requestOptions,
