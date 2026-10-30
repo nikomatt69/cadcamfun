@@ -352,3 +352,16 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   invalid bases refused with the path; open body refused). A history still needs at least one feature (`features` min 1), so a base-only history is not storable yet.
   **Not done (desktop, other work package):** the import flow (file picker -> route or local `importStepToHistory` -> `diagnostics`/`warnings` dialog), a timeline row for a base
   body, and promoting a base to a `Feature` kind.
+
+- 2026-10-31 (reachability session): **`breadth`, `tcp` and the Mitsubishi / Brother posts are reachable.** The desktop kernel panel
+  (`KernelSection.tsx`) has switches for hole cycles, tilted drilling and named features with help text stating what each needs, shows
+  the artifact `notes` (breadth decisions with their rule) and keeps `breadth` in the stale check; `tcp` (boolean, optional) is in
+  `CamManufactureInput`, `CamManufactureOperationInput`, `CamKernelRequest` and `KernelSnapshot`, wired through `jobOfSnapshot` and
+  the sidecar job builder as `post.options.tcp`, and its desktop switch is disabled with a reason unless the machine is five-axis and
+  its post has a tip-control word. `mitsubishi` and `brother` are `PostId`s everywhere (`POST_IDS`, `getPost`, `dialectOf`,
+  `BASE_POSTS`, API lists, `CamRibbon`, controller names, `program/setup.ts`) with presets `mitsubishi-vmc` and `brother-speedio`.
+  **Bug found:** the API artifact schema rejected the cutter kinds `countersink`, `boringbar`, `tslot` and `dovetail`, so every
+  `breadth.holeCycles` job over HTTP returned "invalid artifact"; fixed in `cam-kernel.ts`. Tests: `kernel/panel-wiring.test.ts` (10),
+  `apps/sidecar/test/cam-breadth-tcp.test.ts` (4), `apps/desktop/test/cam-kernel-breadth.test.ts` (3). Open: the ten locale strings
+  for the new controls are machine-translated and need a review; the Brother manual URL in the catalogue is the site's link list and
+  was not opened; the AI tool prompts mention `tcp` but the 32 800-character budget leaves no room for more.
