@@ -19,11 +19,14 @@ import { Schema } from "effect"
 import type { Mesh } from "../../cad/solid.ts"
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
 import { distanceToChain, pointInRing } from "../geometry.ts"
-import { estimateTime, makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
+import { estimateTime, makeProgram, moveTarget, type Move, type Program, type Toolpath } from "../ir.ts"
 import { buildPartModelFromMeshes, partMeshes, type PartModel } from "../model/model.ts"
 import { meshBounds, type Mesh64 } from "../model/element-mesh.ts"
 import { AdaptiveParams, generateAdaptive } from "../operations/adaptive.ts"
 import { DrillParams, generateDrill } from "../operations/drill.ts"
+import { generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
+import { recognizeNamedFeatures, type NamedFeature } from "../model/features.ts"
+import { elementBrep } from "../../cad/scene-step.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
 import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
@@ -71,7 +74,7 @@ import { digestOf, sha256 } from "./identity.ts"
 import { DEFAULT_MACHINE } from "./machines.ts"
 import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
-import { horizontalFaces, offsetRing, planJob, type Plan } from "./planner.ts"
+import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } from "./planner.ts"
 import { planPrintJob, runPrintJob } from "./print.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
@@ -93,6 +96,8 @@ export interface PreparedJob {
   readonly origin: Vec3
   readonly operations: ReadonlyArray<OperationSpec>
   readonly plan: Plan | undefined
+  /** What the breadth the job asked for could not do (named features without exact solids, tilted drilling without rotaries). */
+  readonly breadthNotes: ReadonlyArray<string>
   readonly finishAllowance: number
   readonly scallop: number
   readonly tolerance: number
@@ -212,11 +217,42 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
   }
   const finishAllowance = job.quality?.finishAllowance ?? material.finishAllowance
   const scallop = job.quality?.scallop ?? 0.01
+  // The breadth rules the job asked for; named features need the exact solids, so a part that has none says why in a note.
+  const breadthNotes: string[] = []
+  const breadth = ((): PlanBreadth | undefined => {
+    const asked = job.operations === undefined ? job.breadth : undefined
+    if (asked === undefined) return undefined
+    let named: ReadonlyArray<NamedFeature> | undefined
+    if (asked.namedFeatures === true) {
+      if (job.part.kind !== "elements") breadthNotes.push("Named features need CAD elements: the part is given as meshes, so none were recognised")
+      else if ((job.setupOrientation ?? "+Z") !== "+Z") breadthNotes.push(`Named features are recognised for the upright setup only: the ${job.setupOrientation} setup recognised none`)
+      else {
+        const solids = (job.part.elements as ReadonlyArray<CadElement>).filter((e) => e["type"] !== "workpiece")
+        const byId = new Map(solids.map((e) => [String(e["id"] ?? ""), e] as const))
+        const found: NamedFeature[] = []
+        for (const e of solids) {
+          const exact = elementBrep(e as never, byId as never)
+          if (exact.brep === undefined) { breadthNotes.push(`Named features of ${String(e["id"] ?? e["type"])} not recognised: ${exact.reason}`); continue }
+          found.push(...recognizeNamedFeatures(exact.brep))
+        }
+        named = found
+      }
+    }
+    const five = machine.fiveAxis
+    const upright = (job.setupOrientation ?? "+Z") === "+Z"
+    if (asked.tilted === true && five === undefined) breadthNotes.push("Tilted drilling needs a five-axis machine: holes along other axes are left to the plain plan")
+    else if (asked.tilted === true && !upright) breadthNotes.push(`Tilted drilling is planned for the upright setup only: the ${job.setupOrientation} setup drills along Z`)
+    return {
+      ...(asked.holeCycles === true ? { holeCycles: true } : {}),
+      ...(asked.tilted === true && five !== undefined && upright ? { tilted: { layout: five.layout, limits: { tiltMin: five.tilt[0], tiltMax: five.tilt[1], ...(five.rotation !== undefined ? { cMin: five.rotation[0], cMax: five.rotation[1] } : {}) } } } : {}),
+      ...(named !== undefined ? { named } : {})
+    }
+  })()
   const plan = job.operations === undefined
     ? planJob({
         ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
         elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes),
-        rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}), ...(job.quality?.tabs !== undefined ? { tabs: job.quality.tabs } : {})
+        rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}), ...(job.quality?.tabs !== undefined ? { tabs: job.quality.tabs } : {}), ...(breadth !== undefined ? { breadth } : {})
       })
     : undefined
   const operations = job.operations ?? plan!.operations
@@ -228,10 +264,16 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, origin, operations, plan, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
+  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
 }
 
 // ---------------------------------------------------------------- helpers
+
+/** The planner's notes, what the requested breadth could not do, and each breadth decision with the rule that made it. */
+const planNotes = (p: PreparedJob): ReadonlyArray<string> => [
+  ...(p.plan?.notes ?? []), ...p.breadthNotes,
+  ...(p.plan?.decisions ?? []).map((d) => `${d.rule}: ${d.feature} ${d.outcome}${d.operations.length > 0 ? ` (${d.operations.join(", ")})` : ""}${d.reason !== undefined ? ` - ${d.reason}` : ""}`)
+]
 
 const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
   switch (op.strategy) {
@@ -240,8 +282,8 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "pocket": return op.finish === true ? "finish-wall" : "rough-side"
     case "profile": return op.finish === true ? "finish-wall" : "rough-side"
     case "bore": return "rough-side"
-    case "drill": return op.cut === "tap" || tool.kind === "tap" ? "tap" : op.cut === "ream" || tool.kind === "reamer" ? "ream"
-      : op.cut === "spot" || tool.kind === "spot" || tool.kind === "chamfer" ? "spot" : "drill"
+    case "drill": return op.cut === "tap" || tool.kind === "tap" ? "tap" : op.cut === "ream" || tool.kind === "reamer" || tool.kind === "boringbar" ? "ream"
+      : op.cut === "spot" || tool.kind === "spot" || tool.kind === "chamfer" || tool.kind === "countersink" ? "spot" : "drill"
     case "thread": return "thread-mill"
     case "engrave": return "engrave"
     case "chamfer": return "chamfer"
@@ -582,6 +624,35 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           break
         }
         case "drill": {
+          // A hole cycle (countersink, deep hole, back-bore, tilted) is its own toolpath: it is never run as a plain drill.
+          if (op.cycle !== undefined) {
+            const five = machine.fiveAxis
+            // The tool turns the table only above everything the table can swing through: its farthest corner from the pivot, about
+            // the pivot's height (the table box is the one the clearance check turns, `checkNcClearance`).
+            const swing = five === undefined || machine.table === undefined ? 0 : (() => {
+              const top = stock.min.z - o.z - machine.table.gap
+              return Math.hypot(Math.max(machine.table.length, machine.table.width) / 2, Math.max(Math.abs(top - five.pivot.z), Math.abs(top - 200 - five.pivot.z)))
+            })()
+            const indexing: HoleIndexing | undefined = five === undefined ? undefined : {
+              layout: five.layout, pivot: five.pivot, safeZ: Math.max(CLEARANCE + (sMax.z - partBottom) + tool.stickout, five.pivot.z + swing + 5),
+              limits: { tiltMin: five.tilt[0], tiltMax: five.tilt[1], ...(five.rotation !== undefined ? { cMin: five.rotation[0], cMax: five.rotation[1] } : {}) }
+            }
+            if (op.cycle.kind === "tilted" && (job.setupOrientation ?? "+Z") !== "+Z") { fail("UnsupportedCapability", `${op.id}: tilted drilling is run for the upright setup only`, data); return }
+            const cycle = generateHoleCycle({
+              id: op.id, name, cycle: op.cycle.kind === "back-bore" ? { ...op.cycle, face: op.cycle.face - o.z } : op.cycle, tool, points: op.points.map((p) => shift2(p, o)), top: op.top - o.z, bottom: op.bottom - o.z,
+              clearanceZ: CLEARANCE, retractZ: RETRACT, feed, rpm, coolant, origin: o, ...(indexing !== undefined ? { indexing } : {})
+            })
+            // The cycle turns the table before its first hole: the tool leaves the previous operation by rising to the safe height, so the
+            // table does not swing through it. The cycle itself only rises between orientations.
+            if (op.cycle.kind === "tilted" && indexing !== undefined) {
+              const previous = toolpaths.length === 0 ? undefined : toolpaths[toolpaths.length - 1]!.moves.map(moveTarget).filter((t): t is Vec3 => t !== undefined).pop()
+              const from = previous ?? { x: 0, y: 0, z: CLEARANCE }
+              // The operations after it are programmed with the table upright: it is turned back at the safe height the cycle ended on.
+              const upright: Move = { _tag: "Orient", ...(indexing.layout === "table-AC" ? { a: 0 } : { b: 0 }), c: 0 }
+              generated = { toolpath: { ...cycle, moves: [{ _tag: "Rapid", to: { x: from.x, y: from.y, z: Math.max(indexing.safeZ, from.z) } }, ...cycle.moves, upright] }, warnings: [] }
+            } else generated = { toolpath: cycle, warnings: [] }
+            break
+          }
           const { stepdown: _s, feed: _f, ...drillCommon } = common
           const tapping = cut === "tap"
           if (tapping && tool.pitch === undefined) { fail("InvalidInput", `${op.id}: the tap ${tool.id} has no pitch`, data); return }
@@ -841,6 +912,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const removedByOp = new Map<number, number>()
   const cutLengthByOp = new Map<number, number>()
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
+  let undercutMoves = 0
+  const undercutIds = new Set(operations.filter((x) => x.strategy === "drill" && x.cycle?.kind === "back-bore").map((x) => x.id))
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
   let turnedMoves = 0
   /** What the voxel replay of the turned moves found: certain and possible contacts of the shank, holder and (rapids) flutes with material, and moves it could not check. */
@@ -944,6 +1017,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         forEachSample(seg, tri.stock.cell, (x, y, z) => { tips.push({ x, y, z }) })
         tri.cut(cutter, tips)
       }
+      // A back-bore cuts the underside of the part: the height field sees the part from above only, so these moves are not carved into it
+      // and not judged against it (the claims below stay unresolved, they are never read as passed).
+      if (op !== undefined && undercutIds.has(outcomes[opOfToolpath[op]!]?.id ?? "")) { undercutMoves++; continue }
       let removed = 0
       forEachSample(seg, sampleStep(cellSize, model.radius), (x, y, z) => {
         if (seg.rapid) {
@@ -1006,9 +1082,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     if (excess > allowed) { remainingVolume += (excess - allowed) * hf.cellArea; maxRemaining = Math.max(maxRemaining, excess) }
   }
   // Spec 72 step 0.3: with the table turned, the verdicts are the tri-dexel's. Declared removal the part mesh does not carry (blind
-  // drill points, chamfer bands, thread majors, taps) is a gouge to the replay, and declared leftovers (tabs) are material left: where
+  // drill points and hole cycles, chamfer bands, thread majors, taps) is a gouge to the replay, and declared leftovers (tabs) are material left: where
   // the job declares them the tri-dexel does not decide that verdict and the claim stays unresolved.
-  const declaredRemoval = (prepared.plan?.allowances ?? []).length > 0 || operations.some((op) => op.strategy === "chamfer" || op.strategy === "thread" || (op.strategy === "drill" && (op.cut === "tap" || toolOf(op.tool).kind === "tap")))
+  const declaredRemoval = (prepared.plan?.allowances ?? []).length > 0 || operations.some((op) => (op.strategy === "drill" && op.cycle !== undefined) || op.strategy === "chamfer" || op.strategy === "thread" || (op.strategy === "drill" && (op.cut === "tap" || toolOf(op.tool).kind === "tap")))
   const triAllowance = Math.max(0.05, prepared.scallop * 1.5)
   const triVerdict: TriVerdict | undefined = tri?.verdict(workMeshes, prepared.tolerance, triAllowance)
   const triGougeFound = triVerdict !== undefined && !declaredRemoval && triVerdict.closedPart && triVerdict.gouge.depth > 0
@@ -1156,6 +1232,13 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
     }
   ]
+  if (undercutMoves > 0) {
+    for (const c of claims) {
+      if ((c.id === "no-rapid-in-stock" || c.id === "holder-clearance" || c.id === "no-gouge" || c.id === "material-removed") && c.status === "passed") {
+        claims[claims.indexOf(c)] = { id: c.id, status: "unresolved", detail: `${undercutMoves} moves of back-boring cut the underside of the part, which the height-field replay cannot see: they are not checked. ${c.detail}` }
+      }
+    }
+  }
   if (replayStoppedAt !== undefined) {
     for (const c of claims) {
       if ((c.id === "no-rapid-in-stock" || c.id === "holder-clearance" || c.id === "no-gouge" || c.id === "material-removed") && c.status === "passed") {
@@ -1215,7 +1298,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}) },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
-      notes: [...(prepared.plan?.notes ?? []), ...subprogramNotes(nc)],
+      notes: [...planNotes(prepared), ...subprogramNotes(nc)],
       tolerance
     }
   }
@@ -1248,7 +1331,7 @@ export const planOnly = (job: ManufacturingJob, options: PrepareOptions = {}): C
   const hidden = hiddenSurfaces(p.meshes, p.bounds.min[2], Math.max(1e-6, p.tolerance))
   return { status: "ok", value: {
     operations: p.operations,
-    notes: [...(p.plan?.notes ?? []), ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? [`Manual ${job.setupOrientation} setup: separate NC, refixture and touch off required; workholding and full-part coverage unverified`] : [])],
+    notes: [...planNotes(p), ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? [`Manual ${job.setupOrientation} setup: separate NC, refixture and touch off required; workholding and full-part coverage unverified`] : [])],
     unmachined: [...(p.plan?.unmachined ?? []), ...(hidden > 0 ? [`${hidden} downward-facing mesh triangles above the underside need another setup or a supported rotary process; their coverage is unverified`] : [])]
   } }
 }

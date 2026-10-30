@@ -161,7 +161,7 @@ export type HoleCycle =
   | { readonly kind: "deep"; readonly peck: number; readonly retract: "full" | "chip-break"; readonly peckReduction?: number; readonly minPeck?: number; readonly chipBreakRetract?: number; readonly fullRetractEvery?: number; readonly dwell?: number }
   /**
    * Back-boring from the far side: the bar goes through the Ø`pilotDiameter` hole, the cutter is brought to the bore axis below
-   * the face at work Z `face` and bores up `top - face` mm to Ø`diameter`; `bottom` is the lowest the tool tip goes.
+   * the face at Z `face` (the setup's coordinates, like `top` and `bottom`) and bores up `top - face` mm to Ø`diameter`; `bottom` is the lowest the tool tip goes.
    */
   | { readonly kind: "back-bore"; readonly diameter: number; readonly pilotDiameter: number; readonly face: number }
   /**
@@ -240,6 +240,19 @@ export interface QualityRequirement {
 }
 
 /**
+ * Hole and feature breadth the planner may use (spec 72 P2-5), all off unless asked. The kernel runs the hole cycles it plans
+ * (`drill` with `cycle`), so turning these on is safe here; every decision comes back in the artifact notes with the rule that made it.
+ */
+export interface JobBreadth {
+  /** Countersinks with a countersink cutter, peck-drilled deep holes and back-bores from the far side. */
+  readonly holeCycles?: boolean
+  /** Holes along other axes are drilled along their own axis when the machine's rotaries reach them (needs a five-axis machine). */
+  readonly tilted?: boolean
+  /** Slots, steps, grooves and chamfer / fillet bands recognised on the exact solid (needs `elements` that build one, upright setup). */
+  readonly namedFeatures?: boolean
+}
+
+/**
  * How a printer job is sliced; anything absent comes from the filament (temperatures, fan) and the printer (speed, nozzle, plate).
  * Lengths in mm, speeds in mm/s, temperatures in degrees C.
  */
@@ -293,6 +306,7 @@ export interface ManufacturingJob {
   /** Operations in machining order, in oriented setup coordinates when specified; otherwise CAD world coordinates. Planned from the part when absent. */
   readonly operations?: ReadonlyArray<OperationSpec>
   readonly quality?: QualityRequirement
+  readonly breadth?: JobBreadth
   /** `definition`: a post definition (`post/definition.ts`) that writes the NC instead of the machine's built-in post; a bad one fails the job before planning. */
   readonly post?: { readonly options?: Partial<PostOptions>; readonly definition?: unknown }
   /** How a printer job is sliced (only read when the machine is a `printer`). */

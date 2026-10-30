@@ -277,7 +277,14 @@ export const generateTiltedDrill = (i: HoleCycleInput): Toolpath => {
     }
     b.rapid({ x: b.pos.x, y: b.pos.y, z: topMost + clearGap })
     const indexed = indexToolpath(finish(i, b.moves), { frame, layout: ix.layout, pivot: ix.pivot, ...(ix.limits !== undefined ? { limits: ix.limits } : {}) })
-    out.push(...indexed.toolpath.moves)
+    // After the table has turned the tool is brought over the first hole at the safe height and only then goes down: a diagonal rapid
+    // from the safe height would cut across the turned table.
+    const turned = indexed.toolpath.moves
+    const at = turned.findIndex((m) => m._tag === "Orient")
+    const firstHole = at < 0 ? undefined : turned.slice(at + 1).map(moveTarget).find((t): t is Vec3 => t !== undefined)
+    if (at >= 0 && firstHole !== undefined) {
+      out.push(...turned.slice(0, at + 1), { _tag: "Rapid", to: { x: firstHole.x, y: firstHole.y, z: Math.max(ix.safeZ, firstHole.z) } }, ...turned.slice(at + 1))
+    } else out.push(...turned)
     const last = out.map(moveTarget).filter((t): t is Vec3 => t !== undefined).pop()
     if (last !== undefined) out.push({ _tag: "Rapid", to: { x: last.x, y: last.y, z: Math.max(ix.safeZ, last.z) } })
   }
