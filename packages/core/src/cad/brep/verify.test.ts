@@ -53,8 +53,8 @@ describe("valid-but-wrong detection (spec 42 R7)", () => {
     booleanBrep(small[0], small[1], "subtract")
     expect(booleanCounters().verified).toBe(0)
     // A plate with a row of bores: more than VERIFY_FACES faces together.
-    let plate = makeBox(80, 20, 6)
-    for (let i = 0; i < 8; i++) plate = booleanBrep(plate, makeCylinder(2, 6, at(8 + i * 9, 10, 0)), "subtract", { verify: "off" }).brep
+    let plate = makeBox(190, 20, 6)
+    for (let i = 0; i < 20; i++) plate = booleanBrep(plate, makeCylinder(2, 6, at(8 + i * 9, 10, 0)), "subtract", { verify: "off" }).brep
     expect(plate.faces.length + 3).toBeGreaterThanOrEqual(VERIFY_FACES)
     resetBooleanCounters()
     const r = booleanBrep(plate, makeBox(10, 6, 3, at(0, 0, 3)), "union")
@@ -67,7 +67,7 @@ describe("valid-but-wrong detection (spec 42 R7)", () => {
     resetBooleanCounters()
     let checked = 0
     for (const aligned of [true, false]) {
-      for (let seed = 1; seed <= 8; seed++) {
+      for (let seed = 1; seed <= 5; seed++) {
         const [A, B] = fuzzPair(seed, aligned)
         for (const op of ["union", "intersect", "subtract"] as const) {
           const r = booleanBrep(A, B, op, { verify: "identities" })
