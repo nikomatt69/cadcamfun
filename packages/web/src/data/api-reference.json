@@ -51883,7 +51883,11 @@
                                       "threadmill",
                                       "engraver",
                                       "tap",
-                                      "reamer"
+                                      "reamer",
+                                      "countersink",
+                                      "boringbar",
+                                      "tslot",
+                                      "dovetail"
                                     ]
                                   },
                                   "diameter": {

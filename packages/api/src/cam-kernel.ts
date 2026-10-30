@@ -58,7 +58,7 @@ const cutting = Schema.Struct({
   reference: cam.generator.CuttingReferenceSchema
 })
 const cutter = Schema.Struct({
-  id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
+  id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"]),
   diameter: positive, flutes: Schema.Int, material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
   cornerRadius: Schema.optionalKey(Schema.Finite), angle: Schema.optionalKey(Schema.Finite), tipDiameter: Schema.optionalKey(Schema.Finite), pitch: Schema.optionalKey(Schema.Finite),

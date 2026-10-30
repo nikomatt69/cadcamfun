@@ -7188,6 +7188,10 @@ export type ToolpathGeneratorManufactureOutput =
             | "engraver"
             | "tap"
             | "reamer"
+            | "countersink"
+            | "boringbar"
+            | "tslot"
+            | "dovetail"
           diameter: number
           flutes: number
           material: "hss" | "hss-co" | "carbide" | "pcd"
