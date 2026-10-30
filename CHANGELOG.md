@@ -3,6 +3,26 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.46 (October 2026)
+
+## Core
+
+- Shared chunked deletion filter for minimal conflict sets
+- Failure and recovery counters (spec 42 R0)
+- Independent G-code program reading (4 dialects, look-ahead time, deposit/volume bounds, travel collisions, cost); stats time is the planner's
+- Stable edge/vertex keys, resolve with five outcomes, history timeline lineage (spec 41 N2, N3)
+- Sparse analytic constraint solver, minimal conflict sets, drag sessions (spec 45 K6, K7)
+- Tri-dexel stock with declared error bound, part dexels, gouge/leftover comparison, bench cases (spec 69 B1)
+- Printability analysis (overhang map, thin walls by exact distance transform, bridge spans, full orientation ranking)
+- Engagement along a program, factored Kienzle chain, per-move feed optimisation (spec 61 Z1-Z3, spec 69 G0/G0b)
+- Mesh repair pre-pass (weld, orient, hole fill, self-intersection report) wired into slicePrint
+- Face/edge/vertex provenance recorded by Boolean, transform, merge, sew, push/pull (spec 41 N1)
+- Stepped tool assembly in the replay, rotary-move machine clearance, replay degrades with a declared bound (spec 69 A3-A5)
+
+## API
+
+- Enhance CAD edit hints and improve permission checks
+
 ## v0.1.45 (October 2026)
 
 ## Build and release
