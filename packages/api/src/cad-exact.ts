@@ -262,3 +262,49 @@ export const CadRebuildReport = Schema.Struct({
   warnings: Schema.Array(Schema.String)
 })
 export type CadRebuildReport = typeof CadRebuildReport.Type
+
+/**
+ * Import the solids of a STEP file as base bodies of a parametric history (spec 72 step 2.2): `History.bases`, present before the first
+ * feature, healed to an exact closed solid. A body that is not a closed solid after healing (an open shell, a gap the healing tolerance
+ * does not close) or that is above the size limit is refused with the diagnostics of the heal, and nothing is added unless
+ * `keepAccepted` asks for the bodies that were accepted. Nothing is stored: the history comes back, and the caller saves it.
+ */
+export const CadImportStepRequest = Schema.Struct({
+  /** The STEP file as text (AP203, AP214 or AP242; one or several solids). */
+  step: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(30_000_000)),
+  /** The history to add the bodies to, as the editor stores it (decoded against `ParametricHistory`; a refused field is a 400). Without it only the bodies come back. */
+  history: Schema.optionalKey(Schema.Json),
+  /** Body ids are `<idPrefix><n>`, made unique against the history's bodies and features (default `imported`). */
+  idPrefix: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[A-Za-z][A-Za-z0-9_-]{0,40}$/))),
+  /** Healing (welding) tolerance in mm; the default scales with the body. */
+  tolerance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1e-9, maximum: 1 }))),
+  /** Add the accepted bodies even when another body of the file was refused (default false: all or nothing). */
+  keepAccepted: Schema.optionalKey(Schema.Boolean)
+})
+export type CadImportStepRequest = typeof CadImportStepRequest.Type
+
+export const CadImportStepReport = Schema.Struct({
+  /** True when the bodies were accepted (and, with a history, added to it). False: see `bodies[].diagnostics` and `problems`. */
+  ok: Schema.Boolean,
+  bodies: Schema.Array(Schema.Struct({
+    /** The body id in the history; absent for a refused body. */
+    id: Schema.optionalKey(Schema.String),
+    name: Schema.String,
+    status: Schema.Literals(["exact", "healed", "refused"]),
+    faces: int,
+    volume: Schema.optionalKey(num),
+    maxTolerance: num, limit: num,
+    /** Accepted but looser than the limit: it can be worked on, and STEP export refuses it until it is tightened. */
+    loose: Schema.Boolean,
+    diagnostics: Schema.Array(Schema.String),
+    healed: Schema.optionalKey(Schema.Struct({ verticesWelded: int, edgesWelded: int, verticesTightened: int, edgesRefitted: int, circlesRefitted: int, maxMove: num }))
+  })),
+  /** The accepted bodies in the stored form (`History.bases` entries: id, versioned B-rep JSON, source). */
+  bases: Schema.Array(Schema.Json),
+  /** The history with the accepted bodies appended to `bases`; present only when a history was sent and the result decodes against `ParametricHistory`. */
+  history: Schema.optionalKey(Schema.Json),
+  /** Why nothing was added although bodies were accepted (the history would not decode, the bases are too heavy together). */
+  problems: Schema.Array(Schema.String),
+  warnings: Schema.Array(Schema.String)
+})
+export type CadImportStepReport = typeof CadImportStepReport.Type

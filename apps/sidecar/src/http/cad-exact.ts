@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, type CadImportStepReport, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
 import { decodeHistory, featureEditOf } from "@cadcamfun/ai"
 import { Effect } from "effect"
@@ -82,6 +82,20 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         const decoded = decodeHistory(payload.history)
         if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
         return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
+      }))
+    .handle("importStep", ({ payload }) =>
+      Effect.gen(function*() {
+        // A history sent along is checked here, so a malformed one is a 400 that names each refused field, and the job gets decoded data.
+        let history: unknown
+        if (payload.history !== undefined) {
+          const decoded = decodeHistory(payload.history)
+          if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
+          history = decoded.data
+        }
+        return yield* kernelRun("cad-import-step", {
+          step: payload.step, ...(history !== undefined ? { history } : {}), ...(payload.idPrefix !== undefined ? { idPrefix: payload.idPrefix } : {}),
+          ...(payload.tolerance !== undefined ? { tolerance: payload.tolerance } : {}), ...(payload.keepAccepted !== undefined ? { keepAccepted: payload.keepAccepted } : {})
+        }, "Failed to import the STEP file").pipe(Effect.map((report) => report as unknown as CadImportStepReport))
       }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {

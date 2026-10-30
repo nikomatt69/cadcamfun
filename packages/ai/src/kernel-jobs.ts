@@ -4,7 +4,7 @@
  */
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
 import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
-import { parametricReport, parseHistory } from "./parametric.ts"
+import { decodeHistory, parametricReport, parseHistory } from "./parametric.ts"
 
 // ---------------------------------------------------------------- the exact CAD kernel
 // The B-rep kernel's heavy operations (analysis, STEP export, setup planning, a feature edit, assembly interference): the same
@@ -94,6 +94,54 @@ export const cadRebuild = ({ history, budgetMs }: CadRebuildInput) => {
   }
 }
 
+export interface CadImportStepInput {
+  readonly step: string
+  /** The history to add the bodies to, already decoded against `ParametricHistory` by the caller. */
+  readonly history?: unknown
+  readonly idPrefix?: string
+  readonly tolerance?: number
+  readonly keepAccepted?: boolean
+}
+
+/**
+ * A STEP file as base bodies of a history (spec 72 step 2.2): `importStepToHistory` reads, validates, heals and refuses; the bodies go
+ * into the history in their stored JSON form; and what comes back is decoded against `ParametricHistory` once more, so a history this
+ * returns is one every other layer accepts. All or nothing unless `keepAccepted`: a refused body is never dropped silently.
+ */
+export const cadImportStep = ({ step, history, idPrefix, tolerance, keepAccepted }: CadImportStepInput) => {
+  const base: History | undefined = history === undefined ? undefined : parseHistory(history)
+  const imported = cad.importStepToHistory(step, { ...(idPrefix !== undefined ? { idPrefix } : {}), ...(tolerance !== undefined ? { heal: { tol: tolerance } } : {}) })
+  const problems: string[] = []
+  const accepted = imported.refused.length === 0 || keepAccepted === true ? imported.bases : []
+  let ok = accepted.length > 0
+  let next: History | undefined
+  if (ok && base !== undefined) {
+    const joined = cad.historyToJson(cad.withImported(base, accepted))
+    const stored = cad.basesStorageProblem(joined)
+    const decoded = stored !== undefined ? undefined : decodeHistory(joined)
+    if (stored !== undefined) problems.push(stored)
+    else if (decoded !== undefined && !decoded.success) problems.push(...decoded.problems.slice(0, 8))
+    else next = joined
+    ok = next !== undefined
+  }
+  if (imported.refused.length > 0 && keepAccepted !== true) problems.push(`${imported.refused.length} of ${imported.report.length} bodies were refused; nothing was added (send keepAccepted to add the accepted ones)`)
+  // The ids the history gave the accepted bodies, in order (an id is made unique against the history it joins).
+  const added = next === undefined || base === undefined ? accepted : (next.bases ?? []).slice((base.bases ?? []).length)
+  let at = 0
+  const bodies = imported.report.map((r) => {
+    const placed = r.status === "refused" || !ok ? undefined : added[at]
+    if (r.status !== "refused") at++
+    return {
+      ...(placed !== undefined ? { id: placed.id } : {}), name: r.name, status: r.status, faces: r.faces, ...(r.volume !== undefined ? { volume: r.volume } : {}),
+      maxTolerance: r.maxTolerance, limit: r.limit, loose: r.loose, diagnostics: [...r.diagnostics], ...(r.healed !== undefined ? { healed: { ...r.healed } } : {})
+    }
+  })
+  return {
+    ok, bodies, bases: ok ? cad.historyToJson({ parameters: {}, features: [], bases: added }).bases! : [],
+    ...(ok && next !== undefined ? { history: next } : {}), problems, warnings: [...imported.warnings]
+  }
+}
+
 /** Preparation stays in the worker too; optional stock placement never requires a second mesh build on the caller. */
 type ManufacturingInput = cam.kernel.ManufacturingJob & cam.kernel.PrepareOptions
 
@@ -115,6 +163,8 @@ export interface KernelJobs {
   readonly "cad-hole": { readonly input: CadHoleInput; readonly output: ReturnType<typeof cadHole> }
   readonly "cad-assembly": { readonly input: CadAssemblyInput; readonly output: ReturnType<typeof cadAssembly> }
   readonly "cad-rebuild": { readonly input: CadRebuildInput; readonly output: ReturnType<typeof cadRebuild> }
+  /** A STEP file as base bodies of a history (spec 72 step 2.2). Not cached: the input is the file. */
+  readonly "cad-import-step": { readonly input: CadImportStepInput; readonly output: ReturnType<typeof cadImportStep> }
   /** A drawing sheet of a parametric part: the views, dimensions, section and the title block, as SVG and as entities. */
   readonly "cad-sheet": { readonly input: { readonly history: History; readonly options: drawing.SheetOptions }; readonly output: ReturnType<typeof drawing.generateSheet> }
   readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
@@ -142,5 +192,6 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cad-hole": cadHole,
   "cad-assembly": cadAssembly,
   "cad-rebuild": cadRebuild,
+  "cad-import-step": cadImportStep,
   "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)
 }

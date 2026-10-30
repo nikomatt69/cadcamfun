@@ -7,7 +7,7 @@
  * Lengths are millimetres and angles degrees. A dimension is a number or an expression over the history's parameters.
  */
 import { Effect, Schema, SchemaTransformation } from "effect"
-import { PRIMITIVE_ELEMENTS, expandShape, recipeNames } from "@cadcamfun/core"
+import { PRIMITIVE_ELEMENTS, brep as exactBrep, expandShape, recipeNames } from "@cadcamfun/core"
 
 /** Text the model writes, trimmed before it is checked: whitespace alone is never an id or an expression. */
 const text = (max: number) =>
@@ -275,7 +275,7 @@ export const ParametricParameters = namedRecord(dimension, /^[A-Za-z_][A-Za-z0-9
 
 /** The order rules no field-level check can see: references point backwards, ids are unique, sketches resolve. */
 /** The timeline fields must name what exists: the rollback marker a feature, a feature's group a declared group, groups once. */
-const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }> }): Array<Schema.FilterIssue> => {
+const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }>; readonly bases?: ReadonlyArray<{ readonly id: string; readonly brep: unknown }> }): Array<Schema.FilterIssue> => {
   const issues: Array<Schema.FilterIssue> = []
   if (history.rollback !== undefined && !history.features.some((f) => f.id === history.rollback)) issues.push({ path: ["rollback"], issue: `The rollback marker '${history.rollback}' is not a feature id` })
   const groups = new Set<string>()
@@ -286,6 +286,17 @@ const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; re
   history.features.forEach((f, index) => {
     if (f.group !== undefined && !groups.has(f.group)) issues.push({ path: ["features", index, "group"], issue: `Group '${f.group}' is not in groups` })
   })
+  // Imported bodies (spec 72 step 2.2): an id is a body id, so it is unique among the bases and never a feature's id; the total weight is bounded.
+  const featureIds = new Set(history.features.map((f) => f.id))
+  const baseIds = new Set<string>()
+  let weight = 0
+  for (const [index, b] of (history.bases ?? []).entries()) {
+    if (baseIds.has(b.id)) issues.push({ path: ["bases", index, "id"], issue: `Duplicate imported body id '${b.id}'` })
+    else if (featureIds.has(b.id)) issues.push({ path: ["bases", index, "id"], issue: `The imported body id '${b.id}' is also a feature id; a feature id is a body id` })
+    baseIds.add(b.id)
+    weight += JSON.stringify(b.brep).length
+  }
+  if (weight > exactBrep.MAX_BASES_BYTES) issues.push({ path: ["bases"], issue: `The imported bodies are ${weight} characters of JSON together, above the limit of ${exactBrep.MAX_BASES_BYTES}` })
   return issues
 }
 
@@ -355,10 +366,31 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
   return issues
 }
 
+/**
+ * An imported solid in the JSON form of `brepToJson` (version tag, vertices, edges, faces, shells). Decoding runs `brepFromJson`, so a
+ * refused body names the field (`bases[0].brep.faces[3].loops[0].coedges[2].edge`) and the size limits of `BREP_LIMITS` apply. The
+ * value is kept as written: the kernel reads it as a `Brep`.
+ */
+const ImportedBrep = Schema.Unknown.annotate({ description: "B-rep JSON written by the STEP import action; never write it by hand." }).check(Schema.makeFilter((value) => {
+  const decoded = exactBrep.brepFromJson(value)
+  return decoded.ok || decoded.problems.map((p) => ({ path: p.path, issue: p.message }))
+})) as unknown as Schema.Codec<exactBrep.Brep>
+
+/** A solid imported from a STEP file (`History.bases`): the healed exact body and where it came from. Written by the import action. */
+export const ParametricBase = Schema.Struct({
+  id,
+  brep: ImportedBrep,
+  source: optional(Schema.Struct({
+    format: Schema.Literals(["step", "iges"]), name: optional(Schema.String.check(Schema.isMaxLength(300))),
+    healed: optional(Schema.Struct({ verticesWelded: n, edgesWelded: n, verticesTightened: n, maxMove: n })), maxTolerance: optional(n)
+  }))
+})
+
 export const ParametricHistory = described(
   Schema.Struct({
     parameters: ParametricParameters, features: between(Schema.Array(feature), 1, 80),
     rollback: optional(id), groups: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), collapsed: optional(Schema.Boolean) })), 0, 40)),
+    bases: optional(between(Schema.Array(ParametricBase), 0, exactBrep.MAX_BASES)),
     version: optional(Schema.Literal(2))
   }),
   "JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far. Timeline: a feature with suppressed:true is left out with what needs it (nothing is deleted); rollback names the last built feature; name and group (an id of groups) are display only."
