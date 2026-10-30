@@ -14,6 +14,7 @@ import { resolveProfile, type PrintProfile } from "./profile.ts"
 import { meshVolume, printMeshIssue, printSolidIssue, sliceMesh } from "./slice.ts"
 import { verifyPrint, type PrintCheck } from "./verify.ts"
 import { planSupports } from "./support.ts"
+import { analyseProgram } from "./program.ts"
 import { rankOrientations, rotationDown } from "./printability.ts"
 import { repairMesh, type RepairOptions, type RepairReport } from "./repair.ts"
 import type { PlannedLayer, PrintStats } from "./types.ts"
@@ -26,6 +27,7 @@ export * from "./infill.ts"
 export * from "./orient.ts"
 export * from "./plan.ts"
 export * from "./printability.ts"
+export * from "./program.ts"
 export * from "./profile.ts"
 export * from "./repair.ts"
 export * from "./slice.ts"
@@ -241,8 +243,12 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
 
   stage("g-code", 0.9)
   const emitted = emitGcode({ layers, profile, notes: [...notes, ...warnings.map((w) => `Warning: ${w}`)] })
+  // The time is the planner's, read from the program as written; the emitter's quick estimate stays as `pathTimeSeconds`.
+  const read = analyseProgram(emitted.gcode, { acceleration: profile.acceleration > 0 ? profile.acceleration : 1500, filamentDiameter: profile.filamentDiameter, collisions: false })
+  const stats: PrintStats = { ...emitted.stats, timeSeconds: read.timeSeconds, pathTimeSeconds: emitted.stats.timeSeconds }
+  const gcode = emitted.gcode.replace(/^; Estimated time \d+ s/m, `; Estimated time ${Math.round(read.timeSeconds)} s`)
   stage("verify", 0.95)
-  const checks = verifyPrint({ gcode: emitted.gcode, regions: regions.slice(0, keep), profile, firstModelLayer: raftCount, layers })
+  const checks = verifyPrint({ gcode, regions: regions.slice(0, keep), profile, firstModelLayer: raftCount, layers })
   stage("done", 1)
-  return { gcode: emitted.gcode, stats: emitted.stats, warnings, layers, orientation, checks, regions: regions.slice(0, keep), profile, repairs }
+  return { gcode, stats, warnings, layers, orientation, checks, regions: regions.slice(0, keep), profile, repairs }
 }

@@ -37,7 +37,10 @@ export interface PrintStats {
   readonly layers: number
   readonly filamentMm: number
   readonly filamentGrams: number
+  /** Time with the look-ahead planner of `program.ts` (acceleration and junction jerk) over the written program. */
   readonly timeSeconds: number
+  /** The quick estimate of the emitter (length over feed plus a ramp per path), kept to show how far apart the two models are. */
+  readonly pathTimeSeconds?: number
   readonly travelMm: number
   readonly retractions: number
   /** Bead length by kind, mm. */
