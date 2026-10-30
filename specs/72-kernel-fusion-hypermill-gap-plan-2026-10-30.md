@@ -365,3 +365,13 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `apps/sidecar/test/cam-breadth-tcp.test.ts` (4), `apps/desktop/test/cam-kernel-breadth.test.ts` (3). Open: the ten locale strings
   for the new controls are machine-translated and need a review; the Brother manual URL in the catalogue is the site's link list and
   was not opened; the AI tool prompts mention `tcp` but the 32 800-character budget leaves no room for more.
+
+- 2026-10-31 (agent F, kernel remainder, spec 42 §6.2): **seed 33 solved in place** (the cause was a tangent edge-surface contact reported as two
+  vertices 1.4e-4 mm apart, not a missing singular-point tracer: `mergeTangentHits` in `intersect.ts`); aligned sweep 1-240 and generic 61-200:
+  0 failures, 0 displaced. **R7**: `BooleanOptions.verify` (sampled volume by default from 40 faces, volume identities on request, always after a
+  dropped intersection curve) found and fixed a valid-but-wrong case (a sphere 1e-6 mm inside a cylinder wall: empty intersection); generic seed 133
+  (refused: a face that does not mesh at the coarse validation chord) solved; a `RangeError` from the curve fit is a `BooleanError`. **R8**: locator
+  edge pruning (point location 2x), sampled check cheapened, blend opts out; fully rounded box build 5.3 s to 3.6-4.4 s. **R1**: seed 14 was
+  already closed; fold splitting not built (no failing case). Open and listed in spec 42 §6.2: analytic seeds for coaxial surfaces of revolution,
+  equal-radius corner fillets (4 of 32 Booleans of a rounded box still use the displacement), NURBS x NURBS marching, coarse-chord tessellation
+  of seed 133's cap face. No API/AI/desktop follow-up is needed for these core-only changes (`BooleanCounters` gained `verified` / `verifyRejected`).

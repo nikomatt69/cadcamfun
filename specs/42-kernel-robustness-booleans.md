@@ -107,7 +107,7 @@ and 500 seeds were not run.
 
 **Left open (not claimed)**
 
-- R1 (seed 14 fold), R5 (general SSI), R7 (valid-but-wrong on every Boolean), R8 (performance): untouched.
+- R1 (seed 14 fold), R5 (general SSI), R7 (valid-but-wrong on every Boolean), R8 (performance): untouched at the time of 6.1; see 6.2.
 - R3 same-domain merge covers planes, and cylinders and cones with an identical parametrisation that meet along a closed ring; spheres,
   tori, faces with a different reference direction and curved faces that meet along any other edge are not merged. The "coaxial cylinder of equal radius with a different seam" case is solved
   (volumes exact) but leaves the two faces.
@@ -116,8 +116,52 @@ and 500 seeds were not run.
   displacement (reported, named). Tori tangent along a circle and general analytic-versus-NURBS tangency are untested. The "kept in
   place" result is not a non-manifold solid: it is the manifold-by-duplication form, so a consumer that merges coincident edges
   would see the pinch again.
-- Seed 33 (singular SSI point on a face rim), see 6.1: needs R5 branching.
+- Seed 33 (singular SSI point on a face rim): closed in 6.2.
 - R6: the tolerance rule is body-level (every entity of a result takes the largest operand tolerance), not per entity; ellipses and
   splines are not refitted by `healBrep`; the STEP reader does not mark a body loose from the file's own uncertainty; IGES export
   has no loose check. `History.bases` is a kernel field: the assistant/API history schema and the desktop timeline do not know it
   yet (spec 72 change log lists the exact follow-up), so a base body is not persisted by those layers.
+
+### 6.2 Follow-up 2026-10-31 (third kernel session: seed 33, R1, R7, R8)
+
+Evidence rule as above. Tests: `fuzz-residuals.test.ts` (seed 33, generic seed 133), `verify.test.ts` (7 tests); sweeps by
+`fuzz-sweep.ts` on the final code of each item.
+
+| Item | What | Evidence |
+|---|---|---|
+| Seed 33 (R5 singular point) | **Solved in place, exactly.** The diagnosis in 6.1 was incomplete. The torus touches the cylinder rim at one point where the two branches of the side-face intersection meet at 30 degrees; the real fault was upstream of the SSI: the rim edge touches the torus (a quartic contact, the edge deviates from the surface by x^4/288) and Newton on a double root reported **two** hits 5e-5 rad apart, so the point became two vertices 1.4e-4 mm apart with a sliver edge between them, and the arrangement had an edge used three times. `edgeSurfaceHits` now merges two hits closer than 1e-2 mm whose edge stays within the Boolean tolerance of the surface between them into one hit at the closest approach (`mergeTangentHits`). Both branches then end at one vertex and the plain pipeline arranges them; no singular-point tracer was needed. A transversal pair that close deviates from the surface by less than the tolerance, so merging it is below what the kernel resolves. | `fuzz-residuals.test.ts` seed 33: 0 displacements, 0 warnings, identities 1e-7 (were 1e-3), intersection within 2 % of a 400 000-point oracle |
+| R1 (seed 14 fold) | Closed earlier (a8134360: spurs on an intersection piece are removed; generic seed 14 passes un-pinned, there is no pin in `fuzz.test.ts`). **Fold splitting at a turning point was not built**: no failing instance is left (generic 1-200 and the near-tangent probe below) to drive it, and a fold with no failing case would be untested code. Open if a case appears. | generic sweep 61-200 |
+| R7 | `BooleanOptions.verify` (`"off" / "sampled" / "identities"`). `"identities"` adds U+I=A+B and S+I=A to 1e-6 (debug, fuzzing). `"sampled"` compares the result's exact volume with a Halton sample of the operation's region (overlap box for an intersection) by exact point location (6 sigma + 0.1 % of the region: it resolves a lost or doubled piece of several percent, not a sliver; the identities resolve 1e-6). Default `"sampled"` from `VERIFY_FACES` = 40 faces together (1200 samples), else off. **Always on after a dropped intersection curve** ("could not be refined", "ends away from any boundary point"): that is where a valid-but-wrong solid was found: a sphere 1e-6 mm inside a cylinder wall gave an *empty* intersection and a difference equal to the whole cylinder, every result valid, 44 warnings. It now fails the check and is solved by re-parametrising the sphere (exact, no warning). A rejected result goes to the recovery (reframe, displacement) and is refused if that fails too. `BooleanCounters.verified / verifyRejected`. The blend opts out for its internal tool Booleans (it doubled the time of a fully rounded box, 3.6 s to 7.3 s). `face-empty` (a face that gives no triangle) was already a validation issue; it now retries the face at finer chords before it is reported, because the coarse polylines of a rim and a torus section cross at a shallow angle: generic seed 133 (cylinder x torus) was refused on every union and difference and is solved (identities 3e-14). A `RangeError` from the curve fit of collapsed samples (two surfaces tangent within the tolerance) is a `BooleanError` now, not a crash. | `verify.test.ts`: wrong result rejected / right accepted for each operation, 30 % off rejected, counters, default threshold, identities over 10 fuzz pairs with 0 rejected, the sphere-in-cylinder case; `fuzz-residuals.test.ts` seed 133 with oracle |
+| R8 | Profiled the fully rounded box (12 edges, radius 3 on 40 x 30 x 20: 32 Booleans, 62 faces). Found: (a) `BrepLocator.closest` projected onto every edge for every query; edges are now skipped by a padded box against the best distance (point location 2.0x faster, results identical); (b) the sampled check above, sped up by skipping point location outside an operand's box and sampling only the operation's region; (c) 4 of the 32 Booleans fail the plain pipeline and are solved by displacement (cylinder x cylinder at the corner, 3 x cylinder/sphere x sphere), each costing three Booleans and their checks. The build is 5.3 s before and 3.6 to 4.4 s after on the same loaded machine; a Boolean on the finished rounded box (cylinder through a corner, box on a corner, sphere at a corner, a second rounded box) takes 0.04 to 0.8 s. Face-pair BVH and per-surface tessellation cache were **not** built: no profile shows the face-pair loop (62 x 28 box tests) or surface tessellation as the cost; the remainder is the CDT in `interiorSample` (30 %) and tessellation in `prepare` (27 %). | measured, not gated by a test (a wall-clock test on a shared machine would be flaky); `/tmp` probes not kept |
+
+**Fuzz (`fuzz-sweep.ts`, 3 Booleans per seed):**
+
+| Mode | Seeds | Result |
+|---|---|---|
+| aligned | 1-60 | 0 failures, 0 displaced, 0 refused |
+| aligned | 61-120 | 0 failures, 0 displaced; 3 pole contacts, 4 in place, 6 reframed |
+| aligned | 121-180 | 0 failures, 0 displaced; 3 reframed |
+| aligned | 181-240 | 0 failures, 0 displaced; 2 in place |
+| generic | 61-130 | 0 failures, 0 displaced, 0 refused |
+| generic | 131-200 | 0 failures, 0 displaced, **1 refused (seed 133), now fixed** |
+
+Gate 1 holds for the first time without an exception: 240 aligned seeds, 0 displaced, 0 wrong volume identities (1e-6 undisplaced).
+
+**Near-tangent probe (70 pairs: sphere / cylinder / torus / cone / box pairs offset by 1e-6 to 1e-2 mm from tangency):** found two silent failures
+and one crash, all in "sphere centred on a cylinder axis, radius within 1e-6..1e-3 of the cylinder's" (surfaces nearly tangent along a
+circle): empty intersections (fixed above), a raw `RangeError` (fixed above). Still open: with the sphere 1e-5..1e-3 mm **larger** than the
+cylinder the two intersection circles lie 0.01..0.15 mm apart at an angle of a few hundredths of a radian, the mesh seeds cannot separate
+them and the pipeline falls to the displacement (1e-6, 1e-3: displaced, warned, volume within 2e-4) or refuses (1e-5, with the reason). The
+fix is an analytic seed for coaxial surfaces of revolution (circles), clipped to the faces; not built.
+
+**Left open (not claimed)**
+
+- Coaxial surfaces of revolution (sphere, cylinder, cone, torus about one axis) still go through mesh seeds; see the probe above.
+- Equal-radius corner fillets (cylinder x cylinder, cylinder/sphere x sphere at a rounded-box corner) fail the plain pipeline and use the
+  displacement (4 of 32 Booleans of a fully rounded box). These are the next candidates for R5 singular-point work (tangent along a
+  curve between a fillet cylinder and the corner sphere).
+- R5 general NURBS x NURBS marching (200-pair gate): not touched.
+- The validation retry makes the *Boolean* accept a face the coarse tessellator cannot mesh; a consumer tessellating that solid at
+  chord 0.05 to 0.5 mm (seed 133 union, face 1) still gets no triangles for that face (`tessellate.ts` warns "constrained segments cross").
+  The fix belongs in the tessellator (edge polylines are shared between faces, so a per-face retry breaks the weld).
+- 500 seeds were not run (240 aligned, 140 generic new, 60 generic earlier).
