@@ -46,7 +46,6 @@ export interface NamedFeature {
   readonly direction?: Vec3
   readonly ends?: ReadonlyArray<SlotEnd>
   /** Groove: the axis, a point on it, the diameter of its floor and whether it cuts the outside of a shaft. */
-  readonly axis?: Vec3
   readonly origin?: Vec3
   readonly diameter?: number
   readonly external?: boolean
@@ -58,6 +57,10 @@ export interface NamedFeature {
   readonly upperZ?: number
   readonly lowerZ?: number
   readonly loops?: ReadonlyArray<ReadonlyArray<Vec2>>
+  /** For each loop: `outside` when the material is inside it (an outline), `inside` when it is outside it (the rim of a pocket or a hole). */
+  readonly loopSides?: ReadonlyArray<"outside" | "inside">
+  /** Fillet band of cylinders that all share one axis: that unit axis (an edge along it, or an outline corner radius when parallel to the machining axis). */
+  readonly axis?: Vec3
 }
 
 export interface FeatureOptions {
@@ -169,6 +172,8 @@ interface BandFace {
   readonly turn: number
   /** The long non-tangent links of a chamfer face. */
   readonly long: ReadonlyArray<Link>
+  /** Axis of a cylinder fillet. */
+  readonly axis?: Vec3
 }
 
 const bandFaces = (t: Topology, axis: Vec3, maxBand: number): BandFace[] => {
@@ -191,7 +196,7 @@ const bandFaces = (t: Topology, axis: Vec3, maxBand: number): BandFace[] => {
         ? (links.find((l) => l.kind !== "tangent")?.kind ?? "convex") === "convex"
         : dot3(n, sub3(mid, add3(s.frame.origin, scale3(s.frame.z, dot3(sub3(mid, s.frame.origin), s.frame.z))))) > 0
       if (vertical && !convex) return
-      out.push({ face: fi, kind: "fillet-band", size, convex, turn: 0, long: [] })
+      out.push({ face: fi, kind: "fillet-band", size, convex, turn: 0, long: [], ...(s.kind === "cylinder" ? { axis: s.frame.z } : {}) })
       return
     }
     // Chamfers: a narrow plane (or cone) between two faces it is not tangent to.
@@ -265,7 +270,9 @@ const bands = (t: Topology, axis: Vec3, maxBand: number): { features: NamedFeatu
     const pts = ids.flatMap((fi) => t.points(fi, 8))
     const kind = g[0]!.kind
     const convex = g.filter((f) => f.convex).length * 2 >= g.length
-    const feature: NamedFeature = { id: `${kind === "chamfer-band" ? "chamfer" : "fillet"}-${features.length + 1}`, kind, faces: ids, bounds: boundsOf(pts), convex, size: median(g.map((f) => f.size)), ...(kind === "chamfer-band" ? { turn: g.reduce((s, f) => s + f.turn, 0) / g.length } : {}) }
+    const axes = g.map((f) => f.axis)
+    const shared = kind === "fillet-band" && axes.every((a) => a !== undefined && Math.abs(Math.abs(dot3(a, axes[0]!)) - 1) < PARALLEL) ? axes[0] : undefined
+    const feature: NamedFeature = { id: `${kind === "chamfer-band" ? "chamfer" : "fillet"}-${features.length + 1}`, kind, faces: ids, bounds: boundsOf(pts), convex, size: median(g.map((f) => f.size)), ...(kind === "chamfer-band" ? { turn: g.reduce((s, f) => s + f.turn, 0) / g.length } : {}), ...(shared !== undefined ? { axis: shared } : {}) }
     features.push(kind === "chamfer-band" ? withLoops(t, axis, feature, g) : feature)
   }
   return { features, faces }
@@ -274,6 +281,7 @@ const bands = (t: Topology, axis: Vec3, maxBand: number): { features: NamedFeatu
 /** A chamfer along horizontal edges: Z of its edges and the closed loops of the edge on the wall. */
 const withLoops = (t: Topology, axis: Vec3, f: NamedFeature, g: ReadonlyArray<BandFace>): NamedFeature => {
   const walls: number[] = []
+  const tops: Vec3[] = []
   let upper = -Infinity, lower = Infinity
   for (const bf of g) {
     const horizontal = bf.long.every((l) => Math.abs(dot3(normalize3(curveDerivs(t.b.edges[l.edge]!.curve, (t.b.edges[l.edge]!.t0 + t.b.edges[l.edge]!.t1) / 2)[1]), axis)) < 1e-6 || t.b.edges[l.edge]!.curve.kind === "circle")
@@ -282,11 +290,22 @@ const withLoops = (t: Topology, axis: Vec3, f: NamedFeature, g: ReadonlyArray<Ba
     const top = bf.long.find((l) => l !== wall)
     if (wall === undefined || top === undefined) return f
     walls.push(wall.edge)
+    tops.push(top.mid)
     const z = (l: Link): number => dot3(l.mid, axis)
     upper = Math.max(upper, z(top)); lower = Math.min(lower, z(wall))
   }
   const loops = chainLoops(t.b, walls)
-  return { ...f, upperZ: upper, lowerZ: lower, ...(loops.length > 0 ? { loops } : {}) }
+  // The upper edge of a chamfer on an outline lies inside the loop of its lower edge (material inside); on the rim of a pocket or hole, outside it.
+  const sides = loops.map((loop): "outside" | "inside" => {
+    const near = tops.reduce((best, p) => { const d = distanceToPoints({ x: p.x, y: p.y, z: 0 }, [...loop, loop[0]!].map((q) => ({ x: q.x, y: q.y, z: 0 }))); return d < best.d ? { d, p } : best }, { d: Infinity, p: tops[0]! }).p
+    let inside = false
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+      const a = loop[i]!, b = loop[j]!
+      if (a.y > near.y !== b.y > near.y && near.x < ((b.x - a.x) * (near.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
+    }
+    return inside ? "outside" : "inside"
+  })
+  return { ...f, upperZ: upper, lowerZ: lower, ...(loops.length > 0 ? { loops, loopSides: sides } : {}) }
 }
 
 // ---------------------------------------------------------------- floors: slots and steps

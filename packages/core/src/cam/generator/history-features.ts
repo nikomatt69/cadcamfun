@@ -52,6 +52,8 @@ export interface MachiningHole {
   readonly kind: "simple" | "counterbore" | "countersink"
   readonly headDiameter?: number
   readonly headDepth?: number
+  /** Countersink: included angle of the cone, degrees (the planner picks a countersink cutter of this angle). */
+  readonly headAngle?: number
   /** The cosmetic thread the hole carries (`HoleFeature.thread`): designation, its depth, and its metric size when known. */
   readonly thread?: { readonly designation: string; readonly depth: number; readonly diameter?: number; readonly pitch?: number }
   /** ISO 286 fit of the bore (`HoleFeature.fit`, such as `H7`): a drilled hole is too rough for it, the planner reams it. */
@@ -98,6 +100,8 @@ export interface HistoryFeatures {
   readonly bounds: { readonly min: V3; readonly max: V3 } | undefined
   /** Holes along other axes than Z that the exact recognition left to their own setup (it plugged them to read this one). */
   readonly sideHoles?: number
+  /** The same holes as machining sites (entry, direction, diameter, depth), for a machine that indexes to them (3+2). */
+  readonly sideHoleSites?: ReadonlyArray<MachiningHole>
   /** Faces of the solid hidden from above (under a roof, sideways, facing down) that the exact recognition left to other setups. */
   readonly hiddenFaces?: number
   /** What the derivation left out and why (a feature it does not machine, a hole that is not reachable from above). */
@@ -217,11 +221,12 @@ const derive = (source: History): HistoryFeatures => {
     if (f === undefined) continue
     const head = f.kind === "counterbore" || f.kind === "countersink" ? valueOf(f.headDiameter, parameters) : undefined
     const headDepth = f.kind === "counterbore" ? valueOf(f.headDepth, parameters) : undefined
+    const headAngle = f.kind === "countersink" ? (valueOf(f.angle, parameters) ?? 90) : undefined
     holes.push({
       id: site.feature, source: site.source,
       entry: add(add(add(frame.origin, scale(frame.n, site.offset)), scale(frame.u, site.u)), scale(frame.v, site.v)),
       direction: scale(frame.n, -1), diameter: site.diameter, depth: site.depth, kind: f.kind ?? "simple",
-      ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {}),
+      ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {}), ...(headAngle !== undefined ? { headAngle } : {}),
       ...threadOf(f, parameters, site.depth), ...(f.fit !== undefined ? { fit: f.fit } : {})
     })
   }

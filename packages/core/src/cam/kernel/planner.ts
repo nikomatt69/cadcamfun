@@ -12,18 +12,36 @@
  *
  * Planning chooses tools and regions only; cutting data is computed per operation when the job runs. Everything here is
  * in CAD world coordinates.
+ *
+ * Breadth rules (`PlanInput.breadth`, each decision is recorded in `Plan.decisions` with the rule that made it):
+ *   H1-countersink-cycle   a countersunk hole and a countersink cutter of its cone angle that reaches the diameter: one dwell cycle to
+ *                          `countersinkDepth`; with no such cutter the cone is cut with a 90 degree chamfer / spot tool (H1b) or refused
+ *   H2-deep-hole           a drilled depth of more than 5 x D: pecking with a shrinking peck, chip-break retract up to 8 x D, full
+ *                          retract beyond; a drill whose flutes do not reach depth + point is refused (long-series drill)
+ *   H3-back-bore           a counterbore that opens on the underside: the pilot is drilled from above and a boring bar set to the bore
+ *                          diameter bores up from below; refused when no bar fits the pilot
+ *   H4-tilted-drilling     a plain hole along another axis on a machine that indexes: drilled along its own axis; refused when the
+ *                          rotaries cannot reach it or when it carries a counterbore, countersink, thread or fit
+ *   N1-region-covered      a slot or step the plan's pocket / profile operations already reach, or the 3D strategies of a surface job
+ *   N3-groove              a ring groove: no milling strategy (a turned feature)
+ *   N4-chamfer-band        a convex chamfer along horizontal edges: a 2D chamfer with the cone of its angle; refused otherwise
+ *   N5-fillet-band         a fillet: covered by the outline contour when it is a vertical outline radius, else refused (no edge strategy)
  */
 import { offsetPolyline } from "../../cad/offset.ts"
 import { signedArea } from "../../cad/shapes.ts"
-import type { Vec2 } from "../../cad/vec.ts"
+import type { Vec2, Vec3 } from "../../cad/vec.ts"
 import { distanceToChain, pointInRing } from "../geometry.ts"
+import { chamferGeometry } from "../operations/chamfer.ts"
+import { backBoreShift } from "../operations/hole-cycles.ts"
 import { threadMinorDiameter } from "../operations/thread.ts"
+import { anglesFor, type RotaryLayout, type RotaryLimits } from "../indexing.ts"
+import type { NamedFeature } from "../model/features.ts"
 import { setupTransform, type SetupOrientation } from "../setup.ts"
 import { exactFeatures } from "../brep-part.ts"
 import { historyFeatures, type HistoryFeatures, type MachiningHole } from "../generator/history-features.ts"
 import type { CadElement } from "../generator/schema.ts"
-import type { OperationSpec, ProfileTab, StockBox, TabRequirement } from "./contracts.ts"
-import { pointLength, reamDrill, type Cutter } from "./cutters.ts"
+import type { HoleCycle, OperationSpec, ProfileTab, StockBox, TabRequirement } from "./contracts.ts"
+import { countersinkDepth, pointLength, reamDrill, type Cutter } from "./cutters.ts"
 import { suitability, type Rigidity } from "./cutting-data.ts"
 import type { WorkpieceMaterial } from "./materials.ts"
 
@@ -46,6 +64,31 @@ export interface PlanInput {
   readonly rigidTap?: boolean
   /** Upward horizontal faces of the part, by height (`horizontalFaces`): a freeform part with some gets a flat-area finish. */
   readonly flats?: ReadonlyArray<{ readonly z: number; readonly area: number }>
+  /**
+   * Hole and feature breadth (spec 72 P2-5), all off unless asked: a host that does not run the `cycle` of a drill operation
+   * (`OperationSpec` `drill` with `cycle`) must not enable it, because it would drill them as plain holes.
+   */
+  readonly breadth?: PlanBreadth
+}
+
+export interface PlanBreadth {
+  /** Plan countersinks with a countersink cutter, deep holes with a peck policy, and back-bores from the far side. */
+  readonly holeCycles?: boolean
+  /** The machine indexes (3+2): holes along other axes are drilled along their own axis when the rotaries reach them. */
+  readonly tilted?: { readonly layout: RotaryLayout; readonly limits?: RotaryLimits }
+  /** Named features of the exact solid (`recognizeNamedFeatures`, same coordinates as the plan): each is mapped to an operation or refused. */
+  readonly named?: ReadonlyArray<NamedFeature>
+}
+
+/** One planning decision of the breadth rules: the feature, the rule that decided, what it did and why. */
+export interface PlanDecision {
+  readonly feature: string
+  /** The rule that decided, such as `H2-deep-hole`; the table is in the planner's header comment. */
+  readonly rule: string
+  readonly outcome: "planned" | "covered" | "refused"
+  /** Operations that machine the feature (planned) or already reach it (covered). */
+  readonly operations: ReadonlyArray<string>
+  readonly reason?: string
 }
 
 /**
@@ -88,6 +131,8 @@ export interface Plan {
    * The replay does not count them as gouges.
    */
   readonly allowances: ReadonlyArray<{ readonly center: Vec2; readonly radius: number; readonly floor: number; readonly depth: number }>
+  /** The decisions of the breadth rules (empty unless `breadth` is given), each naming its rule. */
+  readonly decisions: ReadonlyArray<PlanDecision>
 }
 
 const MAX_ROUGH: Readonly<Record<Rigidity, number>> = { hobby: 6, light: 10, standard: 16, heavy: 20 }
@@ -164,6 +209,11 @@ export const planJob = (input: PlanInput): Plan => {
   const unmachined: string[] = []
   const ops: OperationSpec[] = []
   const allowances: Plan["allowances"][number][] = []
+  const decisions: PlanDecision[] = []
+  const breadth = input.breadth ?? {}
+  const decide = (feature: string, rule: string, outcome: PlanDecision["outcome"], operations: ReadonlyArray<string>, reason?: string): void => {
+    decisions.push({ feature, rule, outcome, operations, ...(reason !== undefined ? { reason } : {}) })
+  }
   const partTop = input.bounds.max[2]
   const partBottom = input.bounds.min[2]
   const allowance = input.finishAllowance
@@ -186,6 +236,7 @@ export const planJob = (input: PlanInput): Plan => {
 
   // ------------------------------------------------------------ features
   const features: HistoryFeatures[] = []
+  const sideSites: MachiningHole[] = []
   const freeform: CadElement[] = []
   const byId = new Map((input.elements ?? []).map((e) => [String(e["id"] ?? ""), e] as const))
   const transform = input.setupOrientation !== undefined && input.setupOrientation !== "+Z" ? setupTransform(input.setupOrientation) : undefined
@@ -200,6 +251,7 @@ export const planJob = (input: PlanInput): Plan => {
     }
     if (f !== undefined && (f.outlines.length > 0 || f.pockets.length > 0 || f.holes.length > 0)) {
       features.push(f)
+      sideSites.push(...(f.sideHoleSites ?? []))
       for (const n of f.notes) (/not reachable|requires|not a turned|only a revolution/.test(n) ? unmachined : notes).push(n)
     } else freeform.push(e)
   }
@@ -314,8 +366,52 @@ export const planJob = (input: PlanInput): Plan => {
   }
   const threads: OperationSpec[] = []
   const bores: OperationSpec[] = []
-  for (const h of holes) {
-    if (!isDown(h)) { unmachined.push(`Hole ${h.id} is not drilled from above: it needs another setup or 3+2 indexing`); continue }
+  const cycleOps: OperationSpec[] = []
+  const backBores: OperationSpec[] = []
+  const tiltedHoles: MachiningHole[] = [...sideSites]
+  const cyclesOn = breadth.holeCycles === true
+  /** A deep hole's peck policy by the ratio of its depth to its diameter (rule H2). */
+  const deepPolicy = (d: number, ratio: number): HoleCycle => ({
+    kind: "deep", peck: r3(d), peckReduction: r3(0.1 * d), minPeck: r3(0.3 * d), retract: ratio <= 8 ? "chip-break" : "full",
+    chipBreakRetract: r3(Math.max(0.5, 0.1 * d)), ...(ratio <= 8 ? { fullRetractEvery: 4 } : {})
+  })
+  const cycleGroups = new Map<string, Extract<OperationSpec, { strategy: "drill" }>>()
+  const cycleOp = (key: string, make: () => Extract<OperationSpec, { strategy: "drill" }>, at: Vec2): void => {
+    const g = cycleGroups.get(key)
+    if (g === undefined) { const op = make(); cycleGroups.set(key, op); cycleOps.push(op) } else (g.points as Vec2[]).push(at)
+  }
+  const queue: MachiningHole[] = [...holes]
+  for (let qi = 0; qi < queue.length; qi++) {
+    const h = queue[qi]!
+    if (!isDown(h)) {
+      const up = Math.abs(h.direction.x) < 1e-9 && Math.abs(h.direction.y) < 1e-9 && h.direction.z > 0
+      if (cyclesOn && up && h.kind === "counterbore" && h.headDiameter !== undefined && h.headDepth !== undefined && h.headDepth > 0 && h.headDepth < h.depth) {
+        // H3: the counterbore opens on the underside. The pilot is drilled from the top face as an ordinary hole, the bar bores up.
+        const face = h.entry.z
+        const bar = tools.filter((t) => t.kind === "boringbar" && Math.abs(t.diameter - h.headDiameter!) <= 0.01).sort((a, b) => fit(b) - fit(a) || a.id.localeCompare(b.id))[0]
+        const bottom = bar === undefined ? 0 : face - (bar.headHeight ?? 0) - 0.5
+        const shift = bar === undefined ? undefined : backBoreShift(bar, h.diameter)
+        const why = bar === undefined ? `no boring bar set to Ø${r3(h.headDiameter)} in the library`
+          : shift !== undefined && "reason" in shift ? shift.reason
+            : bar.fluteLength < stock.max.z + 2 - bottom - 1e-9 ? `${bar.name} reaches ${bar.fluteLength} mm, the stock top is ${r3(stock.max.z + 2 - bottom)} mm above its lowest tip`
+              : undefined
+        if (why !== undefined) {
+          unmachined.push(`Hole ${h.id} has its Ø${r3(h.headDiameter)} counterbore on the underside: back-boring is not possible (${why})`)
+          decide(h.id, "H3-back-bore", "refused", [], why)
+          continue
+        }
+        const at = { x: h.entry.x, y: h.entry.y }
+        const pilot: MachiningHole = { id: `${h.id}-pilot`, source: h.source, entry: { x: h.entry.x, y: h.entry.y, z: face + h.depth }, direction: { x: 0, y: 0, z: -1 }, diameter: h.diameter, depth: h.depth, kind: "simple" }
+        queue.push(pilot)
+        const op: OperationSpec = { id: `backbore-${h.id}`, name: `Back bore ${h.id} Ø${r3(h.headDiameter)}`, strategy: "drill", tool: bar!.id, points: [at], top: face + h.headDepth, bottom, cut: "ream", cycle: { kind: "back-bore", diameter: h.headDiameter, pilotDiameter: h.diameter, face } }
+        backBores.push(op)
+        decide(h.id, "H3-back-bore", "planned", [`${pilot.id} (drilled from above)`, op.id])
+        continue
+      }
+      if (breadth.tilted !== undefined) { tiltedHoles.push(h); continue }
+      unmachined.push(`Hole ${h.id} is not drilled from above: it needs another setup or 3+2 indexing`)
+      continue
+    }
     const at = { x: h.entry.x, y: h.entry.y }
     let top = h.entry.z
     if (h.kind === "counterbore" && h.headDiameter !== undefined && h.headDepth !== undefined && h.headDepth > 0) {
@@ -336,6 +432,16 @@ export const planJob = (input: PlanInput): Plan => {
     }
     const reaming = reamer !== undefined && preDrill !== undefined
     const drill = reaming ? preDrill : drills.find((d) => Math.abs(d.diameter - h.diameter) <= 0.02)
+    // H2: a hole deeper than 5 x D is pecked with a policy; the flutes must reach depth + point, or the hole is refused whole.
+    const deepRatio = (top - bottomOfHole) / h.diameter
+    const deep = cyclesOn && drill !== undefined && !reaming && deepRatio > 5
+    const longDrill = deep ? drills.find((d) => Math.abs(d.diameter - h.diameter) <= 0.02 && d.fluteLength >= top - bottomOfHole + pointLength(drill!) - 1e-9) : undefined
+    if (deep && longDrill === undefined) {
+      const need = top - bottomOfHole + pointLength(drill!)
+      unmachined.push(`Hole ${h.id} Ø${r3(h.diameter)} is ${r3(deepRatio)} x D deep: no Ø${r3(h.diameter)} drill has ${r3(need)} mm of flutes (use a long-series drill)`)
+      decide(h.id, "H2-deep-hole", "refused", [], `no Ø${r3(h.diameter)} drill with ${r3(need)} mm flutes`)
+      continue
+    }
     if (drill !== undefined) {
       const tip = pointLength(drill)
       const bottom = through ? bottomOfHole - tip - 0.5 : bottomOfHole - tip
@@ -346,7 +452,13 @@ export const planJob = (input: PlanInput): Plan => {
         const depth = (target / 2) / Math.tan(((s.angle ?? 90) * Math.PI) / 360)
         if (depth > 0.05) group(s, top, top - depth, at, "spot")
       }
-      group(drill, top, bottom, at, "drill")
+      if (deep && longDrill !== undefined) {
+        const cycle = deepPolicy(h.diameter, deepRatio)
+        cycleOp(`deep|${longDrill.id}|${r3(top)}|${r3(bottom)}`, () => ({
+          id: `deep-${longDrill.id}-${cycleGroups.size + 1}`, name: `Deep drill Ø${longDrill.diameter} (${r3(deepRatio)} x D)`, strategy: "drill", tool: longDrill.id, points: [at], top, bottom, cut: "drill", cycle
+        }), at)
+        decide(h.id, "H2-deep-hole", "planned", [`deep-${longDrill.id}`], `${r3(deepRatio)} x D: ${cycle.kind === "deep" && cycle.retract === "chip-break" ? "chip-break retract with a full retract every 4 pecks" : "full retract after every peck"}`)
+      } else group(drill, top, bottom, at, "drill")
       if (reaming) group(reamer!, top, through ? bottomOfHole - 0.5 : bottomOfHole, at, "ream", `Ream Ø${r3(h.diameter)} ${h.fit}`)
     } else {
       const tool = endMill(Math.min(0.75 * h.diameter, maxRough), top - bottomOfHole)
@@ -357,9 +469,28 @@ export const planJob = (input: PlanInput): Plan => {
       }
     }
     if (h.kind === "countersink" && h.headDiameter !== undefined) {
-      const tool = chamfers.find((t) => t.diameter >= h.headDiameter! + 0.5 && (t.angle ?? 90) === 90)
-      if (tool === undefined) unmachined.push(`Countersink of ${h.id}: no 90° spot / chamfer tool larger than Ø${r3(h.headDiameter)}`)
-      else group(tool, h.entry.z, h.entry.z - (h.headDiameter / 2 - (tool.tipDiameter ?? 0) / 2), at, "spot")
+      const angle = h.headAngle ?? 90
+      const csk = cyclesOn
+        ? tools.filter((t) => t.kind === "countersink" && t.angle !== undefined && Math.abs(t.angle - angle) <= 0.5 && t.diameter >= h.headDiameter! - 1e-9 && (t.tipDiameter ?? 0) < h.headDiameter!).sort((a, b) => a.diameter - b.diameter || fit(b) - fit(a) || a.id.localeCompare(b.id))[0]
+        : undefined
+      if (csk !== undefined) {
+        const depth = countersinkDepth(csk, h.headDiameter)
+        cycleOp(`csk|${csk.id}|${r3(h.headDiameter)}|${r3(h.entry.z)}`, () => ({
+          id: `countersink-${csk.id}-${cycleGroups.size + 1}`, name: `Countersink Ø${r3(h.headDiameter!)} ${angle}° (${csk.name})`, strategy: "drill", tool: csk.id, points: [at], top: h.entry.z, bottom: h.entry.z - depth, cut: "spot",
+          cycle: { kind: "countersink", diameter: h.headDiameter! }
+        }), at)
+        decide(h.id, "H1-countersink-cycle", "planned", [`countersink-${csk.id}`], `${csk.name}: ${r3(depth)} mm deep for Ø${r3(h.headDiameter)} at ${angle}°`)
+      } else {
+        const tool = chamfers.find((t) => t.diameter >= h.headDiameter! + 0.5 && (t.angle ?? 90) === 90)
+        if (tool === undefined || (cyclesOn && angle !== 90)) {
+          const why = angle !== 90 ? `a ${angle}° countersink needs a ${angle}° countersink cutter${cyclesOn ? ", none in the library reaches Ø" + r3(h.headDiameter) : " (the cycle rules are off)"}` : `no 90° spot / chamfer tool larger than Ø${r3(h.headDiameter)}`
+          unmachined.push(`Countersink of ${h.id}: ${why}`)
+          if (cyclesOn) decide(h.id, "H1b-countersink-with-cone-tool", "refused", [], why)
+        } else {
+          group(tool, h.entry.z, h.entry.z - (h.headDiameter / 2 - (tool.tipDiameter ?? 0) / 2), at, "spot")
+          if (cyclesOn) decide(h.id, "H1b-countersink-with-cone-tool", "planned", [`spot-${tool.id}`], `no ${angle}° countersink cutter reaches Ø${r3(h.headDiameter)}: cut with ${tool.name}`)
+        }
+      }
     }
     if (h.thread !== undefined) {
       const { diameter, pitch } = h.thread
@@ -385,11 +516,48 @@ export const planJob = (input: PlanInput): Plan => {
       notes.push(`Hole ${h.id} Ø${r3(h.diameter)} is a tap-drill size but has no thread note: it is drilled, not threaded`)
     }
   }
+  // H4: holes along other axes on a machine that indexes, drilled along their own axis, one operation per drill.
+  if (tiltedHoles.length > 0 && breadth.tilted !== undefined) {
+    const tilt = breadth.tilted
+    const byDrill = new Map<string, { tool: Cutter; sites: Array<{ entry: Vec3; direction: Vec3; depth: number; tipZ: number }> }>()
+    for (const h of tiltedHoles) {
+      const normal = { x: -h.direction.x, y: -h.direction.y, z: -h.direction.z }
+      const plain = h.kind === "simple" && h.thread === undefined && h.fit === undefined
+      const drill = drills.find((d) => Math.abs(d.diameter - h.diameter) <= 0.02)
+      const tip = drill === undefined ? 0 : pointLength(drill)
+      const why = !plain ? `only plain holes are drilled along a tilted axis, this one is a ${h.kind}${h.thread !== undefined ? " with a thread" : ""}${h.fit !== undefined ? ` with fit ${h.fit}` : ""}`
+        : anglesFor(normal, tilt.layout, tilt.limits).length === 0 ? "the rotary axes cannot reach its direction within their limits"
+          : drill === undefined ? `no Ø${r3(h.diameter)} drill in the library`
+            : drill.fluteLength < h.depth + tip - 1e-9 ? `${drill.name} has ${drill.fluteLength} mm of flutes for ${r3(h.depth + tip)} mm`
+              : undefined
+      if (why !== undefined || drill === undefined) {
+        unmachined.push(`Hole ${h.id} is not drilled from above and cannot be drilled along its own axis: ${why}`)
+        decide(h.id, "H4-tilted-drilling", "refused", [], why)
+        continue
+      }
+      const g = byDrill.get(drill.id) ?? { tool: drill, sites: [] }
+      byDrill.set(drill.id, g)
+      g.sites.push({ entry: h.entry, direction: h.direction, depth: h.depth, tipZ: h.entry.z + h.direction.z * (h.depth + tip) })
+      decide(h.id, "H4-tilted-drilling", "planned", [`tilted-${drill.id}`], `along (${r3(h.direction.x)}, ${r3(h.direction.y)}, ${r3(h.direction.z)})`)
+    }
+    for (const g of byDrill.values()) {
+      cycleOps.push({
+        id: `tilted-${g.tool.id}`, name: `Tilted drilling Ø${g.tool.diameter} (${g.sites.length} holes)`, strategy: "drill", tool: g.tool.id, points: g.sites.map((q) => ({ x: q.entry.x, y: q.entry.y })),
+        top: Math.max(...g.sites.map((q) => q.entry.z)), bottom: Math.min(...g.sites.map((q) => q.tipZ)), cut: "drill",
+        cycle: { kind: "tilted", sites: g.sites.map((q) => ({ entry: q.entry, direction: q.direction, depth: q.depth })) }
+      })
+    }
+  }
   ops.push(...bores)
   const ORDER: Readonly<Record<HoleCut, number>> = { spot: 0, drill: 1, ream: 2, tap: 3 }
   const sortedGroups = [...groups.values()].sort((a, b) => (a.cut === b.cut ? a.tool.diameter - b.tool.diameter : ORDER[a.cut] - ORDER[b.cut]))
   let counter = 0
+  // The cycle operations (deep holes, countersinks, back-bores, tilted holes) come after the plain spotting and drilling and before reaming and tapping.
+  const kindRank = (o: OperationSpec): number => (o.strategy === "drill" && o.cycle !== undefined ? ({ deep: 0, countersink: 1, tilted: 2, "back-bore": 3 } as const)[o.cycle.kind] : 4)
+  const cycled = [...[...cycleOps].sort((a, b) => kindRank(a) - kindRank(b)), ...backBores]
+  let cyclesPushed = false
   for (const g of sortedGroups) {
+    if (!cyclesPushed && ORDER[g.cut] >= 2) { ops.push(...cycled); cyclesPushed = true }
     counter++
     ops.push({
       id: `${g.cut}-${g.tool.id}-${counter}`,
@@ -397,6 +565,7 @@ export const planJob = (input: PlanInput): Plan => {
       strategy: "drill", tool: g.tool.id, points: g.points, top: g.top, bottom: g.bottom, cut: g.cut
     })
   }
+  if (!cyclesPushed) ops.push(...cycled)
   ops.push(...threads)
   ops.push(...finishes)
 
@@ -458,6 +627,72 @@ export const planJob = (input: PlanInput): Plan => {
     }
     if (prismatic) notes.push(`Elements without a feature history are machined with the 3D strategies: ${freeform.map((e) => String(e["name"] ?? e["type"])).join(", ")}`)
   }
+  // ------------------------------------------------------------ named features (spec 72 P2-5)
+  for (const f of breadth.named ?? []) {
+    const centre = { x: (f.bounds.min.x + f.bounds.max.x) / 2, y: (f.bounds.min.y + f.bounds.max.y) / 2 }
+    switch (f.kind) {
+      case "slot":
+      case "step": {
+        const floorZ = f.floorZ ?? f.bounds.min.z
+        const reaches = (o: OperationSpec): boolean => {
+          if (Math.abs(o.strategy === "adaptive" || o.strategy === "pocket" || o.strategy === "profile" ? o.bottom - floorZ : Infinity) > 0.35) return false
+          if (o.strategy === "adaptive" || o.strategy === "pocket") return pointInRing(centre, o.region.boundary) && !(o.region.islands ?? []).some((i) => pointInRing(centre, i))
+          if (o.strategy === "profile") { const xs = o.loop.map((q) => q.x), ys = o.loop.map((q) => q.y); return Math.min(...xs) <= f.bounds.max.x && Math.max(...xs) >= f.bounds.min.x && Math.min(...ys) <= f.bounds.max.y && Math.max(...ys) >= f.bounds.min.y }
+          return false
+        }
+        const hit = ops.filter(reaches).map((o) => o.id)
+        if (hit.length > 0) decide(f.id, "N1-region-covered", "covered", hit, `${f.kind} floor at Z${r3(floorZ)} is reached by the planned region operations`)
+        else if (surfaceOnly && ops.some((o) => o.strategy === "surface")) decide(f.id, "N1-region-covered", "covered", ops.filter((o) => o.strategy === "surface").map((o) => o.id), `${f.kind} is left to the 3D strategies of the freeform job`)
+        else {
+          const why = `no planned pocket, adaptive or profile operation reaches the ${f.kind} floor at Z${r3(floorZ)}`
+          unmachined.push(`${f.kind === "slot" ? "Slot" : "Step"} ${f.id}: ${why}`)
+          decide(f.id, "N1-region-covered", "refused", [], why)
+        }
+        break
+      }
+      case "groove": {
+        const why = `a ring groove (${f.external === true ? "outside" : "inside"}, Ø${r3(f.diameter ?? 0)}, ${r3(f.width ?? 0)} wide) is a turned feature: the kernel has no milling strategy for it`
+        unmachined.push(`Groove ${f.id}: ${why}`)
+        decide(f.id, "N3-groove", "refused", [], why)
+        break
+      }
+      case "chamfer-band": {
+        const plan = (): { op?: OperationSpec; why?: string } => {
+          if (f.convex !== true) return { why: "a chamfer in an inside corner has no 2D chamfer strategy" }
+          if (f.loops === undefined || f.upperZ === undefined || f.lowerZ === undefined || f.size === undefined) return { why: "the chamfer does not run along horizontal edges with a closed loop" }
+          const drop = f.upperZ - f.lowerZ
+          const inset = Math.sqrt(Math.max(0, f.size * f.size - drop * drop))
+          if (!(drop > 1e-6) || !(inset > 1e-6)) return { why: `the chamfer (width ${r3(f.size)}, drop ${r3(drop)}) is not a sloped band between a top and a wall` }
+          const included = 2 * Math.atan2(inset, drop) * (180 / Math.PI)
+          const cones = tools.filter((t) => (t.kind === "chamfer" || t.kind === "spot" || t.kind === "countersink") && t.angle !== undefined && Math.abs(t.angle - included) <= 1)
+          const cone = cones.filter((t) => chamferGeometry({ radius: t.diameter / 2, tipRadius: t.kind === "spot" ? 0 : (t.tipDiameter ?? 0) / 2, halfAngle: ((t.angle ?? 90) * Math.PI) / 360 }, inset, 0.2).fits).sort((a, b) => a.diameter - b.diameter)[0]
+          if (cone === undefined) return { why: `no chamfer / spot / countersink cutter of ${r3(included)}° (±1°) reaches a ${r3(inset)} mm chamfer` }
+          const sides = f.loopSides ?? f.loops.map(() => "outside" as const)
+          return { op: { id: `chamfer-${f.id}`, name: `Chamfer band ${f.id} (${r3(inset)} x ${r3(drop)})`, strategy: "chamfer", tool: cone.id, loops: f.loops.map((points, i) => ({ points: ccw(points), side: sides[i]! })), top: f.upperZ, width: r3(inset) } }
+        }
+        const r = plan()
+        if (r.op === undefined) { unmachined.push(`Chamfer ${f.id}: ${r.why}`); decide(f.id, "N4-chamfer-band", "refused", [], r.why) }
+        else {
+          const twin = ops.find((o) => o.strategy === "chamfer" && Math.abs(o.top - (f.upperZ ?? 0)) < 0.01 && Math.abs(o.width - r3(Math.sqrt(Math.max(0, f.size! ** 2 - (f.upperZ! - f.lowerZ!) ** 2)))) < 0.01)
+          if (twin !== undefined) decide(f.id, "N4-chamfer-band", "covered", [twin.id], "the deburring chamfer at the same height and width already cuts it")
+          else { ops.push(r.op); decide(f.id, "N4-chamfer-band", "planned", [r.op.id]) }
+        }
+        break
+      }
+      case "fillet-band": {
+        const vertical = f.axis !== undefined && Math.abs(Math.abs(f.axis.z) - 1) < 1e-6
+        const contour = ops.filter((o) => o.strategy === "profile" && o.side === "outside").map((o) => o.id)
+        if (vertical && f.convex === true && contour.length > 0) decide(f.id, "N5-fillet-band", "covered", contour, `an outline radius of R${r3(f.size ?? 0)} is followed by the contour passes`)
+        else {
+          const why = vertical && f.convex !== true ? "a concave vertical radius is left to the cutter radius of the pocket walls and is not an edge treatment"
+            : `a ${f.convex === true ? "round" : "fillet"} of R${r3(f.size ?? 0)} along an edge needs an edge-following strategy (corner-rounding or ball cutter) that the kernel does not have${surfaceOnly ? "; the 3D finishing of the freeform job reaches it" : ""}`
+          if (vertical && f.convex !== true) decide(f.id, "N5-fillet-band", "covered", [], why)
+          else decide(f.id, "N5-fillet-band", "refused", [], why)
+        }
+        break
+      }
+    }
+  }
   if (material.iso === "H" && ops.some((o) => o.strategy === "pocket")) notes.push(`${material.name}: contour pocketing at full width is hard on the cutter; adaptive clearing is preferred`)
-  return { operations: ops, notes, unmachined, allowances }
+  return { operations: ops, notes, unmachined, allowances, decisions }
 }

@@ -176,19 +176,25 @@ const plugSideHoles = (b: Brep): { readonly brep: Brep; readonly plugged: Readon
 export const brepFeatures = (original: Brep, name = "part"): ExactFeatures => {
   const side = plugSideHoles(original)
   if (typeof side === "string") return { reason: `${name}: ${side}` }
-  const direct = readFeatures(side.brep, name, side.plugged.length)
+  const direct = readFeatures(side.brep, name, side.plugged)
   if (direct.features !== undefined) return direct
   // What a tool from above can make of the part: its shadow. Visible freeform faces refuse there too, with their own reason.
   const shadow = shadowSolid(side.brep)
   if (typeof shadow === "string") return direct
-  const seen = readFeatures(shadow.brep, name, side.plugged.length, shadow.hidden)
+  const seen = readFeatures(shadow.brep, name, side.plugged, shadow.hidden)
   return seen.features !== undefined ? seen : direct
 }
 
+/** Included angle of the countersink cone of a recognised hole: its first cone segment, degrees. */
+const coneAngle = (h: RecognizedHole): { readonly headAngle: number } | Record<string, never> => {
+  const cone = h.segments.find((s) => s.kind === "cone" && s.end - s.start > 1e-9)
+  return cone === undefined ? {} : { headAngle: Math.round(((2 * Math.atan(Math.abs(cone.diameterEnd - cone.diameterStart) / 2 / (cone.end - cone.start))) * 180) / Math.PI * 1000) / 1000 }
+}
+
 /** The 2.5D features of a solid that is already read as one setup: the holes along other axes (`plugged`) are left out. */
-const readFeatures = (b: Brep, name: string, plugged: number, hidden = 0): ExactFeatures => {
+const readFeatures = (b: Brep, name: string, pluggedHoles: ReadonlyArray<RecognizedHole>, hidden = 0): ExactFeatures => {
   const refuse = (reason: string): ExactFeatures => ({ reason: `${name}: ${reason}` })
-  const side = { plugged: { length: plugged } }
+  const side = { plugged: { length: pluggedHoles.length } }
   const holes = recognizeHoles(b)
 
   // 1. Every face is a hole wall, a vertical wall or a horizontal floor.
@@ -292,7 +298,13 @@ const readFeatures = (b: Brep, name: string, plugged: number, hidden = 0): Exact
   const ccw = (l: ReadonlyArray<Vec2>): Vec2[] => (signedArea(l) >= 0 ? [...l] : [...l].reverse())
   const machiningHoles: MachiningHole[] = holes.map((h, i) => ({
     id: `hole-${i + 1}`, source: "brep", entry: h.entry, direction: h.direction, diameter: h.diameter, depth: h.depth, kind: h.form,
-    ...(h.headDiameter !== undefined ? { headDiameter: h.headDiameter } : {}), ...(h.headDepth !== undefined ? { headDepth: h.headDepth } : {})
+    ...(h.headDiameter !== undefined ? { headDiameter: h.headDiameter } : {}), ...(h.headDepth !== undefined ? { headDepth: h.headDepth } : {}),
+    ...(h.form === "countersink" ? coneAngle(h) : {})
+  }))
+  const sideSites: MachiningHole[] = pluggedHoles.map((h, i) => ({
+    id: `side-hole-${i + 1}`, source: "brep", entry: h.entry, direction: h.direction, diameter: h.diameter, depth: h.depth, kind: h.form,
+    ...(h.headDiameter !== undefined ? { headDiameter: h.headDiameter } : {}), ...(h.headDepth !== undefined ? { headDepth: h.headDepth } : {}),
+    ...(h.form === "countersink" ? coneAngle(h) : {})
   }))
   const machiningPockets: MachiningPocket[] = pockets.sort((p, q) => q.z1 - p.z1 || q.z0 - p.z0)
     .map((p, i) => ({
@@ -305,7 +317,7 @@ const readFeatures = (b: Brep, name: string, plugged: number, hidden = 0): Exact
     features: {
       holes: machiningHoles, pockets: machiningPockets, outlines: machiningOutlines, turned: [],
       bounds: { min: { x: min.x, y: min.y, z: zMin }, max: { x: max.x, y: max.y, z: zMax } },
-      ...(side.plugged.length > 0 ? { sideHoles: side.plugged.length } : {}),
+      ...(side.plugged.length > 0 ? { sideHoles: side.plugged.length, sideHoleSites: sideSites } : {}),
       ...(hidden > 0 ? { hiddenFaces: hidden } : {}),
       notes: [
         `${name}: ${machiningHoles.length} holes, ${machiningPockets.length} pockets and ${machiningOutlines.length} outlines recognised on the exact B-rep`,

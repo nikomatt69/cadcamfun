@@ -154,6 +154,8 @@ describe("slots, steps, grooves and bands with their faces", () => {
     expect(c.lowerZ).toBeCloseTo(18, 6)
     // The lower edges lie on the walls: the outline of the part.
     expect(c.loops).toHaveLength(1)
+    // Material is inside the loop (an outline), so the cone runs outside it.
+    expect(c.loopSides).toEqual(["outside"])
     const xs = c.loops![0]!.map((p) => p.x), ys = c.loops![0]!.map((p) => p.y)
     const extent = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     ;[0, 60, 0, 40].forEach((v, i) => expect(extent[i]!).toBeCloseTo(v, 9))
