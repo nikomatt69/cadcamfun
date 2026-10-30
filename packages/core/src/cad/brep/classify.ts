@@ -93,6 +93,18 @@ export const brepLocator = (b: Brep, boundaries?: FaceBoundaries): BrepLocator =
     return { lo, hi }
   })
   const periods = b.faces.map((f) => surfacePeriods(f.surface))
+  // Edge boxes from curve samples, padded for the bulge between them: an edge farther than the best distance so far cannot
+  // hold the closest point, and the exact projection (the expensive part of a query) is skipped for it.
+  const edgeBox: Box[] = b.edges.map((e) => {
+    let lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
+    for (let k = 0; k <= 24; k++) {
+      const q = curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 24)
+      lo = { x: Math.min(lo.x, q.x), y: Math.min(lo.y, q.y), z: Math.min(lo.z, q.z) }
+      hi = { x: Math.max(hi.x, q.x), y: Math.max(hi.y, q.y), z: Math.max(hi.z, q.z) }
+    }
+    const pad = e.curve.kind === "line" ? 1e-9 : 0.05 * Math.hypot(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) + 1e-9
+    return { lo: { x: lo.x - pad, y: lo.y - pad, z: lo.z - pad }, hi: { x: hi.x + pad, y: hi.y + pad, z: hi.z + pad } }
+  })
 
   const insideFace = (fi: number, u: number, v: number): boolean => {
     const rings = fb.rings[fi]
@@ -131,6 +143,7 @@ export const brepLocator = (b: Brep, boundaries?: FaceBoundaries): BrepLocator =
     }
     // Edges (the closest point of a face may be on its boundary).
     b.edges.forEach((e, ei) => {
+      if (best !== undefined && boxDistance(edgeBox[ei]!, p) > best.distance) return
       const t = curveProject(e.curve, p, e.t0, e.t1)
       const q = curvePoint(e.curve, t)
       const d = dist3(q, p)

@@ -91,15 +91,19 @@ export interface BooleanCounters {
   readonly inPlaceContact: number
   /** Solved exactly after a bare sphere or torus operand was given another parametrisation frame (poles and seams moved off the contact; no geometry changed). */
   readonly reframed: number
+  /** Results checked against the operands (sampled volume, and the identities when asked) and found right. */
+  readonly verified: number
+  /** Results the check found valid but wrong: the call went on to the recovery instead of returning them (spec 42 R7). */
+  readonly verifyRejected: number
   /** Failures by the stage that gave up. */
   readonly byStage: Readonly<Record<BooleanStage, number>>
 }
 
-const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, inPlaceContact: 0, reframed: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
+const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, inPlaceContact: 0, reframed: 0, verified: 0, verifyRejected: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
 
 export const booleanCounters = (): BooleanCounters => ({ ...COUNTERS, byStage: { ...COUNTERS.byStage } })
 export const resetBooleanCounters = (): void => {
-  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0; COUNTERS.inPlaceContact = 0; COUNTERS.reframed = 0
+  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0; COUNTERS.inPlaceContact = 0; COUNTERS.reframed = 0; COUNTERS.verified = 0; COUNTERS.verifyRejected = 0
   COUNTERS.byStage = { prepare: 0, arrange: 0, validate: 0 }
 }
 
@@ -121,7 +125,22 @@ export interface BooleanOptions {
    * result whose tolerance passes it has the affected faces marked `loose` and carries a warning; the Boolean is not refused.
    */
   readonly maxTolerance?: number
+  /**
+   * How `booleanBrep` checks an exact result against its operands before returning it (spec 42 R7). A valid solid (closed,
+   * manifold, oriented) can still be the wrong solid; the checks catch that, and a result that fails goes to the recovery, and
+   * is refused when the recovery fails too.
+   * - `"off"`: no check (the pole and designed-contact checks still run).
+   * - `"sampled"`: the result's exact volume against a low-discrepancy sample of the operands' box by the operation's rule.
+   * - `"identities"`: `"sampled"` plus the volume identities of the pair, V(A u B) + V(A n B) = V(A) + V(B) and
+   *   V(A - B) + V(A n B) = V(A), to one millionth (computes all three operations; for debugging and fuzzing).
+   * Default `"sampled"` when the operands have `VERIFY_FACES` faces together or more, else `"off"`: small pairs are covered by
+   * the fuzz sweeps, large ones are where a wrong answer is both likelier and costlier to find by eye.
+   */
+  readonly verify?: "off" | "sampled" | "identities"
 }
+
+/** Operands with this many faces together are checked by default (`BooleanOptions.verify`). */
+export const VERIFY_FACES = 24
 
 export interface BooleanStats {
   readonly intersectionCurves: number
@@ -1315,6 +1334,16 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   try {
     if (poleContact) { COUNTERS.poleContact++; throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] }) }
     const done = booleanStrict(A, B, op, options)
+    const mode = options.verify ?? (A.faces.length + B.faces.length >= VERIFY_FACES ? "sampled" : "off")
+    if (mode !== "off" && poleKind !== "designed") {
+      // Valid is not right: a solid can close, orient and still be wrong. A result the operands do not support is not returned.
+      const wrong = !agreesWithOperands(A, B, op, done.brep) || (mode === "identities" && !identitiesOfPair(A, B, options))
+      if (wrong) {
+        COUNTERS.verifyRejected++
+        throw new BooleanError("the exact result is a valid solid that disagrees with the operands (sampled volume or volume identities)", [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
+      }
+      COUNTERS.verified++
+    }
     if (poleKind === "designed" && done.brep.faces.length > 0 && !agreesWithOperands(A, B, op, done.brep)) {
       throw new BooleanError("the exact result of a pole contact disagrees with the operands", [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
     }
@@ -1498,7 +1527,7 @@ const poleContactKind = (a: Brep, b: Brep): "none" | "designed" | "hard" => {
  * lies in the result by the operation's rule (exact point location in each operand), against the result's exact volume. Used on
  * the recovery path only, where a valid-looking wrong solid has been seen.
  */
-const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep): boolean => {
+export const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep): boolean => {
   const la = brepLocator(A), lb = brepLocator(B)
   const pts: Vec3[] = []
   for (const b of [A, B]) {
@@ -1524,6 +1553,17 @@ const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep): bool
   const sigma = boxVolume * Math.sqrt(Math.max(f * (1 - f), 1 / N) / N)
   const actual = exactVolume(result)
   return Math.abs(actual - estimate) <= 6 * sigma + 1e-3 * boxVolume
+}
+
+/**
+ * The volume identities of a pair (union + intersection = A + B, difference + intersection = A) to one millionth, from the plain
+ * pipeline's three results. An operation the plain pipeline refuses cannot be checked this way: it does not count against the
+ * result being asked about (the recovery answers for that operation).
+ */
+const identitiesOfPair = (A: Brep, B: Brep, options: BooleanOptions): boolean => {
+  const set = pairSet(A, B, "identities", () => ({ A, B }), options, 1e-6)
+  try { for (const o of ["union", "intersect", "subtract"] as const) set.get(o) } catch (e) { if (e instanceof BooleanError) return true; throw e }
+  return set.identitiesHold()
 }
 
 /** Exact volume of a solid, kept per solid: the recovery asks for it several times. */
