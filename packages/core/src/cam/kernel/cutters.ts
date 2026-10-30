@@ -24,6 +24,17 @@ export type CutterKind =
   | "tap"
   /** A machine reamer: `diameter` is the finished bore. */
   | "reamer"
+  /** A countersink: a cone of included `angle` (82 / 90 / 100 / 120) from the flat `tipDiameter` up to `diameter`. */
+  | "countersink"
+  /**
+   * A boring / back-boring bar: one insert of axial height `headHeight` sweeps `diameter` about the spindle axis, on a body of
+   * `neckDiameter` that is what goes through the pilot hole. Bores on the way up as well as on the way down.
+   */
+  | "boringbar"
+  /** A T-slot / disc cutter: a disc of `diameter` and thickness `headHeight` on a neck of `neckDiameter`. */
+  | "tslot"
+  /** A dovetail cutter: widest at the tip (`diameter`), flanks at half of the included `angle` from the axis over `headHeight`, on a neck. */
+  | "dovetail"
 
 export type ToolMaterial = "hss" | "hss-co" | "carbide" | "pcd"
 
@@ -56,6 +67,10 @@ export interface Cutter {
   readonly tipDiameter?: number
   /** Thread mill or tap: the pitch its profile cuts, mm. */
   readonly pitch?: number
+  /** Boring bar / T-slot / dovetail: diameter of the body above the cutting head, mm. */
+  readonly neckDiameter?: number
+  /** Boring bar insert height, T-slot disc thickness, dovetail flank height: the axial extent of the cutting head from the tip, mm. */
+  readonly headHeight?: number
   /** Length of the cutting edges from the tip, mm. */
   readonly fluteLength: number
   readonly shankDiameter: number
@@ -79,7 +94,13 @@ const LEGACY_KIND: Readonly<Record<CutterKind, Tool["kind"]>> = {
   engraver: "vbit",
   // The replay sweeps a tap and a reamer as cylinders of their cutting diameter (the tap's lead chamfer is ignored: conservative).
   tap: "endmill",
-  reamer: "endmill"
+  reamer: "endmill",
+  countersink: "vbit",
+  // A boring bar, a T-slot and a dovetail cutter are swept as the cylinder of their largest diameter (more removal than the
+  // real head, never less): the conservative bound the replay accepts for shapes it has no exact profile for.
+  boringbar: "endmill",
+  tslot: "endmill",
+  dovetail: "endmill"
 }
 
 /** The legacy record the operations take (`cam/tool.ts`). */
@@ -103,9 +124,22 @@ export const verifyTool = (c: Cutter): VerifyTool => ({
   shankDiameter: c.shankDiameter,
   stickout: c.stickout,
   ...(c.holder !== undefined ? { holderDiameter: c.holder.diameter, holderLength: c.holder.length, ...(c.holder.steps !== undefined && c.holder.steps.length > 0 ? { holderSteps: c.holder.steps } : {}) } : {}),
-  ...(c.angle !== undefined && (c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "drill") ? { angle: c.angle } : {}),
+  ...(c.angle !== undefined && (c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "countersink" || c.kind === "drill") ? { angle: c.angle } : {}),
   ...(c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })
+
+/**
+ * Depth from the surface at which a countersink cone reaches the finished diameter `diameter`, mm: the cone runs from its flat tip
+ * (`tipDiameter`, 0 = a point) at the tip to its full diameter at `pointLength`, so the tip goes down by the cone height between the
+ * tip and the finished diameter. Throws when the tool cannot make that diameter.
+ */
+export const countersinkDepth = (c: Cutter, diameter: number): number => {
+  if (c.angle === undefined) throw new RangeError(`${c.id}: a countersink needs its included angle`)
+  const tip = (c.tipDiameter ?? 0) / 2
+  if (!(diameter / 2 > tip + 1e-9)) throw new RangeError(`${c.id}: a Ø${diameter} countersink is not wider than the Ø${c.tipDiameter ?? 0} flat of its tip`)
+  if (diameter > c.diameter + 1e-9) throw new RangeError(`${c.id}: the cone is Ø${c.diameter} at most, a Ø${diameter} countersink is wider`)
+  return (diameter / 2 - tip) / Math.tan((c.angle * Math.PI) / 360)
+}
 
 /** Height of the cone point below the full diameter (drills, spot drills, chamfer mills). */
 export const pointLength = (c: Cutter): number => {
@@ -122,8 +156,14 @@ export const cutterIssues = (c: Cutter): ReadonlyArray<string> => {
   if (!Number.isInteger(c.flutes)) out.push(`${c.id}: the number of flutes must be an integer`)
   if (c.fluteLength > c.stickout + 1e-9) out.push(`${c.id}: the flutes (${c.fluteLength} mm) are longer than the stickout (${c.stickout} mm)`)
   if (c.kind === "bull" && (c.cornerRadius === undefined || c.cornerRadius <= 0 || c.cornerRadius >= c.diameter / 2)) out.push(`${c.id}: a bull nose needs 0 < corner radius < D/2`)
-  if ((c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver") && (c.angle === undefined || c.angle <= 0 || c.angle >= 180)) out.push(`${c.id}: a ${c.kind} needs its included angle`)
+  if ((c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "countersink" || c.kind === "dovetail") && (c.angle === undefined || c.angle <= 0 || c.angle >= 180)) out.push(`${c.id}: a ${c.kind} needs its included angle`)
   if ((c.kind === "threadmill" || c.kind === "tap") && (c.pitch === undefined || c.pitch <= 0)) out.push(`${c.id}: a ${c.kind === "tap" ? "tap" : "thread mill"} needs the pitch its profile cuts`)
+  if (c.kind === "countersink" && c.tipDiameter !== undefined && c.tipDiameter >= c.diameter) out.push(`${c.id}: the flat of a countersink tip must be narrower than its cone`)
+  if (c.kind === "boringbar" || c.kind === "tslot" || c.kind === "dovetail") {
+    if (c.neckDiameter === undefined || !(c.neckDiameter > 0) || c.neckDiameter >= c.diameter) out.push(`${c.id}: a ${c.kind} needs a neck narrower than its head (0 < neck < D)`)
+    if (c.headHeight === undefined || !(c.headHeight > 0) || c.headHeight > c.fluteLength + 1e-9) out.push(`${c.id}: a ${c.kind} needs a head height inside its cutting length`)
+    else if (c.kind === "dovetail" && c.angle !== undefined && c.neckDiameter !== undefined && c.diameter / 2 - c.headHeight * Math.tan((c.angle * Math.PI) / 360) < c.neckDiameter / 2 - 1e-9) out.push(`${c.id}: the dovetail flanks run into the neck before the head height`)
+  }
   return out
 }
 
@@ -163,6 +203,12 @@ const tap = (d: number, pitch: number): Cutter => ({
   fluteLength: Math.round(d * 2.5 + 4), shankDiameter: Math.max(3.5, Math.round(d * 0.8 * 10) / 10), stickout: Math.round(d * 6 + 25), holder: HOLDER
 })
 
+/** Countersink of cone diameter `d` and included angle `angle`, with the small flat every ground tip has (a tenth of the diameter). */
+const countersink = (d: number, angle: number): Cutter => ({
+  id: `csk-${d}-${angle}`, name: `Countersink Ø${d} ${angle}° carbide`, kind: "countersink", diameter: d, flutes: 3, material: "carbide", coating: "tin", angle, tipDiameter: Math.round(d * 0.1 * 10) / 10,
+  fluteLength: Math.ceil(d / 2 / Math.tan((angle * Math.PI) / 360)) + 1, shankDiameter: d <= 12 ? 8 : 12, stickout: Math.round(d * 2 + 20), holder: HOLDER
+})
+
 const reamer = (d: number): Cutter => ({
   id: `reamer-${d}`, name: `Reamer Ø${d} H7 carbide 6F`, kind: "reamer", diameter: d, flutes: 6, material: "carbide", coating: "tin",
   fluteLength: Math.round(d * 3 + 6), shankDiameter: Math.max(3, Math.ceil(d)), stickout: Math.round(d * 5 + 20), holder: HOLDER
@@ -193,7 +239,13 @@ export const DEFAULT_CUTTERS: ReadonlyArray<Cutter> = [
   }),
   ...METRIC_THREADS.filter((t) => t.d >= 3 && t.d <= 12).map((t) => tap(t.d, t.pitch)),
   ...REAMER_SIZES.map(reamer),
-  ...DRILL_SIZES.map(drill)
+  ...DRILL_SIZES.map(drill),
+  ...[[12, 90], [16, 90], [20, 90], [16, 82], [20, 100]].map(([d, a]): Cutter => countersink(d!, a!)),
+  // A back-boring bar for a Ø8-Ø12 pilot: 3 mm insert on a Ø6 body; T-slot and dovetail cutters for undercut channels.
+  { id: "boringbar-b16", name: "Back-boring bar Ø16 on Ø6 body", kind: "boringbar", diameter: 16, flutes: 1, material: "carbide", coating: "tin", neckDiameter: 6, headHeight: 3, fluteLength: 40, shankDiameter: 6, stickout: 60, holder: HOLDER },
+  { id: "tslot-12x4", name: "T-slot cutter Ø12 x 4", kind: "tslot", diameter: 12, flutes: 4, material: "carbide", coating: "altin", neckDiameter: 5, headHeight: 4, fluteLength: 12, shankDiameter: 6, stickout: 30, holder: HOLDER },
+  { id: "tslot-20x6", name: "T-slot cutter Ø20 x 6", kind: "tslot", diameter: 20, flutes: 6, material: "carbide", coating: "altin", neckDiameter: 8, headHeight: 6, fluteLength: 16, shankDiameter: 10, stickout: 40, holder: HOLDER },
+  { id: "dovetail-12-60", name: "Dovetail cutter Ø12 60°", kind: "dovetail", diameter: 12, flutes: 4, material: "carbide", coating: "altin", angle: 60, neckDiameter: 6, headHeight: 4, fluteLength: 10, shankDiameter: 8, stickout: 30, holder: HOLDER }
 ]
 
 export const findCutter = (library: ReadonlyArray<Cutter>, id: string): Cutter | undefined => library.find((c) => c.id === id)

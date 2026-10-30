@@ -28,12 +28,13 @@ const ring = Schema.Array(point).check(Schema.isMinLength(3), Schema.isMaxLength
 
 export const CutterSchema = Schema.Struct({
   id, name: Schema.String.check(Schema.isMaxLength(120)),
-  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
+  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"]),
   diameter: positive, flutes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
   material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
   cornerRadius: Schema.optionalKey(nonNegative), angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 180 }))),
   tipDiameter: Schema.optionalKey(nonNegative), pitch: Schema.optionalKey(positive),
+  neckDiameter: Schema.optionalKey(positive), headHeight: Schema.optionalKey(positive),
   fluteLength: positive, shankDiameter: positive, stickout: positive,
   holder: Schema.optionalKey(Schema.Struct({ diameter: positive, length: positive, steps: Schema.optionalKey(Schema.Array(Schema.Struct({ diameter: positive, length: positive }))) })),
   maxRpm: Schema.optionalKey(positive), number: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999 })))

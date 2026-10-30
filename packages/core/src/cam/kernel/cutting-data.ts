@@ -272,7 +272,7 @@ export const effectiveDiameter = (c: Cutter, ap: number): number => {
     if (ap >= rc) return d
     return d - 2 * rc + 2 * Math.sqrt(Math.max(0, rc * rc - (rc - ap) * (rc - ap)))
   }
-  if (c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver") {
+  if (c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "countersink") {
     const half = ((c.angle ?? 90) * Math.PI) / 360
     return Math.min(d, (c.tipDiameter ?? 0) + 2 * ap * Math.tan(half))
   }
@@ -304,7 +304,7 @@ export interface Load { readonly kc: number; readonly hm: number; readonly power
  */
 export const millingLoad = (mat: WorkpieceMaterial, c: Cutter, deff: number, ap: number, ae: number, fz: number, feed: number, rpm: number, vc: number): Load => {
   const phi = engagementAngle(ae, deff)
-  const sinK = c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" ? Math.sin(((c.angle ?? 90) * Math.PI) / 360) : 1
+  const sinK = c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "countersink" ? Math.sin(((c.angle ?? 90) * Math.PI) / 360) : 1
   const hm = phi > 1e-9 ? (2 * Math.min(ae, deff) * fz * sinK) / (deff * phi) : fz
   const kc = mat.kc11 * Math.pow(Math.max(hm, 0.001), -mat.mc)
   const powerKw = (ap * Math.min(ae, deff) * feed * kc) / 60e6
@@ -452,12 +452,12 @@ export const cuttingData = (req: CuttingRequest): CuttingData => {
   const limitedBy: string[] = []
   const { material: mat, cutter: c, machine: m, cut } = req
   if (cut === "drill" || cut === "spot") {
-    if (c.kind !== "drill" && c.kind !== "spot" && c.kind !== "chamfer") warnings.push(`${c.name} is not a drill: it plunges like one at drilling data`)
+    if (c.kind !== "drill" && c.kind !== "spot" && c.kind !== "chamfer" && c.kind !== "countersink") warnings.push(`${c.name} is not a drill: it plunges like one at drilling data`)
     return drilling(req, warnings, limitedBy)
   }
   if (cut === "tap" || cut === "ream") {
     if (cut === "tap" && c.kind !== "tap") warnings.push(`${c.name} is not a tap`)
-    if (cut === "ream" && c.kind !== "reamer") warnings.push(`${c.name} is not a reamer: it is fed in and out like one`)
+    if (cut === "ream" && c.kind !== "reamer" && c.kind !== "boringbar") warnings.push(`${c.name} is not a reamer: it is fed in and out like one`)
     return holeFinishing(req, warnings, limitedBy)
   }
   if (c.kind === "drill") warnings.push(`${c.name} is a drill: it may only plunge, not ${cut}`)

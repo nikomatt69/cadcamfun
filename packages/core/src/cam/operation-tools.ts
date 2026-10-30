@@ -41,6 +41,7 @@ export const OPERATION_TOOLS: Readonly<Record<string, OperationTools>> = {
   "mill/probing": { allowed: ["probe", "setter"], preferred: "probe", why: "probing touches the part with a probe; a tool setter measures the tool" },
   "mill/multiaxis": { allowed: FINISH_3D, preferred: "ball", why: "simultaneous 5-axis keeps a ball, bull, barrel, tapered or lollipop tip on the surface" },
   "mill/face": { allowed: ["facemill", "flat", "bull"], preferred: "facemill", why: "facing takes the top off with a face mill or a large end mill" },
+  "mill/undercut": { allowed: ["disc", "dovetail"], preferred: "disc", why: "an undercut channel (T-slot, dovetail) is cut by a disc or dovetail cutter that enters through a narrower slot on its neck" },
   "mill/chamfer": { allowed: ["chamfer", "engraver", "spot", "cornerRounding", "backChamfer"], preferred: "chamfer", why: "an edge break needs a cone (or a corner-rounding form)" },
   "lathe/facing": { allowed: ["facing", "turning"], preferred: "facing", why: "facing feeds across the end with a facing or turning insert" },
   "lathe/turning": { allowed: ["turning", "facing"], preferred: "turning", why: "external turning needs a turning insert" },

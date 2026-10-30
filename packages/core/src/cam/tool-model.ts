@@ -244,13 +244,13 @@ export const toolModelFromSettings = (s: ToolpathSettings, kind: MachineKind = s
   return toolModelOf({ type: s.toolType === "vbit" ? "vbit" : s.toolType, diameter: s.toolDiameter, numberOfFlutes: s.flutes, ...(s.toolType === "threadmill" ? { threadPitch: s.threadPitch } : {}) }, "mill")
 }
 
-const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver", tap: "tap", reamer: "reamer" }
+const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver", tap: "tap", reamer: "reamer", countersink: "chamfer", boringbar: "boringBar", tslot: "disc", dovetail: "dovetail" }
 
 /** The model of a kernel cutter (the kernel's own tool library): the same shape the preview draws for a resource. */
 export const toolModelFromCutter = (c: Cutter): MillModel => ({
   family: "mill", shape: KERNEL_SHAPE[c.kind], diameter: c.diameter, flutes: c.flutes, fluteLength: c.fluteLength, shankDiameter: c.shankDiameter, stickout: c.stickout,
   ...(c.holder !== undefined ? { holder: c.holder } : {}), ...(c.cornerRadius !== undefined ? { cornerRadius: c.cornerRadius } : {}), ...(c.angle !== undefined ? { angle: c.angle } : {}),
-  ...(c.pitch !== undefined ? { pitch: c.pitch } : {}), ...(c.tipDiameter !== undefined ? { tipDiameter: c.tipDiameter } : {}), assumed: []
+  ...(c.pitch !== undefined ? { pitch: c.pitch } : {}), ...(c.tipDiameter !== undefined ? { tipDiameter: c.tipDiameter } : {}), ...(c.neckDiameter !== undefined ? { neckDiameter: c.neckDiameter } : {}), assumed: []
 })
 
 const arc = (cr: number, cz: number, radius: number, from: number, to: number, steps = 10): ProfilePoint[] =>

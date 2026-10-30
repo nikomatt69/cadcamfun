@@ -57,8 +57,23 @@ const cuttingZone = (c: Cutter, steps: number): ProfilePoint[] => {
       if (rc <= 1e-9) return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: top }]
       return [{ r: 0, z: 0 }, ...arc(R - rc, rc, rc, -Math.PI / 2, 0, steps), { r: R, z: Math.max(top, rc) }]
     }
+    case "boringbar":
+    case "tslot": {
+      // A disc (the insert, the cutting wheel) of radius R and height h on a neck: the neck is what goes through the pilot hole.
+      const h = Math.min(Math.max(c.headHeight ?? top, 1e-3), top)
+      const neck = Math.min(Math.max((c.neckDiameter ?? c.diameter / 2) / 2, 1e-3), R)
+      return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: h }, ...(neck < R - 1e-9 ? [{ r: neck, z: h }] : []), { r: neck, z: Math.max(top, h) }]
+    }
+    case "dovetail": {
+      // Widest at the tip, the flanks closing at half the included angle from the axis over the head height, then the neck.
+      const h = Math.min(Math.max(c.headHeight ?? top, 1e-3), top)
+      const neck = Math.min(Math.max((c.neckDiameter ?? c.diameter / 2) / 2, 1e-3), R)
+      const upper = Math.max(neck, R - h * Math.tan((((c.angle ?? 60) / 2) * Math.PI) / 180))
+      return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: upper, z: h }, ...(upper > neck + 1e-9 ? [{ r: neck, z: h }] : []), { r: neck, z: Math.max(top, h) }]
+    }
     case "chamfer":
     case "spot":
+    case "countersink":
     case "engraver": {
       const half = (((c.angle ?? 90) / 2) * Math.PI) / 180
       const tip = c.kind === "spot" ? 0 : Math.min(Math.max(c.tipDiameter ?? 0, 0) / 2, R)
