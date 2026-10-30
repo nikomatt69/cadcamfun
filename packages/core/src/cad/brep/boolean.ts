@@ -63,6 +63,38 @@ export class BooleanError extends Error {
 
 const DEGENERATE_HINT = "the operands meet in a degenerate way (tangent, coincident or exactly aligned); move one by a small amount, change a radius slightly, or model the contact as an overlap"
 
+/**
+ * What the Booleans of this process did (spec 42 R0): how often the plain pipeline sufficed, how often an operand had to be
+ * displaced to break a degenerate contact (the result is then approximate and carries a warning), how often the plain
+ * pipeline failed, how often every recovery failed too, and how often the answer was empty. Read with `booleanCounters`,
+ * cleared with `resetBooleanCounters`; the seeded report (`kernel-fuzz-report.ts`) and the assistant's `cad.kernel` report print it.
+ */
+export interface BooleanCounters {
+  readonly calls: number
+  /** Solved by the plain pipeline (no displacement). */
+  readonly exact: number
+  /** The plain pipeline failed and a displaced operand gave the answer (a warning says so). */
+  readonly recoveredByDisplacement: number
+  /** The plain pipeline refused (counted before the recovery tries): `booleanStrict` failures. */
+  readonly strictFailure: number
+  /** The plain pipeline and every recovery refused: a `BooleanError` reached the caller. */
+  readonly failed: number
+  /** The result has no faces (disjoint intersection, a subtraction that removes everything). */
+  readonly emptyResult: number
+  /** A pole or apex on the other solid sent the call straight to the recovery. */
+  readonly poleContact: number
+  /** Failures by the stage that gave up. */
+  readonly byStage: Readonly<Record<BooleanStage, number>>
+}
+
+const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
+
+export const booleanCounters = (): BooleanCounters => ({ ...COUNTERS, byStage: { ...COUNTERS.byStage } })
+export const resetBooleanCounters = (): void => {
+  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0
+  COUNTERS.byStage = { prepare: 0, arrange: 0, validate: 0 }
+}
+
 export interface BooleanOptions {
   /** Coincidence tolerance, mm (default 1e-8 × model size, at least 1e-7). */
   readonly tol?: number
@@ -1182,12 +1214,17 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   // A pole of a sphere or the apex of a cone on the other solid's surface is a degenerate contact the pipeline can get wrong
   // without noticing (a sphere's south pole on a torus left the union 0.1 % too big and still valid): go straight to the recovery.
   const poleContact = poleOnOther(A, B) || poleOnOther(B, A)
+  COUNTERS.calls++
   try {
-    if (poleContact) throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] })
-    return booleanStrict(A, B, op, options)
+    if (poleContact) { COUNTERS.poleContact++; throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] }) }
+    const done = booleanStrict(A, B, op, options)
+    COUNTERS.exact++
+    if (done.brep.faces.length === 0) COUNTERS.emptyResult++
+    return done
   } catch (e) {
     if (!(e instanceof BooleanError)) throw e
     const first: BooleanError = e
+    if (!poleContact) COUNTERS.strictFailure++
     const box = boxOf([...A.vertices, ...B.vertices].map((v) => v.point))
     const extent = dist3(box.lo, box.hi)
     const dirs: Vec3[] = [{ x: 0.53, y: 0.31, z: 0.79 }, { x: -0.61, y: 0.43, z: -0.66 }]
@@ -1204,6 +1241,8 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
           // sample cannot.
           if (!agreesWithOperands(A, set.B, op, r)) continue
           if (!set.identitiesHold()) continue
+          COUNTERS.recoveredByDisplacement++
+          if (r.faces.length === 0) COUNTERS.emptyResult++
           return { brep: r, warnings: [`degenerate alignment: the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence`], stats: set.stats(op) }
         } catch (e3) {
           if (!(e3 instanceof BooleanError)) throw e3
@@ -1211,6 +1250,8 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
       }
     }
     const tried = [3e-6, 3e-5, 3e-4, 3e-3].map((k) => Math.max(1e-6, extent * k))
+    COUNTERS.failed++
+    COUNTERS.byStage[first.diagnostic?.stage ?? "validate"]++
     throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[3]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
   }
 }
