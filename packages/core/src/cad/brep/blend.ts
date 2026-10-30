@@ -34,6 +34,12 @@ import { loftBrep, loftSection } from "./loft.ts"
 import { BudgetExceeded } from "./budget.ts"
 import { blendSpherePlaneRim, isSpherePlaneRim } from "./blend-sphere-plane.ts"
 
+/**
+ * The blend carves a body with many small tools, one Boolean after another, and its callers validate the finished body; the
+ * default sampled check of `booleanBrep` would double its time (measured: a box with all 12 edges rounded, 3.6 s to 7.3 s).
+ */
+const INTERNAL = { verify: "off" } as const
+
 interface Box { readonly lo: Vec3; readonly hi: Vec3 }
 
 /** A tool's box from its vertices and edge samples, grown by `pad` (a curved edge bulges between samples by far less). */
@@ -528,7 +534,7 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
     const debug = options.debug
     try {
       const operand = batch.length === 1 ? batch[0]!.tool : mergeBreps(batch.map((x) => x.tool))
-      current = booleanBrep(current, operand, op, debug === undefined ? {} : { debug: (stage, data) => debug(label, stage, data) }).brep
+      current = booleanBrep(current, operand, op, debug === undefined ? INTERNAL : { ...INTERNAL, debug: (stage, data) => debug(label, stage, data) }).brep
       return true
     } catch (err) {
       if (err instanceof BudgetExceeded) throw err
@@ -573,7 +579,7 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
     const subtract = (batch: ReadonlyArray<(typeof corners)[number]>, label: string): boolean => {
       const debug = options.debug
       try {
-        current = booleanBrep(current, batch.length === 1 ? batch[0]!.tool : mergeBreps(batch.map((x) => x.tool)), "subtract", debug === undefined ? {} : { debug: (stage, data) => debug(label, stage, data) }).brep
+        current = booleanBrep(current, batch.length === 1 ? batch[0]!.tool : mergeBreps(batch.map((x) => x.tool)), "subtract", debug === undefined ? INTERNAL : { ...INTERNAL, debug: (stage, data) => debug(label, stage, data) }).brep
         return true
       } catch (err) {
         if (err instanceof BudgetExceeded) throw err
@@ -635,7 +641,7 @@ export const variableFillet = (b: Brep, e: BlendCandidate, radiusA: number, radi
   try {
     const sections = (stations as Array<{ loop: ProfileLoop; at: Vec3 }>).map((x) => loftSection(x.loop, frame(x.at, dir, u)))
     const tool = loftBrep(sections, { name: "blend" })
-    const out = booleanBrep(b, tool, e.convex ? "subtract" : "union").brep
+    const out = booleanBrep(b, tool, e.convex ? "subtract" : "union", INTERNAL).brep
     return { brep: out }
   } catch (err) {
     if (err instanceof BudgetExceeded) throw err

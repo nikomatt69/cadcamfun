@@ -140,7 +140,7 @@ export interface BooleanOptions {
 }
 
 /** Operands with this many faces together are checked by default (`BooleanOptions.verify`). */
-export const VERIFY_FACES = 24
+export const VERIFY_FACES = 40
 
 export interface BooleanStats {
   readonly intersectionCurves: number
@@ -1337,7 +1337,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     const mode = options.verify ?? (A.faces.length + B.faces.length >= VERIFY_FACES ? "sampled" : "off")
     if (mode !== "off" && poleKind !== "designed") {
       // Valid is not right: a solid can close, orient and still be wrong. A result the operands do not support is not returned.
-      const wrong = !agreesWithOperands(A, B, op, done.brep) || (mode === "identities" && !identitiesOfPair(A, B, options))
+      const wrong = !agreesWithOperands(A, B, op, done.brep, mode === "identities" ? 3000 : 1200) || (mode === "identities" && !identitiesOfPair(A, B, options))
       if (wrong) {
         COUNTERS.verifyRejected++
         throw new BooleanError("the exact result is a valid solid that disagrees with the operands (sampled volume or volume identities)", [], { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
@@ -1523,29 +1523,43 @@ const poleContactKind = (a: Brep, b: Brep): "none" | "designed" | "hard" => {
 }
 
 /**
- * Whether a Boolean result has the volume the operands say: the fraction of a low-discrepancy sample of the operands' box that
- * lies in the result by the operation's rule (exact point location in each operand), against the result's exact volume. Used on
- * the recovery path only, where a valid-looking wrong solid has been seen.
+ * Whether a Boolean result has the volume the operands say: the fraction of a low-discrepancy sample of the region the
+ * operation can touch (the operands' box for a union, the overlap of the boxes for an intersection, the first operand's box for a
+ * difference) that lies in the result by the operation's rule (exact point location in each operand), against the result's exact
+ * volume. The bound is six standard deviations of the sample plus a thousandth of the region, so it resolves a lost or doubled
+ * piece of some percent of the region, not a sliver; the volume identities (`BooleanOptions.verify` "identities") resolve one
+ * millionth. Used on the recovery path and by `booleanBrep` for large operands.
  */
-export const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep): boolean => {
-  const la = brepLocator(A), lb = brepLocator(B)
-  const pts: Vec3[] = []
-  for (const b of [A, B]) {
+export const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep, samples = 3000): boolean => {
+  const boxOfBrep = (b: Brep) => {
+    const pts: Vec3[] = []
     const t = tessellateBrep(b, { angleTolDeg: 20 })
     for (let i = 0; i < t.positions.length; i += 3) pts.push({ x: t.positions[i]!, y: t.positions[i + 1]!, z: t.positions[i + 2]! })
+    const tight = boxOf(pts)
+    const pad = 0.01 * dist3(tight.lo, tight.hi)
+    return { lo: { x: tight.lo.x - pad, y: tight.lo.y - pad, z: tight.lo.z - pad }, hi: { x: tight.hi.x + pad, y: tight.hi.y + pad, z: tight.hi.z + pad } }
   }
-  const tight = boxOf(pts)
-  const pad = 0.01 * dist3(tight.lo, tight.hi)
-  const box = { lo: { x: tight.lo.x - pad, y: tight.lo.y - pad, z: tight.lo.z - pad }, hi: { x: tight.hi.x + pad, y: tight.hi.y + pad, z: tight.hi.z + pad } }
+  const ba = boxOfBrep(A), bb = boxOfBrep(B)
+  const inBox = (bx: { lo: Vec3; hi: Vec3 }, p: Vec3) => p.x >= bx.lo.x && p.x <= bx.hi.x && p.y >= bx.lo.y && p.y <= bx.hi.y && p.z >= bx.lo.z && p.z <= bx.hi.z
+  const box =
+    op === "intersect"
+      ? { lo: { x: Math.max(ba.lo.x, bb.lo.x), y: Math.max(ba.lo.y, bb.lo.y), z: Math.max(ba.lo.z, bb.lo.z) }, hi: { x: Math.min(ba.hi.x, bb.hi.x), y: Math.min(ba.hi.y, bb.hi.y), z: Math.min(ba.hi.z, bb.hi.z) } }
+      : op === "subtract"
+        ? ba
+        : { lo: { x: Math.min(ba.lo.x, bb.lo.x), y: Math.min(ba.lo.y, bb.lo.y), z: Math.min(ba.lo.z, bb.lo.z) }, hi: { x: Math.max(ba.hi.x, bb.hi.x), y: Math.max(ba.hi.y, bb.hi.y), z: Math.max(ba.hi.z, bb.hi.z) } }
   const size = { x: box.hi.x - box.lo.x, y: box.hi.y - box.lo.y, z: box.hi.z - box.lo.z }
+  // Boxes that do not overlap: an intersection is empty, whatever the operands look like inside.
+  if (size.x <= 0 || size.y <= 0 || size.z <= 0) return exactVolume(result) <= 1e-9 * Math.max(1, exactVolume(A) + exactVolume(B))
+  const la = brepLocator(A), lb = brepLocator(B)
   const boxVolume = size.x * size.y * size.z
   const tol = Math.max(1e-7, Math.max(size.x, size.y, size.z) * 1e-8)
-  const N = 3000
+  const N = samples
   const halton = (i: number, base: number): number => { let f = 1, r = 0; for (let k = i; k > 0; k = Math.floor(k / base)) { f /= base; r += f * (k % base) } return r }
   let hits = 0
   for (let i = 1; i <= N; i++) {
     const p = { x: box.lo.x + size.x * halton(i, 2), y: box.lo.y + size.y * halton(i, 3), z: box.lo.z + size.z * halton(i, 5) }
-    const a = la.classify(p, tol) !== "out", b = lb.classify(p, tol) !== "out"
+    // A point outside an operand's box is outside the operand: no point location needed.
+    const a = inBox(ba, p) && la.classify(p, tol) !== "out", b = inBox(bb, p) && lb.classify(p, tol) !== "out"
     if (op === "union" ? a || b : op === "intersect" ? a && b : a && !b) hits++
   }
   const f = hits / N

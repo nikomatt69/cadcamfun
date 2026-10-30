@@ -52,12 +52,16 @@ describe("valid-but-wrong detection (spec 42 R7)", () => {
     resetBooleanCounters()
     booleanBrep(small[0], small[1], "subtract")
     expect(booleanCounters().verified).toBe(0)
-    // A plate with a row of bores: more than VERIFY_FACES faces together.
-    let plate = makeBox(190, 20, 6)
-    for (let i = 0; i < 20; i++) plate = booleanBrep(plate, makeCylinder(2, 6, at(8 + i * 9, 10, 0)), "subtract", { verify: "off" }).brep
-    expect(plate.faces.length + 3).toBeGreaterThanOrEqual(VERIFY_FACES)
+    // Two plates with a row of bores each: more than VERIFY_FACES faces together.
+    const plateWith = (y: number, x0: number) => {
+      let plate = makeBox(190, 20, 6, at(0, y, 0))
+      for (let i = 0; i < 20; i++) plate = booleanBrep(plate, makeCylinder(2, 6, at(x0 + i * 9, y + 10, 0)), "subtract", { verify: "off" }).brep
+      return plate
+    }
+    const p1 = plateWith(0, 8), p2 = plateWith(12, 12)
+    expect(p1.faces.length + p2.faces.length).toBeGreaterThanOrEqual(VERIFY_FACES)
     resetBooleanCounters()
-    const r = booleanBrep(plate, makeBox(10, 6, 3, at(0, 0, 3)), "union")
+    const r = booleanBrep(p1, p2, "union")
     expect(validateBrep(r.brep).issues).toEqual([])
     expect(booleanCounters().verified).toBe(1)
     expect(booleanCounters().verifyRejected).toBe(0)
