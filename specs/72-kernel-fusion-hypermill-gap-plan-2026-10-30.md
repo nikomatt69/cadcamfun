@@ -285,3 +285,18 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `M19` on the Fanuc family and Okuma, and the Heidenhain cycle-13 block order (whether `CYCL CALL` is needed), are from memory and
   not qualified on a control. Post definitions inherit the base's word; a definition cannot yet set its own (`PostDefinitionSchema`
   has no field). Tests: `test/cam/spindle-orient.test.ts` (32).
+
+- 2026-10-30 (tip-control session, spec 72 step 0.2 follow-up to the wiring entry): **`tcp: true` works from a kernel job with a trusted
+  replay.** `interpretGcode` tracks the tip-control mode (G43.4 / G234 on, G43 / G49 off; TRAORI(n) / TRAFOOF; M128 / M129, Klartext
+  `FUNCTION TCPM`; a post definition's own blocks through `tipControl: {on, off}`) and marks the segments read under it; `carryTipControl`
+  (`cam/testing/tip-control.ts`) carries them to machine coordinates with the job's table layout and pivot, splitting turning moves at
+  the post tolerance, and `execute.ts` replays the carried segments. When `job.post.options.tcp === true` and no `kinematics` is given,
+  the kernel builds them from `machine.fiveAxis`; a dialect without a tip-control word (Okuma, generic, LinuxCNC) or a machine without
+  a rotary table is refused with an error issue, empty NC and blocked release. Without `tcp` the NC is byte-identical to before.
+  Gate: dome and swarf-cone jobs give the same error tags, claim statuses and release with `tcp` on and off on Fanuc, Mazak, Siemens,
+  Heidenhain and Haas; removed-volume bounds differ by about 0.03 %, gouge volume by 0.1 %; a wrong pivot or layout is detected
+  (`ReplayMismatch`, deviation over 1 mm); with the carry disabled 7 of the 8 gate tests fail. Honest limits: Haas `G234` writes
+  table-turning rapids as G1 feed moves, which the replay reads as cuts; the rapid clearance minimum differs between modes (13.9 mm
+  against 0.38 mm on the dome, both pass) because rapids follow the tip path with `tcp` on; a TCP cancel while the table is tilted
+  leaves the axes the next block does not write unknown (counted, warned, never produced by the posts); arcs under a tilted table are
+  replayed as chords (the posts refuse to write them); head-tilting machines are not modelled.
