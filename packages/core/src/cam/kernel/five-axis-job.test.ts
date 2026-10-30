@@ -36,8 +36,13 @@ describe("five-axis operations in the kernel", () => {
     expect(a.nc).toMatch(/\bC-?\d/)
     // The replay reads the NC the post wrote, so it must not fail on the G-words of the five-axis program.
     expect(a.claims.find((c) => c.id === "nc-replay")!.status).not.toBe("failed")
-    // Moves that turn the table are not checked against the height field, so the stock and gouge claims cannot pass.
-    expect(a.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
+    // Moves that turn the table are replayed on the tri-dexel (spec 72 step 0.3): the ball at the foot of the dome cuts into its flank,
+    // which is a failed claim with an error, and the claim names the replay that found it and its declared error.
+    const gouge = a.claims.find((c) => c.id === "no-gouge")!
+    expect(gouge.status).toBe("failed")
+    expect(gouge.detail).toMatch(/tri-dexel/)
+    expect(a.issues.some((i) => i.tag === "Gouge" && /declared error/.test(i.message))).toBe(true)
+    expect(a.release).toBe("blocked")
     expect(a.claims.find((c) => c.id === "material-removed")!.status).not.toBe("passed")
     // The five-axis removal is bracketed on the raw stock: a positive removal, lower bound not above the upper bound.
     const bracket = /between (\d+) and (\d+) mm³/.exec(a.claims.find((c) => c.id === "material-removed")!.detail)

@@ -68,8 +68,10 @@ describe("the turned moves of a five-axis program are checked on the voxel stock
     const r = runJob(job(ball))
     expect(claim("holder-clearance", r).status).not.toBe("failed")
     expect(claim("no-rapid-in-stock", r).status).not.toBe("failed")
-    // The cut itself is still not compared with the part for turned moves.
-    expect(claim("no-gouge", r).status).toBe("unresolved")
+    // The cut is compared with the part on the tri-dexel replay (spec 72 step 0.3): the ball standing at the foot of the dome reaches
+    // into its flank by about half a millimetre, which the old "unresolved" never said.
+    expect(claim("no-gouge", r).status).toBe("failed")
+    expect(claim("no-gouge", r).detail).toMatch(/tri-dexel/)
   })
 
   test("the result is deterministic", () => {

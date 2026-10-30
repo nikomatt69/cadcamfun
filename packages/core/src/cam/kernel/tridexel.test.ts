@@ -171,6 +171,28 @@ describe("the part cast into rays and the comparison", () => {
     // The ball never cuts into the sphere: the gouge is under the lattice error of the stock.
     expect(c.gouge.depth).toBeLessThanOrEqual(stock.errorBound)
   })
+
+  test("overlapping solids are cast as their union: two blocks that share a slab are one 1500 mm³ part, not three pieces", () => {
+    const min = { x: -1, y: -1, z: -1 }, max = { x: 16, y: 11, z: 11 }
+    const part = PartDexels.fromMeshes([boxMesh(0, 0, 0, 10, 10, 10), boxMesh(5, 0, 0, 15, 10, 10)], min, max, 0.25)
+    for (const axis of [0, 1, 2] as const) expect(part.volume(axis)).toBeCloseTo(1500, -1)
+    expect(part.openRays).toBe(0)
+    // A stock shaped like the union compares clean: nothing lost, nothing left.
+    const stock = TriDexel.fromPart(part)
+    const c = comparePart(stock, part, { threshold: 0.01 })
+    expect(c.gouge.volume).toBe(0)
+    expect(c.left.volume).toBe(0)
+  })
+
+  test("a wall cut 0.2 mm deep through a 10 mm block reads 0.2 mm, not the wall's height or length", () => {
+    const part = PartDexels.fromMeshes([boxMesh(0, 0, 0, 20, 20, 10)], { x: -3, y: -3, z: 0 }, { x: 23, y: 23, z: 10 }, 0.1)
+    const stock = TriDexel.fromPart(part)
+    // The strip y in [0, 0.2] over the whole block height and length is taken out by a flat tool standing 2.8 mm from the wall.
+    stock.removePath(toolSolid(flat(6, 20)), [{ x: -2.8, y: -2.8, z: -1 }, { x: 22.8, y: -2.8, z: -1 }])
+    const c = comparePart(stock, part, { threshold: 0.01 })
+    expect(c.gouge.depth).toBeGreaterThan(0.15)
+    expect(c.gouge.depth).toBeLessThan(0.3)
+  })
 })
 
 describe("probing the shank and holder against the stock", () => {

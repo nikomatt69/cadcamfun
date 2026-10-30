@@ -14,6 +14,9 @@
  *   collision     the continuous check of a joint move: tool probes against the table and the part, certified clear / collision
  *   motion        simultaneous five-axis: locations -> table poses, each move split into blocks and checked for collision
  *   stock         volumetric stock as voxels: sure / possible removal by the cutter's sampled sweep, remaining-volume bracket
+ *   tridexel     stock as rays in three directions with a declared error bound; the part cast into the same rays; gouge / leftover comparison
+ *   tri-replay    the tri-dexel replay of an emitted program: gouge and leftover verdicts for moves with the table turned
+ *   verify-nc     NC the kernel did not write replayed on the tri-dexel against part, stock, tools and travel: gouge with its NC line, leftover, rapids in stock
  *   machine-clearance  holder and shank against the table over every NC move (certified; rotary moves reported, not passed)
  *   convex        exact distance between convex hulls (GJK), and the prism that bounds a cylinder with flat ends
  */
@@ -39,6 +42,10 @@ export { candidatesFor, planTable, forward, toolAxisInMachine, unwrapC, travel, 
 export { checkMotion, cylinderSolid, boxSolid, headScene, trunnionScene, tableBox, linearScene, type Capsule, type Clearance, type MotionCheck, type Pose, type Scene, type Solid, type TableEnvelope } from "./collision.ts"
 export { planSimultaneous, type CutterLocation, type MotionSegment, type PartEnvelope, type SimultaneousInput, type SimultaneousPlan } from "./motion.ts"
 export { voxelStock, removeTipPath, remainingVolume, carryHeightField, type VoxelStock } from "./stock.ts"
+export { TriDexel, PartDexels, comparePart, toolSolid, type ToolSolid, type Deviation, type PartComparison } from "./tridexel.ts"
+export { TriReplay, triCellFor, type TriVerdict, type TriReplayOptions } from "./tri-replay.ts"
+export { verifyNc, type VerifyNcRequest, type VerifyNcResult, type NcFinding } from "./verify-nc.ts"
+export { turnedPoses } from "./turned-poses.ts"
 export { planTurning, type TurnPoint, type TurnStock, type TurningJob, type TurnPass, type TurningPlan } from "./turning.ts"
 export { planBoring, type BoringJob, type BorePass, type BoringPlan } from "./turning.ts"
 export { checkNcClearance, ARC_SAGITTA, type ClearanceFinding, type ClearanceResult, type TableGeometry } from "./machine-clearance.ts"

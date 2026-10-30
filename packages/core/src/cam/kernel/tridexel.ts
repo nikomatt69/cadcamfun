@@ -540,7 +540,43 @@ export class PartDexels {
   /** Rays whose hit count was odd, over the three directions: zero for a closed manifold part. */
   get openRays(): number { return this.dirs[0].odd + this.dirs[1].odd + this.dirs[2].odd }
 
+  /**
+   * The union of the closed meshes. Overlapping solids (a sphere sunk into a block, parts of one assembly) cannot share one hit list:
+   * pairing the sorted hits of all meshes would swap inside and outside wherever two surfaces cross a ray. Each mesh is cast on its
+   * own and the intervals of a ray are merged.
+   */
   static fromMeshes(meshes: ReadonlyArray<Mesh64>, min: Vec3, max: Vec3, cell: number): PartDexels {
+    if (meshes.length <= 1) return PartDexels.castMeshes(meshes, min, max, cell)
+    const parts = meshes.map((m) => PartDexels.castMeshes([m], min, max, cell))
+    const dirs = [0, 1, 2].map((axis) => {
+      const rays = parts[0]!.dirs[axis]!.offset.length - 1
+      const offsets = new Int32Array(rays + 1)
+      const t: number[] = [], na: number[] = []
+      let odd = 0
+      for (const q of parts) odd += q.dirs[axis]!.odd
+      for (let r = 0; r < rays; r++) {
+        offsets[r] = t.length
+        const iv: Array<{ lo: number; hi: number; nLo: number; nHi: number }> = []
+        for (const q of parts) {
+          const d = q.dirs[axis]!
+          for (let h = d.offset[r]!; h + 1 < d.offset[r + 1]!; h += 2) iv.push({ lo: d.t[h]!, hi: d.t[h + 1]!, nLo: d.nAbs[h]!, nHi: d.nAbs[h + 1]! })
+        }
+        iv.sort((x, y) => x.lo - y.lo)
+        let cur: { lo: number; hi: number; nLo: number; nHi: number } | undefined
+        const flush = (): void => { if (cur !== undefined) { t.push(cur.lo, cur.hi); na.push(cur.nLo, cur.nHi) } }
+        for (const x of iv) {
+          if (cur !== undefined && x.lo <= cur.hi) { if (x.hi > cur.hi) { cur.hi = x.hi; cur.nHi = x.nHi } }
+          else { flush(); cur = { ...x } }
+        }
+        flush()
+      }
+      offsets[rays] = t.length
+      return { offset: offsets, t: Float32Array.from(t), nAbs: Float32Array.from(na), odd } satisfies PartDir
+    }) as unknown as readonly [PartDir, PartDir, PartDir]
+    return new PartDexels(min, max, cell, dirs)
+  }
+
+  private static castMeshes(meshes: ReadonlyArray<Mesh64>, min: Vec3, max: Vec3, cell: number): PartDexels {
     const extent = [max.x - min.x, max.y - min.y, max.z - min.z] as const
     const n = [Math.max(1, Math.ceil(extent[0] / cell)), Math.max(1, Math.ceil(extent[1] / cell)), Math.max(1, Math.ceil(extent[2] / cell))] as const
     const centre = (axis: 0 | 1 | 2, i: number): number => i * cell + Math.min(cell, extent[axis] - i * cell) / 2
@@ -673,6 +709,10 @@ export const comparePart = (stock: TriDexel, part: PartDexels, options: { readon
   const allowance = options.allowance ?? 0, threshold = options.threshold ?? 0
   let gVol = 0, gDepth = 0, gRays = 0, gAt: Vec3 | undefined
   let lVol = 0, lDepth = 0, lRays = 0, lAt: Vec3 | undefined
+  // A piece bounded by part surfaces at both ends of its ray is a whole part interval lost (a wall cut through, a plate removed):
+  // its length is a chord between two faces, not a depth below one. It is kept apart and only stands in for the depth when no ray
+  // saw a layer lost below a single surface, so a 0.2 mm strip cut through a 10 mm wall reads 0.2 mm, not 10.
+  let gChord = 0, gChordAt: Vec3 | undefined
   let detached = 0
   for (let axis = 0 as 0 | 1 | 2; axis < 3; axis = (axis + 1) as 0 | 1 | 2) {
     const g = stock.gridOf(axis)
@@ -705,7 +745,12 @@ export const comparePart = (stock: TriDexel, part: PartDexels, options: { readon
           if (thick <= threshold) return
           gv += len * area
           if (!gotG) { gr++; gotG = true }
-          if (thick > gDepth) { gDepth = thick; const pt = [0, 0, 0]; pt[b] = stock.centre(b, m); pt[c] = stock.centre(c, k); pt[axis] = (a + e) / 2; gAt = { x: stock.min.x + pt[0]!, y: stock.min.y + pt[1]!, z: stock.min.z + pt[2]! } }
+          const both = adjLo && adjHi
+          if (both ? thick > gChord : thick > gDepth) {
+            const pt = [0, 0, 0]; pt[b] = stock.centre(b, m); pt[c] = stock.centre(c, k); pt[axis] = (a + e) / 2
+            const at = { x: stock.min.x + pt[0]!, y: stock.min.y + pt[1]!, z: stock.min.z + pt[2]! }
+            if (both) { gChord = thick; gChordAt = at } else { gDepth = thick; gAt = at }
+          }
         }
         let cursor = lo, firstPiece = true
         for (let q2 = 0; q2 < sn; q2++) {
@@ -758,7 +803,7 @@ export const comparePart = (stock: TriDexel, part: PartDexels, options: { readon
     detached = Math.max(detached, dv)
   }
   return {
-    gouge: { volume: gVol, depth: gDepth, rays: gRays, ...(gAt !== undefined ? { at: gAt } : {}) },
+    gouge: { volume: gVol, depth: gDepth > 0 ? gDepth : gChord, rays: gRays, ...((gDepth > 0 ? gAt : gChordAt) !== undefined ? { at: (gDepth > 0 ? gAt : gChordAt)! } : {}) },
     left: { volume: lVol, depth: lDepth, rays: lRays, ...(lAt !== undefined ? { at: lAt } : {}) },
     detached,
     openRays: part.openRays

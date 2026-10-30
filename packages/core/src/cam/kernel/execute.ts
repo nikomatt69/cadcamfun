@@ -29,8 +29,10 @@ import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
 import { swarfWallsNear } from "../swarf-walls.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
-import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
+import type { RotaryAngles } from "../indexing.ts"
 import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
+import { TriReplay, triCellFor, type TriVerdict } from "./tri-replay.ts"
+import { turnedPoses } from "./turned-poses.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile, profileTabFootprints } from "../operations/profile.ts"
@@ -262,33 +264,6 @@ const fiveAxisBracket = (vs: VoxelStock): NonNullable<StockSummary["fiveAxis"]> 
 const fiveAxisRemovalText = (vs: VoxelStock): string => {
   const b = fiveAxisBracket(vs)
   return `Five-axis moves remove between ${b.removedLower.toFixed(0)} and ${b.removedUpper.toFixed(0)} mm³ of the voxel stock they ran on (the raw box less what the three-axis operations left); the three-axis height field does not cover them`
-}
-
-/** Largest table turn between two poses of a move, degrees: the angles are interpolated in steps of at most this. */
-const TURN_STEP = 3
-
-/**
- * The poses of a move made with the table turning from `a0` to `a1` (what the controller interpolates linearly in the joints).
- * The NC position is the tip in machine coordinates, so the tip in the part is `Rᵀ (m - pivot) + pivot` and the tool axis (up from
- * the tip) in the part is `Rᵀ ẑ`; the angles of each pose come from the interpolation, not only from the end of the move.
- */
-const turnedPoses = (layout: RotaryLayout, pivot: Vec3, from: Vec3, to: Vec3, a0: RotaryAngles, a1: RotaryAngles, spacing: number): ReadonlyArray<{ readonly tip: Vec3; readonly axis: Vec3; readonly machine: Vec3 }> => {
-  const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z)
-  const turn = Math.max(Math.abs((a1.a ?? 0) - (a0.a ?? 0)), Math.abs((a1.b ?? 0) - (a0.b ?? 0)), Math.abs((a1.c ?? 0) - (a0.c ?? 0)))
-  const n = Math.min(2000, Math.max(1, Math.ceil(Math.max(length / spacing, turn / TURN_STEP))))
-  const out: Array<{ tip: Vec3; axis: Vec3; machine: Vec3 }> = []
-  for (let k = 0; k <= n; k++) {
-    const f = k / n
-    const m = tableRotation({ a: (a0.a ?? 0) + ((a1.a ?? 0) - (a0.a ?? 0)) * f, b: (a0.b ?? 0) + ((a1.b ?? 0) - (a0.b ?? 0)) * f, c: (a0.c ?? 0) + ((a1.c ?? 0) - (a0.c ?? 0)) * f }, layout)
-    const machine = { x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f, z: from.z + (to.z - from.z) * f }
-    const x = machine.x - pivot.x, y = machine.y - pivot.y, z = machine.z - pivot.z
-    out.push({
-      machine,
-      tip: { x: m[0] * x + m[3] * y + m[6] * z + pivot.x, y: m[1] * x + m[4] * y + m[7] * z + pivot.y, z: m[2] * x + m[5] * y + m[8] * z + pivot.z },
-      axis: { x: m[6], y: m[7], z: m[8] }
-    })
-  }
-  return out
 }
 
 /** The cone of a chamfer mill / spot drill / engraver. */
@@ -871,6 +846,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   /** What the voxel replay of the turned moves found: certain and possible contacts of the shank, holder and (rapids) flutes with material, and moves it could not check. */
   const turned = { rapidSure: 0, rapidPossible: 0, holderSure: 0, holderPossible: 0, unchecked: 0 }
   let turnedVoxels: VoxelStock | undefined
+  let tri: TriReplay | undefined
   const firstFinding = new Map<string, CamIssue>()
   const finding = (key: string, make: () => CamIssue): void => { if (!firstFinding.has(key)) firstFinding.set(key, make()) }
   let gougeColumns = 0, gougeDepth = 0
@@ -904,6 +880,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     // from the material that is really there. The seed only tightens the bracket downwards, never loosens it.
     if (turnedStock !== undefined) carryHeightField(turnedStock, provisional)
     turnedVoxels = turnedStock
+    // Spec 72 step 0.3: when the table turns, the stock is also replayed on the tri-dexel, move by move and in program order, so the
+    // gouge and leftover verdicts rest on a stock whose error is declared and not on a bracket of voxels.
+    if (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined)) {
+      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit })
+    }
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     let replayWork = 0
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
@@ -915,10 +896,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         const end: RotaryAngles = { a: s.rotary.a ?? 0, b: s.rotary.b ?? 0, c: s.rotary.c ?? 0 }
         const start = angles
         angles = end
-        if (turnedStock === undefined || five === undefined || cutter === undefined) { turned.unchecked++; continue }
+        if (turnedStock === undefined || five === undefined || cutter === undefined) { turned.unchecked++; tri?.unchecked(`NC line ${s.line} turns the table with no known cutter`); continue }
         const poses = turnedPoses(five.layout, five.pivot, s.from, s.to, start, end, turnedStock.voxel)
         const tips = poses.map((q) => q.tip), axes = poses.map((q) => q.axis)
         const rapid = s.kind === "rapid"
+        if (!rapid) tri?.cut(cutter, tips, axes)
         // A feed move cuts with the flutes first; the shank and holder then follow through what the flutes removed.
         if (!rapid) removeTipPath(turnedStock, cutter, tips, axes)
         const parts = rapid ? (["cutting", "shank", "holder"] as const) : (["shank", "holder"] as const)
@@ -941,7 +923,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         continue
       }
       // An arc written while the table is turned is not interpreted in the part's frame: it stays unchecked, not passed.
-      if (s.kind === "arc" && ((angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0)) turned.unchecked++
+      if (s.kind === "arc" && ((angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0)) { turned.unchecked++; tri?.unchecked(`the arc at NC line ${s.line} is written with the table turned and is not interpreted in the part's frame`) }
       const op = opAtLine[s.line]
       if (op !== lastOp) { checkGouges(lastOp); lastOp = op }
       const n = toolAtLine[s.line]
@@ -949,14 +931,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         ? { rapid: false, from: s.from, to: s.to, center: s.center, clockwise: s.clockwise, line: s.line }
         : { rapid: s.kind === "rapid", from: s.from, to: s.to, line: s.line }
       if (n === undefined || !cutterByNumber.has(n)) {
-        if (!seg.rapid) { noTool++; finding("notool", () => issue("ReplayMismatch", "replay", `Feed motion at NC line ${s.line} with no known cutter selected`, { line: s.line })) }
+        if (!seg.rapid) { noTool++; tri?.unchecked(`feed motion at NC line ${s.line} has no known cutter`); finding("notool", () => issue("ReplayMismatch", "replay", `Feed motion at NC line ${s.line} with no known cutter selected`, { line: s.line })) }
         continue
       }
       const model = modelOf(n)
       const cutter = cutterByNumber.get(n)!
       const reach = model.radius / cellSize
       replayWork += ((Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z) * (s.kind === "arc" ? 1.6 : 1)) / sampleStep(cellSize, model.radius) + 1) * (Math.PI * reach * reach + 1)
-      if (replayWork > replayLimit) { replayStoppedAt = s.line; break }
+      if (replayWork > replayLimit) { replayStoppedAt = s.line; tri?.unchecked(`the replay stopped at NC line ${s.line}: the rest of the program is not on the tri-dexel`); break }
+      if (tri !== undefined && !seg.rapid && !(s.kind === "arc" && ((angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0))) {
+        const tips: Vec3[] = [s.from]
+        forEachSample(seg, tri.stock.cell, (x, y, z) => { tips.push({ x, y, z }) })
+        tri.cut(cutter, tips)
+      }
       let removed = 0
       forEachSample(seg, sampleStep(cellSize, model.radius), (x, y, z) => {
         if (seg.rapid) {
@@ -1017,6 +1004,24 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   for (let k = 0; k < hf.top.length; k++) {
     const excess = hf.top[k]! - Math.max(targetMax[k]!, declaredTop[k]!)
     if (excess > allowed) { remainingVolume += (excess - allowed) * hf.cellArea; maxRemaining = Math.max(maxRemaining, excess) }
+  }
+  // Spec 72 step 0.3: with the table turned, the verdicts are the tri-dexel's. Declared removal the part mesh does not carry (blind
+  // drill points, chamfer bands, thread majors, taps) is a gouge to the replay, and declared leftovers (tabs) are material left: where
+  // the job declares them the tri-dexel does not decide that verdict and the claim stays unresolved.
+  const declaredRemoval = (prepared.plan?.allowances ?? []).length > 0 || operations.some((op) => op.strategy === "chamfer" || op.strategy === "thread" || (op.strategy === "drill" && (op.cut === "tap" || toolOf(op.tool).kind === "tap")))
+  const triAllowance = Math.max(0.05, prepared.scallop * 1.5)
+  const triVerdict: TriVerdict | undefined = tri?.verdict(workMeshes, prepared.tolerance, triAllowance)
+  const triGougeFound = triVerdict !== undefined && !declaredRemoval && triVerdict.closedPart && triVerdict.gouge.depth > 0
+  const triGougeDecided = triVerdict !== undefined && triVerdict.complete && !declaredRemoval
+  const triLeftDecided = triVerdict !== undefined && triVerdict.complete && declaredLeft.length === 0
+  const triLeftFound = triVerdict !== undefined && triLeftDecided && (triVerdict.left.depth > 0 || triVerdict.detached > 0)
+  if (triVerdict !== undefined && triLeftDecided) {
+    remainingVolume = triVerdict.left.volume + triVerdict.detached
+    maxRemaining = Math.max(triVerdict.left.depth, triVerdict.detached > 0 ? prepared.tolerance + triVerdict.errorBound : 0)
+  }
+  if (triVerdict !== undefined && triGougeFound) {
+    const g = triVerdict.gouge
+    issues.push(issue("Gouge", "replay", `The program cuts ${g.depth.toFixed(3)} mm below the part surface on the tri-dexel replay (${g.rays} rays, ${g.volume.toFixed(2)} mm³)${g.at !== undefined ? ` near (${g.at.x.toFixed(2)}, ${g.at.y.toFixed(2)}, ${g.at.z.toFixed(2)})` : ""}, beyond its declared error of ${triVerdict.errorBound.toFixed(3)} mm`, g.at !== undefined ? { point: g.at } : {}))
   }
   if (replayStoppedAt !== undefined) {
     // What the stopped replay left is not the program's remaining stock: it is not reported as such.
@@ -1118,11 +1123,25 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         : turned.holderPossible > 0 ? `${turned.holderPossible} moves with the table turned bring the shank or holder within a voxel of material that may remain`
         : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, voxel stock for ${turnedMoves} moves with the table turned)` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
     },
-    { id: "no-gouge", status: interpreted === undefined ? "unresolved" : gougeColumns > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their cuts are not checked against the part` : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)` },
     {
-      id: "material-removed", status: interpreted === undefined ? "unresolved" : maxRemaining > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed",
+      id: "no-gouge",
+      status: interpreted === undefined ? "unresolved" : gougeColumns > 0 || triGougeFound ? "failed" : turnedMoves > 0 ? (triGougeDecided ? "passed" : "unresolved") : "passed",
+      detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm`
+        : triVerdict !== undefined && triGougeFound ? `${triVerdict.gouge.depth.toFixed(3)} mm cut below the part on the tri-dexel replay of every move (${turnedMoves} with the table turned)`
+        : turnedMoves > 0 && triVerdict !== undefined && triGougeDecided ? `No cut below the part beyond ${(prepared.tolerance + triVerdict.errorBound).toFixed(3)} mm on the tri-dexel replay of every move (cell ${triVerdict.cell.toFixed(3)} mm, declared error ${triVerdict.errorBound.toFixed(3)} mm, ${turnedMoves} moves with the table turned)`
+        : turnedMoves > 0 ? `${turnedMoves} moves turn the table and the tri-dexel replay does not decide the gouge: ${declaredRemoval ? "the job declares removal the part mesh does not carry (drill points, chamfers, threads)" : triVerdict?.reasons.join("; ") ?? "no tri-dexel replay was made"}`
+        : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)`
+    },
+    {
+      id: "material-removed",
+      status: interpreted === undefined ? "unresolved" : turnedMoves > 0 ? (triLeftDecided ? (triLeftFound ? "failed" : "passed") : maxRemaining > 0 ? "failed" : "unresolved") : maxRemaining > 0 ? "failed" : "passed",
       detail: [
-        maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm` : `The replayed stock matches the part within ${allowed.toFixed(3)} mm`,
+        turnedMoves > 0 && triVerdict !== undefined && triLeftDecided
+          ? (triLeftFound
+            ? `${remainingVolume.toFixed(1)} mm³ of stock stays beyond the part plus ${triAllowance.toFixed(2)} mm on the tri-dexel replay (${triVerdict.left.depth > 0 ? `up to ${triVerdict.left.depth.toFixed(3)} mm normal to the surface` : "uncut stock beside the part"}${triVerdict.detached > 0 ? `; ${triVerdict.detached.toFixed(1)} mm³ stands where the part has no surface above it` : ""}; declared error ${triVerdict.errorBound.toFixed(3)} mm)`
+            : `The tri-dexel replay leaves no stock beyond the part plus ${triAllowance.toFixed(2)} mm (cell ${triVerdict.cell.toFixed(3)} mm, declared error ${triVerdict.errorBound.toFixed(3)} mm)`)
+          : maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm`
+          : `The replayed stock matches the part within ${allowed.toFixed(3)} mm${turnedMoves > 0 && triVerdict !== undefined ? `; the tri-dexel replay does not decide the leftover: ${declaredLeft.length > 0 ? "the job declares material left standing (tabs)" : triVerdict.reasons.join("; ")}` : ""}`,
         ...(turnedMoves > 0 && turnedVoxels !== undefined ? [fiveAxisRemovalText(turnedVoxels)] : [])
       ].join("; ")
     },

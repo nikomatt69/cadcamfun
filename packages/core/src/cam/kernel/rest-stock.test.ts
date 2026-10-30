@@ -132,8 +132,8 @@ describe("a rotary operation consumes the stock its 3-axis predecessor left (K5)
     const claim = preceded.claims.find((c) => c.id === "material-removed")!
     expect(claim.status).not.toBe("passed")
     expect(claim.detail).toMatch(/between \d+ and \d+ mm³/)
-    // Turned moves are still never claimed as gouge-checked.
-    expect(preceded.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
+    // Turned moves are gouge-checked on the tri-dexel replay of every move, and the verdict names it.
+    expect(preceded.claims.find((c) => c.id === "no-gouge")!.detail).toMatch(/tri-dexel/)
     // The tolerance budget stays informational: it is not a verification of requested quality, and it is not asserted here.
     expect(preceded.tolerance?.requested).toBeGreaterThan(0)
   })

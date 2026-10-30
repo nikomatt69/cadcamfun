@@ -35,8 +35,10 @@ describe("a swarf operation in the kernel", () => {
     expect(a.nc).toMatch(/\bA-?\d/)
     expect(a.nc).toMatch(/\bC-?\d/)
     expect(a.claims.find((c) => c.id === "nc-replay")!.status).not.toBe("failed")
-    // Five-axis moves are not carved into the height field: the stock claims stay open, as for every five-axis operation.
-    expect(a.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
+    // The flank cut is replayed on the tri-dexel against the exact part: it does not cut below the wall, within the declared error.
+    const gouge = a.claims.find((c) => c.id === "no-gouge")!
+    expect(gouge.status).toBe("passed")
+    expect(gouge.detail).toMatch(/tri-dexel/)
   })
 
   test("a point on the wall is enough: the kernel reads the rulings from the exact solid and writes the same program", () => {
