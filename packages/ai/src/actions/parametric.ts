@@ -156,7 +156,7 @@ export const runParametricExact = async (input: Input<"cad.parametric_exact">, c
   if ("error" in got) return got.error
   const result = rebuild(got.history)
   const exact = exactReport(got.history, result, EXACT_ACTION_BUDGET_MS)
-  const out: Record<string, unknown> = { ok: !result.issues.some((i) => i.severity === "error"), bodies: exact.bodies, warnings: exact.warnings, issues: result.issues.slice(0, 20) }
+  const out: Record<string, unknown> = { ok: !result.issues.some((i) => i.severity === "error"), bodies: exact.bodies, warnings: [...new Set(exact.warnings)], issues: result.issues.slice(0, 20) }
   if (input.includeStep === true) {
     const step = brep.withBudget(EXACT_ACTION_BUDGET_MS, () => historyToStep(got.history, input.name ?? "part"))
     out["exported"] = step.exported

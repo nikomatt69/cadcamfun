@@ -26,11 +26,11 @@ describe("the assistant's view of the exact model", () => {
     m.extrude(m.sketch("XY").rectangle([0, 0], 10, 10), { depth: 10 })
     m.hole({ id: "bore", plane: "XY", offset: 10, at: [2, 5], diameter: 4, depth: 10 })
     const history = m.build()
-    expect(parametricReport(history).warnings.some((warning) => warning.includes("bore:") && warning.includes("displaced"))).toBe(true)
+    expect(parametricReport(history).warnings.some((warning) => warning.includes("bore:") && warning.includes("kept in place"))).toBe(true)
     for (const includeStep of [false, true]) {
       const result = await runParametricExact({ history, includeStep } as never, context)
       const decoded = Schema.decodeUnknownSync(ACTION_CONTRACTS["cad.parametric_exact"]!.result! as Schema.Decoder<unknown>)(result) as { warnings: string[]; step?: string }
-      expect(decoded.warnings.some((warning) => warning.includes("bore:") && warning.includes("displaced"))).toBe(true)
+      expect(decoded.warnings.some((warning) => warning.includes("bore:") && warning.includes("kept in place"))).toBe(true)
       expect(new Set(decoded.warnings).size).toBe(decoded.warnings.length)
       if (includeStep) expect(decoded.step).toStartWith("ISO-10303-21;")
     }

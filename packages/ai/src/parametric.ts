@@ -33,7 +33,7 @@ export const exactReport = (history: History, result: ReturnType<typeof rebuild>
   try {
     const exact = brep.withBudget(budgetMs, () => {
       const replay = rebuildExact(history, result)
-      warnings = replay.warnings
+      warnings = [...new Set(replay.warnings)]
       return exactSummary(replay)
     })
     const bodies = exact.map((b) =>
