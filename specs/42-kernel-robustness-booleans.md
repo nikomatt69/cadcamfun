@@ -80,16 +80,44 @@ sphere's centre and poles: the intersection circle is the sphere's seam). The 1 
 sample; `fuzz.test.ts` (16 seeds per mode) asserts zero displacements and passes. Seed 73 (a truncated cone whose apex, outside the
 solid, lay on a cylinder) was a false pole contact and is fixed. In-place contacts: 3 seeds. Generic mode, seeds 1-60 (180 Booleans): 0 failures, 0 displacements.
 
+### 6.1 Follow-up 2026-10-30 (second kernel session)
+
+Evidence rule as above; tests are `fuzz-residuals.test.ts`, `tolerance.test.ts`, `heal-circle.test.ts`, `history-import.test.ts`
+(23 new tests); the sweep tool is `packages/core/src/cad/brep/fuzz-sweep.ts` (`bun run ... 121 240 aligned`).
+
+| Item | What | Evidence |
+|---|---|---|
+| R3/R4 residual: sphere pole on a torus (seed 81) and an intersection circle that is a sphere's seam through its poles (seed 116) | Solved in place, exactly. Before any displacement a **bare** sphere or torus operand (one face, what `makeSphere` / `makeTorus` build) is rebuilt with another frame (a sphere's axis is turned so its poles and seam leave the contact; a torus is turned about its axis): the same solid, other parametrisation. The reframed pair must agree with the operands (sampled volume) and satisfy the volume identities to 1e-7, else the next frame, else the displacement. `BooleanCounters.reframed` counts it; no warning, because nothing moved. | `fuzz-residuals.test.ts`: seeds 81 and 116, 0 warnings, 0 displacements, identities 1e-7, intersection volume within 1 % of a 400 000-point Halton oracle built from the analytic solids. The strict result of seed 81 was valid but wrong by 0.85 mm3 before (the pole routing is what caught it) |
+| Seed 170 (121-240 range) | Fixed by the same reframing (sphere seam against a cylinder), 0 warnings | sweep below |
+| Seed 33: torus x cylinder | **Not solved.** The torus's lowest tube circle touches the cylinder's lowest line exactly at the cylinder's end rim: the two intersection branches cross at a point that lies on the rim and the end cap's section curve is tangent to the rim there. The same torus against a cylinder 8 mm long (the crossing inside the face) or 5 mm long (no contact) is solved by the plain pipeline; with the crossing on the rim it needs singular-point branching of the SSI (R5). The displacement stays as the reported last resort and now **names the case**: `degenerate alignment (torus x cylinder: singular surface intersection ... ): the second operand was displaced by 2.2e-3 mm ...; the result is exact only to that distance` | `fuzz-residuals.test.ts` seed 33: identities 1e-3, intersection within 2 % of the oracle, the warning names the surfaces and the reason |
+| R6 tolerance across Booleans | A Boolean result carries the largest operand tolerance plus the fit measured on the result (`validateBrep` now reports `edgeDeviation` and `vertexGap`; `tolerance.ts` `inheritTolerance`). Exact operands and an exact operation stay at the model tolerance (1e-6) however long the chain; an operand looser than 1.5 x the model tolerance makes the result add its measured fit on top. Past the declared limit (`toleranceLimit`: 10 x the model tolerance, or 1e-7 x the body size) the affected faces are marked `loose` and the result carries a warning; `loose` faces stay loose through later Booleans. `BooleanOptions.maxTolerance` sets the limit, `BooleanStats.maxTolerance` reports the result. | `tolerance.test.ts`: 50 Booleans on a plate with holes end at tolerance <= 1.0001e-6 with exact volume; a loose operand gives a loose result with the warning; a 6-Boolean chain on a loose body grows the tolerance and stays loose |
+| R6 STEP export | `writeStepBreps` throws `StepExportError` (part, tolerance, limit, loose faces) for a body with a `loose` face or a tolerance above the limit; `allowLoose: true` writes it with `LOOSE <part>: ...` in `FILE_DESCRIPTION` and the largest tolerance as the file's uncertainty. `sceneToStep` skips a loose body with the reason instead of failing the file. | `tolerance.test.ts`, `history-import.test.ts` |
+| R6 heal: circles | `healBrep` refits circle edges within the healing tolerance: an arc moves (radius and plane kept) to the nearer circle through both end vertices, a full circle through its one vertex; a move above the tolerance is kept and listed in `HealReport.refitNotes`; `circlesRefitted`, `curveMove` report it. Ellipses and splines are still not refitted. An unrepairable body is still refused with the gap | `heal-circle.test.ts`: a cylinder with 30 micrometre per-face rim shifts heals to the exact volume, a half hole through a box edge (arcs with two vertices) too, a 300 micrometre shift with tolerance 1e-5 is refused with the gap |
+| Imported STEP -> history | `importStepToHistory` (`cad/history-import.ts`) reads, validates and heals each solid and keeps it as a base body in `History.bases`; both replays start from the bases. Open or unrepairable bodies are refused with the heal's diagnostics (open edges, the gap, the tolerance that would close it). A body that healed but is loose is accepted and reported loose. | `history-import.test.ts`: exploded box (30 micrometre gaps) imported, healed, then a through hole, a blind pocket and a mirror-join rebuild to the analytic volume within 1e-9 (exact replay) and 0.5 % (mesh replay); a 3 mm gap is refused with "above the healing tolerance" and the tolerance that would heal it; a body missing a face is refused |
+
+**Fuzz (aligned mode, `fuzz-sweep.ts`, 360 Booleans per range):**
+
+| Seeds | Before (this session) | After | Failures | Wrong volumes |
+|---|---|---|---|---|
+| 1-120 | 3 displaced (2.5 %): 33, 81, 116 | **1 displaced (0.83 %): 33** (3 Booleans); 6 Booleans reframed | 0 | 0 (identities 1e-6 undisplaced, 1e-3 displaced) |
+| 121-240 | 1 displaced (0.83 %): 170 | **0 displaced (0 %)**; 3 Booleans reframed | 0 | 0 |
+
+Gate 1 (<= 1 % displaced) holds on both ranges, by one seed on the first. It does not hold for "no displacement at all": seed 33 remains,
+and 500 seeds were not run.
+
 **Left open (not claimed)**
 
 - R1 (seed 14 fold), R5 (general SSI), R7 (valid-but-wrong on every Boolean), R8 (performance): untouched.
 - R3 same-domain merge covers planes, and cylinders and cones with an identical parametrisation that meet along a closed ring; spheres,
   tori, faces with a different reference direction and curved faces that meet along any other edge are not merged. The "coaxial cylinder of equal radius with a different seam" case is solved
   (volumes exact) but leaves the two faces.
-- R4: a pole or apex on a curved face of the other solid (a sphere pole on a torus) still goes through the displacement recovery,
-  reported as before (the strict pipeline was seen 0.8 % off there; `degenerate.test.ts` pins the balanced result). Tori tangent
-  along a circle and general analytic-versus-NURBS tangency are untested. The "kept in place" result is not a non-manifold solid:
-  it is the manifold-by-duplication form, so a consumer that merges coincident edges would see the pinch again.
-- R6: no tolerance growth rules across a chain of Booleans (the 50-Boolean gate), no refusal of `loose` bodies by STEP export,
-  circles and splines are not refitted (their vertices take the larger tolerance), and routing imported STEP bodies through
-  `healBrep` into a history base feature is outside `packages/core/src/cad/brep` (spec 72 P2-10, import half).
+- R4: a pole or apex on a curved face of the other solid is solved exactly only when the operand is a **bare** sphere or torus
+  (reframing). A sphere that is already a trimmed face of a larger body, and a cone apex on a curved face, still go through the
+  displacement (reported, named). Tori tangent along a circle and general analytic-versus-NURBS tangency are untested. The "kept in
+  place" result is not a non-manifold solid: it is the manifold-by-duplication form, so a consumer that merges coincident edges
+  would see the pinch again.
+- Seed 33 (singular SSI point on a face rim), see 6.1: needs R5 branching.
+- R6: the tolerance rule is body-level (every entity of a result takes the largest operand tolerance), not per entity; ellipses and
+  splines are not refitted by `healBrep`; the STEP reader does not mark a body loose from the file's own uncertainty; IGES export
+  has no loose check. `History.bases` is a kernel field: the assistant/API history schema and the desktop timeline do not know it
+  yet (spec 72 change log lists the exact follow-up), so a base body is not persisted by those layers.

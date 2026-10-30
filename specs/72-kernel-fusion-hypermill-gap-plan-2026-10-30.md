@@ -253,6 +253,29 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
     splines. Routing imported STEP bodies into a history base feature (step 2.2 second half, P2-10 import half) is outside
     `packages/core/src/cad/brep` and not done.
 
+- 2026-10-30 (kernel session 2, remainder of steps 2.1 and 2.2; evidence in spec 42 §6.1): status per item.
+  - **P0-9, aligned fuzz: closed to the gate, not to zero.** Seeds 81 (sphere pole on a torus) and 116 (circle = sphere seam
+    through its poles) and 170 are solved exactly by re-parametrising a bare sphere or torus operand (same solid, other frame;
+    identities to 1e-7; `BooleanCounters.reframed`). Aligned displacement: seeds 1-120 **1 of 120 (0.83 %)**, seeds 121-240
+    **0 of 120**; 0 failures, 0 wrong volumes (identities + Halton oracle on the three residual seeds). **Open:** seed 33 (torus x
+    cylinder, intersection branches crossing on a rim) still displaces; the warning now names the case. Needs SSI singular-point
+    branching (spec 42 R5). A sphere that is a trimmed face of a larger body is not reframed.
+  - **P0-10: closed for the three consumers asked, partial overall.** Tolerance across Booleans (result = largest operand
+    tolerance + measured fit, loose flag past the declared limit, warning; 50-Boolean plate chain stays at 1e-6); STEP export
+    refuses loose bodies (`StepExportError`, `allowLoose` writes a stated note; `sceneToStep` skips them with the reason);
+    `healBrep` refits circles. **Open:** ellipse/spline refit, per-entity tolerance inheritance (it is body-level), IGES loose check.
+  - **Step 2.2 second half (P2-10 import half): done in core with a deviation.** `importStepToHistory` + `History.bases`
+    (`cad/history-import.ts`): an exploded-STEP fixture (30 micrometre gaps) is healed, accepts a hole, a pocket and a mirror-join
+    and rebuilds to the analytic volume (1e-9 exact, 0.5 % mesh); unrepairable and open bodies are refused with diagnostics.
+    **Deviation:** a new `imported` member of the `Feature` union was built first and removed: it broke the typecheck of
+    `packages/ai` (`decodeHistory` assignment) and `apps/desktop` (`ParametricPanel.describe` exhaustive switch), outside this
+    work package. `History.bases` is an optional field the kernel replays read and the others ignore. **Follow-up (exact):**
+    (1) `packages/api` / `packages/ai` history schema: add `bases` (array of `{ id, brep, source? }`) so decoding does not drop it
+    (an Effect `Schema.Struct` ignores unknown keys, so a base would be lost silently on a round trip through the API until then);
+    (2) project persistence of the history document must keep `bases` (size: a healed B-rep is JSON, store it as an asset);
+    (3) desktop import flow: call `importStepToHistory`, show `refused[].diagnostics` and `warnings`; timeline row for a base body;
+    (4) optional: promote to a `Feature` kind only after (1) and the desktop switch know it.
+
 - 2026-10-30 (wiring session, hole cycles and posts into the chain): **P2-5 reaches `runJob`.** `ManufacturingJob.breadth`
   (`holeCycles`, `tilted`, `namedFeatures`; off unless asked) feeds `planJob`; a `drill` operation with `cycle` runs
   `generateHoleCycle`; every breadth decision comes back in `CamArtifact.notes` with its rule. Exposed as `breadth` in
