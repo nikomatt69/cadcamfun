@@ -138,3 +138,55 @@ describe("Effect-owned CAD and parametric inputs", () => {
     expect(result.error).toContain("limit")
   })
 })
+
+test("parametric creation preserves collinear and reference dimensions through the host schema and action", async () => {
+  const constraints = [
+    { type: "collinear", a: "l1", b: "l2" },
+    { id: "reference", type: "distance", a: "a", b: "b", value: 99, driven: true }
+  ]
+  const input = { name: "Reference sketch", history: { parameters: {}, features: [{
+    id: "s", type: "sketch", plane: "XY", sketch: {
+      entities: [
+        { id: "a", kind: "point", x: 0, y: 0 }, { id: "b", kind: "point", x: 7, y: 0 },
+        { id: "c", kind: "point", x: 14, y: 0 },
+        { id: "l1", kind: "line", p1: "a", p2: "b" }, { id: "l2", kind: "line", p1: "b", p2: "c" }
+      ], constraints
+    }
+  }] } }
+  const schema = PARAMETRIC_ACTION_INPUTS["cad_edit.parametric_create"]
+  const wire = nikcliWireSchema(schema).parse(input)
+  const decoded = await Effect.runPromise(Schema.decodeUnknownEffect(schema)(wire))
+  expect(decoded.history.features[0]).toMatchObject({ sketch: { constraints } })
+  let received: unknown
+  await runAction("cad_edit.parametric_create", wire, {
+    projectId: "p", handlers: { parametric: async (_project, value) => { received = value; return { ok: true } } } as ToolHandlersShape
+  })
+  expect(received).toMatchObject({ action: "create", history: { features: [{ sketch: { constraints } }] } })
+})
+
+test("JSON-encoded edit fields reach the handler as structured changes without changing text colors", async () => {
+  const { sanitizeArguments } = await import("../src/tools/lenient-arguments.ts")
+  let received: unknown
+  const changes = [{ id: "part", changes: { color: "808080", rotation: { x: 0, y: 90, z: 0 } } }]
+  await runAction("cad_edit.modify", sanitizeArguments({ changes: JSON.stringify(changes) }), {
+    projectId: "p", handlers: { modifyEntities: async (_project, value) => { received = value; return { ok: true } } } as ToolHandlersShape
+  })
+  expect(received).toEqual(changes)
+})
+
+test("edit validation gives executable recovery examples for the failing nested field", async () => {
+  const { formatToolValidationError } = await import("../src/tool-validation.ts")
+  for (const [id, invalid, valid, hint] of [
+    ["cad_edit.modify", { changes: { id: "part", color: "#808080" } }, { changes: [{ id: "part", changes: { color: "#808080" } }] }, 'changes:[{"id"'],
+    ["cad_edit.editor", { actions: [{ action: "color" }] }, { actions: [{ action: "layer_color", layer: "Metal", color: "#808080" }] }, 'actions:[{"action":"layer_color"']
+  ] as const) {
+    const schema = nikcliWireSchema<unknown>(CAD_ACTION_INPUTS[id])
+    const rejected = schema.safeParse(invalid)
+    expect(rejected.success).toBe(false)
+    if (rejected.success) throw new Error("Expected invalid arguments")
+    const message = formatToolValidationError("cad_edit", rejected.error)
+    expect(message).toContain(hint)
+    expect(message).toContain("No mutation was applied")
+    expect(schema.safeParse(valid).success).toBe(true)
+  }
+})

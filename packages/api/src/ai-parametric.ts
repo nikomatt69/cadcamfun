@@ -57,9 +57,9 @@ const entity = Schema.Union([
   described(Schema.Struct({ id, kind: Schema.Literal("ellipse"), center: id, radiusX: positive, radiusY: positive, rotation: optional(n) }), "Sketch ellipse: kind, center is a point ID; radiusX/radiusY are the semi-axes in mm, rotation tilts the x axis (radians). Size it with an ellipseSize constraint."),
   described(Schema.Struct({ id, kind: Schema.Literal("spline"), points: between(Schema.Array(id), 2, 50), closed: optional(Schema.Boolean) }), "Sketch spline: kind, a Catmull-Rom curve through the named points in order; closed:true makes a smooth closed profile.")
 ])
-const named = { id: optional(id) }
+const named = { id: optional(id), driven: optional(Schema.Boolean) }
 const unaryLine = (type: "horizontal" | "vertical") => Schema.Struct({ ...named, type: Schema.Literal(type), line: id })
-const two = (type: "coincident" | "horizontalPoints" | "verticalPoints" | "parallel" | "perpendicular" | "equalLength" | "equalRadius" | "concentric") =>
+const two = (type: "coincident" | "horizontalPoints" | "verticalPoints" | "parallel" | "perpendicular" | "equalLength" | "equalRadius" | "concentric" | "collinear") =>
   Schema.Struct({ ...named, type: Schema.Literal(type), a: id, b: id })
 const distance = (type: "distance" | "distanceX" | "distanceY" | "angle") => Schema.Struct({ ...named, type: Schema.Literal(type), a: id, b: id, value: dimension })
 const pointLine = (type: "pointOnLine" | "midpoint") => Schema.Struct({ ...named, type: Schema.Literal(type), point: id, line: id })
@@ -67,7 +67,7 @@ const radius = (type: "radius" | "diameter") => Schema.Struct({ ...named, type: 
 const constraint = Schema.Union([
   Schema.Struct({ ...named, type: Schema.Literal("fixed"), point: id, x: optional(n), y: optional(n) }),
   unaryLine("horizontal"), unaryLine("vertical"), two("coincident"), two("horizontalPoints"), two("verticalPoints"),
-  two("parallel"), two("perpendicular"), two("equalLength"), two("equalRadius"), two("concentric"),
+  two("parallel"), two("perpendicular"), two("equalLength"), two("equalRadius"), two("concentric"), two("collinear"),
   distance("distance"), distance("distanceX"), distance("distanceY"), distance("angle"),
   Schema.Struct({ ...named, type: Schema.Literal("length"), line: id, value: dimension }), radius("radius"), radius("diameter"),
   pointLine("pointOnLine"), pointLine("midpoint"),

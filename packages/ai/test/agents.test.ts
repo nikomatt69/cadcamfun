@@ -20,7 +20,7 @@ describe("specialist roster", () => {
     expect(permission["cam_edit"]).toEqual({ "*": "ask" })
     expect(permission["mods_edit"]).toBe("deny")
     // Version control is open to the classifier except the two actions that discard history or run unreviewed steps.
-    expect(permission["vcs_edit"]).toEqual({ "*": "ask", "action:restore": "deny", "action:run_workflows": "deny" })
+    expect(permission["vcs_edit"]).toEqual({ "*": "ask", "action:restore": "deny", "action:restore_checkpoint": "deny", "action:run_workflows": "deny" })
     const edits = permission["cad_edit"] as Record<string, string>
     expect(edits["action:delete"]).toBe("deny")
     expect(edits["action:editor"]).toBeUndefined()

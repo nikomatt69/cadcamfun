@@ -67,6 +67,12 @@ const failureOf = (tool: string, problems: ReadonlyArray<Problem>) => {
   const hints = new Set<string>()
   for (const problem of problems) {
     const path = problem.path.map(String)
+    if (tool === "cad_edit" && path.includes("changes")) {
+      hints.add('Use action:"modify", changes:[{"id":"existing-id","changes":{"color":"#808080"}}]. Each array item has id and a nested changes object; rotation is {"x":0,"y":0,"z":90} in degrees.')
+    }
+    if (tool === "cad_edit" && path.includes("actions")) {
+      hints.add('Use action:"editor", actions:[{"action":"layer_color","layer":"existing-layer","color":"#808080"}]. Each entry is an object with its own action; color alone is not an editor action.')
+    }
     if (path.at(-1) === "cases" && problem.expected === "array") {
       hints.add('Send cases as a JSON array of 1..12 objects, e.g. [{"name":"wider","parameters":{"width":80}}], never as a JSON-encoded string.')
     }

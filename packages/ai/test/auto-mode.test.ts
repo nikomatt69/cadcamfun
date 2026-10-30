@@ -43,7 +43,7 @@ describe("the permission map", () => {
       expect([undefined, "deny"], `${name} mods_edit`).toContain(agent.permission["mods_edit"] as string | undefined)
       const vcs = agent.permission["vcs_edit"]
       if (vcs === undefined) continue
-      expect(vcs, `${name} vcs_edit`).toEqual({ "*": "ask", "action:restore": "deny", "action:run_workflows": "deny" })
+      expect(vcs, `${name} vcs_edit`).toEqual({ "*": "ask", "action:restore": "deny", "action:restore_checkpoint": "deny", "action:run_workflows": "deny" })
     }
     // The tool that can restore history is held by Build alone.
     expect(autoAgents.filter(([, agent]) => agent.permission["vcs_edit"] !== undefined).map(([name]) => name)).toEqual(["cadcam-build-auto"])
@@ -82,7 +82,7 @@ describe("the classifier text", () => {
   const soft = text(config.auto_mode.soft_deny)
 
   test("hard-denies what every destructive action destroys", () => {
-    const words: Record<string, string> = { drawing: "elements", component: "saved parts", library: "library rows", history: "history", mod: "extension" }
+    const words: Record<string, string> = { drawing: "elements", component: "saved parts", library: "library rows", history: "history", mod: "extension", operation: "operations", program: "programs", report: "reports", stock: "stock" }
     const effects = new Set(destructive.flatMap((action) => (action as { effects?: ReadonlyArray<string> }).effects ?? []))
     for (const effect of effects) expect(hard, effect).toContain(words[effect]!)
   })
@@ -143,4 +143,11 @@ describe("the scope of a call", () => {
   test("kinds are consistent: a tool with a destructive action is registered as destructive", () => {
     for (const tool of ["cad_edit", "parts", "library_edit", "vcs_edit", "mods_edit"]) expect(toolKind(tool), tool).toBe("destructive")
   })
+})
+
+test("raw model editor arguments cannot crash permission admission or hide destructive actions", () => {
+  const pattern = (actions: unknown) => toolPermissionPattern("cad_edit", { action: "editor", actions }, "p", "cadcam-build-auto")
+  for (const actions of [null, {}, "invalid", [null], [5], [{ action: 3 }]]) expect(pattern(actions)).toBe("action:editor:destructive")
+  for (const actions of ['[{"action":"undo"}]', { item: { action: "layer_delete" } }]) expect(pattern(actions)).toBe("action:editor:destructive")
+  for (const actions of ['[{"action":"layer_color","layer":"Metal","color":"#808080"}]', { item: { action: "layer_color" } }]) expect(pattern(actions)).toBe("action:editor")
 })

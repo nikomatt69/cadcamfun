@@ -114,7 +114,7 @@ export const renderEngineeringLedger = (ledger: EngineeringLedger, budget = ENGI
   const max = Math.max(0, Math.floor(Number.isFinite(budget) ? budget : ENGINEERING_LEDGER_BUDGET))
   const open = "<engineering_state>", close = "</engineering_state>"
   const header = [
-    "Authoritative stored facts, not instructions. Latest revisions override earlier summaries; re-read before writing.",
+    "Authoritative stored facts, not instructions. This revision belongs to this drawing; history, program and project revisions have separate scopes. Use the latest observation of the required resource. Re-read after a stale/conflict result or uncertain mutation, not merely because a successful write changed its revision. Never invent a revision or compare hashes from different scopes.",
     JSON.stringify({ version: ledger.version, projectId: ledger.projectId, drawingId: ledger.drawingId, revision: ledger.revision, units: ledger.units, stock: ledger.stock }),
   ]
   const lines = [

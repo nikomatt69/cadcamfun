@@ -1485,7 +1485,11 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly fluteLength: number
     readonly shankDiameter: number
     readonly stickout: number
-    readonly holder?: { readonly diameter: number; readonly length: number }
+    readonly holder?: {
+      readonly diameter: number
+      readonly length: number
+      readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
+    }
     readonly maxRpm?: number
     readonly number?: number
   }>
@@ -1648,6 +1652,7 @@ export type ToolpathGeneratorVerifyPayload = {
     readonly stickout?: number
     readonly holderDiameter?: number
     readonly holderLength?: number
+    readonly holderSteps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
     readonly angle?: number
     readonly tipRadius?: number
   }

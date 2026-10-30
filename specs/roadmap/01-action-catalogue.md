@@ -1,6 +1,6 @@
 # RM-01 — Action catalogue (deepen the tool seam)
 
-Status: **in progress**. Current step. Seam closed 2026-10-13 (see Change log); open on 2026-10-29: the prompt-size gate (`packages/ai/test/tool-prompts.test.ts`, 33 301 against a 32 800-character ceiling) and the "Required integration checks" that have no test yet. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/features/ai/lib` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
+Status: **in progress**. Current step. Seam closed 2026-10-13 (see Change log); the prompt-size and focused integration gates pass on 2026-10-30 (150 tests); full cross-workspace acceptance and the remaining "Required integration checks" are still open. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/features/ai/lib` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
 
 ## Why this is first
 
@@ -69,6 +69,14 @@ Required integration checks through the caller-facing interface (add tests where
 These are future implementation acceptance requirements, not results of this documentation amendment.
 
 ## Change log
+
+- 2026-10-30: prompt/schema coherence pass: validation errors for nested editor actions and modifications now provide schema-tested recovery examples. Engineering context distinguishes drawing/history/program/project revision scopes and avoids unconditional rereads after successful writes; recovery text forbids probe geometry for schema retries. These prompt changes guide behavior but do not prove live-model task completion. AI typecheck passes; acceptance still requires the remaining cross-workspace and live-session checks.
+
+- 2026-10-30: the broad AI/API run completed with 1,113 passes and four failures: catalogue refresh timeout, inventory timeout/staleness, stale OpenAPI snapshot and generated SDK. Isolated reruns pass: catalogue refresh (1), inventory (4), full API (24). Reviewed regenerated artifacts against existing cloud enroll/pair routes and stepped-holder fields. Editor/input/tool regressions pass; full cross-workspace acceptance and transcript revision-loop investigation remain open.
+
+- 2026-10-30: transcript-driven editor repair: normalize raw arguments before Auto permission classification and guard malformed editor lists, preserving destructive-action denial for JSON/XML-style lists. Normalize JSON-encoded `changes` and `rotation`; add explicit nested modify and layer-color examples within the existing prompt ceiling. Focused Auto/input/prompt checks pass (70 tests) and AI typecheck passes. Full acceptance remains open; the concurrent broad run encountered a catalogue-refresh timeout and an inventory changed during the run.
+
+- 2026-10-30: integration repair on main after the kernel agent round: shared parametric inputs now preserve `collinear` and `driven`; a host-schema-to-action regression verifies preservation before handler entry. Checkpoint input fixtures and Auto denial expectations cover the existing checkpoint actions; classifier wording includes programs, reports and stock. Regenerated the harness inventory and web API reference. The seven focused action-input, permission, prompt and inventory suites pass (150 tests); desktop and sidecar typechecks pass. The full integration gate remains open; no RM-01 completion claimed.
 
 - 2026-10-21: the catalogue grew the exact-kernel capabilities of the spec 33
   increment (`cad.shell` with a wall per face, `cad.offset`, `cad.motion`,

@@ -1,4 +1,5 @@
 /** UI names mapped to native Nikcli agent modes and permission rules. */
+import { sanitizeArguments } from "../tools/lenient-arguments.ts"
 import { DESTRUCTIVE_TOOL_IDS } from "../tools/project-tools.ts"
 import { exposedActions, EXPOSED_TOOL_IDS, nameOf } from "../actions/catalogue.ts"
 
@@ -23,10 +24,19 @@ export type PermissionRule = "allow" | "deny" | "ask" | Readonly<Record<string, 
 export const toolPermissionPattern = (tool: string, input: unknown, projectId: string, agent: string): string => {
   // Standard-mode saved approvals must not bypass Auto's classifier or destructive-action denies.
   if (!agent.endsWith("-auto") || !EXPOSED_TOOL_IDS.includes(tool)) return `project:${projectId}`
-  const args = input as { action?: unknown; actions?: ReadonlyArray<{ action?: string }> } | null
-  if (tool === "cad_edit" && args?.action === "editor" && args.actions?.some((entry) =>
-    ["layer_delete", "undo", "redo"].includes(entry.action ?? ""))) return "action:editor:destructive"
-  return `action:${args?.action ?? "unknown"}`
+  const normalized = sanitizeArguments(input)
+  const args = typeof normalized === "object" && normalized !== null && !Array.isArray(normalized)
+    ? normalized as Record<string, unknown> : undefined
+  if (tool === "cad_edit" && args?.["action"] === "editor") {
+    const actions = args["actions"]
+    // Permission admission precedes action decoding. Malformed lists must never crash or bypass destructive checks.
+    if (!Array.isArray(actions) || actions.some((entry: unknown) => {
+      if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return true
+      const action = (entry as Record<string, unknown>)["action"]
+      return typeof action !== "string" || ["layer_delete", "undo", "redo"].includes(action)
+    })) return "action:editor:destructive"
+  }
+  return `action:${typeof args?.["action"] === "string" ? args["action"] : "unknown"}`
 }
 export const hostAgentWithPermissions = (agent: string, mode: PermissionMode = "approve"): string => mode === "approve" ? agent : `${agent}-${mode}`
 export const inheritedPermissionMode = (agent?: string): PermissionMode => agent?.endsWith("-auto") ? "auto" : agent?.endsWith("-ask") ? "ask" : "approve"

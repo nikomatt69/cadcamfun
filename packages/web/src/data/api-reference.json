@@ -54366,6 +54366,27 @@
                             "length": {
                               "type": "number",
                               "exclusiveMinimum": 0
+                            },
+                            "steps": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "diameter": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "length": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "diameter",
+                                  "length"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -59919,6 +59940,27 @@
                       "holderLength": {
                         "type": "number",
                         "exclusiveMinimum": 0
+                      },
+                      "holderSteps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "diameter": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "length": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "diameter",
+                            "length"
+                          ],
+                          "additionalProperties": false
+                        }
                       },
                       "angle": {
                         "type": "number",

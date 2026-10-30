@@ -4606,6 +4606,86 @@ function getConstructorDescriptor(ast) {
   const getDescriptor = ast.annotations?.[CONSTRUCTOR_ANNOTATION_KEY];
   return isFunction(getDescriptor) ? getDescriptor(ast.typeParameters) : undefined;
 }
+function isJsonLeaf(u) {
+  return u === null || typeof u === "string" || typeof u === "boolean" || typeof u === "number" && globalThis.Number.isFinite(u);
+}
+function isStringTreeLeaf(u) {
+  return u === undefined || typeof u === "string";
+}
+function isTree(u, isLeaf) {
+  const cache = new WeakMap;
+  const stack = [];
+  outer:
+    while (true) {
+      if (typeof u !== "object" || u === null) {
+        if (!isLeaf(u)) {
+          return false;
+        }
+      } else {
+        const value = u;
+        const cached = cache.get(value);
+        if (cached === false) {
+          return false;
+        }
+        if (cached === undefined) {
+          const isArray = Array.isArray(value);
+          if (!isArray) {
+            const prototype = Object.getPrototypeOf(value);
+            if (prototype !== null && prototype !== Object.prototype && Object.getPrototypeOf(prototype) !== null) {
+              return false;
+            }
+          }
+          cache.set(value, false);
+          stack.push({
+            value,
+            keys: isArray ? value.length : Object.keys(value),
+            index: 0
+          });
+        }
+      }
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const keys = frame.keys;
+        if (typeof keys === "number") {
+          if (frame.index < keys) {
+            u = frame.value[frame.index++];
+            continue outer;
+          }
+        } else if (frame.index < keys.length) {
+          u = frame.value[keys[frame.index++]];
+          continue outer;
+        }
+        cache.set(frame.value, true);
+        stack.pop();
+      }
+      return true;
+    }
+}
+function isJson(u) {
+  return isTree(u, isJsonLeaf);
+}
+var Json = /* @__PURE__ */ new Declaration([], () => (input, ast, options) => isJson(input) ? sameExit : fail5(new InvalidType(ast, input, options)), {
+  representation: {
+    id: "effect/schema/Json",
+    payload: null
+  },
+  expected: "JSON value",
+  toCodecJson: () => {
+    return;
+  },
+  toCodecStringTree: () => unknownToStringTree,
+  toArbitrary: () => (fc) => fc.jsonValue()
+});
+function isStringTree(u) {
+  return isTree(u, isStringTreeLeaf);
+}
+var StringTree = /* @__PURE__ */ new Declaration([], () => (input, ast, options) => isStringTree(input) ? sameExit : fail5(new InvalidType(ast, input, options)), {
+  expected: "StringTree",
+  toCodecStringTree: () => {
+    return;
+  }
+});
+var unknownToStringTree = /* @__PURE__ */ new Link(StringTree, /* @__PURE__ */ passthrough2());
 
 // node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaParser.js
 function makeEffect(schema) {
@@ -5718,6 +5798,12 @@ var Class3 = (identifier) => (schema, annotations) => {
     }
   }));
 };
+var Json2 = /* @__PURE__ */ make6(/* @__PURE__ */ annotate(Json, {
+  toCode: () => ({
+    runtime: "Schema.Json",
+    Type: "Schema.Json"
+  })
+}));
 // packages/plugin-sdk/src/capability.ts
 var CAPABILITIES = [
   "drawing:read",
@@ -6111,6 +6197,10 @@ var TRIANGLE_RULE = (() => {
   push6(0.008394777409958, 0.263112829634638, 0.027230314174435);
   return out;
 })();
+
+// packages/core/src/cad/sketch-equations.ts
+var scratch4 = new Float64Array(4);
+var scratch6 = new Float64Array(6);
 // packages/core/src/cad/csg.ts
 var EMPTY = { positions: new Float32Array(0), indices: new Uint32Array(0) };
 // packages/core/src/cad/profile-shape.ts
@@ -6232,6 +6322,9 @@ var TAU4 = 2 * Math.PI;
 var meshOfTessellation = new WeakMap;
 var parametricCache = new Map;
 
+// packages/core/src/cad/brep/lineage-record.ts
+var STEPS = new WeakMap;
+
 // packages/core/src/cad/brep/boolean.ts
 var TAU5 = Math.PI * 2;
 var VOLUMES = new WeakMap;
@@ -6259,6 +6352,8 @@ var TANGENT = Math.cos(0.5 * Math.PI / 180);
 // packages/core/src/cad/brep/fillet-edit.ts
 var TAU11 = 2 * Math.PI;
 var MAX_ARC = Math.PI - 0.001;
+// packages/core/src/cad/brep/naming.ts
+var UNIQUE = new WeakMap;
 // packages/core/src/cad/brep/shell.ts
 var CROSS = 1 + 0.000001;
 // packages/core/src/cad/brep/export-mesh.ts
@@ -6274,6 +6369,8 @@ var CRC_TABLE = (() => {
 })();
 // packages/core/src/cad/brep/iges.ts
 var TAU12 = Math.PI * 2;
+// packages/core/src/cad/brep/naming-keys.ts
+var CACHE = new WeakMap;
 // packages/core/src/cad/history.ts
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
 // packages/core/src/cad/sketch-edit.ts
@@ -7309,6 +7406,45 @@ var MAX_GAP3 = Math.PI / 3;
 
 // packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
+// packages/core/src/cam/macro.ts
+var COMPARISONS = ["eq", "ne", "lt", "le", "gt", "ge"];
+var VarRefSchema = Union2([
+  Struct({ scope: Literals(["local", "global", "system"]), index: Int.check(isGreaterThanOrEqualTo2(0)) }),
+  Struct({ name: String4.check(isMinLength(1), isPattern2(/^[A-Za-z_][A-Za-z0-9_]*$/)) })
+]);
+var ExprSchema = Json2;
+var ConditionSchema = Struct({ cmp: Literals(COMPARISONS), a: ExprSchema, b: ExprSchema });
+var WordExprSchema = Struct({
+  x: optionalKey2(ExprSchema),
+  y: optionalKey2(ExprSchema),
+  z: optionalKey2(ExprSchema),
+  feed: optionalKey2(ExprSchema)
+});
+var AssignSchema = TaggedStruct("Assign", { variable: VarRefSchema, value: ExprSchema });
+var MacroCallSchema = TaggedStruct("MacroCall", {
+  name: String4.check(isMinLength(1)),
+  args: Record(String4.check(isPattern2(/^[A-Za-z]$/)), ExprSchema)
+});
+var IfSchema = TaggedStruct("If", { condition: ConditionSchema });
+var ElseSchema = TaggedStruct("Else", {});
+var EndIfSchema = TaggedStruct("EndIf", {});
+var WhileSchema = TaggedStruct("While", { condition: ConditionSchema });
+var EndWhileSchema = TaggedStruct("EndWhile", {});
+var LabelSchema = TaggedStruct("Label", { name: String4.check(isMinLength(1), isPattern2(/^[A-Za-z0-9_]+$/)) });
+var GotoSchema = TaggedStruct("Goto", {
+  label: String4.check(isMinLength(1), isPattern2(/^[A-Za-z0-9_]+$/)),
+  direction: optionalKey2(Literals(["auto", "forward", "backward"])),
+  condition: optionalKey2(ConditionSchema)
+});
+var CycleBeginSchema = TaggedStruct("CycleBegin", {
+  family: Literals(["heidenhain"]),
+  number: Int.check(isGreaterThan2(0)),
+  name: String4.check(isMinLength(1)),
+  params: Record(String4, Finite)
+});
+var CycleEndSchema = TaggedStruct("CycleEnd", {});
+var MessageSchema = TaggedStruct("Message", { text: String4 });
+
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -7319,12 +7455,14 @@ var RotarySchema = Struct({
 });
 var RapidSchema = TaggedStruct("Rapid", {
   to: Vec3Schema,
-  rotary: optionalKey2(RotarySchema)
+  rotary: optionalKey2(RotarySchema),
+  expr: optionalKey2(WordExprSchema)
 });
 var LinearSchema = TaggedStruct("Linear", {
   to: Vec3Schema,
   feed: Positive,
-  rotary: optionalKey2(RotarySchema)
+  rotary: optionalKey2(RotarySchema),
+  expr: optionalKey2(WordExprSchema)
 });
 var ArcSchema2 = TaggedStruct("Arc", {
   to: Vec3Schema,
@@ -7356,7 +7494,19 @@ var MoveSchema = Union2([
   DwellSchema,
   CommentSchema,
   CycleSchema,
-  OrientSchema
+  OrientSchema,
+  AssignSchema,
+  MacroCallSchema,
+  IfSchema,
+  ElseSchema,
+  EndIfSchema,
+  WhileSchema,
+  EndWhileSchema,
+  LabelSchema,
+  GotoSchema,
+  CycleBeginSchema,
+  CycleEndSchema,
+  MessageSchema
 ]);
 var CoolantSchema = Literals(["off", "flood", "mist"]);
 var ProgramUnitsSchema = Literals(["mm", "inch"]);
@@ -7367,7 +7517,8 @@ var ToolpathSchema = Struct({
   toolId: String4.check(isMinLength(1)),
   spindleRpm: NonNegative,
   coolant: CoolantSchema,
-  moves: ArraySchema(MoveSchema)
+  moves: ArraySchema(MoveSchema),
+  operation: optionalKey2(Struct({ id: String4.check(isMinLength(1)), name: String4 }))
 });
 var ProgramSchema = Struct({
   name: String4.check(isMinLength(1)),
@@ -8405,6 +8556,13 @@ var PART_KINDS = new Set(["wall-outer", "wall-inner", "skin", "infill", "bridge"
 var PRINT_G = new Set([0, 1, 2, 3, 4, 17, 20, 21, 28, 90, 91, 90.1, 91.1, 92, 92.1]);
 var PRINT_M = new Set([0, 1, 2, 17, 18, 30, 82, 83, 84, 104, 109, 140, 190, 106, 107, 204, 205, 400, 900]);
 var PART = new Set(["WALL-OUTER", "WALL-INNER", "SKIN", "FILL", "BRIDGE"]);
+
+// packages/core/src/cam/print/program.ts
+var KNOWN_G = new Set([0, 1, 2, 3, 4, 10, 11, 17, 18, 19, 20, 21, 28, 29, 90, 91, 92]);
+var KNOWN_M = new Set([0, 1, 17, 18, 73, 82, 83, 84, 104, 105, 106, 107, 109, 116, 140, 141, 190, 191, 200, 201, 203, 204, 205, 220, 221, 400, 410, 412, 420, 500, 501, 503, 572, 600, 620, 621, 900, 907, 955, 991, 1002, 1004, 1005, 2000]);
+
+// packages/core/src/cam/print/printability.ts
+var DEG3 = Math.PI / 180;
 // packages/core/src/cam/viewer/collisions.ts
 var HEAD_SIDE = new Set(["head", "spindle", "fork"]);
 var PART_SIDE = new Set(["table", "cradle", "platter"]);
@@ -8418,6 +8576,7 @@ var VerifyToolSchema = Struct({
   stickout: optionalKey2(Positive3),
   holderDiameter: optionalKey2(Positive3),
   holderLength: optionalKey2(Positive3),
+  holderSteps: optionalKey2(ArraySchema(Struct({ diameter: Positive3, length: Positive3 }))),
   angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 179 }))),
   tipRadius: optionalKey2(Positive3)
 });
@@ -8504,6 +8663,7 @@ var VerifyResponseSchema = Struct({
   preview: VerifyPreviewSchema
 });
 // packages/core/src/cam/kernel/contracts.ts
+var PROFILE_LEAD_INS = ["direct", "arc", "ramp", "helix"];
 var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
 // packages/core/src/cam/kernel/machines.ts
 var kernMicroHd = (taper) => ({
@@ -8912,10 +9072,10 @@ var machineConfigOf = (machine) => {
 };
 var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
 // packages/core/src/cam/kernel/head.ts
-var DEG3 = Math.PI / 180;
+var DEG4 = Math.PI / 180;
 
 // packages/core/src/cam/kernel/collision.ts
-var DEG4 = Math.PI / 180;
+var DEG5 = Math.PI / 180;
 // packages/core/src/drawing/title-block.ts
 var DOCUMENT_TYPES = ["part", "assembly", "cam-setup", "cam-program", "sketch"];
 var DOCUMENT_STATUSES = ["draft", "in-review", "released", "obsolete"];
@@ -8975,7 +9135,7 @@ var CutterSchema = Struct({
   fluteLength: positive2,
   shankDiameter: positive2,
   stickout: positive2,
-  holder: optionalKey2(Struct({ diameter: positive2, length: positive2 })),
+  holder: optionalKey2(Struct({ diameter: positive2, length: positive2, steps: optionalKey2(ArraySchema(Struct({ diameter: positive2, length: positive2 }))) })),
   maxRpm: optionalKey2(positive2),
   number: optionalKey2(Int.check(isBetween({ minimum: 1, maximum: 999 })))
 });
@@ -8996,7 +9156,19 @@ var OperationSpecSchema = Union2([
   Struct({ ...overrides, strategy: Literal2("face"), bottom: Finite }),
   Struct({ ...overrides, strategy: Literal2("adaptive"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2) }),
   Struct({ ...overrides, strategy: Literal2("pocket"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2), finish: optionalKey2(Boolean3), within: optionalKey2(region) }),
-  Struct({ ...overrides, strategy: Literal2("profile"), loop: ring2, side: Literals(["outside", "inside"]), top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2), finish: optionalKey2(Boolean3) }),
+  Struct({
+    ...overrides,
+    strategy: Literal2("profile"),
+    loop: ring2,
+    side: Literals(["outside", "inside"]),
+    top: Finite,
+    bottom: Finite,
+    allowance: optionalKey2(nonNegative2),
+    finish: optionalKey2(Boolean3),
+    tabs: optionalKey2(ArraySchema(Struct({ position: Finite.check(isBetween({ minimum: 0, maximum: 1 })), width: positive2, height: positive2 })).check(isMaxLength(64))),
+    leadIn: optionalKey2(Literals(PROFILE_LEAD_INS)),
+    leadRadius: optionalKey2(positive2)
+  }),
   Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive2, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2) }),
   Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot", "tap", "ream"])) }),
   Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive2, pitch: positive2, internal: Boolean3, top: Finite, length: positive2, rightHand: optionalKey2(Boolean3) }),
@@ -9053,6 +9225,8 @@ var PrintRequirementSchema = Struct({
   flow: optionalKey2(Finite.check(isBetween({ minimum: 50, maximum: 150 }))),
   relativeExtrusion: optionalKey2(Boolean3)
 });
+// packages/core/src/cam/kernel/engagement.ts
+var TAU15 = Math.PI * 2;
 // packages/core/src/drawing/sheet.ts
 var LAYERS = [
   { id: "frame", name: "FRAME", color: "#000000", width: 0.7 },

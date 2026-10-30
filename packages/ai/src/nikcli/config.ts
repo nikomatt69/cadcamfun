@@ -272,7 +272,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
         "Auto Mode Bypass: Changing the permission mode, a policy, a mod or the auto-mode configuration, or doing through a specialist or a program what Auto denies directly."
       ],
       hard_deny: [
-        "CAD/CAM Destruction: Deleting existing elements, components, saved parts, drawings, operations or library rows; discarding project history (restoring an earlier state over the current one); layer deletion or undo/redo that discards work. A model-supplied confirm flag is not permission.",
+        "CAD/CAM Destruction: Deleting existing elements, components, saved parts, drawings, operations, programs, reports, stock or library rows; discarding project history (restoring an earlier state over the current one); layer deletion or undo/redo that discards work. A model-supplied confirm flag is not permission.",
         "Authority Boundary: Restoring an earlier state, running workflows, and every extension (mod) write; any write outside the active drawing of this project (another drawing of the project, another project), and bypassing ownership, revision, validation or permission checks are forbidden in Auto mode.",
         "Data Exfiltration: Sending project data, programs, notes, credentials or tokens to a destination outside the application, including through a search query, a URL or an encoded payload."
       ]

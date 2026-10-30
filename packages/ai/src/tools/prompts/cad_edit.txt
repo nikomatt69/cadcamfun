@@ -1,13 +1,13 @@
-Change the open CAD drawing: add, modify, transform, group, delete, import and parametric parts.
+Edit the open drawing.
 
 Actions and Parameters (mm; rotation/history angles degrees)
-- add: elements (1..40) [{type,...fields}]; editor solids, curves, booleans and components. Valid elements are stored; invalid ones appear under skipped. Standard parts and the full catalogue are in cad-3d-modeling.
+- add: elements (1..40) [{type,...fields}]; editor solids, curves, booleans and components. Valid elements are stored; invalid ones appear under skipped. Catalogue: cad-3d-modeling.
 - add_entities: entities (1..500) of line/circle/arc/polyline/rectangle; flat 2D sketches only when requested. Each accepts layer, name, color.
-- modify: changes [{id,changes}]; edit fields in place.
+- modify: changes:[{id,changes:{color:"#808080"}}]; edit fields.
 - transform: ids, dx?, dy?, dz?, rotateAxis?, rotateDegrees?, scale?, about? {x,y,z}, copies? (0=move, up to 100).
 - group: ids, name?, ungroup?, layer?; assemble or open a component.
 - delete: ids, confirm:true only when the user requested deletion. Destructive; host permission still applies.
-- editor: actions (1..40): layer_create/rename/color/show/hide/lock/unlock/delete/activate, view_3d/2d/fit, section_on/off, select/select_none, show/hide/isolate, undo/redo. Fields: layer, newName, color, moveTo, ids, axis, position, inverted.
+- editor: actions:[{action:"layer_color",layer:"Metal",color:"#808080"}] (1..40). layer_create/rename/color/show/hide/lock/unlock/delete/activate, view_3d/2d/fit, section_on/off, select/select_none, show/hide/isolate, undo/redo. Fields: layer, newName, color, moveTo, ids, axis, position, inverted.
 - import: attachment (preferred) or content, format? dxf|svg|step|iges|parasolid|mesh, depth? (required dxf/svg), up? (STEP), scale?, gap?, tolerance?, name?, color?, layer?. IGES stores exact solids; incomplete imports store nothing. Parasolid x_t text/x_b binary are unsupported. STEP/IGES imports recover geometry, not history.
 - parametric_create: history, name, x?, y?, z?, layer?. Store a validated history; sketches use shapes or point/line/arc entities and constraints. See fusion-360-modelling.
 - parametric_update: elementId, parameters, expectedRevision from the last inspection; retain features.

@@ -20,7 +20,7 @@ const TEXT_KEYS = new Set([
  * the structure. Only these are parsed, so text and code that merely look like JSON are never touched.
  */
 const STRUCTURE_KEYS = new Set([
-  "history", "parameters", "features", "sketch", "entities", "constraints", "shapes", "points", "elements", "actions", "profile",
+  "changes", "rotation", "history", "parameters", "features", "sketch", "entities", "constraints", "shapes", "points", "elements", "actions", "profile",
   "path", "params", "positions", "radii", "todos", "ids", "operands", "targets", "at", "step", "stepB", "centre", "near", "normal"
 ])
 

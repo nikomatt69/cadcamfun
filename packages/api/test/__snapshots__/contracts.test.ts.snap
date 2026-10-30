@@ -18816,6 +18816,292 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cloud/enroll": {
+      "post": {
+        "operationId": "cloud.enroll",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                  },
+                  "origin": {
+                    "type": "string",
+                  },
+                  "setupCode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "required": [
+                  "origin",
+                  "name",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                    },
+                    "deviceId": {
+                      "type": "string",
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "workspaceId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "configured",
+                    "origin",
+                    "workspaceId",
+                    "deviceId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
+    "/api/cloud/pair": {
+      "post": {
+        "operationId": "cloud.pair",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "name",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                    },
+                    "link": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "link",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cloud",
+        ],
+      },
+    },
     "/api/cloud/projects": {
       "get": {
         "operationId": "cloud.projects",
@@ -18975,23 +19261,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
           },
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                  },
-                  {
-                    "type": "array",
-                  },
-                ],
-              },
-            },
-          },
-          "required": true,
-        },
         "responses": {
           "200": {
             "content": {
@@ -48536,23 +48805,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
           },
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                  },
-                  {
-                    "type": "array",
-                  },
-                ],
-              },
-            },
-          },
-          "required": true,
-        },
         "responses": {
           "200": {
             "content": {
@@ -48701,23 +48953,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
           },
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                  },
-                  {
-                    "type": "array",
-                  },
-                ],
-              },
-            },
-          },
-          "required": true,
-        },
         "responses": {
           "200": {
             "content": {
@@ -62684,6 +62919,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "exclusiveMinimum": 0,
                               "type": "number",
                             },
+                            "steps": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "diameter": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                  "length": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "diameter",
+                                  "length",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
                           },
                           "required": [
                             "diameter",
@@ -68313,6 +68569,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "holderLength": {
                         "exclusiveMinimum": 0,
                         "type": "number",
+                      },
+                      "holderSteps": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "diameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "length": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "diameter",
+                            "length",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
                       },
                       "kind": {
                         "enum": [
