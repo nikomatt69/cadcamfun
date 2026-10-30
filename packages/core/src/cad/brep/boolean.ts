@@ -37,7 +37,7 @@ import {
   type TriSet
 } from "./intersect.ts"
 import { validateBrep, type BrepIssue } from "./validate.ts"
-import { recordDerivation, type FaceOrigin } from "./lineage-record.ts"
+import { recordDerivation, STEPS, type FaceOrigin } from "./lineage-record.ts"
 import { separateContacts, separateTouchingVertices } from "./contact.ts"
 import { orient2d } from "./predicates.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
@@ -1063,6 +1063,9 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   }
   // Tolerance (spec 42 R6): the result's tolerances are the operands' largest plus the fit measured on the result.
   const fit = inheritTolerance(result, report, [A, B], options.maxTolerance)
+  // The tolerances make a new object; the recorded derivation (provenance, lineage) belongs to the result the caller gets.
+  const step = STEPS.get(result)
+  if (step !== undefined) STEPS.set(fit.brep, step)
   if (fit.looseFaces.length > 0) {
     warnings.push(`tolerance grew to ${fit.maxTolerance.toExponential(1)} mm (operands ${fit.inherited.toExponential(1)} mm), above the declared limit ${fit.limit.toExponential(1)} mm: ${fit.looseFaces.length} face(s) are marked loose and STEP export refuses them`)
   }
