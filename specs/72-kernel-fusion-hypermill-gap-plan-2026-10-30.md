@@ -233,3 +233,22 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   replays foreign NC against part, stock, tools, travel, reports the first gouging NC line (bisection), rapids through stock (flutes + shank + holder);
   no API/sidecar route yet. **0.1**: `.github/workflows/evidence.yml` (nightly corpus, bench, scorecard); the "7 green nights" gate and scorecard
   levels from passing gates are still open. Open in Wave 0: 0.2 (corpus sets b/d), 0.5 (fixtures, release of 5-axis / multi-orientation jobs).
+
+
+
+- 2026-10-30 (kernel session, Wave 2 steps 2.1 and 2.2; details and evidence in spec 42 §6):
+  - **P0-9 partly closed.** Designed coincidence and tangent contact are solved in place: 56 cases x 3 operations
+    (`brep/coincidence.test.ts`) with zero displacement and analytic volumes within 1e-9; the 30-pair aligned probe that sent
+    10 pairs to the displacement recovery before now sends none. Robust `orient2d/orient3d/incircle` (`brep/predicates.ts`, BigInt
+    oracle on 180 000 cases) back the point-in-face winding. Same-domain face merge for cylinders and cones. Still open: the
+    displacement recovery remains as the reported last resort for a pole on a curved face (sphere pole on a torus), an
+    intersection curve coincident with a sphere seam through its poles, and torus/analytic singular SSI; the aligned fuzz probe
+    (seeds 1-120) still displaces 3 seeds (see spec 42 §6 for the figure), above the 1 % target; spec 42 R1/R5/R7/R8 untouched;
+    no NURBS x NURBS work. A contact along a curve is kept as two coincident edges (manifold-by-duplication), not as a
+    non-manifold solid.
+  - **P0-10 partly closed.** `healBrep` re-projects welded vertices onto their faces, refits straight edges, re-measures vertex and
+    edge tolerances, flags `Face.loose`, drops a face written twice (closed shells only) and returns gap diagnostics; an
+    exploded-box fixture with 30 micrometre gaps heals to the exact solid and accepts a Boolean, a 3 mm gap is refused with the
+    gap. Still open: tolerance growth rules across Boolean chains, STEP export refusing `loose` bodies, refit of circles and
+    splines. Routing imported STEP bodies into a history base feature (step 2.2 second half, P2-10 import half) is outside
+    `packages/core/src/cad/brep` and not done.
