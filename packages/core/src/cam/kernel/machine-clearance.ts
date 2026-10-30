@@ -5,16 +5,19 @@
  *
  *   linear / rapid  one move from the previous point to this one
  *   arc             chords whose sagitta is at most `ARC_SAGITTA` mm; the clearance is then required to exceed that sagitta
- *   rotary          moves that change the A/B/C words are counted and not checked: the rotating part body is not modelled here
- *                   (a turning box needs an exact cylinder-to-box distance; the capsules of the probes over-approximate a flat
- *                   end too much to decide it), so the claim stays unsupported rather than passed
+ *   rotary          with `options.rotary` (the machine's layout and pivot) a move that turns the table, or runs with it turned, is
+ *                   checked in the trunnion scene: the table (and any fixture body) is a box that turns about the pivot with the
+ *                   interpolated joints, the tool hangs from the spindle nose; the verdict is `collision`, `clear` or `unresolved`,
+ *                   never skipped. Arcs written with the table turned are counted in `unresolved` (their plane is not the work
+ *                   plane). Without `options.rotary` such moves are counted in `rotaryMoves` and not checked.
  *
  * The stock is not an obstacle: the height-field replay already checks the cutter against the material with the exact tool
  * profile, and a stock box would flag every normal cut of a flute. The table is the fixture the tool can reach past the stock's bottom.
  */
 import type { Vec3 } from "../../cad/vec.ts"
 import type { GSegment } from "../testing/gcode-interpreter.ts"
-import { checkMotion, linearScene, tableBox, type Pose } from "./collision.ts"
+import type { RotaryLayout } from "../indexing.ts"
+import { checkMotion, linearScene, rotatingTableScene, tableBox, type Pose, type TableBody } from "./collision.ts"
 import type { Cutter } from "./cutters.ts"
 
 /** The table as the machine has it: its footprint centred on (`cx`, `cy`) in work coordinates, its top at `top`. */
@@ -24,6 +27,13 @@ export interface TableGeometry {
   readonly top: number
   readonly length: number
   readonly width: number
+}
+
+/** What the trunnion scene needs: the layout, the pivot in the work frame and extra bodies carried by the table (fixtures). */
+export interface RotaryClearance {
+  readonly layout: RotaryLayout
+  readonly pivot: Vec3
+  readonly bodies?: ReadonlyArray<TableBody>
 }
 
 /** The largest chord sagitta of an arc, mm: the arc is checked as chords that stay within it of the arc. */
@@ -39,8 +49,10 @@ export interface ClearanceFinding {
 export interface ClearanceResult {
   /** Linear and arc moves checked (chords for arcs). */
   readonly checked: number
-  /** Moves that change the A/B/C words. They are not checked (see the module note). */
+  /** Moves with the table turned that were NOT checked (no rotary scene given, see the module note). */
   readonly rotaryMoves: number
+  /** Moves with the table turned that were checked in the trunnion scene (they are also counted in `checked`). */
+  readonly rotaryChecked: number
   /** Moves that could not be proven clear within the subdivision depth. */
   readonly unresolved: number
   /** Smallest certified clearance over the clear moves, mm; `undefined` when no move was checked. */
@@ -85,21 +97,44 @@ export const checkNcClearance = (
   segments: ReadonlyArray<GSegment>,
   cutterOf: (line: number) => Cutter | undefined,
   table: TableGeometry,
-  options: { readonly maxDepth?: number } = {}
+  options: { readonly maxDepth?: number; readonly rotary?: RotaryClearance } = {}
 ): ClearanceResult => {
   const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200)]
+  const body: TableBody = { centre: { x: table.cx, y: table.cy, z: table.top - 100 }, half: { x: table.length / 2, y: table.width / 2, z: 100 } }
+  const bodies: TableBody[] = [body, ...(options.rotary?.bodies ?? [])]
   const depth = options.maxDepth !== undefined ? { maxDepth: options.maxDepth } : {}
-  let checked = 0, rotaryMoves = 0, unresolved = 0
+  let checked = 0, rotaryMoves = 0, rotaryChecked = 0, unresolved = 0
   let minClearance: number | undefined
   let first: ClearanceFinding | undefined
   let angles: { a?: number; b?: number; c?: number } = {}
   for (const s of segments) {
     if (s.kind === "dwell") continue
+    const before = angles
     const turns = turnsTable(s, angles)
     const r = rotaryOf(s)
     if (r !== undefined) angles = { ...(r.a !== undefined ? { a: r.a } : {}), ...(r.b !== undefined ? { b: r.b } : {}), ...(r.c !== undefined ? { c: r.c } : {}) }
-    // A move that turns the table, or runs with the table already turned, is not checked: the table box is fixed in the machine.
-    if (turns || (angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0) { rotaryMoves++; continue }
+    const turned = turns || (angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0 || (before.a ?? 0) !== 0 || (before.b ?? 0) !== 0 || (before.c ?? 0) !== 0
+    if (turned && options.rotary !== undefined) {
+      const cutter = cutterOf(s.line)
+      if (cutter === undefined) continue
+      // An arc written with the table turned is not in the work plane: it is not proven, not skipped.
+      if (s.kind === "arc") { unresolved++; continue }
+      const layout = options.rotary.layout
+      const tilt = (a: { a?: number; b?: number }): number => (layout === "table-AC" ? a.a : a.b) ?? 0
+      const pose = (p: Vec3, a: { a?: number; b?: number; c?: number }): Pose => ({ tilt: tilt(a), c: a.c ?? 0, nose: { x: p.x, y: p.y, z: p.z + cutter.stickout } })
+      const scene = rotatingTableScene(cutter, layout, options.rotary.pivot, bodies)
+      const m = checkMotion(scene, pose(s.from, before), pose(s.to, angles), { margin: 0, ...depth })
+      checked++
+      rotaryChecked++
+      if (m.verdict === "collision") {
+        const at = m.at ?? 0
+        first ??= { line: s.line, point: { x: s.from.x + (s.to.x - s.from.x) * at, y: s.from.y + (s.to.y - s.from.y) * at, z: s.from.z + (s.to.z - s.from.z) * at }, clearance: m.clearance }
+      } else if (m.verdict === "unresolved") unresolved++
+      else minClearance = minClearance === undefined ? m.clearance : Math.min(minClearance, m.clearance)
+      continue
+    }
+    // Without a rotary scene a move that turns the table, or runs with it turned, is not checked: the table box is fixed in the machine.
+    if (turned) { rotaryMoves++; continue }
     const cutter = cutterOf(s.line)
     if (cutter === undefined) continue
     const scene = linearScene(cutter, obstacles)
@@ -119,5 +154,5 @@ export const checkNcClearance = (
       else minClearance = minClearance === undefined ? r.clearance : Math.min(minClearance, r.clearance)
     }
   }
-  return { checked, rotaryMoves, unresolved, ...(minClearance !== undefined ? { minClearance } : {}), ...(first !== undefined ? { first } : {}) }
+  return { checked, rotaryMoves, rotaryChecked, unresolved, ...(minClearance !== undefined ? { minClearance } : {}), ...(first !== undefined ? { first } : {}) }
 }

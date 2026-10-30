@@ -56,7 +56,9 @@ describe("five-axis operations in the kernel", () => {
     expect(five.removedLower + five.remainingUpper).toBeCloseTo(44 * 44 * 18, 0)
     expect(Math.round(five.removedLower)).toBe(Number(bracket![1]))
     expect(Math.round(five.removedUpper)).toBe(Number(bracket![2]))
-    expect(a.claims.find((c) => c.id === "machine-clearance")!.status).toBe("unsupported")
+    // The turned moves are checked in the trunnion scene (spec 69 A4): a verdict, never `unsupported`.
+    expect(["passed", "failed", "unresolved"]).toContain(a.claims.find((c) => c.id === "machine-clearance")!.status)
+    expect(a.claims.find((c) => c.id === "machine-clearance")!.detail).toMatch(/trunnion scene|reaches the table|not proven clear/)
   })
 
   test("the B/C trunnion writes B and C words together, no A word, and the bracket and replay follow", () => {

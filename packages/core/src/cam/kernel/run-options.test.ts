@@ -51,9 +51,9 @@ describe("the replayed stock stays inside a column budget", () => {
 })
 
 describe("the stock replay has a work budget", () => {
-  test("a program past the budget is replayed up to it and the rest is reported unchecked, never passed", () => {
+  test("a program past the budget even at eight times the cell is replayed up to it and the rest is reported unchecked, never passed", () => {
     const full = runJob(job)
-    const cut = runJob(job, { replayWorkLimit: 1e5 })
+    const cut = runJob(job, { replayWorkLimit: 1e2 })
     if (full.status !== "ok" || cut.status !== "ok") throw new Error("the job must run")
     // The program itself is the same; only the evidence about it differs.
     expect(cut.value.nc).toBe(full.value.nc)

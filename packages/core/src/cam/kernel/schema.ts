@@ -35,7 +35,7 @@ export const CutterSchema = Schema.Struct({
   cornerRadius: Schema.optionalKey(nonNegative), angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 180 }))),
   tipDiameter: Schema.optionalKey(nonNegative), pitch: Schema.optionalKey(positive),
   fluteLength: positive, shankDiameter: positive, stickout: positive,
-  holder: Schema.optionalKey(Schema.Struct({ diameter: positive, length: positive })),
+  holder: Schema.optionalKey(Schema.Struct({ diameter: positive, length: positive, steps: Schema.optionalKey(Schema.Array(Schema.Struct({ diameter: positive, length: positive }))) })),
   maxRpm: Schema.optionalKey(positive), number: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999 })))
 })
 

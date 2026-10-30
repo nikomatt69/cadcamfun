@@ -27,6 +27,8 @@ export interface ToolModel {
   /** Holder face above the tip, or `undefined`. */
   readonly holderStart: number | undefined
   readonly holderRadius: number | undefined
+  /** Every holder section from the holder face up (the first is `holderStart` / `holderRadius`); empty without a holder. */
+  readonly holderTiers: ReadonlyArray<{ readonly from: number; readonly to: number; readonly radius: number }>
   /** Solid envelope used against fixtures. */
   readonly zones: ReadonlyArray<ToolZone>
 }
@@ -67,5 +69,14 @@ export const toolModel = (tool: VerifyTool): ToolModel => {
   if (holderRadius !== undefined && holderStart !== undefined) {
     zones.push({ radius: holderRadius, from: holderStart, to: holderStart + (tool.holderLength ?? 40), part: "holder" })
   }
-  return { radius, flat, profile, fluteLength, shankRadius, holderStart, holderRadius, zones }
+  const holderTiers: Array<{ from: number; to: number; radius: number }> = []
+  if (holderRadius !== undefined && holderStart !== undefined) {
+    let from = holderStart
+    for (const section of [{ diameter: holderRadius * 2, length: tool.holderLength ?? 40 }, ...(tool.holderSteps ?? [])]) {
+      holderTiers.push({ from, to: from + section.length, radius: section.diameter / 2 })
+      zones.push(...(holderTiers.length > 1 ? [{ radius: section.diameter / 2, from, to: from + section.length, part: "holder" as const }] : []))
+      from += section.length
+    }
+  }
+  return { radius, flat, profile, fluteLength, shankRadius, holderStart, holderRadius, holderTiers, zones }
 }

@@ -32,6 +32,11 @@ export type Coating = "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc
 export interface Holder {
   readonly diameter: number
   readonly length: number
+  /**
+   * Sections stacked above the first one, from the holder face upward (a collet nut, then a taper, then the spindle nose): each
+   * with its own diameter and length. The first section is `diameter` x `length`; a holder without `steps` is one cylinder.
+   */
+  readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
 }
 
 export interface Cutter {
@@ -97,7 +102,7 @@ export const verifyTool = (c: Cutter): VerifyTool => ({
   cuttingLength: c.fluteLength,
   shankDiameter: c.shankDiameter,
   stickout: c.stickout,
-  ...(c.holder !== undefined ? { holderDiameter: c.holder.diameter, holderLength: c.holder.length } : {}),
+  ...(c.holder !== undefined ? { holderDiameter: c.holder.diameter, holderLength: c.holder.length, ...(c.holder.steps !== undefined && c.holder.steps.length > 0 ? { holderSteps: c.holder.steps } : {}) } : {}),
   ...(c.angle !== undefined && (c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver" || c.kind === "drill") ? { angle: c.angle } : {}),
   ...(c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })

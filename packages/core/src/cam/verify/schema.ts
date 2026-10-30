@@ -30,6 +30,8 @@ export const VerifyToolSchema = Schema.Struct({
   stickout: Schema.optionalKey(Positive),
   holderDiameter: Schema.optionalKey(Positive),
   holderLength: Schema.optionalKey(Positive),
+  /** Sections stacked above the first holder section, from the holder face upward (stepped holder, spec 69 A3). */
+  holderSteps: Schema.optionalKey(Schema.Array(Schema.Struct({ diameter: Positive, length: Positive }))),
   /** Included angle of a `vbit`, degrees (default 60). */
   angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 179 }))),
   /** Corner radius of an `endmill` (bull-nose), mm; a `ballnose` always uses its full radius. */

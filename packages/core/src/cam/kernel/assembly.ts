@@ -117,8 +117,15 @@ export const assemblyProfile = (c: Cutter, options: { readonly assumeHolder?: bo
     const Rh = Math.max(holder.diameter / 2, Rs)
     push({ r: Rh, z: stickout }, "holder")
     push({ r: Rh, z: stickout + holder.length }, "holder")
-    push({ r: 0, z: stickout + holder.length }, "holder")
     length = stickout + holder.length
+    // Stepped holder: each further section is a flat shoulder out (or in) to its radius, then straight up.
+    for (const step of c.holder?.steps ?? []) {
+      const Rn = Math.max(step.diameter / 2, 1e-3)
+      push({ r: Rn, z: length }, "holder")
+      length += step.length
+      push({ r: Rn, z: length }, "holder")
+    }
+    push({ r: 0, z: length }, "holder")
   } else {
     push({ r: 0, z: stickout }, "shank")
   }

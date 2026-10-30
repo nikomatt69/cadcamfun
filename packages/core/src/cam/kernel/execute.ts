@@ -761,63 +761,6 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   // ------------------------------------------------------------ replay of the emitted NC
   checkpoint({ stage: "replay" })
-  const hf = field()
-  const initialVolume = hf.volume()
-  const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
-  for (let k = 0; k < target.length; k++) if (target[k]! <= hf.floor + 1e-9) target[k] = Math.max(hf.floor, partBottom)
-  // Lowest the cutter may go: the part, except below blind drilled holes where the point cone is the hole's bottom.
-  const limit = Float64Array.from(target)
-  for (const a of prepared.plan?.allowances ?? []) {
-    const c = shift2(a.center, o), floor = a.floor - o.z - a.depth - 1e-3
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-      if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) <= a.radius + Math.max(hf.cellX, hf.cellY)) {
-        const k = j * nx + i
-        limit[k] = Math.min(limit[k]!, floor)
-      }
-    }
-  }
-  // Declared removal the model does not carry: the band of a chamfer may go down to the chamfer's bottom at the edge.
-  for (const op of operations) {
-    if (op.strategy !== "chamfer") continue
-    const t = toolOf(op.tool)
-    const g = chamferGeometry(coneOf(t), op.width, op.tipOffset ?? 0.2)
-    const floor = op.top - o.z - g.depth - 1e-3
-    for (const loop of op.loops) {
-      const ring = loop.points.map((p) => shift2(p, o))
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
-      for (const p of ring) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
-      const reach = op.width + 2 * Math.max(hf.cellX, hf.cellY)
-      const i0 = Math.max(0, Math.floor((x0 - reach - hf.minX) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((x1 + reach - hf.minX) / hf.cellX))
-      const j0 = Math.max(0, Math.floor((y0 - reach - hf.minY) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((y1 + reach - hf.minY) / hf.cellY))
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const p = { x: hf.centreX(i), y: hf.centreY(j) }
-        if (distanceToChain(p, ring, true) > reach) continue
-        const k = j * nx + i
-        limit[k] = Math.min(limit[k]!, floor)
-      }
-    }
-  }
-  // Declared removal the model does not carry: a thread, milled or tapped, cuts out to its major diameter beyond the drilled hole.
-  for (const op of operations) {
-    const t = toolOf(op.tool)
-    const rings = op.strategy === "thread" ? [{ c: op.center, r: op.diameter / 2, floor: op.top - o.z - op.length }]
-      : op.strategy === "drill" && (op.cut === "tap" || t.kind === "tap") ? op.points.map((c) => ({ c, r: t.diameter / 2, floor: op.bottom - o.z }))
-      : []
-    for (const { c: centre, r, floor } of rings) {
-      const c = shift2(centre, o), reach = r + Math.max(hf.cellX, hf.cellY)
-      const i0 = Math.max(0, Math.floor((c.x - reach - hf.minX) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((c.x + reach - hf.minX) / hf.cellX))
-      const j0 = Math.max(0, Math.floor((c.y - reach - hf.minY) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((c.y + reach - hf.minY) / hf.cellY))
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) > reach) continue
-        const k = j * nx + i
-        limit[k] = Math.min(limit[k]!, floor - 1e-3)
-      }
-    }
-  }
-  const { min: limitMin } = hf.neighbourhood(limit)
-  const { max: targetMax } = hf.neighbourhood(target)
-  const partVolume = target.reduce((s, z) => s + (z - hf.floor), 0) * hf.cellArea
-
   const lines = nc.split("\n")
   const toolAtLine: Array<number | undefined> = new Array(lines.length + 2)
   const opAtLine: Array<number | undefined> = new Array(lines.length + 2)
@@ -840,6 +783,86 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // The replay reads dwells in the post's unit (Fanuc and Haas write milliseconds on `G4 P`).
   const radiusOfNumber = new Map(Object.entries(numbers).map(([id, number]) => [number, toolOf(id).diameter / 2] as const))
   const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds", okuma: post.id === "okuma" })
+  // The replay cell: the one the stock was generated at, coarsened by doubling (at most three times) while the replay of this
+  // NC would pass its work budget. The coarser cell is a declared term of the tolerance budget (`stock-replay`) and a warning, so
+  // the claims keep their meaning with a wider bound instead of being halted (spec 69 A5). Only a program that is still over
+  // budget at eight times the cell is stopped, as before.
+  const replayWorkAt = (c: number): number => {
+    if (interpreted === undefined) return 0
+    let work = 0
+    for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
+      if (s.kind === "dwell" || (s.kind !== "arc" && s.rotary !== undefined)) continue
+      const n = toolAtLine[s.line]
+      const cutter = n === undefined ? undefined : cutterByNumber.get(n)
+      if (cutter === undefined) continue
+      const r = cutter.diameter / 2
+      const reach = r / c
+      work += ((Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z) * (s.kind === "arc" ? 1.6 : 1)) / sampleStep(c, r) + 1) * (Math.PI * reach * reach + 1)
+    }
+    return work
+  }
+  let replayFactor = 1
+  while (replayFactor < 8 && replayWorkAt(cell * replayFactor) > replayLimit) replayFactor *= 2
+  const replayCellSize = cell * replayFactor
+  if (replayFactor > 1) issues.push(issue("UnsupportedCapability", "replay", `The stock replay of this program would pass its work budget at ${cell.toFixed(3)} mm: it ran at ${replayCellSize.toFixed(3)} mm (cell x ${replayFactor}), so the stock-replay term of the tolerance budget grew to ${(replayCellSize / 2).toFixed(3)} mm`, { severity: "warning" }))
+  const rnx = Math.max(1, Math.ceil(width / replayCellSize)), rny = Math.max(1, Math.ceil(depthY / replayCellSize))
+  const hf = new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
+  const initialVolume = hf.volume()
+  const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
+  for (let k = 0; k < target.length; k++) if (target[k]! <= hf.floor + 1e-9) target[k] = Math.max(hf.floor, partBottom)
+  // Lowest the cutter may go: the part, except below blind drilled holes where the point cone is the hole's bottom.
+  const limit = Float64Array.from(target)
+  for (const a of prepared.plan?.allowances ?? []) {
+    const c = shift2(a.center, o), floor = a.floor - o.z - a.depth - 1e-3
+    for (let j = 0; j < hf.ny; j++) for (let i = 0; i < hf.nx; i++) {
+      if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) <= a.radius + Math.max(hf.cellX, hf.cellY)) {
+        const k = j * hf.nx + i
+        limit[k] = Math.min(limit[k]!, floor)
+      }
+    }
+  }
+  // Declared removal the model does not carry: the band of a chamfer may go down to the chamfer's bottom at the edge.
+  for (const op of operations) {
+    if (op.strategy !== "chamfer") continue
+    const t = toolOf(op.tool)
+    const g = chamferGeometry(coneOf(t), op.width, op.tipOffset ?? 0.2)
+    const floor = op.top - o.z - g.depth - 1e-3
+    for (const loop of op.loops) {
+      const ring = loop.points.map((p) => shift2(p, o))
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (const p of ring) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+      const reach = op.width + 2 * Math.max(hf.cellX, hf.cellY)
+      const i0 = Math.max(0, Math.floor((x0 - reach - hf.minX) / hf.cellX)), i1 = Math.min(hf.nx - 1, Math.ceil((x1 + reach - hf.minX) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((y0 - reach - hf.minY) / hf.cellY)), j1 = Math.min(hf.ny - 1, Math.ceil((y1 + reach - hf.minY) / hf.cellY))
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const p = { x: hf.centreX(i), y: hf.centreY(j) }
+        if (distanceToChain(p, ring, true) > reach) continue
+        const k = j * hf.nx + i
+        limit[k] = Math.min(limit[k]!, floor)
+      }
+    }
+  }
+  // Declared removal the model does not carry: a thread, milled or tapped, cuts out to its major diameter beyond the drilled hole.
+  for (const op of operations) {
+    const t = toolOf(op.tool)
+    const rings = op.strategy === "thread" ? [{ c: op.center, r: op.diameter / 2, floor: op.top - o.z - op.length }]
+      : op.strategy === "drill" && (op.cut === "tap" || t.kind === "tap") ? op.points.map((c) => ({ c, r: t.diameter / 2, floor: op.bottom - o.z }))
+      : []
+    for (const { c: centre, r, floor } of rings) {
+      const c = shift2(centre, o), reach = r + Math.max(hf.cellX, hf.cellY)
+      const i0 = Math.max(0, Math.floor((c.x - reach - hf.minX) / hf.cellX)), i1 = Math.min(hf.nx - 1, Math.ceil((c.x + reach - hf.minX) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((c.y - reach - hf.minY) / hf.cellY)), j1 = Math.min(hf.ny - 1, Math.ceil((c.y + reach - hf.minY) / hf.cellY))
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) > reach) continue
+        const k = j * hf.nx + i
+        limit[k] = Math.min(limit[k]!, floor - 1e-3)
+      }
+    }
+  }
+  const { min: limitMin } = hf.neighbourhood(limit)
+  const { max: targetMax } = hf.neighbourhood(target)
+  const partVolume = target.reduce((s, z) => s + (z - hf.floor), 0) * hf.cellArea
+
   const removedByOp = new Map<number, number>()
   const cutLengthByOp = new Map<number, number>()
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
@@ -948,7 +971,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           shankHits++
           finding("shank", () => issue("HolderCollision", "replay", `Shank of ${cutter.name} touches material above its ${cutter.fluteLength} mm flutes at NC line ${s.line}`, { line: s.line, point: { x, y, z }, ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
         }
-        if (model.holderStart !== undefined && model.holderRadius !== undefined && hf.reaches(x, y, model.holderRadius, z + model.holderStart)) {
+        if (model.holderTiers.some((t) => hf.reaches(x, y, t.radius, z + t.from))) {
           holderHits++
           finding("holder", () => issue("HolderCollision", "replay", `Holder of ${cutter.name} touches material at NC line ${s.line}`, { line: s.line, point: { x, y, z }, ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
         }
@@ -981,13 +1004,13 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     const r = d.radius + Math.max(hf.cellX, hf.cellY)
     for (let a = 0; a + 1 < d.points.length || (a === 0 && d.points.length === 1); a++) {
       const p = d.points[a]!, q = d.points[Math.min(a + 1, d.points.length - 1)]!
-      const i0 = Math.max(0, Math.floor((Math.min(p.x, q.x) - r - sMin.x) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((Math.max(p.x, q.x) + r - sMin.x) / hf.cellX))
-      const j0 = Math.max(0, Math.floor((Math.min(p.y, q.y) - r - sMin.y) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((Math.max(p.y, q.y) + r - sMin.y) / hf.cellY))
+      const i0 = Math.max(0, Math.floor((Math.min(p.x, q.x) - r - sMin.x) / hf.cellX)), i1 = Math.min(hf.nx - 1, Math.ceil((Math.max(p.x, q.x) + r - sMin.x) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((Math.min(p.y, q.y) - r - sMin.y) / hf.cellY)), j1 = Math.min(hf.ny - 1, Math.ceil((Math.max(p.y, q.y) + r - sMin.y) / hf.cellY))
       const dx = q.x - p.x, dy = q.y - p.y, len2 = dx * dx + dy * dy
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
         const x = hf.centreX(i), y = hf.centreY(j)
         const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / len2)) : 0
-        if (Math.hypot(x - (p.x + t * dx), y - (p.y + t * dy)) <= r) { const k = j * nx + i; declaredTop[k] = Math.max(declaredTop[k]!, d.z) }
+        if (Math.hypot(x - (p.x + t * dx), y - (p.y + t * dy)) <= r) { const k = j * hf.nx + i; declaredTop[k] = Math.max(declaredTop[k]!, d.z) }
       }
     }
   }
@@ -1039,7 +1062,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     width: machine.table.width
   }
   const clearance = interpreted !== undefined && table !== undefined
-    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, table)
+    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, table, machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } })
     : undefined
   if (clearance?.first !== undefined) {
     const f = clearance.first
@@ -1111,7 +1134,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     {
       id: "machine-clearance",
       status: interpreted === undefined ? "unresolved" : table === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
-      detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C): the rotating part body is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table`
+      detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
     }
   ]
   if (replayStoppedAt !== undefined) {

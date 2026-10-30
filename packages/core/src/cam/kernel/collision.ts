@@ -174,6 +174,33 @@ export const linearScene = (cutter: Cutter, obstacles: ReadonlyArray<Solid>): Sc
   reachObstacles: 0
 })
 
+/** A box carried by the table, in the table's own (unrotated) frame: centre and half extents, mm. */
+export interface TableBody { readonly centre: Vec3; readonly half: Vec3 }
+
+/**
+ * A spindle moved by the linear axes over bodies carried by a trunnion table (the five-axis machine at a turned pose): the
+ * flutes, shank and holder hang from the pose's `nose` as in `linearScene`, and the bodies (the table top, vise, fixture
+ * blocks) are boxes in the table's frame that turn with `tilt` and `c` about `pivot`. The stock and the part are not bodies
+ * here: the replay checks the assembly against the material itself.
+ */
+export const rotatingTableScene = (cutter: Cutter, layout: RotaryLayout, pivot: Vec3, bodies: ReadonlyArray<TableBody>): Scene => {
+  const corners = bodies.flatMap((b) => {
+    const out: Vec3[] = []
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) out.push(add(b.centre, { x: sx * b.half.x, y: sy * b.half.y, z: sz * b.half.z }))
+    return out
+  })
+  const reachObstacles = corners.length === 0 ? 0 : Math.max(...corners.map((c) => length3(sub(c, pivot))))
+  return {
+    probesAt: (pose) => {
+      if (pose.nose === undefined) throw new RangeError("A rotating-table scene needs the spindle nose of the pose")
+      return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout)
+    },
+    obstaclesAt: (pose) => bodies.map((b) => boxSolid(b.centre, b.half, toPartFrame(layout, pose, pivot))),
+    reachProbes: 0,
+    reachObstacles
+  }
+}
+
 /** The table of a machine as an obstacle: a box of `length` x `width` centred on (`cx`, `cy`), its top at `top`, `depth` mm deep. */
 export const tableBox = (cx: number, cy: number, top: number, length: number, width: number, depth: number): Solid =>
   boxSolid({ x: cx, y: cy, z: top - depth / 2 }, { x: length / 2, y: width / 2, z: depth / 2 }, (p) => p)
