@@ -14,6 +14,7 @@ import { resolveProfile, type PrintProfile } from "./profile.ts"
 import { meshVolume, printMeshIssue, printSolidIssue, sliceMesh } from "./slice.ts"
 import { verifyPrint, type PrintCheck } from "./verify.ts"
 import { planSupports } from "./support.ts"
+import { rankOrientations, rotationDown } from "./printability.ts"
 import { repairMesh, type RepairOptions, type RepairReport } from "./repair.ts"
 import type { PlannedLayer, PrintStats } from "./types.ts"
 import type { Region } from "./geom.ts"
@@ -24,6 +25,7 @@ export * from "./geom.ts"
 export * from "./infill.ts"
 export * from "./orient.ts"
 export * from "./plan.ts"
+export * from "./printability.ts"
 export * from "./profile.ts"
 export * from "./repair.ts"
 export * from "./slice.ts"
@@ -41,6 +43,11 @@ export interface PrintOptions {
    * Without it a mesh that is not a closed manifold is refused, as before.
    */
   readonly repair?: boolean | RepairOptions
+  /**
+   * With `autoOrient`: `faces` tries the six faces on the plate (default), `full` ranks the six faces, the biggest flat faces and a
+   * spread of directions by support volume, overhang, height and contact (`rankOrientations`).
+   */
+  readonly orientSearch?: "faces" | "full"
 }
 
 export interface PrintResult {
@@ -169,7 +176,14 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
 
   let meshes: Mesh64[] = prepared
   let orientation = "as designed"
-  if (profile.autoOrient) {
+  if (profile.autoOrient && options.orientSearch === "full") {
+    const ranking = rankOrientations(meshes, { overhangAngle: profile.supportAngle, layerHeight: profile.layerHeight, nozzle: profile.nozzleDiameter })
+    if (ranking.chosen !== ranking.designed) {
+      orientation = ranking.chosen.label
+      meshes = rotateMeshes(meshes, rotationDown(ranking.chosen.down))
+      notes.push(`; Part turned onto ${ranking.chosen.label}: overhang ${ranking.chosen.overhangArea.toFixed(0)} mm2 (designed ${ranking.designed.overhangArea.toFixed(0)}), height ${ranking.chosen.height.toFixed(1)} mm`)
+    }
+  } else if (profile.autoOrient) {
     const { chosen } = bestOrientation(meshes, profile.supportAngle)
     orientation = chosen.name
     if (chosen.name !== "as designed") {
