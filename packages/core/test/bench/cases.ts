@@ -14,6 +14,7 @@ import { rebuild } from "../../src/cad/history.ts"
 import { historyOf } from "../corpus/fixtures.ts"
 import { CAM_WORKLOADS } from "./cam-workloads.ts"
 import { CAM_BREADTH_WORKLOADS } from "./cam-breadth-workloads.ts"
+import { CAD_WORKFLOW_WORKLOADS } from "./cad-workflow-workloads.ts"
 
 export interface BenchCase {
   readonly id: string
@@ -46,5 +47,6 @@ export const BENCH_CASES: ReadonlyArray<BenchCase> = [
   { id: "step.write-flange", run: () => writeStepBreps([{ name: "flange", brep: flangeBrep() }]).length },
   { id: "step.read-flange", run: () => readStepBreps(flangeStep()).parts.reduce((n, p) => n + p.brep.faces.length, 0) },
   ...Object.entries(CAM_WORKLOADS).map(([id, run]) => ({ id: `cam.${id}`, run })),
-  ...Object.entries(CAM_BREADTH_WORKLOADS).map(([id, run]) => ({ id: `cam.${id}`, run }))
+  ...Object.entries(CAM_BREADTH_WORKLOADS).map(([id, run]) => ({ id: `cam.${id}`, run })),
+  ...Object.entries(CAD_WORKFLOW_WORKLOADS).map(([id, run]) => ({ id, run }))
 ]

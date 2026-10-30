@@ -18,6 +18,9 @@
     "cam.engagement-pocket": 250,
     "cam.feed-optimise-pocket": 150,
     "cam.tridexel-build-100x100x50": 150,
-    "cam.tridexel-pocket-pass": 1500
+    "cam.tridexel-pocket-pass": 1500,
+    "sketch.solve-529": 50,
+    "sketch.solve-529-newton": 30,
+    "sketch.drag-200": 8
   }
 }
