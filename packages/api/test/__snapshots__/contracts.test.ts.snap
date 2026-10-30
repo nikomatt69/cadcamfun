@@ -61101,6 +61101,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "breadth": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "holeCycles": {
+                        "type": "boolean",
+                      },
+                      "namedFeatures": {
+                        "type": "boolean",
+                      },
+                      "tilted": {
+                        "type": "boolean",
+                      },
+                    },
+                    "type": "object",
+                  },
                   "deburr": {
                     "exclusiveMinimum": 0,
                     "maximum": 5,
@@ -61837,6 +61852,190 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "ream",
                               ],
                               "type": "string",
+                            },
+                            "cycle": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "diameter": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "countersink",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "diameter",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "chipBreakRetract": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "dwell": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "fullRetractEvery": {
+                                      "minimum": 0,
+                                      "type": "integer",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "deep",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "minPeck": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "peck": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "peckReduction": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "retract": {
+                                      "enum": [
+                                        "full",
+                                        "chip-break",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "peck",
+                                    "retract",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "diameter": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "face": {
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "back-bore",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "pilotDiameter": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "diameter",
+                                    "pilotDiameter",
+                                    "face",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "chipBreak": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "tilted",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "peck": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "sites": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "depth": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                          "direction": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                              },
+                                              "z": {
+                                                "type": "number",
+                                              },
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          "entry": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                              },
+                                              "z": {
+                                                "type": "number",
+                                              },
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z",
+                                            ],
+                                            "type": "object",
+                                          },
+                                        },
+                                        "required": [
+                                          "entry",
+                                          "direction",
+                                          "depth",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "maxItems": 5000,
+                                      "minItems": 1,
+                                      "type": "array",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "sites",
+                                  ],
+                                  "type": "object",
+                                },
+                              ],
                             },
                             "feed": {
                               "exclusiveMinimum": 0,
@@ -62908,6 +63107,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "minimum": 1,
                           "type": "integer",
                         },
+                        "headHeight": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
                         "holder": {
                           "additionalProperties": false,
                           "properties": {
@@ -62965,6 +63168,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "engraver",
                             "tap",
                             "reamer",
+                            "countersink",
+                            "boringbar",
+                            "tslot",
+                            "dovetail",
                           ],
                           "type": "string",
                         },
@@ -62984,6 +63191,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "name": {
                           "maxLength": 120,
                           "type": "string",
+                        },
+                        "neckDiameter": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
                         },
                         "number": {
                           "maximum": 999,

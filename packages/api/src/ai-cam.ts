@@ -55,6 +55,10 @@ export const CamManufactureInput = Schema.Struct({
   tools: Schema.optionalKey(Schema.Array(cam.kernel.CutterSchema).check(Schema.isMinLength(1), Schema.isMaxLength(200))),
   /** Break the top edges with a chamfer of this width, mm (2D chamfer operations). */
   deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
+  /** Hole and feature breadth the planner may use when it plans the operations (all off unless asked); each decision comes back in the notes with its rule. */
+  breadth: Schema.optionalKey(Schema.Struct({
+    holeCycles: Schema.optionalKey(Schema.Boolean), tilted: Schema.optionalKey(Schema.Boolean), namedFeatures: Schema.optionalKey(Schema.Boolean)
+  })),
   /** Hold the outlines cut through the full stock height with this many tabs (`width` mm of material, `height` mm high; spec 69 A1). */
   tabs: Schema.optionalKey(Schema.Struct({ count: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 64 })), width: positive.check(Schema.isLessThanOrEqualTo(100)), height: positive.check(Schema.isLessThanOrEqualTo(50)) })),
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as a subprogram (`M98` on the Fanuc and Haas posts, `CALL LBL` on the Heidenhain Klartext post). */
@@ -109,7 +113,7 @@ export const CamManufactureOperationInput = Schema.Struct({
   machineConfig: CamManufactureInput.fields.machineConfig,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
-  operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr, tabs: CamManufactureInput.fields.tabs,
+  operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr, tabs: CamManufactureInput.fields.tabs, breadth: CamManufactureInput.fields.breadth,
   subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
 })
 

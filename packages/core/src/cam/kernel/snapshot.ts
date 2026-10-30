@@ -8,7 +8,7 @@ import { meshBounds } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
-import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type PrintRequirement, type TabRequirement, type WorkOrigin } from "./contracts.ts"
+import { KERNEL_SCHEMA_VERSION, type CamResult, type JobBreadth, type ManufacturingJob, type OperationSpec, type PrintRequirement, type TabRequirement, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
 import { findMachine, MACHINE_CATALOGUE } from "./machines.ts"
 import { kernelMachineOfConfig, machineRefusal, type MachineConfigRow } from "./machine-config.ts"
@@ -31,6 +31,8 @@ export interface KernelSnapshot {
   readonly deburr?: number
   /** Tabs that hold the outlines the program cuts through the full stock height (spec 69 A1). */
   readonly tabs?: TabRequirement
+  /** Hole and feature breadth the planner may use (countersinks, deep holes, back-bores, tilted drilling, named features). */
+  readonly breadth?: JobBreadth
   /** Write toolpaths that repeat translated as subprograms (`M98` on Fanuc and Haas, `CALL LBL` labels on Heidenhain Klartext). */
   readonly subprograms?: boolean
   /** High-speed contour smoothing with this tolerance, mm (`PostOptions.smoothing`). */
@@ -85,6 +87,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
         } }
         : {}),
       ...(s.print !== undefined ? { print: s.print } : {}),
+      ...(s.breadth !== undefined ? { breadth: s.breadth } : {}),
       quality
     }
   }

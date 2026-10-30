@@ -252,3 +252,17 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
     gap. Still open: tolerance growth rules across Boolean chains, STEP export refusing `loose` bodies, refit of circles and
     splines. Routing imported STEP bodies into a history base feature (step 2.2 second half, P2-10 import half) is outside
     `packages/core/src/cad/brep` and not done.
+
+- 2026-10-30 (wiring session, hole cycles and posts into the chain): **P2-5 reaches `runJob`.** `ManufacturingJob.breadth`
+  (`holeCycles`, `tilted`, `namedFeatures`; off unless asked) feeds `planJob`; a `drill` operation with `cycle` runs
+  `generateHoleCycle`; every breadth decision comes back in `CamArtifact.notes` with its rule. Exposed as `breadth` in
+  `CamManufactureInput` / `CamKernelRequest` / `KernelSnapshot`, the sidecar job builder and the `cam`/`cam_edit` prompts; API
+  clients and the OpenAPI snapshot regenerated. Found while wiring: the tilted cycle turned the table with the tool still low
+  (now: rise to a table-swing safe height first, position over the hole at that height, turn the table upright afterwards);
+  `cycle.face` of a back-bore was in setup coordinates and was not shifted; hole cycles are declared removal (the cone of a blind
+  drill is a gouge to the tri-dexel replay otherwise); a back-bore cuts the underside, which the height-field replay cannot see,
+  so those moves are not carved and the replay claims stay `unresolved`. Tests: `kernel/breadth-job.test.ts` (8, end to end through
+  `runJob`). **Not done:** `tcp: true` from a kernel job. The post converts exactly, but the kernel's NC replay reads the tip-control
+  program's part coordinates as machine coordinates and reports `ReplayMismatch` / `HolderCollision` that the machine-coordinate
+  program does not have: the replay must understand the tip-control word first. A spindle-orient move (`M19`) is still a comment;
+  it needs an IR move and every post/interpreter/viewer switch. The desktop has no control for `breadth` yet.

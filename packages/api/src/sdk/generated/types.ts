@@ -1342,6 +1342,34 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly top: number
         readonly bottom: number
         readonly cut?: "drill" | "spot" | "tap" | "ream"
+        readonly cycle?:
+          | { readonly kind: "countersink"; readonly diameter: number }
+          | {
+              readonly kind: "deep"
+              readonly peck: number
+              readonly retract: "full" | "chip-break"
+              readonly peckReduction?: number
+              readonly minPeck?: number
+              readonly chipBreakRetract?: number
+              readonly fullRetractEvery?: number
+              readonly dwell?: number
+            }
+          | {
+              readonly kind: "back-bore"
+              readonly diameter: number
+              readonly pilotDiameter: number
+              readonly face: number
+            }
+          | {
+              readonly kind: "tilted"
+              readonly peck?: number
+              readonly chipBreak?: boolean
+              readonly sites: ReadonlyArray<{
+                readonly entry: { readonly x: number; readonly y: number; readonly z: number }
+                readonly direction: { readonly x: number; readonly y: number; readonly z: number }
+                readonly depth: number
+              }>
+            }
       }
     | {
         readonly id: string
@@ -1474,6 +1502,10 @@ export type ToolpathGeneratorManufacturePayload = {
       | "engraver"
       | "tap"
       | "reamer"
+      | "countersink"
+      | "boringbar"
+      | "tslot"
+      | "dovetail"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -1482,6 +1514,8 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly angle?: number
     readonly tipDiameter?: number
     readonly pitch?: number
+    readonly neckDiameter?: number
+    readonly headHeight?: number
     readonly fluteLength: number
     readonly shankDiameter: number
     readonly stickout: number
@@ -1495,6 +1529,7 @@ export type ToolpathGeneratorManufacturePayload = {
   }>
   readonly deburr?: number
   readonly tabs?: { readonly count: number; readonly width: number; readonly height: number }
+  readonly breadth?: { readonly holeCycles?: boolean; readonly tilted?: boolean; readonly namedFeatures?: boolean }
   readonly subprograms?: boolean
   readonly nativeCycles?: boolean
   readonly smoothing?: number
@@ -6303,6 +6338,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly tabs?: ToolpathGeneratorManufacturePayload["tabs"]
+  readonly breadth?: ToolpathGeneratorManufacturePayload["breadth"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
   readonly nativeCycles?: ToolpathGeneratorManufacturePayload["nativeCycles"]
   readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]

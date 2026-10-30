@@ -27,6 +27,7 @@ export const CamKernelRequest = Schema.Struct({
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
   tabs: CamManufactureInput.fields.tabs,
+  breadth: CamManufactureInput.fields.breadth,
   subprograms: CamManufactureInput.fields.subprograms,
   nativeCycles: CamManufactureInput.fields.nativeCycles,
   smoothing: CamManufactureInput.fields.smoothing,

@@ -53572,6 +53572,190 @@
                                 "tap",
                                 "ream"
                               ]
+                            },
+                            "cycle": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "countersink"
+                                      ]
+                                    },
+                                    "diameter": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "diameter"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "deep"
+                                      ]
+                                    },
+                                    "peck": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "retract": {
+                                      "type": "string",
+                                      "enum": [
+                                        "full",
+                                        "chip-break"
+                                      ]
+                                    },
+                                    "peckReduction": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "minPeck": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "chipBreakRetract": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "fullRetractEvery": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "dwell": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "peck",
+                                    "retract"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "back-bore"
+                                      ]
+                                    },
+                                    "diameter": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "pilotDiameter": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "face": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "diameter",
+                                    "pilotDiameter",
+                                    "face"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "tilted"
+                                      ]
+                                    },
+                                    "peck": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "chipBreak": {
+                                      "type": "boolean"
+                                    },
+                                    "sites": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "entry": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              },
+                                              "z": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "direction": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              },
+                                              "z": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "depth": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "entry",
+                                          "direction",
+                                          "depth"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "minItems": 1,
+                                      "maxItems": 5000
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "sites"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
                             }
                           },
                           "required": [
@@ -54293,7 +54477,11 @@
                             "threadmill",
                             "engraver",
                             "tap",
-                            "reamer"
+                            "reamer",
+                            "countersink",
+                            "boringbar",
+                            "tslot",
+                            "dovetail"
                           ]
                         },
                         "diameter": {
@@ -54341,6 +54529,14 @@
                           "minimum": 0
                         },
                         "pitch": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "neckDiameter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "headHeight": {
                           "type": "number",
                           "exclusiveMinimum": 0
                         },
@@ -54451,6 +54647,21 @@
                       "width",
                       "height"
                     ],
+                    "additionalProperties": false
+                  },
+                  "breadth": {
+                    "type": "object",
+                    "properties": {
+                      "holeCycles": {
+                        "type": "boolean"
+                      },
+                      "tilted": {
+                        "type": "boolean"
+                      },
+                      "namedFeatures": {
+                        "type": "boolean"
+                      }
+                    },
                     "additionalProperties": false
                   },
                   "subprograms": {

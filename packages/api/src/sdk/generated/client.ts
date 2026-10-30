@@ -3936,6 +3936,7 @@ export function make(options: ClientOptions) {
               tools: input["tools"],
               deburr: input["deburr"],
               tabs: input["tabs"],
+              breadth: input["breadth"],
               subprograms: input["subprograms"],
               nativeCycles: input["nativeCycles"],
               smoothing: input["smoothing"],

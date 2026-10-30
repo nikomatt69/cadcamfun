@@ -284,6 +284,7 @@ const toolHandlers = Effect.gen(function*() {
           } }
           : {}),
         ...(input.print !== undefined ? { print: input.print } : {}),
+        ...(input.breadth !== undefined ? { breadth: input.breadth } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}), ...(input.tabs !== undefined ? { tabs: input.tabs } : {}) }
       }
       const stockNote = machine?.kind === "printer" ? "Additive job: the part is placed on the printer's build plate; material usage is deposited filament, not removed stock." : stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
