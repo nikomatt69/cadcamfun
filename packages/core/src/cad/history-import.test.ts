@@ -3,6 +3,7 @@ import type { Feature, History, SketchFeature } from "./history.ts"
 import { rebuild } from "./history.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { importStepToHistory, withImported } from "./history-import.ts"
+import { sceneToStep } from "./scene-step.ts"
 import { meshVolume } from "./solid.ts"
 import { explodeWithGaps } from "./brep/exploded-fixture.ts"
 import { makeBox, massProperties, StepExportError, validateBrep, writeStepBreps } from "./brep/index.ts"
@@ -105,6 +106,19 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
     const twice = withImported(once, imp)
     expect(new Set(twice.bases!.map((b) => b.id)).size).toBe(2)
     expect(twice.bases!.length).toBe(2)
+  })
+
+  test("a scene export skips a loose body with its tolerance and writes it only when allowed", () => {
+    const imp = importStepToHistory(explodedStep(), { heal: { tighten: false } })
+    const element = { id: "e1", type: "brep", name: "foreign", brep: imp.bases[0]!.brep, x: 0, y: 0, z: 0 }
+    const refused = sceneToStep([element, { id: "e2", type: "brep", name: "sound", brep: makeBox(5, 5, 5), x: 0, y: 0, z: 0 }])
+    expect(refused.skipped.map((s) => s.name)).toEqual(["foreign"])
+    expect(refused.skipped[0]!.reason).toContain("loose body")
+    expect(refused.step).toBeDefined()
+    expect(refused.step).not.toContain("foreign")
+    const allowed = sceneToStep([element], { allowLoose: true })
+    expect(allowed.skipped).toEqual([])
+    expect(allowed.step).toContain("LOOSE foreign")
   })
 
   test("a loose imported body is accepted, said to be loose, and what is built on it cannot be exported silently", () => {
