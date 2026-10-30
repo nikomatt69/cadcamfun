@@ -63788,6 +63788,230 @@
         }
       }
     },
+    "/api/cad/exact/import-step": {
+      "post": {
+        "tags": [
+          "cadExact"
+        ],
+        "operationId": "cadExact.importStep",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "bodies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "exact",
+                              "healed",
+                              "refused"
+                            ]
+                          },
+                          "faces": {
+                            "type": "integer"
+                          },
+                          "volume": {
+                            "type": "number"
+                          },
+                          "maxTolerance": {
+                            "type": "number"
+                          },
+                          "limit": {
+                            "type": "number"
+                          },
+                          "loose": {
+                            "type": "boolean"
+                          },
+                          "diagnostics": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "healed": {
+                            "type": "object",
+                            "properties": {
+                              "verticesWelded": {
+                                "type": "integer"
+                              },
+                              "edgesWelded": {
+                                "type": "integer"
+                              },
+                              "verticesTightened": {
+                                "type": "integer"
+                              },
+                              "edgesRefitted": {
+                                "type": "integer"
+                              },
+                              "circlesRefitted": {
+                                "type": "integer"
+                              },
+                              "maxMove": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "verticesWelded",
+                              "edgesWelded",
+                              "verticesTightened",
+                              "edgesRefitted",
+                              "circlesRefitted",
+                              "maxMove"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "faces",
+                          "maxTolerance",
+                          "limit",
+                          "loose",
+                          "diagnostics"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "bases": {
+                      "type": "array"
+                    },
+                    "history": {},
+                    "problems": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "bodies",
+                    "bases",
+                    "problems",
+                    "warnings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "step": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30000000
+                  },
+                  "history": {},
+                  "idPrefix": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,40}$"
+                  },
+                  "tolerance": {
+                    "type": "number",
+                    "minimum": 1e-9,
+                    "maximum": 1
+                  },
+                  "keepAccepted": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "step"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/cam/setups/plan": {
       "post": {
         "tags": [

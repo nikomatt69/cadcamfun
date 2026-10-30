@@ -17702,6 +17702,230 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cad/exact/import-step": {
+      "post": {
+        "operationId": "cadExact.importStep",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "history": {},
+                  "idPrefix": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,40}$",
+                    "type": "string",
+                  },
+                  "keepAccepted": {
+                    "type": "boolean",
+                  },
+                  "step": {
+                    "maxLength": 30000000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "tolerance": {
+                    "maximum": 1,
+                    "minimum": 1e-9,
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "step",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bases": {
+                      "type": "array",
+                    },
+                    "bodies": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "diagnostics": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "faces": {
+                            "type": "integer",
+                          },
+                          "healed": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "circlesRefitted": {
+                                "type": "integer",
+                              },
+                              "edgesRefitted": {
+                                "type": "integer",
+                              },
+                              "edgesWelded": {
+                                "type": "integer",
+                              },
+                              "maxMove": {
+                                "type": "number",
+                              },
+                              "verticesTightened": {
+                                "type": "integer",
+                              },
+                              "verticesWelded": {
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "verticesWelded",
+                              "edgesWelded",
+                              "verticesTightened",
+                              "edgesRefitted",
+                              "circlesRefitted",
+                              "maxMove",
+                            ],
+                            "type": "object",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "limit": {
+                            "type": "number",
+                          },
+                          "loose": {
+                            "type": "boolean",
+                          },
+                          "maxTolerance": {
+                            "type": "number",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "status": {
+                            "enum": [
+                              "exact",
+                              "healed",
+                              "refused",
+                            ],
+                            "type": "string",
+                          },
+                          "volume": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "faces",
+                          "maxTolerance",
+                          "limit",
+                          "loose",
+                          "diagnostics",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "history": {},
+                    "ok": {
+                      "type": "boolean",
+                    },
+                    "problems": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "warnings": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "ok",
+                    "bodies",
+                    "bases",
+                    "problems",
+                    "warnings",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
     "/api/cad/exact/rebuild": {
       "post": {
         "operationId": "cadExact.rebuild",

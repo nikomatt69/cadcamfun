@@ -2983,6 +2983,25 @@ const Endpoint28_5 = (raw: RawClient["cadExact"]) => (input: Endpoint28_5Input) 
     Effect.mapError(mapClientError),
   )
 
+type Endpoint28_6Request = Parameters<RawClient["cadExact"]["importStep"]>[0]
+type Endpoint28_6Input = {
+  readonly step: Endpoint28_6Request["payload"]["step"]
+  readonly history?: Endpoint28_6Request["payload"]["history"]
+  readonly idPrefix?: Endpoint28_6Request["payload"]["idPrefix"]
+  readonly tolerance?: Endpoint28_6Request["payload"]["tolerance"]
+  readonly keepAccepted?: Endpoint28_6Request["payload"]["keepAccepted"]
+}
+const Endpoint28_6 = (raw: RawClient["cadExact"]) => (input: Endpoint28_6Input) =>
+  raw["importStep"]({
+    payload: {
+      step: input["step"],
+      history: input["history"],
+      idPrefix: input["idPrefix"],
+      tolerance: input["tolerance"],
+      keepAccepted: input["keepAccepted"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup28 = (raw: RawClient["cadExact"]) => ({
   analyze: Endpoint28_0(raw),
   step: Endpoint28_1(raw),
@@ -2990,6 +3009,7 @@ const adaptGroup28 = (raw: RawClient["cadExact"]) => ({
   setups: Endpoint28_3(raw),
   hole: Endpoint28_4(raw),
   rebuild: Endpoint28_5(raw),
+  importStep: Endpoint28_6(raw),
 })
 
 type Endpoint29_0Request = Parameters<RawClient["camSetup"]["plan"]>[0]

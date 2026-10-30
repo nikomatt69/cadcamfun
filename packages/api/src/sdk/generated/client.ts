@@ -463,6 +463,8 @@ import type {
   CadExactHoleOutput,
   CadExactRebuildInput,
   CadExactRebuildOutput,
+  CadExactImportStepInput,
+  CadExactImportStepOutput,
   CamSetupPlanInput,
   CamSetupPlanOutput,
   CamSetupValidateInput,
@@ -4096,6 +4098,24 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/cad/exact/rebuild`,
             body: { history: input["history"], budgetMs: input["budgetMs"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      importStep: (input: CadExactImportStepInput, requestOptions?: RequestOptions) =>
+        request<CadExactImportStepOutput>(
+          {
+            method: "POST",
+            path: `/api/cad/exact/import-step`,
+            body: {
+              step: input["step"],
+              history: input["history"],
+              idPrefix: input["idPrefix"],
+              tolerance: input["tolerance"],
+              keepAccepted: input["keepAccepted"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,

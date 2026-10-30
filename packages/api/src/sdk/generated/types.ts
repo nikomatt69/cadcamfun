@@ -1825,6 +1825,14 @@ export type CadExactHolePayload = {
 
 export type CadExactRebuildPayload = { readonly history: JsonValue; readonly budgetMs?: number }
 
+export type CadExactImportStepPayload = {
+  readonly step: string
+  readonly history?: JsonValue
+  readonly idPrefix?: string
+  readonly tolerance?: number
+  readonly keepAccepted?: boolean
+}
+
 export type CamSetupPlanPayload = {
   readonly setup: {
     readonly id: string
@@ -7780,6 +7788,41 @@ export type CadExactRebuildOutput = {
   }>
   digest: string
   issues: Array<{ feature: string; severity: "error" | "warning"; message: string; remedy?: string }>
+  warnings: Array<string>
+}
+
+export type CadExactImportStepInput = {
+  readonly step: CadExactImportStepPayload["step"]
+  readonly history?: CadExactImportStepPayload["history"]
+  readonly idPrefix?: CadExactImportStepPayload["idPrefix"]
+  readonly tolerance?: CadExactImportStepPayload["tolerance"]
+  readonly keepAccepted?: CadExactImportStepPayload["keepAccepted"]
+}
+
+export type CadExactImportStepOutput = {
+  ok: boolean
+  bodies: Array<{
+    id?: string
+    name: string
+    status: "exact" | "healed" | "refused"
+    faces: number
+    volume?: number
+    maxTolerance: number
+    limit: number
+    loose: boolean
+    diagnostics: Array<string>
+    healed?: {
+      verticesWelded: number
+      edgesWelded: number
+      verticesTightened: number
+      edgesRefitted: number
+      circlesRefitted: number
+      maxMove: number
+    }
+  }>
+  bases: Array<JsonValue>
+  history?: JsonValue
+  problems: Array<string>
   warnings: Array<string>
 }
 
