@@ -8,6 +8,7 @@ import { add3, dist3, dot3, length3, normalize3, scale3, sub3, type Vec3 } from 
 import { curvePoint, curveProject, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject } from "./geom.ts"
 import { edgeUses, type Brep } from "./topology.ts"
 import { faceBoundaries, type FaceBoundaries, type UvSample } from "./tessellate.ts"
+import { orient2d } from "./predicates.ts"
 
 export type PointClass = "in" | "out" | "on"
 
@@ -45,9 +46,11 @@ const winding = (rings: ReadonlyArray<ReadonlyArray<UvSample>>, u: number, v: nu
   for (const r of rings) {
     for (let i = 0; i < r.length; i++) {
       const a = r[i]!, b = r[(i + 1) % r.length]!
+      // Which side of the edge the point is on is a sign question: exact orientation, so a point on a boundary vertex or on a
+      // collinear run of ring samples is never counted in or out by rounding.
       if (a.v <= v) {
-        if (b.v > v && (b.u - a.u) * (v - a.v) - (u - a.u) * (b.v - a.v) > 0) w++
-      } else if (b.v <= v && (b.u - a.u) * (v - a.v) - (u - a.u) * (b.v - a.v) < 0) w--
+        if (b.v > v && orient2d(a.u, a.v, b.u, b.v, u, v) > 0) w++
+      } else if (b.v <= v && orient2d(a.u, a.v, b.u, b.v, u, v) < 0) w--
     }
   }
   return w
