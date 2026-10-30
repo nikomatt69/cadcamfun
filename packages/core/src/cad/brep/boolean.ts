@@ -40,6 +40,7 @@ import { validateBrep, type BrepIssue } from "./validate.ts"
 import { recordDerivation, type FaceOrigin } from "./lineage-record.ts"
 import { separateContacts, separateTouchingVertices } from "./contact.ts"
 import { orient2d } from "./predicates.ts"
+import { makeSphere, makeTorus } from "./primitives.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
@@ -87,15 +88,17 @@ export interface BooleanCounters {
   readonly poleContact: number
   /** Solved by the plain pipeline with a tangent, edge or point contact kept in place (a warning says so; no operand moved). */
   readonly inPlaceContact: number
+  /** Solved exactly after a bare sphere or torus operand was given another parametrisation frame (poles and seams moved off the contact; no geometry changed). */
+  readonly reframed: number
   /** Failures by the stage that gave up. */
   readonly byStage: Readonly<Record<BooleanStage, number>>
 }
 
-const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, inPlaceContact: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
+const COUNTERS = { calls: 0, exact: 0, recoveredByDisplacement: 0, strictFailure: 0, failed: 0, emptyResult: 0, poleContact: 0, inPlaceContact: 0, reframed: 0, byStage: { prepare: 0, arrange: 0, validate: 0 } as Record<BooleanStage, number> }
 
 export const booleanCounters = (): BooleanCounters => ({ ...COUNTERS, byStage: { ...COUNTERS.byStage } })
 export const resetBooleanCounters = (): void => {
-  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0; COUNTERS.inPlaceContact = 0
+  COUNTERS.calls = 0; COUNTERS.exact = 0; COUNTERS.recoveredByDisplacement = 0; COUNTERS.strictFailure = 0; COUNTERS.failed = 0; COUNTERS.emptyResult = 0; COUNTERS.poleContact = 0; COUNTERS.inPlaceContact = 0; COUNTERS.reframed = 0
   COUNTERS.byStage = { prepare: 0, arrange: 0, validate: 0 }
 }
 
@@ -1306,6 +1309,22 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     if (!(e instanceof BooleanError)) throw e
     const first: BooleanError = e
     if (!poleContact) COUNTERS.strictFailure++
+    // An exact way out before any displacement: a bare sphere or torus operand is re-parametrised (its poles and seams move; the
+    // solid does not), which removes a pole or seam lying on the other operand's surface or on an intersection curve. The pair is
+    // checked like a displaced one, against the volume identities, but to a much tighter bound because nothing moved.
+    for (const cand of reframedPairs(A, B)) {
+      try {
+        const set = pairSet(A, B, cand.key, () => cand, options, 1e-7)
+        const r = set.get(op)
+        if (!agreesWithOperands(set.A, set.B, op, r)) continue
+        if (!set.identitiesHold()) continue
+        COUNTERS.reframed++
+        if (r.faces.length === 0) COUNTERS.emptyResult++
+        return { brep: r, warnings: [], stats: set.stats(op) }
+      } catch (e2) {
+        if (!(e2 instanceof BooleanError)) throw e2
+      }
+    }
     const box = boxOf([...A.vertices, ...B.vertices].map((v) => v.point))
     const extent = dist3(box.lo, box.hi)
     const dirs: Vec3[] = [{ x: 0.53, y: 0.31, z: 0.79 }, { x: -0.61, y: 0.43, z: -0.66 }]
@@ -1314,7 +1333,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
       const eps = Math.max(1e-6, extent * scale)
       for (const [di, d] of dirs.entries()) {
         try {
-          const set = displacedSet(A, B, `${scale}:${di}`, () => transformBrep(B, translation(scale3(normalize3(d), eps))), options)
+          const set = pairSet(A, B, `${scale}:${di}`, () => ({ A, B: transformBrep(B, translation(scale3(normalize3(d), eps))) }), options)
           const r = set.get(op)
           // A displaced operand can make the pipeline return a valid solid that is not the answer. Two checks: a sample of the
           // operands' box against the result's volume, and the identities that union, intersection and difference of the same
@@ -1324,7 +1343,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
           if (!set.identitiesHold()) continue
           COUNTERS.recoveredByDisplacement++
           if (r.faces.length === 0) COUNTERS.emptyResult++
-          return { brep: r, warnings: [`degenerate alignment: the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence`], stats: set.stats(op) }
+          return { brep: r, warnings: [`degenerate alignment (${degenerateCase(A, B, first, poleContact)}): the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence; the result is exact only to that distance`], stats: set.stats(op) }
         } catch (e3) {
           if (!(e3 instanceof BooleanError)) throw e3
         }
@@ -1334,6 +1353,69 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     COUNTERS.failed++
     COUNTERS.byStage[first.diagnostic?.stage ?? "validate"]++
     throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[3]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
+  }
+}
+
+/**
+ * Names the case a displacement was needed for: the curved surfaces of both operands and why the plain pipeline did not hold, so
+ * a warning says "torus x cylinder: ..." instead of "something degenerate". Descriptive only; it decides nothing.
+ */
+const degenerateCase = (A: Brep, B: Brep, failure: BooleanError, poleContact: boolean): string => {
+  const kinds = (b: Brep) => [...new Set(b.faces.map((f) => f.surface.kind).filter((k) => k !== "plane"))].sort().join("/") || "planar"
+  const pair = `${kinds(A)} x ${kinds(B)}`
+  if (poleContact) return `${pair}: a pole or apex lies on a curved face of the other solid and the operand cannot be re-parametrised`
+  const reason = failure.message.replace(/^Boolean \w+ produced an invalid solid: /, "invalid result: ").slice(0, 100)
+  return `${pair}: singular surface intersection the plain pipeline cannot arrange (${reason})`
+}
+
+/**
+ * A solid that is one whole sphere or torus face (what `makeSphere` / `makeTorus` build), or undefined. Only these can be
+ * re-parametrised safely: the seam edge belongs to the face, so rebuilding the primitive with another frame gives the same solid.
+ */
+const bareRound = (b: Brep): Face | undefined => {
+  if (b.faces.length !== 1 || b.shells.length !== 1 || b.edges.length > 3) return undefined
+  const f = b.faces[0]!
+  if (f.reversed || (f.surface.kind !== "sphere" && f.surface.kind !== "torus")) return undefined
+  const fr = f.surface.frame
+  if (dot3(cross3(fr.x, fr.y), fr.z) <= 0) return undefined
+  return f
+}
+
+const rotateAbout = (v: Vec3, k: Vec3, a: number): Vec3 =>
+  add3(add3(scale3(v, Math.cos(a)), scale3(cross3(k, v), Math.sin(a))), scale3(k, dot3(k, v) * (1 - Math.cos(a))))
+
+/** The same bare sphere or torus with another frame: a sphere's axis is turned (poles and seam move), a torus is turned about its axis (the seam moves). */
+const reframeRound = (b: Brep, variant: number): Brep | undefined => {
+  const face = bareRound(b)
+  if (face === undefined) return undefined
+  const s = face.surface
+  if (s.kind !== "sphere" && s.kind !== "torus") return undefined
+  // Irrational-looking angles: a designed (grid-aligned) model has no reason to put a pole or a seam on them.
+  const tilts = [0.9273, 2.2143, 1.4427], turns = [0.6174, 1.8851, 2.9702]
+  const f = s.frame
+  let fr: Frame
+  if (s.kind === "sphere") {
+    const z = normalize3(rotateAbout(rotateAbout(f.z, f.x, tilts[variant]!), f.z, turns[variant]!))
+    const x0 = rotateAbout(f.x, f.z, turns[variant]! * 1.7)
+    const x = normalize3(sub3(x0, scale3(z, dot3(x0, z))))
+    fr = { origin: f.origin, x, y: cross3(z, x), z }
+  } else {
+    const x = rotateAbout(f.x, f.z, turns[variant]!)
+    fr = { origin: f.origin, x, y: cross3(f.z, x), z: f.z }
+  }
+  const out = s.kind === "sphere" ? makeSphere(s.radius, fr) : makeTorus(s.major, s.minor, fr)
+  return face.name === undefined ? out : { ...out, faces: out.faces.map((x) => ({ ...x, name: face.name! })) }
+}
+
+/** Candidate pairs for the exact recovery: B re-parametrised, then A, three frames each (only bare spheres and tori qualify). */
+function* reframedPairs(A: Brep, B: Brep): Generator<{ readonly key: string; readonly A: Brep; readonly B: Brep }> {
+  for (let variant = 0; variant < 3; variant++) {
+    const B2 = reframeRound(B, variant)
+    if (B2 !== undefined && poleContactKind(A, B2) !== "hard" && poleContactKind(B2, A) !== "hard") yield { key: `reframeB:${variant}`, A, B: B2 }
+  }
+  for (let variant = 0; variant < 3; variant++) {
+    const A2 = reframeRound(A, variant)
+    if (A2 !== undefined && poleContactKind(A2, B) !== "hard" && poleContactKind(B, A2) !== "hard") yield { key: `reframeA:${variant}`, A: A2, B }
   }
 }
 
@@ -1439,6 +1521,7 @@ const exactVolume = (b: Brep): number => {
 const SETS = new WeakMap<Brep, WeakMap<Brep, Map<string, DisplacedSet>>>()
 
 interface DisplacedSet {
+  readonly A: Brep
   readonly B: Brep
   /** The operation's result on the displaced pair (computed once, whoever asks first); throws the pipeline's `BooleanError`. */
   get(op: BooleanOp): Brep
@@ -1447,20 +1530,23 @@ interface DisplacedSet {
   identitiesHold(): boolean
 }
 
-/** The three operations on A and a displaced copy of B, kept for the next ask: a union, an intersection and a difference of one pair share them. */
-const displacedSet = (A: Brep, B: Brep, key: string, displace: () => Brep, options: BooleanOptions): DisplacedSet => {
+/**
+ * The three operations on a modified copy of the pair (B displaced, or a sphere re-parametrised), kept for the next ask: a union,
+ * an intersection and a difference of one pair share them. `idTol` is the relative bound of the volume identities.
+ */
+const pairSet = (A: Brep, B: Brep, key: string, make: () => { readonly A: Brep; readonly B: Brep }, options: BooleanOptions, idTol = 1e-5): DisplacedSet => {
   let byB = SETS.get(A)
   if (byB === undefined) { byB = new WeakMap(); SETS.set(A, byB) }
   let sets = byB.get(B)
   if (sets === undefined) { sets = new Map(); byB.set(B, sets) }
   const hit = sets.get(key)
   if (hit !== undefined) return hit
-  const B2 = displace()
+  const { A: A2, B: B2 } = make()
   const done = new Map<BooleanOp, BooleanResult | BooleanError>()
   const run = (op: BooleanOp): BooleanResult => {
     let r = done.get(op)
     if (r === undefined) {
-      try { r = booleanStrict(A, B2, op, options) } catch (err) { if (!(err instanceof BooleanError)) throw err; r = err }
+      try { r = booleanStrict(A2, B2, op, options) } catch (err) { if (!(err instanceof BooleanError)) throw err; r = err }
       done.set(op, r)
     }
     if (r instanceof BooleanError) throw r
@@ -1469,6 +1555,7 @@ const displacedSet = (A: Brep, B: Brep, key: string, displace: () => Brep, optio
   const vol = exactVolume
   let holds: boolean | undefined
   const set: DisplacedSet = {
+    A: A2,
     B: B2,
     get: (op) => run(op).brep,
     stats: (op) => run(op).stats,
@@ -1476,8 +1563,8 @@ const displacedSet = (A: Brep, B: Brep, key: string, displace: () => Brep, optio
       if (holds === undefined) {
         try {
           const u = vol(run("union").brep), i = vol(run("intersect").brep), d = vol(run("subtract").brep)
-          const va = vol(A), vb = vol(B2)
-          const tol = 1e-5 * (va + vb)
+          const va = vol(A2), vb = vol(B2)
+          const tol = idTol * (va + vb)
           holds = Math.abs(u + i - va - vb) <= tol && Math.abs(d + i - va) <= tol
         } catch (err) {
           if (!(err instanceof BooleanError)) throw err
