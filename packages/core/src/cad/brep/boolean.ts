@@ -18,7 +18,7 @@
 import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, translation, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
 import { curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface } from "./geom.ts"
 import { interpolateCurve, nurbsCurvePoint, type NurbsCurveData } from "./nurbs.ts"
-import { compactBrep, edgeUses, EMPTY_BREP, transformBrep, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
+import { compactBrepMapped, edgeUses, EMPTY_BREP, transformBrep, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
 import { massProperties } from "./mass.ts"
@@ -37,6 +37,7 @@ import {
   type TriSet
 } from "./intersect.ts"
 import { validateBrep, type BrepIssue } from "./validate.ts"
+import { recordDerivation, type FaceOrigin } from "./lineage-record.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
@@ -947,8 +948,27 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   // Nothing kept: the intersection of solids that are apart or only touch, or a subtraction that removes everything.
   if (faces.length === 0) return { brep: EMPTY_BREP, warnings, stats }
   let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
-  result = mergeCoplanarFaces(result)
-  result = compactBrep(result)
+  // Provenance (spec 41 N1): each kept fragment is a piece of one operand face. `split` and `merged` are decided when the table is read (`provenanceOf`).
+  const wholeFace = (fr: Fragment): boolean => {
+    if (fr.loops.length !== S[fr.solid].brep.faces[fr.face]!.loops.length) return false
+    const original = S[fr.solid].brep.faces[fr.face]!.loops.reduce((n, l) => n + l.coedges.length, 0)
+    if (fr.loops.reduce((n, l) => n + l.length, 0) !== original) return false
+    return fr.loops.every((l) => l.every((h) => {
+      const m = /^E\d+\.(\d+)\.\d+$/.exec(h.piece)
+      return m !== null && edgePieces[fr.solid]![Number(m[1])]!.length === 1
+    }))
+  }
+  const origins: FaceOrigin[][] = kept.map(({ fr, flip }) => [{
+    operand: fr.solid,
+    face: fr.face,
+    relation: wholeFace(fr) ? "same" : "trimmed",
+    ...(flip ? { flipped: true as const } : {})
+  }])
+  const merged = mergeCoplanarFaces(result)
+  result = merged.brep
+  const compacted = compactBrepMapped(result)
+  result = compacted.brep
+  recordDerivation(result, `boolean ${op}`, [A, B], compacted.order.map((m) => merged.from[m]!.flatMap((k) => origins[k]!)))
   options.debug?.("result", result)
   let report = validateBrep(result, { coarseVolume: true })
   // A lens thinner than the coarse chord (seed 114: a 0.07 mm torus/sphere overlap) tessellates with the wrong sign, so a
@@ -1092,7 +1112,7 @@ const samePlane = (a: Face, b: Face): boolean => {
  * Merges faces on the same plane (same orientation) that share edges: the shared edges disappear and the remaining
  * coedges are re-chained into loops.
  */
-const mergeCoplanarFaces = (b: Brep): Brep => {
+const mergeCoplanarFaces = (b: Brep): { readonly brep: Brep; readonly from: ReadonlyArray<ReadonlyArray<number>> } => {
   const uses = edgeUses({ ...b, shells: [{ faces: b.faces.map((_, i) => i), closed: true }] })
   const parent = b.faces.map((_, i) => i)
   const find = (x: number): number => { while (parent[x] !== x) x = parent[x] = parent[parent[x]!]!; return x }
@@ -1104,10 +1124,12 @@ const mergeCoplanarFaces = (b: Brep): Brep => {
   })
   const groups = new Map<number, number[]>()
   b.faces.forEach((_, i) => { const r = find(i); const l = groups.get(r) ?? []; l.push(i); groups.set(r, l) })
-  if ([...groups.values()].every((g) => g.length === 1)) return b
+  if ([...groups.values()].every((g) => g.length === 1)) return { brep: b, from: b.faces.map((_, i) => [i]) }
   const faces: Face[] = []
   const faceMap = new Map<number, number>()
+  const from: number[][] = []
   for (const [root, g] of groups) {
+    from.push(g)
     if (g.length === 1) { faceMap.set(root, faces.length); faces.push(b.faces[root]!); continue }
     const inGroup = new Set(g)
     const all: Coedge[] = g.flatMap((fi) => b.faces[fi]!.loops.flatMap((l) => l.coedges))
@@ -1143,7 +1165,7 @@ const mergeCoplanarFaces = (b: Brep): Brep => {
     faces.push({ ...base, loops })
   }
   const shells = b.shells.map((s) => ({ closed: s.closed, faces: [...new Set(s.faces.map((f) => faceMap.get(f)!))] }))
-  return { ...b, faces, shells }
+  return { brep: { ...b, faces, shells }, from }
 }
 
 void refineSurfaceSurface

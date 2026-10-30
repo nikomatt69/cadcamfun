@@ -13,6 +13,7 @@ import { compose, frame, rotation, translation, type Transform, type Vec3 } from
 import { pushPullCylinder } from "./pushpull-curved.ts"
 import { sewSolids } from "./sew.ts"
 import { extrudeProfile, loopMoments } from "./sweep.ts"
+import { recordDerivation } from "./lineage-record.ts"
 import type { Brep } from "./topology.ts"
 
 /** The cosine a face's normal must reach to the hint (60 degrees, as the mesh rebuild selects). */
@@ -102,16 +103,17 @@ export const pushPullFace = (b: Brep, o: PushPullOptions): Brep | string => {
   const n = pick.normal
   // The moved face keeps its name: a later feature can still refer to it (the pushed face is the prism's far end).
   const original = b.faces[pick.face]!.name
-  const prism = (from: number, to: number): Brep => {
+  const prism = (from: number, to: number, moved: "pushpull.top" | "pushpull.bottom"): Brep => {
     const solid = extrudeProfile({ loops: profile }, to - from, { placement: frame(add3(pick.origin, scale3(n, from)), n, pick.u), name: "pushpull" })
-    if (original === undefined) return solid
-    return { ...solid, faces: solid.faces.map((face) => face.name === "pushpull.top" ? { ...face, name: original } : face) }
+    const named = original === undefined ? solid : { ...solid, faces: solid.faces.map((face) => face.name === "pushpull.top" ? { ...face, name: original } : face) }
+    // Provenance: the end of the prism that is the moved face is that face, offset along its normal; its walls are new.
+    return recordDerivation(named, "pushpull-tool", [b], solid.faces.map((face) => (face.name === moved ? [{ operand: 0, face: pick.face, relation: "offset" as const }] : [])))
   }
   // The overlap the mesh rebuild gives its tool, so the Boolean meets a volume and not a face.
   const margin = 0.01
   try {
-    if (o.distance > 0) return sewSolids(b, prism(0, o.distance)) ?? booleanBrep(b, prism(-margin, o.distance), "union").brep
-    return booleanBrep(b, prism(o.distance, margin), "subtract").brep
+    if (o.distance > 0) return sewSolids(b, prism(0, o.distance, "pushpull.top")) ?? booleanBrep(b, prism(-margin, o.distance, "pushpull.top"), "union").brep
+    return booleanBrep(b, prism(o.distance, margin, "pushpull.bottom"), "subtract").brep
   } catch (err) {
     return `exact push/pull failed: ${err instanceof Error ? err.message : String(err)}`
   }

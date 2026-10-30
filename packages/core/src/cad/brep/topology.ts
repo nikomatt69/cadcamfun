@@ -19,6 +19,7 @@
  */
 import { applyPoint, compose, IDENTITY, MODEL_TOL, near3, scaleOf, type Transform, type Vec3 } from "./math.ts"
 import { curvePoint, transformCurve, transformSurface, type Curve2, type Curve3, type Surface } from "./geom.ts"
+import { recordDerivation, recordRelabel } from "./lineage-record.ts"
 
 export interface Vertex {
   readonly point: Vec3
@@ -179,7 +180,7 @@ export const transformBrep = (b: Brep, tr: Transform): Brep => {
       : f.loops.map((l) => ({ coedges: l.coedges.map((c) => ({ edge: c.edge, reversed: c.reversed })) }))
     return f.name === undefined ? { surface, reversed: mirror ? !f.reversed : f.reversed, loops } : { surface, reversed: mirror ? !f.reversed : f.reversed, loops, name: f.name }
   })
-  return { vertices, edges, faces, shells: b.shells }
+  return recordRelabel({ vertices, edges, faces, shells: b.shells }, "transform", b)
 }
 
 /** Several breps as one (shells side by side, indices renumbered). No Boolean is done. */
@@ -192,11 +193,18 @@ export const mergeBreps = (parts: ReadonlyArray<Brep>): Brep => {
     faces.push(...b.faces.map((f) => ({ ...f, loops: f.loops.map((l) => ({ coedges: l.coedges.map((c) => ({ ...c, edge: c.edge + eo })) })) })))
     shells.push(...b.shells.map((s) => ({ closed: s.closed, faces: s.faces.map((x) => x + fo) })))
   }
-  return { vertices, edges, faces, shells }
+  const merged: Brep = { vertices, edges, faces, shells }
+  return recordDerivation(merged, "merge", parts, parts.flatMap((b, k) => { return b.faces.map((_, i) => [{ operand: k, face: i, relation: "same" as const }]) }))
 }
 
 /** Removes vertices and edges no face uses and renumbers (after Boolean surgery). */
 export const compactBrep = (b: Brep): Brep => {
+  const { brep, order } = compactBrepMapped(b)
+  return recordRelabel(brep, "compact", b, order)
+}
+
+/** `compactBrep` with the old index of every new face (`order[new] = old`); records no derivation. */
+export const compactBrepMapped = (b: Brep): { readonly brep: Brep; readonly order: ReadonlyArray<number> } => {
   const usedE = new Map<number, number>()
   const usedV = new Map<number, number>()
   const edges: Edge[] = []
@@ -209,6 +217,7 @@ export const compactBrep = (b: Brep): Brep => {
   const faceOrder = b.shells.flatMap((s) => s.faces)
   const faceMap = new Map<number, number>()
   const faces: Face[] = []
+  const order: number[] = []
   for (const fi of faceOrder) {
     if (faceMap.has(fi)) continue
     const f = b.faces[fi]!
@@ -225,10 +234,11 @@ export const compactBrep = (b: Brep): Brep => {
       })
     }))
     faceMap.set(fi, faces.length)
+    order.push(fi)
     faces.push({ ...f, loops })
   }
   const shells = b.shells.map((s) => ({ closed: s.closed, faces: s.faces.map((x) => faceMap.get(x)!) }))
-  return { vertices, edges, faces, shells }
+  return { brep: { vertices, edges, faces, shells }, order }
 }
 
 export const countTopology = (b: Brep): { readonly vertices: number; readonly edges: number; readonly faces: number; readonly loops: number; readonly shells: number } => ({

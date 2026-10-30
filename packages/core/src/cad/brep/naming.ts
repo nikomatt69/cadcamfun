@@ -10,6 +10,7 @@
  * Unnamed faces stay unnamed. The result is a Brep whose face names are pairwise distinct for every named face.
  */
 import type { Vec3 } from "./math.ts"
+import { recordRelabel } from "./lineage-record.ts"
 import { adjacentFaces, edgePointAt, type Brep } from "./topology.ts"
 
 const centre = (b: Brep, fi: number): Vec3 => {
@@ -25,7 +26,17 @@ const centre = (b: Brep, fi: number): Vec3 => {
 /** The centre of a face: the mean of its edge midpoints (a point on the face, for a selection or a report). */
 export const faceCentre = (b: Brep, fi: number): Vec3 => centre(b, fi)
 
+const UNIQUE = new WeakMap<Brep, Brep>()
+
 export const uniqueFaceNames = (b: Brep): Brep => {
+  const known = UNIQUE.get(b)
+  if (known !== undefined) return known
+  const out = uniqueNames(b)
+  UNIQUE.set(b, out)
+  return out
+}
+
+const uniqueNames = (b: Brep): Brep => {
   const groups = new Map<string, number[]>()
   b.faces.forEach((f, i) => { if (f.name !== undefined) groups.set(f.name, [...(groups.get(f.name) ?? []), i]) })
   if ([...groups.values()].every((g) => g.length === 1)) return b
@@ -42,7 +53,7 @@ export const uniqueFaceNames = (b: Brep): Brep => {
       .sort((p, r) => p.key.localeCompare(r.key) || q(p.c.x) - q(r.c.x) || q(p.c.y) - q(r.c.y) || q(p.c.z) - q(r.c.z))
     order.forEach((o, k) => { names[o.fi] = `${name}#${k}` })
   }
-  return { ...b, faces: b.faces.map((f, i) => (names[i] === f.name ? f : { ...f, name: names[i]! })) }
+  return recordRelabel({ ...b, faces: b.faces.map((f, i) => (names[i] === f.name ? f : { ...f, name: names[i]! })) }, "unique-names", b)
 }
 
 /** Index of the face called `name`, or undefined (names are unique after `uniqueFaceNames`). */

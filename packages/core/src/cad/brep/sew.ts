@@ -7,8 +7,9 @@
  */
 import { dot3 } from "../vec.ts"
 import { dist3, type Vec3 } from "./math.ts"
-import { compactBrep, edgePointAt, mergeBreps, type Brep, type Coedge, type Edge, type Face } from "./topology.ts"
+import { compactBrepMapped, edgePointAt, mergeBreps, type Brep, type Coedge, type Edge, type Face } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
+import { recordDerivation } from "./lineage-record.ts"
 
 const planeOf = (f: Face): { readonly n: Vec3; readonly o: Vec3 } | undefined =>
   f.surface.kind !== "plane" ? undefined : { n: f.reversed ? { x: -f.surface.frame.z.x, y: -f.surface.frame.z.y, z: -f.surface.frame.z.z } : f.surface.frame.z, o: f.surface.frame.origin }
@@ -62,7 +63,8 @@ export const sewSolids = (a: Brep, b: Brep, tol = 1e-7): Brep | undefined => {
       }
       if (!ok) continue
       const edges = m.edges.map((e) => ({ ...e, v0: vertexMap.get(e.v0) ?? e.v0, v1: vertexMap.get(e.v1) ?? e.v1 }))
-      const faces: Face[] = m.faces.filter((_, k) => k !== i && k !== fo + j).map((f) => ({
+      const kept = m.faces.map((_, k) => k).filter((k) => k !== i && k !== fo + j)
+      const faces: Face[] = kept.map((k) => m.faces[k]!).map((f) => ({
         ...f,
         loops: f.loops.map((l) => ({
           coedges: l.coedges.map((c): Coedge => {
@@ -71,7 +73,10 @@ export const sewSolids = (a: Brep, b: Brep, tol = 1e-7): Brep | undefined => {
           })
         }))
       }))
-      const sewn = compactBrep({ vertices: m.vertices, edges, faces, shells: [{ faces: faces.map((_, k) => k), closed: true }] })
+      const compacted = compactBrepMapped({ vertices: m.vertices, edges, faces, shells: [{ faces: faces.map((_, k) => k), closed: true }] })
+      const sewn = compacted.brep
+      // Provenance: every surviving face is a face of one of the two solids; the glued pair is gone.
+      recordDerivation(sewn, "sew", [a, b], compacted.order.map((o) => { const k = kept[o]!; return k < fo ? [{ operand: 0, face: k, relation: "same" as const }] : [{ operand: 1, face: k - fo, relation: "same" as const }] }))
       const rep = validateBrep(sewn, { coarseVolume: true })
       return rep.valid ? sewn : undefined
     }
