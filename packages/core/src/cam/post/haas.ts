@@ -1,5 +1,6 @@
 import { emitProgram } from "./emitter.ts"
 import { fanucProgramNumber, fanucSubprograms } from "./fanuc.ts"
+import { haasSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post } from "./types.ts"
 
 /**
@@ -30,6 +31,7 @@ export const haasDialect: Dialect = {
   dwell: "milliseconds",
   uppercaseComments: true,
   rotary: true,
+  spindleOrient: haasSpindleOrient,
   tcp: "G234",
   inverseTime: { on: "G93", off: "G94" },
   // Haas G234 page: "The rotary axes must be at 0 before commanding G234"; "Do not program rapid moves while TCPC is active".

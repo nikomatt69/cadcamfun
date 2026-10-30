@@ -199,16 +199,29 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
     toolpaths.push({ id: `nc-${k}`, name: current.tool !== undefined ? `T${current.tool}` : `Operation ${k}`, toolId: String(current.tool ?? 1), spindleRpm: current.rpm, coolant: current.coolant, moves: current.moves })
   }
   let mended = 0
+  let nextOrient = 0
+  const orients = run.orients
+  const orientMove = (e: (typeof orients)[number]): Move => ({ _tag: "SpindleOrient", angle: ((e.angle % 360) + 360) % 360 })
   run.segments.forEach((segment, i) => {
     const state = states[i]!
-    const rpm = state.spindle === "off" ? 0 : Math.round(state.rpm)
+    // A spindle stopped at an orientation (M19) is still the operation's spindle: it restarts at the same speed, so it stays in the toolpath.
+    const rpm = state.oriented === true ? current?.rpm ?? 0 : state.spindle === "off" ? 0 : Math.round(state.rpm)
     if (current === undefined || state.tool !== current.tool || rpm !== current.rpm || state.coolant !== current.coolant) {
       flush()
       current = { tool: state.tool, rpm, coolant: state.coolant, moves: [] }
     }
-    while (nextComment < commentLines.length && commentLines[nextComment]! <= segment.line) {
-      current.moves.push({ _tag: "Comment", text: commentAt.get(commentLines[nextComment]!)! })
-      nextComment++
+    // Comments and spindle orientations before this segment, in the order of their lines.
+    for (;;) {
+      const c = nextComment < commentLines.length && commentLines[nextComment]! <= segment.line ? commentLines[nextComment]! : undefined
+      const o = nextOrient < orients.length && orients[nextOrient]!.at <= i ? orients[nextOrient]! : undefined
+      if (c === undefined && o === undefined) break
+      if (o !== undefined && (c === undefined || o.line <= c)) {
+        current.moves.push(orientMove(o))
+        nextOrient++
+      } else {
+        current.moves.push({ _tag: "Comment", text: commentAt.get(c!)! })
+        nextComment++
+      }
     }
     switch (segment.kind) {
       case "dwell":
@@ -232,6 +245,8 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
       }
     }
   })
+  // An orientation after the last motion (the spindle left oriented at the end).
+  while (nextOrient < orients.length && current !== undefined) current.moves.push(orientMove(orients[nextOrient++]!))
   flush()
   if (errors.length > 0) return { errors, notes, run }
 

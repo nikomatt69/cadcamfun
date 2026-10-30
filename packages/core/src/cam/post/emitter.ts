@@ -18,6 +18,7 @@ import {
   type OrientMove,
   type Program,
   type Rotary,
+  type SpindleOrientMove,
   type Toolpath,
   arcSweepBetween,
   expandCycle,
@@ -28,6 +29,7 @@ import {
 import { type ArcMode, type Dialect, type PlaneCall, type PostOptions, type TiltedPlane, defaultPostOptions } from "./types.ts"
 import { prepareFiveAxis, tipMinutesOf } from "./five-axis-frame.ts"
 import { frameMatrix, isIdentityPlane } from "./workplane.ts"
+import { angleText } from "./spindle-orient.ts"
 import { assertCycleSafe } from "../cycle-safety.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
@@ -154,6 +156,11 @@ class Writer {
   // True IR position (mm), for arc geometry and cycle expansion.
   ir: Vec3 | undefined
   spindleRpm = 0
+  /**
+   * Speed to restart at: a spindle orientation stops the spindle, so the next feed move writes `M3 S<rpm>` first. Cleared when an
+   * operation states its own spindle word.
+   */
+  restartRpm: number | undefined
   coolant: "off" | "flood" | "mist" = "off"
   tool = 0
   readonly scale: number
@@ -311,6 +318,7 @@ class Writer {
 
   linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr, source?: Move): void {
     this.endCycle()
+    this.restartSpindle()
     const a = this.axes(to)
     this.withExpr(a, expr)
     this.ensureTcp(rotary !== undefined)
@@ -465,6 +473,33 @@ class Writer {
     this.motion = "G0"
   }
 
+  /**
+   * Spindle orientation (`M19` / `SPOS`): the control's own words, or a refusal. The spindle is stopped afterwards, so the writer
+   * remembers the speed and restarts it before the next feed move.
+   */
+  spindleOrient(move: SpindleOrientMove): void {
+    this.endCycle()
+    const spec = this.dialect.spindleOrient
+    const angle = move.angle ?? 0
+    spindleOrientRefusal(this.dialect, angle)
+    for (const line of spec!.blocks(angleText(angle))) {
+      if (line.startsWith(KLARTEXT_PREFIX)) this.lines.push(line)
+      else this.block(line)
+    }
+    if (this.spindleRpm > 0) {
+      this.restartRpm = this.spindleRpm
+      this.spindleRpm = 0
+    }
+  }
+
+  /** Writes the spindle start that follows an orientation, before the first feed move after it. */
+  private restartSpindle(): void {
+    if (this.restartRpm === undefined) return
+    this.block("M3", `S${this.restartRpm}`)
+    this.spindleRpm = this.restartRpm
+    this.restartRpm = undefined
+  }
+
   dwell(seconds: number): void {
     this.endCycle()
     const p =
@@ -476,6 +511,7 @@ class Writer {
 
   arc(move: ArcMove): void {
     this.endCycle()
+    this.restartSpindle()
     this.leaveInverse()
     const from = this.ir
     if (from === undefined) {
@@ -602,6 +638,7 @@ class Writer {
 
   cycleMove(move: CycleMove): void {
     assertCycleSafe(move)
+    this.restartSpindle()
     this.leaveInverse()
     const from = this.ir ?? { x: move.to.x, y: move.to.y, z: move.retractHeight }
     const klartext = this.dialect.klartextCycles === true && this.scale === 1
@@ -707,6 +744,9 @@ class Writer {
       case "Orient":
         this.orient(move)
         break
+      case "SpindleOrient":
+        this.spindleOrient(move)
+        break
       case "Assign":
       case "MacroCall":
       case "If":
@@ -808,6 +848,17 @@ const feedRange = (toolpath: Toolpath): string => {
   return lo === hi ? `${Math.round(lo)}` : `${Math.round(lo)}-${Math.round(hi)}`
 }
 
+/** Refuses (with the reason) an orientation the control has no word for, or one it can only do at its fixed mark. */
+const spindleOrientRefusal = (dialect: Dialect, angle: number): void => {
+  const spec = dialect.spindleOrient
+  if (spec === undefined) {
+    throw new RangeError(`${dialect.id}: this control has no spindle orientation (M19 / SPOS); a back-boring bar or any tool that must stop at an angle cannot be driven by it, so the program is refused instead of written without the orientation`)
+  }
+  if (!spec.angled && Math.abs(angle) > 1e-9) {
+    throw new RangeError(`${dialect.id}: this control orients the spindle only to its own fixed mark (M19 takes no angle); ${angleText(angle)} degrees would be dropped silently, so the program is refused`)
+  }
+}
+
 const carriesRotary = (move: Move): boolean =>
   (move._tag === "Rapid" || move._tag === "Linear") && move.rotary !== undefined
 
@@ -824,6 +875,7 @@ const rejectUnwritable = (program: Program, dialect: Dialect): void => {
     if (simultaneous && indexed) {
       throw new RangeError(`Toolpath "${toolpath.name}" mixes positioned rotary axes (3+2) with simultaneous rotary motion: split it into two operations`)
     }
+    for (const m of toolpath.moves) if (m._tag === "SpindleOrient") spindleOrientRefusal(dialect, m.angle ?? 0)
     if (simultaneous && !dialect.rotary) {
       throw new RangeError(`Toolpath "${toolpath.name}" drives rotary axes, which the ${dialect.id} post cannot write: use a 5-axis post (haas) or a 3-axis operation`)
     }
@@ -930,6 +982,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       w.tool = n
     }
     first = false
+    w.restartRpm = undefined
     if (tp.spindleRpm > 0 && w.spindleRpm !== Math.round(tp.spindleRpm)) {
       w.block("M3", `S${Math.round(tp.spindleRpm)}`)
       w.spindleRpm = Math.round(tp.spindleRpm)

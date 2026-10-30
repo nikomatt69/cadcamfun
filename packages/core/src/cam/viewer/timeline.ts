@@ -68,6 +68,13 @@ export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate =
         time += move.seconds
         return
       }
+      if (move._tag === "SpindleOrient") {
+        // The spindle stops and finds its mark in place: a stationary beat on the clock, nothing moves.
+        const duration = previewMoveDuration(move, from, anglesFrom, angles, rapidRate)
+        moves.push({ path: p, index, kind: "dwell", from, to: from, start: time, duration, state, anglesFrom, angles })
+        time += duration
+        return
+      }
       const duration = previewMoveDuration(move, from, anglesFrom, angles, rapidRate)
       moves.push({
         path: p, index, kind: move._tag === "Rapid" ? "rapid" : "feed", from, to: move.to, start: time, duration, state, anglesFrom, angles,

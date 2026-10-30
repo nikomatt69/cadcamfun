@@ -76,6 +76,16 @@ export const OrientSchema = Schema.TaggedStruct("Orient", {
   c: Schema.optionalKey(Schema.Finite)
 })
 
+/**
+ * Spindle orientation (`M19`, Siemens `SPOS`): the spindle stops and turns to `angle` (degrees, 0 = the control's orientation
+ * mark, default) and is held there, so a tool with one cutting edge (the insert of a back-boring bar) points in a known direction.
+ * It moves nothing in the part's space and is **not** `Orient`, which turns the rotary table. The spindle is stopped afterwards: a
+ * post restarts it (`M3 S..`) before the next feed move. A control without the word refuses the program instead of dropping it.
+ */
+export const SpindleOrientSchema = Schema.TaggedStruct("SpindleOrient", {
+  angle: Schema.optionalKey(Schema.Finite)
+})
+
 export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream", "bore"])
 export type CycleKind = typeof CycleKindSchema.Type
 
@@ -112,6 +122,7 @@ export const MoveSchema = Schema.Union([
   CommentSchema,
   CycleSchema,
   OrientSchema,
+  SpindleOrientSchema,
   AssignSchema,
   MacroCallSchema,
   IfSchema,
@@ -132,17 +143,20 @@ export type ArcMove = typeof ArcSchema.Type
 export type DwellMove = typeof DwellSchema.Type
 export type CommentMove = typeof CommentSchema.Type
 export type OrientMove = typeof OrientSchema.Type
+export type SpindleOrientMove = typeof SpindleOrientSchema.Type
 export type CycleMove = typeof CycleSchema.Type
 export type Move = typeof MoveSchema.Type
 
 /** Clearance kept above the last depth when a peck cycle rapids back down, mm. */
 export const PECK_CLEARANCE = 0.5
+/** Planning figure for one spindle orientation (stop, find the mark, hold), seconds; controls differ, none is faster than this. */
+export const SPINDLE_ORIENT_SECONDS = 2
 /** Retract between pecks of a chip-breaking cycle, mm. */
 export const CHIP_BREAK_RETRACT = 0.5
 
 // ---------------------------------------------------------------- move helpers
 
-/** Endpoint of a move, or `undefined` for `Dwell`/`Comment`, which do not move. */
+/** Endpoint of a move, or `undefined` for `Dwell`/`Comment`/`SpindleOrient`, which do not move. */
 export const moveTarget = (move: Move): Vec3 | undefined => {
   switch (move._tag) {
     case "Rapid":
@@ -154,6 +168,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
     case "Dwell":
     case "Comment":
     case "Orient":
+    case "SpindleOrient":
       return undefined
   }
 }
@@ -212,6 +227,7 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "Dwell":
     case "Comment":
     case "Orient":
+    case "SpindleOrient":
     case "Assign":
     case "MacroCall":
     case "If":
@@ -445,7 +461,7 @@ export const toolpathBounds = (toolpath: Toolpath): Bounds3D => {
   }
   let started = false
   walk(toolpath, (move, from) => {
-    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient" || isControlNode(move)) return
+    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient" || move._tag === "SpindleOrient" || isControlNode(move)) return
     if (!started) {
       include(from.x, from.y, from.z)
       started = true
@@ -478,6 +494,9 @@ export const estimateTime = (toolpath: Toolpath, rapidRate: number): number => {
         break
       case "Dwell":
         seconds += move.seconds
+        break
+      case "SpindleOrient":
+        seconds += SPINDLE_ORIENT_SECONDS
         break
       case "Comment":
         break
@@ -655,6 +674,7 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
       const to = moveTarget(move)
       if (to === undefined) {
         if (move._tag === "Orient") checkRotary(toolpath.id, moveIndex, [["A", move.a], ["B", move.b], ["C", move.c]])
+        if (move._tag === "SpindleOrient" && move.angle !== undefined && !(move.angle >= 0 && move.angle < 360)) invalid(`spindle orientation ${move.angle} deg is outside 0..360`)
         continue
       }
       if (move._tag === "Cycle") {

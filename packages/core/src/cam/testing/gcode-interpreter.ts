@@ -125,6 +125,19 @@ export interface MotionSample {
   readonly line: number
   /** A probing move (touch probe or tool setter), not a cut. */
   readonly probe: boolean
+  /** The spindle is stopped at an orientation (`M19`, `SPOS`) and has not been started since; absent otherwise. */
+  readonly oriented?: boolean
+}
+
+/**
+ * A spindle orientation (`M19`, Siemens `SPOS`, Klartext cycle 13) read from the text. It moves nothing, so it is no segment:
+ * `at` is the number of segments before it, which places it among them (a converter inserts it before `segments[at]`).
+ */
+export interface SpindleOrientEvent {
+  readonly line: number
+  /** Degrees; 0 when the block names none (the control's own mark). */
+  readonly angle: number
+  readonly at: number
 }
 
 export interface InterpretResult {
@@ -143,6 +156,8 @@ export interface InterpretResult {
   readonly toolNames: ReadonlyMap<number, string>
   /** Program text had a program end (`M2`/`M30`). */
   readonly ended: boolean
+  /** Spindle orientations in program order (not motion, not segments). */
+  readonly orients: ReadonlyArray<SpindleOrientEvent>
   /** Words with an effect on motion that were not replayed. */
   readonly unsupported: ReadonlyArray<{ readonly line: number; readonly word: string }>
   /** With `track`: the machine state of each segment, aligned with `segments`. */
@@ -226,6 +241,14 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   let plane: 17 | 18 | 19 = 17
   let xMode: "diameter" | "radius" = "diameter"
   let spindle: "cw" | "ccw" | "off" = "off"
+  /** Stopped at an orientation since the last spindle word. */
+  let oriented = false
+  const orients: SpindleOrientEvent[] = []
+  const orientSpindle = (angle: number): void => {
+    spindle = "off"
+    oriented = true
+    orients.push({ line: physical, angle, at: segments.length })
+  }
   let sWord = 0
   let css = false
   let maxRpm: number | undefined
@@ -268,7 +291,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
   const sample = (line: number, at: P3): void => {
     if (states === undefined) return
-    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line, probe: motion === 38 })
+    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line, probe: motion === 38, ...(oriented ? { oriented: true } : {}) })
     retracted = false
     homed = false
   }
@@ -555,6 +578,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (keyword === undefined) return false
     if (keyword === "CYCLE800") { cycle800(called?.[2] ?? ""); return true }
     if (keyword === "PLANE") { klartextPlane(code.toUpperCase()); return true }
+    // Siemens `SPOS=<degrees>`: the spindle stops in position control at that angle.
+    if (keyword === "SPOS") { orientSpindle(Number(/SPOS\s*=\s*([-+]?(?:\d+\.?\d*|\.\d+))/.exec(upper)?.[1] ?? 0)); return true }
     if (SILENT_STATEMENTS.has(keyword)) return true
     if (tokenize(code).some((w) => "XYZABCIJKRE".includes(w.letter)) || called !== null) {
       errors.push(`line ${physical}: unsupported ${keyword}`)
@@ -686,9 +711,11 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
           const times = get("L")
           if (program === undefined) errors.push(`line ${physical}: M98 without a program number`)
           else call = { program: Math.round(program), times: times === undefined ? 1 : Math.max(0, Math.round(times)) }
-        } else if (m === 3) spindle = "cw"
-        else if (m === 4) spindle = "ccw"
-        else if (m === 5 || m === 19) spindle = "off"
+        } else if (m === 3) { spindle = "cw"; oriented = false }
+        else if (m === 4) { spindle = "ccw"; oriented = false }
+        else if (m === 5) { spindle = "off"; oriented = false }
+        // M19 stops the spindle at an angle (Haas P, LinuxCNC R; Fanuc takes none): an event, no motion.
+        else if (m === 19) orientSpindle(get("R") ?? get("P") ?? 0)
         else if (m === 6) changeTool = true
         else if (m === 7) coolant = "mist"
         else if (m === 8) coolant = "flood"
@@ -1037,7 +1064,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   flushComp()
   drain()
 
-  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, unsupported, ...(states !== undefined ? { states } : {}) }
+  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, orients, unsupported, ...(states !== undefined ? { states } : {}) }
 }
 
 // -- frame maths ----------------------------------------------------------------------------------------------------------

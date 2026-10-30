@@ -23,6 +23,7 @@ export interface DecodedKlartext {
 /** `toolRadius` gives the radius of a tool number: the cycles that mill a path (208) need it to replay the tool centre's path. */
 export const decodeKlartext = (text: string, toolRadius?: (tool: number) => number | undefined): DecodedKlartext => {
   const unsupported: Array<{ line: number; word: string }> = []
+  let orienting = false, orientCalled = false
   let dwell = false, tolerance = false, datum = false, inch = false, name: string | undefined, ended = false
   let centre: { readonly absolute: boolean; readonly x: number; readonly y: number } | undefined
   /** The fixed cycle being defined (its rows follow while a line ends with `~`) and the one a `M99` calls. */
@@ -142,6 +143,11 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     if (tool) { if (tool[2] !== undefined) spindle = Number(tool[2]); if (tool[1] !== undefined) toolNumber = Number(tool[1]) }
     if (tool) return [tool[1] !== undefined ? `T${tool[1]} M6` : "", tool[2] !== undefined ? `S${tool[2]}` : ""].filter(Boolean).join(" ")
     if (/^M(?:0|1|2|3|4|5|7|8|9|30|128|129)$/.test(line)) { if (line === "M2" || line === "M30") ended = true; return line }
+    // Cycle 13 ORIENTATION: the angle row is the orientation (`M19 R<deg>` to the replay); the call after it moves nothing.
+    if (line === "CYCL DEF 13.0 ORIENTATION") { orienting = true; return "" }
+    const angle = /^CYCL DEF 13\.1 ANGLE\s*([+-]?\d+(?:\.\d+)?)$/.exec(line)
+    if (angle && orienting) { orienting = false; orientCalled = true; return `M19 R${Number(angle[1])}` }
+    if (line === "CYCL CALL" && orientCalled) { orientCalled = false; return "" }
     if (line === "CYCL DEF 9.0 DWELL TIME") { dwell = true; return "" }
     const time = /^CYCL DEF 9.1 DWELL (\d+(?:\.\d+)?)$/.exec(line)
     if (time && dwell) { dwell = false; return `G4 P${time[1]}` }

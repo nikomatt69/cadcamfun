@@ -63,6 +63,7 @@ export const movesToGcode = (moves: ReadonlyArray<Move>): string => {
         if (words !== "") out += `G0${words}\n`
         break
       }
+      case "SpindleOrient": out += move.angle === undefined || move.angle === 0 ? "M19\n" : `M19 R${f3(move.angle)}\n`; break
       case "Cycle": break
     }
   }

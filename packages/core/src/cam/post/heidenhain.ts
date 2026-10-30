@@ -2,6 +2,7 @@ import type { Program } from "../ir.ts"
 import { emitProgram } from "./emitter.ts"
 import { KLARTEXT_PREFIX } from "./macro-syntax.ts"
 import { genericDialect } from "./generic.ts"
+import { klartextSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post, PostOptions } from "./types.ts"
 import { klartextTiltedPlane } from "./workplane.ts"
 
@@ -29,7 +30,9 @@ export const heidenhainDialect: Dialect = {
   ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
   commentStyle: "semicolon", tcp: { on: () => "M128", off: () => "M129" },
   // Klartext feeds are tip feeds under M128; there is no inverse-time word.
-  inverseTime: undefined
+  inverseTime: undefined,
+  // Cycle 13 ORIENTATION (klartext, passed through as finished blocks).
+  spindleOrient: klartextSpindleOrient
 }
 
 /**

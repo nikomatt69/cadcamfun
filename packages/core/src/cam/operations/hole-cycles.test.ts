@@ -25,7 +25,7 @@ interface Replay {
  */
 const replay = (stock: TriDexel, tool: Cutter, moves: ReadonlyArray<Move>, start: Vec3, setup?: { layout: RotaryLayout; pivot: Vec3 }, stopped?: Cutter): Replay => {
   const solid = toolSolid(tool)
-  // While the spindle is stopped and oriented (between an M19 comment and the next "spindle start") only the body of the bar exists in
+  // While the spindle is stopped and oriented (from a SpindleOrient to the next feed move, where the post restarts it) only the body of the bar exists in
   // the part's frame: a rotating envelope would be wrong there, the insert is a single point.
   const bodySolid = toolSolid(stopped ?? tool)
   let halted = false
@@ -50,11 +50,15 @@ const replay = (stock: TriDexel, tool: Cutter, moves: ReadonlyArray<Move>, start
   }
   const run = (move: Move): void => {
     switch (move._tag) {
-      case "Rapid": case "Linear": if (segment.length === 0) push(at); push(move.to); at = move.to; break
-      case "Cycle": for (const e of expandCycle(move, at)) run(e); at = moveTarget(move)!; break
-      case "Comment":
-        if (/M19/.test(move.text) || /spindle start/.test(move.text)) { flush(); halted = /M19/.test(move.text) }
+      case "Rapid": case "Linear":
+        // The spindle restarts before the first feed move after an orientation.
+        if (move._tag === "Linear" && halted) { flush(); halted = false }
+        if (segment.length === 0) push(at)
+        push(move.to)
+        at = move.to
         break
+      case "Cycle": for (const e of expandCycle(move, at)) run(e); at = moveTarget(move)!; break
+      case "SpindleOrient": flush(); halted = true; break
       case "Orient": flush(); angles = { ...(move.a !== undefined ? { a: move.a } : {}), ...(move.b !== undefined ? { b: move.b } : {}), c: move.c ?? 0 }; break
       default: break
     }
@@ -224,7 +228,9 @@ describe("back boring through a pilot hole", () => {
     ])
     // The cut feeds upward at the cutting feed, to the ceiling less the insert height.
     expect(tp.moves.find((m) => m._tag === "Linear")).toMatchObject({ feed: 120, to: { z: 12 - 3 } })
-    expect(tp.moves.filter((m) => m._tag === "Comment" && /M19/.test(m.text))).toHaveLength(2)
+    // The orientation is a move of its own (no longer a comment), once before each shift, with the insert towards +X.
+    expect(tp.moves.filter((m) => m._tag === "SpindleOrient")).toEqual([{ _tag: "SpindleOrient", angle: 0 }, { _tag: "SpindleOrient", angle: 0 }])
+    expect(tp.moves.filter((m) => m._tag === "Comment" && /M19|spindle start/.test(m.text))).toHaveLength(0)
     expect(tp.moves.some((m) => m._tag === "Dwell")).toBe(true)
   })
 

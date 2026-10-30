@@ -182,6 +182,14 @@ export interface TcpCodes {
   readonly end?: (tool: number) => string
 }
 
+/** The control's words for spindle orientation (IR `SpindleOrient`, `spindle-orient.ts`). */
+export interface SpindleOrientCodes {
+  /** Whether the control takes an angle in the block; `false`: it stops at its own fixed mark, so any other angle is refused. */
+  readonly angled: boolean
+  /** The blocks for an angle in degrees, already formatted (`90`, `22.5`). A `KT:`-prefixed line is a finished Klartext block. */
+  readonly blocks: (angle: string) => ReadonlyArray<string>
+}
+
 /** What differs between G-code dialects; the emitter is shared. */
 export interface Dialect {
   readonly id: PostId | VendorPostId
@@ -266,6 +274,8 @@ export interface Dialect {
     /** Block that returns to the caller (`M99`). */
     readonly end: string
   }
+  /** The control's spindle-orientation words; absent (GRBL): a program with a `SpindleOrient` move is refused, never written without it. */
+  readonly spindleOrient?: SpindleOrientCodes
   /** The control's tilted-plane words; absent: a program with `workPlanes` is refused. */
   readonly tiltedPlane?: TiltedPlaneCodes
   /** Inverse-time feed mode (`PostOptions.inverseTimeFeed`): the words that switch it on and back to feed per minute. */

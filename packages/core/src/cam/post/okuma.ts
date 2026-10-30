@@ -1,4 +1,5 @@
 import { emitProgram } from "./emitter.ts"
+import { isoSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post } from "./types.ts"
 
 /**
@@ -25,6 +26,7 @@ export const okumaDialect: Dialect = {
   dwellWord: "F",
   uppercaseComments: true,
   rotary: true,
+  spindleOrient: isoSpindleOrient,
   workOffset: (offset) => `G15 H${Number(offset.slice(1)) - 53}`,
   begin: () => [],
   setup: ["G90", "G17", "G94", "G40", "G80"],

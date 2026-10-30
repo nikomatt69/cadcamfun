@@ -187,7 +187,7 @@ export const indexToolpath = (toolpath: Toolpath, input: IndexInput): IndexedToo
         moves.push({ ...move, to: bottom, retractHeight: top.z })
         break
       }
-      case "Dwell": case "Comment": moves.push(move); break
+      case "Dwell": case "Comment": case "SpindleOrient": moves.push(move); break
       case "Orient": moves.push(move); break
     }
   }

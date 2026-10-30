@@ -10,8 +10,8 @@
  *                indexed (3+2) machine (`indexing.ts`), one orientation per hole direction
  *
  * All Z values are work coordinates (zero at the chosen origin); the sites of a tilted cycle are CAD world mm shifted by `origin`.
- * Spindle orientation (M19) and the oriented shift of a back-boring bar have no move of their own in the IR: they are written as
- * comments at the place they happen, and the X shifts are real moves, so the path is the one the machine must make.
+ * Spindle orientation (M19 / SPOS) of a back-boring bar is the IR move `SpindleOrient` (insert towards +X is angle 0), written by every
+ * post with the control's own word or refused; the X shifts are real moves, so the path is the one the machine must make.
  */
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
 import { optimizedOrder } from "../geometry.ts"
@@ -174,8 +174,9 @@ export const backBoreShift = (tool: Cutter, pilotDiameter: number): { readonly s
 
 /**
  * Back-boring (G87-style, as explicit moves): over the pilot hole the bar is oriented (insert towards +X) and shifted by `-Q`, goes
- * down through the pilot to `bottom` below the far face, is shifted back onto the axis, started, and fed upwards until the top of the
- * insert is at `top` (the ceiling of the new bore), dwells, is stopped and oriented, shifted again, and withdrawn through the pilot.
+ * down through the pilot to `bottom` below the far face, is shifted back onto the axis, started (the post restarts the stopped spindle
+ * before the first feed move), and fed upwards until the top of the insert is at `top` (the ceiling of the new bore), dwells, is
+ * stopped and oriented again (`SpindleOrient`), shifted again, and withdrawn through the pilot.
  * `face` is the work Z of the far (under) face the bore starts at; the insert is wholly below it at the start.
  */
 export const generateBackBore = (i: HoleCycleInput): Toolpath => {
@@ -199,18 +200,16 @@ export const generateBackBore = (i: HoleCycleInput): Toolpath => {
   b.comment(`Back bore Ø${c.diameter} from the face at Z${c.face} up to Z${i.top}: ${i.name}`)
   optimizedOrder(i.points).forEach((p) => {
     b.rapid({ x: p.x, y: p.y, z: i.clearanceZ })
-    b.comment("M19 spindle stop and orient: insert towards +X")
+    b.push({ _tag: "SpindleOrient", angle: 0 })
     b.rapid({ x: p.x - q, y: p.y, z: i.clearanceZ })
     b.rapid({ x: p.x - q, y: p.y, z: i.bottom })
     b.rapid({ x: p.x, y: p.y, z: i.bottom })
-    b.comment("spindle start")
     b.linear({ x: p.x, y: p.y, z: tipEnd }, i.feed)
     b.dwell(Math.max(0.2, Math.round((2 * 60 / i.rpm) * 1000) / 1000))
-    b.comment("M19 spindle stop and orient: insert towards +X")
+    b.push({ _tag: "SpindleOrient", angle: 0 })
     b.rapid({ x: p.x - q, y: p.y, z: tipEnd })
     b.rapid({ x: p.x - q, y: p.y, z: i.clearanceZ })
     b.rapid({ x: p.x, y: p.y, z: i.clearanceZ })
-    b.comment("spindle start")
   })
   if (i.points.length === 0) b.comment("nothing to bore: no hole positions")
   return finish(i, b.moves)
