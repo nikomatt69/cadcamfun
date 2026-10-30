@@ -11,9 +11,10 @@ import { emitGcode } from "./gcode.ts"
 import { bestOrientation, rotateMeshes } from "./orient.ts"
 import { planLayers, planRaft } from "./plan.ts"
 import { resolveProfile, type PrintProfile } from "./profile.ts"
-import { meshVolume, printSolidIssue, sliceMesh } from "./slice.ts"
+import { meshVolume, printMeshIssue, printSolidIssue, sliceMesh } from "./slice.ts"
 import { verifyPrint, type PrintCheck } from "./verify.ts"
 import { planSupports } from "./support.ts"
+import { repairMesh, type RepairOptions, type RepairReport } from "./repair.ts"
 import type { PlannedLayer, PrintStats } from "./types.ts"
 import type { Region } from "./geom.ts"
 
@@ -24,6 +25,7 @@ export * from "./infill.ts"
 export * from "./orient.ts"
 export * from "./plan.ts"
 export * from "./profile.ts"
+export * from "./repair.ts"
 export * from "./slice.ts"
 export * from "./support.ts"
 export type { Extrusion, PathKind, PlannedLayer, PrintStats } from "./types.ts"
@@ -34,6 +36,11 @@ export interface PrintOptions {
   readonly onProgress?: (fraction: number, stage: string) => void
   /** Read between layers; a slice that sees it set stops with an `AbortError`. */
   readonly signal?: { readonly aborted: boolean }
+  /**
+   * Repair the meshes before slicing (weld, drop degenerate faces, make the winding consistent, close holes; see `repair.ts`).
+   * Without it a mesh that is not a closed manifold is refused, as before.
+   */
+  readonly repair?: boolean | RepairOptions
 }
 
 export interface PrintResult {
@@ -48,6 +55,8 @@ export interface PrintResult {
   /** The material of each printed model layer, bottom first, in bed coordinates. */
   readonly regions: ReadonlyArray<Region>
   readonly profile: PrintProfile
+  /** One report per input mesh when `repair` was asked for. */
+  readonly repairs: ReadonlyArray<RepairReport>
 }
 
 const boundsOfAll = (meshes: ReadonlyArray<Mesh64>): { min: [number, number, number]; max: [number, number, number] } => {
@@ -133,12 +142,32 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
   const notes: string[] = []
   const stage = (name: string, fraction: number): void => options.onProgress?.(fraction, name)
   if (input.length === 0) throw new Error("There is nothing to slice")
+  const repairs: RepairReport[] = []
+  const prepared: Mesh64[] = []
   for (let i = 0; i < input.length; i++) {
-    const malformed = printSolidIssue(input[i]!)
+    let mesh = input[i]!
+    if (options.repair !== undefined && options.repair !== false) {
+      const malformed = printMeshIssue(mesh)
+      if (malformed !== undefined) throw new RangeError(`Mesh ${i + 1}: ${malformed}`)
+      const repaired = repairMesh(mesh, { ...(options.repair === true ? {} : options.repair), ...(options.signal ? { signal: options.signal } : {}) })
+      repairs.push(repaired.report)
+      if (repaired.report.status === "unrepairable") throw new RangeError(`Mesh ${i + 1} cannot be repaired: ${repaired.report.problems.join("; ")}`)
+      if (repaired.report.status === "repaired") {
+        const r = repaired.report
+        warnings.push(`mesh ${i + 1} was repaired before slicing: ${[
+          r.weldedVertices > 0 ? `${r.weldedVertices} vertices welded` : "", r.degenerateRemoved + r.duplicateRemoved + r.internalRemoved > 0 ? `${r.degenerateRemoved + r.duplicateRemoved + r.internalRemoved} faulty faces removed` : "",
+          r.flippedTriangles > 0 ? `${r.flippedTriangles} faces re-oriented` : "", r.holesFilled > 0 ? `${r.holesFilled} hole(s) closed with ${r.holeTriangles} triangles` : ""
+        ].filter((x) => x !== "").join(", ")}`)
+      }
+      if ((repaired.report.selfIntersections?.pairs ?? 0) > 0) warnings.push(`mesh ${i + 1}: ${repaired.report.selfIntersections!.pairs} triangle pair(s) cross each other; the slice treats the overlap as material`)
+      mesh = repaired.mesh
+    }
+    const malformed = printSolidIssue(mesh)
     if (malformed !== undefined) throw new RangeError(`Mesh ${i + 1}: ${malformed}`)
+    prepared.push(mesh)
   }
 
-  let meshes: Mesh64[] = input.slice()
+  let meshes: Mesh64[] = prepared
   let orientation = "as designed"
   if (profile.autoOrient) {
     const { chosen } = bestOrientation(meshes, profile.supportAngle)
@@ -201,5 +230,5 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
   stage("verify", 0.95)
   const checks = verifyPrint({ gcode: emitted.gcode, regions: regions.slice(0, keep), profile, firstModelLayer: raftCount, layers })
   stage("done", 1)
-  return { gcode: emitted.gcode, stats: emitted.stats, warnings, layers, orientation, checks, regions: regions.slice(0, keep), profile }
+  return { gcode: emitted.gcode, stats: emitted.stats, warnings, layers, orientation, checks, regions: regions.slice(0, keep), profile, repairs }
 }
