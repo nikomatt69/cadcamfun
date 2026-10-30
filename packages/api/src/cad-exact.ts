@@ -236,3 +236,29 @@ export const CadHoleReport = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })
 ])
 export type CadHoleReport = typeof CadHoleReport.Type
+
+/**
+ * Rebuild a parametric history (spec 72 step 1.3): the features alone, no stored drawing. Answers with the exact model of each body and a
+ * digest of it, so a client with its own kernel (the desktop) can tell the server-side rebuild is the one it holds.
+ */
+export const CadRebuildRequest = Schema.Struct({
+  /** The history as the editor stores it; the kernel job decodes it against `ParametricHistory` (its checks are not portable to the generated clients) and answers 400 with the problems. */
+  history: Schema.Json,
+  /** Time the exact work may take, ms (default 60 000); a body it did not reach says so. */
+  budgetMs: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 120_000 })))
+})
+export type CadRebuildRequest = typeof CadRebuildRequest.Type
+
+export const CadRebuildReport = Schema.Struct({
+  ok: Schema.Boolean,
+  parameters: Schema.Record(Schema.String, num),
+  bodies: Schema.Array(Schema.Struct({
+    id: Schema.String, exact: Schema.Boolean, reason: Schema.optionalKey(Schema.String), valid: Schema.optionalKey(Schema.Boolean),
+    volume: Schema.optionalKey(num), area: Schema.optionalKey(num), centroid: Schema.optionalKey(vec3), genus: Schema.optionalKey(int),
+    faces: Schema.optionalKey(int), edges: Schema.optionalKey(int), vertices: Schema.optionalKey(int), surfaces: Schema.optionalKey(Schema.Record(Schema.String, int))
+  })),
+  digest: Schema.String,
+  issues: Schema.Array(Schema.Struct({ feature: Schema.String, severity: Schema.Literals(["error", "warning"]), message: Schema.String, remedy: Schema.optionalKey(Schema.String) })),
+  warnings: Schema.Array(Schema.String)
+})
+export type CadRebuildReport = typeof CadRebuildReport.Type

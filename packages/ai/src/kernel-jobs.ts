@@ -3,7 +3,7 @@
  * drift. Inputs and outputs are plain data (structured-clone safe); histories are decoded here, at the job's own boundary.
  */
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
-import { cad, cam, drawing, type History } from "@cadcamfun/core"
+import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
 import { parametricReport, parseHistory } from "./parametric.ts"
 
 // ---------------------------------------------------------------- the exact CAD kernel
@@ -70,6 +70,30 @@ export const cadHole = ({ elements, edit }: CadHoleInput) => {
   }
 }
 
+export interface CadRebuildInput { readonly history: unknown; readonly budgetMs?: number }
+
+/**
+ * A history rebuilt from its features alone (spec 72 step 1.3): the mesh rebuild's issues and parameters plus the exact model of each
+ * body, and the digest a client holding its own kernel compares with. The same `rebuild` + `rebuildExact` the desktop runs locally.
+ */
+export const cadRebuild = ({ history, budgetMs }: CadRebuildInput) => {
+  const decoded = parseHistory(history)
+  const result = rebuild(decoded)
+  let warnings: ReadonlyArray<string> = []
+  const summary = brep.withBudget(budgetMs ?? 60_000, () => {
+    const exact = rebuildExact(decoded, result)
+    warnings = exact.warnings
+    return exactSummary(exact)
+  })
+  return {
+    ok: result.bodies.length > 0 && !result.issues.some((i) => i.severity === "error"),
+    parameters: result.parameters,
+    bodies: summary, digest: exactDigest(summary),
+    issues: result.issues.map((i) => ({ feature: i.feature, severity: i.severity, message: i.message, ...(i.remedy !== undefined ? { remedy: i.remedy } : {}) })),
+    warnings
+  }
+}
+
 /** Preparation stays in the worker too; optional stock placement never requires a second mesh build on the caller. */
 type ManufacturingInput = cam.kernel.ManufacturingJob & cam.kernel.PrepareOptions
 
@@ -90,6 +114,7 @@ export interface KernelJobs {
   readonly "cad-setups": { readonly input: CadSetupsInput; readonly output: ReturnType<typeof cadSetups> }
   readonly "cad-hole": { readonly input: CadHoleInput; readonly output: ReturnType<typeof cadHole> }
   readonly "cad-assembly": { readonly input: CadAssemblyInput; readonly output: ReturnType<typeof cadAssembly> }
+  readonly "cad-rebuild": { readonly input: CadRebuildInput; readonly output: ReturnType<typeof cadRebuild> }
   /** A drawing sheet of a parametric part: the views, dimensions, section and the title block, as SVG and as entities. */
   readonly "cad-sheet": { readonly input: { readonly history: History; readonly options: drawing.SheetOptions }; readonly output: ReturnType<typeof drawing.generateSheet> }
   readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
@@ -116,5 +141,6 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cad-setups": cadSetups,
   "cad-hole": cadHole,
   "cad-assembly": cadAssembly,
+  "cad-rebuild": cadRebuild,
   "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)
 }

@@ -241,7 +241,12 @@ export const applyGlobalSettingsToSelected = (state: MultiToolpathState): MultiT
   )
 })
 
-/** One program from every generated toolpath, in execution order (legacy `generateCombinedGCode`). */
+/**
+ * One text from every generated toolpath, in execution order (legacy `generateCombinedGCode`).
+ *
+ * @deprecated Not a program: every block keeps its own header, `M30` and `%`, and no tool change is written (spec 14 §1). The panel
+ * downloads through the setup path (`lib/setup.ts` -> `camSetup.generate`); this stays only for the legacy text view and its test.
+ */
 export const combineGCode = (toolpaths: ReadonlyArray<ElementToolpath>, stamp: string = new Date().toISOString()): string => {
   const ordered = byOrder(toolpaths)
   let text = "; Combined G-Code from Multiple Toolpaths\n"

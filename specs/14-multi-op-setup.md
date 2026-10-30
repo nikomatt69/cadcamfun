@@ -89,7 +89,12 @@ New group `camSetup` (additive; the legacy routes of `05-api-sidecar.md` are unt
 - `program/{op,setup,tooltable,plan,programs}.ts`, exported as `cam.program`.
 - `PostOptions.toolNumbers?: Record<string, number>` and `PostOptions.retractBeforeToolChange?: boolean` in `post/types.ts`; `emitProgram` applies both. Defaults keep the existing output byte-identical.
 - `analyseGcode` reports one `Toolpath` per tool change (the reference interpreter now returns tool changes with their line), so a multi-tool `.nc` parsed back keeps its tools for the viewport, the verifier and the AI tools.
-- Desktop (`setupStore`) and DB persistence follow in the next steps of this WP.
+- Built 2026-10-30 (spec 72 steps 1.1, 1.2): `cam/program/{op,setup,tooltable,plan,programs}.ts` exported as `cam.program` (plus `geometryFor`,
+  `reorderByTool`, `groupsOf`); `packages/api/src/{cam-setup.ts,groups/cam-setup.ts}` with `POST /api/cam/setups/{plan,validate,generate}`; sidecar
+  `http/cam-setup.ts` (generate runs inline, not in a worker); desktop `lib/setup.ts`, `api/setup.ts`, `store/setupStore.ts`; the multi-toolpath panel
+  downloads through `camSetup.generate`. `combineGCode` is deprecated and stays for the legacy text view.
+- Open: DB persistence of a setup (after RM-03), AI actions `setup_plan` / `setup_generate` (after RM-01), desktop controls for grouping / post /
+  retract (the store holds the choices, no UI sets them yet), `generate` in a worker, `fromPreviousStock` is the diameter hand-over only.
 
 ## 6. Change log
 
