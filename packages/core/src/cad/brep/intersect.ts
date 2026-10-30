@@ -191,7 +191,58 @@ export const edgeSurfaceHits = (
       hits.push({ ...h, t: tt, point: curvePoint(e.curve, tt) })
     }
   }
-  return hits.sort((a, b) => a.t - b.t)
+  return mergeTangentHits(e, s, hits.sort((a, b) => a.t - b.t), tol)
+}
+
+/**
+ * Two hits of one edge with one surface that lie closer than `TANGENT_WINDOW` apart, with the edge staying within `tol` of
+ * the surface between them, are one tangent contact: the edge touches the surface (a double root of the distance function)
+ * and Newton, converging slowly on a double root, reports the two sides of the touch. Left as two they make two vertices a
+ * few micrometres apart and a sliver edge between them. They become one hit at the closest approach of edge and surface.
+ * A transversal pair that close is below the kernel's tolerance anyway: the edge deviates from the surface by at most
+ * (gap)^2 / (8 R) between two crossings, and only that deviation under `tol` merges.
+ */
+const TANGENT_WINDOW = 1e-2
+const mergeTangentHits = (e: Edge, s: Surface, hits: CurveSurfaceHit[], tol: number): CurveSurfaceHit[] => {
+  if (hits.length < 2) return hits
+  const away = (t: number, hint: SurfaceParam): { readonly d: number; readonly u: number; readonly v: number } => {
+    const p = curvePoint(e.curve, t)
+    const q = surfaceProject(s, p, hint)
+    return { d: dist3(surfacePoint(s, q.u, q.v), p), u: q.u, v: q.v }
+  }
+  const out: CurveSurfaceHit[] = []
+  for (let i = 0; i < hits.length; i++) {
+    let h = hits[i]!
+    const n = hits[i + 1]
+    if (n !== undefined && dist3(h.point, n.point) < TANGENT_WINDOW) {
+      // Closest approach between the two roots: coarse scan, then a ternary search.
+      let a = h.t, b = n.t
+      let best = a, bestD = Infinity
+      for (let k = 0; k <= 32; k++) {
+        const t = a + ((b - a) * k) / 32
+        const d = away(t, { u: h.u, v: h.v }).d
+        if (d < bestD) { bestD = d; best = t }
+      }
+      const step = (b - a) / 32
+      a = Math.max(h.t, best - step); b = Math.min(n.t, best + step)
+      for (let k = 0; k < 40; k++) {
+        const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3
+        if (away(m1, { u: h.u, v: h.v }).d < away(m2, { u: h.u, v: h.v }).d) b = m2
+        else a = m1
+      }
+      const t = (a + b) / 2
+      const w = away(t, { u: h.u, v: h.v })
+      // Deviation of the edge from the surface across the whole span between the roots.
+      let spread = 0
+      for (let k = 0; k <= 16; k++) spread = Math.max(spread, away(h.t + ((n.t - h.t) * k) / 16, { u: h.u, v: h.v }).d)
+      if (w.d <= tol && spread <= tol) {
+        h = { t, u: w.u, v: w.v, point: curvePoint(e.curve, t) }
+        i++
+      }
+    }
+    out.push(h)
+  }
+  return out
 }
 
 /** True when the edge lies on the surface (every sample within `tol`). */

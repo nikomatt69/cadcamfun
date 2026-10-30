@@ -108,19 +108,14 @@ describe("aligned fuzz residuals are solved in place or named (spec 42 gate 1)",
     expect(Math.abs(vol(out.i) - mc) / mc).toBeLessThan(0.01)
   })
 
-  test("seed 33: torus x cylinder with a crossing intersection curve on the rim is displaced, reported, and named", () => {
+  test("seed 33: torus x cylinder with the intersection branches crossing on the rim is solved in place", () => {
     const { A, B, out } = run(33)
     expect(A.faces[0]!.surface.kind).toBe("torus")
-    expect(out.counters.recoveredByDisplacement).toBeGreaterThan(0)
-    // Never silent: every displaced Boolean says which surfaces and why.
-    const named = out.warnings.filter((w) => w.includes("degenerate alignment"))
-    expect(named.length).toBeGreaterThan(0)
-    for (const w of named) {
-      expect(w).toContain("torus x cylinder")
-      expect(w).toContain("singular surface intersection")
-      expect(w).toContain("exact only to that distance")
-    }
-    identities(A, B, out, 1e-3)
+    // The torus touches the cylinder's end rim at one point where the two branches of the intersection cross. Newton reports
+    // that tangent contact as two roots a fraction of a millimetre apart; they are one vertex. No displacement, no warning.
+    expect(out.counters.recoveredByDisplacement).toBe(0)
+    expect(out.warnings).toEqual([])
+    identities(A, B, out, 1e-7)
     const t = A.faces[0]!.surface
     if (t.kind !== "torus") throw new Error("unexpected operand")
     const inT = torusAt(t.frame.origin, t.major, t.minor)
