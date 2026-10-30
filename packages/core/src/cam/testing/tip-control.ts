@@ -20,7 +20,9 @@
  *
  * Not covered, reported and never passed silently: an arc while the table stands tilted (a circle of the part frame is no circle in the
  * machine axes, it is replayed as chords within `tolerance`, counted in `arcsLinearised`); a motion that would need more than
- * {@link MAX_DEPTH} bisections to stay within `tolerance` (counted in `unconverged`, written with the chord it reached).
+ * {@link MAX_DEPTH} bisections to stay within `tolerance` (counted in `unconverged`, written with the chord it reached); a motion that follows
+ * the cancel word while the table stands tilted (`cancelledTilted`): the axes it does not write keep the machine position of the control, which
+ * the replay only knows as the carried tip, so those words are ambiguous.
  */
 import type { Vec3 } from "../../cad/vec.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
@@ -46,6 +48,8 @@ export interface CarryResult {
   readonly arcsLinearised: number
   /** Motions that stayed outside `tolerance` at the deepest bisection. */
   readonly unconverged: number
+  /** Machine-axis motions that follow a tip-control cancel with the table tilted (their unwritten axes are not known). */
+  readonly cancelledTilted: number
   /** Pieces that stop short of the end of their NC motion: they lie on the tip path, not at a position the program wrote. */
   readonly interior: ReadonlySet<GSegment>
   /** Largest distance of a carried tip from the pivot, mm: the lever that turns an angle rounding into a position error. */
@@ -75,11 +79,12 @@ export const machineToTip = (machine: Vec3, h: { readonly a?: number; readonly b
  * unchanged when no motion is marked, so a program written without a tip-control word costs nothing and is not touched.
  */
 export const carryTipControl = (segments: ReadonlyArray<GSegment>, kinematic: TipKinematic, options: { readonly tolerance?: number } = {}): CarryResult => {
-  if (!segments.some((s) => s.kind !== "dwell" && s.tcp === true)) return { segments, carried: 0, pieces: 0, arcsLinearised: 0, unconverged: 0, interior: new Set(), maxRadius: 0 }
+  if (!segments.some((s) => s.kind !== "dwell" && s.tcp === true)) return { segments, carried: 0, pieces: 0, arcsLinearised: 0, unconverged: 0, cancelledTilted: 0, interior: new Set(), maxRadius: 0 }
   const tolerance = options.tolerance ?? 0.01
   if (!(Number.isFinite(tolerance) && tolerance > 0)) throw new RangeError("tolerance must be a positive number of millimetres")
   const out: GSegment[] = []
-  let carried = 0, pieces = 0, arcsLinearised = 0, unconverged = 0, maxRadius = 0
+  let carried = 0, pieces = 0, arcsLinearised = 0, unconverged = 0, cancelledTilted = 0, maxRadius = 0
+  let previousTcp = false
   const interior = new Set<GSegment>()
   let held = zero()
   let machine: P3 | undefined
@@ -93,6 +98,8 @@ export const carryTipControl = (segments: ReadonlyArray<GSegment>, kinematic: Ti
     const end = anglesOf(held, s.kind === "arc" ? undefined : s.rotary)
     if (s.tcp !== true) {
       // Machine-axis words as written. Its start is where the machine stands (after a tip-control motion that is the carried end).
+      if (previousTcp && tilted(held)) cancelledTilted++
+      previousTcp = false
       const seg = dist(s.from, machine) < 1e-9 ? s : { ...s, from: machine }
       out.push(seg)
       tip = machineToTip(s.to, end, kinematic)
@@ -101,6 +108,7 @@ export const carryTipControl = (segments: ReadonlyArray<GSegment>, kinematic: Ti
       continue
     }
     carried++
+    previousTcp = true
     const { tcp: _marked, ...plain } = s
     const tipFrom = tip, tipTo = s.to
     if (s.kind === "arc") {
@@ -162,7 +170,7 @@ export const carryTipControl = (segments: ReadonlyArray<GSegment>, kinematic: Ti
     machine = previous
     held = end
   }
-  return { segments: out, carried, pieces, arcsLinearised, unconverged, interior, maxRadius }
+  return { segments: out, carried, pieces, arcsLinearised, unconverged, cancelledTilted, interior, maxRadius }
 }
 
 const heldRotary = (h: Angles, layout: RotaryLayout): SegmentAngles => (layout === "table-AC" ? { a: h.a, c: h.c } : { b: h.b, c: h.c })

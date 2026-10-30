@@ -860,6 +860,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   if (read !== undefined && read.tipControlSegments > 0 && carryKinematic === undefined) {
     issues.push(issue("UnsupportedCapability", "replay", `${read.tipControlSegments} NC motions run under tool-centre-point control, but ${machine.name} has no table kinematics to carry the tool tip to machine coordinates: they are not replayed`))
   }
+  if (carry !== undefined && carry.cancelledTilted > 0) issues.push(issue("UnsupportedCapability", "replay", `${carry.cancelledTilted} motions follow a tool-centre-point cancel with the table tilted: the axes they do not write keep the control's machine position, which the replay only knows as the tip, so those motions are not exactly replayed`, { severity: "warning" }))
   if (carry !== undefined && carry.unconverged > 0) issues.push(issue("ReplayMismatch", "replay", `${carry.unconverged} tool-centre-point motions turn the table faster than the replay can follow within ${(job.post?.options?.tolerance ?? 0.01)} mm: reduce the angle step of the toolpath`, { severity: "warning" }))
   const interpreted = read === undefined || carry === undefined ? read : { ...read, segments: carry.segments }
   // The replay cell: the one the stock was generated at, coarsened by doubling (at most three times) while the replay of this
@@ -1285,7 +1286,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     },
     {
       id: "nc-replay", status: interpreted === undefined ? "unresolved" : interpreted.errors.length > 0 || noTool > 0 || !extentAgrees ? "failed" : "passed",
-      detail: interpreted === undefined ? "No NC was emitted" : `Interpreted ${interpreted.segments.length} NC motions independently of the post; extents agree within ${rounding.toExponential(1)} mm`
+      detail: interpreted === undefined ? "No NC was emitted" : `Interpreted ${interpreted.segments.length} NC motions independently of the post; extents agree within ${rounding.toExponential(1)} mm${carry !== undefined ? `; ${carry.carried} motions ran under tool-centre-point control and were carried to machine coordinates through the table pivot (${carry.pieces} pieces within ${job.post?.options?.tolerance ?? 0.01} mm of the tip path)` : ""}`
     },
     { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" },
     {
