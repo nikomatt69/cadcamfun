@@ -333,3 +333,22 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   local `rebuildExact`. The request carries `history: Json` (the generated clients cannot port `ParametricHistory`'s checks); the handler decodes it and
   answers 400 with the refused fields. Open for P1-3: desktop and AI do not call the route yet (they rebuild locally).
 
+
+- 2026-10-30 (agent D, branch worktree-agent-a5fb3b79fb9836547): **`History.bases` survives the API, the store and the rebuild route.** (1) `brep/serialize.ts`: the JSON form of a
+  `Brep` is its index tables plus `version: 1` (`brepToJson`, `brepFromJson`, `brepToText`); the checked decoder reads every curve and surface kind, finite numbers, every
+  index, NURBS knot counts, and the limits `BREP_LIMITS` (4 000 faces, 4 000 000 characters per body), `MAX_BASES` (8) and `MAX_BASES_BYTES` (12 000 000 together); a refusal
+  carries the path (`faces[3].loops[0].coedges[2].edge`). Round trip: volume, area, topology counts, every vertex/edge tolerance and the `loose` flags are identical (box,
+  cylinder, cone, sphere, torus, healed exploded box, STEP read-back, a NURBS loft, recipes). It does not judge geometry: the import runs `validateBrep`/heal first
+  (`baseStorageProblem` refuses a body above the limit or with a non-finite number). `history-import.ts` is now exported from `cad` (`importStepToHistory`,
+  `withImported`, `historyToJson`, `basesStorageProblem`). (2) `ParametricHistory.bases` (`ParametricBase`: id, versioned brep, source): ids unique, never a feature id, the brep
+  decoded with `brepFromJson` (error paths like `bases.0.brep.faces.1.loops.0.coedges.0.edge`), at most 8; a history without bases decodes and encodes byte-identically.
+  No DB migration: histories live inside the element JSON of `drawing.data`, which carries the field unchanged. (3) `POST /api/cad/exact/import-step` (group `cadExact`, kernel job
+  `cad-import-step`, not cached): STEP text (+ optional `history`, `idPrefix`, `tolerance`, `keepAccepted`) -> per-body report (status, faces, volume, tolerance, loose,
+  diagnostics), `bases` (stored form) and the history with the bases appended, re-decoded against `ParametricHistory` before it is returned. All or nothing unless `keepAccepted`;
+  a refused body (open shell, gap above the healing tolerance, too large) gives `ok: false` with the diagnostics of the heal and nothing added; a file that is not STEP gives
+  `ok: false` with a reason. API only: the `cad`/`cad_edit` prompts are at 32 791 of 32 800 characters, so no AI action was added (a model should not carry a STEP file in a tool
+  call anyway; the `bases` field appears in the history schema with a "written by the import action" description). Gates: `apps/sidecar/test/history-bases.test.ts` (import route ->
+  rebuild route -> `parametric_create` -> `parametric_inspect` -> `parametric_update` -> `parametric_exact`, volume 6000 - pi*4*30 to 1e-9, digest equal to a local `rebuildExact`;
+  invalid bases refused with the path; open body refused). A history still needs at least one feature (`features` min 1), so a base-only history is not storable yet.
+  **Not done (desktop, other work package):** the import flow (file picker -> route or local `importStepToHistory` -> `diagnostics`/`warnings` dialog), a timeline row for a base
+  body, and promoting a base to a `Feature` kind.
