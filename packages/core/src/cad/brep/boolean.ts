@@ -41,7 +41,7 @@ import { recordDerivation, STEPS, type FaceOrigin } from "./lineage-record.ts"
 import { separateContacts, separateTouchingVertices } from "./contact.ts"
 import { orient2d } from "./predicates.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
-import { inheritTolerance } from "./tolerance.ts"
+import { inheritTolerance, operandSlack } from "./tolerance.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
@@ -117,7 +117,7 @@ export interface BooleanOptions {
    */
   readonly seedAngleDeg?: number
   /**
-   * The declared tolerance limit, mm (default `toleranceLimit`: 10 x the model tolerance, or ten millionths of the body's size). A
+   * The declared tolerance limit, mm (default `toleranceLimit`: 10 x the model tolerance, or three millionths of the body size). A
    * result whose tolerance passes it has the affected faces marked `loose` and carries a warning; the Boolean is not refused.
    */
   readonly maxTolerance?: number
@@ -1037,12 +1037,13 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   result = compacted.brep
   try { recordDerivation(result, `boolean ${op}`, [A, B], compacted.order.map((m) => merged.from[m]!.flatMap((k) => origins[k]!))) } catch { /* advisory */ }
   options.debug?.("result", result)
-  let report = validateBrep(result, { coarseVolume: true })
+  const slack = operandSlack(A, B)
+  let report = validateBrep(result, { coarseVolume: true, slack })
   // A lens thinner than the coarse chord (seed 114: a 0.07 mm torus/sphere overlap) tessellates with the wrong sign, so a
   // coarse non-positive volume alone is not proof the faces point inwards: the exact volume decides. Only that one issue is
   // rechecked exactly; a face that gave no triangle or a broken topology stays a failure on the coarse evidence.
   if (!report.valid && report.issues.length > 0 && report.issues.every((i) => i.kind === "orientation")) {
-    const exact = validateBrep(result)
+    const exact = validateBrep(result, { slack })
     if (exact.valid) report = exact
   }
   // Shells that meet in a point (a cavity tangent to the outer wall, spheres tangent outside) share one vertex, which Euler-Poincare
@@ -1051,7 +1052,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const touching = separateTouchingVertices(result.vertices, result.edges, result.faces)
     if (touching !== undefined) {
       const split = shellsByConnectivity({ vertices: touching.vertices, edges: touching.edges, faces: touching.faces, shells: [] })
-      const again = validateBrep(split, { coarseVolume: true })
+      const again = validateBrep(split, { coarseVolume: true, slack })
       if (again.valid) { result = split; report = again; contactNote = `point contact kept in place: ${touching.splitVertices} vertex(es) split between shells` }
     }
   }

@@ -787,7 +787,7 @@ export interface StepWriteOptions {
    * the largest tolerance, and the file description says which parts are loose and by how much.
    */
   readonly allowLoose?: boolean
-  /** The tolerance limit, mm (default `toleranceLimit` of each part: 10 x the model tolerance, or ten millionths of its size). */
+  /** The tolerance limit, mm (default `toleranceLimit` of each part: 10 x the model tolerance, or three millionths of its size). */
   readonly maxTolerance?: number
 }
 

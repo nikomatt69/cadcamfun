@@ -72,6 +72,8 @@ export const maxTolerance = (b: Brep): number => {
 export interface ValidateOptions {
   /** Distance tolerance for geometric checks, mm (default 1e-5 × model size, at least 1e-6). */
   readonly tol?: number
+  /** Added to the geometric tolerance, mm: a result built on loose operands may be as loose as they were (spec 42 R6). */
+  readonly slack?: number
   /** Skip the (more expensive) volume/orientation check. */
   readonly skipVolume?: boolean
   /**
@@ -85,7 +87,7 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
   const issues: BrepIssue[] = []
   let size = 0
   for (const v of b.vertices) size = Math.max(size, Math.abs(v.point.x), Math.abs(v.point.y), Math.abs(v.point.z))
-  const tol = options.tol ?? Math.max(1e-6, 1e-7 * (1 + size) * 10)
+  const tol = (options.tol ?? Math.max(1e-6, 1e-7 * (1 + size) * 10)) + (options.slack ?? 0)
   // Indices.
   b.edges.forEach((e, ei) => {
     if (b.vertices[e.v0] === undefined || b.vertices[e.v1] === undefined) issues.push({ kind: "index", edge: ei, message: `edge ${ei} references a missing vertex` })

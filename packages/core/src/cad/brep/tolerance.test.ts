@@ -21,7 +21,7 @@ const looseBox = (): Brep => {
         const p = b.vertices[v]!.point
         const s = (k++ % 5) - 2
         m = vertices.length
-        vertices.push({ point: { x: p.x + (s * 3e-5) / 2, y: p.y - (s * 3e-5) / 3, z: p.z + (s % 2 === 0 ? 1 : -1) * 1.5e-5 }, tol: 1e-6 })
+        vertices.push({ point: { x: p.x + (s * 1.2e-4) / 2, y: p.y - (s * 1.2e-4) / 3, z: p.z + (s % 2 === 0 ? 1 : -1) * 0.6e-4 }, tol: 1e-6 })
         vmap.set(v, m)
       }
       return m
@@ -40,7 +40,7 @@ const looseBox = (): Brep => {
       }))
     })
   })
-  return healBrep({ vertices, edges, faces, shells: [{ faces: faces.map((_, i) => i), closed: true }] }, { tol: 1e-4, tighten: false }).brep
+  return healBrep({ vertices, edges, faces, shells: [{ faces: faces.map((_, i) => i), closed: true }] }, { tol: 2e-3, tighten: false }).brep
 }
 
 describe("tolerance across Booleans (spec 42 R6)", () => {
@@ -98,7 +98,7 @@ describe("tolerance across Booleans (spec 42 R6)", () => {
   })
 
   test("the limit grows with the size of the body", () => {
-    expect(toleranceLimit(makeBox(10, 10, 10))).toBe(LOOSE_TOLERANCE)
+    expect(toleranceLimit(makeBox(1, 1, 1))).toBe(LOOSE_TOLERANCE)
     expect(toleranceLimit(makeBox(100000, 10, 10))).toBeGreaterThan(LOOSE_TOLERANCE)
   })
 })

@@ -12,7 +12,7 @@
  *     curve ends that meet there, on the result as built (`validateBrep` reports both).
  *
  * A body whose tolerance passes the declared limit has its affected faces flagged `loose` (`Face.loose`), which STEP export
- * refuses unless it is told otherwise. The limit is `LOOSE_TOLERANCE`, or ten millionths of the body size when that is larger (a
+ * refuses unless it is told otherwise. The limit is `LOOSE_TOLERANCE`, or three millionths of the body size when that is larger (a
  * fitted curve on a metre-long part is legitimately a few micrometres off).
  */
 import { dist3, MODEL_TOL } from "./math.ts"
@@ -36,8 +36,17 @@ export const bodySize = (b: Brep): number => {
   return dist3(lo, hi)
 }
 
-/** The declared tolerance limit of a body: `LOOSE_TOLERANCE`, or 1e-7 x its size when that is larger. */
-export const toleranceLimit = (b: Brep): number => Math.max(LOOSE_TOLERANCE, 1e-7 * bodySize(b))
+/** The declared tolerance limit of a body: `LOOSE_TOLERANCE`, or 3e-6 x its size when that is larger. */
+export const toleranceLimit = (b: Brep): number => Math.max(LOOSE_TOLERANCE, 3e-6 * bodySize(b))
+
+/**
+ * The extra geometric tolerance a result may need because its operands are loose: their largest tolerance when it is above the
+ * model's own accuracy, else 0. The Boolean validates its result with it, so a body healed to 1e-4 can be worked on.
+ */
+export const operandSlack = (...operands: ReadonlyArray<Brep>): number => {
+  const m = operands.reduce((acc, o) => Math.max(acc, maxTolerance(o)), 0)
+  return m > SLACK * MODEL_TOL ? m : 0
+}
 
 export interface InheritedTolerance {
   readonly brep: Brep
