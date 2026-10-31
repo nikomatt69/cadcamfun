@@ -3,6 +3,24 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.49 (October 2026)
+
+## Core
+
+- Real vector PDF writer for sheets and drawings (spec 49 O2)
+- Tolerance budget as an opt-in release gate, quality.enforceTolerance (spec 69 B4)
+- Adaptive layer height (tolerance-governed, flat-face snapping, min-limited reporting); hot-path hypot removal and offset bbox rejection
+- Multi-setup jobs with their own work offsets and cross-setup part coverage (spec 69 C1, C5)
+- STL/OBJ/3MF import and export with units, mesh repair and validity report (spec 50 X8)
+- Lathe planner (face, rough, finish, groove, thread, part, bore), Fanuc and Sinumerik writers, revolved-raster stock-removal verifier with analytic expectations (spec 52 T1-T5, P1)
+- Fixture bodies in the job model decide machine-clearance and setup-workholding (spec 69 C3, spec 72 0.5)
+- Stock model (bar, mesh/previous-setup stock) and the roughed-then-finished five-axis fixture reaching verified-program (spec 69 C2, spec 72 0.5)
+- Definition/occurrence model, constraint mates with solver, configurations, mass roll-up (spec 46 A1, A2, A5)
+
+## API
+
+- Cad.kernel action (stable refs, resolve across edits, naming health, Boolean counters) and cad-naming skill (spec 41 N7)
+
 ## v0.1.48 (October 2026)
 
 ## Core
