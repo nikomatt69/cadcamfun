@@ -3,6 +3,40 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.48 (October 2026)
+
+## Core
+
+- Degenerate intersection samples are a typed refusal, results after a dropped curve are always verified (sphere 1e-6 inside a cylinder was valid and wrong)
+- A face that does not mesh at the coarse validation chord is retried finer (generic seed 133 solved, was refused)
+- Verify check samples the operation's region and skips point location outside operand boxes; blend Booleans opt out
+- R7 default-check test uses enough faces
+- Verify option (sampled volume, volume identities) on exact Booleans, locator edge-box pruning, R7 tests (WIP)
+- Merge the two Newton roots of a tangent edge-surface contact into one vertex (seed 33 solved in place)
+- Artifact cutter kinds include countersink, boringbar, tslot, dovetail; tests for breadth, tcp and the vendor presets
+- Breadth and tcp controls in the kernel panel, tcp through the contracts, Mitsubishi and Brother as PostIds with machine presets
+- Versioned JSON form of a Brep (brepToJson/brepFromJson) with checked decode and size limits; export history-import
+
+## Desktop
+
+- Mitsubishi and Brother entries for the new post ids
+- Breadth and tip-control switches in the kernel panel
+
+## Sidecar
+
+- History bases through import route, store, load and rebuild; import job reports an unreadable file
+- Bases in ParametricHistory, POST /api/cad/exact/import-step and cad-import-step kernel job
+
+## AI
+
+- Recovery warnings are unique and the tangent-hole test expects the in-place contact warning
+
+## Documentation
+
+- Spec 42 6.2 and spec 72 change log for seed 33, R1, R7, R8
+- Spec 72 log for breadth, tcp and Mitsubishi/Brother reachability
+- Spec 72 change log for History.bases through the API and store
+
 ## v0.1.47 (October 2026)
 
 ## Core
