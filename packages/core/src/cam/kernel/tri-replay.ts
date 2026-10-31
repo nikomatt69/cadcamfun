@@ -49,6 +49,8 @@ export interface TriReplayOptions {
   readonly cell: number
   /** Cell visits the replay may spend (`poses x rays touched per pose`); over it the replay stops and is incomplete. */
   readonly budget: number
+  /** The stock is this closed solid (work frame) instead of the whole box: a bar, a casting, the stock a previous setup left. */
+  readonly shape?: ReadonlyArray<Mesh64>
 }
 
 export class TriReplay {
@@ -60,7 +62,7 @@ export class TriReplay {
   private readonly reasons: string[] = []
 
   constructor(private readonly options: TriReplayOptions) {
-    this.stock = TriDexel.box(options.min, options.max, options.cell)
+    this.stock = options.shape === undefined ? TriDexel.box(options.min, options.max, options.cell) : TriDexel.fromPart(PartDexels.fromMeshes(options.shape, options.min, options.max, options.cell))
   }
 
   /** Mark the replay incomplete: a move it could not place in the part's frame, or a tool it does not know. */

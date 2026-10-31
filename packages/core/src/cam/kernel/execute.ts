@@ -93,6 +93,8 @@ export interface PreparedJob {
   readonly meshes: ReadonlyArray<Mesh64>
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] }
   readonly stock: StockBox
+  /** The stock when it is not a box (bar, casting, previous setup), oriented setup coordinates; the box `stock` is its bounds. */
+  readonly stockMesh?: ReadonlyArray<Mesh64>
   /** Work zero in oriented setup coordinates. */
   readonly origin: Vec3
   readonly operations: ReadonlyArray<OperationSpec>
@@ -182,7 +184,45 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     } }
   }
 
+  let stockMeshes: Mesh64[] | undefined
+  if (job.stockModel !== undefined) {
+    const model = job.stockModel
+    if (model.kind === "cylinder") {
+      const n = Math.max(16, Math.min(512, Math.round(model.segments ?? 128)))
+      if (!(model.radius > 0) || !(model.z1 > model.z0) || ![model.center.x, model.center.y, model.radius, model.z0, model.z1].every(Number.isFinite)) {
+        return { status: "failed", issues: [issue("InvalidInput", "prepare", "A cylinder stock needs a finite centre and a positive radius and height")] }
+      }
+      const pos: number[] = [], ix: number[] = []
+      for (let k = 0; k < n; k++) {
+        const a = (2 * Math.PI * k) / n
+        const x = model.center.x + model.radius * Math.cos(a), y = model.center.y + model.radius * Math.sin(a)
+        pos.push(x, y, model.z0, x, y, model.z1)
+      }
+      for (let k = 0; k < n; k++) {
+        const b0 = 2 * k, t0 = 2 * k + 1, b1 = 2 * ((k + 1) % n), t1 = 2 * ((k + 1) % n) + 1
+        ix.push(b0, b1, t1, b0, t1, t0)
+      }
+      const cb = pos.length / 3, ct = cb + 1
+      pos.push(model.center.x, model.center.y, model.z0, model.center.x, model.center.y, model.z1)
+      for (let k = 0; k < n; k++) { const b0 = 2 * k, t0 = 2 * k + 1, b1 = 2 * ((k + 1) % n), t1 = 2 * ((k + 1) % n) + 1; ix.push(cb, b1, b0, ct, t0, t1) }
+      stockMeshes = [{ positions: Float64Array.from(pos), indices: Uint32Array.from(ix) }]
+    } else {
+      const m = { positions: Float64Array.from(model.mesh.positions), indices: Uint32Array.from(model.mesh.indices) }
+      if (m.indices.length < 12 || !m.positions.every(Number.isFinite)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "A mesh stock needs a closed solid with finite coordinates")] }
+      stockMeshes = [m]
+    }
+    const b = boundsOf(stockMeshes)
+    job = { ...job, stock: { min: { x: b.min[0], y: b.min[1], z: b.min[2] }, max: { x: b.max[0], y: b.max[1], z: b.max[2] } } }
+  }
   const transform = setupTransform(job.setupOrientation ?? "+Z")
+  if (stockMeshes !== undefined && job.setupOrientation !== undefined && job.setupOrientation !== "+Z") stockMeshes = stockMeshes.map((mesh) => {
+    const positions = new Float64Array(mesh.positions.length)
+    for (let i = 0; i < positions.length; i += 3) {
+      const p = applyPoint(transform, { x: mesh.positions[i]!, y: mesh.positions[i + 1]!, z: mesh.positions[i + 2]! })
+      positions.set([p.x, p.y, p.z], i)
+    }
+    return { positions, indices: mesh.indices }
+  })
   if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") meshes = meshes.map((mesh) => {
     const positions = new Float64Array(mesh.positions.length)
     for (let i = 0; i < positions.length; i += 3) {
@@ -265,7 +305,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
+  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -473,7 +513,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const cell = replayCell(wanted, width, depthY)
   if (cell > wanted * 1.0001) issues.push(issue("UnsupportedCapability", "replay", `A replay cell of ${wanted.toFixed(3)} mm would need ${Math.ceil((width / wanted) * (depthY / wanted)).toLocaleString("en-US")} columns for this stock: the replay uses ${cell.toFixed(3)} mm to stay within ${MAX_REPLAY_CELLS.toLocaleString("en-US")} (the tolerance budget carries the coarser cell)`, { severity: "warning" }))
   const nx = Math.max(1, Math.ceil(width / cell)), ny = Math.max(1, Math.ceil(depthY / cell))
-  const field = (): HeightField => new HeightField(nx, ny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
+  // A stock that is not a box (bar, casting, previous setup): the columns outside it start at the floor, the others at its top surface.
+  const stockShape: Mesh64[] | undefined = prepared.stockMesh?.map((m) => {
+    const p = Float64Array.from(m.positions)
+    for (let k = 0; k < p.length; k += 3) { p[k] = p[k]! - o.x; p[k + 1] = p[k + 1]! - o.y; p[k + 2] = p[k + 2]! - o.z }
+    return { positions: p, indices: m.indices }
+  })
+  const seedStock = (f: HeightField): HeightField => {
+    if (stockShape === undefined) return f
+    const t = f.rasterise(stockShape as unknown as ReadonlyArray<Mesh>)
+    for (let k = 0; k < f.top.length; k++) f.top[k] = Math.min(f.top[k]!, Math.max(f.floor, t[k]!))
+    return f
+  }
+  const field = (): HeightField => seedStock(new HeightField(nx, ny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z))
   const provisional = field()
   const grid = new Grid(provisional)
   const workStock = (top: number): Stock => ({ x: width, y: depthY, z: Math.max(1e-3, top - sMin.z), origin: { x: sMin.x, y: sMin.y, z: top }, material: material.id })
@@ -886,7 +938,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const replayCellSize = cell * replayFactor
   if (replayFactor > 1) issues.push(issue("UnsupportedCapability", "replay", `The stock replay of this program would pass its work budget at ${cell.toFixed(3)} mm: it ran at ${replayCellSize.toFixed(3)} mm (cell x ${replayFactor}), so the stock-replay term of the tolerance budget grew to ${(replayCellSize / 2).toFixed(3)} mm`, { severity: "warning" }))
   const rnx = Math.max(1, Math.ceil(width / replayCellSize)), rny = Math.max(1, Math.ceil(depthY / replayCellSize))
-  const hf = new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
+  const hf = seedStock(new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z))
   const initialVolume = hf.volume()
   const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
   for (let k = 0; k < target.length; k++) if (target[k]! <= hf.floor + 1e-9) target[k] = Math.max(hf.floor, partBottom)
@@ -995,7 +1047,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     // Spec 72 step 0.3: when the table turns, the stock is also replayed on the tri-dexel, move by move and in program order, so the
     // gouge and leftover verdicts rest on a stock whose error is declared and not on a bracket of voxels.
     if (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined)) {
-      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit })
+      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}) })
     }
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     let replayWork = 0

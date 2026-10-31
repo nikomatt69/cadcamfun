@@ -24,6 +24,17 @@ export interface StockBox {
   readonly max: Vec3
 }
 
+/**
+ * The raw workpiece when it is not a box (spec 69 C2). `cylinder` is a vertical bar (axis +Z in CAD world coordinates, `segments`
+ * facets, default 128, vertices on the circle). `mesh` is a closed solid in CAD world coordinates: a casting, a scan, or the stock a
+ * previous setup left. The kernel keeps the box `stock` as the bounding box of the model; a part that does not fit the bounds is
+ * refused. Only the part's bounds are checked against a mesh stock, not its volume, and the height-field replay of three-axis
+ * moves reads a mesh stock by its top surface (a hollow stock is not modelled).
+ */
+export type StockModel =
+  | { readonly kind: "cylinder"; readonly center: Vec2; readonly radius: number; readonly z0: number; readonly z1: number; readonly segments?: number }
+  | { readonly kind: "mesh"; readonly mesh: { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> } }
+
 export type WorkOrigin = "stock-center" | "stock-corner"
 
 /**
@@ -296,6 +307,8 @@ export interface ManufacturingJob {
   readonly part: PartSource
   /** Stock block in CAD world coordinates; default: the part bounds plus 2 mm on the sides and 1 mm on top. */
   readonly stock?: StockBox
+  /** A stock that is not a box (bar, casting, scan, previous setup); its bounds replace `stock`. */
+  readonly stockModel?: StockModel
   /** Manual refixture: CAD direction facing the spindle; operations use the oriented setup coordinates. */
   readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
