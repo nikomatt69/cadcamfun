@@ -115,6 +115,12 @@ export interface TiltedPlane {
   readonly layout?: RotaryLayout
   /** Which of the two rotary solutions the control takes: `1` / `-1` (Siemens `_DIR`, Heidenhain `SEQ+` / `SEQ-`). Absent: the control's own pick. */
   readonly solution?: 1 | -1
+  /**
+   * Heidenhain only: write the plane with the legacy `CYCL DEF 19 WORKING PLANE` cycle instead of `PLANE SPATIAL`
+   * (`workplane.ts`). The two take the same spatial angles, so the toolpath replays identically; the flag is for a control or a
+   * shop that still runs the old cycle. A control without cycle 19 refuses the plane rather than writing another word.
+   */
+  readonly legacy?: boolean
 }
 
 /** Siemens `CYCLE800` settings that belong to the machine, not to the part. */
