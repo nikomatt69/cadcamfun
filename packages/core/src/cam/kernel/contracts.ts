@@ -260,6 +260,12 @@ export interface QualityRequirement {
   readonly deburr?: number
   /** Hold the outlines the program cuts through the full stock height with tabs (spec 69 A1); without it the plan only says so in a note. */
   readonly tabs?: TabRequirement
+  /**
+   * Release only a program whose tolerance budget is met (spec 69 B4): the claim `tolerance` passes when the terms of `CamArtifact.tolerance`
+   * add up to at most `tolerance` and none is unbounded, and fails naming the largest term otherwise; a failed claim keeps the program at `preview`.
+   * Off by default: the budget is then informational, as before.
+   */
+  readonly enforceTolerance?: boolean
 }
 
 /**
@@ -372,7 +378,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage"
+  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage" | "tolerance"
   readonly status: ClaimStatus
   readonly detail: string
 }

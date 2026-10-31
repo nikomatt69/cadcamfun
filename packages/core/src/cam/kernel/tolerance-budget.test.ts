@@ -64,3 +64,19 @@ describe("the tolerance budget of an artifact (spec 29 §3)", () => {
     expect(a.claims.some((c) => (c.id as string) === "tolerance")).toBe(false)
   })
 })
+
+describe("the tolerance budget as an opt-in release gate (spec 69 B4)", () => {
+  test("off by default no claim is added; on, a budget above the request fails the claim naming the largest term and holds the release at preview", () => {
+    expect(run(base()).claims.some((c) => c.id === "tolerance")).toBe(false)
+    const a = run(base({ quality: { resolution: 0.4, tolerance: 0.01, enforceTolerance: true } }))
+    const c = a.claims.find((x) => x.id === "tolerance")!
+    expect(c.status).toBe("failed")
+    expect(c.detail).toMatch(/above the requested 0\.01 mm; the largest is [a-z-]+ at/)
+    expect(a.release).toBe("preview")
+  })
+  test("a request the budget meets passes the claim and leaves the release to the other claims", () => {
+    const a = run(base({ machine: accurate(), quality: { resolution: 0.4, tolerance: 2, enforceTolerance: true } }))
+    const c = a.claims.find((x) => x.id === "tolerance")!
+    expect(c).toMatchObject({ status: "passed", detail: expect.stringMatching(/within the requested 2 mm/) })
+  })
+})
