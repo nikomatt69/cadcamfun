@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.50 (October 2026)
+
+## Core
+
+- A history may hold only imported bodies; removeImported refuses a body a feature names; import route starts from an empty timeline
+
+## Desktop
+
+- The part panel imports a STEP file as an imported body, shows the heal report, and removes it unless a feature names it
+
 ## v0.1.49 (October 2026)
 
 ## Core
