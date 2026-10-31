@@ -40,7 +40,7 @@ export interface PlanOutput {
   readonly end: Vec2
 }
 
-const dist = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y)
+const dist = (a: Vec2, b: Vec2): number => { const dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy) }
 const polyLength = (p: ReadonlyArray<Vec2>): number => { let l = 0; for (let i = 1; i < p.length; i++) l += dist(p[i - 1]!, p[i]!); return l }
 
 /**

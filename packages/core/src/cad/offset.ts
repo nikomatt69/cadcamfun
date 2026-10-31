@@ -381,6 +381,8 @@ export const offsetRings = (
   const valid = (piece: Piece): boolean => {
     const mid = { x: (piece.a.x + piece.b.x) / 2, y: (piece.a.y + piece.b.y) / 2 }
     for (const o of originals) {
+      // A segment further than the offset distance from the point (by its box) cannot be nearer than it.
+      if (mid.x < Math.min(o.a.x, o.b.x) - absD || mid.x > Math.max(o.a.x, o.b.x) + absD || mid.y < Math.min(o.a.y, o.b.y) - absD || mid.y > Math.max(o.a.y, o.b.y) + absD) continue
       if (piece.source.kind === "bevel" && o.ring === piece.source.ring) {
         const n = ringSizes[o.ring]!
         const v = piece.source.vertex

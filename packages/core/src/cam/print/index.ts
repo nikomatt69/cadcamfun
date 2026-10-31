@@ -14,12 +14,14 @@ import { resolveProfile, type PrintProfile } from "./profile.ts"
 import { meshVolume, printMeshIssue, printSolidIssue, sliceMesh } from "./slice.ts"
 import { verifyPrint, type PrintCheck } from "./verify.ts"
 import { planSupports } from "./support.ts"
+import { adaptiveStack, type AdaptiveOptions } from "./adaptive.ts"
 import { analyseProgram } from "./program.ts"
 import { rankOrientations, rotationDown } from "./printability.ts"
 import { repairMesh, type RepairOptions, type RepairReport } from "./repair.ts"
 import type { PlannedLayer, PrintStats } from "./types.ts"
 import type { Region } from "./geom.ts"
 
+export * from "./adaptive.ts"
 export * from "./bodies.ts"
 export * from "./filament.ts"
 export * from "./geom.ts"
@@ -50,6 +52,11 @@ export interface PrintOptions {
    * spread of directions by support volume, overhang, height and contact (`rankOrientations`).
    */
   readonly orientSearch?: "faces" | "full"
+  /**
+   * Layers of varying thickness: thick on steep walls, thin where the surface leans, ending on the part's flat faces
+   * (`adaptive.ts`). `layerHeight` of the profile is then only the default for the bounds and the first layer.
+   */
+  readonly adaptive?: boolean | AdaptiveOptions
 }
 
 export interface PrintResult {
@@ -200,7 +207,12 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
   if (!place.fits) warnings.push(`the part (${(raw.max[0] - raw.min[0]).toFixed(1)} x ${(raw.max[1] - raw.min[1]).toFixed(1)} mm) does not fit the ${profile.bedWidth} x ${profile.bedDepth} mm bed`)
   const partHeight = raw.max[2] - raw.min[2]
 
-  const { tops: modelTops, heights } = layerStack(partHeight, profile)
+  const adaptive = options.adaptive === undefined || options.adaptive === false ? undefined
+    : adaptiveStack(meshes, partHeight, Math.min(profile.firstLayerHeight, partHeight), { max: Math.min(0.8 * profile.nozzleDiameter, Math.max(profile.layerHeight, 0.28)), ...(options.adaptive === true ? {} : options.adaptive) })
+  if (adaptive !== undefined) notes.push(`; Adaptive layers: ${adaptive.tops.length} layers of ${Math.min(...adaptive.heights).toFixed(2)} to ${Math.max(...adaptive.heights).toFixed(2)} mm, stair-step deviation at most ${adaptive.worstDeviation.toFixed(3)} mm`)
+  const { tops: modelTops, heights } = adaptive ?? layerStack(partHeight, profile)
+  // Supports plan with one pitch: the mean layer of an adaptive stack.
+  const planProfile: PrintProfile = adaptive === undefined ? profile : { ...profile, layerHeight: partHeight / adaptive.tops.length }
   // The part's mean cross-section (its volume over its height), never less than a tenth of its box: a box is not its material.
   const area = Math.max(meshes.reduce((v, m) => v + Math.abs(meshVolume(m)), 0) / Math.max(partHeight, 1e-9), 0.1 * (raw.max[0] - raw.min[0]) * (raw.max[1] - raw.min[1]))
   const tooLarge = printWorkIssue(modelTops.length + profile.raftLayers, area, profile.extrusionWidth, profile.layerHeight)
@@ -225,7 +237,7 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
   const keep = lastFilled + 1
 
   stage("supports", 0.2)
-  const supports = planSupports(regions.slice(0, keep), profile, profile.support === "none")
+  const supports = planSupports(regions.slice(0, keep), planProfile, profile.support === "none")
   warnings.push(...supports.warnings)
   if (profile.support === "none" && supports.overhangArea > 4) warnings.push(`${supports.overhangArea.toFixed(0)} mm2 overhangs more than ${profile.supportAngle} degrees and is printed without support: turn supports on or change the orientation`)
 

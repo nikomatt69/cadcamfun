@@ -55,7 +55,7 @@ const speedFactor = (kind: PathKind, p: PrintProfile): number => {
 
 const pathLength = (points: ReadonlyArray<Vec2>): number => {
   let l = 0
-  for (let i = 1; i < points.length; i++) l += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y)
+  for (let i = 1; i < points.length; i++) { const dx = points[i]!.x - points[i - 1]!.x, dy = points[i]!.y - points[i - 1]!.y; l += Math.sqrt(dx * dx + dy * dy) }
   return l
 }
 
@@ -198,7 +198,7 @@ export const emitGcode = (input: EmitInput): EmitResult => {
   }
   /** Moves to `to` at height `z` without extruding; long moves and layer changes retract first. */
   const travel = (to: Vec2, z: number): void => {
-    const d = Math.hypot(to.x - cx, to.y - cy)
+    const d = Math.sqrt((to.x - cx) * (to.x - cx) + (to.y - cy) * (to.y - cy))
     const layerChange = !located || Math.abs(z - cz) > 1e-6
     if (d < 1e-6 && !layerChange) return
     const lift = d >= p.retractMinTravel || layerChange
@@ -252,7 +252,7 @@ export const emitGcode = (input: EmitInput): EmitResult => {
       let pathTime = speed / accel
       for (let k = 1; k < points.length; k++) {
         const q = points[k]!
-        const len = Math.hypot(q.x - prev.x, q.y - prev.y)
+        const len = Math.sqrt((q.x - prev.x) * (q.x - prev.x) + (q.y - prev.y) * (q.y - prev.y))
         if (len < 1e-6) continue
         const amount = len * perMm
         e += amount
