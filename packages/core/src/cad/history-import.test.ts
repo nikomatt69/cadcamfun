@@ -2,7 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Feature, History, SketchFeature } from "./history.ts"
 import { rebuild } from "./history.ts"
 import { rebuildExact } from "./history-brep.ts"
-import { importStepToHistory, withImported } from "./history-import.ts"
+import { importStepToHistory, importedUses, removeImported, withImported } from "./history-import.ts"
 import { sceneToStep } from "./scene-step.ts"
 import { meshVolume } from "./solid.ts"
 import { explodeWithGaps } from "./brep/exploded-fixture.ts"
@@ -132,5 +132,19 @@ describe("an imported STEP body is the base of a history (spec 72 step 2.2)", ()
     const brep = exact.bodies[0]!.brep!
     expect(brep.faces.some((f) => f.loose === true)).toBe(true)
     expect(() => writeStepBreps([{ name: "x", brep }])).toThrow(StepExportError)
+  })
+
+  test("an imported body is removed unless a feature names it", () => {
+    const imp = importStepToHistory(explodedStep())
+    const id = imp.bases[0]!.id
+    const alone = withImported(history([]), imp)
+    const gone = removeImported(alone, id)
+    expect(gone.refusal).toBeUndefined()
+    expect(gone.history.bases).toBeUndefined()
+    expect(removeImported(alone, "nope").refusal).toContain("not an imported body")
+    const moved = withImported(history([{ id: "m1", type: "move", targets: [id], translate: [1, 0, 0] }]), imp)
+    expect(importedUses(moved, id)).toEqual(["m1"])
+    expect(removeImported(moved, id).refusal).toContain("m1")
+    expect(removeImported(moved, id).history).toBe(moved)
   })
 })

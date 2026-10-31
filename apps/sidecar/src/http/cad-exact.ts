@@ -1,6 +1,6 @@
 import { Api, BadRequest, type CadImportStepReport, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
-import { decodeHistory, featureEditOf } from "@cadcamfun/ai"
+import { decodeHistory, decodeStartHistory, featureEditOf } from "@cadcamfun/ai"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -88,7 +88,7 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         // A history sent along is checked here, so a malformed one is a 400 that names each refused field, and the job gets decoded data.
         let history: unknown
         if (payload.history !== undefined) {
-          const decoded = decodeHistory(payload.history)
+          const decoded = decodeStartHistory(payload.history)
           if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
           history = decoded.data
         }

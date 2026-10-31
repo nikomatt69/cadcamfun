@@ -14,6 +14,7 @@
 import { BREP_LIMITS, MAX_BASES, MAX_BASES_BYTES, brepFromJson, brepToJson, formatPath, healBrep, readStepBreps, validateBrep, type Brep, type BrepLimits, type HealOptions, type HealReport } from "./brep/index.ts"
 import { looseFaceIndices, toleranceLimit } from "./brep/tolerance.ts"
 import type { History, ImportedBase } from "./history.ts"
+import { bodyCreator, bodyRefs } from "./history-timeline.ts"
 
 export interface ImportedBodyReport {
   readonly name: string
@@ -136,6 +137,23 @@ export const withImported = (history: History, imported: HistoryImport | Readonl
     return id === b.id ? b : { ...b, id }
   })
   return { ...history, bases: [...(history.bases ?? []), ...fresh] }
+}
+
+/** The features that name an imported body (`targets`, `body`, `bodies`, `tools`, ...), by id. */
+export const importedUses = (history: History, id: string): ReadonlyArray<string> =>
+  history.features.filter((f) => bodyRefs(f).some((ref) => ref === id || bodyCreator(ref) === id)).map((f) => f.id)
+
+/**
+ * The history without one imported body. A body that a feature names is not dropped silently: the refusal lists the features, which
+ * the person removes or retargets first. A feature that acts on "the bodies built so far" without naming it simply no longer sees it.
+ */
+export const removeImported = (history: History, id: string): { readonly history: History; readonly refusal?: string } => {
+  if (!(history.bases ?? []).some((b) => b.id === id)) return { history, refusal: `'${id}' is not an imported body of this history` }
+  const uses = importedUses(history, id)
+  if (uses.length > 0) return { history, refusal: `'${id}' is named by ${uses.join(", ")}` }
+  const bases = (history.bases ?? []).filter((b) => b.id !== id)
+  const { bases: _gone, ...rest } = history
+  return { history: bases.length === 0 ? rest : { ...history, bases } }
 }
 
 /** The history with each base body in its JSON form (version tag), the form the API, the store and the desktop carry. */

@@ -161,3 +161,26 @@ test("an imported id never collides with a feature id", async () => {
   expect(report.ok).toBe(true)
   expect(report.bodies[0]!.id).toBe("h1-2")
 })
+
+test("a history that holds only an imported body is accepted, rebuilt, stored and loaded", async () => {
+  const response = await post("import-step", { step: stepText, history: { parameters: {}, features: [] } })
+  expect(response.status).toBe(200)
+  const report = Schema.decodeUnknownSync(CadImportStepReport)(response.body)
+  expect(report.ok).toBe(true)
+  expect(report.problems).toEqual([])
+  const history = JSON.parse(JSON.stringify(report.history))
+  expect(history.features).toEqual([])
+  expect(history.bases).toHaveLength(1)
+  const rebuilt = Schema.decodeUnknownSync(CadRebuildReport)((await post("rebuild", { history })).body)
+  expect(rebuilt.ok).toBe(true)
+  expect(rel(rebuilt.bodies[0]!.volume!, 6000)).toBeLessThan(1e-9)
+  const created = await run("cad_edit", { action: "parametric_create", name: "Imported only", history })
+  expect(created.ok).toBe(true)
+  const elementId = created.ids?.[0] ?? created.elementId
+  const inspected = await run("cad", { action: "parametric_inspect", elementId })
+  expect(inspected.history.bases).toEqual(history.bases)
+  // Neither a feature nor a body is still refused, with the field named.
+  const empty = decodeHistory({ parameters: {}, features: [] })
+  expect(empty.success).toBe(false)
+  if (!empty.success) expect(empty.problems.join(" ")).toContain("at least one feature or one imported body")
+})
