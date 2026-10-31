@@ -2,40 +2,41 @@ Inspect the open CAD drawing: elements, layers, exact solids, assemblies, DFM an
 
 Actions and Parameters (lengths mm; history and joint angles degrees)
 - describe: counts, bounds, layers; no parameters. Start here.
-- check: sizes, operands, duplicates and floating parts; no parameters.
-- relations: firstId, secondId; bounds, placement and dependencies.
-- grep: query, layerId?, parametricOnly?, includeParameters?, offset?, limit?; search properties and parameters with revisions.
-- vision: focus?; capture the visible CAD viewport.
-- inspect_elements: ids?, layerId?, offset?, limit?; full element properties, paged.
-- inspect_layers: no parameters; layers and active layer.
-- inspect_search: query, layerId?, limit?; matching text.
+- check: sizes, operands, duplicates, floating parts; no parameters.
+- relations: firstId, secondId; bounds, placement, dependencies.
+- grep: query, layerId?, parametricOnly?, includeParameters?, offset?, limit?; search properties, parameters, revisions.
+- vision: focus?; capture the CAD viewport.
+- inspect_elements: ids?, layerId?, offset?, limit?; full properties, paged.
+- inspect_layers: no parameters; layers, active layer.
+- inspect_search: query, layerId?, limit?; matches.
 - inspect_property: elementId, path (property-name array), offset?, maxChars?; one property, paged.
-- inspect_origins: ids?, layerId?, offset?, limit?; origins, bounds and distance from zero.
-- drawing: elementId or history, options?; dimensioned PDF/SVG. Options include GDT, datums, balloons; see schema.
-- parametric_validate: history; build and validate before storing.
+- inspect_origins: ids?, layerId?, offset?, limit?; origins, bounds, distance from zero.
+- drawing: elementId or history, options?; dimensioned PDF/SVG; GDT, datums, balloons in options.
+- parametric_validate: history; validate before storing.
 - parametric_inspect: elementId; parameters and revision.
-- parametric_test: elementId, cases (1-12) [{name,parameters,expectedBodies?,minVolumeMm3?,maxVolumeMm3?,checks?}]; dimensional checks and variants.
+- parametric_test: elementId, cases (1-12) [{name,parameters,expectedBodies?,minVolumeMm3?,maxVolumeMm3?,checks?}]; dimensional checks, variants.
 - parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material? (metal|cast|plastic), minWall?, envelope? {x,y,z}.
-- parametric_exact: elementId or history, includeStep?, name?; exact body or reason it is mesh-only.
-- exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes and CAM suitability.
-- assembly: washers?; exact clashes, gaps, BOM, joints, missing fasteners.
-- setups: ids?, fixture?, allowed?; setup orientations per solid.
-- title_block: none; the title block, completed, with what it lacks.
+- parametric_exact: elementId or history, includeStep?, name?; exact body or why mesh-only.
+- exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes, CAM fit.
+- assembly: washers?; clashes, gaps, BOM, joints, missing fasteners.
+- setups: ids?, fixture?, allowed?; orientations per solid.
+- title_block: none; the completed title block and what it lacks.
 - distance: firstId, secondId; smallest exact gap and closest points.
-- shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview. Get names from exact.
+- kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming), naming health, Boolean counters; resolve gives exact|split|merged|deleted|ambiguous.
+- shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview; names from exact.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.
-- offset: id, distance; outward offset preview, rounded convex corners. Unsupported geometry returns a reason.
-- motion: model {ground,joints,couplings?,contacts?}, sweep {joint,from,to,steps,quantity?}; scene part ids, zero-pose world origins/axes. closesLoop constraints solve passive joints. Reports closure, contact gaps and clearance violations per frame; no contact-force simulation.
-- surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Rectangular isoparametric trim; stitch matching full boundaries. Curved thicken requires explicit axial direction. General curved normal offsets are refused. Open surfaces are not CAM solids.
-- exchange: format step|iges|parasolid, ids?; exact file text. Parasolid is explicitly unsupported.
-- parametric_fastener: size?, fit?, shaftDiameter?; thread, tap, clearance and counterbore.
+- offset: id, distance; outward offset preview, rounded convex corners; unsupported says why.
+- motion: model {ground,joints,couplings?,contacts?}, sweep {joint,from,to,steps,quantity?}; scene part ids, zero-pose origins/axes. closesLoop solves passive joints. Reports closure, gaps, clearances per frame; no contact forces.
+- surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Rectangular isoparametric trim; stitch needs matching full boundaries; curved thicken needs an axial direction; general curved normal offsets are refused; open surfaces are not CAM solids.
+- exchange: format step|iges|parasolid, ids?; file text. Parasolid is unsupported.
+- parametric_fastener: size?, fit?, shaftDiameter?; thread, tap, clearance, counterbore.
 - parametric_recipe: recipe, params?; standard-part history. Recipes: mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure.
-- parametric_from_element: elementId, depth?; named dimensions from existing geometry.
+- parametric_from_element: elementId, depth?; named dimensions from geometry.
 
 Paging: limit goes up to 500 on inspect_elements, inspect_origins and inspect_search (their ids up to 500 too; defaults 10, 10, 20) and up to 200 on grep (default 20).
 
 Result (JSON)
-ok, geometry findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; parameter revisions guard later updates.
+ok, geometry findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; revisions guard later updates.
 
 Do not use it
-To write use cad_edit; to machine use cam/cam_edit. Consult fusion-360-modelling for history features and supported domains.
+To write use cad_edit; to machine use cam/cam_edit. Consult fusion-360-modelling for history features.
