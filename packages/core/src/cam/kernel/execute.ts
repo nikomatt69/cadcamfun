@@ -1253,13 +1253,30 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     length: machine.table.length,
     width: machine.table.width
   }
-  const clearance = interpreted !== undefined && table !== undefined
-    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, table, machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } })
+  // Fixture bodies, CAD world -> oriented setup -> work frame (AABB of the turned box: only errs towards a collision).
+  const fixtureBodies = (job.fixtures ?? []).map((f) => {
+    const t = setupTransform(job.setupOrientation ?? "+Z")
+    const cs = [f.min.x, f.max.x].flatMap((x) => [f.min.y, f.max.y].flatMap((y) => [f.min.z, f.max.z].map((z) => applyPoint(t, { x, y, z }))))
+    const lo = { x: Math.min(...cs.map((c) => c.x)) - o.x, y: Math.min(...cs.map((c) => c.y)) - o.y, z: Math.min(...cs.map((c) => c.z)) - o.z }
+    const hi = { x: Math.max(...cs.map((c) => c.x)) - o.x, y: Math.max(...cs.map((c) => c.y)) - o.y, z: Math.max(...cs.map((c) => c.z)) - o.z }
+    return { id: f.id, lo, hi, body: { centre: { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2, z: (lo.z + hi.z) / 2 }, half: { x: (hi.x - lo.x) / 2, y: (hi.y - lo.y) / 2, z: (hi.z - lo.z) / 2 } } }
+  })
+  // A body that cuts into the part is not workholding: the part is solid there (the part's box is the test; it errs towards a refusal).
+  const partLo = { x: prepared.bounds.min[0] - o.x, y: prepared.bounds.min[1] - o.y, z: prepared.bounds.min[2] - o.z }
+  const partHi = { x: prepared.bounds.max[0] - o.x, y: prepared.bounds.max[1] - o.y, z: prepared.bounds.max[2] - o.z }
+  const fixtureInPart = fixtureBodies.filter((f) => f.lo.x < partHi.x - 1e-6 && f.hi.x > partLo.x + 1e-6 && f.lo.y < partHi.y - 1e-6 && f.hi.y > partLo.y + 1e-6 && f.lo.z < partHi.z - 1e-6 && f.hi.z > partLo.z + 1e-6)
+  // A machine with no table geometry still checks its fixture bodies: the table is then a box far below the work.
+  const clearTable: TableGeometry | undefined = table ?? (fixtureBodies.length > 0 ? { cx: 0, cy: 0, top: -1e5, length: 1, width: 1 } : undefined)
+  const clearance = interpreted !== undefined && clearTable !== undefined
+    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, clearTable, {
+        ...(machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } }),
+        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => f.body) } : {})
+      })
     : undefined
   if (clearance?.first !== undefined) {
     const f = clearance.first
     const cutter = cutterByNumber.get(toolAtLine[f.line] ?? -1)
-    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
+    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
   }
 
   // ------------------------------------------------------------ evidence
@@ -1343,8 +1360,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" },
     {
       id: "machine-clearance",
-      status: interpreted === undefined ? "unresolved" : table === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
-      detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
+      status: interpreted === undefined ? "unresolved" : clearTable === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
+      detail: clearTable === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
     }
   ]
   if (undercutMoves > 0) {
@@ -1371,7 +1388,18 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     claims.push({ id: "part-coverage", status: "unresolved", detail })
     issues.push(issue("UnsupportedCapability", "evidence", detail, { severity: "warning" }))
   }
-  if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
+  // Workholding (spec 69 C3): decided when the setup gives its bodies; otherwise a manual refixture keeps its open claim as before.
+  if (fixtureBodies.length > 0) {
+    const ids = fixtureBodies.map((f) => f.id).join(", ")
+    const bad = fixtureInPart.length > 0 ? `fixture ${fixtureInPart.map((f) => f.id).join(", ")} overlaps the part's bounds (a body inside the part is not workholding)`
+      : clearance === undefined ? "no NC was checked against the fixtures"
+      : clearance.first !== undefined ? `the tool assembly reaches a fixture or the table at NC line ${clearance.first.line}`
+      : clearance.unresolved > 0 || clearance.rotaryMoves > 0 ? `${clearance.unresolved + clearance.rotaryMoves} moves could not be proven clear of the fixtures` : undefined
+    claims.push({ id: "setup-workholding", status: bad === undefined ? "passed" : fixtureInPart.length > 0 || clearance?.first !== undefined ? "failed" : "unresolved",
+      detail: bad ?? `${fixtureBodies.length} fixture bodies (${ids}) stay clear of the tool assembly over ${clearance!.checked} moves (at least ${(clearance!.minClearance ?? 0).toFixed(3)} mm); their contact with the stock is the clamping and is not checked` })
+    if (fixtureInPart.length > 0) issues.push(issue("InvalidInput", "evidence", bad!, { severity: "error" }))
+    if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z" && hidden === 0 && skippedSamples === 0) claims.push({ id: "part-coverage", status: "unresolved", detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" })
+  } else if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
     { id: "setup-workholding", status: "unresolved", detail: "Manual refixture requires independently configured and checked workholding; no fixture is assumed by this program" },
     ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
   )
