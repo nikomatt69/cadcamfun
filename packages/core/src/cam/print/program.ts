@@ -229,7 +229,6 @@ export const analyseProgram = (gcode: string, options: ProgramOptions = {}): Pro
       continue
     }
     if (g === undefined) continue
-    seen.add(`G${g}`)
     if (!KNOWN_G.has(g)) { unknown.add(`G${g}`); continue }
     // Marlin's G90/G91 also select the extruder mode; Klipper, RepRapFirmware and Bambu leave it to M82/M83.
     if (g === 90) { relativeXYZ = false; if (marlinLike) relativeE = false; continue }

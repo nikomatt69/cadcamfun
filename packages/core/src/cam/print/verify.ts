@@ -96,6 +96,26 @@ export const replayBeads = (gcode: string, options: ReplayOptions = {}): { beads
   for (let n = 0; start <= gcode.length; n++) {
     let end = gcode.indexOf("\n", start)
     if (end < 0) end = gcode.length
+    // A plain motion block (`G1 X.. Y.. E.. F..`, nothing else on the line) changes none of the text state and has nothing to
+    // validate beyond its characters: it is recorded without a regex pass, which is nearly every line of a large program.
+    if (gcode.charCodeAt(start) === 71 && (gcode.charCodeAt(start + 1) === 49 || gcode.charCodeAt(start + 1) === 48) && gcode.charCodeAt(start + 2) === 32) {
+      let plain = true
+      for (let i = start + 3; i < end; i++) {
+        const c = gcode.charCodeAt(i)
+        if (c === 32 || (c >= 48 && c <= 57) || c === 46 || c === 45) continue
+        if (c === 88 || c === 89 || c === 90 || c === 69 || c === 70) {
+          const next = gcode.charCodeAt(i + 1)
+          if ((next >= 48 && next <= 57) || next === 45 || next === 46) continue
+        }
+        plain = false
+        break
+      }
+      if (plain) {
+        start = end + 1
+        states.push({ kind, layer, height, homed: homeAxes.size === 3, nozzleReady, bedReady })
+        continue
+      }
+    }
     const raw = gcode.slice(start, end).trim()
     start = end + 1
     if (raw.startsWith(";TYPE:")) kind = raw.slice(6).trim()
