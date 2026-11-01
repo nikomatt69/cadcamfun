@@ -9,6 +9,7 @@ import { EmptyActionInput as empty } from "./ai-cam.ts"
 import { CadKernelInput } from "./ai-cad-kernel.ts"
 import { CadWorkflowInput } from "./ai-cad-workflow.ts"
 import { CadExportInput, CadFastenInput } from "./ai-export.ts"
+import { CadSimulateInput } from "./ai-simulate.ts"
 
 const optional = Schema.optionalKey
 const nonEmpty = Schema.String.check(Schema.isMinLength(1))
@@ -207,6 +208,7 @@ export const CAD_ACTION_INPUTS = {
   "cad.grep": CadGrepInput,
   "cad.vision": VisionInput,
   "cad.exact": CadExactInput,
+  "cad.simulate": CadSimulateInput,
   "cad.assembly": CadAssemblyInput,
   "cad.title_block": empty,
   "cad.setups": CadSetupsInput,

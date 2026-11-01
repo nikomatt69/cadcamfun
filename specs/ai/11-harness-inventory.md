@@ -12,19 +12,19 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 ## Totals
 
-- Actions: **119** in **15** tools (read 68, write 45, destructive 6).
-- Actions with an identified execution path: **119/119**.
-- Actions named in their tool prompt: **119/119**.
-- Actions mentioned by at least one test file: **118/119**.
-- Actions with a declared result schema: **119/119**.
+- Actions: **120** in **15** tools (read 69, write 45, destructive 6).
+- Actions with an identified execution path: **120/120**.
+- Actions named in their tool prompt: **120/120**.
+- Actions mentioned by at least one test file: **119/120**.
+- Actions with a declared result schema: **120/120**.
 - Prompt files: **63** (base layers 8, modes 5); one-shot workflows: **5**.
-- Built-in skills: **22** (plus user skills from the store); composer commands: **36**.
+- Built-in skills: **23** (plus user skills from the store); composer commands: **36**.
 
 ## Tools
 
 | Tool | Effect | Actions | Holders (primaries and specialists) | Prompt chars |
 | --- | --- | --- | --- | --- |
-| `cad` | read | 32 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3976 |
+| `cad` | read | 33 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4155 |
 | `cad_edit` | destructive | 19 | primary:build, editor, modeler | 3906 |
 | `cam` | read | 19 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3904 |
 | `cam_edit` | write | 8 | primary:build, machinist, optimizer | 2887 |
@@ -74,6 +74,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad.exchange` | read | — | format*, ids | handler `cadExchange` → `apps/sidecar/src/services/ai.ts:705` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.kernel` | read | — | op*, elementId, history, body, kinds, limit, refs, parameters, after, madeAfter | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, cad-kernel-naming.test.ts |
 | `cad.workflow` | read | — | op*, entities, constraints, drag, definitions, occurrences, mates, drive, checks, elementId, history, options, format, attachment, data, unit, repair, requireSolid | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, cad-workflow.test.ts |
+| `cad.simulate` | read | — | op*, analysis, id, history, body, material, overrides, size, maxElements, supports, loads, thermal, referenceTemperature, uniformTemperature, initialTemperature, transient, modes, criterion, freeExpansion, metric, levels, factor, tolerance, candidates, targetSafety, probes | handler `cadExportBodies` → `apps/sidecar/src/services/ai.ts:718` | yes | declared | action-inputs-cad.test.ts |
 | `cad.distance` | read | — | firstId*, secondId* | handler `cadDistance` → `apps/sidecar/src/services/ai.ts:817` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.parametric_fastener` (was `cad_parametric`) | read | — | size, fit, shaftDiameter | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
 | `cad.parametric_recipe` (was `cad_parametric`) | read | — | recipe*, params | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
@@ -96,7 +97,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad_edit.delete` (was `cad_delete_entities`) | destructive | drawing | ids*, confirm* | handler `deleteEntities` → `apps/sidecar/src/services/ai.ts:982` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, auto-mode.test.ts, bridge.test.ts, nikcli-host.test.ts, service.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
 | `cad_edit.editor` (was `cad_editor`) | write | interface, drawing | actions* | local (in-package implementation) — `packages/ai/src/actions/cad-edit.ts` | yes | declared | action-inputs-cad.test.ts, auto-mode.test.ts, ai-workspace.test.ts, cad-section.test.ts |
 | `cad_edit.import` (was `cad_import_drawing`) | write | drawing | format, content, attachment, depth, up, scale, gap, tolerance, name, color, layer | handler `addElements` → `apps/sidecar/src/services/ai.ts:935`<br>handler `cadStoreBodies` → `apps/sidecar/src/services/ai.ts:693` | yes | declared | action-inputs-cad.test.ts, attachments.test.ts, ai-cam-tools.test.ts, ai-exact.test.ts, ai-stock-inspection.test.ts, ai-attachments.test.ts |
-| `cad_edit.export` | write | file | format*, ids, history, name, unit, tolerance | handler `cadExportBodies` → `apps/sidecar/src/services/ai.ts:718`<br>handler `saveFile` → `apps/sidecar/src/services/ai.ts:724` | yes | declared | action-inputs-cad.test.ts, export.test.ts |
+| `cad_edit.export` | write | file | format*, ids, history, name, unit, tolerance | handler `cadExportBodies` → `apps/sidecar/src/services/ai.ts:718`<br>handler `saveFile` → `apps/sidecar/src/services/ai.ts:724` | yes | declared | action-inputs-cad.test.ts, export.test.ts, ai-export.test.ts |
 | `cad_edit.parametric_create` (was `cad_parametric`) | write | drawing | history*, name*, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing-binding.test.ts, ai-drawing.test.ts, ai-fusion-governance.test.ts, ai-parametric-acceptance.test.ts, history-bases.test.ts |
 | `cad_edit.parametric_update` (was `cad_parametric`) | write | drawing | elementId*, parameters*, expectedRevision* | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-cad-to-gcode-e2e.test.ts, history-bases.test.ts |
 | `cad_edit.parametric_timeline` (was `cad_parametric`) | write | drawing | elementId*, expectedRevision*, suppress, release, rollback, rollForward, move | handler `parametric` → `apps/sidecar/src/services/ai.ts:880` | yes | declared | action-inputs-cad.test.ts, ai-parametric-timeline.test.ts |
@@ -131,14 +132,14 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cam_edit.export` | write | file | kind*, operationId*, format, extension, name, unit | handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1131`<br>handler `operationStock` → `apps/sidecar/src/services/ai.ts:733`<br>handler `saveFile` → `apps/sidecar/src/services/ai.ts:724` | yes | declared | export.test.ts |
+| `cam_edit.export` | write | file | kind*, operationId*, format, extension, name, unit | handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1131`<br>handler `operationStock` → `apps/sidecar/src/services/ai.ts:733`<br>handler `saveFile` → `apps/sidecar/src/services/ai.ts:724` | yes | declared | export.test.ts, ai-export.test.ts |
 | `cam_edit.turn` | write | operation, program | profile*, stock*, stepdown, allowance, feedMmRev, rpm, machine, machineConfig, expectedRevision | handler `turnOperation` → `apps/sidecar/src/services/ai.ts:330` | yes | declared | cam-kernel.test.ts |
 | `cam_edit.manufacture` | write | operation, program | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, expectedRevision, operations, tools, deburr, tabs, breadth, subprograms, nativeCycles, tcp, smoothing, print | handler `manufactureOperation` → `apps/sidecar/src/services/ai.ts:407` | yes | declared | cam-wire.test.ts, cam-kernel.test.ts |
-| `cam_edit.create` (was `cam_create_operation`) | write | operation | type*, params, expectedRevision | handler `createOperation` → `apps/sidecar/src/services/ai.ts:1023` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.update` (was `cam_update_operation`) | write | operation | operationId*, params*, expectedRevision | handler `updateOperation` → `apps/sidecar/src/services/ai.ts:1062` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-workspace.test.ts |
-| `cam_edit.generate` (was `cam_generate_gcode`) | write | program | operationId, maxLines | handler `generateGcode` → `apps/sidecar/src/services/ai.ts:1119` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, post-edit-diagnostics.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.verify` (was `cam_verify_toolpath`) | write | report | operationId*, tool, fixtures, targetSolids, stock, resolution, tolerance, start | handler `verifyOperation` → `apps/sidecar/src/services/ai.ts:1165` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.stock_set` (was `cam_stock`) | write | stock | stock* | handler `stock` → `apps/sidecar/src/http/workspace.ts:72`, `apps/sidecar/src/http/workspace.ts:153` (+2) | yes | declared | cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts |
+| `cam_edit.create` (was `cam_create_operation`) | write | operation | type*, params, expectedRevision | handler `createOperation` → `apps/sidecar/src/services/ai.ts:1023` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-export.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.update` (was `cam_update_operation`) | write | operation | operationId*, params*, expectedRevision | handler `updateOperation` → `apps/sidecar/src/services/ai.ts:1062` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-export.test.ts, ai-workspace.test.ts |
+| `cam_edit.generate` (was `cam_generate_gcode`) | write | program | operationId, maxLines | handler `generateGcode` → `apps/sidecar/src/services/ai.ts:1119` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, post-edit-diagnostics.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-export.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.verify` (was `cam_verify_toolpath`) | write | report | operationId*, tool, fixtures, targetSolids, stock, resolution, tolerance, start | handler `verifyOperation` → `apps/sidecar/src/services/ai.ts:1165` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-export.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.stock_set` (was `cam_stock`) | write | stock | stock* | handler `stock` → `apps/sidecar/src/http/workspace.ts:72`, `apps/sidecar/src/http/workspace.ts:153` (+2) | yes | declared | cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-export.test.ts, ai-stock-inspection.test.ts, ai-verify-binding.test.ts |
 
 ### `library`
 
@@ -267,7 +268,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2740 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1540 | ai-specialists.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3976 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4155 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3906 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3904 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2887 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
@@ -320,7 +321,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- |
 | `cad-3d-modeling` | cad | 16920 | cad, cad_edit, cam_edit, parts, research, agent |
 | `cam-operation-workflow` | cam | 1350 | cad, cam, cam_edit, library |
-| `toolpath-verification` | cam | 1797 | cam_edit |
+| `toolpath-verification` | cam | 2337 | cam_edit |
 | `cutting-parameters` | cam | 1108 | cam, library |
 | `drilling-and-holes` | cam | 1815 | — |
 | `precision-and-tolerances` | cam | 2197 | cam_edit |
@@ -331,13 +332,14 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad-naming` | cad | 2763 | cad, cad_edit, parts |
 | `cad-workflow` | cad | 5271 | cad, cad_edit, parts |
 | `parametric-design` | cad | 7702 | cad, cad_edit, parts, vcs_edit |
-| `fusion-360-modelling` | cad | 12257 | cad, cad_edit, cam, parts |
+| `fusion-360-modelling` | cad | 13771 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 7046 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1320 | cam, cam_edit, library |
 | `project-auto-memory` | general | 904 | memory, memory_edit |
 | `stock-and-fixtures` | cam | 837 | — |
+| `fea-simulation` | cad | 4364 | cad, cad_edit, library, memory |
 | `cam-turning` | cam | 3480 | cam, cam_edit |
 | `cam-post` | cam | 2933 | cam |
 

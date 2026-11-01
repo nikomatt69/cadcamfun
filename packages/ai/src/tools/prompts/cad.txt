@@ -22,13 +22,14 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - setups: ids?, fixture?, allowed?; orientations per solid.
 - title_block: none; the completed title block and what it lacks.
 - distance: firstId, secondId; smallest exact gap and closest points.
-- kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming), naming health, Boolean counters; resolve gives exact|split|merged|deleted|ambiguous.
-- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; computed, not stored; skill cad-workflow.
+- kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming); resolve gives exact|split|merged|deleted|ambiguous.
+- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview; names from exact.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.
 - offset: id, distance; outward offset preview, rounded convex corners; unsupported says why.
-- motion: model, sweep; scene part ids, zero-pose origins/axes. closesLoop solves passive joints. Reports closure, gaps, clearances per frame; no contact forces.
-- surface: operation patch|stitch|thicken, patches (data, trim?), thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Isoparametric rectangular trim; stitch needs matching full boundaries; curved thicken needs an axial direction (other normal offsets refused); open surfaces are not CAM solids.
+- motion: model, sweep; scene part ids, zero-pose origins/axes; closesLoop solves passive joints; no contact forces.
+- surface: operation patch|stitch|thicken, patches (data, trim?), thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Curved thicken needs an axial direction; open surfaces are not CAM solids.
+- simulate: op run|converge|materials|library, analysis, id or history, body?, material?, overrides?, size?, maxElements?, supports?, loads?, thermal?, referenceTemperature?, uniformTemperature?, initialTemperature?, transient?, modes?, criterion?, freeExpansion?, metric?, levels?, factor?, tolerance?, candidates?, targetSafety?, probes?; FE stress, findings; skill fea-simulation.
 - exchange: format step|iges|parasolid, ids?; file text. Parasolid is unsupported.
 - parametric_fastener: size?, fit?, shaftDiameter?; thread, tap, clearance, counterbore.
 - parametric_recipe: recipe, params?; standard-part history. Recipes: mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure.
@@ -37,7 +38,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 Paging: limit goes up to 500 on inspect_elements, inspect_origins and inspect_search (ids too; defaults 10, 10, 20) and up to 200 on grep (default 20).
 
 Result (JSON)
-ok, geometry findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; revisions guard later updates.
+ok, findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; revisions guard updates.
 
 Do not use it
 To write use cad_edit; to machine use cam/cam_edit. Consult fusion-360-modelling for history features.

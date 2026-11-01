@@ -1,0 +1,11 @@
+/** Finite-element simulation (spec 48): study definition, voxel-tet mesher, quadratic tetrahedra, solvers and result fields. */
+export * from "./materials.ts"
+export * from "./study.ts"
+export * from "./mesh.ts"
+export * from "./regions.ts"
+export * from "./results.ts"
+export { runStudy } from "./run.ts"
+export type { Located, RunHooks, RunOutcome, StudyResult } from "./run.ts"
+export * from "./advisor.ts"
+export * from "./machining.ts"
+export { jacobiEigen } from "./eigen.ts"

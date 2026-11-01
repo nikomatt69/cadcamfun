@@ -5,6 +5,7 @@
  */
 import { runCadKernel } from "./cad-kernel-naming.ts"
 import { runCadWorkflow } from "./cad-workflow.ts"
+import { runCadSimulate } from "./simulate.ts"
 import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
 import { Schema } from "effect"
@@ -237,6 +238,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.workflow", kind: "read",
     parameters: INPUTS["cad.workflow"],
     run: (input, context) => runCadWorkflow(input, context)
+  }),
+  defineWireAction({
+    id: "cad.simulate", kind: "read",
+    parameters: INPUTS["cad.simulate"],
+    run: (input, context) => runCadSimulate(input as never, context)
   }),
   defineWireAction({
     id: "cad.distance", kind: "read",

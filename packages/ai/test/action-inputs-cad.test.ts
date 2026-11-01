@@ -38,6 +38,16 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.relations": { accept: [{ firstId: "a", secondId: "b" }], refuse: [{ firstId: "a" }, { firstId: "", secondId: "b" }] },
   "cad.grep": { accept: [{ query: "bolt" }, { query: "bolt", parametricOnly: true, limit: 200, offset: 3 }], refuse: [{ query: "" }, { query: "b", limit: 201 }, { query: "b", offset: -1 }] },
   "cad.vision": { accept: [{}, { focus: "the pocket" }], refuse: [{ focus: "" }, { focus: "   " }] },
+  "cad.simulate": {
+    accept: [
+      { op: "library" },
+      { op: "run", analysis: "static", id: "a", size: 2, supports: [{ region: { kind: "plane", axis: "x", value: 0 } }], loads: [{ kind: "force", region: { kind: "plane", axis: "x", value: 10 }, force: [0, 0, -50] }, { kind: "gravity" }] },
+      { op: "run", analysis: "thermal_stress", history: {}, uniformTemperature: 120, supports: [{ region: { kind: "cylinder", axis: "z", center: [0, 0], radius: 5 }, dofs: ["x", "y"] }] },
+      { op: "converge", analysis: "modal", id: "a", modes: 3, metric: "frequency", levels: 3, factor: 1.6 },
+      { op: "materials", analysis: "static", id: "a", candidates: ["steel-s235", "aluminium-6061-t6"], targetSafety: 2 }
+    ],
+    refuse: [{}, { op: "run", analysis: "plasma" }, { op: "run", analysis: "static", size: -1 }, { op: "run", analysis: "static", loads: [{ kind: "force", region: { kind: "plane", axis: "w", value: 1 }, force: [0, 0, 1] }] }, { op: "converge", levels: 9 }]
+  },
   "cad.exact": { accept: [{}, { ids: ["a"], machining: false }], refuse: [{ ids: [] }, { machining: "no" }] },
   "cad.setups": { accept: [{}, { ids: ["a"], fixture: "none", allowed: ["+Z", "-X"] }], refuse: [{ ids: [] }, { fixture: "top" }, { allowed: [] }, { allowed: ["+W"] }] },
   "cad.assembly": { accept: [{}, { washers: false }], refuse: [{ washers: 1 }] },

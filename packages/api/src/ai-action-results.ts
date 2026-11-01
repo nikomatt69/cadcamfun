@@ -212,6 +212,8 @@ const generated = Schema.Struct({
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
 /** An export is a stored file: its name, key, size and hash, plus what went into it. The bytes are never in the answer. */
 const exported = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), format: str, file: ExportedFile, warnings: strings }), [record])
+/** A simulation answers with its numbers and findings, never with whole fields. */
+const simulated = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), op: Schema.Literals(["run", "converge", "materials", "library"]) }), [record])
 /** Fasteners inserted into the drawing: the elements and what the kernel could not fasten. */
 const fastened = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), added: Schema.Array(record), plans: int, existing: int, unfastened: Schema.Array(record) }), [record])
 const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
@@ -312,6 +314,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.parametric_dfm": read(parametricDfm),
   "cad.parametric_exact": read(parametricExact),
   "cad.exact": read(exact),
+  "cad.simulate": read(simulated),
   "cad.assembly": read(assembly),
   "cad.title_block": read(titleBlock),
   "cad.setups": read(setups),

@@ -11,7 +11,7 @@ import { useSelectionStore } from "../store/selectorStore.ts"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { prefersDark } from "../../../shared/state/settings.ts"
-import CADCanvas from "./CADCanvas.tsx"
+import SimulationPanel from "./SimulationPanel.tsx"
 import ComponentCreationModal from "./ComponentCreationModal.tsx"
 
 export interface EnhancedToolbarProps {
@@ -293,7 +293,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
                 <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label={t("cad.drawing.close")}><X size={20} /></button>
               </div>
             </div>
-            <div class="h-[calc(100%-4rem)] overflow-hidden"><CADCanvas width="100%" height="100%" allowDragDrop keyboard={false} /></div>
+            <div class="h-[calc(100%-4rem)] overflow-hidden"><SimulationPanel /></div>
             <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-2">
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">

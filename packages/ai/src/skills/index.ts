@@ -14,6 +14,7 @@ import camOperationWorkflow from "./text/cam-operation-workflow.md" with { type:
 import toolpathVerification from "./text/toolpath-verification.md" with { type: "text" }
 import cuttingParameters from "./text/cutting-parameters.md" with { type: "text" }
 import drillingAndHoles from "./text/drilling-and-holes.md" with { type: "text" }
+import feaSimulation from "./text/fea-simulation.md" with { type: "text" }
 import precisionAndTolerances from "./text/precision-and-tolerances.md" with { type: "text" }
 import industrialStandards from "./text/industrial-standards.md" with { type: "text" }
 import machinesAndAxes from "./text/machines-and-axes.md" with { type: "text" }
@@ -114,6 +115,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "machining-cycle-presets", description: "Reusable pocket, contour, adaptive, drilling and turning sequences with explicit machine and verification requirements.", category: "cam", tags: ["cam", "cycles", "presets"], body: skillText(machiningCyclePresets) },
   { name: "project-auto-memory", description: "Automatically retain verified project facts and resume connected CAD/CAM tasks after delegation or compaction.", category: "general", tags: ["memory", "context", "continuation"], body: skillText(projectAutoMemory) },
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) },
+  { name: "fea-simulation", description: "Finite-element studies on a solid: static stress, thermal, thermal stress, modal and buckling; the run, converge and material loop that improves a study, stress criteria and limits.", category: "cad", tags: ["fea", "simulation", "stress", "thermal", "modal"], body: skillText(feaSimulation) },
   { name: "cam-turning", description: "Plan a turned part with real inserts: roughing, finishing, grooving, threading, parting, nose-radius path and the stock-removal replay (cam lathe).", category: "cam", tags: ["cam", "turning", "lathe"], body: skillText(camTurning) },
   { name: "cam-post", description: "Test a post by replaying its text, diff against expected NC, and optimise feeds from measured engagement (cam post_test, cam process).", category: "cam", tags: ["cam", "post", "feeds"], body: skillText(camPost) }
 ]
