@@ -46,3 +46,13 @@ configuration list / activate; AI: `cad_assembly` actions (parameter names only)
 ## 5. Order
 
 A1 → A2 → A3 (the gripper target) → A5 → A4 → A6 → A7 → A8 → A9 → A10.
+
+## Change log
+
+- 2026-10-31 (CAD-B): **A1, A2, A5 built** in `cad/assembly/`. `model.ts`: definitions stored once, nested occurrences (cycle refused), `editDefinition` updates every occurrence,
+  `makeIndependent`, design-table configurations (`configurationsFromTable`, 12-row test with analytic mass per row), mass/centroid/inertia by summing definitions (box + cylinder closed forms).
+  `mates.ts` + `solve.ts`: 13 mate kinds with analytic gradients (checked against central differences, all kinds), LM per component from the present pose, DOF per assembly and per occurrence
+  (pin in hole with seated shoulder leaves 1), redundant mates, minimal conflicting set, joint limits (clamped and reported), `sweepJoint`; a four-bar linkage over 360 degrees of crank agrees
+  with the analytic closure to 1e-6 rad (a closed kinematic loop, A3 mechanism check). `analysis.ts` wires interference/clearance/BOM of assembly-analysis to placed occurrences.
+  AI: `cad.workflow` op `assembly` (mates, drive, interference, mass, bom, clearance). Open: A3 rack-and-pinion gripper assembly, A4 in-context refs (needs spec 41 resolution), A6 exploded views,
+  A7 lazy loading/BVH screening, A8-A10; mates with persistent-name operands need agent 1's `resolve(ref)` (operands are features or face indices behind `featureOfFace`).

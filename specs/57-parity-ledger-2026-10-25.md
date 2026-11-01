@@ -74,15 +74,15 @@ stale "Status" lines of specs 40–55 as the single place that says what is buil
 | 45 K1 | open | no project / intersect to sketch |
 | 45 K2 | partial | ellipse and Catmull-Rom spline (`sketch-curves.ts`); no NURBS control-point / fit-point splines |
 | 45 K3 | partial | trim and extend (`c870a1df`); no offset, 2D fillet, patterns as relations |
-| 45 K4–K8 | open | no 3D sketch, blocks, minimal-conflict diagnostics, incremental drag solve, drag-to-edit sketcher (DOF analysis exists in `sketch.ts`, 24 constraint kinds) |
+| 45 K4–K8 | partial | K6 (minimal conflict sets, per-point freedom, redundancy) and K7 (`createSketchSession` / `dragSketch`, 0.3 ms per drag step on 199 entities) built 2026-10-31 (`sketch-solver.test.ts`); no 3D sketch, blocks or drag-to-edit sketcher UI |
 | 45 D1, D3, D5 | open | no delete-face-with-heal, replace / split / merge faces, direct edit of imported STEP as history |
 | 45 D2, D4 | partial | face move / push-pull (`brep/face-edit.ts`), hole / boss / fillet / NURBS edits (spec 33 C8, spec 40 U2); no general offset face with neighbour re-intersection |
-| 46 A1, A2, A4, A5, A7 | open | no definition / occurrence model, constraint mates (mates are placement transforms: `mateTransform`), in-context refs, configurations, lazy load |
+| 46 A1, A2, A4, A5, A7 | partial | A1, A2, A5 built 2026-10-31 (`cad/assembly/`: definitions/occurrences, 13 mate kinds with solver, DOF, configurations, mass roll-up; `assembly.test.ts`); in-context refs (A4) and lazy load (A7) open |
 | 46 A3 | partial | joints with limits, gear and rack couplings, forward solver (`19b23e56`, `31a13967`); closed loops and a Grübler check n/v |
 | 46 A6 | partial | **view-only** animated exploded view in the desktop (`features/cad/lib/exploded-view.ts`, `b3a0fb56`); no explode steps in the model, no trails, not per configuration |
 | 46 A8, A9, A10 | partial | BOM, exact interference and clearance (`d9b550d1`, `e14e8078`), `motionStudy`; no assembly features, no driving laws / contact, no per-pair interference policy |
 | 47 SM1–SM5 | partial | `cad/sheet-metal.ts` (`80cc2672`, 296 lines): thickening, corner rounding, edge flanges with reliefs, hems, outline development, `flatPatternDxf`; no bend-aware body, no contour flange, no 3D unfold with refold, no bend table |
-| 47 SM6, SM7 | open | no forming tools; `dfm.ts` has no sheet-metal rules |
+| 47 SM6, SM7 | partial | SM7 built 2026-10-31 (`cad/sheet/sheet-dfm.ts`, rule ids); W1 profile library and W3 cut list built (`weldment.ts`); no forming tools (SM6) |
 | 47 W1–W3, MT1–MT3 | open | no weldment, cut list, mold, parting line, core / cavity (no hit in `packages/core/src`) |
 
 ### 2.6 Specs 48, 49, 50 — simulation, drawings, exchange
@@ -97,7 +97,7 @@ stale "Status" lines of specs 40–55 as the single place that says what is buil
 | 49 T1 | partial | GD&T feature control frames (14 characteristics), datums, balloons (`879c9cfc`, `drawing/gdt.ts`); modifiers, composite frames and datum targets n/v |
 | 49 T2 | partial | balloons only; no surface texture, weld symbols, hole tables |
 | 49 O1 | partial | title block (`ef43f7aa`, `drawing/title-block.ts`), sheet; revision table and multi-sheet n/v |
-| 49 O2 | open | the PDF written by the desktop (`jpegSheetPdf` in `features/cad/lib/drawing-export.ts`) wraps a **raster JPEG**; there is no vector PDF writer in core |
+| 49 O2 | partial | vector PDF writer in core built 2026-10-31 (`drawing/pdf.ts`, `sheetToPdf`); the desktop still exports through `jpegSheetPdf` (adapter switch open) |
 | 49 O3 | partial | `DrawingPanel.tsx` exists; the editing scope of the spec is n/v |
 | 49 P1, P2 | open | no 3D annotations (PMI) and no AP242 semantic PMI |
 | 50 X1 | partial | STEP write (AP214 product structure) and read of assemblies through `MAPPED_ITEM` / `NEXT_ASSEMBLY_USAGE_OCCURRENCE`; no colours, ids / names round trip n/v |
@@ -105,7 +105,7 @@ stale "Status" lines of specs 40–55 as the single place that says what is buil
 | 50 X4, X5 | n/v | extra surface entity coverage and external validator not judged |
 | 50 X6 | partial | IGES reader / writer `brep/iges.ts` (`76256b6f`); transformation matrices (124, chained) on geometry, vertex lists and solids, reflections included, refused on shared topology and when they scale (2026-10-27); lines read with an arc-length parameter so a moved IGES body stays valid; 102 / 118 / 140 / 142 / 143 and subfigures (308 / 408) open |
 | 50 X7 | partial | `cad/dxf.ts`; no blocks / hatches / dimensions both ways verified; DWG decision D2 |
-| 50 X8, X9 | open | `mesh-clean.ts` (weld, topology) exists but there is no STL / OBJ / 3MF **import** into a body and no faceted-to-analytic recovery |
+| 50 X8, X9 | partial | X8: STL / OBJ / 3MF import with units, repair and validity report built 2026-10-31 (`cad/exchange/`); no storing as a document body, no PLY; X9 faceted-to-analytic recovery open |
 | 50 X10 | partial | STL, OBJ, glTF, 3MF export of exact bodies (`470d04ae`); no faceted STEP |
 
 ### 2.7 Specs 51, 52 — five-axis and turning

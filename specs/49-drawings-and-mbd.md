@@ -85,3 +85,10 @@ A drawing document always has a title block (ISO 7200 data fields), whether it i
 ## 5. Order
 
 G1 → D1 → D2 → D3 → G2 → T1 → O2 → G3 → T3 → T2 → O1 → O3 → P1 → P2.
+
+## Change log
+
+- 2026-10-31 (CAD-B): **O2 built.** `drawing/pdf.ts` writes a real vector PDF (paths, Bezier circles/arcs/ellipses/bulges, splines, hatches, dimensions with arrow heads, blocks, entity transforms,
+  dash/colour/width, standard Helvetica with AFM widths and WinAnsi, byte-exact xref, deterministic, no `/Image`): `drawingToPdf`, `drawingsToPdf`, `sheetToPdf`. Sheets stay associative by
+  regeneration from the history (`pdf.test.ts` "associativity": editing the parameter changes the PDF dimension). AI: `cad.workflow` op `sheet`. Open: the desktop still exports through
+  `jpegSheetPdf` (adapter work: switch to `sheetToPdf`), model-ref (face id) associativity beyond regeneration (D1 proper), surface texture/weld symbols/hole tables, PMI.

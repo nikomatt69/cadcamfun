@@ -50,3 +50,10 @@ Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-1
 ## 6. Order
 
 SM1 → SM2 → SM3 → SM4 → SM5 → W1 → W2 → MT1 → MT2 → MT3 → SM6/SM7 → W3.
+
+## Change log
+
+- 2026-10-31 (CAD-B): **SM7, W1, W3 (cut list) built** in `cad/sheet/` (exported as `fabrication`). `sheet-dfm.ts`: rule ids SM-FLANGE-MIN (4T+R), SM-HOLE-BEND (2.5T+R), SM-HOLE-MIN, SM-HOLE-EDGE,
+  SM-RELIEF-DEPTH/WIDTH with measured vs required; `weldment.ts`: closed-form areas and outline loops for rect/round tube (corner radii), flat bar, angle, channel, I-beam (20x20x2 tube
+  equals the closed form and the outline), `weldmentCutList` (grouped by profile/length/end cuts, mass) and `mitredFrame` (volume = area x centreline perimeter, exact). Unfolding already
+  exists in `sheet-metal.ts`. Open: SM6 forming tools, W2 members along 3D paths, ISO 2553 weld table, MT1-MT3; no AI action yet (prompt ceiling): core API only.
