@@ -11,8 +11,11 @@
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
  * ribs, sheets, text, coils and modelled threads (`thread-brep.ts`: a faceted helicoid, any length the standard sizes allow, refused at once under a time budget that cannot cover it), and the union /
  * subtract / intersect of every tool, and the draft and the push/pull of a hole wall or a boss side (`brep/draft-curved.ts`,
- * `brep/pushpull-curved.ts`). A body that went through anything else (the draft and push/pull of other curved faces, the catalogue elements
- * ellipsoid / gear, a thread too long for the time budget) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
+ * `brep/pushpull-curved.ts`). The catalogue washer, nut, bolt, screw and spring are exact too (revolutions, a hex
+ * extrusion with its bore, and the coil sweep), and so is the gear: its flanks are the planar chords of the involute
+ * the mesh draws, declared in `brep/catalogue.ts` like the faceted helicoid of a modelled thread. A body that went
+ * through anything else (the draft and push/pull of other curved faces, the catalogue element ellipsoid, a thread
+ * too long for the time budget) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
@@ -47,6 +50,10 @@ import {
   makeSphere,
   makeTorus,
   makeCapsule,
+  makeWasher,
+  makeNut,
+  makeBolt,
+  makeGear,
   draftCurvedFace,
   draftPlanarFace,
   BudgetExceeded,
@@ -501,6 +508,12 @@ const gizmo = (rx: number, ry: number, rz: number, centre: Vec3): Transform => {
   return { m, t }
 }
 
+/** Nominal diameter of a metric size string such as "M8" in the catalogue options, as the editor reads it. */
+const metricSize = (options: Readonly<Record<string, string>>, fallback: number): number => {
+  const match = typeof options["size"] === "string" ? options["size"].match(/M(\d+(?:\.\d+)?)/i) : null
+  return match ? Number(match[1]) : fallback
+}
+
 /** Exact catalogue solid placed at `at` as the catalogue builds it, before its rotation; a string says why there is none. */
 export const catalogueBrep = (
   element: string,
@@ -603,10 +616,61 @@ export const catalogueBrep = (
       // Refused, not approximated: an ellipsoid is the affine image of a sphere and the kernel has no rational
       // ellipsoid surface; a NURBS patch would only be an approximation of it (spec 39 §2: refusal over approximation).
       return "an ellipsoid has no exact model yet (the kernel has no rational ellipsoid surface; a sphere, or a revolve of an ellipse, is exact)"
-    case "gear":
-      // The involute flank is not one of the kernel's exact curves (line, arc, ellipse); a NURBS flank would only be
-      // an approximation of it, so the gear is refused rather than silently approximated.
-      return "an involute gear has no exact model yet (its flanks are involutes, which the kernel's exact curves cannot carry)"
+    case "washer": {
+      const d = metricSize(options, 5)
+      const outer = typeof p["outerDiameter"] === "number" && p["outerDiameter"]! > d ? p["outerDiameter"]! : 2.2 * d
+      const thickness = typeof p["thickness"] === "number" && p["thickness"]! > 0 ? p["thickness"]! : 0.2 * d
+      try {
+        return { brep: makeWasher(d, outer, thickness, at), centre: at }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+    case "nut": {
+      try {
+        return { brep: makeNut(metricSize(options, 5), at), centre: at }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+    case "bolt":
+    case "screw": {
+      try {
+        return { brep: makeBolt(metricSize(options, 5), num("length", 20), at), centre: at }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+    case "gear": {
+      try {
+        const brep = makeGear({
+          moduleValue: num("moduleValue", 1),
+          teeth: Math.floor(num("teeth", 20)),
+          pressureAngle: num("pressureAngle", 20),
+          thickness: num("thickness", 5),
+          holeDiameter: typeof p["holeDiameter"] === "number" ? p["holeDiameter"]! : 0
+        }, at)
+        return { brep, centre: at }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+    case "spring": {
+      const radius = num("radius", 1), wireRadius = num("wireRadius", 0.1), turns = num("turns", 5), height = num("height", 5)
+      const pitch = height / turns
+      if (!(radius > wireRadius) || !(pitch > 2 * wireRadius + 1e-9) || turns > 60) return "a spring whose turns touch, or with more than 60 turns, has no exact model (the mesh catalogue refuses it too)"
+      try {
+        const g = coilGeometry({ cx: at.x, cy: at.y, z0: at.z - height / 2, radius, pitch, turns, wire: 2 * wireRadius, square: false, left: false })
+        const pieces: PathPiece[] = g.path.slice(1).map((b, i) => ({ kind: "line", a: g.path[i]!, b }))
+        const loop: ProfileLoop = g.ring2d.map((a, i) => ({ kind: "line", a, b: g.ring2d[(i + 1) % g.ring2d.length]! }))
+        const t = g.normal, radial = { x: 1, y: 0, z: 0 }
+        const binormal = { x: t.y * radial.z - t.z * radial.y, y: t.z * radial.x - t.x * radial.z, z: t.x * radial.y - t.y * radial.x }
+        const start = sweepStartFrame({ origin: g.centre, u: radial, v: binormal, n: t }, pieceTangent(pieces[0]!, false))
+        return { brep: sweepPath({ loops: [loop] }, start, pieces, { closed: false, name: "spring" }), centre: at }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
     default:
       return `the catalogue element '${element}' has no exact model yet`
   }

@@ -74,6 +74,12 @@ export const CELLS: ReadonlyArray<Cell> = [
   { id: "primitive.prism", build: (m) => { m.primitive({ element: "prism", params: { radius: 6, height: 10, sides: 6 } }) } },
   { id: "primitive.ellipsoid", build: (m) => { m.primitive({ element: "ellipsoid", params: { radiusX: 8, radiusY: 5, radiusZ: 4 } }) } },
   { id: "primitive.gear", build: (m) => { m.primitive({ element: "gear", params: { moduleValue: 2, teeth: 16, thickness: 8 } }) } },
+  { id: "primitive.gear-bore", build: (m) => { m.primitive({ element: "gear", params: { moduleValue: 2, teeth: 20, thickness: 10, holeDiameter: 10 } }) } },
+  { id: "primitive.nut", build: (m) => { m.primitive({ element: "nut", options: { size: "M8" } }) } },
+  { id: "primitive.bolt", build: (m) => { m.primitive({ element: "bolt", params: { length: 50 }, options: { size: "M8" } }) } },
+  { id: "primitive.screw", build: (m) => { m.primitive({ element: "screw", params: { length: 40 }, options: { size: "M6" } }) } },
+  { id: "primitive.washer", build: (m) => { m.primitive({ element: "washer", params: { outerDiameter: 16, thickness: 1.5 }, options: { size: "M8" } }) } },
+  { id: "primitive.spring", build: (m) => { m.primitive({ element: "spring", params: { radius: 10, wireRadius: 1.5, turns: 5, height: 40 } }) } },
   { id: "primitive.capsule", build: (m) => { m.primitive({ element: "capsule", params: { radius: 3, height: 14 } }) } },
   { id: "primitive.hemisphere", build: (m) => { m.primitive({ element: "hemisphere", params: { radius: 6 } }) } },
   // other features

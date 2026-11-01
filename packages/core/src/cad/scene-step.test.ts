@@ -86,10 +86,17 @@ describe("the drawing as a STEP file", () => {
   })
 
   test("a solid with only a mesh is written as facets and said so", () => {
-    const r = sceneToStep([{ id: "g", type: "gear", moduleValue: 2, teeth: 12, thickness: 5, x: 0, y: 0, z: 0, name: "gear" }])
+    const r = sceneToStep([{ id: "g", type: "ellipsoid", radiusX: 10, radiusY: 6, radiusZ: 4, x: 0, y: 0, z: 0, name: "ellipsoid" }])
     expect(r.parts.length).toBe(1)
     expect(r.parts[0]!.exact).toBe(false)
     expect(r.parts[0]!.note).toContain("faceted")
+    expect(readStepBreps(r.step!).parts.length).toBe(1)
+  })
+
+  test("a catalogue gear is written exact, not as facets", () => {
+    const r = sceneToStep([{ id: "g", type: "gear", moduleValue: 2, teeth: 12, thickness: 5, x: 0, y: 0, z: 0, name: "gear" }])
+    expect(r.parts.length).toBe(1)
+    expect(r.parts[0]!.exact).toBe(true)
     expect(readStepBreps(r.step!).parts.length).toBe(1)
   })
 

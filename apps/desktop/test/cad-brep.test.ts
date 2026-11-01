@@ -50,7 +50,8 @@ test("exact analysis of drawing elements: catalogue solids, Booleans on their op
     { id: "a", type: "cube", width: 40, height: 30, depth: 10, x: 0, y: 0, z: 0 },
     { id: "b", type: "cylinder", radius: 5, height: 20, x: 0, y: 0, z: 0 },
     { id: "c", type: "boolean-subtract", operands: ["a", "b"], name: "plate" },
-    { id: "g", type: "gear", moduleValue: 2, teeth: 12, thickness: 5 }
+    { id: "g", type: "gear", moduleValue: 2, teeth: 12, thickness: 5 },
+    { id: "e", type: "ellipsoid", radiusX: 10, radiusY: 6, radiusZ: 4 }
   ]
   const plate = analyzeExact(all[2]!, all)
   expect(plate.ok).toBe(true)
@@ -60,7 +61,8 @@ test("exact analysis of drawing elements: catalogue solids, Booleans on their op
     expect(plate.surfaces).toEqual({ plane: 6, cylinder: 1 })
     expect(plate.valid).toBe(true)
   }
-  expect(analyzeExact(all[3]!, all).ok).toBe(false)
+  expect(analyzeExact(all[3]!, all).ok).toBe(true)
+  expect(analyzeExact(all[4]!, all).ok).toBe(false)
   expect("step" in elementStep(all[2]!, all)).toBe(true)
 })
 
