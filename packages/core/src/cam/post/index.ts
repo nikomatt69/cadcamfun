@@ -58,3 +58,4 @@ export const getPost =(id: PostId): Post | undefined => posts[id] as Post | unde
 /** The dialect of an implemented post: what its control can do (canned cycles, rigid tapping, rotary axes). */
 export const dialectOf = (id: PostId): Dialect | undefined =>
   ({ generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, grbl: grblDialect, haas: haasDialect, siemens: siemensDialect, heidenhain: heidenhainDialect, okuma: okumaDialect, mazak: mazakDialect, mitsubishi: mitsubishiDialect, brother: brotherDialect } as Partial<Record<PostId, Dialect>>)[id]
+export { testPost, testAllPosts, type PostCheck, type PostTestResult, type PostTestOptions, type PostDiffLine, type CheckStatus } from "./tester.ts"

@@ -29,6 +29,8 @@ import workflowsCadcam from "./text/workflows-cadcam.md" with { type: "text" }
 import machiningCyclePresets from "./text/machining-cycle-presets.md" with { type: "text" }
 import projectAutoMemory from "./text/project-auto-memory.md" with { type: "text" }
 import stockAndFixtures from "./text/stock-and-fixtures.md" with { type: "text" }
+import camTurning from "./text/cam-turning.md" with { type: "text" }
+import camPost from "./text/cam-post.md" with { type: "text" }
 
 /** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
 export const USER_MARKER = ".user-skill"
@@ -111,7 +113,9 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "workflows-cadcam", description: "How the agent uses the Actions-style workflows: YAML shape, registered uses steps, interpolation, and when to dispatch manually.", category: "workflows", tags: ["workflows", "actions", "automation"], body: skillText(workflowsCadcam) },
   { name: "machining-cycle-presets", description: "Reusable pocket, contour, adaptive, drilling and turning sequences with explicit machine and verification requirements.", category: "cam", tags: ["cam", "cycles", "presets"], body: skillText(machiningCyclePresets) },
   { name: "project-auto-memory", description: "Automatically retain verified project facts and resume connected CAD/CAM tasks after delegation or compaction.", category: "general", tags: ["memory", "context", "continuation"], body: skillText(projectAutoMemory) },
-  { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) }
+  { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) },
+  { name: "cam-turning", description: "Plan a turned part with real inserts: roughing, finishing, grooving, threading, parting, nose-radius path and the stock-removal replay (cam lathe).", category: "cam", tags: ["cam", "turning", "lathe"], body: skillText(camTurning) },
+  { name: "cam-post", description: "Test a post by replaying its text, diff against expected NC, and optimise feeds from measured engagement (cam post_test, cam process).", category: "cam", tags: ["cam", "post", "feeds"], body: skillText(camPost) }
 ]
 
 /** The `SKILL.md` text nikcli reads: front matter then the playbook. */

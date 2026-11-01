@@ -10,7 +10,7 @@ Actions and Parameters (mm, mm/min, rpm)
 - turn: profile, stock, stepdown, allowance, feedMmRev, rpm, machine, machineConfig, expectedRevision (as cam turn). Store identical external-turning NC with lathe stock. Always preview; ideal point tool, unqualified workholding/controller. Re-run turn after changes, never legacy generate.
 
 Result (JSON)
-- ok; create/update: operationId; generate: programHash, lines/previewLines/omittedLines, preview; verify: status, programHash, issues, stats and modelling limits. manufacture/turn: operationId, release, identity; desktop loads the stored original.
+- ok; create/update: operationId; generate: programHash, lines/previewLines/omittedLines, preview; verify: status, programHash, issues, stats and modelling limits. manufacture/turn: operationId, release, identity.
 
 Do not use it
 - For reads or static analysis: use cam. A simulated pass proves only the supplied model.
