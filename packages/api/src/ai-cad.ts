@@ -8,7 +8,7 @@ import { drawing } from "@cadcamfun/core"
 import { EmptyActionInput as empty } from "./ai-cam.ts"
 import { CadKernelInput } from "./ai-cad-kernel.ts"
 import { CadWorkflowInput } from "./ai-cad-workflow.ts"
-import { CadExportInput } from "./ai-export.ts"
+import { CadExportInput, CadFastenInput } from "./ai-export.ts"
 
 const optional = Schema.optionalKey
 const nonEmpty = Schema.String.check(Schema.isMinLength(1))
@@ -244,5 +244,6 @@ export const CAD_ACTION_INPUTS = {
   "cad_edit.delete": Schema.Struct({ ids: Schema.Array(nonEmpty).check(Schema.isMinLength(1)), confirm: Schema.Literal(true) }),
   "cad_edit.editor": Schema.Struct({ actions: Schema.Array(CadEditorAction).check(Schema.isMinLength(1), Schema.isMaxLength(40)) }),
   "cad_edit.import": CadImportInput,
-  "cad_edit.export": CadExportInput
+  "cad_edit.export": CadExportInput,
+  "cad_edit.fasten": CadFastenInput
 } as const

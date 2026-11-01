@@ -715,6 +715,22 @@ const toolHandlers = Effect.gen(function*() {
         return { ok: true, format: input.format, content, parts: parts.length, warnings: [], ...where(loaded) }
       } catch (error) { return { ok: false, error: `Exact export failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
+    cadFasten: async (projectId, input) => {
+      { const denied = await refused(projectId); if (denied) return denied }
+      const loaded = await load(projectId, true)
+      try {
+        const r = cad.fastenScene(loaded.elements, { ...(input.washers !== undefined ? { washers: input.washers } : {}) })
+        const unfastened = r.unfastened.slice(0, 20).map((u) => ({ bodies: u.bodies, at: u.at, reason: u.reason }))
+        if (r.elements.length === 0) return { ok: true, added: [], plans: 0, existing: r.existing, unfastened, skipped: r.skipped, note: r.unfastened.length > 0 ? "No stack of holes could be fastened; the reasons are listed." : "Every shared hole already has its fastener, or the drawing has none." }
+        if (r.elements.length > 400) return { ok: false, error: `${r.elements.length} fasteners would be inserted; fasten fewer parts at a time.` }
+        const created: Element[] = r.elements.map((e) => ({ ...e, type: "brep", id: crypto.randomUUID(), layerId: "default" }))
+        await save(loaded, loaded.data, [...loaded.elements, ...created])
+        return {
+          ok: true, added: created.map((e) => ({ id: e.id, name: e.name, role: (e["metadata"] as { fastener?: { role?: string } } | undefined)?.fastener?.role })),
+          plans: r.plans.length, existing: r.existing, unfastened, skipped: r.skipped, ...where(loaded)
+        }
+      } catch (error) { return { ok: false, error: `Fastening failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
     cadExportBodies: async (projectId, ids) => {
       { const denied = await refused(projectId); if (denied) return { ok: false as const, error: (denied as { error?: string }).error ?? "Not allowed." } }
       const loaded = await load(projectId)

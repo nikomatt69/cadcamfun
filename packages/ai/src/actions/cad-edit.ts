@@ -283,6 +283,10 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({ id: "cad_edit.import", kind: "write", replaces: "cad_import_drawing", parameters: INPUTS["cad_edit.import"], run: runImport }),
   defineWireAction({ id: "cad_edit.export", kind: "write", parameters: INPUTS["cad_edit.export"], run: runCadExport }),
   defineWireAction({
+    id: "cad_edit.fasten", kind: "write", parameters: INPUTS["cad_edit.fasten"],
+    run: ({ washers }, { handlers, projectId }) => handlers.cadFasten === undefined ? { ok: false, error: "Fastening is unavailable in this host." } : handlers.cadFasten(projectId, { ...(washers !== undefined ? { washers } : {}) })
+  }),
+  defineWireAction({
     id: "cad_edit.parametric_create", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_create"],
     run: (input, context) => runParametricCreate(input, context)

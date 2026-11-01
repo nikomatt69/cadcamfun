@@ -57,6 +57,8 @@ export interface ToolHandlersShape {
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */
   cadShell?(projectId: string, input: CadShellInput): Promise<unknown>
   cadExchange?(projectId: string, input: CadExchangeInput): Promise<unknown>
+  /** Inserts the exact screws, washers and nuts the shared holes of the open drawing still need (smart fasteners). */
+  cadFasten?(projectId: string, input: { readonly washers?: boolean }): Promise<unknown>
   /** The exact solids of the open drawing (all of them, or `ids`), for export; elements with no exact solid are named in `skipped`. */
   cadExportBodies?(projectId: string, ids?: ReadonlyArray<string>): Promise<
     | { readonly ok: true; readonly bodies: ReadonlyArray<{ readonly id: string; readonly name: string; readonly brep: cad.brep.Brep }>; readonly skipped: ReadonlyArray<string> }

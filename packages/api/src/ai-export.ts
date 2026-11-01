@@ -50,3 +50,10 @@ export const ExportedFile = Schema.Struct({
   bytes: Schema.Int, sha256: Schema.String
 })
 export type ExportedFile = typeof ExportedFile.Type
+
+/** Insert the screws, washers and nuts the assembly's shared holes still need (the plan `cad` `assembly` lists as missing). */
+export const CadFastenInput = Schema.Struct({
+  /** Washer under the head (when the hole is not counterbored) and under the nut. Default true. */
+  washers: optional(Schema.Boolean)
+}).annotate({ description: "Insert the exact ISO screws, washers and nuts the coaxial holes of the drawing's parts still need." })
+export type CadFastenInput = typeof CadFastenInput.Type

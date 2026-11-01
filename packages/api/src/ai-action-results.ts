@@ -212,6 +212,8 @@ const generated = Schema.Struct({
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
 /** An export is a stored file: its name, key, size and hash, plus what went into it. The bytes are never in the answer. */
 const exported = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), format: str, file: ExportedFile, warnings: strings }), [record])
+/** Fasteners inserted into the drawing: the elements and what the kernel could not fasten. */
+const fastened = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), added: Schema.Array(record), plans: int, existing: int, unfastened: Schema.Array(record) }), [record])
 const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
 
 // ---------------------------------------------------------------- `library`, `parts`, `library_edit`
@@ -347,6 +349,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.editor": write(["interface", "drawing"], editor),
   "cad_edit.import": write(["drawing"], added),
   "cad_edit.export": write(["file"], exported),
+  "cad_edit.fasten": write(["drawing"], fastened),
   "cad_edit.parametric_create": write(["drawing"], parametricCreated),
   "cad_edit.parametric_update": write(["drawing"], parametricUpdated),
   "cad_edit.parametric_timeline": write(["drawing"], parametricTimeline),

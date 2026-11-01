@@ -154,4 +154,41 @@ describe("export through the bridge", () => {
     await invoke("cam_edit", { action: "update", operationId, params: { depth: 8 } })
     expect((await invoke("cam_edit", { action: "export", kind: "stock", operationId })).body.result).toMatchObject({ ok: false })
   })
+
+  test("fasten inserts the screws, washers and nuts the shared holes need, once, and the assembly exports with them", async () => {
+    const { model } = await import("@cadcamfun/core")
+    const block = (h: number, d: number, depth: number) => {
+      const m = model()
+      m.extrude(m.sketch("XY").rectangle([0, 0], 60, 30), { depth: h, id: "block" })
+      m.hole({ plane: "XY", offset: h, at: [15, 15], diameter: d, depth, id: "a" })
+      m.hole({ plane: "XY", offset: h, at: [45, 15], diameter: d, depth, id: "b" })
+      return m.build()
+    }
+    const elements = [
+      { id: "base", type: "parametric", name: "Base", history: block(20, 6.8, 16), x: 0, y: 0, z: 0, layerId: "default", metadata: { material: "aluminium" } },
+      { id: "plate", type: "parametric", name: "Plate", history: block(8, 9, 8), x: 0, y: 0, z: 20, layerId: "default", metadata: { material: "S235JR" } }
+    ]
+    const project = (await app.call("/api/projects", { method: "POST", json: { name: "Fasten" } })).body.id as string
+    await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Joint", data: { elements } } })
+    const token = (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: "fasten", projectId: project, mode: "write" } })).body.token as string
+    const invoke = (tool: string, input: Record<string, unknown>) => app.call("/api/ai/actions/invoke", {
+      method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId: project, tool, input }
+    })
+
+    const missingBefore = (await invoke("cad", { action: "assembly" })).body.result
+    expect(missingBefore.ok).toBe(true)
+    const first = await invoke("cad_edit", { action: "fasten" })
+    expect(first.body.result).toMatchObject({ ok: true, plans: 2, existing: 0, unfastened: [] })
+    expect(first.body.result.added.map((a: { name: string }) => a.name)).toEqual(["ISO 4762 M8x20", "ISO 7089 M8", "ISO 4762 M8x20", "ISO 7089 M8"])
+    expect(first.body.result.added.map((a: { role: string }) => a.role)).toEqual(["screw", "washer", "screw", "washer"])
+
+    const again = await invoke("cad_edit", { action: "fasten" })
+    expect(again.body.result).toMatchObject({ ok: true, added: [], plans: 0, existing: 2 })
+
+    // The fasteners are exact solids of the drawing: the whole joint goes out as one STEP file.
+    const step = await invoke("cad_edit", { action: "export", format: "step", name: "joint" })
+    expect(step.body.result).toMatchObject({ ok: true, file: { name: "joint.step" } })
+    expect(step.body.result.bodies).toHaveLength(6)
+  })
 })
+
