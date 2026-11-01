@@ -43,7 +43,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 
 ## What is not there
 
-A `shell` hollows an earlier extrude, revolve or sweep, not a loft: a bottle, vase or cup is a `revolve` of its half profile plus a `shell` (open top), or a loft stored and hollowed with `cad_edit` `shell`. A `primitive` such as `gear` can be mesh-only (no exact model): check `cad` `parametric_exact` before promising STEP or CAM from it.
+A `shell` hollows an earlier extrude, revolve or sweep, not a loft: a bottle, vase or cup is a `revolve` of its half profile plus a `shell` (open top), or a loft stored and hollowed with `cad_edit` `shell`. Exact `primitive` elements (STEP, CAM and STL-closed): cube, sphere, cylinder, cone, prism, pyramid, hemisphere, capsule, torus, and extrusion, revolution, sweep, loft from a profile. MESH-ONLY (view and mesh STL, no STEP, no machining): ellipsoid, gear, spring, bolt, screw, nut, washer, wall, floor, window, door, column, roof, stair. For a part that must be exact build it from features: washer = circle + inner circle `extrude`; nut = hex `polygon` `extrude` + `hole` + internal `thread`; bolt/screw = hex or round head `extrude` + shaft + external `thread`; spring = `coil`; ellipsoid = `revolve` of a half ellipse; column = cylinder; wall/floor = cube. A gear has no exact form (involute flanks): say so and offer the mesh gear, or a tooth profile drawn as a `polyline` of computed points. `cad` `parametric_exact` tells which bodies are exact.
 
 Flanges on adjacent sheet edges and their corner treatment, general freeform normal offsets, arbitrary UV trim curves, and Parasolid parsing remain unsupported. Use the structured refusal; never present a smaller feature as equivalent to the requested geometry.
 
