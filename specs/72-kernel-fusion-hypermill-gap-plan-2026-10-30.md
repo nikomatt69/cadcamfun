@@ -375,3 +375,12 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   already closed; fold splitting not built (no failing case). Open and listed in spec 42 §6.2: analytic seeds for coaxial surfaces of revolution,
   equal-radius corner fillets (4 of 32 Booleans of a rounded box still use the displacement), NURBS x NURBS marching, coarse-chord tessellation
   of seed 133's cap face. No API/AI/desktop follow-up is needed for these core-only changes (`BooleanCounters` gained `verified` / `verifyRejected`).
+
+- 2026-10-31 (wiring G, STEP import into the history): a history may now hold only imported bodies (`features` minimum 0, refused with the
+  field named when there is neither a feature nor a body; `decodeStartHistory` lets the import route and the `cad-import-step` job start from an
+  empty timeline); `removeImported` / `importedUses` in core (a body a feature names is not removed, the refusal lists the features); the
+  Parametric part panel has an "Import STEP" chooser (same `importStepToHistory` as the route, all or nothing, report shown, body stored in its
+  JSON form), a row per imported body and a remove button (`importStepIntoHistory` in `features/cad/lib/importStep.ts`). The i18n literal
+  baseline was refreshed: the Mitsubishi and Brother manual titles (round 3) had pushed `manuals/lib/catalogue.ts` 2 above it. Still open: no AI
+  action for the import (the STEP text would have to cross the model, and the tool-prompt budget has 9 characters left; the file route and the
+  panel cover it); 33 new locale strings are machine-translated.
