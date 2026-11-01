@@ -277,6 +277,7 @@ export const ParametricParameters = namedRecord(dimension, /^[A-Za-z_][A-Za-z0-9
 /** The timeline fields must name what exists: the rollback marker a feature, a feature's group a declared group, groups once. */
 const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }>; readonly bases?: ReadonlyArray<{ readonly id: string; readonly brep: unknown }> }): Array<Schema.FilterIssue> => {
   const issues: Array<Schema.FilterIssue> = []
+  if (history.features.length === 0 && (history.bases ?? []).length === 0) issues.push({ path: ["features"], issue: "A history needs at least one feature or one imported body" })
   if (history.rollback !== undefined && !history.features.some((f) => f.id === history.rollback)) issues.push({ path: ["rollback"], issue: `The rollback marker '${history.rollback}' is not a feature id` })
   const groups = new Set<string>()
   for (const [index, g] of (history.groups ?? []).entries()) {
@@ -388,7 +389,7 @@ export const ParametricBase = Schema.Struct({
 
 export const ParametricHistory = described(
   Schema.Struct({
-    parameters: ParametricParameters, features: between(Schema.Array(feature), 1, 80),
+    parameters: ParametricParameters, features: between(Schema.Array(feature), 0, 80),
     rollback: optional(id), groups: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), collapsed: optional(Schema.Boolean) })), 0, 40)),
     bases: optional(between(Schema.Array(ParametricBase), 0, exactBrep.MAX_BASES)),
     version: optional(Schema.Literal(2))

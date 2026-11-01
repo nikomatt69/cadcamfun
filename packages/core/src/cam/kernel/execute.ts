@@ -93,6 +93,8 @@ export interface PreparedJob {
   readonly meshes: ReadonlyArray<Mesh64>
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] }
   readonly stock: StockBox
+  /** The stock when it is not a box (bar, casting, previous setup), oriented setup coordinates; the box `stock` is its bounds. */
+  readonly stockMesh?: ReadonlyArray<Mesh64>
   /** Work zero in oriented setup coordinates. */
   readonly origin: Vec3
   readonly operations: ReadonlyArray<OperationSpec>
@@ -103,6 +105,12 @@ export interface PreparedJob {
   readonly scallop: number
   readonly tolerance: number
 }
+
+/**
+ * The chord and path tolerance the kernel works to. Enforcing the tolerance (spec 69 B4) reserves a quarter of the request for each of
+ * the two chord terms, so the other terms of the budget (grid cell, NC rounding, machine) have the second half to fit in.
+ */
+const chordTolerance = (job: ManufacturingJob): number => (job.quality?.tolerance ?? 0.01) / (job.quality?.enforceTolerance === true ? 4 : 1)
 
 const issue = (tag: CamIssue["tag"], stage: CamIssue["stage"], message: string, extra: Partial<CamIssue> = {}): CamIssue =>
   ({ tag, severity: extra.severity ?? "error", stage, message, ...extra })
@@ -164,7 +172,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
   let elements: ReadonlyArray<CadElement> | undefined
   if (job.part.kind === "elements") {
     elements = job.part.elements as ReadonlyArray<CadElement>
-    const built = partMeshes(elements.filter((e) => e["type"] !== "workpiece") as never, { tolerance: job.quality?.tolerance ?? 0.01 })
+    const built = partMeshes(elements.filter((e) => e["type"] !== "workpiece") as never, { tolerance: chordTolerance(job) })
     if (built !== undefined) meshes = [...built.meshes]
   } else {
     meshes = job.part.meshes.filter((m) => m.indices.length >= 3).map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
@@ -182,7 +190,45 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     } }
   }
 
+  let stockMeshes: Mesh64[] | undefined
+  if (job.stockModel !== undefined) {
+    const model = job.stockModel
+    if (model.kind === "cylinder") {
+      const n = Math.max(16, Math.min(512, Math.round(model.segments ?? 128)))
+      if (!(model.radius > 0) || !(model.z1 > model.z0) || ![model.center.x, model.center.y, model.radius, model.z0, model.z1].every(Number.isFinite)) {
+        return { status: "failed", issues: [issue("InvalidInput", "prepare", "A cylinder stock needs a finite centre and a positive radius and height")] }
+      }
+      const pos: number[] = [], ix: number[] = []
+      for (let k = 0; k < n; k++) {
+        const a = (2 * Math.PI * k) / n
+        const x = model.center.x + model.radius * Math.cos(a), y = model.center.y + model.radius * Math.sin(a)
+        pos.push(x, y, model.z0, x, y, model.z1)
+      }
+      for (let k = 0; k < n; k++) {
+        const b0 = 2 * k, t0 = 2 * k + 1, b1 = 2 * ((k + 1) % n), t1 = 2 * ((k + 1) % n) + 1
+        ix.push(b0, b1, t1, b0, t1, t0)
+      }
+      const cb = pos.length / 3, ct = cb + 1
+      pos.push(model.center.x, model.center.y, model.z0, model.center.x, model.center.y, model.z1)
+      for (let k = 0; k < n; k++) { const b0 = 2 * k, t0 = 2 * k + 1, b1 = 2 * ((k + 1) % n), t1 = 2 * ((k + 1) % n) + 1; ix.push(cb, b1, b0, ct, t0, t1) }
+      stockMeshes = [{ positions: Float64Array.from(pos), indices: Uint32Array.from(ix) }]
+    } else {
+      const m = { positions: Float64Array.from(model.mesh.positions), indices: Uint32Array.from(model.mesh.indices) }
+      if (m.indices.length < 12 || !m.positions.every(Number.isFinite)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "A mesh stock needs a closed solid with finite coordinates")] }
+      stockMeshes = [m]
+    }
+    const b = boundsOf(stockMeshes)
+    job = { ...job, stock: { min: { x: b.min[0], y: b.min[1], z: b.min[2] }, max: { x: b.max[0], y: b.max[1], z: b.max[2] } } }
+  }
   const transform = setupTransform(job.setupOrientation ?? "+Z")
+  if (stockMeshes !== undefined && job.setupOrientation !== undefined && job.setupOrientation !== "+Z") stockMeshes = stockMeshes.map((mesh) => {
+    const positions = new Float64Array(mesh.positions.length)
+    for (let i = 0; i < positions.length; i += 3) {
+      const p = applyPoint(transform, { x: mesh.positions[i]!, y: mesh.positions[i + 1]!, z: mesh.positions[i + 2]! })
+      positions.set([p.x, p.y, p.z], i)
+    }
+    return { positions, indices: mesh.indices }
+  })
   if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") meshes = meshes.map((mesh) => {
     const positions = new Float64Array(mesh.positions.length)
     for (let i = 0; i < positions.length; i += 3) {
@@ -265,7 +311,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
+  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -473,7 +519,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const cell = replayCell(wanted, width, depthY)
   if (cell > wanted * 1.0001) issues.push(issue("UnsupportedCapability", "replay", `A replay cell of ${wanted.toFixed(3)} mm would need ${Math.ceil((width / wanted) * (depthY / wanted)).toLocaleString("en-US")} columns for this stock: the replay uses ${cell.toFixed(3)} mm to stay within ${MAX_REPLAY_CELLS.toLocaleString("en-US")} (the tolerance budget carries the coarser cell)`, { severity: "warning" }))
   const nx = Math.max(1, Math.ceil(width / cell)), ny = Math.max(1, Math.ceil(depthY / cell))
-  const field = (): HeightField => new HeightField(nx, ny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
+  // A stock that is not a box (bar, casting, previous setup): the columns outside it start at the floor, the others at its top surface.
+  const stockShape: Mesh64[] | undefined = prepared.stockMesh?.map((m) => {
+    const p = Float64Array.from(m.positions)
+    for (let k = 0; k < p.length; k += 3) { p[k] = p[k]! - o.x; p[k + 1] = p[k + 1]! - o.y; p[k + 2] = p[k + 2]! - o.z }
+    return { positions: p, indices: m.indices }
+  })
+  const seedStock = (f: HeightField): HeightField => {
+    if (stockShape === undefined) return f
+    const t = f.rasterise(stockShape as unknown as ReadonlyArray<Mesh>)
+    for (let k = 0; k < f.top.length; k++) f.top[k] = Math.min(f.top[k]!, Math.max(f.floor, t[k]!))
+    return f
+  }
+  const field = (): HeightField => seedStock(new HeightField(nx, ny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z))
   const provisional = field()
   const grid = new Grid(provisional)
   const workStock = (top: number): Stock => ({ x: width, y: depthY, z: Math.max(1e-3, top - sMin.z), origin: { x: sMin.x, y: sMin.y, z: top }, material: material.id })
@@ -886,7 +944,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const replayCellSize = cell * replayFactor
   if (replayFactor > 1) issues.push(issue("UnsupportedCapability", "replay", `The stock replay of this program would pass its work budget at ${cell.toFixed(3)} mm: it ran at ${replayCellSize.toFixed(3)} mm (cell x ${replayFactor}), so the stock-replay term of the tolerance budget grew to ${(replayCellSize / 2).toFixed(3)} mm`, { severity: "warning" }))
   const rnx = Math.max(1, Math.ceil(width / replayCellSize)), rny = Math.max(1, Math.ceil(depthY / replayCellSize))
-  const hf = new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
+  const hf = seedStock(new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z))
   const initialVolume = hf.volume()
   const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
   for (let k = 0; k < target.length; k++) if (target[k]! <= hf.floor + 1e-9) target[k] = Math.max(hf.floor, partBottom)
@@ -995,7 +1053,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     // Spec 72 step 0.3: when the table turns, the stock is also replayed on the tri-dexel, move by move and in program order, so the
     // gouge and leftover verdicts rest on a stock whose error is declared and not on a bracket of voxels.
     if (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined)) {
-      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit })
+      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}) })
     }
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     let replayWork = 0
@@ -1201,13 +1259,30 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     length: machine.table.length,
     width: machine.table.width
   }
-  const clearance = interpreted !== undefined && table !== undefined
-    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, table, machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } })
+  // Fixture bodies, CAD world -> oriented setup -> work frame (AABB of the turned box: only errs towards a collision).
+  const fixtureBodies = (job.fixtures ?? []).map((f) => {
+    const t = setupTransform(job.setupOrientation ?? "+Z")
+    const cs = [f.min.x, f.max.x].flatMap((x) => [f.min.y, f.max.y].flatMap((y) => [f.min.z, f.max.z].map((z) => applyPoint(t, { x, y, z }))))
+    const lo = { x: Math.min(...cs.map((c) => c.x)) - o.x, y: Math.min(...cs.map((c) => c.y)) - o.y, z: Math.min(...cs.map((c) => c.z)) - o.z }
+    const hi = { x: Math.max(...cs.map((c) => c.x)) - o.x, y: Math.max(...cs.map((c) => c.y)) - o.y, z: Math.max(...cs.map((c) => c.z)) - o.z }
+    return { id: f.id, lo, hi, body: { centre: { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2, z: (lo.z + hi.z) / 2 }, half: { x: (hi.x - lo.x) / 2, y: (hi.y - lo.y) / 2, z: (hi.z - lo.z) / 2 } } }
+  })
+  // A body that cuts into the part is not workholding: the part is solid there (the part's box is the test; it errs towards a refusal).
+  const partLo = { x: prepared.bounds.min[0] - o.x, y: prepared.bounds.min[1] - o.y, z: prepared.bounds.min[2] - o.z }
+  const partHi = { x: prepared.bounds.max[0] - o.x, y: prepared.bounds.max[1] - o.y, z: prepared.bounds.max[2] - o.z }
+  const fixtureInPart = fixtureBodies.filter((f) => f.lo.x < partHi.x - 1e-6 && f.hi.x > partLo.x + 1e-6 && f.lo.y < partHi.y - 1e-6 && f.hi.y > partLo.y + 1e-6 && f.lo.z < partHi.z - 1e-6 && f.hi.z > partLo.z + 1e-6)
+  // A machine with no table geometry still checks its fixture bodies: the table is then a box far below the work.
+  const clearTable: TableGeometry | undefined = table ?? (fixtureBodies.length > 0 ? { cx: 0, cy: 0, top: -1e5, length: 1, width: 1 } : undefined)
+  const clearance = interpreted !== undefined && clearTable !== undefined
+    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, clearTable, {
+        ...(machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } }),
+        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => f.body) } : {})
+      })
     : undefined
   if (clearance?.first !== undefined) {
     const f = clearance.first
     const cutter = cutterByNumber.get(toolAtLine[f.line] ?? -1)
-    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
+    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
   }
 
   // ------------------------------------------------------------ evidence
@@ -1291,8 +1366,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" },
     {
       id: "machine-clearance",
-      status: interpreted === undefined ? "unresolved" : table === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
-      detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
+      status: interpreted === undefined ? "unresolved" : clearTable === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
+      detail: clearTable === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
     }
   ]
   if (undercutMoves > 0) {
@@ -1319,12 +1394,23 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     claims.push({ id: "part-coverage", status: "unresolved", detail })
     issues.push(issue("UnsupportedCapability", "evidence", detail, { severity: "warning" }))
   }
-  if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
+  // Workholding (spec 69 C3): decided when the setup gives its bodies; otherwise a manual refixture keeps its open claim as before.
+  if (fixtureBodies.length > 0) {
+    const ids = fixtureBodies.map((f) => f.id).join(", ")
+    const bad = fixtureInPart.length > 0 ? `fixture ${fixtureInPart.map((f) => f.id).join(", ")} overlaps the part's bounds (a body inside the part is not workholding)`
+      : clearance === undefined ? "no NC was checked against the fixtures"
+      : clearance.first !== undefined ? `the tool assembly reaches a fixture or the table at NC line ${clearance.first.line}`
+      : clearance.unresolved > 0 || clearance.rotaryMoves > 0 ? `${clearance.unresolved + clearance.rotaryMoves} moves could not be proven clear of the fixtures` : undefined
+    claims.push({ id: "setup-workholding", status: bad === undefined ? "passed" : fixtureInPart.length > 0 || clearance?.first !== undefined ? "failed" : "unresolved",
+      detail: bad ?? `${fixtureBodies.length} fixture bodies (${ids}) stay clear of the tool assembly over ${clearance!.checked} moves (at least ${(clearance!.minClearance ?? 0).toFixed(3)} mm); their contact with the stock is the clamping and is not checked` })
+    if (fixtureInPart.length > 0) issues.push(issue("InvalidInput", "evidence", bad!, { severity: "error" }))
+    if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z" && hidden === 0 && skippedSamples === 0) claims.push({ id: "part-coverage", status: "unresolved", detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" })
+  } else if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
     { id: "setup-workholding", status: "unresolved", detail: "Manual refixture requires independently configured and checked workholding; no fixture is assumed by this program" },
     ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
   )
   const hardFailure = issues.some((i) => i.severity === "error")
-  const release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
+  let release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
 
   const toolChanges = usedTools.length
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
@@ -1349,7 +1435,22 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     ...(positioning === undefined ? ["the machine states no positioning accuracy, so the machine's own share of the deviation is unknown"] : [])
   ]
   const achieved = budgetTerms.reduce((s, t) => s + t.mm, 0)
-  const tolerance: ToleranceBudget = { requested: prepared.tolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= prepared.tolerance }
+  const requestedTolerance = job.quality?.tolerance ?? 0.01
+  const tolerance: ToleranceBudget = { requested: requestedTolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= requestedTolerance }
+  // Opt-in gate (spec 69 B4): the program is released only when the deviation it can be promised is within the requested tolerance.
+  if (job.quality?.enforceTolerance === true) {
+    const biggest = [...tolerance.terms].sort((a, b) => b.mm - a.mm)[0]
+    const met = tolerance.met
+    claims.push({
+      id: "tolerance", status: met ? "passed" : "failed",
+      detail: met ? `The terms add up to ${tolerance.achieved} mm, within the requested ${tolerance.requested} mm`
+        : [
+          tolerance.achieved > tolerance.requested ? `The terms add up to ${tolerance.achieved} mm, above the requested ${tolerance.requested} mm; the largest is ${biggest?.id} at ${biggest?.mm} mm (${biggest?.basis})` : undefined,
+          tolerance.unbounded.length > 0 ? `unbounded: ${tolerance.unbounded.join("; ")}` : undefined
+        ].filter((x): x is string => x !== undefined).join("; ")
+    })
+    if (!met && release === "verified-program") release = "preview"
+  }
   return {
     status: "ok",
     value: {

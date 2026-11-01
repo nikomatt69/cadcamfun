@@ -63,10 +63,12 @@ const sourceIssue = (e: CadElement): string | undefined => {
   return undefined
 }
 
+/** Boxes that overlap or touch (within a micron): solids that meet face to face are one body to print, not two islands. */
 const overlap = (a: Mesh64, b: Mesh64): boolean => {
   const p = meshBounds(a)
   const q = meshBounds(b)
-  return p.min[0] < q.max[0] && p.max[0] > q.min[0] && p.min[1] < q.max[1] && p.max[1] > q.min[1] && p.min[2] < q.max[2] && p.max[2] > q.min[2]
+  const eps = 1e-6
+  return p.min[0] <= q.max[0] + eps && p.max[0] >= q.min[0] - eps && p.min[1] <= q.max[1] + eps && p.max[1] >= q.min[1] - eps && p.min[2] <= q.max[2] + eps && p.max[2] >= q.min[2] - eps
 }
 
 export const printBodies = (selected: ReadonlyArray<CadElement>): PrintBodies => {

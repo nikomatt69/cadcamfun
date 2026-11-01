@@ -3,9 +3,10 @@ import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
+  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, removeImported, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
+import { importStepIntoHistory } from "../lib/importStep.ts"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
 
 const INPUT = "panel-input font-mono"
@@ -63,6 +64,19 @@ export default function ParametricPanel(props: { readonly element: Element; read
   const move = (id: string, to: number) => {
     const result = moveFeatureTo(history(), id, to)
     if (result.refusal !== undefined) { setError(`Not moved: ${result.refusal}`); return }
+    edit(() => result.history)
+  }
+  /** A STEP file added as an imported body: the report is shown whether or not it was added. */
+  const [importLines, setImportLines] = createSignal<ReadonlyArray<string>>([])
+  const importStep = async (file: File | undefined) => {
+    if (file === undefined) return
+    const outcome = importStepIntoHistory(await file.text(), history())
+    setImportLines(outcome.lines)
+    if (outcome.ok) edit(() => outcome.history)
+  }
+  const dropImported = (id: string) => {
+    const result = removeImported(history(), id)
+    if (result.refusal !== undefined) { setError(`Not removed: ${result.refusal}`); return }
     edit(() => result.history)
   }
   /** What the timeline shows of a feature's state (spec 58): nothing for a built one. */
@@ -293,6 +307,28 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div>
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.imported")}</h5>
+        <ul class="mb-2 space-y-1" data-testid="imported-bodies">
+          <For each={history().bases ?? []}>{(base) =>
+            <li class="flex items-center justify-between gap-2 rounded-md border border-gray-200 p-2 text-sm dark:border-gray-600" data-testid={`base-${base.id}`}>
+              <span class="min-w-0 truncate">
+                <span class="font-medium">{base.source?.name ?? base.id}</span>
+                <span class="ml-2 text-xs text-gray-500">{base.id} · {base.brep.faces.length} faces{base.source?.healed !== undefined && base.source.healed.verticesTightened + base.source.healed.verticesWelded + base.source.healed.edgesWelded > 0 ? " · healed" : ""}</span>
+              </span>
+              <button type="button" class={SMALL} disabled={props.locked} aria-label={`Remove ${base.id}`} title={t("cad.param.removeImported")} onClick={() => dropImported(base.id)}>✕</button>
+            </li>}
+          </For>
+        </ul>
+        <label class={`${SMALL} mb-2 inline-block cursor-pointer`}>
+          {t("cad.param.importStep")}
+          <input type="file" accept=".step,.stp" class="hidden" disabled={props.locked} data-testid="import-step"
+            onChange={(e) => { const input = e.currentTarget; void importStep(input.files?.[0]).then(() => { input.value = "" }) }} />
+        </label>
+        <Show when={importLines().length > 0}>
+          <ul class="mb-2 space-y-0.5 text-xs text-gray-600 dark:text-gray-300" data-testid="import-report">
+            <For each={importLines()}>{(line) => <li>{line}</li>}</For>
+          </ul>
+        </Show>
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("subscription.features")}</h5>
         <ol class="space-y-3">
           <For each={history().features}>{(feature, index) => <>

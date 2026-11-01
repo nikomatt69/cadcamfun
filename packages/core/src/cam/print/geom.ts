@@ -30,7 +30,7 @@ export const ringArea = (ring: Ring): number => {
 
 export const ringLength = (ring: Ring): number => {
   let l = 0
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) l += Math.hypot(ring[i]!.x - ring[j]!.x, ring[i]!.y - ring[j]!.y)
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const dx = ring[i]!.x - ring[j]!.x, dy = ring[i]!.y - ring[j]!.y; l += Math.sqrt(dx * dx + dy * dy) }
   return l
 }
 
@@ -101,7 +101,7 @@ export const simplifyRing = (ring: Ring, tol: number): Ring => {
       const q = ring[e]!
       const dx = q.x - p.x
       const dy = q.y - p.y
-      const len = Math.hypot(dx, dy)
+      const len = Math.sqrt(dx * dx + dy * dy)
       let worst = -1
       let at = -1
       for (let i = (s + 1) % n; i !== e; i = (i + 1) % n) {

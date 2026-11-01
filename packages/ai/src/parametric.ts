@@ -17,6 +17,18 @@ export const parseHistory = (value: unknown): History => {
   return decoded.data
 }
 
+/**
+ * A history to start an import from: like `decodeHistory`, but a history with no feature and no body yet (the empty timeline an
+ * imported solid is added to) is accepted too. Its other fields are checked through a throw-away sketch standing in for the missing
+ * feature, which is dropped again.
+ */
+export const decodeStartHistory = (value: unknown): ReturnType<typeof decodeHistory> => {
+  const record = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
+  if (record === undefined || !Array.isArray(record["features"]) || record["features"].length > 0 || (Array.isArray(record["bases"]) && record["bases"].length > 0)) return decodeHistory(value)
+  const probe = decodeHistory({ ...record, features: [{ id: "start-probe", type: "sketch", plane: "XY", sketch: { entities: [{ id: "p", kind: "point", x: 0, y: 0 }], constraints: [] } }] })
+  return probe.success ? { success: true, data: { ...probe.data, features: [] } } : probe
+}
+
 /** Time the exact view may add to every validation report (the assistant's hot path, on the sidecar's thread). */
 export const REPORT_EXACT_BUDGET_MS = 1_500
 /** Time `parametric_exact`, which the assistant asks for on purpose, may take. */
