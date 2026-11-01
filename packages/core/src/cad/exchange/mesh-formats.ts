@@ -154,6 +154,24 @@ export const writeStl = (m: MeshData, name = "cadcamfun"): Uint8Array => {
   return out
 }
 
+/** ASCII STL of one mesh (millimetres), for tools and reviewers that read text. */
+export const writeStlAscii = (m: MeshData, name = "cadcamfun"): string => {
+  const n = m.indices.length / 3
+  const label = name.replace(/\s+/g, "_")
+  const lines: string[] = [`solid ${label}`]
+  for (let t = 0; t < n; t++) {
+    const nrm = normalOf(m, t)
+    lines.push(`  facet normal ${nrm.join(" ")}`, "    outer loop")
+    for (let v = 0; v < 3; v++) {
+      const i = m.indices[t * 3 + v]!
+      lines.push(`      vertex ${m.positions[i * 3]} ${m.positions[i * 3 + 1]} ${m.positions[i * 3 + 2]}`)
+    }
+    lines.push("    endloop", "  endfacet")
+  }
+  lines.push(`endsolid ${label}`)
+  return lines.join("\n") + "\n"
+}
+
 /** OBJ with one object per mesh (indices are global across objects, as the format requires). */
 export const writeObj = (meshes: ReadonlyArray<NamedMesh>): string => {
   const lines: string[] = ["# cadcamfun, millimetres"]

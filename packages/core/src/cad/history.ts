@@ -162,10 +162,20 @@ export interface PatternFeature {
   /** `grid`: the number of rows and the offset between two rows (`count` is the number along `step`). */
   readonly countB?: Dimension
   readonly stepB?: readonly [Dimension, Dimension, Dimension]
-  /** `circular`: the centre on the XY plane (the axis is Z) and the angle spanned by all the copies, degrees (default 360). */
+  /**
+   * `circular`: the axis the copies turn about (default z) and the point it passes through, given as the two other coordinates in
+   * cyclic order (axis z: [x, y]; axis x: [y, z]; axis y: [z, x]); `span` is the angle spanned by all the copies, degrees (default 360).
+   */
+  readonly axis?: "x" | "y" | "z"
   readonly centre?: readonly [Dimension, Dimension]
   readonly span?: Dimension
 }
+
+/** The line a circular pattern turns about: its direction and a point on it (see `PatternFeature.axis` for the centre's coordinates). */
+export const patternAxis = (axis: "x" | "y" | "z" | undefined, centre: readonly [number, number]): { readonly dir: { x: number; y: number; z: number }; readonly through: { x: number; y: number; z: number } } =>
+  axis === "x" ? { dir: { x: 1, y: 0, z: 0 }, through: { x: 0, y: centre[0], z: centre[1] } }
+    : axis === "y" ? { dir: { x: 0, y: 1, z: 0 }, through: { x: centre[1], y: 0, z: centre[0] } }
+      : { dir: { x: 0, y: 0, z: 1 }, through: { x: centre[0], y: centre[1], z: 0 } }
 export interface MirrorFeature {
   readonly id: string
   readonly type: "mirror"
@@ -1907,7 +1917,8 @@ export const rebuild = (history: History): RebuildResult => {
             if (c.some((s) => s === undefined) || span === undefined) break
             // A full circle divides by the count (the last copy is the first again); a partial one spreads the copies end to end.
             const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
-            for (let i = 1; i < count; i++) emit((m) => rotateMesh(m, { x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
+            const about = patternAxis(f.axis, [c[0]!, c[1]!])
+            for (let i = 1; i < count; i++) emit((m) => rotateMesh(m, about.dir, (each * i * Math.PI) / 180, about.through), `${f.id}#${i}`)
           }
           if (source === undefined) {
             for (const b of chosen) for (const p of placements) bodies.push({ id: chosen.length === 1 ? p.label : `${p.label}:${b.id}`, mesh: p.place(b.mesh), feature: f.id })
@@ -1935,12 +1946,35 @@ export const rebuild = (history: History): RebuildResult => {
       touched.delete(f.id)
       lineage[f.id] = [...touched]
       const failed = issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error")
+      // A cut that takes nothing away is the quietest mistake a history can hold (a hole drilled from a plane that is not on the part,
+      // a tool beside the body): the model and the user both read "ok" and the part is wrong. Say it.
+      if (!failed && before.size > 0 && cutsMaterial(f)) {
+        const volumeBefore = [...before.values()].reduce((sum, mesh) => sum + meshVolume(mesh), 0)
+        const volumeAfter = bodies.reduce((sum, b) => sum + meshVolume(b.mesh), 0)
+        const removed = volumeBefore - volumeAfter
+        // A hole's own volume is known: a sliver left where its plane merely grazes the body (a fraction of a cubic millimetre) is no hole.
+        const diameter = f.type === "hole" ? dim(f.diameter, f.id) : undefined, depth = f.type === "hole" ? dim(f.depth, f.id) : undefined
+        const intended = diameter !== undefined && depth !== undefined ? Math.PI * (diameter / 2) ** 2 * depth : undefined
+        if (removed <= Math.max(1e-3, 1e-7 * volumeBefore) || (intended !== undefined && removed < 0.02 * intended)) {
+          issues.push({
+            feature: f.id, severity: "warning",
+            message: f.type === "hole"
+              ? `Hole '${f.id}' removes no material: a hole starts on its plane (at its offset) and drills against the plane's normal, so on the top face of a body it needs the offset of that face, and the point must lie on the body. Check plane, offset and at.`
+              : `'${f.id}' removes no material: its tool does not overlap the bodies it cuts. Check its position and the bodies it targets.`
+          })
+        }
+      }
       states[f.id] = { state: failed ? "failed" : "ok" }
       if (failed) broken.set(f.id, f.id)
     }
   }
   return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
 }
+
+/** Whether a feature is meant to take material away from the bodies it meets (so that taking none is worth a warning). */
+const cutsMaterial = (f: Feature): boolean =>
+  f.type === "hole" || (f.type === "combine" && f.operation === "cut") || (f.type === "thread" && (f.operation ?? (f.kind === "internal" || f.cut === true ? "subtract" : "new")) === "subtract") ||
+  (f.type !== "thread" && "operation" in f && f.operation === "subtract")
 
 /** Volume of the bodies together, mm^3 (they may touch but are assumed not to overlap). */
 export const historyVolume = (result: RebuildResult): number => result.bodies.reduce((sum, b) => sum + meshVolume(b.mesh), 0)

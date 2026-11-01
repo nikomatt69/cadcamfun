@@ -6,8 +6,10 @@
 import { CAM_ACTION_INPUTS } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { defineWireAction, type ActionSpec } from "./action.ts"
+import { runCamExport } from "./export.ts"
 
 export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
+  defineWireAction({ id: "cam_edit.export", kind: "write", parameters: CAM_ACTION_INPUTS["cam_edit.export"], run: runCamExport }),
   defineWireAction({
     id: "cam_edit.turn", kind: "write", parameters: CAM_ACTION_INPUTS["cam_edit.turn"],
     run: (input, { handlers, projectId, signal }) => handlers.turnOperation?.(projectId, input, signal) ?? { ok: false, error: "Native turning program storage is unavailable in this host." }

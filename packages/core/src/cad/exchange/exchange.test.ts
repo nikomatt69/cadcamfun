@@ -3,7 +3,7 @@ import { deflateRawSync } from "node:zlib"
 import { frame, makeBox, makeCylinder } from "../brep/index.ts"
 import { meshTopology } from "../mesh-topology.ts"
 import {
-  bodiesTo3mf, brepMesh, crc32, flatten3mf, importMesh, inflateRaw, parseObj, parseStl, read3mf, readZip, repairMesh, write3mf, writeObj, writeStl, zipStore,
+  bodiesTo3mf, brepMesh, crc32, flatten3mf, importMesh, inflateRaw, parseObj, parseStl, read3mf, readZip, repairMesh, write3mf, writeObj, writeStl, writeStlAscii, zipStore,
   type MeshData
 } from "./index.ts"
 
@@ -78,6 +78,16 @@ describe("STL and OBJ", () => {
     expect(back!.name).toBe("block")
     expect(back!.mesh.indices.length).toBe(36)
     expect(back!.mesh.positions.length / 3).toBe(8)
+    expect(volumeOf(back!.mesh)).toBeCloseTo(6000, 4)
+  })
+
+  test("the ASCII STL writer round-trips through the parser with the same volume", () => {
+    const m = boxMesh(10, 20, 30)
+    const text = writeStlAscii(m, "my block")
+    expect(text.startsWith("solid my_block")).toBe(true)
+    expect(text.trimEnd().endsWith("endsolid my_block")).toBe(true)
+    const [back] = parseStl(new TextEncoder().encode(text))
+    expect(back!.mesh.indices.length).toBe(36)
     expect(volumeOf(back!.mesh)).toBeCloseTo(6000, 4)
   })
 

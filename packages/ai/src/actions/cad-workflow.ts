@@ -10,6 +10,7 @@ import { EXACT_ACTION_BUDGET_MS, decodeHistory } from "../parametric.ts"
 import { KernelJobError, runKernelJob } from "../kernel-job.ts"
 import { getAttachment, attachmentNames } from "../attachments.ts"
 import type { ActionContext } from "./action.ts"
+import { closedMesh } from "./export.ts"
 
 type Rec = Record<string, unknown>
 const RAD = Math.PI / 180
@@ -296,7 +297,7 @@ const runMeshExport = async (input: CadWorkflowInput, context: ActionContext) =>
       const bodies = exact.bodies.filter((b) => b.brep !== undefined).map((b) => ({ name: b.id, brep: b.brep! }))
       const missing = exact.bodies.filter((b) => b.brep === undefined).map((b) => b.id)
       if (bodies.length === 0) return fail("mesh_export", "No body of the part has an exact model to export.", { reasons: missing })
-      const meshes = bodies.map((b) => ({ name: b.name, mesh: exchange.brepMesh(b.brep) }))
+      const meshes = bodies.map((b) => ({ name: b.name, mesh: closedMesh(b.brep).mesh }))
       let bytes: Uint8Array
       if (format === "3mf") bytes = exchange.write3mf(meshes, { unit: input.unit ?? "millimeter" })
       else if (format === "obj") bytes = new TextEncoder().encode(exchange.writeObj(meshes))

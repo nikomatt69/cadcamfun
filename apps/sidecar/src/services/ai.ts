@@ -34,6 +34,8 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
+import { StorageService } from "./storage.ts"
+import { bodiesForExport, freeKey, safeFileName, stockOfVerification } from "./ai-export.ts"
 import { kvTaskJournal } from "./ai-task-journal.ts"
 import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
@@ -127,6 +129,7 @@ const toolHandlers = Effect.gen(function*() {
   const misc = yield* MiscRepo
   const { user: local } = yield* LocalProfile
   const kv = yield* KvStore
+  const storage = yield* StorageService
   const actingCell = yield* ActingUser
   const liveEvents = yield* LiveEvents
   /** The account of the chat turn that called a tool (the local profile until one has). */
@@ -711,6 +714,29 @@ const toolHandlers = Effect.gen(function*() {
         const content = input.format === "iges" ? cad.brep.writeIgesBreps(parts) : cad.brep.writeStepBreps(parts)
         return { ok: true, format: input.format, content, parts: parts.length, warnings: [], ...where(loaded) }
       } catch (error) { return { ok: false, error: `Exact export failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadExportBodies: async (projectId, ids) => {
+      { const denied = await refused(projectId); if (denied) return { ok: false as const, error: (denied as { error?: string }).error ?? "Not allowed." } }
+      const loaded = await load(projectId)
+      try { return bodiesForExport(loaded.elements, ids) }
+      catch (error) { return { ok: false as const, error: `The exact solids could not be read: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    saveFile: async (projectId, file) => {
+      await assertWrite(projectId)
+      const loaded = await load(projectId)
+      try {
+        const key = await freeKey((candidate) => run(storage.downloadBytes(candidate)).then((bytes) => bytes !== null), loaded.projectId, file.name)
+        await run(storage.upload(key, file.bytes))
+        return { ok: true as const, name: safeFileName(key.slice(key.lastIndexOf("/") + 1)), key }
+      } catch (error) { return { ok: false as const, error: `The file could not be stored: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    operationStock: async (projectId, operationId) => {
+      const loaded = await load(projectId)
+      const stored = await run(toolpaths.find(acting().id, operationId))
+      if (!stored || stored.project.id !== loaded.projectId || stored.row.drawingId !== loaded.id) return { ok: false as const, error: "Operation not found in the active drawing" }
+      const found = await operation(projectId, operationId)
+      if ("error" in found) return { ok: false as const, error: found.error }
+      return stockOfVerification(record(stored.row.data), stored.row.gcode, { revision: drawingRevision(loaded), requestRevision: identity(found.request), programRevision: identity(stored.row.gcode) })
     },
     cadOffset: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }

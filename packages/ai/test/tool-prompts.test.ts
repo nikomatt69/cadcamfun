@@ -70,7 +70,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +300: cad_edit parametric_timeline (spec 58 T7: suppress, release, rollback, move).
     // Spec 64: the searchable first lines and the new limits stayed inside this ceiling by cutting the duplicated first sentences
     // of library, vcs, vcs_edit, mods and mods_edit, the repeated surface limits and the mods preamble; no action or rule was removed.
-    expect(total).toBeLessThan(32_800)
+    // +350: cad_edit export / cam_edit export (STL, OBJ, 3MF, STEP, IGES and NC files stored in the project export folder).
+    expect(total).toBeLessThan(33_150)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

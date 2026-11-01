@@ -63,6 +63,9 @@ export interface PostEditDiagnostics {
   readonly guidance: string
 }
 
+/** Writes that change nothing the diagnostics read: an export stores a file and leaves the drawing and the program as they were. */
+const WRITES_NOTHING_TO_CHECK: ReadonlySet<string> = new Set(["cad_edit.export", "cam_edit.export"])
+
 const GUIDANCE = "Diagnostics ran automatically on what this edit changed (like an LSP after an edit). Fix every error before continuing; do not repeat the same edit unchanged. Warnings may be reported to the user instead."
 
 const record = (value: unknown): Record<string, unknown> | undefined =>
@@ -129,7 +132,7 @@ export const postEditDiagnostics = async (
   budgetMs: number = POST_EDIT_DIAGNOSTICS_BUDGET_MS
 ): Promise<PostEditDiagnostics | undefined> => {
   try {
-    if (action.kind === "read") return undefined
+    if (action.kind === "read" || WRITES_NOTHING_TO_CHECK.has(action.id)) return undefined
     const value = record(result)
     if (value === undefined || value["ok"] === false) return undefined
     if (Array.isArray(value["issues"]) && value["issues"].length > 0) return undefined

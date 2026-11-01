@@ -7,11 +7,11 @@ export const ActionKind = Schema.Literals(["read", "write", "destructive"])
 
 /**
  * What an action changes or reaches beyond reading the open document, declared per action (`ACTION_CONTRACTS`) and never
- * inferred from its tool. `interface` is the editor or viewport on the user's screen, `external` the network, `task` the
+ * inferred from its tool. `file` is an export written to the project's export folder, `interface` is the editor or viewport on the user's screen, `external` the network, `task` the
  * delegation scheduler. A `read` action may only have `interface` or `external`; every write names a persistent effect.
  */
 export const ActionEffect = Schema.Literals([
-  "drawing", "operation", "program", "report", "stock", "component", "library", "memory", "context", "mod", "history", "workflow", "task", "interface", "external"
+  "drawing", "operation", "program", "report", "stock", "file", "component", "library", "memory", "context", "mod", "history", "workflow", "task", "interface", "external"
 ])
 export type ActionEffect = typeof ActionEffect.Type
 export const PERSISTENT_EFFECTS: ReadonlyArray<ActionEffect> = ActionEffect.literals.filter((effect) => effect !== "interface" && effect !== "external")

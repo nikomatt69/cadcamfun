@@ -13,6 +13,7 @@ import { cam } from "@cadcamfun/core"
 import type { ActionEffect } from "./ai-actions.ts"
 import { CamTurningPlan } from "./ai-cam.ts"
 import { CamLatheResult, CamPostTestResult, CamProcessResult } from "./ai-cam-breadth.ts"
+import { ExportedFile } from "./ai-export.ts"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -209,6 +210,8 @@ const generated = Schema.Struct({
 })
 /** A verification is a verdict: `ok` is false when the replay finds a collision or gouge. */
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
+/** An export is a stored file: its name, key, size and hash, plus what went into it. The bytes are never in the answer. */
+const exported = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), format: str, file: ExportedFile, warnings: strings }), [record])
 const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
 
 // ---------------------------------------------------------------- `library`, `parts`, `library_edit`
@@ -343,6 +346,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   // Mostly what the editor shows (view, selection); the layers it creates, renames or deletes belong to the drawing.
   "cad_edit.editor": write(["interface", "drawing"], editor),
   "cad_edit.import": write(["drawing"], added),
+  "cad_edit.export": write(["file"], exported),
   "cad_edit.parametric_create": write(["drawing"], parametricCreated),
   "cad_edit.parametric_update": write(["drawing"], parametricUpdated),
   "cad_edit.parametric_timeline": write(["drawing"], parametricTimeline),
@@ -380,6 +384,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   // Replays the stored program and persists only a report bound to its hash and manufacturing inputs.
   "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
+  "cam_edit.export": write(["file"], exported),
 
   "library.component_list": read(componentList),
   "library.lookup_component": read(rows()),

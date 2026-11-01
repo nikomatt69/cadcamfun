@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
 import { CamMachineConfig } from "./cam-machine-config.ts"
 import { CamLatheInput, CamPostTestInput, CamProcessInput } from "./ai-cam-breadth.ts"
+import { CamExportInput } from "./ai-export.ts"
 
 const id = Schema.NonEmptyString
 const revision = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -182,5 +183,6 @@ export const CAM_ACTION_INPUTS = {
   "cam_edit.generate": CamGenerateInput,
   "cam_edit.verify": CamVerifyInput,
   "cam_edit.stock_set": CamStockSetInput,
-  "cam_edit.manufacture": CamManufactureOperationInput
+  "cam_edit.manufacture": CamManufactureOperationInput,
+  "cam_edit.export": CamExportInput
 } as const

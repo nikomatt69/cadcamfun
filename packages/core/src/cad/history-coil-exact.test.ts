@@ -31,6 +31,18 @@ describe("exact coil (C2)", () => {
     expect(rel(massProperties(b.brep!).volume, meshVolume(mesh.mesh))).toBeLessThan(0.01)
   })
 
+  test("a spring of twelve turns is built in seconds, not minutes, and matches the mesh", () => {
+    // The joints of the sweep are sewn in halves (n log n): this was quadratic, a spring of eight turns took over a minute.
+    const h = history([{ id: "spring", type: "coil", radius: 10, pitch: 4, turns: 12, wireDiameter: 1.2, operation: "new" }])
+    const t0 = performance.now()
+    const b = rebuildExact(h).bodies[0]!
+    const seconds = (performance.now() - t0) / 1000
+    expect(b.reason).toBeUndefined()
+    expect(validateBrep(b.brep!).issues.map((i) => i.message)).toEqual([])
+    expect(rel(massProperties(b.brep!).volume, meshVolume(rebuild(h).bodies[0]!.mesh))).toBeLessThan(0.01)
+    expect(seconds).toBeLessThan(40)
+  })
+
   test("a left-handed coil keeps its exact model", () => {
     const h = history([{ id: "spring", type: "coil", radius: 8, pitch: 7, turns: 2, wireDiameter: 2.5, handedness: "left", operation: "new" }])
     const b = rebuildExact(h).bodies[0]!

@@ -131,8 +131,15 @@ export const sweepPath = (profile: Profile, start: PathFrame, path: ReadonlyArra
     pieces.push(revolveProfile(placed, p.angle, { origin: p.center, axis: p.axis, radial, name: `${options.name ?? "sweep"}.${i}` }))
   })
   // Consecutive pieces share their joint face exactly (a run's end cap is the next bend's start cap): sewn, not Booleaned.
-  let acc = pieces[0]!
+  // Halves are sewn first and then each other, so a path of n pieces validates solids of size n log n in all, not n squared: a
+  // spring of twenty turns is hundreds of pieces. The faces keep the order a piece-by-piece sewing gives.
+  const sewRange = (from: number, to: number): Brep => {
+    if (to - from === 1) return pieces[from]!
+    const mid = from + Math.ceil((to - from) / 2)
+    const a = sewRange(from, mid), b = sewRange(mid, to)
+    return sewSolids(a, b) ?? booleanBrep(a, b, "union").brep
+  }
   // A closed path's last piece meets the first again: that joint is inside one solid already, so the Boolean closes it.
-  for (const [k, b] of pieces.slice(1).entries()) acc = (closed && k === pieces.length - 2 ? undefined : sewSolids(acc, b)) ?? booleanBrep(acc, b, "union").brep
-  return acc
+  if (closed && pieces.length > 1) return booleanBrep(sewRange(0, pieces.length - 1), pieces[pieces.length - 1]!, "union").brep
+  return sewRange(0, pieces.length)
 }

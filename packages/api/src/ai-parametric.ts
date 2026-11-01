@@ -87,7 +87,10 @@ const shape = Schema.Union([
   ),
   described(Schema.Struct({ id, kind: Schema.Literal("ellipse"), at: pair, radiusX: dimension, radiusY: dimension, segments: optional(intBetween(8, 200)) }), "Nominal ellipse with exact rational profile curves. segments (default 48) controls legacy construction vertices/edges for constraints; display sampling follows its chord tolerance."),
   described(Schema.Struct({ id, kind: Schema.Literal("slot"), at: pair, length: dimension, width: dimension, angle: optional(dimension) }), "Slot: at = middle, length end to end (must exceed width), angle in degrees."),
-  described(Schema.Struct({ id, kind: Schema.Literal("polyline"), points: between(Schema.Array(pair), 3, 200) }), "Any closed outline: points [x, y] in order; every coordinate may be an expression."),
+  described(
+    Schema.Struct({ id, kind: Schema.Literal("polyline"), points: between(Schema.Array(pair), 2, 200), closed: optional(Schema.Boolean) }),
+    "Points [x, y] in order, every coordinate may be an expression. Closed outline by default (at least 3 points: an extrude/revolve profile). closed:false is an open chain of lines (at least 2 points): a sweep path, a rib centre line or a sheet-metal profile."
+  ),
   described(
     Schema.Struct({
       id, kind: Schema.Literal("curve"), curve: Schema.Literals(["spline", "bezier", "nurbs"]), points: between(Schema.Array(pair), 2, 100),
@@ -141,6 +144,7 @@ const feature = Schema.Union([
     id, type: Schema.Literal("pattern"), ...timeline, feature: optional(id),
     bodies: optional(described(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50)), "instead of feature: body ids copied whole, each copy a new body <id>#<k>.")),
     kind: Schema.Literals(["linear", "circular", "grid", "path"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
+    axis: optional(described(axis3, "circular only: the axis the copies turn about, x, y or z (default z). centre is where it passes, as the two other coordinates in cyclic order: z [x,y], x [y,z], y [z,x].")),
     path: optional(described(id, "path only: the sketch whose open chain the copies ride, spaced by arc length and turned with its tangent.")),
     countB: optional(described(dimension, "grid only: the number of rows (count is the number along step).")),
     stepB: optional(described(triple, "grid only: the offset between two rows [dx,dy,dz]."))
@@ -389,7 +393,7 @@ export const ParametricBase = Schema.Struct({
 
 export const ParametricHistory = described(
   Schema.Struct({
-    parameters: ParametricParameters, features: between(Schema.Array(feature), 0, 80),
+    parameters: withDefault(ParametricParameters, {}), features: between(Schema.Array(feature), 0, 80),
     rollback: optional(id), groups: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), collapsed: optional(Schema.Boolean) })), 0, 40)),
     bases: optional(between(Schema.Array(ParametricBase), 0, exactBrep.MAX_BASES)),
     version: optional(Schema.Literal(2))

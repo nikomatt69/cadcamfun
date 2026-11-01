@@ -22,7 +22,7 @@ import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
 import { catmullRomCurves, ellipseCurves } from "./sketch-curves.ts"
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "./vec.ts"
-import { cornersOf, rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
+import { cornersOf, patternAxis, rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
 import { sheetOutline, thickenPath, withHems, withEdgeFlanges, edgeFlangeReliefs } from "./sheet-metal.ts"
 import { textBars } from "./text-solid.ts"
 import { coilGeometry } from "./helix.ts"
@@ -1122,7 +1122,8 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
               const c = (f.centre ?? [0, 0]).map(dim)
               const span = f.span === undefined ? 360 : dim(f.span)
               const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
-              for (let i = 1; i < count; i++) emit(rotation({ x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
+              const about = patternAxis(f.axis, [c[0]!, c[1]!])
+              for (let i = 1; i < count; i++) emit(rotation(about.dir, (each * i * Math.PI) / 180, about.through), `${f.id}#${i}`)
             }
             const moved = (x: Exact, tr: Transform): Exact => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr)))
             if (source === undefined) {

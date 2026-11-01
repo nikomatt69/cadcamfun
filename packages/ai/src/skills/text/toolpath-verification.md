@@ -15,3 +15,5 @@ cam_edit action verify replays the G-code on a height-field model of the stock. 
 | InterpreterWarning | a line of the program could not be read and was skipped | that move was NOT verified; regenerate, or simplify the line the message names |
 
 Always state what was modelled (`modelled` in the result): without a holder, fixtures or a target part those checks did not run. Volume and air-cut numbers are planning figures. An InterpreterWarning means part of the program was never replayed, so the rest of the report does not cover it. Never write "safe", "certified" or "collision-free": write "no errors found in what was modelled".
+
+Files: after a verification `cam_edit` `export` writes the stored program (`kind:"program"`, `extension` nc|tap|gcode|ngc|mpf|h|txt as the controller wants) or the stock it leaves (`kind:"stock"`, stl|stl_ascii|obj|3mf) into the project export folder. The stock mesh is the verified height field at its cell size (`cellMm`), faceted and unable to hold an undercut; `thinCells` counts cells cut through to the stock bottom. It refuses when the program, the settings or the drawing changed since the verification: verify again, then export.

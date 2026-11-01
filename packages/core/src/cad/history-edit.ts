@@ -124,7 +124,7 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
         add("countB", "rows", f.countB)
         f.stepB?.forEach((s, i) => add(`stepB.${i}`, `row step ${"xyz"[i]}`, s))
       } else if (f.kind === "linear") { f.step?.forEach((s, i) => add(`step.${i}`, `step ${"xyz"[i]}`, s)) }
-      else { f.centre?.forEach((c, i) => add(`centre.${i}`, `centre ${"xy"[i]}`, c)); add("span", "span (deg)", f.span) }
+      else { f.centre?.forEach((c, i) => add(`centre.${i}`, `centre ${(f.axis === "x" ? "yz" : f.axis === "y" ? "zx" : "xy")[i]}`, c)); add("span", "span (deg)", f.span) }
       break
   }
   return out

@@ -57,6 +57,20 @@ export interface ToolHandlersShape {
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */
   cadShell?(projectId: string, input: CadShellInput): Promise<unknown>
   cadExchange?(projectId: string, input: CadExchangeInput): Promise<unknown>
+  /** The exact solids of the open drawing (all of them, or `ids`), for export; elements with no exact solid are named in `skipped`. */
+  cadExportBodies?(projectId: string, ids?: ReadonlyArray<string>): Promise<
+    | { readonly ok: true; readonly bodies: ReadonlyArray<{ readonly id: string; readonly name: string; readonly brep: cad.brep.Brep }>; readonly skipped: ReadonlyArray<string> }
+    | { readonly ok: false; readonly error: string; readonly skipped?: ReadonlyArray<string>; readonly missing?: ReadonlyArray<string> }
+  >
+  /** Keeps an export in the project's export folder and answers with the key it is stored under (relative, never an absolute path). */
+  saveFile?(projectId: string, file: { readonly name: string; readonly mime: string; readonly bytes: Uint8Array }): Promise<
+    { readonly ok: true; readonly name: string; readonly key: string } | { readonly ok: false; readonly error: string }
+  >
+  /** The remaining-stock height field of an operation's last verification, valid only for the program stored now; `floor` is the bottom of the stock. */
+  operationStock?(projectId: string, operationId: string): Promise<
+    | { readonly ok: true; readonly preview: cam.verify.VerifyResponse["preview"]; readonly floor: number; readonly programHash: string }
+    | { readonly ok: false; readonly error: string }
+  >
   cadStoreBodies?(projectId: string, bodies: ReadonlyArray<{ readonly brep: cad.brep.Brep; readonly name: string; readonly kind: "solid" | "surface" }>): Promise<unknown>
   cadOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
   cadHole?(projectId: string, input: CadHoleInput): Promise<unknown>

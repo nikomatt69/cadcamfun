@@ -15,6 +15,7 @@ import { attachmentNames, getAttachment } from "../attachments.ts"
 import { validated } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 import { holeInputProblem } from "./cad.ts"
+import { runCadExport } from "./export.ts"
 import {
   runParametricConvert, runParametricCreate, runParametricRecipeCreate, runParametricTimeline, runParametricUpdate
 } from "./parametric.ts"
@@ -280,6 +281,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({ id: "cad_edit.import", kind: "write", replaces: "cad_import_drawing", parameters: INPUTS["cad_edit.import"], run: runImport }),
+  defineWireAction({ id: "cad_edit.export", kind: "write", parameters: INPUTS["cad_edit.export"], run: runCadExport }),
   defineWireAction({
     id: "cad_edit.parametric_create", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_create"],

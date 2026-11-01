@@ -9,6 +9,7 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - delete: ids, confirm:true only when the user requested deletion. Destructive; host permission still applies.
 - editor: actions:[{action:"layer_color",layer:"Metal",color:"#808080"}] (1..40). layer_create/rename/color/show/hide/lock/unlock/delete/activate, view_3d/2d/fit, section_on/off, select/select_none, show/hide/isolate, undo/redo. Fields: layer, newName, color, moveTo, ids, axis, position, inverted.
 - import: attachment (preferred) or content, format? dxf|svg|step|iges|parasolid|mesh, depth? (required dxf/svg), up? (STEP), scale?, gap?, tolerance?, name?, color?, layer?. IGES stores exact solids; incomplete imports store nothing. Parasolid x_t text/x_b binary are unsupported. STEP/IGES imports recover geometry, not history.
+- export: format stl|stl_ascii|obj|3mf|step|iges, ids? (default all solids) or history, name?, unit? (3mf), tolerance?. Stores a file in the project export folder; answer: file {name,key,bytes,sha256}.
 - parametric_create: history, name, x?, y?, z?, layer?. Store a validated history; sketches use shapes or point/line/arc entities and constraints. See fusion-360-modelling.
 - parametric_update: elementId, parameters, expectedRevision from the last inspection; retain features.
 - parametric_timeline: elementId, expectedRevision, suppress? release? (feature ids), rollback? (last built feature) | rollForward?, move? {feature,to}. Nothing is deleted; refused moves say why.

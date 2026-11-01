@@ -9,7 +9,8 @@
  *   polygon    at (centre), sides (whole), radius (to the corners; `flats` makes it the radius to the middle of the sides), rotation
  *   ellipse    at (centre), radiusX, radiusY, drawn as `segments` straight chords
  *   slot       at (middle), length (overall), width, angle (degrees): two half-circle ends joined by two straight sides
- *   polyline   points [[x, y], ...] (at least three): any closed outline; every coordinate is a dimension
+ *   polyline   points [[x, y], ...]: any closed outline (at least three points), or with closed:false an open chain of lines (at least two,
+ *              a sweep path, a rib, a sheet-metal profile); every coordinate is a dimension
  *   curve      a spline through points, a Bezier or a NURBS (B-spline) from control points; open (a sweep path, or a profile edge
  *              closed by `chord`) or closed. The curve is sampled from the evaluated control points at every rebuild, so moving a
  *              control point by a parameter reshapes it.
@@ -32,7 +33,7 @@ export type SketchShape =
   | { readonly id: string; readonly kind: "polygon"; readonly at: Pair; readonly sides: number; readonly radius: Dimension; readonly flats?: boolean; readonly rotation?: Dimension }
   | { readonly id: string; readonly kind: "ellipse"; readonly at: Pair; readonly radiusX: Dimension; readonly radiusY: Dimension; readonly segments?: number }
   | { readonly id: string; readonly kind: "slot"; readonly at: Pair; readonly length: Dimension; readonly width: Dimension; readonly angle?: Dimension }
-  | { readonly id: string; readonly kind: "polyline"; readonly points: ReadonlyArray<Pair> }
+  | { readonly id: string; readonly kind: "polyline"; readonly points: ReadonlyArray<Pair>; readonly closed?: boolean }
   | { readonly id: string; readonly kind: "curve"; readonly curve: "spline" | "bezier" | "nurbs"; readonly points: ReadonlyArray<Pair>; readonly closed?: boolean; readonly chord?: boolean; readonly degree?: number; readonly divisions?: number }
 
 export interface ExpandedShape {
@@ -242,10 +243,12 @@ export const expandShape = (shape: SketchShape, evaluate: Evaluate, lenient = fa
       }] }
     }
     case "polyline": {
-      if (shape.points.length < 3) refuse(`Polyline '${id}' needs at least three points (it has ${shape.points.length})`)
+      const closed = shape.closed !== false
+      if (shape.points.length < (closed ? 3 : 2)) refuse(`Polyline '${id}' needs at least ${closed ? "three points (a closed outline)" : "two points (an open chain)"}; it has ${shape.points.length}`)
       const acc = origin()
       shape.points.forEach(([x, y], k) => placed(acc, `p${k}`, x, y))
-      shape.points.forEach((_, k) => acc.entities.push({ id: `${id}.l${k}`, kind: "line", p1: `${id}.p${k}`, p2: `${id}.p${(k + 1) % shape.points.length}` }))
+      const segments = closed ? shape.points.length : shape.points.length - 1
+      for (let k = 0; k < segments; k++) acc.entities.push({ id: `${id}.l${k}`, kind: "line", p1: `${id}.p${k}`, p2: `${id}.p${(k + 1) % shape.points.length}` })
       return acc
     }
   }

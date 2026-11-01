@@ -37,11 +37,13 @@ const twin = (b: Brep, e1: Edge, e2: Edge, tol: number): { readonly flip: boolea
 export const sewSolids = (a: Brep, b: Brep, tol = 1e-7): Brep | undefined => {
   const m = mergeBreps([a, b])
   const fo = a.faces.length
+  // The plane of every face of b once, not once per face of a: sewing a long chain of pieces would otherwise be quadratic here.
+  const planesB = b.faces.map((f) => planeOf(f))
   for (let i = 0; i < a.faces.length; i++) {
     const pa = planeOf(a.faces[i]!)
     if (pa === undefined) continue
     for (let j = 0; j < b.faces.length; j++) {
-      const pb = planeOf(b.faces[j]!)
+      const pb = planesB[j]
       if (pb === undefined || dot3(pa.n, pb.n) > -1 + 1e-12) continue
       const d = { x: pb.o.x - pa.o.x, y: pb.o.y - pa.o.y, z: pb.o.z - pa.o.z }
       if (Math.abs(dot3(d, pa.n)) > tol) continue

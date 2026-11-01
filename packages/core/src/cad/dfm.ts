@@ -335,7 +335,7 @@ export const holeSites = (source: History, parameters: Readonly<Record<string, n
         if (step.some((s) => s === undefined)) continue
         const du = step[0]! * u.x + step[1]! * u.y + step[2]! * u.z, dv = step[0]! * v.x + step[1]! * v.y + step[2]! * v.z
         for (let i = 1; i < count; i++) sites.push({ ...source, feature: `${f.id}#${i}`, u: source.u + du * i, v: source.v + dv * i })
-      } else if (source.plane === "XY") {
+      } else if (source.plane === "XY" && (f.axis ?? "z") === "z") {
         const c = (f.centre ?? [0, 0]).map((s) => value(s, parameters))
         const span = f.span === undefined ? 360 : value(f.span, parameters)
         if (c.some((s) => s === undefined) || span === undefined) continue

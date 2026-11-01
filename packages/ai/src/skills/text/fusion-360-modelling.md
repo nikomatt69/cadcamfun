@@ -7,7 +7,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 - Put profiles in `sketch.shapes` (no points to place, no constraints to write; fully constrained; every measure takes a number or an expression of the parameters):
   - 2-point or centre rectangle: `{id, kind:"rectangle", at:[x,y], width, height, centered?}`
   - circle: `{kind:"circle", at, diameter}`; polygon: `{kind:"polygon", at, sides, radius, flats?, rotation?}`; ellipse: `{kind:"ellipse", at, radiusX, radiusY}`
-  - slot: `{kind:"slot", at, length, width, angle?}` (length is end to end, round ends included); any outline: `{kind:"polyline", points:[[x,y],...]}`
+  - slot: `{kind:"slot", at, length, width, angle?}` (length is end to end, round ends included); any closed outline: `{kind:"polyline", points:[[x,y],...]}`; the same with `closed:false` is an OPEN chain of lines (two points or more): the path of a sweep or pipe, a rib's centre line, a sheet-metal profile — no points and lines to write by hand
   - spline through points: `{kind:"curve", curve:"spline", points}`; control-point spline: `curve:"nurbs"` (degree 3 by default) or `curve:"bezier"`. An open curve is a sweep path; `chord:true` closes it with a straight line to make a profile; `closed:true` closes a spline or nurbs smoothly.
 - Hand-built `entities` and `constraints` (point, line, circle, arc; tangent, parallel, symmetric, ...) are for drawings the shapes cannot express. A shape's points are named `<id>.p0`, `<id>.v1`, ... when you need to constrain against them.
 - Two shapes in one sketch, one inside the other, make a ring: the inner loop is a hole.
@@ -26,7 +26,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 - Text (emboss or engrave): `text` (`text`, cap `height`, `depth`, `plane` and `offset` at the face, `at`, `align`; operation union raises it, subtract with direction down cuts it in).
 - Every solid of the 3D catalogue (box, cylinder, cone, sphere, ellipsoid, torus, prism, pyramid, hemisphere, capsule, gear, extrusion, revolution, sweep, loft, spring, bolt, screw, nut, washer, wall, floor, window, door, column, roof, stair): `primitive` with `params` (the same fields as the 3D elements: width, height, depth, radius, tubeRadius, sides, moduleValue, teeth, ...), `at` (the centre), `rotation` (degrees) and `operation`, so a catalogue solid can also cut.
 - Make what is already drawn parametric: `cad` `parametric_from_element` returns the history of an element (its measures become named parameters, a flat shape gets a `depth`, a component becomes one feature per part), `cad_edit` `parametric_convert` stores the twin and leaves the original for you to delete once it is checked. Use it whenever the user asks to make something parametric or to change a drawn part by its dimensions.
-- Hole (simple, counterbore, countersink; sized from the fastener tables with `parametric_fastener`): `hole`.
+- Hole (simple, counterbore, countersink; sized from the fastener tables with `parametric_fastener`): `hole`. A hole starts ON its plane (at its `offset`) and drills AGAINST the plane normal: on the top face of a body at z=30, plane XY needs `offset:30`; the plane ZX or YZ of a part turned about Y or X needs the offset of its face. A hole that removes nothing is reported as a warning: read it, never ignore it.
 
 ## Modify and arrange
 
@@ -34,7 +34,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 - Press Pull a flat face: `pushpull` (`name` is the exact face, e.g. `plate.top`, and then `near` is only a hint; a name that is gone is an error, never a nearby face. Without `name`, `near` picks the nearest face. `normal` chooses the top or the bottom, `distance` positive grows the body, negative cuts it; holes in the face stay; a curved face such as a boss side or a hole wall is offset along its normals, so a cylinder changes radius).
 - Draft one face of any body: `draft` (`name` is the exact face and then `near` is only a hint; a missing name is an error. Without `name`, `near` a point on the face, `angle`, `pull` direction, `neutral` plane position; positive leans the wall inward above the neutral plane; a curved face is drafted one way, neutral at its base or top, so a boss becomes a cone). Join two bodies rigidly face to face: `mate` (`body` moves its `face` flush against `to.face`, `offset` gap, `spin` degrees = revolute, `slide` [u,v] = slider, `limits` for the range of motion; an overlap of the two bodies is reported); both bodies must exist (operation new for the second).
 - Combine bodies by id: `combine` (join, cut, intersect; `keepTools`). Split Body with a plane: `split`. Move/Copy: `move` (rotate in degrees, then translate; `copy`). Scale: `scale` (one factor or three).
-- Rectangular and circular pattern: `pattern` (linear, grid, circular) of an earlier tool, or `bodies` to copy whole bodies; mirror: `mirror` through XY, YZ or ZX at an offset, of a tool or of `bodies` (`join: true` turns half of a symmetric part into the part: model the half, mirror it joined).
+- Rectangular and circular pattern: `pattern` (linear, grid, circular) of an earlier tool, or `bodies` to copy whole bodies; mirror: `mirror` through XY, YZ or ZX at an offset, of a tool or of `bodies` (`join: true` turns half of a symmetric part into the part: model the half, mirror it joined). A circular pattern turns about Z unless it has `axis:"x"|"y"|"z"` (a bolt circle on a flange turned about Y is `axis:"y"`); `centre` is where the axis passes, as the two other coordinates in cyclic order (z: [x,y], x: [y,z], y: [z,x]).
 
 ## Parameters
 
@@ -42,6 +42,8 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 - Change a size later with `cad_edit` `parametric_update`; try variants first with `cad` `parametric_test` (nothing is written). A shape's measures are also reachable one by one (width, diameter, radius, length, angle).
 
 ## What is not there
+
+A `shell` hollows an earlier extrude, revolve or sweep, not a loft: a bottle, vase or cup is a `revolve` of its half profile plus a `shell` (open top), or a loft stored and hollowed with `cad_edit` `shell`. A `primitive` such as `gear` can be mesh-only (no exact model): check `cad` `parametric_exact` before promising STEP or CAM from it.
 
 Flanges on adjacent sheet edges and their corner treatment, general freeform normal offsets, arbitrary UV trim curves, and Parasolid parsing remain unsupported. Use the structured refusal; never present a smaller feature as equivalent to the requested geometry.
 
@@ -55,7 +57,7 @@ Flanges on adjacent sheet edges and their corner treatment, general freeform nor
 - A `sheet` accepts `flanges:[{end:"start"|"end",length,angle}]` on its full-width exposed edges. Angles are signed degrees, length is from the virtual bend corner. The existing `bendRadius`, thickness and width apply; flatPatterns includes the new bends. A hem cannot share that edge. Optional `relief:{width,depth}` removes rectangular bend-end notches on turns up to 90 degrees, narrows the flange at both width ends and updates the flat blank.
 - `cad.motion` studies exact scene parts using a model `{ground,joints,couplings?,contacts?}` and sweep `{joint,from,to,steps,quantity?}`. Revolute/prismatic/cylindrical/ball/planar joints, gear/rack couplings, explicit `closesLoop` constraints solved on passive joints, per-frame closure and contact distances/clearance violations. This reports non-penetration violations, not contact forces or cam-following dynamics.
 - `cad.surface` previews; `cad_edit.surface` stores a NURBS patch, stitches matching full edges or thickens a patch. Open surfaces are typed separately and excluded from solid machining. Rectangular trims use exact isoparametric curves. Planar normal thickening is exact; curved patches need an explicit axial direction. Axial thickness does not claim constant normal distance.
-- `cad.exchange` exports exact STEP/IGES text. `cad_edit.import` accepts IGES manifold solids with analytic/rational surfaces and shared topology, or refuses incomplete/unsupported files. Parasolid x_t is text, x_b is binary; neither format is STEP/IGES.
+- `cad.exchange` returns exact STEP/IGES as text for reading. To get a FILE the user keeps, use `cad_edit` `export` (stl, stl_ascii, obj, 3mf, step, iges; `ids` or an inline `history`, `name`, `unit` for 3mf): it is stored in the project export folder and the answer gives its name, key, size and SHA-256, never the bytes. A mesh that the first tessellation leaves open is re-meshed or repaired and the answer says so in `warnings`; give the STL only when its body says `solid:true`. `cad_edit.import` accepts IGES manifold solids with analytic/rational surfaces and shared topology, or refuses incomplete/unsupported files. Parasolid x_t is text, x_b is binary; neither format is STEP/IGES.
 
 ## Example (it builds: a plate with a slot and three posts)
 

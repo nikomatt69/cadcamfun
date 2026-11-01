@@ -645,3 +645,14 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
 - 2026-10-15: Step 11: coverage of the four untested CAM actions (fixed the chain order they reported), versioned evaluation
   corpus v1 with STEP round trip and negative cases, reported/estimated tokens and known/unknown cost kept apart, compiled
   sidecar smoke with a latency, memory and stall baseline. Open: traces, the legacy usage route, Step 6/9/10 open items.
+- 2026-11-01: files the kernels make, for real. `cad_edit.export` (STL binary/ASCII, OBJ, 3MF, STEP, IGES from the exact solids of the drawing
+  or an inline history) and `cam_edit.export` (the stored NC with the controller's extension; the stock a verified program leaves as
+  STL/OBJ/3MF from the verified height field) store a file under `exports/<project>/` and answer with name, key, size and SHA-256, never
+  the bytes or an absolute path; effect `file`. A mesh the kernel's tessellation leaves open is re-meshed on a tolerance ladder, then
+  repaired, and the answer says so (shared with `cad.workflow mesh_export`). CAD modelling found by building twelve real parts through the
+  wire schema: circular `pattern` takes `axis` (it only turned about Z, so a bolt circle on a part turned about Y was impossible), a
+  `polyline` shape can be an open chain (`closed:false`: sweep paths, ribs and sheet profiles had no JSON form), `parameters` defaults to
+  `{}`, a cut that removes no material (a hole drilled from a plane that is not on the part) is a warning, and the exact path sweep sews
+  halves (a coil of eight turns went from over a minute to six seconds). Open: `shell` of a loft, exact `gear` primitive, a tessellator that
+  never leaves a crack, the pre-existing skill-description budget in `prompt-corpus.test.ts`.
+

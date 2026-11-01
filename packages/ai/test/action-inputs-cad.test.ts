@@ -63,6 +63,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad_edit.group": { accept: [{ ids: ["a", "b"], name: "G" }], refuse: [{ ids: [] }, { ids: ["a"], name: "" }] },
   "cad_edit.delete": { accept: [{ ids: ["a"], confirm: true }], refuse: [{ ids: ["a"] }, { ids: ["a"], confirm: false }] },
   "cad_edit.editor": { accept: [{ actions: [{ action: "view_fit" }, { action: "section_on", axis: "x", position: 10 }] }], refuse: [{ actions: [] }, { actions: [{ action: "explode" }] }] },
+  "cad_edit.export": { accept: [{ format: "stl" }, { format: "step", ids: ["a", "b"], name: "housing (v2)" }, { format: "3mf", unit: "inch", tolerance: 0.01 }], refuse: [{}, { format: "glb" }, { format: "stl", name: "../x" }, { format: "stl", ids: [] }, { format: "stl", tolerance: 0 }] },
   "cad_edit.import": { accept: [{ attachment: "part.dxf", depth: 5 }, { format: "svg", content: "<svg/>", depth: 2 }], refuse: [{ format: "invalid" }, { content: "" }, { depth: 0 }] },
   "cad.drawing": {
     accept: [
