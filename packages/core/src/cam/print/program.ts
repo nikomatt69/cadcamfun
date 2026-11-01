@@ -66,40 +66,66 @@ export interface ProgramAnalysis {
 const KNOWN_G = new Set([0, 1, 2, 3, 4, 10, 11, 17, 18, 19, 20, 21, 28, 29, 90, 91, 92])
 const KNOWN_M = new Set([0, 1, 17, 18, 73, 82, 83, 84, 104, 105, 106, 107, 109, 116, 140, 141, 190, 191, 200, 201, 203, 204, 205, 220, 221, 400, 410, 412, 420, 500, 501, 503, 572, 600, 620, 621, 900, 907, 955, 991, 1002, 1004, 1005, 2000])
 
-/** Words of a line without its comment: [letter, value] pairs, plus the first bare word (a macro name). */
-const parseLine = (raw: string): { words: Array<[string, number]>; macro: string | undefined; comment: string } => {
-  let end = raw.length
-  const semi = raw.indexOf(";")
-  let comment = ""
-  if (semi >= 0) { end = semi; comment = raw.slice(semi + 1) }
-  const words: Array<[string, number]> = []
+/** Per-line word table: the value and presence of each letter A-Z (the first occurrence wins). Reused for every line. */
+const vals = new Float64Array(26)
+const present = new Uint8Array(26)
+const POW10 = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15]
+
+/**
+ * Reads the words of `src[from, end)` into the table without allocating: numbers are accumulated as an integer and divided by a
+ * power of ten, which is exactly the correctly rounded decimal value while the digits fit a double (15), and read with `Number`
+ * otherwise. Stops at a `;` (its position is returned), skips `( ... )` comments, and returns the first bare word as a macro.
+ */
+const scanLine = (src: string, from: number, end: number): { macro: string | undefined; semi: number; words: number } => {
+  present.fill(0)
+  let words = 0
   let macro: string | undefined
-  let i = 0
+  let semi = -1
+  let i = from
   while (i < end) {
-    const c = raw.charCodeAt(i)
+    const c = src.charCodeAt(i)
+    if (c === 59) { semi = i; break }
     if (c === 32 || c === 9 || c === 13) { i++; continue }
-    if (c === 40) { const close = raw.indexOf(")", i); i = close < 0 ? end : close + 1; continue }
+    if (c === 40) { const close = src.indexOf(")", i); i = close < 0 || close >= end ? end : close + 1; continue }
     const upper = c >= 97 && c <= 122 ? c - 32 : c
     if (upper >= 65 && upper <= 90) {
       let j = i + 1
       const start = j
-      while (j < end && (raw.charCodeAt(j) === 45 || raw.charCodeAt(j) === 43 || raw.charCodeAt(j) === 46 || (raw.charCodeAt(j) >= 48 && raw.charCodeAt(j) <= 57))) j++
-      if (j > start) { words.push([String.fromCharCode(upper), Number(raw.slice(start, j))]); i = j; continue }
-      // A bare word: the macro or extended command (SET_PRESSURE_ADVANCE, START_PRINT, M-less commands).
-      if (words.length === 0 && macro === undefined) {
-        j = i
-        while (j < end && raw.charCodeAt(j) !== 32 && raw.charCodeAt(j) !== 9) j++
-        macro = raw.slice(i, j).toUpperCase()
+      let negative = false
+      const sign = src.charCodeAt(j)
+      if (sign === 45 || sign === 43) { negative = sign === 45; j++ }
+      let mantissa = 0, digits = 0, fraction = 0, dot = false, ok = true
+      for (; j < end; j++) {
+        const d = src.charCodeAt(j)
+        if (d >= 48 && d <= 57) { mantissa = mantissa * 10 + (d - 48); digits++; if (dot) fraction++ }
+        else if (d === 46 && !dot) dot = true
+        else break
+      }
+      if (digits === 0) ok = false
+      if (ok) {
+        const value = digits <= 15 ? mantissa / POW10[fraction]! : Number(src.slice(start, j))
+        const slot = upper - 65
+        if (!present[slot]) { present[slot] = 1; vals[slot] = negative ? -value : value; words++ }
         i = j
-        // The macro's parameters (X=1 Y=2) are not G-code words.
-        i = end
         continue
+      }
+      // A bare word: the macro or extended command (SET_PRESSURE_ADVANCE, START_PRINT).
+      if (words === 0 && macro === undefined) {
+        j = i
+        while (j < end && src.charCodeAt(j) !== 32 && src.charCodeAt(j) !== 9 && src.charCodeAt(j) !== 59) j++
+        macro = src.slice(i, j).toUpperCase()
+        // The macro's parameters (X=1 Y=2) are not G-code words.
+        const rest = src.indexOf(";", j)
+        semi = rest >= 0 && rest < end ? rest : -1
+        break
       }
     }
     i++
   }
-  return { words, macro, comment }
+  return { macro, semi, words }
 }
+
+const G_SLOT = 6, M_SLOT = 12, T_SLOT = 19
 
 const detect = (text: string, opaque: ReadonlyArray<{ word: string }>, seen: ReadonlySet<string>): { dialect: GcodeDialect; evidence: string[] } => {
   const evidence: string[] = []
@@ -167,23 +193,26 @@ export const analyseProgram = (gcode: string, options: ProgramOptions = {}): Pro
     let end = gcode.indexOf("\n", pos)
     if (end < 0) end = gcode.length
     lineNo++
-    const raw = gcode.slice(pos, end)
+    const lineStart = pos
     pos = end + 1
     lines++
-    const { words, macro, comment } = parseLine(raw)
-    if (words.length === 0 && macro === undefined) {
-      const t = /^\s*(?:TYPE|type):\s*(.+?)\s*$/.exec(comment)
-      if (t) { let id = typeIds.get(t[1]!); if (id === undefined) { id = types.length; types.push(t[1]!); typeIds.set(t[1]!, id) } type = id }
+    const { macro, semi, words } = scanLine(gcode, lineStart, end)
+    if (words === 0 && macro === undefined) {
+      if (semi >= 0) {
+        const t = /^\s*(?:TYPE|type):\s*(.+?)\s*$/.exec(gcode.slice(semi + 1, end))
+        if (t) { let id = typeIds.get(t[1]!); if (id === undefined) { id = types.length; types.push(t[1]!); typeIds.set(t[1]!, id) } type = id }
+      }
       continue
     }
     if (macro !== undefined) {
       if (!/^(M\d+|G\d+)$/.test(macro)) opaque.push({ line: lineNo, word: macro })
       continue
     }
-    const g = words.find((w) => w[0] === "G")?.[1]
-    const m = words.find((w) => w[0] === "M")?.[1]
-    const t = words.find((w) => w[0] === "T")?.[1]
-    const get = (letter: string): number | undefined => { for (const w of words) if (w[0] === letter) return w[1]; return undefined }
+    const L = (letter: string): number | undefined => (present[letter.charCodeAt(0) - 65] ? vals[letter.charCodeAt(0) - 65] : undefined)
+    const g = present[G_SLOT] ? vals[G_SLOT] : undefined
+    const m = present[M_SLOT] ? vals[M_SLOT] : undefined
+    const t = present[T_SLOT] ? vals[T_SLOT] : undefined
+    const get = L
     if (m !== undefined) {
       seen.add(`M${m}`)
       if (!KNOWN_M.has(m)) unknown.add(`M${m}`)
