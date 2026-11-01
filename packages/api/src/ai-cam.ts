@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
 import { CamMachineConfig } from "./cam-machine-config.ts"
+import { CamJobInput } from "./ai-cam-job.ts"
 
 const id = Schema.NonEmptyString
 const revision = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -172,6 +173,8 @@ export const CAM_ACTION_INPUTS = {
   "cam.turn": CamTurningInput,
   "cam_edit.turn": CamTurningOperationInput,
   "cam.manufacture": CamManufactureInput,
+  /** A multi-setup job run in process: plan or run every setup, read claims, bounds and failure reasons (skill cam-five-axis). */
+  "cam.job": CamJobInput,
   "cam.chain_status": Schema.Struct({ operationId: id }),
   "cam_edit.create": CamCreateInput,
   "cam_edit.update": CamUpdateInput,
