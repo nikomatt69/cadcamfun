@@ -3,6 +3,22 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.53 (November 2026)
+
+## Core
+
+- Introduce simulation panel and integrate into enhanced toolbar
+- Close the cracks the exact tessellation leaves between faces that sample a shared edge differently (T-junction split)
+- Files the kernels make (STL/3MF/OBJ/STEP/IGES/NC/stock) and CAD modelling gaps found by building real parts
+
+## Sidecar
+
+- Cad_edit.fasten inserts the exact ISO screws, washers and nuts the shared holes need (smart fasteners were unreachable from the assistant)
+
+## AI
+
+- Fusion skill says which catalogue primitives are exact and which feature builds the others
+
 ## v0.1.52 (November 2026)
 
 ## Core
