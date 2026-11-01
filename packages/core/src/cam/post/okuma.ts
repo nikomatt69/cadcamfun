@@ -27,6 +27,7 @@ export const okumaDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: true,
   workOffset: (offset) => `G15 H${Number(offset.slice(1)) - 53}`,
   begin: () => [],
   setup: ["G90", "G17", "G94", "G40", "G80"],

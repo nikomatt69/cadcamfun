@@ -40,6 +40,7 @@ export const fanucDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: true,
   tcp: "G43.4",
   // Tilted working plane indexing (G68.2 + G53.1, workplane.ts) and inverse-time feed (G93, back with G94).
   tiltedPlane: fanucTiltedPlane,

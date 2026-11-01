@@ -1307,6 +1307,7 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly tabs?: ReadonlyArray<{ readonly position: number; readonly width: number; readonly height: number }>
         readonly leadIn?: "direct" | "arc" | "ramp" | "helix"
         readonly leadRadius?: number
+        readonly compensation?: "none" | "controller"
       }
     | {
         readonly id: string
@@ -1621,6 +1622,7 @@ export type ToolpathGeneratorVerifyPayload = {
           }
         | { readonly _tag: "Orient"; readonly a?: number; readonly b?: number; readonly c?: number }
         | { readonly _tag: "SpindleOrient"; readonly angle?: number }
+        | { readonly _tag: "CutterComp"; readonly side: "left" | "right" | "off"; readonly register?: number }
         | {
             readonly _tag: "Assign"
             readonly variable:
@@ -7138,6 +7140,7 @@ export type ToolpathGeneratorManufactureOutput =
                 }
               | { _tag: "Orient"; a?: number; b?: number; c?: number }
               | { _tag: "SpindleOrient"; angle?: number }
+              | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
               | {
                   _tag: "Assign"
                   variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
@@ -7414,6 +7417,7 @@ export type ToolpathGeneratorParseOutput = {
           }
         | { _tag: "Orient"; a?: number; b?: number; c?: number }
         | { _tag: "SpindleOrient"; angle?: number }
+        | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
         | {
             _tag: "Assign"
             variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
@@ -7960,6 +7964,7 @@ export type CamSetupGenerateOutput = {
             }
           | { _tag: "Orient"; a?: number; b?: number; c?: number }
           | { _tag: "SpindleOrient"; angle?: number }
+          | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
           | {
               _tag: "Assign"
               variable: { scope: "local" | "global" | "system"; index: number } | { name: string }

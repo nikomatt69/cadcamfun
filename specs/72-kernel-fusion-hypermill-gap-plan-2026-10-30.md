@@ -375,3 +375,14 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   already closed; fold splitting not built (no failing case). Open and listed in spec 42 §6.2: analytic seeds for coaxial surfaces of revolution,
   equal-radius corner fillets (4 of 32 Booleans of a rounded box still use the displacement), NURBS x NURBS marching, coarse-chord tessellation
   of seed 133's cap face. No API/AI/desktop follow-up is needed for these core-only changes (`BooleanCounters` gained `verified` / `verifyRejected`).
+- 2026-11-01 (build, step 3.3 first half, P2-3): kernel cutter radius compensation. IR move `CutterComp {side left|right|off, register?}` (pass-through in
+  length/time/viewer/playback); dialect flag `cutterComp` (generic, Fanuc family, Haas, Okuma, Siemens, LinuxCNC, Mazak, Mitsubishi/Brother by inheritance;
+  GRBL and Heidenhain refuse with a reason, Klartext RL/RR not written); `ProfileParams.compensation: "controller"` and `OperationSpec` profile
+  `compensation` (schema, API, generated clients): the program is the contour itself with `G42 D<tool>` (climb) or `G41` (conventional), straight 45 degree
+  approach and exit of 2-6 tool radii on free ground, one lap per depth, `G40` in the exit. Refused with reasons: tabs, open contours, arcs, onLine, no
+  room for the approach. Gate: `test/cam/cutter-comp.test.ts` (the interpreter's offset path lies one radius from the contour, a 2.9 mm register radius
+  cuts 0.1 mm smaller) and `kernel/cutter-comp-job.test.ts` (same removed volume as the tool-centre path, no-gouge / material-removed / nc-replay pass).
+  The `nc-replay` extent check is widened by the tool radius in X and Y for compensated tools and says so; it bounds the offset, the exact proof is the
+  interpreter test. Open: the planner never chooses it (opt-in per operation), pocket / surface finishes, spring passes, wear register (D separate from T),
+  `convertNc` does not turn G41/G42 back into `CutterComp`, Klartext RL/RR, desktop control.
+

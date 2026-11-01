@@ -13,7 +13,7 @@ export const anglesAfter = (move: Move, before: Rotary): Rotary => {
 export const previewMoveDuration = (move: Move, from: Vec3, before: Rotary, after: Rotary, rapidRate: number): number => {
   if (move._tag === "Dwell") return move.seconds
   if (move._tag === "SpindleOrient") return SPINDLE_ORIENT_SECONDS
-  if (move._tag === "Comment" || move._tag === "Cycle" || isControlNode(move)) return 0
+  if (move._tag === "Comment" || move._tag === "Cycle" || move._tag === "CutterComp" || isControlNode(move)) return 0
   const swing = Math.max(...(["a", "b", "c"] as const).map((k) => Math.abs((after[k] ?? 0) - (before[k] ?? 0))))
   if (move._tag === "Orient") return swing / PREVIEW_ROTARY_RATE * 60
   const length = moveLength(move, from)

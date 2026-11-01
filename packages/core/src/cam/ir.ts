@@ -86,6 +86,17 @@ export const SpindleOrientSchema = Schema.TaggedStruct("SpindleOrient", {
   angle: Schema.optionalKey(Schema.Finite)
 })
 
+/**
+ * Cutter radius compensation by the control (`G41` / `G42` / `G40`): the moves that follow, until `off`, are the programmed contour and
+ * the control keeps the tool centre a radius to the `left` or `right` of the direction of travel, using the radius in the tool's
+ * register (D = the tool number unless `register` says otherwise). It moves nothing itself: the control applies the offset on the
+ * next XY move and leaves it on the move after `off`. A control without the words refuses the program instead of dropping them.
+ */
+export const CutterCompSchema = Schema.TaggedStruct("CutterComp", {
+  side: Schema.Literals(["left", "right", "off"]),
+  register: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))
+})
+
 export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream", "bore"])
 export type CycleKind = typeof CycleKindSchema.Type
 
@@ -123,6 +134,7 @@ export const MoveSchema = Schema.Union([
   CycleSchema,
   OrientSchema,
   SpindleOrientSchema,
+  CutterCompSchema,
   AssignSchema,
   MacroCallSchema,
   IfSchema,
@@ -144,6 +156,7 @@ export type DwellMove = typeof DwellSchema.Type
 export type CommentMove = typeof CommentSchema.Type
 export type OrientMove = typeof OrientSchema.Type
 export type SpindleOrientMove = typeof SpindleOrientSchema.Type
+export type CutterCompMove = typeof CutterCompSchema.Type
 export type CycleMove = typeof CycleSchema.Type
 export type Move = typeof MoveSchema.Type
 
@@ -169,6 +182,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
     case "Comment":
     case "Orient":
     case "SpindleOrient":
+    case "CutterComp":
       return undefined
   }
 }
@@ -228,6 +242,7 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "Comment":
     case "Orient":
     case "SpindleOrient":
+    case "CutterComp":
     case "Assign":
     case "MacroCall":
     case "If":
@@ -461,7 +476,7 @@ export const toolpathBounds = (toolpath: Toolpath): Bounds3D => {
   }
   let started = false
   walk(toolpath, (move, from) => {
-    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient" || move._tag === "SpindleOrient" || isControlNode(move)) return
+    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient" || move._tag === "SpindleOrient" || move._tag === "CutterComp" || isControlNode(move)) return
     if (!started) {
       include(from.x, from.y, from.z)
       started = true

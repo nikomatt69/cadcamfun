@@ -51456,6 +51456,34 @@
                                                 "_tag": {
                                                   "type": "string",
                                                   "enum": [
+                                                    "CutterComp"
+                                                  ]
+                                                },
+                                                "side": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "left",
+                                                    "right",
+                                                    "off"
+                                                  ]
+                                                },
+                                                "register": {
+                                                  "type": "integer",
+                                                  "minimum": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "side"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
                                                     "Assign"
                                                   ]
                                                 },
@@ -53394,6 +53422,13 @@
                             "leadRadius": {
                               "type": "number",
                               "exclusiveMinimum": 0
+                            },
+                            "compensation": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "controller"
+                              ]
                             }
                           },
                           "required": [
@@ -55390,6 +55425,34 @@
                                       },
                                       "required": [
                                         "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CutterComp"
+                                          ]
+                                        },
+                                        "side": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "minimum": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side"
                                       ],
                                       "additionalProperties": false
                                     },
@@ -58481,6 +58544,34 @@
                                         "_tag": {
                                           "type": "string",
                                           "enum": [
+                                            "CutterComp"
+                                          ]
+                                        },
+                                        "side": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "minimum": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
                                             "Assign"
                                           ]
                                         },
@@ -59753,6 +59844,34 @@
                                     },
                                     "required": [
                                       "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "CutterComp"
+                                        ]
+                                      },
+                                      "side": {
+                                        "type": "string",
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off"
+                                        ]
+                                      },
+                                      "register": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "side"
                                     ],
                                     "additionalProperties": false
                                   },
@@ -66325,6 +66444,34 @@
                                             },
                                             "required": [
                                               "_tag"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "CutterComp"
+                                                ]
+                                              },
+                                              "side": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "left",
+                                                  "right",
+                                                  "off"
+                                                ]
+                                              },
+                                              "register": {
+                                                "type": "integer",
+                                                "minimum": 1
+                                              }
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "side"
                                             ],
                                             "additionalProperties": false
                                           },

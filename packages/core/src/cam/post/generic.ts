@@ -12,6 +12,7 @@ export const genericDialect: Dialect = {
   uppercaseComments: false,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: true,
   inverseTime: { on: "G93", off: "G94" },
   begin: () => [],
   setup: ["G90", "G17", "G94"],

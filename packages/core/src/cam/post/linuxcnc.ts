@@ -27,6 +27,7 @@ export const linuxcncDialect: Dialect = {
   uppercaseComments: false,
   rotary: true,
   spindleOrient: linuxcncSpindleOrient,
+  cutterComp: true,
   inverseTime: { on: "G93", off: "G94" },
   smoothing: { on: (tol) => [`G64 P${tol}`], off: ["G61"] },
   begin: () => ["%"],

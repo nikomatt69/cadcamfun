@@ -276,6 +276,8 @@ export interface Dialect {
   }
   /** The control's spindle-orientation words; absent (GRBL): a program with a `SpindleOrient` move is refused, never written without it. */
   readonly spindleOrient?: SpindleOrientCodes
+  /** The control has cutter radius compensation `G41` / `G42 D` / `G40` (IR `CutterComp`); absent: a program with the move is refused. */
+  readonly cutterComp?: boolean
   /** The control's tilted-plane words; absent: a program with `workPlanes` is refused. */
   readonly tiltedPlane?: TiltedPlaneCodes
   /** Inverse-time feed mode (`PostOptions.inverseTimeFeed`): the words that switch it on and back to feed per minute. */
