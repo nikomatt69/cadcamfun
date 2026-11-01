@@ -76,6 +76,16 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.parametric_test": { accept: [{ elementId: "a", cases: [{ name: "wider", parameters: { w: 80 } }] }], refuse: [{ elementId: "a", cases: [] }, { elementId: "a", cases: "[]" }] },
   "cad.parametric_dfm": { accept: [{ elementId: "a", process: "mill" }, { history, envelope: { x: 100, y: 100, z: 50 } }], refuse: [{ process: "laser" }, { minWall: 0 }] },
   "cad.kernel": { accept: [{ op: "health", elementId: "a" }, { op: "refs", history, kinds: ["face"], limit: 50 }, { op: "resolve", history, refs: ["face:plate|plate.top"], parameters: { w: 60 } }], refuse: [{}, { op: "scan" }, { op: "resolve", refs: ["nonsense"] }, { op: "refs", limit: 0 }, { op: "refs", kinds: [] }] },
+  "cad.workflow": {
+    accept: [
+      { op: "sketch", entities: [{ id: "a", kind: "point", x: 0, y: 0 }, { id: "b", kind: "point", x: 3, y: 1 }, { id: "l", kind: "line", p1: "a", p2: "b" }], constraints: [{ type: "fixed", point: "a" }, { type: "length", line: "l", value: 5 }], drag: { entity: "b", to: { x: 0, y: 5 } } },
+      { op: "assembly", definitions: [{ id: "blk", shape: { kind: "box", x: 10, y: 10, z: 10 } }], occurrences: [{ id: "o1", definition: "blk", grounded: true }], checks: ["interference", "mass"], drive: { joint: "h", from: 0, to: 90, steps: 10 } },
+      { op: "sheet", history, format: "pdf", options: { size: "A3" } },
+      { op: "mesh_import", data: "c29saWQ=", unit: "inch", repair: { maxHoleEdges: 8 }, requireSolid: true },
+      { op: "mesh_export", elementId: "a", format: "3mf", unit: "millimeter" }
+    ],
+    refuse: [{}, { op: "scan" }, { op: "sketch", entities: [] }, { op: "sketch", entities: [{ id: "a", kind: "circle", center: "c", radius: 0 }] }, { op: "sketch", entities: [{ id: "a", kind: "point", x: 0, y: 0 }], constraints: [{ type: "bogus" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 0, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 1, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }], drive: { joint: "h", from: 0, to: 1, steps: 1 } }, { op: "mesh_export", format: "gcode" }, { op: "mesh_import", unit: "furlong", data: "c29saWQ=" }]
+  },
   "cad.parametric_exact": { accept: [{ elementId: "a", includeStep: true }], refuse: [{ includeStep: "yes" }, { name: "" }] },
   "cad.parametric_fastener": { accept: [{}, { size: "M6", fit: "medium" }], refuse: [{ fit: "loose" }, { shaftDiameter: 0 }] },
   "cad.parametric_recipe": { accept: [{ recipe: "flange" }, { recipe: "flange", params: { boltCount: 6 } }], refuse: [{ recipe: "teapot" }, {}] },

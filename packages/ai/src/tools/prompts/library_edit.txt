@@ -7,7 +7,7 @@ Actions
 - upsert_library_item: create or replace a generic item (template, setup sheet, fixture).
 - set_cost: create or update a price: material cost, cutter wear, operation rates.
 - set_default: the project's default material, tool and machine, used to seed new operations.
-- delete: remove one row of the user's libraries. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
+- delete: remove one row of the user's libraries. Destructive: send confirm true only after the user asked for it.
 
 Parameters
 - upsert_material: id (omit to create), name, description, properties ({name: number|string|boolean}), isPublic.
@@ -21,7 +21,7 @@ Parameters
 Fill every parameter the row stores: empty fields are incomplete. Use the units named (mm, rpm, mm/min) and keep values consistent (cutting length within total length, shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) draw the tool's 3D model: set those the cutter type has, omit the rest.
 
 Result (JSON)
-- ok, id, created (true: created, false: an existing row replaced); the store's answer, not the intention. delete also returns what still refers to the row.
+- ok, id, created (true: created, false: an existing row replaced). delete also returns what still refers to the row.
 
 Do not use it
 - To read what exists: library is read-only.

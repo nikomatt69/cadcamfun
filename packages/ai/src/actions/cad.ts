@@ -4,6 +4,7 @@
  * which is what lets the read-only specialists have the whole tool.
  */
 import { runCadKernel } from "./cad-kernel-naming.ts"
+import { runCadWorkflow } from "./cad-workflow.ts"
 import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
 import { Schema } from "effect"
@@ -231,6 +232,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.kernel", kind: "read",
     parameters: INPUTS["cad.kernel"],
     run: (input, context) => runCadKernel(input, context)
+  }),
+  defineWireAction({
+    id: "cad.workflow", kind: "read",
+    parameters: INPUTS["cad.workflow"],
+    run: (input, context) => runCadWorkflow(input, context)
   }),
   defineWireAction({
     id: "cad.distance", kind: "read",

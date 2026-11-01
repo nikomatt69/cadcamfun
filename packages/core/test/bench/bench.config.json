@@ -23,6 +23,9 @@
     "sketch.solve-529-newton": 30,
     "sketch.drag-200": 8,
     "history.exact-50-features-full": 1000,
-    "history.exact-50-features-resumed": 250
+    "history.exact-50-features-resumed": 250,
+    "print.slice-499k-triangles": 600,
+    "print.repair-499k-triangles": 1500,
+    "print.pipeline-20k-triangles": 4000
   }
 }

@@ -54,3 +54,13 @@ Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-1
 ## 4. Order
 
 K6, K2, K3, K1 (needs spec 41 N3), D1–D3, K7, K8, K4, K5, D4, D5.
+
+## Change log
+
+- 2026-10-31 (CAD-B): **K6 and K7 built.** `cad/sketch-equations.ts` (analytic gradient for every constraint kind, checked against central differences in
+  `sketch-solver.test.ts` "every constraint kind"), `sketch-solver.ts` (components, reverse Cuthill-McKee envelope Cholesky Levenberg-Marquardt, rank/null space,
+  per-point freedom, redundant constraints, chunked deletion filter `cad/sketch/deletion-filter.ts` for the minimal conflicting set: seeded 200-case test, >= 95 % minimal,
+  always a culprit), `createSketchSession`/`dragSketch` (warm start, path following, nearest feasible pose, `blockedBy`, never relaxes a constraint), `collinear` and
+  reference (`driven`) dimensions. Bench `sketch.solve-529` 4-5 ms (529 constraints), `sketch.drag-200` 0.3 ms median (199 entities; target 8 ms), budgets in `bench.config.json`.
+  AI: `cad.workflow` op `sketch` (solve, diagnose, drag). Still open: K1 (needs spec 41 refs), K2 NURBS/fit splines, K3 offset/fillet/patterns as relations, K4 3D sketch, K5 blocks,
+  K8 desktop sketcher (adapter work), D1-D5.

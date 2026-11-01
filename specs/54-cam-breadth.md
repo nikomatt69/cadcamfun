@@ -82,3 +82,7 @@ meanwhile.
 ## 5. Order
 
 C1 → R1 → R2 → C2 (one dialect at a time) → Q1 → R3 → L1/L2 → Q2 → Q3 → R4 → Q4 → H1 → L3 → C3.
+
+## 6. Change log
+
+- 2026-10-31: **C3 post tester built.** `cam/post/tester.ts` (`testPost`, `testAllPosts`): a post's text is replayed by the reference interpreter and checked against the program (replay without unsupported words, bounds with arc extremes, cut length, end points, tools, spindle, end, optional expected-output line diff); `nc` checks a shop's own text. Tests: `post/tester.test.ts` (all 11 posts pass the sample; moved coordinate, dropped arc, missing end, unknown word and a changed feed each fail; a refusing post is `refused` with its reason). Assistant: `cam post_test` (text is read back with `programOfNc` first), skill `cam-post`. **Open:** Fagor dialect, L1 ISO 13399 / tool library I/O, L2 editable versioned cutting-data library, L3 life counters, R2/R3/R4/Q1-Q4 (not touched this round), UI/CLI table.

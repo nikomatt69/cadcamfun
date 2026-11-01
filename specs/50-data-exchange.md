@@ -73,3 +73,11 @@ each costs:
 
 X3 (corpus runner first, so every other item has numbers) → X1 → X4 → X6 → X8 → X2 (with spec 49 P2) → X9 → X5 → X7 → X10;
 §2.4 only with D2.
+
+## Change log
+
+- 2026-10-31 (CAD-B): **X8 built (mesh)**, `cad/exchange/` (exported as `exchange`; the 3MF codec `threemf.ts` is shared with the printing side). STL binary/ASCII (multi-solid), OBJ (polygons, negative
+  indices, objects), 3MF read (stored and deflate packages via a self-contained inflate, units micron..foot to mm, component trees including `p:path` production parts, build transforms with mirror
+  handling, metadata) and write (units, per-object transforms, part numbers), `bodiesTo3mf`; `repairMesh` (weld, degenerate/duplicate, consistent outward orientation per shell, small-hole fill, defect
+  report before/after) and `importMesh` (`requireSolid` refusal with the defect list). AI: `cad.workflow` ops `mesh_import`, `mesh_export`. Open: PLY, storing an imported mesh as a document body
+  (the existing `cad_edit.import` mesh path still takes parsed attachments), X9 faceted-to-analytic recovery, X1-X7.

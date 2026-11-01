@@ -21,6 +21,7 @@ import drawingsAndImages from "./text/drawings-and-images.md" with { type: "text
 import pluginAuthoring from "./text/plugin-authoring.md" with { type: "text" }
 import parametricDesign from "./text/parametric-design.md" with { type: "text" }
 import cadNaming from "./text/cad-naming.md" with { type: "text" }
+import cadWorkflow from "./text/cad-workflow.md" with { type: "text" }
 import fusion360Modelling from "./text/fusion-360-modelling.md" with { type: "text" }
 import composedCamPrograms from "./text/composed-cam-programs.md" with { type: "text" }
 import versionControlCadcam from "./text/version-control-cadcam.md" with { type: "text" }
@@ -28,6 +29,8 @@ import workflowsCadcam from "./text/workflows-cadcam.md" with { type: "text" }
 import machiningCyclePresets from "./text/machining-cycle-presets.md" with { type: "text" }
 import projectAutoMemory from "./text/project-auto-memory.md" with { type: "text" }
 import stockAndFixtures from "./text/stock-and-fixtures.md" with { type: "text" }
+import camTurning from "./text/cam-turning.md" with { type: "text" }
+import camPost from "./text/cam-post.md" with { type: "text" }
 
 /** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
 export const USER_MARKER = ".user-skill"
@@ -102,6 +105,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: skillText(drawingsAndImages) },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: skillText(pluginAuthoring) },
   { name: "cad-naming", description: "Stable face/edge/vertex refs: make, resolve after edits, naming health.", category: "cad", tags: ["cad", "naming", "references", "kernel"], body: skillText(cadNaming) },
+  { name: "cad-workflow", description: "Constrained sketches (solve, diagnose, drag), assemblies with mates, drawing sheets as vector PDF and STL/OBJ/3MF import and export through cad workflow.", category: "cad", tags: ["cad", "sketch", "assembly", "mates", "pdf", "3mf"], body: skillText(cadWorkflow) },
   { name: "parametric-design", description: "When and how to build a parametric element: named dimensions, expressions, when to choose parametric over loose solids, how to edit later.", category: "cad", tags: ["cad", "parametric", "dimensions"], body: skillText(parametricDesign) },
   { name: "fusion-360-modelling", description: "Fusion 360 commands mapped to parametric features: shapes, curves (spline, Bezier, NURBS), sweep, revolve, loft, coil, rib, sheet metal, modelled threads, text, push/pull, draft, joints, catalogue solids, combine, split, move, scale, patterns and parameters.", category: "cad", tags: ["cad", "parametric", "fusion360", "sweep", "revolve", "nurbs"], body: skillText(fusion360Modelling) },
   { name: "composed-cam-programs", description: "Compose CAM programs with several operations: sequencing, stock carry-over, multi-setup, lathe plus mill, verification per operation.", category: "cam", tags: ["cam", "workflow", "milling", "lathe"], body: skillText(composedCamPrograms) },
@@ -109,7 +113,9 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "workflows-cadcam", description: "How the agent uses the Actions-style workflows: YAML shape, registered uses steps, interpolation, and when to dispatch manually.", category: "workflows", tags: ["workflows", "actions", "automation"], body: skillText(workflowsCadcam) },
   { name: "machining-cycle-presets", description: "Reusable pocket, contour, adaptive, drilling and turning sequences with explicit machine and verification requirements.", category: "cam", tags: ["cam", "cycles", "presets"], body: skillText(machiningCyclePresets) },
   { name: "project-auto-memory", description: "Automatically retain verified project facts and resume connected CAD/CAM tasks after delegation or compaction.", category: "general", tags: ["memory", "context", "continuation"], body: skillText(projectAutoMemory) },
-  { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) }
+  { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) },
+  { name: "cam-turning", description: "Plan a turned part with real inserts: roughing, finishing, grooving, threading, parting, nose-radius path and the stock-removal replay (cam lathe).", category: "cam", tags: ["cam", "turning", "lathe"], body: skillText(camTurning) },
+  { name: "cam-post", description: "Test a post by replaying its text, diff against expected NC, and optimise feeds from measured engagement (cam post_test, cam process).", category: "cam", tags: ["cam", "post", "feeds"], body: skillText(camPost) }
 ]
 
 /** The `SKILL.md` text nikcli reads: front matter then the playbook. */

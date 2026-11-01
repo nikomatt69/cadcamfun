@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
 import { CamMachineConfig } from "./cam-machine-config.ts"
+import { CamLatheInput, CamPostTestInput, CamProcessInput } from "./ai-cam-breadth.ts"
 
 const id = Schema.NonEmptyString
 const revision = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -170,6 +171,9 @@ export const CAM_ACTION_INPUTS = {
   "cam.materials": Schema.Struct({ query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(80))) }),
   "cam.cutting_data": CamCuttingDataInput,
   "cam.turn": CamTurningInput,
+  "cam.lathe": CamLatheInput,
+  "cam.process": CamProcessInput,
+  "cam.post_test": CamPostTestInput,
   "cam_edit.turn": CamTurningOperationInput,
   "cam.manufacture": CamManufactureInput,
   "cam.chain_status": Schema.Struct({ operationId: id }),

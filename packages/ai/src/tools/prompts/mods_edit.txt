@@ -1,5 +1,5 @@
 Write, enable, disable or remove a mod: a standing rule that survives a restart.
-A mod is a small extension module the host loads and runs; it acts on the whole application, not on one project.
+A mod is a small extension module the host runs; it acts on the whole application.
 
 Authoring (the only shape the store accepts)
 - Plain ESM, dependency-free: no `import`, no `require`; everything reachable arrives on the hook's `$` argument.
