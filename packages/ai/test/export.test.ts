@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { exchange, rebuildExact } from "@cadcamfun/core"
+import { buildRecipe, exchange, rebuildExact } from "@cadcamfun/core"
 import { decodeHistory } from "../src/parametric.ts"
 import { runAction } from "../src/actions/catalogue.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
@@ -91,6 +91,18 @@ describe("cad_edit.export", () => {
     expect(r).toMatchObject({ ok: true, file: { name: "Base_plate.stl" }, warnings: [expect.stringContaining("Sketch (not a solid)")] })
     expect(volumeOfStl(files.get(r["file"].key)!)).toBeCloseTo(10_000, 2)
   })
+
+  test("recipes whose faces sample a shared edge differently still export as closed solids, with the same volume", async () => {
+    const { files, handlers } = host()
+    // Each of these left cracks in the kernel's own tessellation (flange: a bolt circle; enclosure: a shell; duct: a NURBS loft).
+    const expected = { flange: 132_700, enclosure: 76_400, duct_transition: 48_480 } as const
+    for (const name of ["flange", "enclosure", "duct_transition"] as const) {
+      const r = await call("cad_edit.export", { format: "stl", history: buildRecipe(name, {}).history, name }, handlers)
+      expect(r, name).toMatchObject({ ok: true, bodies: [{ solid: true }] })
+      expect(Math.abs(r["bodies"][0].volumeMm3 - expected[name]) / expected[name], name).toBeLessThan(0.002)
+      expect(Math.abs(volumeOfStl(files.get(r["file"].key)!) - r["bodies"][0].volumeMm3), name).toBeLessThan(5)
+    }
+  }, 90_000)
 
   test("it refuses ids with a history, a host that stores nothing, and a name that leaves the folder", async () => {
     const { handlers } = host()

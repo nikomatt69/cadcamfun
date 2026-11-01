@@ -54,13 +54,16 @@ export interface BodyMesh {
   readonly mesh: exchange.MeshData
   /** The chord tolerance that gave a closed mesh, mm; absent when the kernel's default did. */
   readonly tolerance?: number
+  /** Triangles split where one face sampled a shared edge more finely than its neighbour (a T-junction); the geometry does not move. */
+  readonly tJunctions?: number
   /** Present when no tolerance closed the mesh and the cracks were filled: what was repaired. */
   readonly repaired?: { readonly filledHoles: number; readonly filledTriangles: number; readonly remaining: ReadonlyArray<string> }
 }
 
 /**
  * The watertight mesh of an exact body. A tolerance the caller asked for is used as it is; otherwise the kernel's default is tried
- * first and, when it leaves a crack between two faces, a ladder of other tolerances, and as a last resort the cracks are filled.
+ * first and, when it leaves a crack between two faces, the T-junctions are split, then a ladder of other tolerances is tried (each with the
+ * same split), and as a last resort the cracks are filled.
  * Whatever was changed is returned, never hidden: a mesh that is still open says so in `remaining`.
  */
 export const closedMesh = (body: brep.Brep, tolerance?: number): BodyMesh => {
@@ -69,7 +72,11 @@ export const closedMesh = (body: brep.Brep, tolerance?: number): BodyMesh => {
   for (const chordTol of ladder) {
     const mesh = exchange.brepMesh(body, chordTol === undefined ? {} : { chordTol })
     first ??= mesh
-    if (meshTopology(mesh).solid) return { mesh, ...(chordTol !== undefined && tolerance === undefined ? { tolerance: chordTol } : {}) }
+    const used = chordTol !== undefined && tolerance === undefined ? { tolerance: chordTol } : {}
+    if (meshTopology(mesh).solid) return { mesh, ...used }
+    // Two faces that sample their shared edge differently leave a crack the geometry does not have: split the triangle that runs past.
+    const joined = exchange.closeByTJunctions(mesh)
+    if (joined.closed) return { mesh: joined.mesh, ...used, tJunctions: joined.splitEdges }
   }
   const fixed = exchange.repairMesh(first!, { maxHoleEdges: 64 })
   return { mesh: fixed.mesh, repaired: { filledHoles: fixed.report.defects.filledHoles, filledTriangles: fixed.report.defects.filledTriangles, remaining: fixed.report.remaining } }
@@ -121,9 +128,10 @@ const render = (input: CadExportInput, bodies: ReadonlyArray<Body>, stem: string
   }
   const made = bodies.map((b) => ({ name: b.name, ...closedMesh(b.brep, input.tolerance) }))
   const meshes = made.map((m) => ({ name: m.name, mesh: m.mesh }))
-  const stats = meshStats(meshes).map((s, k) => ({ ...s, ...(made[k]!.tolerance !== undefined ? { chordTolMm: made[k]!.tolerance } : {}), ...(made[k]!.repaired !== undefined ? { repaired: made[k]!.repaired } : {}) }))
+  const stats = meshStats(meshes).map((s, k) => ({ ...s, ...(made[k]!.tolerance !== undefined ? { chordTolMm: made[k]!.tolerance } : {}), ...(made[k]!.tJunctions !== undefined ? { tJunctionsSplit: made[k]!.tJunctions } : {}), ...(made[k]!.repaired !== undefined ? { repaired: made[k]!.repaired } : {}) }))
   const notes = made.flatMap((m) => [
     ...(m.tolerance !== undefined ? [`${m.name}: the default tessellation left a crack between two faces; meshed at ${m.tolerance} mm chord tolerance instead.`] : []),
+    ...(m.tJunctions !== undefined ? [`${m.name}: two faces sampled a shared edge differently; ${m.tJunctions} triangle edge(s) were split to close it (no vertex moved).`] : []),
     ...(m.repaired !== undefined ? [`${m.name}: no tolerance closed the mesh; ${m.repaired.filledHoles} cracks (${m.repaired.filledTriangles} triangles) were filled.`] : [])
   ])
   return { bytes: encodeMesh(input.format, meshes, stem, input.unit), stats, open: stats.filter((s) => !("solid" in s) || !s.solid).map((s) => s.name), notes }

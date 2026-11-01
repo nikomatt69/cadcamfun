@@ -655,4 +655,9 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   `{}`, a cut that removes no material (a hole drilled from a plane that is not on the part) is a warning, and the exact path sweep sews
   halves (a coil of eight turns went from over a minute to six seconds). Open: `shell` of a loft, exact `gear` primitive, a tessellator that
   never leaves a crack, the pre-existing skill-description budget in `prompt-corpus.test.ts`.
+- 2026-11-01 (later): the exact kernel's tessellation leaves cracks where two faces sample a shared edge differently (the recipes `flange`,
+  `enclosure`, `duct_transition` and a pipe bend came out as open meshes). `exchange.splitTJunctions` splits the triangle that runs past a
+  vertex on its edge (no vertex moves, volume and area unchanged) and drops zero-area filler triangles; `closedMesh` uses it before the
+  tolerance ladder and the hole filler. All seven recipes and ten stress parts now export as closed solids. Open: the tessellator itself
+  (a curved shared edge sampled twice is not a T-junction).
 

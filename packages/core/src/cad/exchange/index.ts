@@ -2,5 +2,6 @@
 export * from "./zip.ts"
 export * from "./mesh-formats.ts"
 export * from "./mesh-repair.ts"
+export * from "./mesh-tjunction.ts"
 export * from "./threemf.ts"
 export * from "./import.ts"
