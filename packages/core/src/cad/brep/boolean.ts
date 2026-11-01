@@ -531,9 +531,52 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const b = surfaceProject(sb, p, { u: q.ub, v: q.vb })
     return { p, ua: a.u, va: a.v, ub: b.u, vb: b.v }
   }
+  /**
+   * An open intersection curve that stops short of a boundary vertex it points at (a mesh seed ends where a thin sliver of one
+   * face, such as the wedge between a wall and an arc that touches it, is narrower than the mesh can resolve) is marched on to
+   * that vertex. Only a vertex that lies on both surfaces, straight ahead of the end (within 14 degrees) and within a few seed
+   * chords counts, and every step is a Newton solution on both surfaces that stays on the straight way to it; otherwise the curve
+   * is left as it was (and is refused later as before). An end already at a vertex is not touched.
+   */
+  const extendToVertex = (curve: SsiPoint[], atEnd: boolean, sa: Surface, sb: Surface): SsiPoint[] => {
+    const end = atEnd ? curve[curve.length - 1]! : curve[0]!
+    const prev = atEnd ? curve[curve.length - 2]! : curve[1]!
+    if (reg.pts.some((P) => dist3(P, end.p) <= snapR)) return curve
+    const chordDir = normalize3(sub3(end.p, prev.p))
+    if (length3(chordDir) === 0) return curve
+    let target: Vec3 | undefined, best = Infinity
+    for (const P of reg.pts) {
+      const d = dist3(P, end.p)
+      if (d > seedChord * 16 || d >= best || dot3(sub3(P, end.p), chordDir) < 0.97 * d) continue
+      const qa = surfaceProject(sa, P), qb = surfaceProject(sb, P)
+      if (dist3(surfacePoint(sa, qa.u, qa.v), P) > tol * 10 || dist3(surfacePoint(sb, qb.u, qb.v), P) > tol * 10) continue
+      best = d
+      target = P
+    }
+    if (target === undefined) return curve
+    const way = sub3(target, end.p)
+    const steps = Math.max(1, Math.ceil(best / (seedChord * 2)))
+    const added: SsiPoint[] = []
+    let last = end
+    for (let k = 1; k <= steps; k++) {
+      const seed = add3(end.p, scale3(way, k / steps))
+      const q = k === steps
+        ? projectToSsi(last, target, sa, sb)
+        : refineSurfaceSurface(sa, sb, seed, { u: last.ua, v: last.va }, { u: last.ub, v: last.vb }, normalize3(way), tol)
+      // Off the straight way (more than a twentieth of the run) is another branch or a curve that bends away: give up.
+      if (q === undefined || dist3(q.p, seed) > 0.05 * best + tol * 10) return curve
+      added.push(q)
+      last = q
+    }
+    return atEnd ? [...curve, ...added] : [...added.reverse(), ...curve]
+  }
   ssis.forEach((c, ci) => {
     const sa = A.faces[c.fa]!.surface, sb = B.faces[c.fb]!.surface
     let pts = c.pts
+    if (!c.closed && pts.length >= 2) {
+      pts = extendToVertex(pts, true, sa, sb)
+      pts = extendToVertex(pts, false, sa, sb)
+    }
     // Vertices on this curve: registry points that lie on both surfaces and near the polyline.
     const onCurve: Array<{ readonly vid: number; readonly seg: number; readonly f: number }> = []
     reg.pts.forEach((P, vid) => {
