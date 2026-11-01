@@ -22,7 +22,7 @@
  * band `loops` only along straight and circular edges. A feature that cannot be read is simply absent, never approximated.
  */
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3, type Vec2, type Vec3 } from "../../cad/vec.ts"
-import { curveDerivs, curvePoint, edgeUses, surfaceNormal, surfaceProject, type Brep } from "../../cad/brep/index.ts"
+import { curveDerivs, curvePoint, edgeUses, recognizeHoles, surfaceNormal, surfaceProject, type Brep, type Surface } from "../../cad/brep/index.ts"
 
 export type NamedFeatureKind = "slot" | "step" | "groove" | "chamfer-band" | "fillet-band"
 export type SlotEnd = "open" | "closed" | "round"
@@ -176,9 +176,25 @@ interface BandFace {
   readonly axis?: Vec3
 }
 
-const bandFaces = (t: Topology, axis: Vec3, maxBand: number): BandFace[] => {
+/**
+ * Whether a curved fillet face bulges out of the material: its outward normal points away from the centre of curvature. A
+ * torus in a groove is a hollow (concave) even though both of its edges are tangent; a rounded outer edge is convex.
+ */
+const curvatureConvex = (s: Extract<Surface, { kind: "cylinder" | "torus" | "sphere" }>, mid: Vec3, n: Vec3): boolean => {
+  if (s.kind === "sphere") return dot3(n, sub3(mid, s.frame.origin)) > 0
+  const d = sub3(mid, s.frame.origin)
+  const axial = dot3(d, s.frame.z)
+  const radial = sub3(d, scale3(s.frame.z, axial))
+  const r = length3(radial)
+  const centre = add3(s.frame.origin, add3(scale3(s.frame.z, axial), scale3(radial, s.kind === "torus" && r > 0 ? s.major / r : 0)))
+  return dot3(n, sub3(mid, centre)) > 0
+}
+
+const bandFaces = (t: Topology, axis: Vec3, maxBand: number, holeFaces: ReadonlySet<number>): BandFace[] => {
   const out: BandFace[] = []
   t.b.faces.forEach((f, fi) => {
+    // A hole's own faces (a countersink cone, a drill point) are hole features, never chamfer or fillet bands.
+    if (holeFaces.has(fi)) return
     const links = t.linksOf(fi)
     const tangent = links.filter((l) => l.kind === "tangent")
     const s = f.surface
@@ -192,19 +208,18 @@ const bandFaces = (t: Topology, axis: Vec3, maxBand: number): BandFace[] => {
       const n = t.normal(fi, mid)
       // A cylinder parallel to the machining axis is a corner radius of an outline, a slot end or a pocket: left to the cutter radius when concave.
       const vertical = s.kind === "cylinder" && Math.abs(Math.abs(dot3(s.frame.z, axis)) - 1) < PARALLEL
-      const convex = s.kind === "sphere" || s.kind === "torus"
-        ? (links.find((l) => l.kind !== "tangent")?.kind ?? "convex") === "convex"
-        : dot3(n, sub3(mid, add3(s.frame.origin, scale3(s.frame.z, dot3(sub3(mid, s.frame.origin), s.frame.z))))) > 0
+      const convex = curvatureConvex(s, mid, n)
       if (vertical && !convex) return
       out.push({ face: fi, kind: "fillet-band", size, convex, turn: 0, long: [], ...(s.kind === "cylinder" ? { axis: s.frame.z } : {}) })
       return
     }
-    // Chamfers: a narrow plane (or cone) between two faces it is not tangent to.
+    // Chamfers: a narrow plane (or cone) between two faces it is not tangent to. Both long edges are convex: a chamfer bevels a
+    // material corner. A narrow concave band (the flat floor of a trapezoidal groove, a sloped pocket floor) is not a chamfer.
     if (s.kind !== "plane" && s.kind !== "cone") return
     const hard = links.filter((l) => l.kind !== "tangent").sort((x, y) => y.length - x.length)
     if (hard.length < 2 || tangent.length > 0) return
     const [e1, e2] = [hard[0]!, hard[1]!]
-    if (t.other(e1, fi) === t.other(e2, fi) || e1.kind !== e2.kind) return
+    if (t.other(e1, fi) === t.other(e2, fi) || e1.kind !== "convex" || e2.kind !== "convex") return
     // The long edges of a chamfer run side by side: two straight ones must be parallel.
     const c1 = t.b.edges[e1.edge]!.curve, c2 = t.b.edges[e2.edge]!.curve
     if (c1.kind === "line" && c2.kind === "line" && Math.abs(dot3(c1.dir, c2.dir)) < 0.99) return
@@ -254,8 +269,8 @@ const chainLoops = (b: Brep, edges: ReadonlyArray<number>): Vec2[][] => {
   return loops
 }
 
-const bands = (t: Topology, axis: Vec3, maxBand: number): { features: NamedFeature[]; faces: ReadonlyMap<number, BandFace> } => {
-  const faces = new Map(bandFaces(t, axis, maxBand).map((f) => [f.face, f] as const))
+const bands = (t: Topology, axis: Vec3, maxBand: number, holeFaces: ReadonlySet<number>): { features: NamedFeature[]; faces: ReadonlyMap<number, BandFace> } => {
+  const faces = new Map(bandFaces(t, axis, maxBand, holeFaces).map((f) => [f.face, f] as const))
   const parent = new Map<number, number>([...faces.keys()].map((f) => [f, f]))
   const find = (x: number): number => { let r = x; while (parent.get(r) !== r) r = parent.get(r)!; return r }
   for (const l of t.links) {
@@ -391,16 +406,46 @@ const floors = (t: Topology, axis: Vec3, bandOf: ReadonlyMap<number, BandFace>):
 
 // ---------------------------------------------------------------- ring grooves
 
-const grooves = (t: Topology): NamedFeature[] => {
+interface GrooveRing {
+  readonly plane: number
+  /** The tangent fillet face between the groove floor and the ring, when the corner is rounded. */
+  readonly via: number | undefined
+}
+
+/** The two ring planes that bound a groove floor, looking through a tangent fillet band at each rounded corner. */
+const grooveRings = (t: Topology, fi: number, axis: Vec3, bandOf: ReadonlyMap<number, BandFace>): GrooveRing[] => {
+  const rings: GrooveRing[] = []
+  const add = (plane: number, via: number | undefined): void => {
+    const at = rings.findIndex((r) => r.plane === plane)
+    if (at < 0) rings.push({ plane, via })
+    else if (rings[at]!.via === undefined && via !== undefined) rings[at] = { plane, via }
+  }
+  for (const l of t.linksOf(fi)) {
+    const nb = t.other(l, fi)
+    const ringEdge = (plane: number, edge: number): boolean =>
+      isPlane(t, plane) && t.b.edges[edge]!.curve.kind === "circle" && Math.abs(dot3(t.normal(plane, l.mid), axis)) > 1 - PARALLEL
+    if (l.kind === "concave" && ringEdge(nb, l.edge)) { add(nb, undefined); continue }
+    const band = bandOf.get(nb)
+    if (l.kind !== "tangent" || band === undefined || band.kind !== "fillet-band") continue
+    // A fillet is tangent on both sides: the plane beyond it, across its other tangent edge, is the ring.
+    const beyond = t.linksOf(nb).find((m) => m !== l && m.kind === "tangent" && t.other(m, nb) !== fi)
+    if (beyond === undefined) continue
+    const plane = t.other(beyond, nb)
+    if (ringEdge(plane, beyond.edge)) add(plane, nb)
+  }
+  return rings
+}
+
+const grooves = (t: Topology, bandOf: ReadonlyMap<number, BandFace>): NamedFeature[] => {
   const out: NamedFeature[] = []
   t.b.faces.forEach((f, fi) => {
     const s = f.surface
     if (s.kind !== "cylinder") return
     const axis = s.frame.z
     // Full-turn circle edges: a ring groove's floor is bounded by two of them, each against a plane perpendicular to the axis.
-    const rings = t.linksOf(fi).filter((l) => l.kind === "concave" && isPlane(t, t.other(l, fi)) && t.b.edges[l.edge]!.curve.kind === "circle" && Math.abs(dot3(t.normal(t.other(l, fi), l.mid), axis)) > 1 - PARALLEL)
+    const rings = grooveRings(t, fi, axis, bandOf)
     if (rings.length !== 2) return
-    const [pa, pb] = [t.other(rings[0]!, fi), t.other(rings[1]!, fi)]
+    const [pa, pb] = [rings[0]!.plane, rings[1]!.plane]
     const na = t.normal(pa, planeOrigin(t, pa)), nb = t.normal(pb, planeOrigin(t, pb))
     const gap = dot3(sub3(planeOrigin(t, pb), planeOrigin(t, pa)), na)
     if (dot3(na, nb) > -1 + PARALLEL || !(gap > PARALLEL)) return
@@ -413,7 +458,7 @@ const grooves = (t: Topology): NamedFeature[] => {
     const reach = external ? Math.max(...radii) : Math.min(...radii)
     const depth = Math.abs(reach - s.radius)
     if (!(depth > PARALLEL) || (external ? reach < s.radius : reach > s.radius)) return
-    const ids = [fi, pa, pb].sort((p, q) => p - q)
+    const ids = [fi, pa, pb, ...rings.flatMap((r) => (r.via === undefined ? [] : [r.via]))].filter((v, i, a) => a.indexOf(v) === i).sort((p, q) => p - q)
     out.push({ id: "", kind: "groove", faces: ids, bounds: boundsOf(ids.flatMap((i) => t.points(i, 8))), width: gap, depth, axis, origin: s.frame.origin, diameter: 2 * s.radius, external })
   })
   return out
@@ -428,8 +473,10 @@ export const recognizeNamedFeatures = (b: Brep, options: FeatureOptions = {}): R
   const box = boundsOf(b.vertices.map((v) => v.point))
   const extents = [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter((e) => e > 1e-9)
   const maxBand = options.maxBand ?? 0.5 * Math.min(...extents)
-  const band = bands(t, axis, maxBand)
-  const all = [...floors(t, axis, band.faces), ...grooves(t), ...band.features]
+  // Holes are features of their own: their faces are never claimed as chamfer or fillet bands (a countersink cone, a drill point).
+  const holeFaces = new Set(recognizeHoles(b).flatMap((h) => h.segments.flatMap((s) => s.faces)))
+  const band = bands(t, axis, maxBand, holeFaces)
+  const all = [...floors(t, axis, band.faces), ...grooves(t, band.faces), ...band.features]
   const count: Record<string, number> = {}
   return all.map((f) => {
     count[f.kind] = (count[f.kind] ?? 0) + 1
@@ -445,6 +492,8 @@ export interface ExpectedFeature {
   /** Centre of the feature's bounding box and the distance within which a found feature is that one, mm. */
   readonly at: Vec3
   readonly tolerance: number
+  /** The faces the feature owns, when known. A found feature must claim exactly these, not just sit in the same place. */
+  readonly faces?: ReadonlyArray<number>
 }
 
 export interface KindScore {
@@ -457,10 +506,16 @@ export interface KindScore {
 
 const centre = (f: NamedFeature): Vec3 => ({ x: (f.bounds.min.x + f.bounds.max.x) / 2, y: (f.bounds.min.y + f.bounds.max.y) / 2, z: (f.bounds.min.z + f.bounds.max.z) / 2 })
 
+const sameFaces = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean => {
+  if (a.length !== b.length) return false
+  const x = [...a].sort((p, q) => p - q), y = [...b].sort((p, q) => p - q)
+  return x.every((v, i) => v === y[i])
+}
+
 /**
  * Precision and recall of a recognition against what a part is known to contain, per feature kind. A found feature is a true
- * positive when it is of the expected kind and its bounding box is centred within the tolerance of an expected one not yet matched.
- * A kind neither expected nor found scores 1 / 1 (nothing to get wrong).
+ * positive when it is of the expected kind, its bounding box is centred within the tolerance of an expected one not yet matched,
+ * and — when the expectation names faces — it claims exactly those faces. A kind neither expected nor found scores 1 / 1.
  */
 export const scoreRecognition = (expected: ReadonlyArray<ExpectedFeature>, found: ReadonlyArray<NamedFeature>): Readonly<Record<NamedFeatureKind, KindScore>> => {
   const kinds: NamedFeatureKind[] = ["slot", "step", "groove", "chamfer-band", "fillet-band"]
@@ -472,7 +527,7 @@ export const scoreRecognition = (expected: ReadonlyArray<ExpectedFeature>, found
     let tp = 0
     for (const f of got) {
       const c = centre(f)
-      const i = want.findIndex((e, k) => !taken.has(k) && length3(sub3(c, e.at)) <= e.tolerance)
+      const i = want.findIndex((e, k) => !taken.has(k) && length3(sub3(c, e.at)) <= e.tolerance && (e.faces === undefined || sameFaces(f.faces, e.faces)))
       if (i >= 0) { taken.add(i); tp++ }
     }
     out[kind] = { expected: want.length, found: got.length, truePositive: tp, precision: got.length === 0 ? 1 : tp / got.length, recall: want.length === 0 ? 1 : tp / want.length }
