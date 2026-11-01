@@ -3,6 +3,7 @@
  * libraries: inspection never provisions a project, a drawing or a default (the sidecar's handlers enforce that too),
  * which is what lets the read-only specialists have the whole tool.
  */
+import { runCadKernel } from "./cad-kernel-naming.ts"
 import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
 import { Schema } from "effect"
@@ -226,6 +227,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     } }),
   defineWireAction({ id: "cad.exchange", kind: "read", parameters: INPUTS["cad.exchange"],
     run: (input, { handlers, projectId }) => handlers.cadExchange === undefined ? { ok: false, error: "Exact exchange is unavailable in this host." } : handlers.cadExchange(projectId, input) }),
+  defineWireAction({
+    id: "cad.kernel", kind: "read",
+    parameters: INPUTS["cad.kernel"],
+    run: (input, context) => runCadKernel(input, context)
+  }),
   defineWireAction({
     id: "cad.distance", kind: "read",
     parameters: INPUTS["cad.distance"],

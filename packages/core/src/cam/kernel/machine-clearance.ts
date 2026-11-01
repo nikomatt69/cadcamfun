@@ -17,7 +17,7 @@
 import type { Vec3 } from "../../cad/vec.ts"
 import type { GSegment } from "../testing/gcode-interpreter.ts"
 import type { RotaryLayout } from "../indexing.ts"
-import { checkMotion, linearScene, rotatingTableScene, tableBox, type Pose, type TableBody } from "./collision.ts"
+import { boxSolid, checkMotion, linearScene, rotatingTableScene, tableBox, type Pose, type TableBody } from "./collision.ts"
 import type { Cutter } from "./cutters.ts"
 
 /** The table as the machine has it: its footprint centred on (`cx`, `cy`) in work coordinates, its top at `top`. */
@@ -97,11 +97,12 @@ export const checkNcClearance = (
   segments: ReadonlyArray<GSegment>,
   cutterOf: (line: number) => Cutter | undefined,
   table: TableGeometry,
-  options: { readonly maxDepth?: number; readonly rotary?: RotaryClearance } = {}
+  options: { readonly maxDepth?: number; readonly rotary?: RotaryClearance; readonly fixtures?: ReadonlyArray<TableBody> } = {}
 ): ClearanceResult => {
-  const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200)]
+  const fixtures = options.fixtures ?? []
+  const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200), ...fixtures.map((f) => boxSolid(f.centre, f.half, (p) => p))]
   const body: TableBody = { centre: { x: table.cx, y: table.cy, z: table.top - 100 }, half: { x: table.length / 2, y: table.width / 2, z: 100 } }
-  const bodies: TableBody[] = [body, ...(options.rotary?.bodies ?? [])]
+  const bodies: TableBody[] = [body, ...fixtures, ...(options.rotary?.bodies ?? [])]
   const depth = options.maxDepth !== undefined ? { maxDepth: options.maxDepth } : {}
   let checked = 0, rotaryMoves = 0, rotaryChecked = 0, unresolved = 0
   let minClearance: number | undefined

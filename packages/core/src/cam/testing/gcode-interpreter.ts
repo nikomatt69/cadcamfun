@@ -758,6 +758,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         const n = Math.round(w.value)
         pendingTool = n
         if (!usesToolChange) { tools.push(n); tool = n }
+      } else if (w.letter === "K" && words.some((v) => v.letter === "G" && Math.round(v.value) === 33) && !words.some((v) => v.letter === "F")) {
+        // Sinumerik `G33 Z.. K<lead>`: K is the lead of a thread along Z, per spindle revolution (the role Fanuc gives F).
+        feed = w.value * unit
       } else if (w.letter === "F") {
         // In a dwell block F is the time (Siemens `G4 F<s>`), never the feed: the modal feed stays.
         if (!words.some((v) => v.letter === "G" && Math.round(v.value * 10) === 40)) feed = inverse ? w.value : w.value * unit

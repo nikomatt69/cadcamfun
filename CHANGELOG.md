@@ -3,6 +3,68 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.50 (October 2026)
+
+## Core
+
+- A history may hold only imported bodies; removeImported refuses a body a feature names; import route starts from an empty timeline
+
+## Desktop
+
+- The part panel imports a STEP file as an imported body, shows the heal report, and removes it unless a feature names it
+
+## v0.1.49 (October 2026)
+
+## Core
+
+- Real vector PDF writer for sheets and drawings (spec 49 O2)
+- Tolerance budget as an opt-in release gate, quality.enforceTolerance (spec 69 B4)
+- Adaptive layer height (tolerance-governed, flat-face snapping, min-limited reporting); hot-path hypot removal and offset bbox rejection
+- Multi-setup jobs with their own work offsets and cross-setup part coverage (spec 69 C1, C5)
+- STL/OBJ/3MF import and export with units, mesh repair and validity report (spec 50 X8)
+- Lathe planner (face, rough, finish, groove, thread, part, bore), Fanuc and Sinumerik writers, revolved-raster stock-removal verifier with analytic expectations (spec 52 T1-T5, P1)
+- Fixture bodies in the job model decide machine-clearance and setup-workholding (spec 69 C3, spec 72 0.5)
+- Stock model (bar, mesh/previous-setup stock) and the roughed-then-finished five-axis fixture reaching verified-program (spec 69 C2, spec 72 0.5)
+- Definition/occurrence model, constraint mates with solver, configurations, mass roll-up (spec 46 A1, A2, A5)
+
+## API
+
+- Cad.kernel action (stable refs, resolve across edits, naming health, Boolean counters) and cad-naming skill (spec 41 N7)
+
+## v0.1.48 (October 2026)
+
+## Core
+
+- Degenerate intersection samples are a typed refusal, results after a dropped curve are always verified (sphere 1e-6 inside a cylinder was valid and wrong)
+- A face that does not mesh at the coarse validation chord is retried finer (generic seed 133 solved, was refused)
+- Verify check samples the operation's region and skips point location outside operand boxes; blend Booleans opt out
+- R7 default-check test uses enough faces
+- Verify option (sampled volume, volume identities) on exact Booleans, locator edge-box pruning, R7 tests (WIP)
+- Merge the two Newton roots of a tangent edge-surface contact into one vertex (seed 33 solved in place)
+- Artifact cutter kinds include countersink, boringbar, tslot, dovetail; tests for breadth, tcp and the vendor presets
+- Breadth and tcp controls in the kernel panel, tcp through the contracts, Mitsubishi and Brother as PostIds with machine presets
+- Versioned JSON form of a Brep (brepToJson/brepFromJson) with checked decode and size limits; export history-import
+
+## Desktop
+
+- Mitsubishi and Brother entries for the new post ids
+- Breadth and tip-control switches in the kernel panel
+
+## Sidecar
+
+- History bases through import route, store, load and rebuild; import job reports an unreadable file
+- Bases in ParametricHistory, POST /api/cad/exact/import-step and cad-import-step kernel job
+
+## AI
+
+- Recovery warnings are unique and the tangent-hole test expects the in-place contact warning
+
+## Documentation
+
+- Spec 42 6.2 and spec 72 change log for seed 33, R1, R7, R8
+- Spec 72 log for breadth, tcp and Mitsubishi/Brother reachability
+- Spec 72 change log for History.bases through the API and store
+
 ## v0.1.47 (October 2026)
 
 ## Core

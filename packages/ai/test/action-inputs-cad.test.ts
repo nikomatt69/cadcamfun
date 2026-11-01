@@ -75,6 +75,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.parametric_inspect": { accept: [{ elementId: "a" }], refuse: [{}] },
   "cad.parametric_test": { accept: [{ elementId: "a", cases: [{ name: "wider", parameters: { w: 80 } }] }], refuse: [{ elementId: "a", cases: [] }, { elementId: "a", cases: "[]" }] },
   "cad.parametric_dfm": { accept: [{ elementId: "a", process: "mill" }, { history, envelope: { x: 100, y: 100, z: 50 } }], refuse: [{ process: "laser" }, { minWall: 0 }] },
+  "cad.kernel": { accept: [{ op: "health", elementId: "a" }, { op: "refs", history, kinds: ["face"], limit: 50 }, { op: "resolve", history, refs: ["face:plate|plate.top"], parameters: { w: 60 } }], refuse: [{}, { op: "scan" }, { op: "resolve", refs: ["nonsense"] }, { op: "refs", limit: 0 }, { op: "refs", kinds: [] }] },
   "cad.parametric_exact": { accept: [{ elementId: "a", includeStep: true }], refuse: [{ includeStep: "yes" }, { name: "" }] },
   "cad.parametric_fastener": { accept: [{}, { size: "M6", fit: "medium" }], refuse: [{ fit: "loose" }, { shaftDiameter: 0 }] },
   "cad.parametric_recipe": { accept: [{ recipe: "flange" }, { recipe: "flange", params: { boltCount: 6 } }], refuse: [{ recipe: "teapot" }, {}] },

@@ -24,6 +24,29 @@ export interface StockBox {
   readonly max: Vec3
 }
 
+/**
+ * The raw workpiece when it is not a box (spec 69 C2). `cylinder` is a vertical bar (axis +Z in CAD world coordinates, `segments`
+ * facets, default 128, vertices on the circle). `mesh` is a closed solid in CAD world coordinates: a casting, a scan, or the stock a
+ * previous setup left. The kernel keeps the box `stock` as the bounding box of the model; a part that does not fit the bounds is
+ * refused. Only the part's bounds are checked against a mesh stock, not its volume, and the height-field replay of three-axis
+ * moves reads a mesh stock by its top surface (a hollow stock is not modelled).
+ */
+export type StockModel =
+  | { readonly kind: "cylinder"; readonly center: Vec2; readonly radius: number; readonly z0: number; readonly z1: number; readonly segments?: number }
+  | { readonly kind: "mesh"; readonly mesh: { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> } }
+
+/**
+ * A workholding body (spec 69 C3): a vise jaw, clamp, parallel or fixture block, as an axis-aligned box in CAD world coordinates (the
+ * kernel turns it with the setup). A body that is not a box is given by its bounding box, which only errs towards a collision. The
+ * tool assembly is checked against every body over the whole NC (`machine-clearance`, also with the table turned: the body is carried
+ * by the table), a body that cuts into the part is refused, and a setup with bodies and a clear run has a decided `setup-workholding`.
+ */
+export interface FixtureBody {
+  readonly id: string
+  readonly min: Vec3
+  readonly max: Vec3
+}
+
 export type WorkOrigin = "stock-center" | "stock-corner"
 
 /**
@@ -237,6 +260,12 @@ export interface QualityRequirement {
   readonly deburr?: number
   /** Hold the outlines the program cuts through the full stock height with tabs (spec 69 A1); without it the plan only says so in a note. */
   readonly tabs?: TabRequirement
+  /**
+   * Release only a program whose tolerance budget is met (spec 69 B4): the claim `tolerance` passes when the terms of `CamArtifact.tolerance`
+   * add up to at most `tolerance` and none is unbounded, and fails naming the largest term otherwise; a failed claim keeps the program at `preview`.
+   * Off by default: the budget is then informational, as before.
+   */
+  readonly enforceTolerance?: boolean
 }
 
 /**
@@ -296,6 +325,10 @@ export interface ManufacturingJob {
   readonly part: PartSource
   /** Stock block in CAD world coordinates; default: the part bounds plus 2 mm on the sides and 1 mm on top. */
   readonly stock?: StockBox
+  /** Workholding bodies of this setup (vise, jaws, clamps); see `FixtureBody`. */
+  readonly fixtures?: ReadonlyArray<FixtureBody>
+  /** A stock that is not a box (bar, casting, scan, previous setup); its bounds replace `stock`. */
+  readonly stockModel?: StockModel
   /** Manual refixture: CAD direction facing the spindle; operations use the oriented setup coordinates. */
   readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
@@ -345,7 +378,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage"
+  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage" | "tolerance"
   readonly status: ClaimStatus
   readonly detail: string
 }

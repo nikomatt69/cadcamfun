@@ -92,6 +92,8 @@ export * from "./mesh-normals.ts"
 
 // Exact B-rep kernel (SMLib-style) and the exact replay of parametric histories.
 export * as brep from "./brep/index.ts"
+export * as exchange from "./exchange/index.ts"
+export * as assembly from "./assembly/index.ts"
 export * from "./history-brep.ts"
 export * from "./scene-step.ts"
 export * from "./smart-fasteners.ts"

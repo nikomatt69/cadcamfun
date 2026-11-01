@@ -70,3 +70,29 @@ describe("A4: moves with the table turned get a machine-clearance verdict", () =
     expect(turnedArc.unresolved).toBe(1)
   })
 })
+
+describe("C3: fixture bodies decide setup-workholding and machine-clearance", () => {
+  const job = (fixtures: ManufacturingJob["fixtures"]): ManufacturingJob => ({ ...pocketJob(slim), fixtures })
+  const away = { id: "vise-jaw", min: { x: 60, y: -30, z: 0 }, max: { x: 80, y: 30, z: 30 } }
+
+  test("no fixture keeps workholding open as before; a clear fixture decides it passed, with the margin stated", () => {
+    expect(claim(run(pocketJob(slim)), "setup-workholding")).toBeUndefined()
+    const a = run(job([away]))
+    expect(claim(a, "setup-workholding").status).toBe("passed")
+    expect(claim(a, "setup-workholding").detail).toMatch(/vise-jaw/)
+  })
+
+  test("a clamp over the slot is hit by the holder: the claim fails with its NC line and the release is blocked", () => {
+    const clamp = { id: "strap-clamp", min: { x: -1, y: -30, z: 55 }, max: { x: 1, y: 30, z: 62 } }
+    const a = run(job([clamp]))
+    expect(claim(a, "setup-workholding").status).toBe("failed")
+    expect(claim(a, "setup-workholding").detail).toMatch(/NC line \d+/)
+    expect(a.release).toBe("blocked")
+  })
+
+  test("a body inside the part is not workholding", () => {
+    const a = run(job([{ id: "inside", min: { x: -5, y: -5, z: 10 }, max: { x: 5, y: 5, z: 20 } }]))
+    expect(claim(a, "setup-workholding").status).toBe("failed")
+    expect(claim(a, "setup-workholding").detail).toMatch(/overlaps the part/)
+  })
+})
