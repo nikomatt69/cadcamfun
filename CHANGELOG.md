@@ -3,6 +3,20 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.52 (November 2026)
+
+## Core
+
+- Sheet-metal DFM rules, weldment profile library and cut list (spec 47 SM7, W1, W3); spec change logs for 45/46/47/49/50
+- Feature recognition keeps hole faces out of chamfer and fillet bands, reads concave grooves through fillets, and scores by claimed faces
+- Incremental exact replay resumes from the first dirty feature through a stage cache (spec 58 T4)
+- AnalyseProgram scans G-code words into a reusable table without per-line allocation
+- Solids that meet face to face are united into one body before slicing
+
+## Documentation
+
+- Change logs for 61 Z1-Z3, 52 T1-T5/P1, 54 C3
+
 ## v0.1.51 (November 2026)
 
 ## API

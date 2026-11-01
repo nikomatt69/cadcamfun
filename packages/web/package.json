@@ -1,7 +1,7 @@
 {
   "name": "@cadcamfun/web",
   "private": true,
-  "version": "0.1.51",
+  "version": "0.1.52",
   "description": "CADCAMFUN documentation site and Studio, deployed to Cloudflare.",
   "type": "module",
   "scripts": {
