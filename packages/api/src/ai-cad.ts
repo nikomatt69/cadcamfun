@@ -7,6 +7,7 @@ import { Effect, Schema, SchemaTransformation } from "effect"
 import { drawing } from "@cadcamfun/core"
 import { EmptyActionInput as empty } from "./ai-cam.ts"
 import { CadKernelInput } from "./ai-cad-kernel.ts"
+import { CadWorkflowInput } from "./ai-cad-workflow.ts"
 
 const optional = Schema.optionalKey
 const nonEmpty = Schema.String.check(Schema.isMinLength(1))
@@ -221,6 +222,7 @@ export const CAD_ACTION_INPUTS = {
   "cad_edit.title_block_set": CadTitleBlockSetInput,
   "cad.distance": CadDistanceInput,
   "cad.kernel": CadKernelInput,
+  "cad.workflow": CadWorkflowInput,
   "cad_edit.add_entities": Schema.Struct({ entities: Schema.Array(CadSketchEntity).check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
   "cad_edit.modify": Schema.Struct({
     changes: Schema.Array(Schema.Struct({ id: nonEmpty, changes: Schema.Record(Schema.String, Schema.Unknown) })).check(Schema.isMinLength(1))

@@ -323,6 +323,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.motion": read(Schema.Struct({ ok: Schema.Literal(true), frames: Schema.Array(record), firstClash: Schema.optionalKey(record), firstViolation: Schema.optionalKey(record), firstContact: Schema.optionalKey(record), firstContactViolation: Schema.optionalKey(record) })),
   "cad.distance": read(distance),
   "cad.kernel": read(Schema.Struct({ ok: Schema.Boolean, op: Schema.Literals(["health", "refs", "resolve"]), bodies: Schema.optionalKey(Schema.Array(record)), booleans: Schema.optionalKey(record), refs: Schema.optionalKey(Schema.Array(record)), results: Schema.optionalKey(Schema.Array(record)), truncated: Schema.optionalKey(Schema.Boolean), warnings: Schema.optionalKey(strings), error: Schema.optionalKey(str) })),
+  "cad.workflow": read(Schema.Struct({ ok: Schema.Boolean, op: Schema.Literals(["sketch", "assembly", "sheet", "mesh_import", "mesh_export"]), status: Schema.optionalKey(str), error: Schema.optionalKey(str), warnings: Schema.optionalKey(strings) })),
   "cad.parametric_fastener": read(fastener),
   "cad.parametric_recipe": read(recipe),
   "cad.parametric_from_element": read(fromElement),

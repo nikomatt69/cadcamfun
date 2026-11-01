@@ -21,6 +21,7 @@ import drawingsAndImages from "./text/drawings-and-images.md" with { type: "text
 import pluginAuthoring from "./text/plugin-authoring.md" with { type: "text" }
 import parametricDesign from "./text/parametric-design.md" with { type: "text" }
 import cadNaming from "./text/cad-naming.md" with { type: "text" }
+import cadWorkflow from "./text/cad-workflow.md" with { type: "text" }
 import fusion360Modelling from "./text/fusion-360-modelling.md" with { type: "text" }
 import composedCamPrograms from "./text/composed-cam-programs.md" with { type: "text" }
 import versionControlCadcam from "./text/version-control-cadcam.md" with { type: "text" }
@@ -102,6 +103,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: skillText(drawingsAndImages) },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: skillText(pluginAuthoring) },
   { name: "cad-naming", description: "Stable face/edge/vertex refs: make, resolve after edits, naming health.", category: "cad", tags: ["cad", "naming", "references", "kernel"], body: skillText(cadNaming) },
+  { name: "cad-workflow", description: "Constrained sketches (solve, diagnose, drag), assemblies with mates, drawing sheets as vector PDF and STL/OBJ/3MF import and export through cad workflow.", category: "cad", tags: ["cad", "sketch", "assembly", "mates", "pdf", "3mf"], body: skillText(cadWorkflow) },
   { name: "parametric-design", description: "When and how to build a parametric element: named dimensions, expressions, when to choose parametric over loose solids, how to edit later.", category: "cad", tags: ["cad", "parametric", "dimensions"], body: skillText(parametricDesign) },
   { name: "fusion-360-modelling", description: "Fusion 360 commands mapped to parametric features: shapes, curves (spline, Bezier, NURBS), sweep, revolve, loft, coil, rib, sheet metal, modelled threads, text, push/pull, draft, joints, catalogue solids, combine, split, move, scale, patterns and parameters.", category: "cad", tags: ["cad", "parametric", "fusion360", "sweep", "revolve", "nurbs"], body: skillText(fusion360Modelling) },
   { name: "composed-cam-programs", description: "Compose CAM programs with several operations: sequencing, stock carry-over, multi-setup, lathe plus mill, verification per operation.", category: "cam", tags: ["cam", "workflow", "milling", "lathe"], body: skillText(composedCamPrograms) },
