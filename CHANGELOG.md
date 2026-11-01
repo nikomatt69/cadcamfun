@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.54 (November 2026)
+
+## Core
+
+- Add exact models for standard parts including gears, washers, nuts, bolts, and springs
+
 ## v0.1.53 (November 2026)
 
 ## Core
