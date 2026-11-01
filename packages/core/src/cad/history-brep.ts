@@ -616,9 +616,74 @@ export const catalogueBrep = (
  * an exact model carries the reason. With `budgetMs` the exact work stops once that time is spent (`brep/budget.ts`), and
  * every body says so: the caller's thread is never held longer.
  */
-export const rebuildExact = (history: History, given?: RebuildResult, options: { readonly budgetMs?: number } = {}): ExactRebuild => {
+export const rebuildExact = (history: History, given?: RebuildResult, options: { readonly budgetMs?: number; readonly cache?: ExactStageCache } = {}): ExactRebuild => {
   const result = given ?? rebuild(history)
-  return exactReplay(history, result).at(history.features.length, result.bodies, options)
+  return exactReplay(history, result, options.cache === undefined ? {} : { cache: options.cache }).at(history.features.length, result.bodies, options.budgetMs === undefined ? {} : { budgetMs: options.budgetMs })
+}
+
+/**
+ * Incremental exact rebuild (spec 58 T4). The replay is sequential, so the state after the first k features is a pure function of
+ * those features, the parameter values they read, the imported bases and the mesh rebuild's verdict on them. The cache keeps that
+ * state at every feature boundary under a fingerprint of exactly those inputs; the next replay of an edited history resumes from the
+ * longest boundary whose fingerprint chain still matches, and only replays from the first dirty feature. A mismatch anywhere means a
+ * shorter shared prefix: a stale entry is never used, because the chain must match feature by feature from the start.
+ * The caller owns the cache object (one per open part); the replay that uses it updates it in place.
+ */
+export interface ExactStageCache {
+  /** `fingerprints[k]` identifies the first k features and everything they read. */
+  fingerprints: string[]
+  /** `states[k]` is the replay state before feature k runs (undefined where the replay never stood). */
+  states: Array<ExactReplayState | undefined>
+  /** Boundary the last replay resumed from, and how many features it replayed (reports and tests). */
+  lastResumedAt?: number
+  lastReplayed?: number
+}
+export const newExactStageCache = (): ExactStageCache => ({ fingerprints: [], states: [] })
+
+interface ExactReplayState {
+  readonly bodies: ReadonlyArray<{ id: string; feature: string; exact: Exact }>
+  readonly tools: ReadonlyArray<readonly [string, unknown]>
+  readonly extrusions: ReadonlyArray<readonly [string, unknown]>
+  readonly sweeps: ReadonlyArray<readonly [string, unknown]>
+  readonly revolutions: ReadonlyArray<readonly [string, unknown]>
+  readonly planes: ReadonlyArray<readonly [string, unknown]>
+  readonly warnings: ReadonlyArray<string>
+  readonly timeline: ReadonlyArray<ExactSnapshot>
+}
+
+let BASE_IDS = 0
+const BASE_TAGS = new WeakMap<object, number>()
+const baseTag = (b: object): number => { let t = BASE_TAGS.get(b); if (t === undefined) { t = ++BASE_IDS; BASE_TAGS.set(b, t) } return t }
+
+/** cyrb53: a 53-bit string hash (no platform API, so the core stays usable in the browser). */
+const hash53 = (str: string): string => {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ c, 2654435761)
+    h2 = Math.imul(h2 ^ c, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+}
+
+/** The fingerprint chain of a replay: entry k covers the bases and features 0..k-1. */
+const stageFingerprints = (history: History, result: RebuildResult, active: ReturnType<typeof timelinePlan>["states"]): string[] => {
+  const names = Object.keys(result.parameters)
+  const out: string[] = [(history.bases ?? []).map((b) => `${b.id}:${baseTag(b.brep)}`).join(",")]
+  let acc = out[0]!
+  for (const f of history.features) {
+    const text = JSON.stringify(f)
+    // A feature reads a parameter only through a name in its own text (dimensions and sketch constraints are expressions over names).
+    const tokens = new Set(text.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [])
+    const read = names.filter((n) => tokens.has(n)).map((n) => `${n}=${result.parameters[n]}`).join(";")
+    const failed = result.issues.some((i) => i.feature === f.id && i.severity === "error")
+    const skipped = result.states?.[f.id]?.state === "skipped"
+    acc = hash53(`${acc}|${text}|${read}|${active[f.id]?.state ?? "?"}|${failed ? 1 : 0}${skipped ? 1 : 0}`) + String(text.length)
+    out.push(acc)
+  }
+  return out
 }
 
 /**
@@ -630,11 +695,16 @@ export const rebuildExact = (history: History, given?: RebuildResult, options: {
  * entries are read when that feature is replayed. Once a budget ran out the replay stays stopped and every answer says so.
  * Indices are asked in history order: an earlier index answers the model already reached, the replay never runs backwards.
  */
+export interface ExactReplayOptions {
+  /** Resume from, and update, this cache (spec 58 T4). */
+  readonly cache?: ExactStageCache
+}
+
 export interface ExactReplay {
   readonly at: (index: number, bodies: RebuildResult["bodies"], options?: { readonly budgetMs?: number }) => ExactRebuild
 }
 
-export const exactReplay = (history: History, result: RebuildResult): ExactReplay => {
+export const exactReplay = (history: History, result: RebuildResult, replayOptions: ExactReplayOptions = {}): ExactReplay => {
   const warnings: string[] = []
   let featureId = "history"
   const combine = (a: Brep, b: Brep, operation: "union" | "subtract" | "intersect"): Brep => {
@@ -722,15 +792,48 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   }
 
   let next = 0
+  const cache = replayOptions.cache
+  const fingerprints = cache === undefined ? [] : stageFingerprints(history, result, active)
+  const saveState = (): ExactReplayState => ({
+    bodies: bodies.map((b) => ({ ...b })), tools: [...tools], extrusions: [...extrusions], sweeps: [...sweeps], revolutions: [...revolutions], planes: [...planes],
+    warnings: [...warnings], timeline: timeline.slice(0, next + 1)
+  })
+  const restoreState = (st: ExactReplayState, k: number): void => {
+    bodies.length = 0
+    bodies.push(...st.bodies.map((b) => ({ ...b })))
+    for (const [m, entries] of [[tools, st.tools], [extrusions, st.extrusions], [sweeps, st.sweeps], [revolutions, st.revolutions], [planes, st.planes]] as const) {
+      ;(m as Map<string, unknown>).clear()
+      for (const [key, value] of entries) (m as Map<string, unknown>).set(key, value)
+    }
+    warnings.length = 0
+    warnings.push(...st.warnings)
+    timeline.length = 0
+    timeline.push(...st.timeline)
+    next = k
+  }
   // The bodies after each feature (see `ExactRebuild.timeline`): captured when a feature is about to run, and once more at the end.
   const timeline: ExactSnapshot[] = []
   const capture = (): void => {
     if (timeline.length > next) return
     timeline[next] = { after: next, ...(next > 0 ? { feature: history.features[next - 1]!.id } : {}), bodies: bodies.flatMap((b) => (b.exact.brep === undefined ? [] : [{ id: b.id, brep: b.exact.brep }])) }
   }
+  let resumed = false
   const advance = (end: number): void => {
+    if (cache !== undefined && !resumed) {
+      resumed = true
+      // The longest boundary whose whole fingerprint chain matches the cache's and whose state was kept.
+      let k = 0
+      if (cache.fingerprints[0] === fingerprints[0]) while (k + 1 < fingerprints.length && cache.fingerprints[k + 1] === fingerprints[k + 1]) k++
+      while (k > 0 && cache.states[k] === undefined) k--
+      if (k > 0) restoreState(cache.states[k]!, k)
+      cache.lastResumedAt = next
+      cache.lastReplayed = 0
+      cache.fingerprints = fingerprints
+      cache.states = cache.states.slice(0, next + 1)
+    }
     while (next < end && stopped === undefined) {
       capture()
+      if (cache !== undefined) { cache.states[next] = saveState(); cache.lastReplayed = (cache.lastReplayed ?? 0) + 1 }
       const f = history.features[next++]!
       if (active[f.id]?.state !== "active" || failed(f.id) || result.states?.[f.id]?.state === "skipped") continue
       featureId = f.id
@@ -1578,6 +1681,7 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
       }
     }
     capture()
+    if (cache !== undefined && stopped === undefined) cache.states[next] = saveState()
   }
   // Align with the mesh bodies by id.
   const snapshot = (meshBodies: RebuildResult["bodies"]): ExactRebuild => {

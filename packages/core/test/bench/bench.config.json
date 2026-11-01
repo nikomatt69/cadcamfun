@@ -21,6 +21,8 @@
     "cam.tridexel-pocket-pass": 1500,
     "sketch.solve-529": 50,
     "sketch.solve-529-newton": 30,
-    "sketch.drag-200": 8
+    "sketch.drag-200": 8,
+    "history.exact-50-features-full": 1000,
+    "history.exact-50-features-resumed": 250
   }
 }
