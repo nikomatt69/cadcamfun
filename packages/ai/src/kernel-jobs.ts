@@ -4,7 +4,7 @@
  */
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
 import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
-import { decodeHistory, parametricReport, parseHistory } from "./parametric.ts"
+import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } from "./parametric.ts"
 
 // ---------------------------------------------------------------- the exact CAD kernel
 // The B-rep kernel's heavy operations (analysis, STEP export, setup planning, a feature edit, assembly interference): the same
@@ -109,7 +109,9 @@ export interface CadImportStepInput {
  * returns is one every other layer accepts. All or nothing unless `keepAccepted`: a refused body is never dropped silently.
  */
 export const cadImportStep = ({ step, history, idPrefix, tolerance, keepAccepted }: CadImportStepInput) => {
-  const base: History | undefined = history === undefined ? undefined : parseHistory(history)
+  const start = history === undefined ? undefined : decodeStartHistory(history)
+  if (start !== undefined && !start.success) throw new Error(`Invalid parametric history: ${start.problems.join("; ")}`)
+  const base: History | undefined = start?.data
   let imported: ReturnType<typeof cad.importStepToHistory>
   try {
     imported = cad.importStepToHistory(step, { ...(idPrefix !== undefined ? { idPrefix } : {}), ...(tolerance !== undefined ? { heal: { tol: tolerance } } : {}) })

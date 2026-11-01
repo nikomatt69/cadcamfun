@@ -106,6 +106,12 @@ export interface PreparedJob {
   readonly tolerance: number
 }
 
+/**
+ * The chord and path tolerance the kernel works to. Enforcing the tolerance (spec 69 B4) reserves a quarter of the request for each of
+ * the two chord terms, so the other terms of the budget (grid cell, NC rounding, machine) have the second half to fit in.
+ */
+const chordTolerance = (job: ManufacturingJob): number => (job.quality?.tolerance ?? 0.01) / (job.quality?.enforceTolerance === true ? 4 : 1)
+
 const issue = (tag: CamIssue["tag"], stage: CamIssue["stage"], message: string, extra: Partial<CamIssue> = {}): CamIssue =>
   ({ tag, severity: extra.severity ?? "error", stage, message, ...extra })
 
@@ -166,7 +172,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
   let elements: ReadonlyArray<CadElement> | undefined
   if (job.part.kind === "elements") {
     elements = job.part.elements as ReadonlyArray<CadElement>
-    const built = partMeshes(elements.filter((e) => e["type"] !== "workpiece") as never, { tolerance: job.quality?.tolerance ?? 0.01 })
+    const built = partMeshes(elements.filter((e) => e["type"] !== "workpiece") as never, { tolerance: chordTolerance(job) })
     if (built !== undefined) meshes = [...built.meshes]
   } else {
     meshes = job.part.meshes.filter((m) => m.indices.length >= 3).map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
@@ -305,7 +311,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: job.quality?.tolerance ?? 0.01 } }
+  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -1404,7 +1410,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
   )
   const hardFailure = issues.some((i) => i.severity === "error")
-  const release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
+  let release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
 
   const toolChanges = usedTools.length
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
@@ -1429,7 +1435,22 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     ...(positioning === undefined ? ["the machine states no positioning accuracy, so the machine's own share of the deviation is unknown"] : [])
   ]
   const achieved = budgetTerms.reduce((s, t) => s + t.mm, 0)
-  const tolerance: ToleranceBudget = { requested: prepared.tolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= prepared.tolerance }
+  const requestedTolerance = job.quality?.tolerance ?? 0.01
+  const tolerance: ToleranceBudget = { requested: requestedTolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= requestedTolerance }
+  // Opt-in gate (spec 69 B4): the program is released only when the deviation it can be promised is within the requested tolerance.
+  if (job.quality?.enforceTolerance === true) {
+    const biggest = [...tolerance.terms].sort((a, b) => b.mm - a.mm)[0]
+    const met = tolerance.met
+    claims.push({
+      id: "tolerance", status: met ? "passed" : "failed",
+      detail: met ? `The terms add up to ${tolerance.achieved} mm, within the requested ${tolerance.requested} mm`
+        : [
+          tolerance.achieved > tolerance.requested ? `The terms add up to ${tolerance.achieved} mm, above the requested ${tolerance.requested} mm; the largest is ${biggest?.id} at ${biggest?.mm} mm (${biggest?.basis})` : undefined,
+          tolerance.unbounded.length > 0 ? `unbounded: ${tolerance.unbounded.join("; ")}` : undefined
+        ].filter((x): x is string => x !== undefined).join("; ")
+    })
+    if (!met && release === "verified-program") release = "preview"
+  }
   return {
     status: "ok",
     value: {
