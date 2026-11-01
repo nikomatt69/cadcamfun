@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.51 (November 2026)
+
+## API
+
+- Cad.workflow action (constrained sketches, assemblies with mates, vector PDF sheets, STL/OBJ/3MF) and skill cad-workflow
+
+## Documentation
+
+- Harness inventory for cad.workflow (derived, regenerated once)
+
 ## v0.1.50 (October 2026)
 
 ## Core
