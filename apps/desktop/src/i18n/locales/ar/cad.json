@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "لا شيء قابل للاشتقاق للورقة بعد.",
   "cad.pmi.unanchored": "{count} تعليق بلا نقطة تثبيت، وتظهر في لوحة PMI فقط.",
   "cad.sub.vertex": "الرأس {index}",
-  "cad.sub.hover": "تحت المؤشر"
+  "cad.sub.hover": "تحت المؤشر",
+  "cad.flat": "مفرود",
+  "cad.flat.toggle": "إظهار المخطط المفرود للصفيحة المعدنية",
+  "cad.flat.title": "المخطط المفرود",
+  "cad.flat.sheet": "ميزة الصفيحة",
+  "cad.flat.empty": "تعذر فرد أي ميزة صفيحة معدنية في هذا الجزء.",
+  "cad.flat.summary": "الطول المفرود {length} مم، العرض {width} مم، عدد الثنيات {bends}"
 }

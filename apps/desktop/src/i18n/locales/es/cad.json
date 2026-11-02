@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "Todavía no hay nada derivable para la hoja.",
   "cad.pmi.unanchored": "{count} anotación(es) no tienen punto de anclaje y solo aparecen en el panel PMI.",
   "cad.sub.vertex": "Vértice {index}",
-  "cad.sub.hover": "Bajo el cursor"
+  "cad.sub.hover": "Bajo el cursor",
+  "cad.flat": "Desarrollo",
+  "cad.flat.toggle": "Mostrar el desarrollo de la chapa",
+  "cad.flat.title": "Desarrollo de chapa",
+  "cad.flat.sheet": "Operación de chapa",
+  "cad.flat.empty": "No se pudo desarrollar ninguna operación de chapa de esta pieza.",
+  "cad.flat.summary": "Longitud desarrollada {length} mm, ancho {width} mm, {bends} pliegues"
 }

@@ -43,6 +43,8 @@ import { createJointMarkers } from "../lib/joint-markers.ts"
 import { useAssemblyStore } from "../store/assemblyStore.ts"
 import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, pixelRadiusAt, sameSubEntity, type SubEntityPick, type SubHighlightKind, type VertexPicking } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
+import { flatPatternSource } from "../lib/flat-pattern.ts"
+import FlatPatternOverlay from "./FlatPatternOverlay.tsx"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
@@ -211,7 +213,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [rebuilds, setRebuilds] = createSignal(0)
   const [hoveredId, setHoveredId] = createSignal<string | null>(null)
   /** The face or edge of an exact solid under the cursor, and the one last clicked. */
-  const [hoveredSub, setHoveredSub] = createSignal<SubEntityPick | undefined>(undefined)
+  const [hoveredSub, setHoveredSub] =createSignal<SubEntityPick | undefined>(undefined)
   const [pickedSub, setPickedSub] = createSignal<SubEntityPick | undefined>(undefined)
   const [isSelectionMode, setSelectionMode] = createSignal(false)
   const [isMultiSelectMode, setMultiSelectMode] = createSignal(false)
@@ -238,6 +240,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
+  // The flat pattern toggle shows only while the drawing holds a sheet-metal part (a cheap look at the features, no replay).
+  const sheetSource = createMemo(() => flatPatternSource(elements.elements as ReadonlyArray<{ id: string; type?: unknown; history?: unknown }>, selectedIds()))
   /** Every drawn object, in insertion order. */
   const cadObjects = (): THREE.Object3D[] => Array.from(objectsById.values(), (entry) => entry.object)
   const objectOf = (id: string) => objectsById.get(id)?.object
@@ -1437,6 +1441,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
+      <FlatPatternOverlay />
+
       <Show when={pickedSub()}>
         {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
       </Show>
@@ -1592,6 +1598,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </select>
         <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "#0288d1" : "rgba(0,0,0,0.7)" }}
           aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
+        <Show when={sheetSource() !== undefined}>
+          <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showFlatPattern ? "#d32f2f" : "rgba(0,0,0,0.7)" }}
+            aria-pressed={cad.showFlatPattern} title={t("cad.flat.toggle")} data-testid="show-flat-pattern" onClick={() => cad.setShowFlatPattern(!cad.showFlatPattern)}>{t("cad.flat")}</button>
+        </Show>
       </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button

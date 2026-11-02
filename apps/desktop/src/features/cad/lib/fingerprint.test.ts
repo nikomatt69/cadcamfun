@@ -14,7 +14,7 @@ const rectangle = (id: string, w: number | string, h: number | string, group?: s
 const part = (history: History, extra: Record<string, unknown> = {}) => ({ id: "p", type: "parametric", name: "Part", x: 0, y: 0, z: 0, history, ...extra })
 const plate = (): History => ({
   parameters: { width: 40, height: 25, thick: 6 },
-  features: [rectangle("s1", "width", "height", "profile"), { id: "plate", type: "extrude", sketch: "s1", depth: "thick", operation: "new", group: "body" } as Feature, { id: "hole", type: "extrude", sketch: "s1", depth: 2, operation: "cut", group: "body" } as Feature],
+  features: [rectangle("s1", "width", "height", "profile"), { id: "plate", type: "extrude", sketch: "s1", depth: "thick", operation: "new", group: "body" } as Feature, { id: "hole", type: "extrude", sketch: "s1", depth: 2, operation: "subtract", group: "body" } as Feature],
   groups: [{ id: "profile", name: "Profile" }, { id: "body", name: "Body" }] as never
 })
 
@@ -44,7 +44,7 @@ describe("what changes the shape fingerprint of a parametric part", () => {
     expect(shapeFingerprint(part({ ...plate(), rollback: "plate" }))).not.toBe(base)
     const deeper: History = { ...plate(), features: plate().features.map((f) => (f.id === "hole" ? ({ ...f, depth: 3 } as Feature) : f)) }
     expect(shapeFingerprint(part(deeper))).not.toBe(base)
-    const added: History = { ...plate(), features: [...plate().features, { id: "extra", type: "extrude", sketch: "s1", depth: 1, operation: "join" } as Feature] }
+    const added: History = { ...plate(), features: [...plate().features, { id: "extra", type: "extrude", sketch: "s1", depth: 1, operation: "union" } as Feature] }
     expect(shapeFingerprint(part(added))).not.toBe(base)
   })
 

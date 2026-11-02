@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "शीट के लिए अभी कुछ भी व्युत्पन्न नहीं हो सकता।",
   "cad.pmi.unanchored": "{count} एनोटेशन में एंकर बिंदु नहीं है और वे केवल PMI पैनल में सूचीबद्ध हैं।",
   "cad.sub.vertex": "शीर्ष {index}",
-  "cad.sub.hover": "कर्सर के नीचे"
+  "cad.sub.hover": "कर्सर के नीचे",
+  "cad.flat": "समतल",
+  "cad.flat.toggle": "शीट-मेटल भाग का समतल पैटर्न दिखाएँ",
+  "cad.flat.title": "समतल पैटर्न",
+  "cad.flat.sheet": "शीट फ़ीचर",
+  "cad.flat.empty": "इस भाग की कोई शीट-मेटल फ़ीचर विकसित नहीं की जा सकी।",
+  "cad.flat.summary": "विकसित लंबाई {length} मिमी, चौड़ाई {width} मिमी, मोड़ {bends}"
 }

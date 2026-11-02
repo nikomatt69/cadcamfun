@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "Für das Blatt ist noch nichts ableitbar.",
   "cad.pmi.unanchored": "{count} Annotation(en) haben keinen Ankerpunkt und stehen nur im PMI-Bereich.",
   "cad.sub.vertex": "Eckpunkt {index}",
-  "cad.sub.hover": "Unter dem Cursor"
+  "cad.sub.hover": "Unter dem Cursor",
+  "cad.flat": "Abwicklung",
+  "cad.flat.toggle": "Abwicklung des Blechteils anzeigen",
+  "cad.flat.title": "Abwicklung",
+  "cad.flat.sheet": "Blech-Feature",
+  "cad.flat.empty": "Kein Blech-Feature dieses Teils konnte abgewickelt werden.",
+  "cad.flat.summary": "Abgewickelte Länge {length} mm, Breite {width} mm, {bends} Biegungen"
 }

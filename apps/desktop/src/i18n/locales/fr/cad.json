@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "Rien de déductible pour la feuille pour l'instant.",
   "cad.pmi.unanchored": "{count} annotation(s) sans point d'ancrage, listée(s) uniquement dans le panneau PMI.",
   "cad.sub.vertex": "Sommet {index}",
-  "cad.sub.hover": "Sous le curseur"
+  "cad.sub.hover": "Sous le curseur",
+  "cad.flat": "Développé",
+  "cad.flat.toggle": "Afficher le développé de la tôle",
+  "cad.flat.title": "Développé de tôle",
+  "cad.flat.sheet": "Fonction tôle",
+  "cad.flat.empty": "Aucune fonction tôle de cette pièce n'a pu être développée.",
+  "cad.flat.summary": "Longueur développée {length} mm, largeur {width} mm, {bends} plis"
 }

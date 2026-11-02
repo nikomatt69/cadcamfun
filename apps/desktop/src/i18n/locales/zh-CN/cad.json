@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "暂时没有可用于图纸页的内容。",
   "cad.pmi.unanchored": "{count} 个标注没有锚点，仅在 PMI 面板中列出。",
   "cad.sub.vertex": "顶点 {index}",
-  "cad.sub.hover": "光标下"
+  "cad.sub.hover": "光标下",
+  "cad.flat": "展开",
+  "cad.flat.toggle": "显示钣金件的展开图",
+  "cad.flat.title": "展开图",
+  "cad.flat.sheet": "钣金特征",
+  "cad.flat.empty": "此零件的钣金特征均无法展开。",
+  "cad.flat.summary": "展开长度 {length} mm，宽度 {width} mm，折弯 {bends} 处"
 }

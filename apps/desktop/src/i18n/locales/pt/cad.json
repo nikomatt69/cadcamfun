@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "Ainda nada derivável para a folha.",
   "cad.pmi.unanchored": "{count} anotação(ões) sem ponto de ancoragem, listada(s) apenas no painel PMI.",
   "cad.sub.vertex": "Vértice {index}",
-  "cad.sub.hover": "Sob o cursor"
+  "cad.sub.hover": "Sob o cursor",
+  "cad.flat": "Planificação",
+  "cad.flat.toggle": "Mostrar a planificação da chapa",
+  "cad.flat.title": "Planificação de chapa",
+  "cad.flat.sheet": "Recurso de chapa",
+  "cad.flat.empty": "Nenhum recurso de chapa desta peça pôde ser planificado.",
+  "cad.flat.summary": "Comprimento planificado {length} mm, largura {width} mm, {bends} dobras"
 }

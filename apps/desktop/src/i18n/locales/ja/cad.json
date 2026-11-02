@@ -1038,5 +1038,11 @@
   "cad.pmi.drawingEmpty": "シートに反映できるものはまだありません。",
   "cad.pmi.unanchored": "{count} 件の注記にはアンカー点がなく、PMI パネルにのみ表示されます。",
   "cad.sub.vertex": "頂点 {index}",
-  "cad.sub.hover": "カーソル下"
+  "cad.sub.hover": "カーソル下",
+  "cad.flat": "展開",
+  "cad.flat.toggle": "板金部品の展開図を表示",
+  "cad.flat.title": "展開図",
+  "cad.flat.sheet": "板金フィーチャ",
+  "cad.flat.empty": "この部品の板金フィーチャは展開できませんでした。",
+  "cad.flat.summary": "展開長さ {length} mm、幅 {width} mm、曲げ {bends} か所"
 }

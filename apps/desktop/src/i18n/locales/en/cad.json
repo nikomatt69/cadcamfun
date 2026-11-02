@@ -1038,5 +1038,11 @@
   "cad.parametric.configs.volume": "{volume} cm³",
   "cad.parametric.configs.errors": "{count} error(s)",
   "cad.sub.vertex": "Vertex {index}",
-  "cad.sub.hover": "Under cursor"
+  "cad.sub.hover": "Under cursor",
+  "cad.flat": "Flat",
+  "cad.flat.toggle": "Show the flat pattern of the sheet-metal part",
+  "cad.flat.title": "Flat pattern",
+  "cad.flat.sheet": "Sheet feature",
+  "cad.flat.empty": "No sheet-metal feature of this part could be developed.",
+  "cad.flat.summary": "Developed length {length} mm, width {width} mm, {bends} bends"
 }
