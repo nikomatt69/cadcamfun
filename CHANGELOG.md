@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.65 (November 2026)
+
+## Sidecar
+
+- Enhance AI context handling by integrating drawing data into the AI context assembly process. Update parameter handling in AI functions to include session IDs and drawings, ensuring accurate context retrieval for user sessions. Improve error messages for verification processes and refine element transformation functions for better clarity in user feedback.
+
 ## v0.1.64 (November 2026)
 
 ## Desktop
