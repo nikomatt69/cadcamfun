@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import type { Db } from "./index.ts"
 import { aiCommandTable, aiMutationReceiptTable } from "./schema.ts"
 
@@ -68,7 +68,8 @@ export const commitMutation = <A>(
       resourceId: evidence.resourceId ?? null,
       previousRevision: evidence.previousRevision ?? null,
       revision: evidence.revision ?? null,
-      result: evidence.result ?? null,
+      // Drizzle binds JavaScript null as SQL NULL; this mandatory JSON column needs the JSON literal instead.
+      result: evidence.result == null ? sql`'null'` : evidence.result,
       committedAt: new Date()
     }).run()
   }

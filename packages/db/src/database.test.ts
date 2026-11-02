@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Effect } from "effect"
-import { Database, schema } from "./index.ts"
+import { Database, schema, commitMutation, withMutationCommand } from "./index.ts"
 
 const migrationsFolder = new URL("../drizzle", import.meta.url).pathname
 const run = <A, E>(eff: Effect.Effect<A, E, Database>) =>
@@ -64,3 +64,28 @@ describe("Database layer", () => {
       expect(after?.updatedAt.getTime()).toBeGreaterThanOrEqual(before!.updatedAt.getTime())
     })))
 })
+
+
+test("void and null mutations commit their domain change and a JSON-null receipt", () =>
+  run(Effect.gen(function*() {
+    const { db, query } = yield* Database
+    yield* query("seed command", (db) => {
+      db.insert(schema.userTable).values({ id: "receipt-user", email: "receipt@test.local" }).run()
+      db.insert(schema.projectTable).values({ id: "receipt-project", name: "Before", ownerId: "receipt-user" }).run()
+      db.insert(schema.aiCommandTable).values({ id: "receipt-command", actorId: "receipt-user", projectId: "receipt-project", sessionId: "session", callId: "call", actionId: "vcs_edit.start_change", inputDigest: "input", status: "running" }).run()
+    })
+    yield* Effect.promise(() => withMutationCommand({ id: "receipt-command", actorId: "receipt-user", projectId: "receipt-project" }, async () => {
+      for (const result of [undefined, null]) {
+        const returned = commitMutation(db, "vcs.apply", (tx) => {
+          tx.update(schema.projectTable).set({ name: "After" }).where(eq(schema.projectTable.id, "receipt-project")).run()
+          return { result, resourceId: "receipt-project" }
+        })
+        expect(returned).toBe(result)
+      }
+    }))
+    const receipts = yield* query("read receipts", (db) => db.select().from(schema.aiMutationReceiptTable).all())
+    expect(receipts.map((receipt) => receipt.result)).toEqual([null, null])
+    expect(receipts.map((receipt) => receipt.sequence)).toEqual([1, 2])
+    const project = yield* query("read changed project", (db) => db.select().from(schema.projectTable).where(eq(schema.projectTable.id, "receipt-project")).get())
+    expect(project?.name).toBe("After")
+  })))

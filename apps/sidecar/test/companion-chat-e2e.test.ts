@@ -127,7 +127,7 @@ describe("the assistant from the phone", () => {
     )
     const storedResults = recovered.events?.filter((event) => event.type === "tool_result") ?? []
     expect(storedResults).toHaveLength(4)
-    expect(storedResults.every((event) => event.ok)).toBe(true)
+    expect(storedResults.filter((event) => !event.ok)).toEqual([])
     expect(recovered.usage).toBeDefined()
     expect(recovered.usage?.inputTokens).toBeGreaterThan(0)
     expect(recovered.usage?.outputTokens).toBeGreaterThan(0)
