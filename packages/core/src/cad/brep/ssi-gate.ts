@@ -14,7 +14,7 @@
 import { add3, cross3, dist3, dot3, frame, normalize3, scale3, sub3, type Vec3 } from "./math.ts"
 import { clampedUniformKnots, type NurbsSurfaceData } from "./nurbs.ts"
 import { fitCurve } from "./boolean.ts"
-import { curvePoint, surfaceDistance, surfaceNormal, surfacePoint, type Surface } from "./geom.ts"
+import { curvePoint, surfaceDistance, surfaceNormal, surfacePoint, surfaceProject, type Surface } from "./geom.ts"
 import { densify, intersectPatches, nurbsRange, type ParamRange, type PatchCurve } from "./ssi.ts"
 
 const mulberry = (seed: number) => () => {
@@ -149,10 +149,19 @@ export const truthOf = (pair: SsiPair): Truth => {
     signed = (p) => {
       const k = hash.nearest(p, 1.0)
       if (k < 0) return Number.NaN
+      // Beyond the patch's edge the nearest node is a boundary node and its normal says nothing about the other side.
+      const bi = Math.floor(k / (G + 1)), bj = k % (G + 1)
+      if (bi === 0 || bi === G || bj === 0 || bj === G) return Number.NaN
       return dot3(sub3(p, bp[k]!), bn[k]!)
     }
   }
-  const s = pts.map(signed)
+  // An analytic B is a patch too: beyond its parameter rectangle there is no surface.
+  const inB = (p: Vec3): boolean => {
+    if (b.kind === "nurbs") return true
+    const q = surfaceProject(b, p)
+    return q.v >= rb.v0 && q.v <= rb.v1 && (b.kind !== "plane" || (q.u >= rb.u0 && q.u <= rb.u1))
+  }
+  const s = pts.map((p) => (inB(p) ? signed(p) : Number.NaN))
   // Is the crossing real for a surface that is only a patch? A sign change counts where the nearest B point is near (NaN = far).
   const flagged = new Array<boolean>(pts.length).fill(false)
   const id = (i: number, j: number) => i * (G + 1) + j
