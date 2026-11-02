@@ -109,7 +109,7 @@ export const applyDisplayMode = (root: THREE.Object3D, mode: DisplayMode, ghoste
   const plan = planFor(mode, hasEdgeLines(root), ghosted)
   root.traverse((object) => {
     if (object.userData.isControlPoint === true || object.userData.isOutline === true) return
-    if (isEdgeHolder(object)) { object.visible = plan.edges; return }
+    if (isEdgeHolder(object)) { object.userData.displayEdges = plan.edges; object.visible = plan.edges && root.userData.lodHidden !== true; return }
     if (!isMesh(object)) return
     // Hidden-line faces must be in the depth buffer before the edges are tested against it.
     const base = (object.userData.displayRenderOrder ??= object.renderOrder) as number

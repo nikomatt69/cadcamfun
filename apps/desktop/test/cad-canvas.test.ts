@@ -41,4 +41,4 @@ test("the CAD canvas mounts without WebGL and keeps its overlays usable", async 
     expect(useElementsStore.getState().selectedElement).toBeNull()
     expect(root.textContent).not.toContain("Move (G)")
   } finally { stopKeys(); dispose(); state.dispose() }
-})
+}, 30_000) // the first import of the canvas pulls in the whole kernel

@@ -638,5 +638,10 @@
   "cad.display.xray": "أشعة سينية",
   "cad.display.ghost": "شبحي",
   "cad.invalid.title": "عناصر لا يمكن رسمها: {count}",
-  "cad.invalid.more": "و{count} أخرى"
+  "cad.invalid.more": "و{count} أخرى",
+  "cad.sketches": "المخططات",
+  "cad.sketches.toggle": "إظهار المخططات التي استخدمتها الميزات",
+  "cad.issues.title": "ميزات بها أخطاء: {count}",
+  "cad.sub.face": "الوجه {index}",
+  "cad.sub.edge": "الحافة {index}"
 }

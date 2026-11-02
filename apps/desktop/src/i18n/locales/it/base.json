@@ -638,5 +638,10 @@
   "cad.display.xray": "Raggi X",
   "cad.display.ghost": "Fantasma",
   "cad.invalid.title": "Elementi che non si possono disegnare: {count}",
-  "cad.invalid.more": "e altri {count}"
+  "cad.invalid.more": "e altri {count}",
+  "cad.sketches": "Schizzi",
+  "cad.sketches.toggle": "Mostra gli schizzi già usati dalle feature",
+  "cad.issues.title": "Feature con errori: {count}",
+  "cad.sub.face": "Faccia {index}",
+  "cad.sub.edge": "Spigolo {index}"
 }
