@@ -84,10 +84,10 @@ describe("CAM page", () => {
       expect(document.documentElement.classList.contains("dark")).toBe(!before)
       await click('button[aria-label="Toggle dark mode"]')
 
-      // Post-processor tab: 7 dialects, Heidenhain switches the select.
+      // Post-processor tab: 9 targets (the real posts, LinuxCNC and GRBL included); Heidenhain switches the target select.
       await clickText("button", "Post-Processor")
-      const select = await find<HTMLSelectElement>("#post-processor-type")
-      expect([...select.options].map((o) => o.value)).toEqual(["fanuc", "heidenhain", "siemens", "haas", "mazak", "okuma", "generic"])
+      const select = await find<HTMLSelectElement>("#post-processor-target")
+      expect([...select.options].map((o) => o.value)).toEqual(["fanuc", "haas", "siemens", "heidenhain", "okuma", "mazak", "linuxcnc", "grbl", "generic"])
       select.value = "heidenhain"
       select.dispatchEvent(new window.Event("change", { bubbles: true }))
       await settle()
