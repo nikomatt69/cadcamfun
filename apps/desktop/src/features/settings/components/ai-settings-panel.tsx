@@ -157,7 +157,7 @@ export function AISettingsPanel(): JSX.Element {
       </div>
 
       <Show when={saveSuccess()}>
-        <div class="p-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm rounded flex items-center">
+        <div class="px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm rounded flex items-center">
           <Cpu size={14} class="mr-2" />
           {t("settings.ai.saved")}
         </div>
@@ -204,7 +204,7 @@ export function AISettingsPanel(): JSX.Element {
           <div class="flex justify-between items-center">
             <div>
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                <Server size={14} class="mr-1.5 text-blue-500" />
+                <Server size={14} class="mr-1.5 text-gray-400" />
                 {t("settings.ai.mcp")}
               </label>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -238,7 +238,7 @@ export function AISettingsPanel(): JSX.Element {
               </button>
 
               <Show when={showMCPSettings()}>
-                <div class="mt-3 space-y-3 pl-2 border-l-2 border-blue-200 dark:border-blue-800">
+                <div class="mt-3 space-y-3 pl-3 border-l-2 border-blue-200 dark:border-blue-800">
                   <div>
                     <label for="mcp-endpoint" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t("settings.ai.mcpEndpoint")}
@@ -326,7 +326,7 @@ export function AISettingsPanel(): JSX.Element {
 
                     <Show when={mcpTestStatus() !== "idle" && mcpTestResult() !== undefined}>
                       <div
-                        class={`mt-2 p-2 text-xs rounded ${
+                        class={`mt-2 px-3 py-2 text-xs rounded ${
                           mcpTestStatus() === "success"
                             ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
                             : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
@@ -459,7 +459,7 @@ export function AISettingsPanel(): JSX.Element {
       {/* Performance summary */}
       <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-4">
         <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-          <Zap size={14} class="mr-1.5 text-yellow-500" />
+          <Zap size={14} class="mr-1.5 text-gray-400" />
           {t("settings.ai.stats")}
         </h3>
 
@@ -480,13 +480,13 @@ export function AISettingsPanel(): JSX.Element {
         <Show when={settings().mcpEnabled}>
           <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-              <Server size={14} class="mr-1.5 text-blue-500" />
+              <Server size={14} class="mr-1.5 text-gray-400" />
               {t("settings.ai.mcpStats")}
             </h4>
             <div class="flex space-x-4">
               <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.savings")}</p>
-                <p class="text-sm font-medium text-green-600 dark:text-green-400">
+                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                   --
                 </p>
               </div>

@@ -415,7 +415,7 @@ export function ProfileSettings(): JSX.Element {
 
                     <div class="border-t border-slate-200/70 pt-4 dark:border-slate-700/50">
                       <div class="flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                        <Clock class="h-4 w-4 mr-1" />
+                        <Clock class="h-4 w-4 mr-1.5" />
                         {t("settings.profile.memberSince", { date: formatMemberSince(userStats().memberSince) })}
                       </div>
                     </div>
@@ -549,7 +549,7 @@ export function ProfileSettings(): JSX.Element {
 
                   <div>
                     <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      <MapPin class="h-4 w-4 inline mr-1" />
+                      <MapPin class="h-4 w-4 inline mr-1.5" />
                       {t("settings.profile.location")}
                     </label>
                     <input
@@ -564,7 +564,7 @@ export function ProfileSettings(): JSX.Element {
 
                   <div>
                     <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      <Globe class="h-4 w-4 inline mr-1" />
+                      <Globe class="h-4 w-4 inline mr-1.5" />
                       {t("settings.profile.website")}
                     </label>
                     <input

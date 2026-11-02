@@ -226,7 +226,7 @@ export function SessionManagement(): JSX.Element {
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={authSessions}>
             {(session) => (
-              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <DeviceIcon deviceInfo={session.deviceInfo} />
                   <div>
@@ -284,7 +284,7 @@ export function SessionManagement(): JSX.Element {
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={mcpSessions}>
             {(session) => (
-              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <Wifi class={`h-5 w-5 ${getStatusColor(session.status)}`} />
                   <div>
@@ -331,7 +331,7 @@ export function SessionManagement(): JSX.Element {
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={apiTokens()}>
             {(token) => (
-              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <Key class={`h-5 w-5 ${token.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`} />
                   <div>
@@ -377,12 +377,12 @@ export function SessionManagement(): JSX.Element {
           <AlertTriangle class="h-4 w-4 mr-2" />
           {t("settings.sessions.tips")}
         </h4>
-        <ul class="space-y-2 text-sm text-amber-800 dark:text-amber-300">
-          <li>• Regularly review and revoke unused sessions and tokens</li>
-          <li>• Sign out of sessions on shared or public devices</li>
-          <li>• Use API tokens with minimal required permissions</li>
-          <li>• Monitor for suspicious activity from unknown locations</li>
-          <li>• Set appropriate expiration dates for API tokens</li>
+        <ul class="list-disc space-y-2 pl-5 text-sm text-amber-800 dark:text-amber-300">
+          <li>Regularly review and revoke unused sessions and tokens</li>
+          <li>Sign out of sessions on shared or public devices</li>
+          <li>Use API tokens with minimal required permissions</li>
+          <li>Monitor for suspicious activity from unknown locations</li>
+          <li>Set appropriate expiration dates for API tokens</li>
         </ul>
       </div>
     </div>
