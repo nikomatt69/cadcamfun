@@ -136,3 +136,14 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
   the remaining bodies still build; the exact replay skips the same. Panel: "not built: X failed" and the remedy under the issue; the
   assistant report lists skipped features with their cause. Remedies for shell, Boolean and thread failures are not built yet (their
   errors keep today's text).
+
+## Change log (CAD-A round 2026-10-31)
+
+- **T4 built for the exact replay** (`exactReplay(..., { cache })` / `rebuildExact(h, result, { cache })`, `ExactStageCache`, `newExactStageCache`):
+  the replay state is checkpointed at every feature boundary under a fingerprint chain (feature JSON, the parameters its text reads, the
+  mesh verdict, suppression state, imported bases); the next replay resumes from the longest boundary whose chain still matches.
+  Tests `cad/history-incremental.test.ts`: resumed == full (volume, face names, key sets) for last-feature, middle, parameter, suppress/release,
+  first-feature edits; a foreign cache is never used. Bench (`history.exact-50-features-full` / `-resumed`: 36 sketches + base extrude +
+  12 holes, edit of the last hole, load 0.77 per CPU, 7 runs): **349 ms full, 52.6 ms resumed (6.6x)**; budgets 1000 / 250 ms.
+  Not done: the **mesh** replay (`rebuild()`) still runs in full and is now the dominant cost of an edit (it needs the `ReplayState`
+  refactor of the T4 row); a per-part cache is not yet held by the sidecar (adapter work).
