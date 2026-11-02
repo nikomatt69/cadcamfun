@@ -8,6 +8,7 @@
  */
 import { For, Show, createSignal, createUniqueId, type JSX } from "solid-js"
 import { MessageSquareText } from "lucide-solid"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { useAiStore } from "../../ai/index.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
@@ -23,7 +24,7 @@ import {
 } from "../lib/resource-generation.ts"
 import { t, type Key } from "../../../i18n/index.ts"
 
-const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
 const LABEL = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
 
 /** The assistant is optional at render time (the page also mounts without the AI provider, e.g. in isolation). */
@@ -105,7 +106,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
           <For each={spec.examples}>{(example, index) => (
             <button
               type="button"
-              class="rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-300"
+              class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-300"
               onClick={() => setRequest(t(`library.generate.ex.${props.kind}.${index()}` as Key))}
             >
               {t(`library.generate.ex.${props.kind}.${index()}` as Key)}
@@ -117,16 +118,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label for="generate-quantity" class={LABEL}>{t("library.generate.howMany")}</label>
-          <input
-            id="generate-quantity"
-            name="quantity"
-            type="number"
-            min={MIN_GENERATION_COUNT}
-            max={MAX_GENERATION_COUNT}
-            class={INPUT}
-            value={quantity()}
-            onInput={(event) => setQuantity(generationCount(Number(event.currentTarget.value)))}
-          />
+          <NumberField id="generate-quantity" name="quantity" int min={String(MIN_GENERATION_COUNT)} max={String(MAX_GENERATION_COUNT)} class={INPUT} value={quantity()} accept={(value) => value >= MIN_GENERATION_COUNT} onValue={(value) => setQuantity(generationCount(value))} />
         </div>
         <div class="flex flex-col justify-end gap-1.5 text-sm text-slate-700 dark:text-slate-300">
           <label class="inline-flex items-center gap-2">

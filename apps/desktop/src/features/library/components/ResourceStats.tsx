@@ -2,7 +2,7 @@ import { For, Show, type JSX } from "solid-js"
 
 export interface StatItem { readonly label: string; readonly value: string }
 
-const TILE = "rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"
+const TILE = "rounded-[5px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700/70 dark:bg-slate-800/40"
 
 /** The figures of a resource as a grid of labelled tiles, the same on every details page. */
 export function StatGrid(props: { readonly items: ReadonlyArray<StatItem>; readonly columns?: 2 | 3 | 4 }): JSX.Element {
@@ -10,7 +10,7 @@ export function StatGrid(props: { readonly items: ReadonlyArray<StatItem>; reado
   return <dl class={`grid gap-2 ${columns()}`}>
     <For each={props.items}>{(item) => (
       <div class={TILE}>
-        <dt class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{item.label}</dt>
+        <dt class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{item.label}</dt>
         <dd class="mt-0.5 break-words text-xs font-medium text-slate-900 dark:text-white">{item.value}</dd>
       </div>
     )}</For>

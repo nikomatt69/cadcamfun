@@ -408,7 +408,7 @@ function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined
       <div class="space-y-4" data-testid="machine-sections">
         <Show when={(props.row ?? {})["builtin"] === true}><p class="text-xs text-slate-500 dark:text-slate-400">{t("library.detail.builtinNote")}</p></Show>
         <For each={sections()}>{(section) => <div>
-          <h4 class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{section.title}</h4>
+          <h4 class="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{section.title}</h4>
           <StatGrid items={section.facts} />
         </div>}</For>
         <Show when={sections().length === 0}><p class="text-xs italic text-slate-500 dark:text-slate-400">{t("library.detail.noFigures")}</p></Show>

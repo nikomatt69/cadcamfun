@@ -44,7 +44,7 @@ interface ResourceMeta {
   readonly facts: (row: Row) => ReadonlyArray<Fact>
 }
 
-const TH = "px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400"
+const TH = "px-4 py-2.5 text-left text-xs font-medium text-slate-500 dark:text-slate-400"
 
 const MACHINE_TYPES = (): Readonly<Record<string, string>> => ({
   mill: t("pages.mill"),
@@ -418,7 +418,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       </>}
     >
             <Show when={!loading()} fallback={<StageLoading label={`${t("common.loading")} ${lower}...`} />}>
-              <Show when={error() === undefined} fallback={<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{error()}</div>}>
+              <Show when={error() === undefined} fallback={<div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{error()}</div>}>
                 <Show
                   when={filtered().length > 0}
                   fallback={

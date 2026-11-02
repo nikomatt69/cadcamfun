@@ -25,7 +25,7 @@ export function PreviewFrame(props: {
       </div>
     </div>
     {props.children}
-    <Show when={props.hint}><p class="text-[10.5px] text-slate-500 dark:text-slate-400">{props.hint}</p></Show>
+    <Show when={props.hint}><p class="text-[11px] text-slate-500 dark:text-slate-400">{props.hint}</p></Show>
   </div>
 }
 

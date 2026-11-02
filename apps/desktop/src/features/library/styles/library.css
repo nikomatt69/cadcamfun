@@ -86,7 +86,7 @@ html.dark :is(.library-dialog, .library-manager, .library-browser) {
 .library-kind-tabs > button:hover { color: var(--library-text); }
 .library-kind-tabs > button[aria-selected="true"] { color: var(--library-accent); }
 .library-kind-tabs > button[aria-selected="true"]::after { background: var(--library-accent); }
-.library-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 0 5px; border-radius: 4px; background: var(--library-hover); color: var(--library-muted); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 18px; }
+.library-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 0 6px; border-radius: 4px; background: var(--library-hover); color: var(--library-muted); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 18px; }
 .library-browser-toolbar { flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px 24px 14px; border-bottom: 1px solid var(--library-border); }
 .library-section-heading { display: flex; align-items: center; justify-content: space-between; }
 .library-section-heading h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--library-text); }
@@ -125,7 +125,7 @@ html.dark :is(.library-dialog, .library-manager, .library-browser) {
 .library-select-button { color: var(--library-accent); border-color: var(--library-border); }
 .library-select-button:hover { background: var(--library-selected); border-color: var(--library-accent); }
 .library-text-button { border-color: transparent; color: var(--library-muted); }
-.library-filter-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.library-filter-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .library-source-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .library-sources { display: flex; align-items: center; gap: 4px; overflow-x: auto; }
 .library-sources > button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--library-radius); background: transparent; color: var(--library-muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
@@ -141,12 +141,12 @@ html.dark :is(.library-dialog, .library-manager, .library-browser) {
 .library-item:hover { border-color: var(--library-muted); }
 .library-item-preview { display: grid; place-items: center; height: 86px; margin: 12px 12px 0; border-radius: 4px; background: var(--library-inset); color: var(--library-muted); flex-shrink: 0; }
 .library-material-swatch { width: 32px; height: 32px; border-radius: 5px; border: 1px solid rgb(128 128 128 / 25%); }
-.library-item-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; padding: 14px; }
+.library-item-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; }
 .library-item-body h4 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 .library-item-body p { margin: 0; color: var(--library-muted); font-size: 11px; }
 .library-item-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .library-item-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: auto; }
-.library-item-tags span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 1px 5px; border-radius: 3px; background: var(--library-inset); color: var(--library-muted); font-size: 10px; }
+.library-item-tags span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 2px 6px; border-radius: 4px; background: var(--library-inset); color: var(--library-muted); font-size: 10px; }
 .library-item-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--library-border); }
 .library-item-actions .library-select-button { min-height: 28px; padding: 3px 12px; font-size: 11px; }
 .library-item-list { display: flex; flex-direction: column; gap: 8px; }
