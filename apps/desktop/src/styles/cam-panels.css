@@ -14,8 +14,7 @@
 .cam-editor__paint pre { padding: 10px 12px; color: var(--panel-text); }
 .cam-editor__stack { position: relative; flex: 1; min-width: 0; }
 .cam-editor__paint { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.cam-editor__band { position: absolute; left: 0; right: 0; height: 20px; margin-top: 10px; background: var(--panel-accent-soft); opacity: 0.55; pointer-events: none; }
-.cam-editor__gutter .cam-editor__band { opacity: 0.9; }
+.cam-editor__band { position: absolute; left: 0; right: 0; height: 20px; margin-top: 10px; background: var(--panel-accent-soft); pointer-events: none; }
 .panel .cam-editor__code { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; resize: none; border: 0; border-radius: 0; padding: 10px 12px; background: transparent; color: var(--panel-text); font: inherit; white-space: pre; overflow: auto; outline: none; }
 .panel .cam-editor__code--painted { color: transparent; caret-color: var(--panel-text); }
 .panel .cam-editor__code--painted::selection { background: color-mix(in srgb, var(--panel-accent) 28%, transparent); }
@@ -48,8 +47,8 @@
 .cam-post__note-title { margin: 0 0 3px; font-weight: 600; }
 .cam-post__figures-wrap { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: 5px; }
 .cam-post__figures { width: 100%; border-collapse: collapse; font-size: 11.5px; line-height: 16px; font-variant-numeric: tabular-nums; }
-.cam-post__figures caption { padding: 6px 8px; caption-side: top; text-align: left; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--panel-text-faint); background: var(--panel-bg-subtle); border-bottom: 1px solid var(--panel-border); }
-.cam-post__figures :is(th, td) { padding: 5px 8px; text-align: right; white-space: nowrap; color: var(--panel-text); }
+.cam-post__figures caption { padding: 8px 12px; caption-side: top; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--panel-text-faint); background: var(--panel-bg-subtle); border-bottom: 1px solid var(--panel-border); }
+.cam-post__figures :is(th, td) { padding: 6px 12px; text-align: right; white-space: nowrap; color: var(--panel-text); }
 .cam-post__figures thead th { font-size: 10.5px; font-weight: 600; color: var(--panel-text-muted); background: var(--panel-bg-subtle); border-bottom: 1px solid var(--panel-border); }
 .cam-post__figures :is(th, td):first-child { text-align: left; }
 .cam-post__figures tbody td:first-child { font-weight: 500; color: var(--panel-text-muted); white-space: normal; }

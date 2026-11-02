@@ -1,0 +1,285 @@
+/* Workshop scenes (CAM bench): shallow strips for narrow panels. Colours are the app's
+   `--ent-*` tokens through the `--ss-*` fallbacks, so light and dark need no second drawing. */
+
+.ss-stage .wk-grid { position: absolute; inset: 0; }
+
+.ss-stage .wk-stock { fill: var(--ss-surface); stroke: var(--ss-line-strong); stroke-width: 1.2; }
+
+.ss-stage .wk-path {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.ss-stage .wk-path[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 2.4s linear; }
+.ss-stage .wk-path[data-on="false"] { transition: none; }
+
+.ss-stage .wk-tool {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ss-accent);
+  box-shadow: 0 0 0 3px var(--ss-accent-soft), 0 1px 3px rgb(0 0 0 / 0.25);
+  offset-path: path("M40 26 H196 V62 H40 V34 H182 V54 H54 V44 H168");
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+}
+
+.ss-stage .wk-tool[data-on="true"] { offset-distance: 100%; transition: offset-distance 2.4s linear; }
+.ss-stage .wk-tool[data-on="false"] { opacity: 0; transition: none; }
+
+.ss-stage .wk-code {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 132px;
+  padding: 12px 12px 0;
+  background: var(--ss-surface);
+  border-left: 1px solid var(--ss-line);
+  font-family: var(--ss-mono);
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ss-text-muted);
+}
+
+.ss-stage .wk-code__line {
+  display: block;
+  padding: 1px 0;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.3s ease, transform 0.3s var(--ss-ease);
+}
+
+.ss-stage .wk-code__line[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .wk-code__line[data-now="true"] { color: var(--ss-text); }
+
+.ss-stage .wk-estimate { left: 32px; top: 24px; }
+
+/* ── G-code: the program and the check that sweeps it ─────────────────────── */
+.ss-stage .wk-program {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  bottom: 12px;
+  width: 196px;
+  padding: 8px 10px;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  font-family: var(--ss-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ss-text-muted);
+  overflow: hidden;
+}
+
+.ss-stage .wk-program__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--ss-line);
+  color: var(--ss-text-faint);
+}
+
+.ss-stage .wk-program__name { color: var(--ss-text); font-size: 10.5px; }
+.ss-stage .wk-program__line { display: block; white-space: nowrap; }
+.ss-stage .wk-program__line[data-checked="true"] { color: var(--ss-text); }
+
+.ss-stage .wk-check {
+  position: absolute;
+  left: 224px;
+  top: 34px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ss-accent-soft);
+  color: var(--ss-ok);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ss-stage .wk-check[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .wk-result { left: 256px; top: 38px; }
+
+/* ── Operations: the list and the row that joins it ──────────────────────── */
+.ss-stage .wk-ops { position: absolute; inset: 0; background: var(--ss-surface); }
+
+.ss-stage .wk-ops__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+.ss-stage .wk-ops__add {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--ss-accent-soft);
+  color: var(--ss-accent);
+  transition: filter 0.15s ease;
+}
+
+.ss-stage .wk-ops__add[data-pressed="true"] { filter: brightness(0.92); }
+.ss-stage .wk-ops__rows { display: flex; flex-direction: column; transform: translateY(-34px); transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.ss-stage .wk-ops__rows[data-carry="true"] { transform: none; }
+
+.ss-stage .wk-op {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  flex: none;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+.ss-stage .wk-op__tool { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--ss-surface-inset); color: var(--ss-text-faint); flex: none; }
+.ss-stage .wk-op__name { font-size: 11px; font-weight: 500; color: var(--ss-text); white-space: nowrap; }
+.ss-stage .wk-op__time { margin-left: auto; }
+.ss-stage .wk-op--fresh { background: var(--ss-accent-soft); opacity: 0; transition: opacity 0.3s ease; }
+.ss-stage .wk-op--fresh[data-in="true"] { opacity: 1; }
+.ss-stage .wk-op--fresh .wk-op__tool { background: var(--ss-surface); color: var(--ss-accent); }
+
+/* ── Machine: the list, the picked row and the card that arrives ─────────── */
+.ss-stage .wk-machines { position: absolute; left: 14px; top: 14px; width: 150px; display: flex; flex-direction: column; gap: 6px; }
+
+.ss-stage .wk-machine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  transition: border-color 0.3s var(--ss-ease), background-color 0.3s var(--ss-ease);
+}
+
+.ss-stage .wk-machine[data-on="true"] { border-color: var(--ss-accent); background: var(--ss-accent-soft); }
+.ss-stage .wk-machine__mark { width: 8px; height: 8px; border-radius: 2px; background: var(--ss-text-faint); flex: none; transition: background-color 0.3s ease; }
+.ss-stage .wk-machine[data-on="true"] .wk-machine__mark { background: var(--ss-accent); }
+.ss-stage .wk-machine__name { font-size: 11px; font-weight: 500; color: var(--ss-text); white-space: nowrap; }
+
+.ss-stage .wk-spec {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  width: 150px;
+  padding: 9px 11px;
+  border: 1px solid var(--ss-line-strong);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s var(--ss-ease), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ss-stage .wk-spec[data-in="true"] { opacity: 1; transform: none; }
+.ss-stage .wk-spec__title { display: block; font-size: 11.5px; font-weight: 600; color: var(--ss-text); margin-bottom: 6px; }
+.ss-stage .wk-spec .ss-bar { margin-bottom: 5px; }
+.ss-stage .wk-spec__chip { display: inline-flex; margin-top: 2px; padding: 2px 7px; border-radius: 999px; background: var(--ss-surface-inset); font-size: 10px; color: var(--ss-text-muted); white-space: nowrap; }
+
+/* ── Tool: the cutter that is assigned to an operation ───────────────────── */
+.ss-stage .wk-cutter {
+  position: absolute;
+  left: 86px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ss-stage .wk-cutter[data-seated="true"] { transform: translateY(30px); }
+.ss-stage .wk-cutter__shank { width: 7px; height: 16px; border-radius: 2px 2px 0 0; background: var(--ss-line-strong); }
+.ss-stage .wk-cutter__flute { width: 11px; height: 9px; border-radius: 0 0 3px 3px; background: var(--ss-accent); }
+
+.ss-stage .wk-op--seat {
+  position: absolute;
+  left: 14px;
+  top: 56px;
+  width: 168px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.ss-stage .wk-op--seat[data-in="true"] { opacity: 1; }
+
+/* ── Simulation: the head, the cut and the pass ──────────────────────────── */
+.ss-stage .wk-removal { fill: var(--ss-surface-inset); opacity: 0; transition: opacity 0.4s ease; }
+.ss-stage .wk-removal[data-on="true"] { opacity: 1; }
+
+.ss-stage .wk-head {
+  position: absolute;
+  left: 28px;
+  top: 24px;
+  width: 10px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--ss-accent);
+  box-shadow: 0 0 0 3px var(--ss-accent-soft);
+  opacity: 0;
+  transition: transform 2.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.ss-stage .wk-head[data-on="true"] { opacity: 1; transform: translateX(258px); }
+
+.ss-stage .wk-progress {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 12px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ss-line);
+  overflow: hidden;
+}
+
+.ss-stage .wk-progress__fill { display: block; width: 0; height: 100%; background: var(--ss-accent); transition: width 2.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.ss-stage .wk-progress__fill[data-on="true"] { width: 100%; }
+.ss-stage .wk-done { left: 232px; top: 22px; color: var(--ss-ok); }
+
+/* ── A scene on a dark ground (the CAM viewport) ─────────────────────────── */
+/* The viewport is dark in both themes, so the app's light tokens would be wrong
+   there: this block pins the scene to the dark palette on purpose. */
+.ss-stage.ss-stage--dark {
+  --ss-surface: #171b22;
+  --ss-surface-subtle: #1c212a;
+  --ss-surface-inset: #12161c;
+  --ss-line: #2b323d;
+  --ss-line-strong: #3a4352;
+  --ss-text: #e6e9ef;
+  --ss-text-muted: #9aa4b2;
+  --ss-text-faint: #6f7886;
+  --ss-accent: #6b95f2;
+  --ss-accent-soft: #1c2a47;
+  --ss-ok: #4cc07a;
+}
+
+
