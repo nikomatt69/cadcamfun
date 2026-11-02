@@ -1,6 +1,5 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Box, Copy, Eye, EyeOff, Layers, Lock, Move, ToggleLeft, ToggleRight, Trash2, Unlock, Wrench } from "lucide-solid"
-import { Motion } from "solid-motionone"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
@@ -39,10 +38,9 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
   const moveToLayer = (layerId: string) => { props.onMoveToLayer(layerId); setShowLayerDropdown(false) }
 
   return (
-    <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-      class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex flex-col">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex flex-col">
       <div class="mb-2 pb-2 border-b dark:border-gray-700">
-        <button class={`flex items-center px-3 py-1.5 rounded text-sm w-full ${props.isSelectionMode ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
+        <button type="button" aria-pressed={props.isSelectionMode} class={`flex items-center px-3 py-1.5 rounded text-sm w-full ${props.isSelectionMode ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
           onClick={() => props.onSelectionModeChange(!props.isSelectionMode)}>
           <Wrench size={16} class="mr-2" />
           {t("cad.sel.tool")}
@@ -59,10 +57,10 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
       </Show>
 
       <div class="mb-2 flex items-center">
-        <button class={`flex items-center px-2 py-1 rounded text-xs ${props.isMultiSelectMode ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
+        <button type="button" aria-pressed={props.isMultiSelectMode} class={`flex items-center px-2 py-1 rounded text-xs ${props.isMultiSelectMode ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
           onClick={props.onMultiSelectModeToggle}>
-          <Show when={props.isMultiSelectMode} fallback={<><ToggleLeft size={14} class="mr-1" />{t("cad.sel.multiOff")}</>}>
-            <ToggleRight size={14} class="mr-1" />Multi-select On
+          <Show when={props.isMultiSelectMode} fallback={<><ToggleLeft size={14} class="mr-1" />{t("cad.explorer.multi")}</>}>
+            <ToggleRight size={14} class="mr-1" />{t("cad.explorer.multi")}
           </Show>
         </button>
       </div>
@@ -70,26 +68,26 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
       <Show when={hasSelection()}>
         <div class="space-y-1">
           <div class="flex space-x-1">
-            <button class={ACTION} onClick={toggleVisibility} title={allVisible() ? "Hide selected" : "Show selected"}>
+            <button type="button" class={ACTION} onClick={toggleVisibility} title={allVisible() ? t("cad.explorer.hideSelected") : t("browser.show")}>
               <Show when={allVisible()} fallback={<><Eye size={12} class="mr-1" />{t("cad.createComponent.show")}</>}><EyeOff size={12} class="mr-1" />{t("cad.createComponent.hide")}</Show>
             </button>
-            <button class={ACTION} onClick={toggleLocked} title={allLocked() ? "Unlock selected" : "Lock selected"}>
+            <button type="button" class={ACTION} onClick={toggleLocked} title={allLocked() ? t("browser.unlock") : t("browser.lockSelection")}>
               <Show when={allLocked()} fallback={<><Lock size={12} class="mr-1" />{t("cad.lock")}</>}><Unlock size={12} class="mr-1" />{t("browser.unlock")}</Show>
             </button>
           </div>
           <div class="flex space-x-1">
-            <button class={ACTION} onClick={props.onDuplicateSelected} title={t("cad.explorer.copyTitle")}><Copy size={12} class="mr-1" />{t("cad.ribbon.duplicate")}</button>
-            <button class={ACTION} onClick={() => useCADStore.getState().setActiveTool("move")} title={t("cad.sel.move")}><Move size={12} class="mr-1" />{t("cad.move")}</button>
+            <button type="button" class={ACTION} onClick={props.onDuplicateSelected} title={t("cad.explorer.copyTitle")}><Copy size={12} class="mr-1" />{t("cad.ribbon.duplicate")}</button>
+            <button type="button" class={ACTION} onClick={() => useCADStore.getState().setActiveTool("move")} title={t("cad.sel.move")}><Move size={12} class="mr-1" />{t("cad.move")}</button>
           </div>
           <div class="relative">
-            <button class="w-full flex items-center justify-center px-2 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs"
+            <button type="button" aria-expanded={showLayerDropdown()} class="w-full flex items-center justify-center px-2 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs"
               onClick={() => setShowLayerDropdown(!showLayerDropdown())} title={t("cad.sel.moveToLayer")}>
-              <Layers size={12} class="mr-1" />Move to Layer
+              <Layers size={12} class="mr-1" />{t("cad.sel.moveToLayer")}
             </button>
             <Show when={showLayerDropdown()}>
               <div class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded shadow-lg z-10 max-h-40 overflow-y-auto">
                 <For each={layers.layers}>{(layer) =>
-                  <button class="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" onClick={() => moveToLayer(layer.id)}>
+                  <button type="button" class="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" onClick={() => moveToLayer(layer.id)}>
                     <div class="w-2 h-2 rounded-full mr-2" style={{ "background-color": layer.color }} />
                     {layer.name}
                   </button>}</For>
@@ -97,15 +95,15 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
             </Show>
           </div>
           <Show when={count() > 1}>
-            <button class="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-xs" onClick={props.onCreateComponent} title={t("cad.sel.createComponent")}>
+            <button type="button" class="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-xs" onClick={props.onCreateComponent} title={t("cad.sel.createComponent")}>
               <Box size={12} class="mr-1" />{t("cad.createComponent.title")}
             </button>
           </Show>
-          <button class="w-full flex items-center justify-center px-2 py-1.5 bg-red-500 text-white hover:bg-red-600 rounded text-xs" onClick={props.onDeleteSelected} title={t("cad.explorer.deleteSelected")}>
+          <button type="button" class="w-full flex items-center justify-center px-2 py-1.5 bg-red-500 text-white hover:bg-red-600 rounded text-xs" onClick={props.onDeleteSelected} title={t("cad.explorer.deleteSelected")}>
             <Trash2 size={12} class="mr-1" />{t("cad.customElements.delete")}
           </button>
         </div>
       </Show>
-    </Motion.div>
+    </div>
   )
 }

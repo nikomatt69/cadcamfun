@@ -50,8 +50,8 @@ export default function LayerManager(): JSX.Element {
         <Show when={isAdding()}>
           <div class="sidebar-layer-add">
               <input
-                type="text" placeholder={t("cad.layerName")} value={newName()} onInput={(e) => setNewName(e.currentTarget.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") add() }}
+                type="text" aria-label={t("cad.layerName")} placeholder={t("cad.layerName")} value={newName()} onInput={(e) => setNewName(e.currentTarget.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") add(); else if (e.key === "Escape") setIsAdding(false) }}
                 class="panel-input" autofocus
               />
               <button type="button" onClick={add} class="panel-btn panel-btn--primary">{t("cad.add")}</button>
@@ -72,19 +72,19 @@ export default function LayerManager(): JSX.Element {
                     <Show when={layer.locked}><span class="text-xs text-gray-500">{t("cad.layers.lockedTag")}</span></Show>
                   </button>
                   <div class="sidebar-layer__actions">
-                    <button type="button" class={ICON_BUTTON} title={layer.visible ? t("cad.layers.hide") : t("cad.layers.show")}
+                    <button type="button" class={ICON_BUTTON} title={layer.visible ? t("cad.layers.hide") : t("cad.layers.show")} aria-label={`${layer.visible ? t("cad.layers.hide") : t("cad.layers.show")}: ${layer.name}`}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); store.updateLayer(layer.id, { visible: !layer.visible }) }}>
                       <Show when={layer.visible} fallback={<EyeOff size={16} />}><Eye size={16} /></Show>
                     </button>
-                    <button type="button" class={ICON_BUTTON} title={layer.locked ? t("cad.layers.unlock") : t("cad.layers.lock")}
+                    <button type="button" class={ICON_BUTTON} title={layer.locked ? t("cad.layers.unlock") : t("cad.layers.lock")} aria-label={`${layer.locked ? t("cad.layers.unlock") : t("cad.layers.lock")}: ${layer.name}`}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); store.updateLayer(layer.id, { locked: !layer.locked }) }}>
                       <Show when={layer.locked} fallback={<Unlock size={16} />}><Lock size={16} /></Show>
                     </button>
-                    <button type="button" class={ICON_BUTTON} title={t("cad.editLayer")}
+                    <button type="button" class={ICON_BUTTON} title={t("cad.editLayer")} aria-label={`${t("cad.editLayer")}: ${layer.name}`}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); startEdit(layer) }}>
                       <Edit size={16} />
                     </button>
-                    <button type="button" class={ICON_BUTTON} title={t("cad.deleteLayer")} disabled={store.layers.length <= 1}
+                    <button type="button" class={ICON_BUTTON} title={t("cad.deleteLayer")} aria-label={`${t("cad.deleteLayer")}: ${layer.name}`} disabled={store.layers.length <= 1}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); remove(layer.id) }}>
                       <Trash2 size={16} class={store.layers.length <= 1 ? "text-gray-300" : "text-red-500"} />
                     </button>
@@ -93,8 +93,8 @@ export default function LayerManager(): JSX.Element {
               }>
                 <div class="p-2">
                   <div class="flex items-center mb-2">
-                    <input type="color" value={editColor()} onInput={(e) => setEditColor(e.currentTarget.value)} class="w-6 h-6 mr-2 border-0" />
-                    <input type="text" value={editName()} onInput={(e) => setEditName(e.currentTarget.value)} class="flex-1 block border-gray-300 rounded-md shadow-sm dark:text-blue-400 focus:ring-blue-500 focus:border-blue-500 sm:text-xs" autofocus />
+                    <input type="color" aria-label={t("cad.explorer.color")} value={editColor()} onInput={(e) => setEditColor(e.currentTarget.value)} class="w-6 h-6 mr-2 border-0" />
+                    <input type="text" aria-label={t("cad.layerName")} value={editName()} onInput={(e) => setEditName(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); else if (e.key === "Escape") setEditing(null) }} class="panel-input min-w-0 flex-1" autofocus />
                   </div>
                   <div class="flex justify-end space-x-2">
                     <button type="button" onClick={saveEdit} class="panel-icon-btn text-green-700" aria-label={t("cad.layers.save")}><Save size={14} /></button>

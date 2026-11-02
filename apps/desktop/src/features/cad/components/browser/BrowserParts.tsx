@@ -112,14 +112,14 @@ export function RowActions(props: { readonly id: string; readonly visible: boole
   const stop = (action: () => void) => (event: MouseEvent) => { event.stopPropagation(); action() }
   return (
     <div class="workstation-row-actions flex items-center space-x-0.5 ml-1" data-testid={`row-actions-${props.id}`}>
-      <button class={`${MINI} ${props.locked ? "" : "opacity-0 group-hover:opacity-100"}`} title={props.locked ? t("browser.unlock") : t("browser.lock")} aria-label={props.locked ? t("browser.unlock") : t("browser.lock")} onClick={stop(() => b.toggleLocked(props.id))}>
+      <button class={`${MINI} ${props.locked ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`} title={props.locked ? t("browser.unlock") : t("browser.lock")} aria-label={props.locked ? t("browser.unlock") : t("browser.lock")} onClick={stop(() => b.toggleLocked(props.id))}>
         <Show when={props.locked} fallback={<Unlock size={12} />}><Lock size={12} class="text-orange-500" /></Show>
       </button>
-      <button class={`${MINI} ${props.visible ? "opacity-0 group-hover:opacity-100" : ""}`} title={props.visible ? t("browser.hide") : t("browser.show")} aria-label={props.visible ? t("browser.hide") : t("browser.show")} onClick={stop(() => b.toggleVisible(props.id))}>
+      <button class={`${MINI} ${props.visible ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : ""}`} title={props.visible ? t("browser.hide") : t("browser.show")} aria-label={props.visible ? t("browser.hide") : t("browser.show")} onClick={stop(() => b.toggleVisible(props.id))}>
         <Show when={props.visible} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} /></Show>
       </button>
-      <button class={`${MINI} opacity-0 group-hover:opacity-100`} title={t("browser.duplicate")} aria-label={t("browser.duplicate")} onClick={stop(() => b.duplicate(props.id))}><Copy size={12} /></button>
-      <button class={`${MINI} opacity-0 group-hover:opacity-100 text-red-500`} title={t("browser.delete")} aria-label={t("browser.delete")} onClick={stop(() => b.remove(props.id))}><Trash2 size={12} /></button>
+      <button class={`${MINI} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`} title={t("browser.duplicate")} aria-label={t("browser.duplicate")} onClick={stop(() => b.duplicate(props.id))}><Copy size={12} /></button>
+      <button class={`${MINI} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-red-500`} title={t("browser.delete")} aria-label={t("browser.delete")} onClick={stop(() => b.remove(props.id))}><Trash2 size={12} /></button>
     </div>
   )
 }
@@ -153,7 +153,7 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
             <div data-testid={`browser-section-${section.id}`}>
               <Show when={b.mode() !== "flat"}>
                 <div class="group flex items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border-y border-gray-200 dark:border-gray-700 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-                  <button class={MINI} aria-label={t("browser.toggleSection", { name: section.label })} onClick={() => b.toggleSection(section.id)}>
+                  <button class={MINI} aria-label={t("browser.toggleSection", { name: section.label })} aria-expanded={b.isSectionOpen(section.id)} onClick={() => b.toggleSection(section.id)}>
                     <Show when={b.isSectionOpen(section.id)} fallback={<ChevronRight size={14} />}><ChevronDown size={14} /></Show>
                   </button>
                   <Show when={layer()}>{(l) => <span class="w-2.5 h-2.5 rounded-full mr-2" style={{ "background-color": l().color }} />}</Show>
@@ -165,7 +165,7 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
                         <button class={`${MINI} normal-case`} title={t("browser.makeActive")} aria-label={t("browser.activate", { name: section.label })} onClick={() => layers.setActiveLayer(l().id)}>
                           <Crosshair size={12} class={layers.activeLayer === l().id ? "text-blue-500" : "text-gray-400"} />
                         </button>
-                        <button class={`${MINI} text-red-500 opacity-0 group-hover:opacity-100`} title={t("browser.deleteLayerTitle")} aria-label={t("browser.deleteLayer", { name: section.label })} onClick={() => b.deleteLayer(l().id)}><Trash2 size={12} /></button>
+                        <button class={`${MINI} text-red-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`} title={t("browser.deleteLayerTitle")} aria-label={t("browser.deleteLayer", { name: section.label })} onClick={() => b.deleteLayer(l().id)}><Trash2 size={12} /></button>
                       </>
                     )}
                   </Show>

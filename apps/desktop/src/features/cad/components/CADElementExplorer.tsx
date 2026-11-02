@@ -89,7 +89,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     if (open.length > 0) setExpanded((previous) => ({ ...previous, ...Object.fromEntries(open.map((id) => [id, true])) }))
   }))
 
-  const selectNode = (id: string, event?: MouseEvent) => {
+  const selectNode = (id: string, event?: MouseEvent | KeyboardEvent) => {
     if (!elements.elements.some((element) => element.id === id)) return
     const additive = !!event && (event.ctrlKey || event.metaKey || multiSelect())
     if (additive && selection.selectedElementIds.includes(id)) selection.deselectElement(id)
@@ -117,15 +117,23 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     return (
       <div class="select-none">
         <div
-           class={`workstation-browser-row workstation-browser-row--cad flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 ${isSelected() ? "border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
+           class={`workstation-browser-row workstation-browser-row--cad flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 ${isSelected() ? "border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
           style={{ "padding-left": `${nodeProps.depth * 16 + 8}px` }}
+          role="button"
+          tabIndex={0}
+          aria-pressed={isSelected()}
           onClick={(event) => selectNode(nodeProps.node.id, event)}
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget) return
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(nodeProps.node.id, event) }
+            else if (event.key === "F2") { event.preventDefault(); browser.startRename(nodeProps.node.id) }
+          }}
         >
-          <button class="mr-2 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" onClick={(event) => { event.stopPropagation(); if (hasChildren()) setExpanded((previous) => ({ ...previous, [nodeProps.node.id]: !previous[nodeProps.node.id] })) }}>
-            <Show when={hasChildren()} fallback={<div class="w-[14px]" />}>
+          <Show when={hasChildren()} fallback={<span class="mr-2 w-[18px] shrink-0" aria-hidden="true" />}>
+            <button type="button" class="mr-2 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" aria-label={t("browser.toggleSection", { name: nodeProps.node.name })} aria-expanded={isExpanded()} onClick={(event) => { event.stopPropagation(); setExpanded((previous) => ({ ...previous, [nodeProps.node.id]: !previous[nodeProps.node.id] })) }}>
               <Show when={isExpanded()} fallback={<ChevronRight size={14} class="text-gray-500 dark:text-gray-400" />}><ChevronDown size={14} class="text-gray-500 dark:text-gray-400" /></Show>
-            </Show>
-          </button>
+            </button>
+          </Show>
           <div class="mr-2 flex-shrink-0"><ElementIcon type={nodeProps.node.type} /></div>
           <RenameName id={nodeProps.node.id} name={nodeProps.node.name} browser={browser} />
            <span class="workstation-browser-type text-gray-500 dark:text-gray-400">{nodeProps.node.type}</span>
@@ -156,7 +164,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
       width: element.width as number | undefined, height: element.height as number | undefined, radius: element.radius as number | undefined,
       material: (element.material as string | undefined) || t("cad.explorer.defaultMaterial"),
       color: typeof element.color === "string" ? element.color : "#1e88e5",
-      opacity: (element.opacity as number | undefined) || 1
+      opacity: (element.opacity as number | undefined) ?? 1
     }
   })
 
@@ -196,7 +204,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
         </div>
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div class="grid grid-cols-2 gap-2">
-            <button class={ACTION} onClick={() => setMultiSelect(!multiSelect())} title={multiSelect() ? t("cad.explorer.multiOff") : t("cad.explorer.multiOn")}>
+            <button type="button" class={ACTION} aria-pressed={multiSelect()} onClick={() => setMultiSelect(!multiSelect())} title={multiSelect() ? t("cad.explorer.multiOff") : t("cad.explorer.multiOn")}>
               <span class="w-3 h-3 rounded-sm border mr-2 border-gray-400 dark:border-gray-500 flex items-center justify-center">
                 <Show when={multiSelect()}><span class="w-2 h-2 bg-blue-500 rounded-sm" /></Show>
               </span>
@@ -282,8 +290,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
               </div>
             </div>
             <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div class="grid grid-cols-2 gap-2">
-                <button class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">{t("cad.explorer.edit")}</button>
+              <div class="flex justify-end">
                 <button onClick={() => selection.duplicateSelection()} class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">{t("browser.duplicate")}</button>
               </div>
             </div>
