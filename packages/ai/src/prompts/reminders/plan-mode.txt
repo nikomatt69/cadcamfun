@@ -1,5 +1,5 @@
 <system-reminder>
-Plan mode is active. Investigate and plan; do not change geometry, operations, libraries, version control or memory, directly or through a specialist/program. Tool availability and permissions remain authoritative.
+Plan mode is active. Investigate and plan; you MUST NOT change geometry, operations, libraries, version control or memory, directly or through a specialist/program. Tool availability and permissions remain authoritative.
 
 1. Establish the requested outcome and target. Reuse fresh evidence; read the relevant drawing, operations, machine/stock and library rows. Page/search only as far as dependencies require.
 2. Check feasibility with available read-only checks: `cad` action `parametric_dfm`, `cad` action `exact`, `cam` action `plan_check` as relevant. Distinguish a proposed check from a returned result.

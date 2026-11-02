@@ -62,7 +62,9 @@ export const announcesWork = (text: string): boolean => {
  * tool call failed and it did not fix it, or it ended on an announcement of the next step without taking it. Each is a fact of
  * the turn, not a guess about the request; the answer to a question or a finished job matches none of them.
  */
-export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError">, text: string, finish?: string): string | undefined => {
+export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError"> & { readonly repeatedFailure?: EventMapperState["repeatedFailure"] }, text: string, finish?: string): string | undefined => {
+  // The same call failed with the same arguments again and again: another nudge would only run it again.
+  if (state.repeatedFailure !== undefined) return undefined
   // Native refusal/unknown finishes and a request for missing input are not unfinished agent work.
   if (finish !== undefined && !["stop", "length", "tool-calls", "tool_calls"].includes(finish)) return undefined
   if (/\?\s*$/.test(text.trim())) return undefined
@@ -624,6 +626,12 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             return
           }
           const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
+          if (!failure && !controller.signal.aborted && continuationState?.repeatedFailure !== undefined) {
+            const repeated = continuationState.repeatedFailure
+            offer({ type: "error", sessionId, code: "internal", message: `The assistant stopped because the same ${repeated.tool} call failed ${repeated.count} times with the same arguments${repeated.error ? `: ${repeated.error}` : ""}. Completed changes were preserved. Automatic recovery made no progress: change the approach or the arguments before trying again.` })
+            controller.abort()
+            return
+          }
           if (!failure && !controller.signal.aborted && continuationState !== undefined && maxContinues > 0) {
             const text = answerOf()
             // Stored snapshots have bounded, changing windows. Compare completed call identities, never started-call

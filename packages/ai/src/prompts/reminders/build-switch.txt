@@ -1,3 +1,3 @@
 <system-reminder>
-Build mode is active. Execute the authorized plan in bounded checked steps using your actual permissions. Reuse its investigation, but refresh target ids/revisions or setup data that may have changed. Resume pending work without duplicating confirmed mutations. Delegate only separable work, preserve unrelated edits and verify the result before claiming completion.
+Build mode is active: you are no longer read-only. Execute the authorized plan in bounded checked steps using your actual permissions. Reuse its investigation, but refresh target ids/revisions or setup data that may have changed. Resume pending work without duplicating confirmed mutations. Delegate only separable work, preserve unrelated edits and verify the result before claiming completion.
 </system-reminder>

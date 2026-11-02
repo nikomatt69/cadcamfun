@@ -45,6 +45,12 @@ export interface EventMapperState {
   toolCalls: number
   /** Completed tool evidence, keyed by call identity so a bounded history read cannot manufacture progress from a count. */
   readonly successfulCalls: Map<string, string>
+  /** Argument signature (`tool` + stable input) per started call id, kept so a finished call can be matched to its arguments. */
+  readonly callSignatures: Map<string, string>
+  /** How many times each argument signature has failed in this turn. */
+  readonly failedSignatures: Map<string, number>
+  /** The first signature that failed `REPEATED_FAILURE_LIMIT` times: the turn is looping, not progressing. */
+  repeatedFailure: { readonly tool: string; readonly count: number; readonly error: string } | undefined
   /** The most recent tool call ended in an error, and what it said; cleared by the next success. */
   lastToolError: string | undefined
   readonly toolErrors: Map<string, string>
@@ -75,6 +81,9 @@ export const newMapperState = (): EventMapperState => ({
   todos: [],
   toolCalls: 0,
   successfulCalls: new Map(),
+  callSignatures: new Map(),
+  failedSignatures: new Map(),
+  repeatedFailure: undefined,
   lastToolError: undefined,
   toolErrors: new Map(),
   ownTexts: new Set(),
@@ -488,13 +497,54 @@ const mapHostEventWithPrograms = (sessionId: string, event: HostEvent, state: Ev
   return result === -1 ? [...events, ...inner] : [...events.slice(0, result), ...inner, ...events.slice(result)]
 }
 
+/** The same tool call, with the same arguments, failing this many times in one turn is a loop, not a retry. */
+export const REPEATED_FAILURE_LIMIT = 3
+
+/** JSON with object keys sorted at every depth, so argument order never makes the same call look new. Bounded: the signature is only compared, never shown. */
+const stableInput = (value: unknown): string => {
+  const seen = new Set<object>()
+  const write = (item: unknown): string => {
+    if (item === null || typeof item !== "object") return JSON.stringify(item) ?? "undefined"
+    if (seen.has(item)) return "\"<circular>\""
+    seen.add(item)
+    const text = Array.isArray(item) ? `[${item.map(write).join(",")}]` : `{${Object.keys(item).sort().map((key) => `${JSON.stringify(key)}:${write((item as Record<string, unknown>)[key])}`).join(",")}}`
+    seen.delete(item)
+    return text
+  }
+  try { return write(value).slice(0, 4_000) } catch { return String(value).slice(0, 4_000) }
+}
+
+const bounded = (map: Map<string, unknown>, limit: number): void => {
+  while (map.size > limit) map.delete(map.keys().next().value as string)
+}
+
 export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
   const events = mapHostEventWithPrograms(sessionId, event, state)
   for (const mapped of events) {
+    if (mapped.type === "tool_call") {
+      state.callSignatures.set(mapped.callId, `${mapped.tool}\n${stableInput(mapped.input)}`)
+      bounded(state.callSignatures, 500)
+      continue
+    }
     if (mapped.type !== "tool_result") continue
     // A partial mutation may have committed useful work despite an error. Preserve that evidence without treating
     // a started call, an unsuccessful retry or a changed error message as progress.
-    if (mapped.ok || outputRecord(mapped.output)?.["mutationApplied"] === true) state.successfulCalls.set(mapped.callId, mapped.tool)
+    if (mapped.ok || outputRecord(mapped.output)?.["mutationApplied"] === true) {
+      state.successfulCalls.set(mapped.callId, mapped.tool)
+      const signature = state.callSignatures.get(mapped.callId)
+      if (signature !== undefined) {
+        state.failedSignatures.delete(signature)
+        if (state.repeatedFailure?.tool === mapped.tool) state.repeatedFailure = undefined
+      }
+      continue
+    }
+    const signature = state.callSignatures.get(mapped.callId) ?? mapped.tool
+    const count = (state.failedSignatures.get(signature) ?? 0) + 1
+    state.failedSignatures.set(signature, count)
+    bounded(state.failedSignatures, 500)
+    if (count >= REPEATED_FAILURE_LIMIT && state.repeatedFailure === undefined) {
+      state.repeatedFailure = { tool: mapped.tool, count, error: mapped.output.slice(0, 500) }
+    }
   }
   return events
 }
