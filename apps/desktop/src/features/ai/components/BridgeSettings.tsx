@@ -67,7 +67,7 @@ export function BridgeSettings(): JSX.Element {
   return (
     <div class="space-y-2" data-testid="ai-bridge">
       <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.bridge.title")}</h3>
-      <p class="text-xs text-gray-500">{t("ai.bridge.hint")}</p>
+      <p class="assistant-meta-text">{t("ai.bridge.hint")}</p>
 
       <ul class="space-y-1.5" data-testid="ai-bridge-list">
         <For each={tokens()}>{(token) => (
@@ -78,7 +78,7 @@ export function BridgeSettings(): JSX.Element {
               <p class="truncate font-mono assistant-meta-text mt-0.5" title={token.projectId}>{token.projectId} · {t("ai.bridge.expires", { date: token.expiresAt.slice(0, 10) })}</p>
             </div>
             <button type="button" class="assistant-icon-action is-danger" aria-label={t("ai.bridge.revoke", { name: token.name })} disabled={busy()} data-testid="ai-bridge-revoke" onClick={() => void revoke(token.id)}>
-              <Trash2 size={12} aria-hidden="true" />
+              <Trash2 size={14} aria-hidden="true" />
             </button>
           </li>
         )}</For>

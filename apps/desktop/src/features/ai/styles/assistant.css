@@ -172,7 +172,7 @@
 }
 .assistant-markdown th,
 .assistant-markdown td {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--assistant-line);
   text-align: left;
 }
@@ -721,7 +721,7 @@
   right: 0;
   z-index: 40;
   min-width: 212px;
-  padding: 5px;
+  padding: 4px;
   background: var(--assistant-floating);
   border: 1px solid var(--assistant-line-strong);
   border-radius: 11px;
@@ -1890,7 +1890,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
@@ -2011,7 +2011,7 @@
   gap: 8px;
   font-weight: 500;
   color: var(--assistant-coral);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .assistant-control-error-body {
@@ -2022,9 +2022,9 @@
 
 .assistant-agent-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 6px;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
   border-radius: 999px;
   vertical-align: 1px;
 }
@@ -2072,7 +2072,7 @@
   flex: 1;
   overflow-y: auto;
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2449,7 +2449,7 @@ html.dark .assistant-surface .assistant-field:focus {
   width: 240px;
   max-height: min(340px, calc(100vh - 180px));
   overflow-y: auto;
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--assistant-line-strong);
   border-radius: 12px;
   color: var(--assistant-ink);
@@ -2588,7 +2588,7 @@ html.dark .assistant-surface .assistant-field:focus {
   width: min(340px, calc(100vw - 40px));
   max-height: min(380px, calc(100vh - 180px));
   overflow-y: auto;
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--assistant-line-strong);
   border-radius: 12px;
   color: var(--assistant-ink);
@@ -2688,7 +2688,7 @@ html.dark .assistant-surface .assistant-field:focus {
   left: 0;
   z-index: 50;
   width: min(260px, calc(100vw - 40px));
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--assistant-line-strong);
   border-radius: 12px;
   color: var(--assistant-ink);
@@ -2772,7 +2772,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 6px;
   max-width: 100%;
   height: 24px;
-  padding: 0 6px;
+  padding: 0 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -2935,7 +2935,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 12px;
   padding: 16px 12px 12px 16px;
   border-bottom: 1px solid var(--assistant-line);
-  }
+}
 
 .assistant-context-dialog-title {
   flex: 1 1 auto;
@@ -3254,7 +3254,7 @@ html.dark .assistant-surface .assistant-field:focus {
 
 .assistant-palette-scroll {
   min-height: 0;
-  padding: 5px;
+  padding: 4px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -3279,7 +3279,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 8px;
   width: 100%;
   min-height: 36px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 8px;
   color: var(--assistant-ink);
@@ -3302,7 +3302,7 @@ html.dark .assistant-surface .assistant-field:focus {
 }
 
 .assistant-palette-args {
-  margin-left: 5px;
+  margin-left: 6px;
   color: var(--assistant-muted);
   font-size: 11px;
   font-weight: 450;
@@ -3350,13 +3350,13 @@ html.dark .assistant-surface .assistant-field:focus {
 }
 
 .assistant-palette-foot kbd {
-  min-width: 17px;
-  padding: 1px 4px;
+  min-width: 20px;
+  padding: 2px 6px;
   border: 1px solid var(--assistant-line);
   border-radius: 4px;
   color: var(--assistant-ink);
   background: var(--assistant-raised);
-  font: 9px/1.35 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font: 11px/1.35 ui-monospace, "SFMono-Regular", Menlo, monospace;
   text-align: center;
 }
 
@@ -3373,7 +3373,7 @@ html.dark .assistant-surface .assistant-field:focus {
 
 .assistant-cmd-help-list > div {
   min-width: 0;
-  padding: 8px 8px;
+  padding: 8px 12px;
   border: 1px solid var(--assistant-line);
   border-radius: 9px;
   background: var(--assistant-bg);
@@ -3392,7 +3392,7 @@ html.dark .assistant-surface .assistant-field:focus {
 }
 
 .assistant-cmd-help-list dd {
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--assistant-muted);
   font-size: 11px;
   line-height: 1.45;
@@ -3553,7 +3553,7 @@ html.dark .assistant-surface .assistant-field:focus {
     display: none;
   }
   .assistant-control-icon:not([data-control="permissions"]) {
-    width: 26px;
+    width: 28px;
     padding: 0;
     justify-content: center;
   }
@@ -3568,7 +3568,7 @@ html.dark .assistant-surface .assistant-field:focus {
     max-width: 20ch;
   }
   .assistant-scope-control-root {
-    width: 26px;
+    width: 28px;
     flex-shrink: 0;
   }
   .assistant-scope-control {
@@ -3596,7 +3596,7 @@ html.dark .assistant-surface .assistant-field:focus {
     display: none;
   }
   .assistant-control-icon[data-control="permissions"] {
-    width: 26px;
+    width: 28px;
     padding: 0;
     justify-content: center;
   }
@@ -3731,7 +3731,7 @@ html.dark .assistant-surface .assistant-field:focus {
   margin: 0;
   pointer-events: none;
   color: var(--assistant-subtle);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow: hidden;
@@ -3741,7 +3741,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-feedback {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .assistant-copy-btn.is-active {
@@ -3765,7 +3765,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-catalogue-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .assistant-catalogue-tool {
@@ -3798,13 +3798,13 @@ html.dark .assistant-surface .assistant-field:focus {
 }
 
 .assistant-catalogue-tool-body {
-  padding: 0 8px 8px;
+  padding: 0 12px 12px;
 }
 
 .assistant-catalogue-actions {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   margin-top: 4px;
 }
 
@@ -3845,7 +3845,7 @@ html.dark .assistant-surface .assistant-field:focus {
 
 /* What the conversation cost. */
 .assistant-cost-summary {
-  margin-top: 10px;
-  padding-top: 9px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--assistant-line);
 }

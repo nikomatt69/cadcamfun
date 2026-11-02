@@ -68,7 +68,7 @@ function ProviderRow(props: {
         aria-expanded={props.open}
         onClick={props.onToggle}
       >
-        <KeyRound size={12} aria-hidden="true" class="assistant-meta-text" />
+        <KeyRound size={14} aria-hidden="true" class="assistant-meta-text" />
         <span class="assistant-provider-name">{props.provider.name}</span>
         <span class="assistant-meta-text">
           {t("ai.catalogue.modelCount", { count: props.provider.models.length })}
@@ -76,7 +76,7 @@ function ProviderRow(props: {
         <span class="assistant-pill" data-status={configured() ? "completed" : "idle"}>
           {configured() ? t("ai.status.configured") : t("ai.status.missing")}
         </span>
-        {props.open ? <ChevronDown size={12} aria-hidden="true" class="assistant-meta-text" /> : <ChevronRight size={12} aria-hidden="true" class="assistant-meta-text" />}
+        {props.open ? <ChevronDown size={14} aria-hidden="true" class="assistant-meta-text" /> : <ChevronRight size={14} aria-hidden="true" class="assistant-meta-text" />}
       </button>
       <Show when={props.open}>
         <div class="assistant-provider-detail" data-testid="ai-provider-detail">
@@ -145,7 +145,7 @@ function ProviderRow(props: {
                 onInput={(event) => setBaseUrl(event.currentTarget.value)}
               />
             </Show>
-            <div class="flex gap-1.5 pt-0.5">
+            <div class="flex gap-2 pt-1">
               <button
                 type="submit"
                 disabled={busy() || !!authorization() || key().trim().length === 0}
@@ -160,7 +160,7 @@ function ProviderRow(props: {
                   class="assistant-btn assistant-btn-secondary is-danger"
                   onClick={() => void run(() => ai.removeCredentials(props.provider.id), t("ai.providers.removed"))}
                 >
-                  <Trash2 size={12} aria-hidden="true" />
+                  <Trash2 size={14} aria-hidden="true" />
                   {t("ai.providers.remove")}
                 </button>
               </Show>
@@ -226,7 +226,7 @@ export function ProviderSettings(): JSX.Element {
       </button>
       <Show when={ai.catalogueError()}>{(error) => <p role="alert" class="assistant-status-error text-xs">{error()}</p>}</Show>
       <Show when={ai.providers().length > 0}>
-        <div class="text-xs text-gray-500" data-testid="ai-catalogue-counts">
+        <div class="assistant-meta-text" data-testid="ai-catalogue-counts">
           {t("ai.catalogue.providerCount", { count: ai.providers().length })} ·{" "}
           {t("ai.catalogue.modelCount", { count: totalModels() })}
         </div>
@@ -243,8 +243,8 @@ export function ProviderSettings(): JSX.Element {
       </div>
       <Show when={ai.model()}>
         {(model) => (
-          <div class="flex items-center gap-1 text-xs" data-testid="ai-current-model">
-            <span class="text-gray-400">{t("ai.model.current")}:</span>
+          <div class="flex items-center gap-2 text-xs" data-testid="ai-current-model">
+            <span class="assistant-meta-text">{t("ai.model.current")}:</span>
             <span class="font-mono text-gray-700 dark:text-gray-300">
               {model().provider}/{model().model}
             </span>
@@ -254,7 +254,7 @@ export function ProviderSettings(): JSX.Element {
       <Show
         when={filtered().length > 0}
         fallback={
-          <p class="text-xs text-gray-400" data-testid="ai-provider-empty">
+          <p class="assistant-meta-text" data-testid="ai-provider-empty">
             {ai.providers().length === 0
               ? ai.providersPending()
                 ? t("ai.catalogue.loading")

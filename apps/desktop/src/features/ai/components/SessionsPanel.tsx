@@ -31,7 +31,7 @@ export function SessionsPanel(): JSX.Element {
       <div class="assistant-panel-header">
         <p class="assistant-section-label mb-0">{t("ai.sessions.title")} ({ai.sessions().length})</p>
         <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => ai.newSession()} data-testid="ai-session-new">
-          <Plus size={12} aria-hidden="true" />
+          <Plus size={14} aria-hidden="true" />
           {t("ai.sessions.new")}
         </button>
       </div>
@@ -68,19 +68,19 @@ export function SessionsPanel(): JSX.Element {
                   ref={(el) => queueMicrotask(() => el.focus())}
                 />
                 <button type="button" class="assistant-icon-action" aria-label={t("ai.sessions.save")} onClick={() => commit(session.id)}>
-                  <Check size={12} aria-hidden="true" />
+                  <Check size={14} aria-hidden="true" />
                 </button>
               </Show>
               <Show when={editing() !== session.id}>
                 <button type="button" class="assistant-icon-action" aria-label={t("ai.sessions.rename")} data-testid="ai-session-rename"
                   onClick={() => { setTitle(session.title); setEditing(session.id) }}>
-                  <Pencil size={12} aria-hidden="true" />
+                  <Pencil size={14} aria-hidden="true" />
                 </button>
                 <Show
                   when={confirming() === session.id}
                   fallback={
                     <button type="button" class="assistant-icon-action is-danger" aria-label={t("ai.sessions.delete")} data-testid="ai-session-delete" onClick={() => setConfirming(session.id)}>
-                      <Trash2 size={12} aria-hidden="true" />
+                      <Trash2 size={14} aria-hidden="true" />
                     </button>
                   }
                 >

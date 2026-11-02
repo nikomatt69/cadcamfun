@@ -97,9 +97,9 @@ export function SkillsSettings(): JSX.Element {
     <div class="space-y-2" data-testid="ai-skills">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.skills.title")}</h3>
-        <span class="text-[11px] text-gray-500">{t("ai.skills.count", { user: user().length, max: max(), builtIn: builtIn().length })}</span>
+        <span class="assistant-meta-text">{t("ai.skills.count", { user: user().length, max: max(), builtIn: builtIn().length })}</span>
       </div>
-      <p class="text-xs text-gray-500">{t("ai.skills.hint")}</p>
+      <p class="assistant-meta-text">{t("ai.skills.hint")}</p>
 
       <ul class="space-y-1.5" data-testid="ai-skills-list">
         <For each={skills()}>{(skill) => (
@@ -111,7 +111,7 @@ export function SkillsSettings(): JSX.Element {
             </div>
             <Show when={!skill.builtIn}>
               <button type="button" class="assistant-icon-action is-danger" aria-label={t("ai.skills.remove", { name: skill.name })} disabled={busy()} onClick={() => void remove(skill.name)}>
-                <Trash2 size={12} aria-hidden="true" />
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             </Show>
           </li>
@@ -133,7 +133,7 @@ export function SkillsSettings(): JSX.Element {
       <div class="flex gap-2">
         <input ref={picker} type="file" accept=".md,text/markdown,text/plain" class="hidden" onChange={(event) => { void readFile(event.currentTarget.files); event.currentTarget.value = "" }} />
         <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => picker?.click()}>
-          <Upload size={12} aria-hidden="true" />
+          <Upload size={14} aria-hidden="true" />
           {t("ai.skills.open")}
         </button>
         <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => setMarkdown(TEMPLATE)}>{t("ai.skills.template")}</button>

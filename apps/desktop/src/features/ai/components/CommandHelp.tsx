@@ -22,7 +22,7 @@ export function CommandHelp(props: Props): JSX.Element {
 
   return (
     <div class="assistant-cmd-help" data-testid="ai-command-help">
-      <p class="text-xs text-gray-500">{t("ai.cmd.help.hint")}</p>
+      <p class="assistant-meta-text">{t("ai.cmd.help.hint")}</p>
       <For each={groups()}>
         {(group) => (
           <section>

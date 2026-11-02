@@ -51,7 +51,7 @@ export function AssistantPanel(props: Props): JSX.Element {
                   title={translate("ai.open")}
                   style={{ animation: "none", transition: "none" }}
                 >
-                  <Maximize2 size={16} aria-hidden="true" />
+                  <Maximize2 size={14} aria-hidden="true" />
                 </A>
                 <Show when={props.onClose}>
                   <button
@@ -62,7 +62,7 @@ export function AssistantPanel(props: Props): JSX.Element {
                     style={{ animation: "none", transition: "none" }}
                     onClick={() => props.onClose?.()}
                   >
-                    <X size={16} aria-hidden="true" />
+                    <X size={14} aria-hidden="true" />
                   </button>
                 </Show>
               </>
