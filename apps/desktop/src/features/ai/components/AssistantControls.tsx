@@ -8,7 +8,7 @@
  * the height back to the conversation. Each keeps its label as an accessible
  * name and the agent description as a tooltip, so nothing was lost.
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, createUniqueId, type JSX } from "solid-js"
 import Bot from "lucide-solid/icons/bot"
 import ShieldCheck from "lucide-solid/icons/shield-check"
 import Brain from "lucide-solid/icons/brain"
@@ -50,6 +50,26 @@ function ControlMenu(props: {
   readonly onChange: (value: string) => void
 }): JSX.Element {
   const selected = () => props.options.find((option) => option.value === props.value)
+  const listId = createUniqueId()
+  let trigger: HTMLButtonElement | undefined
+  let list: HTMLDivElement | undefined
+  const focusSelected = (): void => queueMicrotask(() => {
+    list?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]')?.focus()
+      ?? list?.querySelector<HTMLButtonElement>('[role="option"]')?.focus()
+  })
+  const onListKey = (event: KeyboardEvent): void => {
+    const buttons = [...(list?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])]
+    const current = buttons.findIndex((button) => button === document.activeElement)
+    const next = event.key === "ArrowDown" ? (current + 1) % buttons.length
+      : event.key === "ArrowUp" ? (current + buttons.length - 1) % buttons.length
+      : event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : -1
+    if (event.key === "Escape") {
+      event.preventDefault(); event.stopPropagation(); props.onClose(); trigger?.focus(); return
+    }
+    if (next < 0 || buttons.length === 0) return
+    event.preventDefault()
+    buttons[next]?.focus()
+  }
   return (
     <div class="assistant-control-menu-root">
       <button
@@ -60,9 +80,11 @@ function ControlMenu(props: {
         aria-label={`${props.label}: ${selected()?.label ?? props.value}`}
         aria-haspopup="listbox"
         aria-expanded={props.open}
+        aria-controls={props.open ? listId : undefined}
+        ref={trigger}
         title={props.title ?? `${props.label}: ${selected()?.label ?? props.value}`}
         data-control={props.id}
-        onClick={props.onToggle}
+        onClick={() => { if (!props.open) focusSelected(); props.onToggle() }}
       >
         <span class="assistant-control-glyph" aria-hidden="true">{props.icon}</span>
         <Show when={props.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot(), margin: 0 }} aria-hidden="true" />}</Show>
@@ -75,7 +97,7 @@ function ControlMenu(props: {
         </Show>
       </button>
       <Show when={props.open}>
-        <div class="assistant-control-popover" role="listbox" aria-label={props.label}>
+        <div ref={list} id={listId} class="assistant-control-popover" role="listbox" aria-label={props.label} onKeyDown={onListKey}>
           <div class="assistant-control-popover-head">
             <span>{props.label}</span>
             <span>{selected()?.label}</span>
@@ -88,11 +110,13 @@ function ControlMenu(props: {
                   type="button"
                   role="option"
                   aria-selected={active()}
+                  tabIndex={-1}
                   class="assistant-control-option"
                   classList={{ "is-active": active() }}
                   onClick={() => {
                     props.onChange(option.value)
                     props.onClose()
+                    trigger?.focus()
                   }}
                 >
                   <span class="assistant-control-option-check">{active() ? <Check size={13} aria-hidden="true" /> : null}</span>

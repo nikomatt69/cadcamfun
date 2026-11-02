@@ -7656,6 +7656,17 @@
                       }
                     ]
                   },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "taskId": {
                     "anyOf": [
                       {

@@ -1,37 +1,103 @@
+/**
+ * The generator's contextual diagrams: origin reference, geometry and the operation in 3D. They project real
+ * model-space scenes through one bounded camera and sit in the shared preview viewport (`PreviewStage`).
+ */
 import { For, Show, createMemo, type JSX } from "solid-js"
 import { t } from "../../../../i18n/index.ts"
 import { operationExample, projectExample, type PreviewScene } from "../../lib/generator-preview.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
+import { PreviewStage } from "./PreviewStage.tsx"
+
+type Point = readonly [number, number]
+const pointsOf = (points: string): Point[] => points.split(" ").map((pair) => {
+  const [x, y] = pair.split(",")
+  return [Number(x), Number(y)]
+})
+const longestLine = (lines: ReadonlyArray<{ readonly points: string; readonly kind?: string }>): { readonly points: string; readonly kind?: string } | undefined =>
+  lines.filter((line) => line.kind === undefined || line.kind === "path").reduce<{ readonly points: string; readonly kind?: string } | undefined>(
+    (best, line) => best === undefined || line.points.length > best.points.length ? line : best,
+    undefined
+  )
 
 /** SVG projects real model-space geometry without allocating another viewport or a render loop. */
-export function ExamplePreview(props: { readonly model: PreviewScene; readonly title: string; readonly detail?: string; readonly example?: boolean; readonly testId?: string }): JSX.Element {
+export function ExamplePreview(props: {
+  readonly model: PreviewScene
+  readonly title: string
+  readonly detail?: string | undefined
+  readonly example?: boolean | undefined
+  readonly testId?: string | undefined
+  readonly variant?: "origin" | "geometry" | "operation" | undefined
+  readonly chip?: string | undefined
+}): JSX.Element {
   const view = createMemo(() => projectExample(props.model))
+  const detail = (): string | undefined => props.example === true ? t("cam.generator.preview.example") : props.detail
+  const label = (): string => [props.title, detail(), props.chip].filter((value): value is string => value !== undefined && value !== "").join(" · ")
+  const path = createMemo(() => props.variant === "operation" ? longestLine(view().lines) : undefined)
+  const start = createMemo(() => {
+    const line = path()
+    return line === undefined ? undefined : pointsOf(line.points)[0]
+  })
+  const end = createMemo(() => {
+    const line = path()
+    if (line === undefined) return undefined
+    const points = pointsOf(line.points)
+    const last = points.at(-1)
+    const previous = points.at(-2)
+    return last === undefined || previous === undefined ? undefined : { point: last, angle: Math.atan2(last[1] - previous[1], last[0] - previous[0]) * 180 / Math.PI }
+  })
   return (
-    <figure class="panel-preview" data-testid={props.testId}>
-      <figcaption class="panel-preview__caption">
-        <span>{props.title}</span>
-        <span class="panel-preview__detail">{props.example ? t("cam.generator.preview.example") : props.detail}</span>
-      </figcaption>
-      <svg viewBox="0 0 320 154" role="img" aria-label={[props.title, props.example ? t("cam.generator.preview.example") : props.detail].filter(Boolean).join(" · ")}>
-        <For each={view().faces}>{(f) => <polygon points={f.points} class={`panel-preview__face panel-preview__face--${f.shade}`} stroke-linejoin="round" />}</For>
-        <For each={view().lines}>{(l) => <polyline points={l.points} class={`panel-preview__line panel-preview__line--${l.kind ?? "path"}`} fill="none" stroke-linejoin="round" stroke-linecap="round" />}</For>
-        <Show when={view().marker}>{(p) => <g class="panel-preview__origin" data-testid="preview-origin-marker" transform={`translate(${p()[0]},${p()[1]})`}>
-          <circle r="6" class="panel-preview__halo" /><circle r="2.5" />
-          <text x="9" y="-8">{t("cam.generator.preview.zero")}</text>
-        </g>}</Show>
-        <Show when={props.model.lines.some(l => l.kind === "axis")}>
-          <For each={view().lines.filter(l => l.kind === "axis")}>{(l, i) => {
-            const end = l.points.split(" ").at(-1)!.split(",")
-            return <text class="panel-preview__axis" x={Number(end[0]) + 4} y={Number(end[1]) - 4}>{["X", "Y", "Z"][i()]}</text>
-          }}</For>
-        </Show>
+    <PreviewStage title={props.title} detail={detail()} chip={props.chip} testId={props.testId} ariaLabel={label()}>
+      <svg viewBox="0 0 320 154" role="img" aria-label={label()}>
+        <g class={`panel-preview__scene panel-preview__scene--${props.variant ?? "operation"}`}>
+          <For each={view().faces}>
+            {(face) => <polygon points={face.points} class={`panel-preview__face panel-preview__face--${face.shade}`} stroke-linejoin="round" />}
+          </For>
+          <For each={view().lines}>
+            {(line) => <polyline points={line.points} pathLength={line.kind === "axis" ? undefined : 1} class={`panel-preview__line panel-preview__line--${line.kind ?? "path"}`} fill="none" stroke-linejoin="round" stroke-linecap="round" />}
+          </For>
+          <Show when={view().marker}>
+            {(point) => (
+              <g class="panel-preview__origin" data-testid="preview-origin-marker" transform={`translate(${point()[0]},${point()[1]})`}>
+                <circle r="6" class="panel-preview__halo" />
+                <circle r="2.5" />
+                <text x="9" y="-8">{t("cam.generator.preview.zero")}</text>
+              </g>
+            )}
+          </Show>
+          <Show when={props.variant === "operation" && start()}>
+            {(point) => (
+              <g class="panel-preview__start" transform={`translate(${point()[0]},${point()[1]})`}>
+                <circle r="4.2" class="panel-preview__start-ring" />
+                <circle r="1.5" />
+              </g>
+            )}
+          </Show>
+          <Show when={props.variant === "operation" && end()}>
+            {(tail) => (
+              <path
+                d="M-4 -3 L1 0 L-4 3"
+                class="panel-preview__chevron"
+                transform={`translate(${tail().point[0]},${tail().point[1]}) rotate(${tail().angle})`}
+              />
+            )}
+          </Show>
+          <Show when={props.model.lines.some((line) => line.kind === "axis")}>
+            <For each={view().lines.filter((line) => line.kind === "axis")}>
+              {(line, index) => {
+                const tail = pointsOf(line.points).at(-1)
+                return tail === undefined ? undefined : <text class="panel-preview__axis" x={tail[0] + 4} y={tail[1] - 4}>{["X", "Y", "Z"][index()]}</text>
+              }}
+            </For>
+          </Show>
+        </g>
       </svg>
-    </figure>
+    </PreviewStage>
   )
 }
 
 export function OperationExample(): JSX.Element {
   const gen = useGeneratorStore()
   const model = createMemo(() => operationExample(gen.settings))
-  return <ExamplePreview model={model()} title={t("cam.generator.preview.operation")} example testId="operation-example" />
+  const chip = createMemo(() => gen.settings.machineType === "3dprinter" ? `Ø ${gen.settings.nozzleDiameter}` : `Ø ${gen.settings.toolDiameter}`)
+  return <ExamplePreview model={model()} title={t("cam.generator.preview.operation")} example testId="operation-example" variant="operation" chip={chip()} />
 }

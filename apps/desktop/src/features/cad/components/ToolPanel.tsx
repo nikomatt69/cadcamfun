@@ -7,7 +7,6 @@ import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Anchor, Box, Circle, Minus, Square, Triangle, Wrench } from "lucide-solid"
-import { Motion, Presence } from "solid-motionone"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { formDefaults } from "../lib/formDefaults.ts"
@@ -77,8 +76,6 @@ export const CATEGORIZED_TOOLS: ReadonlyArray<ToolCategory> = [
     { name: "Group", icon: svg("group"), action: "group" }] }
 ]
 
-// Spelled out so Tailwind sees every class.
-const COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" }
 const INPUT = "w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
 
 interface ElementFormProps {
@@ -106,12 +103,12 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
 
   const numberInput = (name: string, label: string) => (
     <div>
-      <label class="block text-xs text-gray-500">{labelOr(label, label)}</label>
-      <NumberField name={name} class={INPUT} value={Number(data()[name] ?? 0)} accept={() => true} onValue={(value) => setData({ ...data(), [name]: value })} />
+      <label for={`element-${props.type}-${name}`} class="block text-xs text-gray-500">{labelOr(label, label)}</label>
+      <NumberField id={`element-${props.type}-${name}`} name={name} class={INPUT} value={Number(data()[name] ?? 0)} accept={() => true} onValue={(value) => setData({ ...data(), [name]: value })} />
     </div>
   )
   const positionFields = () => (
-    <div class="grid grid-cols-3 z-50 gap-2">{numberInput("x", "X")}{numberInput("y", "Y")}{numberInput("z", "Z")}</div>
+    <div class="grid gap-2" style={{ "grid-template-columns": "repeat(auto-fit, minmax(70px, 1fr))" }}>{numberInput("x", "X")}{numberInput("y", "Y")}{numberInput("z", "Z")}</div>
   )
   const wireframeOption = () => (
     <div class="mt-2">
@@ -145,7 +142,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
     return <>
       <Show when={positioned}>{positionFields()}</Show>
       <For each={rows}>{(row, index) =>
-        <div class={`grid ${COLS[row.length]} gap-2 ${index() > 0 || positioned ? "mt-2" : ""}`}>
+        <div class={`grid gap-2 ${index() > 0 || positioned ? "mt-2" : ""}`} style={{ "grid-template-columns": `repeat(auto-fit, minmax(${row.length === 1 ? 120 : 70}px, 1fr))` }}>
           <For each={row}>{([name, label]) => numberInput(name, label)}</For>
         </div>}</For>
       <Show when={WIREFRAME.has(props.type)}>{wireframeOption()}</Show>
@@ -154,25 +151,25 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
   const submit = (event: SubmitEvent) => { event.preventDefault(); props.onAdd({ ...data(), type: props.type }) }
 
   const content = (
-    <Motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-      class="panel sidebar-element-form overflow-y-auto p-4 w-[320px] max-h-[480px]"
+    <div
+      class="panel sidebar-element-form overflow-y-auto p-4"
       style={{
         ...(props.formPosition ? { position: "fixed", top: `${props.formPosition.y}px`, left: `${props.formPosition.x}px`, "z-index": "2147483647", isolation: "isolate" } : {}),
-        "scrollbar-width": "none"
+        width: "min(320px, calc(100vw - 24px))", "max-height": "min(480px, calc(100vh - 24px))"
       }}
+      onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); props.onCancel() } }}
     >
       <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">{t("cad.toolpanel.addType", { type: labelOr(`cad.toolpanel.tool.${props.type}`, props.type.charAt(0).toUpperCase() + props.type.slice(1)) })}</h4>
       <form onSubmit={submit}>
         {fields()}
         <div class="mt-3">
-          <label class="block text-xs text-gray-500">{t("library.color")}</label>
-          <input type="color" name="color" value={data()["color"] ?? "#1e88e5"} onInput={(e) => change("color", "text", e.currentTarget)} class="w-full h-8" />
+          <label for={`element-${props.type}-color`} class="block text-xs text-gray-500">{t("library.color")}</label>
+          <input id={`element-${props.type}-color`} type="color" name="color" value={data()["color"] ?? "#1e88e5"} onInput={(e) => change("color", "text", e.currentTarget)} class="w-full h-8" />
         </div>
         <Show when={props.type === "line" || props.type === "circle" || props.type === "rectangle"}>
           <div class="mt-2">
-            <label class="block text-xs text-gray-500">{t("cad.toolpanel.lineWidth")}</label>
-            <NumberField name="linewidth" class={INPUT} value={Number(data()["linewidth"] ?? 1)} int accept={(value) => value >= 1 && value <= 10} onValue={(value) => setData({ ...data(), linewidth: value })} />
+            <label for={`element-${props.type}-linewidth`} class="block text-xs text-gray-500">{t("cad.toolpanel.lineWidth")}</label>
+            <NumberField id={`element-${props.type}-linewidth`} name="linewidth" class={INPUT} value={Number(data()["linewidth"] ?? 1)} int accept={(value) => value >= 1 && value <= 10} onValue={(value) => setData({ ...data(), linewidth: value })} />
           </div>
         </Show>
         <div class="mt-4 flex justify-end space-x-2">
@@ -180,7 +177,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
           <button type="submit" class="panel-btn panel-btn--primary">{t("cad.toolpanel.addElement")}</button>
         </div>
       </form>
-    </Motion.div>
+    </div>
   )
   // Rendered in a portal so it sits above every panel.
   return props.formPosition ? <Portal>{content}</Portal> : content
@@ -188,7 +185,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
 
 /** Where the form opens: next to the cursor, kept fully inside the viewport. */
 export const formPositionFor = (clientX: number, clientY: number, viewport = { width: window.innerWidth, height: window.innerHeight }) => {
-  const formWidth = 320, formHeight = 500, margin = 20
+  const margin = 12, formWidth = Math.min(320, Math.max(0, viewport.width - margin * 2)), formHeight = Math.min(480, Math.max(0, viewport.height - margin * 2))
   let x = clientX + 15
   let y = clientY + 15
   if (x + formWidth + margin > viewport.width) { x = clientX - formWidth - 15; if (x < margin) x = viewport.width - formWidth - margin }
@@ -204,12 +201,14 @@ export default function ToolPanel(): JSX.Element {
   const elements = useElementsStore()
   const layers = useLayerStore()
   const activeLayerInfo = createMemo(() => layers.layers.find((layer) => layer.id === layers.activeLayer))
+  const blocked = () => !activeLayerInfo() || activeLayerInfo()?.locked === true
 
   const close = () => { setSelectedTool(null); setFormPosition(null) }
   const click = (action: string, event: MouseEvent) => {
     if (selectedTool() === action) return close()
     setSelectedTool(action)
-    setFormPosition(formPositionFor(event.clientX, event.clientY))
+    const rect = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : undefined
+    setFormPosition(formPositionFor(event.detail === 0 && rect ? rect.right : event.clientX, event.detail === 0 && rect ? rect.top : event.clientY))
   }
 
   return (
@@ -217,29 +216,29 @@ export default function ToolPanel(): JSX.Element {
       <Show when={!activeLayerInfo()}>
         <div class="bg-yellow-50 dark:bg-yellow-700 dark:text-yellow-100 text-yellow-800 p-3 rounded-md mb-3 text-xs">{t("cad.toolpanel.selectLayer")}</div>
       </Show>
+      <Show when={activeLayerInfo()?.locked}><p class="mb-3 text-xs" role="status">{t("cad.layerLocked")}</p></Show>
       <div class="space-y-3">
         <For each={CATEGORIZED_TOOLS}>{(category) =>
           <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={categoryLabel(category)} icon={Wrench} summary={String(category.tools.length)}>
             <div class="grid grid-cols-4 gap-1">
               <For each={category.tools}>{(tool) =>
-                <Motion.button
+                <button type="button"
                   onClick={(e: MouseEvent) => click(tool.action, e)}
                   class={`sidebar-tool ${selectedTool() === tool.action ? "sidebar-tool--selected" : ""}`}
-                  disabled={!activeLayerInfo()}
+                  disabled={blocked()}
+                  aria-pressed={selectedTool() === tool.action}
                   title={toolLabel(tool)}
                 >
                   <div class="mb-0.5">{tool.icon()}</div>
                   <span class="text-[10px] truncate w-full text-center">{toolLabel(tool)}</span>
-                </Motion.button>}</For>
+                </button>}</For>
             </div>
           </SidebarSection>}</For>
       </div>
-      <Presence>
-        <Show when={selectedTool() && activeLayerInfo() && formPosition()}>
+        <Show when={selectedTool() && !blocked() && formPosition()}>
           <ElementForm type={selectedTool()!} formPosition={formPosition()} onCancel={close}
-            onAdd={(element) => { elements.addElement(element); close() }} />
+            onAdd={(element) => { if (!blocked()) elements.addElement(element); close() }} />
         </Show>
-      </Presence>
     </div>
   )
 }

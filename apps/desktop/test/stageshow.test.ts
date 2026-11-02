@@ -3,14 +3,19 @@
  * rests on the poster for reduced motion, and the module previews mount without a layout.
  */
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const src = (rel: string) => readFileSync(join(import.meta.dir, "../src", rel), "utf8")
+const stageshowDir = join(import.meta.dir, "../src/shared/ui/stageshow")
+
+/** Every scene module, whatever it is called: the checks follow the files, not a list. */
+const sceneFiles = (): ReadonlyArray<string> =>
+  readdirSync(stageshowDir).filter((file) => file.endsWith(".tsx"))
 
 describe("stageshow", () => {
   test("every preview names a poster inside its phase table", () => {
-    for (const file of ["previews.tsx", "scenes-account.tsx", "scenes-cad.tsx", "scenes-cam.tsx", "scenes-system.tsx", "scenes-pages.tsx"]) {
+    for (const file of sceneFiles()) {
       const code = src(`shared/ui/stageshow/${file}`)
       for (const m of code.matchAll(/steps=\{\[([^\]]+)\]\} poster=\{(\d+)\}/g)) {
         const steps = m[1]!.split(",").length

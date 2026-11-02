@@ -4,7 +4,7 @@
  * analysis below. The G-code is read by the pure `cam.viewer.previewPath`; this component only draws.
  */
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
-import { ChevronUp, Info } from "lucide-solid"
+import { ChevronUp, Home, Info } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { t } from "../../../i18n/index.ts"
 
@@ -140,10 +140,13 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
     fit()
     const onResize = (): void => { resize(); draw() }
     window.addEventListener("resize", onResize)
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(onResize) : undefined
+    if (canvas?.parentElement) observer?.observe(canvas.parentElement)
     const onScroll = (): void => { setShowScrollTop((container?.scrollTop ?? 0) > 300) }
     container?.addEventListener("scroll", onScroll)
     onCleanup(() => {
       window.removeEventListener("resize", onResize)
+      observer?.disconnect()
       container?.removeEventListener("scroll", onScroll)
     })
   })
@@ -165,6 +168,19 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
     const delta = event.deltaY > 0 ? -0.1 : 0.1
     setScale((previous) => Math.max(0.1, previous + previous * delta))
   }
+  const onCanvasKey = (event: KeyboardEvent): void => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return
+    const step = event.shiftKey ? 40 : 10
+    const delta = event.key === "ArrowLeft" ? { x: -step, y: 0 } : event.key === "ArrowRight" ? { x: step, y: 0 }
+      : event.key === "ArrowUp" ? { x: 0, y: step } : event.key === "ArrowDown" ? { x: 0, y: -step } : undefined
+    if (delta) setOffset((previous) => ({ x: previous.x + delta.x, y: previous.y + delta.y }))
+    else if (event.key === "+" || event.key === "=") setScale((previous) => previous * 1.1)
+    else if (event.key === "-") setScale((previous) => Math.max(0.1, previous * 0.9))
+    else if (event.key === "Home") fit()
+    else return
+    event.preventDefault()
+    event.stopPropagation()
+  }
 
   const position = () => toolPath()[currentPoint()]
 
@@ -177,69 +193,64 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
       <div class="relative flex-1" style={{ width: props.width, "min-height": "400px" }}>
         <canvas
           ref={canvas}
-          class="absolute inset-0 cursor-move"
+          class="absolute inset-0 cursor-move focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          role="img" aria-label={t("cam.toolpath")} tabIndex={0}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
           onWheel={onWheel}
+          onKeyDown={onCanvasKey}
         />
 
         <Show when={!props.gcode}>
-          <div class="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80">
-            <div class="text-center p-6 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white rounded-lg shadow-md">
-              <h3 class="text-lg font-medium text-gray-900 mb-2">{t("cam.gen.viewer.noGcode")}</h3>
-              <p class="text-gray-600">
-                Import a G-Code file or generate one with the toolpath generator to display here.
-              </p>
+          <div class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div class="rounded-lg p-6 text-center">
+              <h3 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">{t("cam.gen.viewer.noGcode")}</h3>
+              <p class="text-gray-600 dark:text-gray-300">{t("cam.verify.empty")}</p>
             </div>
           </div>
         </Show>
 
-        <div class="absolute top-4 left-4 p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white bg-opacity-80 rounded-md shadow-sm">
-          <Show when={toolPath().length > 0}>
+        <Show when={toolPath().length > 0}>
+          <div class="absolute left-4 top-4 rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
             <p class="text-sm font-medium">{t("cam.gen.viewer.position")}</p>
             <Show when={position()}>
               {(point) => (
-                <p class="text-xs text-gray-600">
+                <p class="text-xs tabular-nums text-gray-600 dark:text-gray-300">
                   X: {point().x.toFixed(2)}, Y: {point().y.toFixed(2)}, Z: {point().z.toFixed(2)}
                 </p>
               )}
             </Show>
             <div class="mt-2">
-              <p class="text-xs text-gray-500">Zoom: {(scale() * 100).toFixed(0)}%</p>
+              <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">{t("cam.gen.viewer.tipZoom")}: {(scale() * 100).toFixed(0)}%</p>
             </div>
-          </Show>
-        </div>
+          </div>
+        </Show>
 
         <div class="absolute top-4 right-4 space-y-2">
           <button
-            class="p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white rounded-md shadow-sm hover:bg-gray-100 block"
+            type="button" aria-label={t("cam.gen.viewer.resetView")}
+            class="block rounded-md border border-slate-200 bg-white p-2 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-gray-800 dark:text-white dark:hover:bg-slate-700"
             onClick={fit}
             title={t("cam.gen.viewer.resetView")}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
+            <Home size={16} aria-hidden="true" />
           </button>
 
           <button
-            class="p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white rounded-md shadow-sm hover:bg-gray-100 block"
+            type="button" aria-label={t("cam.gen.viewer.dimensions")} aria-pressed={additionalInfoVisible()}
+            class="block rounded-md border border-slate-200 bg-white p-2 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-gray-800 dark:text-white dark:hover:bg-slate-700"
             onClick={() => setAdditionalInfoVisible(!additionalInfoVisible())}
-            title={additionalInfoVisible() ? "Nascondi dettagli" : "Mostra dettagli"}
+            title={t("cam.gen.viewer.dimensions")}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
+            <Info size={16} aria-hidden="true" />
           </button>
         </div>
 
         <Show when={toolPath().length > 0 && additionalInfoVisible()}>
-          <div class="absolute bottom-4 left-4 right-4 p-3 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white bg-opacity-90 rounded-md shadow-sm text-xs">
-            <div class="flex justify-between items-center">
+          <div class="absolute bottom-4 left-4 right-4 rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-gray-800 dark:text-white">
+            <div class="flex flex-wrap items-center justify-between gap-2 tabular-nums">
               <div>
                 <span class="font-medium">{t("cam.gen.viewer.dimensions")}</span> X: {stats().minX.toFixed(2)} -{" "}
                 {stats().maxX.toFixed(2)}, Y: {stats().minY.toFixed(2)} -{" "}
@@ -254,8 +265,8 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
             </div>
 
             <div class="mt-1 text-gray-500 flex items-center">
-              <Info size={12} class="mr-1" />
-              Use the mouse to move the view. Wheel to zoom.
+              <Info size={12} class="mr-1" aria-hidden="true" />
+              {t("cam.gen.viewer.tipMove")} · {t("cam.gen.viewer.tipZoom")}
             </div>
           </div>
         </Show>
