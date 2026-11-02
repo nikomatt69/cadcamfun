@@ -11,14 +11,14 @@ import { formatGridStep } from "../../../viewport/grid-lod.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
 import { CaptureButtons } from "../../../viewport/CaptureButtons.tsx"
-import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
 import { Cog, HelpCircle, Layers, Maximize2, Minimize2, Move, RotateCw, Sliders } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
-import { useCADStore } from "../store/cadStore.ts"
+import { useCADStore, type PickedEntity } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -39,10 +39,13 @@ import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { applySketchVisibility } from "../lib/history-view.ts"
 import { applyDetailLevel } from "../lib/detail-level.ts"
-import { createJointMarkers } from "../lib/joint-markers.ts"
+import { applyJointSelection, createJointMarkers, describeJoint, pickJointMarker, type JointPick } from "../lib/joint-markers.ts"
 import { useAssemblyStore } from "../store/assemblyStore.ts"
-import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
-import { shapeFingerprint } from "../lib/fingerprint.ts"
+import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, pixelRadiusAt, sameSubEntity, type SubEntityPick, type SubHighlightKind, type VertexPicking } from "../lib/sub-entity.ts"
+import { shapeFingerprint, shapeKey } from "../lib/fingerprint.ts"
+import { ShapePool } from "../lib/shared-geometry.ts"
+import { flatPatternSource } from "../lib/flat-pattern.ts"
+import FlatPatternOverlay from "./FlatPatternOverlay.tsx"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
@@ -203,6 +206,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let pointerDown: { x: number; y: number; additive: boolean } | undefined
   /** One Three object per drawn element, with the shape it was built for. The canvas owns this map. */
   const objectsById = new Map<string, { object: THREE.Object3D; shape: number }>()
+  /** The built shapes identical parts share (one master per shape, a copy per part). */
+  const shapes = new ShapePool()
   /** The drawn objects that pass the layer visibility test: the raycast candidate list, kept in step with the map. */
   let visibleObjects: THREE.Object3D[] = []
 
@@ -211,7 +216,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [rebuilds, setRebuilds] = createSignal(0)
   const [hoveredId, setHoveredId] = createSignal<string | null>(null)
   /** The face or edge of an exact solid under the cursor, and the one last clicked. */
-  const [hoveredSub, setHoveredSub] = createSignal<SubEntityPick | undefined>(undefined)
+  const [hoveredSub, setHoveredSub] =createSignal<SubEntityPick | undefined>(undefined)
   const [pickedSub, setPickedSub] = createSignal<SubEntityPick | undefined>(undefined)
   const [isSelectionMode, setSelectionMode] = createSignal(false)
   const [isMultiSelectMode, setMultiSelectMode] = createSignal(false)
@@ -238,6 +243,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
+  // The flat pattern toggle shows only while the drawing holds a sheet-metal part (a cheap look at the features, no replay).
+  const sheetSource = createMemo(() => flatPatternSource(elements.elements as ReadonlyArray<{ id: string; type?: unknown; history?: unknown }>, selectedIds()))
   /** Every drawn object, in insertion order. */
   const cadObjects = (): THREE.Object3D[] => Array.from(objectsById.values(), (entry) => entry.object)
   const objectOf = (id: string) => objectsById.get(id)?.object
@@ -271,6 +278,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }
     return undefined
   }
+  /** The ray of the last `setPointer` and the screen tolerance for the corners of exact solids (snapping priority vertex > edge > face). */
+  const vertexPicking = (): VertexPicking | undefined =>
+    camera && container ? { ray: raycaster.ray.clone(), radiusAt: pixelRadiusAt(camera, container.clientHeight || 1) } : undefined
+  const jointAt = (): JointPick | undefined => { const picking = vertexPicking(); return picking === undefined ? undefined : pickJointMarker(jointMarkers, picking) }
+  const entityOf = (sub: SubEntityPick): PickedEntity => ({ elementId: sub.elementId, kind: sub.kind, index: sub.index, ...(sub.coords !== undefined ? { coords: sub.coords } : {}) })
   const elementIdAt = (): string | null => {
     lastHits = []
     if (visibleObjects.length === 0) return null
@@ -513,6 +525,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       rig = undefined
       orbit?.dispose()
       look.dispose()
+      // Each part gives its share of the geometry back first, then the pool frees its masters, then the scene's own helpers go.
+      for (const entry of objectsById.values()) disposeObject(entry.object)
+      shapes.clear()
       // Dispose the entire owned scene once, including helper textures.
       if (scene) disposeObject(scene)
       objectsById.clear()
@@ -705,7 +720,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         }
       }
       if (!object) {
-        const built = buildElementObject(element, invalidate)
+        // Identical parts (a pattern, a row of fasteners) are built once and share their geometry; see `lib/shared-geometry.ts`.
+        const built = shapes.acquire(
+          `${shapeKey(element)}|${cad.tolerance}|${currentLookTier()}`, element,
+          () => buildElementObject(element, invalidate),
+          (copy) => applyElementTransform(copy, element as ElementTransformFields, originOffset())
+        )
         if (!built) continue
         objectsById.set(element.id, { object: built, shape })
         scene.add(built)
@@ -780,7 +800,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (pick !== undefined && scene && pick.object.parent !== null) { subOverlays[kind] = createSubHighlight(pick, kind); scene.add(subOverlays[kind]!) }
     invalidate()
   }
-  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null) }, { defer: true }))
+  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null); cad.setHoveredEntity(null) }, { defer: true }))
   createEffect(() => { const pick = hoveredSub(); const picked = pickedSub(); showSub("hover", pick !== undefined && sameSubEntity(pick, picked) ? undefined : pick) })
   createEffect(() => showSub("picked", pickedSub()))
   createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
@@ -799,9 +819,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const box = modelBox()
       jointMarkers = createJointMarkers(joints, box.isEmpty() ? 100 : box.getBoundingSphere(new THREE.Sphere()).radius, offset)
       scene.add(jointMarkers)
+      applyJointSelection(jointMarkers, untrack(() => cad.pickedJoint), untrack(() => cad.hoveredJoint))
     }
+    // A picked joint that is gone (removed, hidden) is no longer picked.
+    const picked = untrack(() => cad.pickedJoint)
+    if (picked !== null && (!show || !joints.some((joint) => joint.id === picked))) cad.setPickedJoint(null)
     invalidate()
   })
+  createEffect(() => { if (applyJointSelection(jointMarkers, cad.pickedJoint, cad.hoveredJoint)) invalidate() })
 
   // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
   createEffect(() => {
@@ -1099,14 +1124,23 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (!move || !container || !scene || !camera) return
       setPointer(move)
       if (raycaster.intersectObjects(controlPoints).length > 0) { container.style.cursor = "pointer"; return }
+      // A joint glyph is drawn over the model, so it is under the cursor before any part is.
+      const joint = jointAt()
+      if ((joint?.jointId ?? null) !== cad.hoveredJoint) cad.setHoveredJoint(joint?.jointId ?? null)
+      if (joint !== undefined) {
+        container.style.cursor = "pointer"
+        if (hoveredId() !== null) setHoveredId(null)
+        if (hoveredSub() !== undefined) { setHoveredSub(undefined); cad.setHoveredEntity(null) }
+        return
+      }
       const id = gizmo?.axis ? null : elementIdAt()
       if (id !== hoveredId()) {
         setHoveredId(id)
         container.style.cursor = id ? "pointer" : "default"
       }
       // The face or edge of an exact solid under the cursor.
-      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id)) : undefined
-      if (!sameSubEntity(sub, hoveredSub())) setHoveredSub(sub)
+      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking()) : undefined
+      if (!sameSubEntity(sub, hoveredSub())) { setHoveredSub(sub); cad.setHoveredEntity(sub === undefined ? null : entityOf(sub)) }
       const hit = planePoint()
       if (hit) publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
     })
@@ -1185,11 +1219,15 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click
     setPointer(event)
+    // A joint glyph under the cursor is the click's target: the joint becomes the picked one and the selection is left alone.
+    const joint = jointAt()
+    if (joint !== undefined) { cad.setPickedJoint(joint.jointId); return }
+    if (cad.pickedJoint !== null) cad.setPickedJoint(null)
     const id = elementIdAt()
     if (id && !isLocked(id)) {
       selection.selectElement(id, down.additive)
-      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id))
-      cad.setPickedEntity(sub === undefined ? null : { elementId: sub.elementId, kind: sub.kind, index: sub.index })
+      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking())
+      cad.setPickedEntity(sub === undefined ? null : entityOf(sub))
       setPickedSub(sub)
     } else if (!id && !down.additive) { selection.clearSelection(); cad.setPickedEntity(null); setPickedSub(undefined) }
   }
@@ -1433,8 +1471,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
+      <FlatPatternOverlay />
+
       <Show when={pickedSub()}>
-        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }) })}</div>}
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
       </Show>
 
       <Show when={issueItems().length > 0}>
@@ -1588,6 +1628,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </select>
         <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "#0288d1" : "rgba(0,0,0,0.7)" }}
           aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
+        <Show when={sheetSource() !== undefined}>
+          <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showFlatPattern ? "#d32f2f" : "rgba(0,0,0,0.7)" }}
+            aria-pressed={cad.showFlatPattern} title={t("cad.flat.toggle")} data-testid="show-flat-pattern" onClick={() => cad.setShowFlatPattern(!cad.showFlatPattern)}>{t("cad.flat")}</button>
+        </Show>
       </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button

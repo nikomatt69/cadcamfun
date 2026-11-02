@@ -47,6 +47,14 @@ describe("display modes", () => {
     expect(edgesOf(mesh).visible).toBe(true)
   })
 
+  test("hidden-line of a primitive without edge lines does not make it vanish (found in a real WebGL render)", () => {
+    const mesh = primitive()
+    applyDisplayMode(mesh, "hidden-line")
+    expect(material(mesh).colorWrite).toBe(true)
+    expect(planFor("hidden-line", false)).toEqual({ fill: "solid", opacity: 1, edges: false })
+    expect(planFor("hidden-line", true).fill).toBe("depth-only")
+  })
+
   test("wireframe of a solid with edges shows the edges only, through the part", () => {
     const mesh = solid()
     applyDisplayMode(mesh, "wireframe")

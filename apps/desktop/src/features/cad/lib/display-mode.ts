@@ -38,7 +38,8 @@ export const planFor = (mode: DisplayMode, hasEdges: boolean, ghosted = false): 
   switch (mode) {
     case "shaded": return { fill: "solid", opacity: 1, edges: false }
     case "shaded-edges": return { fill: "solid", opacity: 1, edges: true }
-    case "hidden-line": return { fill: "depth-only", opacity: 1, edges: true }
+    // A part without edge lines (a plain primitive) would vanish entirely: it stays a shaded solid instead.
+    case "hidden-line": return hasEdges ? { fill: "depth-only", opacity: 1, edges: true } : { fill: "solid", opacity: 1, edges: false }
     case "wireframe": return hasEdges ? { fill: "invisible", opacity: 1, edges: true } : { fill: "triangles", opacity: 1, edges: false }
     case "xray": return { fill: "translucent", opacity: XRAY_OPACITY, edges: true }
     case "ghost": return ghosted ? { fill: "translucent", opacity: GHOST_OPACITY, edges: false } : { fill: "solid", opacity: 1, edges: true }

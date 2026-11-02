@@ -7,6 +7,7 @@ import { useLayerStore } from "../store/layerStore.ts"
 import { getFieldsForElementType, numberRulesFor, type PropertyField } from "../lib/propertyFields.ts"
 import ParametricPanel from "./ParametricPanel.tsx"
 import ExactModelPanel from "./ExactModelPanel.tsx"
+import JointCard from "./JointCard.tsx"
 
 /** Elements that can have an exact (B-rep) model: STEP imports, analytic catalogue solids, parametric parts, Booleans. */
 const EXACT_TYPES: ReadonlySet<string> = new Set(["brep", "parametric", "cube", "cylinder", "cone", "sphere", "torus", "hemisphere", "prism", "pyramid", "extrusion", "revolution", "boolean-union", "boolean-subtract", "boolean-intersect"])
@@ -14,6 +15,19 @@ import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
 import SurfacingPanel from "./SurfacingPanel.tsx"
 import { canMakeParametric, makeParametric } from "../lib/makeParametric.ts"
 import { ColorListInput, ElementListInput, NumberField, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
+
+/** Elements drawn with faces, which can be made translucent (`element.opacity`, honoured by the canvas for all of them). */
+export const OPACITY_TYPES: ReadonlySet<string> = new Set([
+  "cube", "sphere", "cylinder", "cone", "torus", "extrusion", "tube", "lathe", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule",
+  "boolean-union", "boolean-subtract", "boolean-intersect", "parametric", "brep", "revolution", "sweep", "loft", "thread", "gear", "spring",
+  "screw", "bolt", "nut", "washer", "rivet", "wall", "floor", "roof", "window", "door", "stair", "column", "mesh", "group"
+])
+
+/** The opacity field of an element type: a number from 0.05 to 1, absent for a curve or an annotation and for a type that already lists its own. */
+export const opacityFieldFor = (type: string, own: ReadonlyArray<PropertyField>): PropertyField | undefined =>
+  OPACITY_TYPES.has(type) && !own.some((field) => field.name === "opacity")
+    ? { name: "opacity", get label() { return t("cad.material.opacity") }, type: "number", min: 0.05, max: 1, step: 0.05 }
+    : undefined
 
 const SOLID_TYPES_FOR_SURFACING = new Set(["box", "cube", "cylinder", "sphere", "cone", "torus", "extrude", "revolve"])
 /** The fields that draw their own label: the panel must not repeat it above them. */
@@ -126,6 +140,8 @@ export default function PropertyPanel(): JSX.Element {
   // Keyed on the type only: a list rebuilt on every keystroke would remount the inputs and take the focus away mid-typing.
   const elementType = createMemo(() => String(properties().type ?? ""))
   const fields = createMemo(() => getFieldsForElementType(elementType()))
+  // The appearance every solid shares: how see-through it is (0.05 = nearly glass, 1 = opaque). Types whose own field list has it keep theirs.
+  const opacityField = createMemo((): PropertyField | undefined => opacityFieldFor(elementType(), fields()))
 
   const control = (field: PropertyField): JSX.Element => (
     <Switch fallback={
@@ -165,10 +181,12 @@ export default function PropertyPanel(): JSX.Element {
   return (
     <Show when={elements.selectedElement} fallback={
       <div class="workstation-properties">
+        <JointCard />
         <PanelCard title={t("cad.properties")}><p class="panel-empty">{t("cad.noElementSelected")}</p></PanelCard>
       </div>
     }>{(selected) =>
       <div class="workstation-properties">
+        <JointCard />
         <PanelCard title={t("cad.elementProperties")} testId="property-panel" actions={<>
             <SaveElementToLibrary />
             <button onClick={() => elements.duplicateElement(selected().id)} class="panel-icon-btn" title={t("cad.duplicate")} disabled={locked()}>
@@ -208,6 +226,13 @@ export default function PropertyPanel(): JSX.Element {
                   </div>
                 </Show>}
               </For>}
+            </Show>
+
+            <Show when={opacityField()}>{(field) =>
+              <div data-testid="opacity-field">
+                <label for={field().name} class={LABEL}>{field().label}</label>
+                <NumberField id={field().name} name={field().name} label={field().label} value={properties()[field().name] ?? 1} onChange={(value) => set(field().name, value)} onError={(error) => flag(field().name, error)} {...numberRulesFor(field())} step={field().step} disabled={disabled()} showError={tried()} class={INPUT} />
+              </div>}
             </Show>
 
             <Show when={tried() && Object.keys(errors()).length > 0}>

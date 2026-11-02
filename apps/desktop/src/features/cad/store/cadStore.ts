@@ -5,6 +5,8 @@ import { useElementsStore } from "./elementsStore.ts";
 import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
 import { DEFAULT_EXPLODED_VIEW, type ExplodedViewState } from "../lib/exploded-view.ts";
 import { DEFAULT_DISPLAY_MODE, isDisplayMode, type DisplayMode } from "../lib/display-mode.ts";
+import { bindViewPrefs } from "../lib/view-prefs.ts";
+import { useDocumentStore } from "./documentStore.ts";
 
 type ViewMode = "2d" | "3d";
 type OriginPreset =
@@ -65,6 +67,14 @@ interface OriginOffset {
   z: number;
 }
 
+/** A face, edge or corner of an exact solid, as the status bar and the panels name it. `coords` is a corner's model position. */
+export interface PickedEntity {
+  readonly elementId: string;
+  readonly kind: "face" | "edge" | "vertex";
+  readonly index: number;
+  readonly coords?: { readonly x: number; readonly y: number; readonly z: number };
+}
+
 interface CADState {
   viewMode: ViewMode;
   activeTool: string;
@@ -116,9 +126,20 @@ interface CADState {
   /** Show the sketches a feature already uses (a sketch nothing uses is always shown). */
   showSketches: boolean;
   setShowSketches: (show: boolean) => void;
+  /** The 2D flat pattern overlay of a sheet-metal part (`lib/flat-pattern.ts`). */
+  showFlatPattern: boolean;
+  setShowFlatPattern: (show: boolean) => void;
   /** The face or edge of an exact solid the person clicked in the canvas (null: none). Cleared when the selection moves on. */
-  pickedEntity: { readonly elementId: string; readonly kind: "face" | "edge"; readonly index: number } | null;
-  setPickedEntity: (entity: CADState["pickedEntity"]) => void;
+  pickedEntity: PickedEntity | null;
+  setPickedEntity: (entity: PickedEntity | null) => void;
+  /** The face, edge or corner under the cursor (null: none), for the status chip. */
+  hoveredEntity: PickedEntity | null;
+  setHoveredEntity: (entity: PickedEntity | null) => void;
+  /** The joint whose glyph the person clicked (its id in the assembly), and the one under the cursor. */
+  pickedJoint: string | null;
+  setPickedJoint: (id: string | null) => void;
+  hoveredJoint: string | null;
+  setHoveredJoint: (id: string | null) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -130,8 +151,16 @@ export const useCADStore = create<CADState>((set, get) => ({
   setDisplayMode: (mode) => set((state) => (isDisplayMode(mode) ? { displayMode: mode } : state)),
   showSketches: false,
   setShowSketches: (show) => set({ showSketches: show === true }),
+  showFlatPattern: false,
+  setShowFlatPattern: (show) => set({ showFlatPattern: show === true }),
   pickedEntity: null,
   setPickedEntity: (entity) => set({ pickedEntity: entity }),
+  hoveredEntity: null,
+  setHoveredEntity: (entity) => set({ hoveredEntity: entity }),
+  pickedJoint: null,
+  setPickedJoint: (id) => set({ pickedJoint: id }),
+  hoveredJoint: null,
+  setHoveredJoint: (id) => set({ hoveredJoint: id }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({
@@ -233,3 +262,7 @@ export const useCADStore = create<CADState>((set, get) => ({
   toggleDimensions: () =>
     set((state) => ({ showDimensions: !state.showDimensions })),
 }));
+
+// The display mode, the sketch visibility and the flat pattern overlay survive a restart and follow the open project
+// (restored now, when a project is opened, and written on every change; see `lib/view-prefs.ts`).
+bindViewPrefs(useCADStore, useDocumentStore);

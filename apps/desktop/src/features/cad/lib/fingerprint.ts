@@ -13,7 +13,7 @@
  * different parts of the drawing cannot make the canvas keep the wrong geometry.
  */
 
-/** Fields that place an element without changing what it is made of. */
+/** Fields that place an element without changing what it is made of (on the element itself; inside it the same names are geometry). */
 export const PLACEMENT_KEYS: ReadonlySet<string> = new Set([
   // The factory bakes x / y / z into `object.position`; `applyElementTransform` moves it by the delta.
   "x", "y", "z",
@@ -28,10 +28,13 @@ export const PLACEMENT_KEYS: ReadonlySet<string> = new Set([
 /**
  * Timeline display fields of a parametric history (spec 58): the history's `groups` and each feature's `group` fold the timeline and
  * never change a replay. They are skipped only inside a history (an object with `parameters` and `features`), where they mean that;
- * `suppressed` and `rollback` do change the model and stay in. A feature's `name` is already a bookkeeping key above.
+ * `suppressed`, `rollback`, the parameters and the active `configuration` do change the model and stay in.
  */
 const HISTORY_DISPLAY_KEYS: ReadonlySet<string> = new Set(["groups"])
-const FEATURE_DISPLAY_KEYS: ReadonlySet<string> = new Set(["group"])
+/** A feature's group and name are timeline labels; a configuration's name is a label too (its id and values are not). */
+const FEATURE_SKIP: ReadonlySet<string> = new Set(["group", "name", "description"])
+const CONFIGURATION_SKIP: ReadonlySet<string> = new Set(["name", "description"])
+const NO_SKIP: ReadonlySet<string> = new Set()
 const isHistory = (record: Record<string, unknown>): boolean => Array.isArray(record["features"]) && typeof record["parameters"] === "object" && record["parameters"] !== null
 
 /** How deep to walk before giving up: a nested group inside a component inside a group is already deep. */
@@ -44,8 +47,11 @@ const MAX_DEPTH = 12
 const numberBits = new Float64Array(1)
 const numberWords = new Uint32Array(numberBits.buffer)
 
+/** Folded into every step; 0 for the plain fingerprint, another constant for the second hash of `shapeKey`. */
+let seed = 0
+
 const mix = (hash: number, value: number): number => {
-  let next = (hash ^ (value | 0)) >>> 0
+  let next = (hash ^ (value | 0) ^ seed) >>> 0
   next = Math.imul(next, 16777619) >>> 0
   return next
 }
@@ -55,7 +61,12 @@ const mixNumber = (hash: number, value: number): number => {
   return mix(mix(hash, numberWords[0]!), numberWords[1]!)
 }
 
-const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: ReadonlySet<string> = PLACEMENT_KEYS): number => {
+/**
+ * `skip` names the keys left out of the record (or of each record of the array) being hashed, and of nothing below it. The placement
+ * keys are skipped on the element itself only: a control point's `x`, a sketch point's `y`, a parameter called `x` or a child's `name`
+ * inside the element are its geometry, and leaving them out made an edit of one of them look like "nothing changed".
+ */
+const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: ReadonlySet<string> = NO_SKIP): number => {
   if (value === null) return mix(0, 1)
   switch (typeof value) {
     case "number": return mixNumber(0, value)
@@ -99,15 +110,14 @@ const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: Readon
     const record = object as Record<string, unknown>
     // Sorted, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are the same shape.
     const history = isHistory(record)
-    const keys = Object.keys(record).filter((key) => !PLACEMENT_KEYS.has(key) && !skip.has(key) && !(history && HISTORY_DISPLAY_KEYS.has(key))).sort()
+    const keys = Object.keys(record).filter((key) => !skip.has(key) && !(history && HISTORY_DISPLAY_KEYS.has(key))).sort()
     let next = mix(0, 11 + keys.length)
     for (const key of keys) {
       next = mix(next, hash(key, seen, depth + 1))
-      // The features of a history are hashed without their display fields; below them the ordinary rule applies again.
-      const inner = history && key === "features" ? new Set([...PLACEMENT_KEYS, ...FEATURE_DISPLAY_KEYS]) : PLACEMENT_KEYS
-      next = mix(next, Array.isArray(record[key]) && inner !== PLACEMENT_KEYS
-        ? (record[key] as readonly unknown[]).reduce<number>((h, item) => mix(h, hash(item, seen, depth + 2, inner)), mix(0, 9 + (record[key] as readonly unknown[]).length))
-        : hash(record[key], seen, depth + 1))
+      // A history's features and configurations are hashed without their display fields (the group, the name); what is inside them is
+      // geometry again, whatever it is called.
+      const inner = history && key === "features" ? FEATURE_SKIP : history && key === "configurations" ? CONFIGURATION_SKIP : NO_SKIP
+      next = mix(next, hash(record[key], seen, depth + 1, inner))
     }
     return next
   } finally {
@@ -116,4 +126,19 @@ const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: Readon
 }
 
 /** The shape fingerprint of an element: same number = same geometry, move it as much as you like. */
-export const shapeFingerprint = (element: unknown): number => hash(element, new WeakSet<object>(), 0)
+export const shapeFingerprint = (element: unknown): number => hash(element, new WeakSet<object>(), 0, PLACEMENT_KEYS)
+
+/**
+ * A key that tells the shapes of *different* elements apart: two independent 32-bit hashes (64 bits) and the element's type. The plain
+ * fingerprint is only ever compared between two versions of one element; sharing a built shape between elements (`shared-geometry.ts`)
+ * must not trust 32 bits, because a collision would draw one part with another part's geometry.
+ */
+export const shapeKey = (element: unknown): string => {
+  const first = shapeFingerprint(element)
+  seed = 0x9e3779b1
+  try {
+    const second = hash(element, new WeakSet<object>(), 0, PLACEMENT_KEYS)
+    const type = (element as { type?: unknown } | null)?.type
+    return `${typeof type === "string" ? type : ""}:${first.toString(36)}:${second.toString(36)}`
+  } finally { seed = 0 }
+}
