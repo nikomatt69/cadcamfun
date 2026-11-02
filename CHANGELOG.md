@@ -3,6 +3,32 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.71 (November 2026)
+
+## Desktop
+
+- Refine generator previews and desktop controls
+- Improve shared field validation states
+- Refine assistant conversation interface
+- Refine CAD toolbar and version dialog
+- Refine simulation and verification controls
+- Correct shared accordion composition
+- Keep numeric controls in sync
+- Refine assembly and annotation panels
+- Refine chat and feature flag screens
+- Correct shared checkbox interaction
+- Refine library and settings controls
+- Dismiss tooltips reliably
+- Refine manuals and material details
+- Simplify shared card presentation
+- Refine companion profile and connection screens
+- Polish desktop controls and navigation
+- Refine toolpath and cost workflows
+- Refine assistant and plugin dialogs
+- Refine dashboard and account screens
+- Extend desktop Stageshow scenes
+- Refine conversation selection controls
+
 ## v0.1.70 (November 2026)
 
 ## Desktop
