@@ -51,8 +51,8 @@ export const PROMPT_BUDGETS = {
   description: 4_550,
   /** One skill body. */
   skill: 17_000,
-  /** All skill descriptions together (the `skill` tool lists them on every request). */
-  skillDescriptions: 2_600,
+  /** All skill descriptions together (the `skill` tool lists them on every request). Raised from 2 600 to 3 300: 23 skills now cost 3 199 (fea-simulation, cam-turning, cam-post, cad-workflow, fusion-360-modelling joined). */
+  skillDescriptions: 3_300,
   /** One workflow, system and user prompt together. */
   workflow: 3_000
 } as const
