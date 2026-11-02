@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.55 (November 2026)
+
+## Core
+
+- Introduce PMI functionality in CAD system
+
 ## v0.1.54 (November 2026)
 
 ## Core
