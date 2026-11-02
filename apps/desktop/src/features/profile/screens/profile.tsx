@@ -13,11 +13,11 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { Box, Calendar, Folder, Globe, Layout, Mail, MapPin, Pencil, Share2, Shield, User, Wrench } from "lucide-solid"
+import { Box, Calendar, Folder, Globe, Layout, Mail, MapPin, Pencil, Shield, User, Wrench } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 import {
-  BADGE, CARD, PANEL, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage, WorkspaceTabs,
+  BADGE, CARD, PANEL, StageEmpty, StageError, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage, WorkspaceTabs,
   type WorkspaceTabItem
 } from "../../../shared/components/WorkspacePage.tsx"
 
@@ -70,7 +70,7 @@ export function ProfileScreen(): JSX.Element {
   ]
 
   const itemCard = (item: UserItem, href: string, Icon: ItemIcon, withDescription: boolean): JSX.Element => (
-    <A href={href} class={`${CARD} cursor-pointer`}>
+    <A href={href} class={`${CARD} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`}>
       <div class="flex h-20 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
         <Show
           when={typeof item.thumbnail === "string" && item.thumbnail.length > 0}
@@ -89,11 +89,11 @@ export function ProfileScreen(): JSX.Element {
     </A>
   )
 
-  const stat = (icon: JSX.Element, value: number, label: string): JSX.Element => (
+  const stat = (icon: JSX.Element, value: number | undefined, label: string): JSX.Element => (
     <div class="flex items-center gap-2 rounded-[5px] bg-slate-50 p-3 dark:bg-slate-800/40">
       <span class="flex h-7 w-7 flex-none items-center justify-center rounded-[4px] border border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">{icon}</span>
       <div class="min-w-0">
-        <p class="text-[15px] font-semibold leading-5 tabular-nums text-slate-900 dark:text-white">{value}</p>
+        <p class="text-[15px] font-semibold leading-5 tabular-nums text-slate-900 dark:text-white">{value ?? "—"}</p>
         <p class="truncate text-[10.5px] text-slate-500 dark:text-slate-400">{label}</p>
       </div>
     </div>
@@ -112,6 +112,7 @@ export function ProfileScreen(): JSX.Element {
       }
     >
       <Show when={!isLoading()} fallback={<StageLoading label={t("common.loading")} />}>
+        <Show when={!profile.error()} fallback={<StageError message={`${t("common.error")}: ${profile.error()}`} />}>
         <Show when={profile.data()} fallback={
           <StageEmpty icon={<User size={22} aria-hidden="true" />} title={t("profile.notFoundTitle")} hint={t("profile.notFoundBody")}>
             <A href="/" class={TOOLBAR_BUTTON}>{t("profile.returnHome")}</A>
@@ -172,44 +173,51 @@ export function ProfileScreen(): JSX.Element {
                   <Show when={typeof me().website === "string" && (me().website?.length ?? 0) > 0}>
                     <a href={me().website ?? ""} target="_blank" rel="noopener noreferrer" class={TOOLBAR_BUTTON}><Globe size={14} aria-hidden="true" />{t("profile.website")}</a>
                   </Show>
-                  <button type="button" class={TOOLBAR_BUTTON}><Share2 size={14} aria-hidden="true" />{t("profile.shareProfile")}</button>
                 </div>
               </div>
 
               <div class="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-700/70 lg:grid-cols-4">
-                {stat(<Folder size={14} aria-hidden="true" />, (projects.data() ?? []).length, t("shell.projects"))}
-                {stat(<Box size={14} aria-hidden="true" />, (components.data() ?? []).length, t("shell.components"))}
-                {stat(<Wrench size={14} aria-hidden="true" />, (toolpaths.data() ?? []).length, t("shell.toolpaths"))}
-                {stat(<Layout size={14} aria-hidden="true" />, (organizations.data() ?? []).length, t("shell.organizations"))}
+                {stat(<Folder size={14} aria-hidden="true" />, projects.data()?.length, t("shell.projects"))}
+                {stat(<Box size={14} aria-hidden="true" />, components.data()?.length, t("shell.components"))}
+                {stat(<Wrench size={14} aria-hidden="true" />, toolpaths.data()?.length, t("shell.toolpaths"))}
+                {stat(<Layout size={14} aria-hidden="true" />, organizations.data()?.length, t("shell.organizations"))}
               </div>
+              <Show when={organizations.error()}><StageError message={`${t("common.error")}: ${organizations.error()}`} /></Show>
             </section>
 
             <WorkspaceTabs class="mb-3" tabs={tabs()} value={activeTab()} onChange={setActiveTab} label={t("profile.role")} />
 
             <Show when={activeTab() === "projects"}>
+              <Show when={!projects.error()} fallback={<StageError message={`${t("common.error")}: ${projects.error()}`} />}>
               <Show when={(projects.data() ?? []).length > 0} fallback={<StageEmpty icon={<Folder size={22} aria-hidden="true" />} preview="projects" title={t("profile.emptyProjects")} hint={t("profile.emptyProjectsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={projects.data() ?? []}>{(project) => itemCard(project, `/projects/${project.id}`, Folder, false)}</For>
                 </div>
               </Show>
+              </Show>
             </Show>
 
             <Show when={activeTab() === "components"}>
+              <Show when={!components.error()} fallback={<StageError message={`${t("common.error")}: ${components.error()}`} />}>
               <Show when={(components.data() ?? []).length > 0} fallback={<StageEmpty icon={<Box size={22} aria-hidden="true" />} preview="cad" title={t("profile.emptyComponents")} hint={t("profile.emptyComponentsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={components.data() ?? []}>{(component) => itemCard(component, `/components/${component.id}`, Box, true)}</For>
                 </div>
               </Show>
+              </Show>
             </Show>
 
             <Show when={activeTab() === "toolpaths"}>
+              <Show when={!toolpaths.error()} fallback={<StageError message={`${t("common.error")}: ${toolpaths.error()}`} />}>
               <Show when={(toolpaths.data() ?? []).length > 0} fallback={<StageEmpty icon={<Wrench size={22} aria-hidden="true" />} preview="cam" title={t("profile.emptyToolpaths")} hint={t("profile.emptyToolpathsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={toolpaths.data() ?? []}>{(toolpath) => itemCard(toolpath, `/toolpaths/${toolpath.id}`, Wrench, false)}</For>
                 </div>
               </Show>
+              </Show>
             </Show>
           </>}
+        </Show>
         </Show>
       </Show>
     </WorkspacePage>

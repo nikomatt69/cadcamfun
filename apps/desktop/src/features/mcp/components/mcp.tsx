@@ -8,10 +8,11 @@
  * read that same body back and fail with the legacy message instead of an Effect one.
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
-import { Show, createEffect, createSignal, type JSX } from "solid-js"
+import { Show, createEffect, createSignal, createUniqueId, type JSX } from "solid-js"
 import { Effect } from "effect"
 import type { McpServerEntry, McpServerPatch } from "@cadcamfun/api"
 import { t } from "../../../i18n/index.ts"
+import { FIELD, RAIL_LABEL } from "../../../shared/components/WorkspacePage.tsx"
 
 /** A server row as the legacy cards and form read it (the DB row plus form-only fields). */
 export type McpServerCard = McpServerEntry & { readonly defaultWorkingDirectory?: string | null }
@@ -107,21 +108,30 @@ export interface McpServerFormProps {
   readonly isSubmitting?: boolean
 }
 
-/** Legacy `components/MCPServerForm.tsx`, including its seeded-from-`id` URL field. */
+/** The shared form for creating and editing a connection. */
 export function McpServerForm(props: McpServerFormProps): JSX.Element {
+  const prefix = createUniqueId()
+  const id = (name: string): string => `${prefix}-${name}`
   const initial = () => props.initialValues ?? {}
   const [name, setName] = createSignal(initial().name ?? "")
   const [type, setType] = createSignal<"sse" | "stdio">(
     (initial().type === "stdio" ? "stdio" : "sse")
   )
-  // Legacy seeds the URL from `initialValues.id` (not `.url`); kept bug for bug.
-  const [url, setUrl] = createSignal(initial().id ?? "")
+  const [url, setUrl] = createSignal(initial().url ?? "")
   const [command, setCommand] = createSignal(initial().command ?? "")
   const [argsText, setArgsText] = createSignal("")
   const [workingDirectory, setWorkingDirectory] = createSignal(initial().workingDirectory ?? "")
   const [defaultWorkingDirectory, setDefaultWorkingDirectory] = createSignal(initial().defaultWorkingDirectory ?? "")
   const [enabled, setEnabled] = createSignal(initial().enabled !== false)
   const [errors, setErrors] = createSignal<Record<string, string>>({})
+  const clearError = (key: string): void => {
+    if (errors()[key] === undefined) return
+    setErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
 
   createEffect(() => {
     const args = initial().args
@@ -129,7 +139,6 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
     try {
       setArgsText(Array.isArray(args) ? args.join(" ") : JSON.stringify(args))
     } catch {
-      console.error("Failed to parse args:", args)
       setArgsText("")
     }
   })
@@ -181,24 +190,28 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
   return (
     <form class="space-y-4" onSubmit={(event) => void submit(event)}>
       <div>
-        <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.serverName")}</label>
+        <label for={id("name")} class={RAIL_LABEL}>{t("mcp.form.serverName")}</label>
         <input
+          id={id("name")}
           type="text"
           value={name()}
-          onInput={(event) => setName(event.currentTarget.value)}
-          class={`w-full rounded border p-2 ${errors().name ? "border-red-500" : "border-gray-300"}`}
+          onInput={(event) => { setName(event.currentTarget.value); if (event.currentTarget.value.trim()) clearError("name") }}
+          class={`${FIELD} ${errors().name ? "border-red-500" : ""}`}
+          aria-invalid={errors().name !== undefined}
+          aria-describedby={errors().name ? id("name-error") : undefined}
           placeholder={t("mcp.form.namePlaceholder")}
           disabled={busy()}
         />
-        <Show when={errors().name}><p class="mt-1 text-sm text-red-600">{errors().name}</p></Show>
+        <Show when={errors().name}><p id={id("name-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().name}</p></Show>
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.serverType")}</label>
+        <label for={id("type")} class={RAIL_LABEL}>{t("mcp.form.serverType")}</label>
         <select
+          id={id("type")}
           value={type()}
-          onChange={(event) => setType(event.currentTarget.value === "stdio" ? "stdio" : "sse")}
-          class="w-full rounded border border-gray-300 p-2"
+          onChange={(event) => { setType(event.currentTarget.value === "stdio" ? "stdio" : "sse"); clearError("url"); clearError("command") }}
+          class={FIELD}
           disabled={busy() || initial().id !== undefined}
         >
           <option value="sse">{t("mcp.type.sse")}</option>
@@ -208,72 +221,84 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
 
       <Show when={type() === "sse"}>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.serverUrl")}</label>
+          <label for={id("url")} class={RAIL_LABEL}>{t("mcp.form.serverUrl")}</label>
           <input
+            id={id("url")}
             type="text"
             value={url()}
-            onInput={(event) => setUrl(event.currentTarget.value)}
-            class={`w-full rounded border p-2 ${errors().url ? "border-red-500" : "border-gray-300"}`}
+            onInput={(event) => { setUrl(event.currentTarget.value); if (event.currentTarget.value.trim()) clearError("url") }}
+            class={`${FIELD} ${errors().url ? "border-red-500" : ""}`}
+            aria-invalid={errors().url !== undefined}
+            aria-describedby={errors().url ? id("url-error") : undefined}
             placeholder={t("mcp.form.urlPlaceholder")}
             disabled={busy()}
           />
-          <Show when={errors().url}><p class="mt-1 text-sm text-red-600">{errors().url}</p></Show>
+          <Show when={errors().url}><p id={id("url-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().url}</p></Show>
         </div>
       </Show>
 
       <Show when={type() === "stdio"}>
         <div class="space-y-4">
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.command")}</label>
+            <label for={id("command")} class={RAIL_LABEL}>{t("mcp.form.command")}</label>
             <input
+              id={id("command")}
               type="text"
               value={command()}
-              onInput={(event) => setCommand(event.currentTarget.value)}
-              class={`w-full rounded border p-2 ${errors().command ? "border-red-500" : "border-gray-300"}`}
+              onInput={(event) => { setCommand(event.currentTarget.value); if (event.currentTarget.value.trim()) clearError("command") }}
+              class={`${FIELD} ${errors().command ? "border-red-500" : ""}`}
+              aria-invalid={errors().command !== undefined}
+              aria-describedby={errors().command ? `${id("command-error")} ${id("command-help")}` : id("command-help")}
               placeholder={t("mcp.form.commandPlaceholder")}
               disabled={busy()}
             />
-            <Show when={errors().command}><p class="mt-1 text-sm text-red-600">{errors().command}</p></Show>
-            <p class="mt-1 text-xs text-gray-500">{t("mcp.form.commandHelp")}</p>
+            <Show when={errors().command}><p id={id("command-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().command}</p></Show>
+            <p id={id("command-help")} class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("mcp.form.commandHelp")}</p>
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.arguments")}</label>
+            <label for={id("args")} class={RAIL_LABEL}>{t("mcp.form.arguments")}</label>
             <input
+              id={id("args")}
               type="text"
               value={argsText()}
               onInput={(event) => setArgsText(event.currentTarget.value)}
-              class="w-full rounded border border-gray-300 p-2"
+              class={FIELD}
+              aria-describedby={id("args-help")}
               placeholder={t("mcp.form.argsPlaceholder")}
               disabled={busy()}
             />
-            <p class="mt-1 text-xs text-gray-500">{t("mcp.form.argsHelp")}</p>
+            <p id={id("args-help")} class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("mcp.form.argsHelp")}</p>
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.workingDirectory")}</label>
+            <label for={id("working-directory")} class={RAIL_LABEL}>{t("mcp.form.workingDirectory")}</label>
             <input
+              id={id("working-directory")}
               type="text"
               value={workingDirectory()}
               onInput={(event) => setWorkingDirectory(event.currentTarget.value)}
-              class="w-full rounded border border-gray-300 p-2"
+              class={FIELD}
+              aria-describedby={id("working-directory-help")}
               placeholder={t("mcp.form.workingDirectoryPlaceholder")}
               disabled={busy()}
             />
-            <p class="mt-1 text-xs text-gray-500">{t("mcp.form.workingDirectoryHelp")}</p>
+            <p id={id("working-directory-help")} class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("mcp.form.workingDirectoryHelp")}</p>
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">{t("mcp.form.defaultWorkingDirectory")}</label>
+            <label for={id("default-working-directory")} class={RAIL_LABEL}>{t("mcp.form.defaultWorkingDirectory")}</label>
             <input
+              id={id("default-working-directory")}
               type="text"
               value={defaultWorkingDirectory()}
               onInput={(event) => setDefaultWorkingDirectory(event.currentTarget.value)}
-              class="w-full rounded border border-gray-300 p-2"
+              class={FIELD}
+              aria-describedby={id("default-working-directory-help")}
               placeholder={t("mcp.form.defaultWorkingDirectoryPlaceholder")}
               disabled={busy()}
             />
-            <p class="mt-1 text-xs text-gray-500">{t("mcp.form.defaultWorkingDirectoryHelp")}</p>
+            <p id={id("default-working-directory-help")} class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("mcp.form.defaultWorkingDirectoryHelp")}</p>
           </div>
         </div>
       </Show>
@@ -281,13 +306,13 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
       <div class="flex items-center">
         <input
           type="checkbox"
-          id="enabled"
+          id={id("enabled")}
           checked={enabled()}
           onChange={(event) => setEnabled(event.currentTarget.checked)}
           class="h-4 w-4 rounded border-gray-300 text-blue-600"
           disabled={busy()}
         />
-        <label for="enabled" class="ml-2 block text-sm text-gray-700">{t("mcp.form.enabled")}</label>
+        <label for={id("enabled")} class="ml-2 block text-sm text-gray-700 dark:text-gray-300">{t("mcp.form.enabled")}</label>
       </div>
 
       <div class="flex space-x-3 pt-2">
