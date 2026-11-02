@@ -186,6 +186,10 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
           <StageLoading label={t("dashboard.loading")} />
         </Show>
 
+        <Show when={!props.loading && props.data.projectsCount === 0}>
+          <FirstRun />
+        </Show>
+
         <section aria-label={t("dashboard.kpi.label")}>
           <SectionHeader index="01" title={t("dashboard.kpi.label")} />
           <StatGrid>
@@ -209,6 +213,25 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
         </section>
       </div>
     </WorkspacePage>
+  )
+}
+
+/**
+ * First run: no project exists yet. The CAD scene says what the app does (a sketch becomes a part), the
+ * title and tagline are the dashboard's own, and the one next step is the toolbar's primary action.
+ */
+function FirstRun(): JSX.Element {
+  return (
+    <section class={`${CARD} dash-first`} aria-label={t("dashboard.hero.tagline")}>
+      <ModulePreview module="cad" />
+      <div class="dash-first__body">
+        <p class="dash-first__text">{t("dashboard.hero.tagline")}</p>
+        <A href="/projects/create" class={TOOLBAR_PRIMARY}>
+          <Plus size={14} aria-hidden="true" />
+          {t("dashboard.hero.cta.start")}
+        </A>
+      </div>
+    </section>
   )
 }
 

@@ -146,3 +146,8 @@
 .dash-row-label { font-weight: 600; }
 .dash-row-detail { color: var(--ent-text-muted); }
 .dash-row-arrow { color: var(--ent-text-faint); flex-shrink: 0; }
+
+/* First run: the CAD scene over one line of copy and the primary action. */
+.dash-first { max-width: 480px; margin-inline: auto; width: 100%; }
+.dash-first__body { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.dash-first__text { margin: 0; flex: 1; min-width: 0; font-size: 12px; color: var(--ent-text-muted); }
