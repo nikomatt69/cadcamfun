@@ -13,6 +13,7 @@
  * (blue), status colours only where they carry meaning.
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { SessionsScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import {
   AlertTriangle, CheckCircle, Clock, Database, Key, Laptop, MapPin, RefreshCw,
@@ -213,6 +214,14 @@ export function SessionManagement(): JSX.Element {
             {t("settings.sessions.authTitle", { count: authSessions.length })}
           </h4>
         </div>
+
+        <Show when={authSessions.length === 0}>
+          <div class="p-6" aria-hidden="true">
+            <div class="mx-auto max-w-md overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+              <SessionsScene />
+            </div>
+          </div>
+        </Show>
 
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={authSessions}>

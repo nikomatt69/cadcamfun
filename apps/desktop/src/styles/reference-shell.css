@@ -231,6 +231,7 @@
 .reference-legal-icon { width: 36px; height: 36px; border-radius: 5px; background: var(--shell-active); color: var(--shell-active-text); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
 .reference-legal-card h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; }
 .reference-legal-intro { color: var(--shell-muted); margin: 0 0 16px; font-size: 12px; line-height: 1.6; }
+.reference-legal-scene { max-width: 26rem; margin: 0 0 16px; overflow: hidden; border: 1px solid var(--shell-border); border-radius: 5px; }
 .reference-legal-card h2 { font-size: 13px; font-weight: 600; margin: 14px 0 4px; }
 .reference-legal-card p { color: var(--shell-text); margin: 0 0 8px; line-height: 1.6; font-size: 12px; max-width: 72ch; }
 .reference-legal-footer { font-size: 12px; }

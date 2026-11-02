@@ -75,12 +75,21 @@ export function LoadingState(props: { readonly label: string; readonly rows?: nu
 export function EmptyState(props: {
   readonly label: string
   readonly preview?: PreviewKind
+  /** A page-specific scene, when the shared module previews cannot tell this screen's story. */
+  readonly scene?: JSX.Element
   readonly action?: JSX.Element
 }): JSX.Element {
   return (
     <div class="empty-state">
-      <Show when={props.preview !== undefined}>
-        <div class="empty-state__preview"><ModulePreview module={props.preview!} /></div>
+      <Show
+        when={props.scene !== undefined}
+        fallback={
+          <Show when={props.preview !== undefined}>
+            <div class="empty-state__preview"><ModulePreview module={props.preview!} /></div>
+          </Show>
+        }
+      >
+        <div class="empty-state__preview">{props.scene}</div>
       </Show>
       <p class="px-6 py-6 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">{props.label}</p>
       <Show when={props.action !== undefined}><div class="empty-state__action">{props.action}</div></Show>

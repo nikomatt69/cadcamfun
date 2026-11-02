@@ -7,7 +7,7 @@
  * `GET /api/analytics/user-metrics` → `chartData` series.
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
-import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
+import { AnalyticsScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createMemo, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { AlertCircle } from "lucide-solid"
@@ -120,7 +120,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
           when={data().length > 0}
           fallback={
             <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-              <div class="w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TrendPreview /></div>
+              <div class="w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><AnalyticsScene /></div>
               <p class="text-sm text-gray-500 dark:text-gray-400">{t("admin.chart.empty")}</p>
             </div>
           }

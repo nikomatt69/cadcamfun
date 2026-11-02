@@ -16,6 +16,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { t } from "../../../i18n/index.ts"
 import { readGithubToken, saveGithubToken } from "../../../app/github-token.ts"
 import { WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
+import { CommitScene } from "../../../shared/ui/stageshow/index.ts"
 
 type Tab = "changes" | "history" | "branches" | "pulls" | "actions" | "github"
 const TABS: ReadonlyArray<readonly [Tab, Parameters<typeof t>[0]]> = [
@@ -471,6 +472,11 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
 
       <Show when={tab() === "changes"}>
         <section class={`${CARD} space-y-3`}>
+          <Show when={commits().length === 0 && dirty().length === 0}>
+            <div class="max-w-md overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true">
+              <CommitScene />
+            </div>
+          </Show>
           <p>{dirty().length === 0 ? t("vcs.changes.clean") : t("vcs.changes.dirty", { count: String(dirty().length) })}</p>
           <ul class="font-mono text-xs"><For each={dirty()}>{(p) => <li>{p}</li>}</For></ul>
           <input class={INPUT} placeholder={t("vcs.changes.message")} value={message()} onInput={(e) => setMessage(e.currentTarget.value)} />
@@ -484,14 +490,19 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
         </Show>
         <section class="grid gap-4 md:grid-cols-2">
           <ul class={`${CARD} space-y-2`}>
-            <Show when={commits().length === 0}><li class="text-sm text-slate-500">{t("vcs.history.empty")}</li></Show>
+            <Show when={commits().length === 0}>
+              <li class="overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true"><CommitScene /></li>
+              <li class="text-sm text-slate-500">{t("vcs.history.empty")}</li>
+            </Show>
             <For each={commits()}>
               {(c) => (
-                <li class="cursor-pointer text-sm" onClick={() => selectCommit(c)}>
-                  <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
-                  <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1 text-xs text-blue-700">{b}</span>}</For>
-                  <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-slate-500">{t("vcs.history.merge")}</span></Show>
-                  <div class="text-xs text-slate-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</div>
+                <li>
+                  <button type="button" aria-pressed={selected()?.oid === c.oid} class={`w-full rounded-md px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${selected()?.oid === c.oid ? "bg-blue-50 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`} onClick={() => selectCommit(c)}>
+                    <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
+                    <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1 text-xs text-blue-700">{b}</span>}</For>
+                    <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-slate-500">{t("vcs.history.merge")}</span></Show>
+                    <span class="block text-xs text-slate-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</span>
+                  </button>
                 </li>
               )}
             </For>

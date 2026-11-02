@@ -6,7 +6,7 @@
  * filter after paging keeps the offset; that is preserved here on purpose.
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
-import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
+import { TimelineScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
 import { Calendar, ChevronDown, Filter } from "lucide-solid"
@@ -218,7 +218,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
           fallback={
             <Show when={loading() && logs().length === 0} fallback={
               <div class="p-6 text-center">
-                <div class="mx-auto mb-3 max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TrendPreview /></div>
+                <div class="mx-auto mb-3 max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TimelineScene /></div>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white">{t("history.empty")}</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-300">
                   {filters().itemTypes.length > 0 || filters().actions.length > 0 || filters().startDate || filters().endDate

@@ -10,11 +10,12 @@ const src = (rel: string) => readFileSync(join(import.meta.dir, "../src", rel), 
 
 describe("stageshow", () => {
   test("every preview names a poster inside its phase table", () => {
-    const code = src("shared/ui/stageshow/previews.tsx")
-    for (const m of code.matchAll(/steps=\{\[([^\]]+)\]\} poster=\{(\d+)\}/g)) {
-      const steps = m[1]!.split(",").length
-      expect(Number(m[2])).toBeLessThan(steps - 0)
-      expect(Number(m[2])).toBeLessThan(steps - 1) // the last phase is the reset beat, never the poster
+    for (const file of ["previews.tsx", "scenes-account.tsx", "scenes-cad.tsx", "scenes-cam.tsx", "scenes-system.tsx", "scenes-pages.tsx"]) {
+      const code = src(`shared/ui/stageshow/${file}`)
+      for (const m of code.matchAll(/steps=\{\[([^\]]+)\]\} poster=\{(\d+)\}/g)) {
+        const steps = m[1]!.split(",").length
+        expect(Number(m[2])).toBeLessThan(steps - 1) // the last phase is the reset beat, never the poster
+      }
     }
   })
 
@@ -35,6 +36,64 @@ describe("stageshow", () => {
 })
 
 describe("stageshow mounted", () => {
+  test("playback follows visibility and changes to reduced motion", async () => {
+    const { installDom } = await import("./helpers/dom.ts")
+    installDom()
+    const { createRoot } = await import("solid-js")
+    const { createStory } = await import("../src/shared/ui/stageshow/story.ts")
+    let visible: ((entries: Array<{ isIntersecting: boolean }>) => void) | undefined
+    let motionChange: (() => void) | undefined
+    const media = { matches: false, addEventListener: (_: string, fn: () => void) => { motionChange = fn }, removeEventListener: () => {} }
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => media })
+    const previousObserver = globalThis.IntersectionObserver
+    globalThis.IntersectionObserver = class {
+      constructor(callback: typeof visible) { visible = callback }
+      observe() {}
+      disconnect() {}
+    } as unknown as typeof IntersectionObserver
+    let dispose = () => {}
+    try {
+      const story = createRoot((end) => {
+        dispose = end
+        const result = createStory({ steps: [10, 100], poster: 1 })
+        result.watch(document.createElement("div"))
+        return result
+      })
+      expect(story.phase()).toBe(1)
+      visible?.([{ isIntersecting: true }])
+      expect(story.phase()).toBe(0)
+      media.matches = true
+      motionChange?.()
+      expect(story.phase()).toBe(1)
+      media.matches = false
+      motionChange?.()
+      expect(story.phase()).toBe(0)
+      visible?.([{ isIntersecting: false }])
+      expect(story.phase()).toBe(1)
+    } finally {
+      dispose()
+      globalThis.IntersectionObserver = previousObserver
+    }
+  })
+
+  test("page scenes mount, every one decorative", async () => {
+    const { installDom } = await import("./helpers/dom.ts")
+    installDom()
+    const { render } = await import("solid-js/web")
+    const {
+      AnalyticsScene, CommitScene, DocumentScene, FlagsScene, PasskeyScene, SessionsScene, TimelineScene
+    } = await import("../src/shared/ui/stageshow/index.ts")
+    const root = document.createElement("div")
+    document.body.replaceChildren(root)
+    const dispose = render(() => [
+      AnalyticsScene(), CommitScene(), DocumentScene(), FlagsScene(), PasskeyScene(), SessionsScene(), TimelineScene()
+    ], root)
+    try {
+      expect(root.querySelectorAll(".ss-stage").length).toBe(7)
+      expect([...root.querySelectorAll(".ss-stage")].every((el) => el.getAttribute("aria-hidden") === "true")).toBe(true)
+    } finally { dispose() }
+  }, 20_000)
+
   test("module previews, the empty state and the skeleton render under happy-dom", async () => {
     const { installDom } = await import("./helpers/dom.ts")
     installDom()

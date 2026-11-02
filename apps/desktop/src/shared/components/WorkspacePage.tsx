@@ -180,12 +180,21 @@ export function StageEmpty(props: {
   readonly hint: string
   /** A Stageshow illustration of what will fill this screen, shown instead of the icon tile. */
   readonly preview?: PreviewKind
+  /** A page-specific scene, when the shared module previews cannot tell this screen's story. */
+  readonly scene?: JSX.Element
   readonly children?: JSX.Element
 }): JSX.Element {
   return (
     <div class="workspace-empty">
-      <Show when={props.preview !== undefined} fallback={<div class="workspace-empty__icon" aria-hidden="true">{props.icon}</div>}>
-        <div class="workspace-empty__preview"><ModulePreview module={props.preview!} /></div>
+      <Show
+        when={props.scene !== undefined}
+        fallback={
+          <Show when={props.preview !== undefined} fallback={<div class="workspace-empty__icon" aria-hidden="true">{props.icon}</div>}>
+            <div class="workspace-empty__preview"><ModulePreview module={props.preview!} /></div>
+          </Show>
+        }
+      >
+        <div class="workspace-empty__preview">{props.scene}</div>
       </Show>
       <h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{props.title}</h3>
       <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{props.hint}</p>

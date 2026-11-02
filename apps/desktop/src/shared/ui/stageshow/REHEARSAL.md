@@ -15,10 +15,18 @@ crop that puts the eye on the story), `loading` for the skeleton, `presence` for
 | `scenes-cad.tsx` | explorer, drawing sheet, PMI |
 | `scenes-cam.tsx` | verify, cost, trend |
 | `scenes-system.tsx` | phone pairing, update, background tasks |
+| `scenes-pages.tsx` | analytics, timeline, history, document, passkeys, sessions, feature flags |
 
 Used by: dashboard module cards, `StageEmpty` (`preview` prop), `StageLoading`/`LoadingState` (skeleton rows),
 404/500/offline, the assistant's empty thread, project detail tabs, auth/billing/profile/org screens, CAD
 explorer/drawing/PMI panels, CAM verify/cost, analytics, companion, update prompt, background tasks.
+
+Reuse pass (no new artwork): `ModulePreview` gained a `lost` kind so `StageEmpty preview="lost"` covers
+not-found states — manuals search, organization not-found, project not-found (the `/manuals`,
+`/organizations/:id` and `/projects/:id` routes delegate to those screens). The MCP settings empty
+(`/settings/mcp`) frames the existing `ConnectPreview` over its real text, matching the analytics
+empty-state framing and the MCP directory's `preview="connect"`. Deferred by roadmap ownership:
+project-history scenes (WP11) and a CAD/CAM job tour (WP7 viewport) wait for their RM steps.
 
 ## Beats
 
@@ -51,8 +59,11 @@ one global reduced-motion rule for ambient loops (spinners keep turning).
 ## Not checked
 
 - No film of every scene's full loop; the loop seam was read on the first seven scenes only.
+- The page-level scenes have not yet been filmed in their actual hosts, dark theme or narrow layouts.
 - Dark theme of the account, CAD, CAM and system scenes; the narrow side panels (~280 px) in the real app.
 - The scenes inside the running Tauri app (WKWebView): `offset-path` on the CAM tool dot is verified in
   Chromium only.
+- The reuse-pass slots above (manuals, org/project not-found, MCP settings) were checked by typecheck and
+  the stageshow test only; they inherit the dark/narrow/WKWebView gaps above and were not filmed.
 - Icon-size consistency and hover shapes were not re-audited across ~70 CAD and ~100 CAM files.
 - Gradient flattening was checked by grep and by eye on the dashboard, not on every screen it touches.

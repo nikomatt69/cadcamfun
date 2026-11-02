@@ -13,6 +13,7 @@
  * v6 has no `userAnalyticsService` to write test rows with).
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { AnalyticsScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
 import { Motion } from "solid-motionone"
@@ -433,6 +434,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
                 fallback={
                   <EmptyCard
                     icon={<Users class="h-12 w-12 text-gray-400" />}
+                    scene={<AnalyticsScene />}
                     title={t("cost.system.emptyTitle")}
                     body={t("cost.system.emptyBody")}
                   />
@@ -470,6 +472,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
               fallback={
                 <EmptyCard
                   icon={<BarChart2 class="h-12 w-12 text-gray-400" />}
+                  scene={<AnalyticsScene />}
                   title={t("cost.emptyTitle")}
                   body={t("cost.emptyBody")}
                   action={t("cost.generate")}
@@ -525,6 +528,8 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
 
 interface EmptyCardProps {
   readonly icon: JSX.Element
+  /** A page scene shown in place of the icon when the empty state deserves the story. */
+  readonly scene?: JSX.Element
   readonly title: string
   readonly body: string
   readonly action?: string
@@ -540,7 +545,14 @@ function EmptyCard(props: EmptyCardProps): JSX.Element {
       transition={{ duration: 0.3 }}
     >
       <div class="flex flex-col items-center space-y-4">
-        <div class="rounded-full bg-gray-100 p-4 dark:bg-gray-700">{props.icon}</div>
+        <Show
+          when={props.scene !== undefined}
+          fallback={<div class="rounded-full bg-gray-100 p-4 dark:bg-gray-700">{props.icon}</div>}
+        >
+          <div class="w-full max-w-md overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true">
+            {props.scene}
+          </div>
+        </Show>
         <div>
           <h3 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">{props.title}</h3>
           <p class="max-w-md text-gray-500 dark:text-gray-400">{props.body}</p>

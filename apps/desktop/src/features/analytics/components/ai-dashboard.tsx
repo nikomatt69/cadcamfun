@@ -11,6 +11,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { Activity, BarChart2, Clock, Cpu, MessageCircle, RefreshCw, Target, TrendingUp, Zap } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
+import { AnalyticsScene, TimelineScene } from "../../../shared/ui/stageshow/index.ts"
 
 type TabKey = "context" | "stats" | "insights" | "performance"
 
@@ -296,8 +297,10 @@ export function AiDashboard(): JSX.Element {
               </button>
             </div>
 
-            <div class="rounded-xl border border-gray-200/30 bg-gray-50/60 p-8 text-center dark:border-gray-600/30 dark:bg-gray-700/60">
-              <Target size={32} class="mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+            <div class="rounded-xl border border-gray-200/30 bg-gray-50/60 p-4 text-center dark:border-gray-600/30 dark:bg-gray-700/60">
+              <div class="mx-auto mb-3 max-w-md overflow-hidden rounded-md border border-gray-200/60 dark:border-gray-600/40" aria-hidden="true">
+                <AnalyticsScene />
+              </div>
               <p class="text-sm text-gray-500 dark:text-gray-400">{t("aiDash.noInsights")}</p>
             </div>
           </Motion.div>
@@ -308,6 +311,9 @@ export function AiDashboard(): JSX.Element {
               {t("aiDash.recentHistory")}
             </h3>
             <div class="max-h-64 space-y-3 overflow-y-auto">
+              <div class="mx-auto max-w-md overflow-hidden rounded-md border border-gray-200/60 dark:border-gray-600/40" aria-hidden="true">
+                <TimelineScene />
+              </div>
               <div class="p-4 text-center text-gray-500 dark:text-gray-400">{t("aiDash.noInteractions")}</div>
             </div>
           </Motion.div>

@@ -1,0 +1,468 @@
+/* Page-level scenes (scenes-pages.tsx). Scoped under `.ss-stage`; tokens come from stage.css. */
+
+.ss-stage.ss-pages { background: var(--ss-surface-inset); }
+
+.ss-stage .pg-analytics,
+.ss-stage .pg-timeline,
+.ss-stage .pg-commit,
+.ss-stage .pg-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--ss-surface);
+}
+
+/* ── Shared chrome ──────────────────────────────────────────────────────── */
+.ss-stage .pg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ss-line);
+}
+.ss-stage .pg-head .ss-bar { height: 5px; }
+.ss-stage .pg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 6px;
+  border: 1px solid var(--ss-line);
+  border-radius: 999px;
+  background: var(--ss-surface-subtle);
+  color: var(--ss-text-muted);
+  font-family: var(--ss-mono);
+  font-size: 8.5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ss-stage .pg-chip--ok {
+  border-color: color-mix(in srgb, var(--ss-ok) 42%, var(--ss-line));
+  background: color-mix(in srgb, var(--ss-ok) 10%, var(--ss-surface));
+  color: var(--ss-ok);
+}
+.ss-stage .pg-panel__title { font-size: 11px; font-weight: 600; letter-spacing: -0.01em; color: var(--ss-text); }
+.ss-stage .pg-panel__action {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: var(--ss-action);
+  color: var(--ss-action-text);
+  font-size: 9.5px;
+  font-weight: 500;
+  transition: background-color 0.25s ease, filter 0.1s ease;
+}
+.ss-stage .pg-panel__action[data-pressed="true"] { filter: brightness(0.9); }
+.ss-stage .pg-panel__action[data-done="true"] { background: var(--ss-ok); }
+
+/* ── Analytics: chart scrub ─────────────────────────────────────────────── */
+.ss-stage .pg-metric {
+  position: absolute;
+  top: 30px;
+  left: 12px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.ss-stage .pg-metric__track {
+  display: flex;
+  flex-direction: column;
+  height: 24px;
+  overflow: hidden;
+  transition: transform 0.45s var(--ss-ease);
+}
+.ss-stage .pg-metric__track > span {
+  height: 24px;
+  line-height: 24px;
+  color: var(--ss-text);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ss-stage .pg-metric__track[data-next="true"] { transform: translateY(-24px); }
+.ss-stage .pg-metric__label { color: var(--ss-text-faint); font-size: 9.5px; }
+
+.ss-stage .pg-chart { position: absolute; inset: 0; }
+.ss-stage .pg-grid { stroke: var(--ss-line); stroke-width: 1; opacity: 0.8; }
+.ss-stage .pg-baseline { stroke: var(--ss-line-strong); stroke-width: 1; }
+.ss-stage .pg-area { fill: var(--ss-accent-soft); opacity: 0.8; }
+.ss-stage .pg-line {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.ss-stage .pg-line[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.ss-stage .pg-line[data-on="false"] { transition: none; }
+.ss-stage .pg-hair {
+  stroke: var(--ss-line-strong);
+  stroke-width: 1;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.ss-stage .pg-hair[data-on="true"] { opacity: 1; }
+.ss-stage .pg-dot {
+  fill: var(--ss-accent);
+  stroke: var(--ss-surface);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.ss-stage .pg-dot[data-on="true"] { opacity: 1; }
+.ss-stage .pg-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ss-text);
+  color: var(--ss-surface);
+  font-family: var(--ss-mono);
+  font-size: 8.5px;
+  line-height: 1.3;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.ss-stage .pg-tip[data-show="true"] { opacity: 1; transform: none; }
+
+/* ── Timeline: a row arrives ────────────────────────────────────────────── */
+.ss-stage .pg-live {
+  width: 5px;
+  height: 5px;
+  margin-right: auto;
+  border-radius: 50%;
+  background: var(--ss-accent);
+  opacity: 0.35;
+}
+.ss-stage .pg-live[data-on="true"] { animation: pg-beat 0.45s ease 2; }
+.ss-stage .pg-tl-list {
+  position: absolute;
+  top: 38px;
+  left: 14px;
+  right: 12px;
+  padding-left: 14px;
+  border-left: 1px solid var(--ss-line);
+}
+.ss-stage .pg-tl-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  min-width: 0;
+}
+.ss-stage .pg-tl-node {
+  position: absolute;
+  left: -18px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--ss-surface);
+  border-radius: 50%;
+  background: var(--ss-line-strong);
+}
+.ss-stage .pg-tl-row--fresh {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.5s var(--ss-ease), opacity 0.3s ease;
+}
+.ss-stage .pg-tl-row--fresh[data-in="true"] { height: 28px; opacity: 1; }
+.ss-stage .pg-tl-row--fresh .pg-tl-node { background: var(--ss-ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ss-ok) 16%, transparent); }
+.ss-stage .pg-tl-chip {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--ss-surface-subtle);
+  color: var(--ss-text-muted);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ss-stage .pg-tl-chip--ok { background: color-mix(in srgb, var(--ss-ok) 12%, var(--ss-surface)); color: var(--ss-ok); }
+.ss-stage .pg-tl-name {
+  overflow: hidden;
+  color: var(--ss-text);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ss-stage .pg-tl-time { margin-left: auto; flex-shrink: 0; color: var(--ss-text-faint); font-family: var(--ss-mono); font-size: 8.5px; }
+.ss-stage .pg-tl-timebar { flex-shrink: 0; }
+
+/* ── Commit: a node lands on the branch ─────────────────────────────────── */
+.ss-stage .pg-commit__body { position: absolute; top: 34px; left: 12px; right: 12px; display: flex; gap: 12px; }
+.ss-stage .pg-graph { position: relative; flex-shrink: 0; width: 14px; }
+.ss-stage .pg-graph__line { position: absolute; top: 8px; bottom: 4px; left: 6px; width: 1px; background: var(--ss-line-strong); }
+.ss-stage .pg-graph__node {
+  position: absolute;
+  top: 28px;
+  left: 2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ss-line-strong);
+  border-radius: 50%;
+  background: var(--ss-surface);
+}
+.ss-stage .pg-graph__node--fresh {
+  top: 4px;
+  border-color: var(--ss-accent);
+  opacity: 0;
+  transform: scale(0.55);
+  transition: opacity 0.3s ease, transform 0.35s var(--ss-ease);
+}
+.ss-stage .pg-graph__node--fresh[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .pg-commit__main { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.ss-stage .pg-form {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  overflow: hidden;
+  opacity: 1;
+  transition: height 0.35s var(--ss-ease), opacity 0.2s ease;
+}
+.ss-stage .pg-form[data-done="true"] { height: 0; opacity: 0; }
+.ss-stage .pg-form__text {
+  flex: 1;
+  min-width: 0;
+  height: 25px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--ss-line-strong);
+  border-radius: 5px;
+  background: var(--ss-surface);
+  color: var(--ss-text);
+  font-size: 10px;
+  line-height: 25px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ss-stage .pg-form__btn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--ss-action);
+  color: var(--ss-action-text);
+  font-size: 9.5px;
+  font-weight: 500;
+  transition: filter 0.1s ease;
+}
+.ss-stage .pg-form__btn[data-pressed="true"] { filter: brightness(0.9); }
+.ss-stage .pg-commit__row { display: flex; align-items: center; gap: 8px; height: 28px; min-width: 0; }
+.ss-stage .pg-commit__row--fresh {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.45s var(--ss-ease), opacity 0.3s ease;
+}
+.ss-stage .pg-commit__row--fresh[data-in="true"] { height: 28px; opacity: 1; }
+.ss-stage .pg-hash { flex-shrink: 0; color: var(--ss-text-faint); font-family: var(--ss-mono); font-size: 8.5px; }
+.ss-stage .pg-commit__message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ss-text);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ss-stage .pg-diff { margin-left: auto; flex-shrink: 0; font-family: var(--ss-mono); font-size: 8.5px; font-weight: 500; }
+.ss-stage .pg-add { color: var(--ss-ok); }
+.ss-stage .pg-del { margin-left: 4px; color: var(--ss-text-faint); }
+
+/* ── Legal: the sheet and the seal ──────────────────────────────────────── */
+.ss-stage.ss-document { background: var(--ss-surface-inset); }
+.ss-stage .pg-doc {
+  position: absolute;
+  top: 10px;
+  bottom: -6px;
+  left: 18px;
+  width: 236px;
+  padding: 12px 14px;
+  border: 1px solid var(--ss-line);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--ss-surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+.ss-stage .pg-doc__head { display: flex; align-items: center; gap: 6px; }
+.ss-stage .pg-doc__mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--ss-line);
+  border-radius: 4px;
+  background: var(--ss-surface-subtle);
+  color: var(--ss-accent);
+}
+.ss-stage .pg-doc__title { color: var(--ss-text); font-size: 12px; font-weight: 600; letter-spacing: -0.01em; }
+.ss-stage .pg-doc__line { height: 4px; margin-top: 8px; opacity: 0.42; transition: background-color 0.25s ease, opacity 0.25s ease; }
+.ss-stage .pg-doc__line[data-reading="true"] { background: var(--ss-accent); opacity: 0.8; }
+
+/* ── Passkeys: the first key arrives ────────────────────────────────────── */
+.ss-stage .pg-passkey__empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  margin: 10px 12px 0;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px dashed var(--ss-line-strong);
+  border-radius: 6px;
+  opacity: 1;
+  transition: height 0.35s var(--ss-ease), margin 0.35s var(--ss-ease), opacity 0.25s ease;
+}
+.ss-stage .pg-passkey__empty[data-gone="true"] { height: 0; margin-top: 0; opacity: 0; }
+.ss-stage .pg-passkey__outline {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ss-line);
+  border-radius: 50%;
+  color: var(--ss-text-faint);
+}
+.ss-stage .pg-passkey__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 0;
+  margin: 0 12px;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.4s var(--ss-ease), margin 0.4s var(--ss-ease), opacity 0.3s ease;
+}
+.ss-stage .pg-passkey__row[data-in="true"] { height: 46px; margin-top: 10px; opacity: 1; }
+.ss-stage .pg-passkey__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ss-line);
+  border-radius: 6px;
+  background: var(--ss-surface-subtle);
+  color: var(--ss-accent);
+}
+.ss-stage .pg-passkey__text { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.ss-stage .pg-passkey__name { color: var(--ss-text); font-size: 10px; font-weight: 500; }
+.ss-stage .pg-passkey__sub { color: var(--ss-text-faint); font-size: 9px; }
+.ss-stage .pg-passkey__check { display: grid; place-items: center; margin-left: auto; color: var(--ss-ok); }
+
+/* ── Sessions: a device leaves ──────────────────────────────────────────── */
+.ss-stage .pg-device {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  margin: 0 12px;
+  border-bottom: 1px solid var(--ss-line);
+}
+.ss-stage .pg-device:last-of-type { border-bottom: 0; }
+.ss-stage .pg-device--leaving {
+  overflow: hidden;
+  opacity: 1;
+  transition: height 0.4s var(--ss-ease), opacity 0.25s ease, border-color 0.25s ease;
+}
+.ss-stage .pg-device--leaving[data-gone="true"] { height: 0; border-color: transparent; opacity: 0; }
+.ss-stage .pg-device__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ss-line);
+  border-radius: 6px;
+  background: var(--ss-surface-subtle);
+  color: var(--ss-text-muted);
+}
+.ss-stage .pg-device__text { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.ss-stage .pg-device__name { color: var(--ss-text); font-size: 10px; font-weight: 500; }
+.ss-stage .pg-device__sub { color: var(--ss-text-faint); font-size: 9px; }
+.ss-stage .pg-device__trash {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--ss-text-faint);
+  transition: filter 0.1s ease;
+}
+.ss-stage .pg-device__trash[data-pressed="true"] { filter: brightness(0.85); background: var(--ss-surface-subtle); }
+.ss-stage .pg-toast {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--ss-ok) 40%, var(--ss-line));
+  border-radius: 5px;
+  background: var(--ss-surface);
+  color: var(--ss-ok);
+  font-size: 9px;
+  font-weight: 500;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.25s ease, transform 0.3s var(--ss-ease);
+}
+.ss-stage .pg-toast[data-show="true"] { opacity: 1; transform: none; }
+
+/* ── Feature flags: a switch opens its override row ─────────────────────── */
+.ss-stage .pg-flag { display: flex; align-items: center; gap: 7px; height: 24px; padding: 0 12px; }
+.ss-stage .pg-flag__name { color: var(--ss-text); font-family: var(--ss-mono); font-size: 9.5px; }
+.ss-stage .pg-flag__group { color: var(--ss-text-faint); font-size: 8.5px; }
+.ss-stage .pg-switch {
+  display: flex;
+  align-items: center;
+  width: 24px;
+  height: 14px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--ss-line-strong);
+  transition: background-color 0.25s ease, filter 0.1s ease;
+}
+.ss-stage .pg-switch > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ss-surface);
+  transition: transform 0.25s var(--ss-ease);
+}
+.ss-stage .pg-switch[data-pressed="true"] { filter: brightness(0.9); }
+.ss-stage .pg-switch[data-on="true"] { background: var(--ss-ok); }
+.ss-stage .pg-switch[data-on="true"] > span { transform: translateX(10px); }
+.ss-stage .pg-flag__detail {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 0;
+  padding: 0 12px;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.35s var(--ss-ease), opacity 0.25s ease;
+}
+.ss-stage .pg-flag__detail[data-in="true"] { height: 22px; opacity: 1; }
+.ss-stage .pg-flag__reason { color: var(--ss-text-muted); font-size: 9px; }
+
+@keyframes pg-beat {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}

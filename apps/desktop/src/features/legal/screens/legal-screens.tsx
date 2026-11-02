@@ -6,6 +6,7 @@ import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { Scale, ShieldCheck, ScrollText } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
+import { DocumentScene } from "../../../shared/ui/stageshow/index.ts"
 
 interface LegalDoc {
   readonly titleKey: "legal.terms.title" | "legal.privacy.title" | "legal.thirdParty.title"
@@ -61,6 +62,7 @@ export function LegalScreen(props: { readonly kind: keyof typeof docs }): JSX.El
     <div class="reference-legal-icon"><Icon size={28} /></div>
     <h1>{t(doc().titleKey)}</h1>
     <p class="reference-legal-intro">{t(doc().introKey)}</p>
+    <div class="reference-legal-scene"><DocumentScene /></div>
     <For each={doc().sections}>{(section) => <>
       <h2>{section.heading}</h2>
       <p>{section.body}</p>

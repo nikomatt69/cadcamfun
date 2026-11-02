@@ -11,8 +11,9 @@
  * (blue), no hover scaling.
  */
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { PasskeyScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createSignal, onMount, type JSX } from "solid-js"
-import { AlertTriangle, Computer, Fingerprint, Phone, Plus, ShieldCheck, Trash } from "lucide-solid"
+import { AlertTriangle, Computer, Phone, Plus, ShieldCheck, Trash } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 
@@ -186,7 +187,9 @@ export function PasskeySettings(): JSX.Element {
               when={passkeys().length > 0}
               fallback={
                 <div class="p-8 text-center">
-                  <Fingerprint class="mx-auto mb-4 h-10 w-10 text-slate-300 dark:text-slate-600" />
+                  <div class="mx-auto mb-4 max-w-md overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true">
+                    <PasskeyScene />
+                  </div>
                   <h4 class="mb-2 text-base font-medium text-slate-900 dark:text-white">{t("settings.passkeys.empty")}</h4>
                   <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.passkeys.emptyHint")}</p>
                 </div>

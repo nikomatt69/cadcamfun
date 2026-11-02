@@ -15,6 +15,7 @@ import { Check, Settings, Shield, X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { ADMIN_EMAILS, LOCAL_ADMIN_EMAIL, featureFlagService, isAdminUser } from "./feature-flags.ts"
 import { Button, Field, Notice, SectionHeader, TextField } from "../../../shared/components/enterprise.tsx"
+import { FlagsScene } from "../../../shared/ui/stageshow/index.ts"
 
 export function AdminFeatureFlagsPanel(): JSX.Element | null {
   const [selectedUser, setSelectedUser] = createSignal("")
@@ -81,6 +82,15 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
               onInput={setSelectedUser}
             />
           </Field>
+
+          <Show when={!selectedUser()}>
+            <div
+              aria-hidden="true"
+              style={{ "max-width": "28rem", overflow: "hidden", border: "1px solid var(--ent-border)", "border-radius": "var(--ent-radius)" }}
+            >
+              <FlagsScene />
+            </div>
+          </Show>
 
           <Show when={selectedUser()}>
             <div class="ent-card">

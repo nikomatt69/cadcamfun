@@ -9,7 +9,7 @@
  * window is hidden, and it never plays for people who asked for reduced motion — they get the
  * `poster` phase, the one frame that tells the whole story on its own.
  */
-import { createSignal, onCleanup, onMount, type Accessor } from "solid-js"
+import { createSignal, onCleanup, type Accessor } from "solid-js"
 
 export interface Story {
   /** Current phase index. */
@@ -65,24 +65,26 @@ export function createStory(options: StoryOptions): Story {
   }
 
   const watch = (el: HTMLElement): void => {
-    onMount(() => {
-      if (prefersReducedMotion()) return
-      const sync = (): void => (seen && !document.hidden ? start() : settle())
-      const observer =
-        typeof IntersectionObserver === "function"
-          ? new IntersectionObserver((entries) => {
-              seen = entries.some((entry) => entry.isIntersecting)
-              sync()
-            }, { threshold: 0.25 })
-          : undefined
-      observer?.observe(el)
-      document.addEventListener("visibilitychange", sync)
-      if (observer === undefined) sync()
-      onCleanup(() => {
-        observer?.disconnect()
-        document.removeEventListener("visibilitychange", sync)
-        stop()
-      })
+    const motion = typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : undefined
+    const sync = (): void => (seen && !document.hidden && !motion?.matches ? start() : settle())
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver((entries) => {
+            seen = entries.some((entry) => entry.isIntersecting)
+            sync()
+          }, { threshold: 0.25 })
+        : undefined
+    observer?.observe(el)
+    document.addEventListener("visibilitychange", sync)
+    motion?.addEventListener?.("change", sync)
+    if (observer === undefined) sync()
+    onCleanup(() => {
+      observer?.disconnect()
+      document.removeEventListener("visibilitychange", sync)
+      motion?.removeEventListener?.("change", sync)
+      stop()
     })
   }
 
