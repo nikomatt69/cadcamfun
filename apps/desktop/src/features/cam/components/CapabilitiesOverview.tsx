@@ -20,14 +20,16 @@ interface GroupCardProps {
   readonly itemKeys: ReadonlyArray<Key>
 }
 
+/** One neutral bar for every group: the accent says nothing the title does not (craft.md, colour). */
+const BAR = "var(--ent-line-strong, #cbd5e1)"
 const ACCENT_BAR: Readonly<Record<GroupCardProps["accent"], string>> = {
-  blue: "#3b82f6",
-  purple: "#9333ea",
-  cyan: "#0891b2",
-  amber: "#d97706",
-  orange: "#ea580c",
-  green: "#059669",
-  red: "#dc2626"
+  blue: BAR,
+  purple: BAR,
+  cyan: BAR,
+  amber: BAR,
+  orange: BAR,
+  green: BAR,
+  red: BAR
 }
 
 function GroupCard(props: GroupCardProps): JSX.Element {
