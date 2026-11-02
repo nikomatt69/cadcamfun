@@ -107,7 +107,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
   const numberInput = (name: string, label: string) => (
     <div>
       <label class="block text-xs text-gray-500">{labelOr(label, label)}</label>
-      <NumberField class={INPUT} value={Number(data()[name] ?? 0)} accept={() => true} onValue={(value) => setData({ ...data(), [name]: value })} />
+      <NumberField name={name} class={INPUT} value={Number(data()[name] ?? 0)} accept={() => true} onValue={(value) => setData({ ...data(), [name]: value })} />
     </div>
   )
   const positionFields = () => (
@@ -172,7 +172,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
         <Show when={props.type === "line" || props.type === "circle" || props.type === "rectangle"}>
           <div class="mt-2">
             <label class="block text-xs text-gray-500">{t("cad.toolpanel.lineWidth")}</label>
-            <NumberField class={INPUT} value={Number(data()["linewidth"] ?? 1)} int accept={(value) => value >= 1 && value <= 10} onValue={(value) => setData({ ...data(), linewidth: value })} />
+            <NumberField name="linewidth" class={INPUT} value={Number(data()["linewidth"] ?? 1)} int accept={(value) => value >= 1 && value <= 10} onValue={(value) => setData({ ...data(), linewidth: value })} />
           </div>
         </Show>
         <div class="mt-4 flex justify-end space-x-2">

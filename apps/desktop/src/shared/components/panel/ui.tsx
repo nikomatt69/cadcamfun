@@ -92,6 +92,7 @@ interface NumberFieldProps {
   readonly accept?: (value: number) => boolean
   readonly class?: string
   readonly id?: string
+  readonly name?: string
   readonly label?: string
 }
 
@@ -103,6 +104,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
   return (
     <DimensionField
       id={props.id}
+      name={props.name}
       label={props.label}
       value={props.value}
       integer={props.int}

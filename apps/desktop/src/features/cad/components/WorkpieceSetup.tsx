@@ -109,9 +109,9 @@ export default function WorkpieceSetup(): JSX.Element {
   const number = (name: "width" | "height" | "depth" | "positionX" | "positionY" | "positionZ", label: string, wrap = false) => (
     <div>
       <label class={LABEL}>{label}</label>
-      <Show when={wrap} fallback={<NumberField class={`mt-1 ${FIELD}`} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />}>
+      <Show when={wrap} fallback={<NumberField name={name} class={`mt-1 ${FIELD}`} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />}>
         <div class="mt-1 relative rounded-md shadow-sm">
-          <NumberField class={FIELD} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />
+          <NumberField name={name} class={FIELD} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />
           <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none" />
         </div>
       </Show>
