@@ -1,4 +1,4 @@
-import { brep, cam, creasedNormals, elementBrep as cadElementBrep, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
+import { brep, cam, creasedNormals, type History, elementBrep as cadElementBrep, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
 import { useCustomElementsStore } from "../store/customElementsStore.ts";
@@ -10,6 +10,7 @@ import { initializeElementTransform } from "./element-transform.ts";
 import { applyMaterialLook, elementMaterialName } from "../../../viewport/render-look.ts";
 import { currentLookTier } from "../../../viewport/render-look-setting.ts";
 import { buildExtraElement, isExtraElement } from "./extra-elements.ts";
+import { createSketchOverlays, historyErrors, historyView } from "./history-view.ts";
 
 /** The edges of solids and curves: a mid-dark grey that lets the face colour show through, not black, so a part reads as one body and not as a drawing of one. */
 const EDGE_STYLE = { color: 0x59606a, opacity: 0.45 } as const
@@ -94,6 +95,30 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
   group.userData.isBrep = true;
   group.userData.brepFaces = cached.model.faces.length;
   return group;
+};
+
+/**
+ * A feature history as the canvas shows it: its solid (the bodies united, or one by one when they cannot be united), the sketches
+ * of the history with their solve status and constraint glyphs, and `userData.historyIssues` for the features that failed. The mesh is
+ * the one the CAM machines (`placeElementMesh` of the same rebuild); a history that builds no body but has sketches still shows them.
+ */
+const parametricObject = (element: any, offset: { x: number; y: number; z: number }, onEdgesReady?: () => void): THREE.Object3D | null => {
+  const history = element.history as History | undefined;
+  if (typeof history !== "object" || history === null || !Array.isArray(history.features)) return null;
+  const view = historyView(history);
+  const placedElement = withoutGizmo(element);
+  const solids = view.parts.map((part) => solidObject(
+    cam.model.placeElementMesh(placedElement, { positions: Float64Array.from(part.positions), indices: part.indices }),
+    { color: 0x26a69a, ...element }, offset, onEdgesReady
+  ));
+  const at = { x: (Number(element.x) || 0) + offset.x, y: (Number(element.y) || 0) + offset.y, z: (Number(element.z) || 0) + offset.z };
+  const sketches = createSketchOverlays(history, view, at);
+  const errors = historyErrors(view);
+  if (solids.length === 0 && sketches.length === 0) return null;
+  const result: THREE.Object3D = solids.length === 1 && sketches.length === 0 ? solids[0]! : new THREE.Group().add(...solids, ...sketches);
+  result.userData.isParametric = true;
+  if (errors.length > 0) result.userData.historyIssues = errors;
+  return result;
 };
 
 /** The elements a Boolean depends on, itself included. */
@@ -1402,10 +1427,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
       }
 
       // A parametric model: its feature history rebuilt into one solid (the same solid the CAM machines).
-      case "parametric": {
-        const solid = cam.model.elementMesh(withoutGizmo(element));
-        return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset, onEdgesReady) : null;
-      }
+      case "parametric": return parametricObject(element, originOffset, onEdgesReady);
 
       // An exact solid (a STEP import): faces with their exact normals and the B-rep edges.
       case "brep":

@@ -638,5 +638,8 @@
   "cad.display.xray": "Rayons X",
   "cad.display.ghost": "Fantôme",
   "cad.invalid.title": "Éléments impossibles à dessiner : {count}",
-  "cad.invalid.more": "et {count} de plus"
+  "cad.invalid.more": "et {count} de plus",
+  "cad.sketches": "Esquisses",
+  "cad.sketches.toggle": "Afficher les esquisses déjà utilisées par des fonctions",
+  "cad.issues.title": "Fonctions en erreur : {count}"
 }

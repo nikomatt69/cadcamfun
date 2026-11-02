@@ -638,5 +638,8 @@
   "cad.display.xray": "Рентген",
   "cad.display.ghost": "Призрак",
   "cad.invalid.title": "Элементы, которые нельзя отобразить: {count}",
-  "cad.invalid.more": "и ещё {count}"
+  "cad.invalid.more": "и ещё {count}",
+  "cad.sketches": "Эскизы",
+  "cad.sketches.toggle": "Показывать эскизы, уже использованные операциями",
+  "cad.issues.title": "Операции с ошибками: {count}"
 }

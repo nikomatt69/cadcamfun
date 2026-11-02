@@ -638,5 +638,8 @@
   "cad.display.xray": "X線",
   "cad.display.ghost": "ゴースト",
   "cad.invalid.title": "描画できない要素: {count}",
-  "cad.invalid.more": "ほか {count} 件"
+  "cad.invalid.more": "ほか {count} 件",
+  "cad.sketches": "スケッチ",
+  "cad.sketches.toggle": "フィーチャが使用済みのスケッチを表示",
+  "cad.issues.title": "エラーのあるフィーチャ: {count}"
 }

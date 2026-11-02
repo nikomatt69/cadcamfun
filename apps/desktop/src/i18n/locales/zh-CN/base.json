@@ -638,5 +638,8 @@
   "cad.display.xray": "X光",
   "cad.display.ghost": "幽灵",
   "cad.invalid.title": "无法绘制的元素：{count}",
-  "cad.invalid.more": "以及另外 {count} 个"
+  "cad.invalid.more": "以及另外 {count} 个",
+  "cad.sketches": "草图",
+  "cad.sketches.toggle": "显示已被特征使用的草图",
+  "cad.issues.title": "出错的特征：{count}"
 }

@@ -36,6 +36,7 @@ import { booleanFormed } from "../lib/createThreeObject.ts"
 import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
+import { applySketchVisibility } from "../lib/history-view.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
@@ -220,6 +221,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [memory, setMemory] = createSignal({ used: 0, total: 0, geometries: 0, textures: 0 })
   const [frame, setFrame] = createSignal(0)
   /** The elements that have no geometry to draw: each is a red marker in the scene and a line in the banner. */
+  /** Features of a drawn history that failed: the part is drawn without them, and the person is told which and why. */
+  const [issueItems, setIssueItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly feature: string; readonly message: string }>>([])
   const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
@@ -694,6 +697,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         return { id, name: element?.name || element?.type || id, reason: String(object.userData.invalidReason ?? "") }
       }))
     }
+    const failing = drawn.filter((object) => Array.isArray(object.userData.historyIssues))
+    if (failing.length > 0 || issueItems().length > 0) {
+      setIssueItems(failing.flatMap((object) => {
+        const id = String(object.userData.elementId)
+        const element = all.find((candidate) => candidate.id === id) as { name?: string; type?: string } | undefined
+        return (object.userData.historyIssues as ReadonlyArray<{ feature: string; message: string }>).map((issue) => ({ id, name: element?.name || element?.type || id, feature: issue.feature, message: issue.message }))
+      }))
+    }
     setRebuilds((count) => count + 1)
     invalidate()
     props.onElementsChange?.(all)
@@ -725,6 +736,16 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     for (const [id, entry] of objectsById) {
       if (applyDisplayMode(entry.object, mode, mode === "ghost" && selected.size > 0 && !selected.has(id))) changed = true
     }
+    if (changed) invalidate()
+  })
+
+  // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
+  createEffect(() => {
+    rebuilds()
+    const show = cad.showSketches
+    if (!ready()) return
+    let changed = false
+    for (const entry of objectsById.values()) if (applySketchVisibility(entry.object, show)) changed = true
     if (changed) invalidate()
   })
 
@@ -1341,6 +1362,17 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
+      <Show when={issueItems().length > 0}>
+        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-amber-900/90 px-3 py-2 text-xs text-white shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
+          <p class="font-semibold">{t("cad.issues.title", { count: issueItems().length })}</p>
+          <ul class="mt-1 space-y-0.5">
+            <For each={issueItems().slice(0, 4)}>{(item) => (
+              <li><button type="button" class="text-left underline decoration-dotted" onClick={() => selection.selectElement(item.id)}>{item.name}</button> · {item.feature}: {item.message}</li>
+            )}</For>
+          </ul>
+        </div>
+      </Show>
+
       <div class="panel cad-viewport-top">
         <div class="cad-viewport-selection">
           <SelectionControls
@@ -1479,6 +1511,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
           <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
         </select>
+        <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "#0288d1" : "rgba(0,0,0,0.7)" }}
+          aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
       </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button

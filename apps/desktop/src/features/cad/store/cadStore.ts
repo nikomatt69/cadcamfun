@@ -113,6 +113,9 @@ interface CADState {
   /** How the canvas draws solids: shaded, with edges, hidden line, wireframe, x-ray or ghost (`lib/display-mode.ts`). */
   displayMode: DisplayMode;
   setDisplayMode: (mode: DisplayMode) => void;
+  /** Show the sketches a feature already uses (a sketch nothing uses is always shown). */
+  showSketches: boolean;
+  setShowSketches: (show: boolean) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -122,6 +125,8 @@ export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
   displayMode: DEFAULT_DISPLAY_MODE,
   setDisplayMode: (mode) => set((state) => (isDisplayMode(mode) ? { displayMode: mode } : state)),
+  showSketches: false,
+  setShowSketches: (show) => set({ showSketches: show === true }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

@@ -638,5 +638,8 @@
   "cad.display.xray": "Raios X",
   "cad.display.ghost": "Fantasma",
   "cad.invalid.title": "Elementos que não podem ser desenhados: {count}",
-  "cad.invalid.more": "e mais {count}"
+  "cad.invalid.more": "e mais {count}",
+  "cad.sketches": "Esboços",
+  "cad.sketches.toggle": "Mostrar os esboços que as operações já usam",
+  "cad.issues.title": "Operações com erros: {count}"
 }

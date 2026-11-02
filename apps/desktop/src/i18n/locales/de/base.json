@@ -638,5 +638,8 @@
   "cad.display.xray": "Röntgen",
   "cad.display.ghost": "Geist",
   "cad.invalid.title": "Elemente, die nicht gezeichnet werden können: {count}",
-  "cad.invalid.more": "und {count} weitere"
+  "cad.invalid.more": "und {count} weitere",
+  "cad.sketches": "Skizzen",
+  "cad.sketches.toggle": "Skizzen anzeigen, die Features bereits verwenden",
+  "cad.issues.title": "Features mit Fehlern: {count}"
 }
