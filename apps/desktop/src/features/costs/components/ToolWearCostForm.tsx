@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useRead } from "../../../app/queries.ts"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { FIELD, PANEL, TOOLBAR_BUTTON, TOOLBAR_PRIMARY } from "../../../shared/components/WorkspacePage.tsx"
 import type { ProductionCostsStore } from "../store/costsStore.ts"
 import { t } from "../../../i18n/index.ts"
@@ -67,7 +68,7 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
 
   return (
     <div class={PANEL}>
-      <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.wear.editTitle") : t("costs.wear.addTitle")}</h3>
+      <h3 class="text-[13px] font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.wear.editTitle") : t("costs.wear.addTitle")}</h3>
 
       <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
         <div>
@@ -95,18 +96,18 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
 
         <div>
           <label for="wearRatePerMeter" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.rate")}</label>
-          <input id="wearRatePerMeter" type="number" name="wearRatePerMeter" value={formData.wearRatePerMeter} onInput={handleChange} min="0" step="0.01" class={FIELD} required />
+          <NumberField id="wearRatePerMeter" name="wearRatePerMeter" value={formData.wearRatePerMeter} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("wearRatePerMeter", value)} />
           <p class="text-xs text-gray-500 mt-1">{t("costs.wear.rateHint")}</p>
         </div>
 
         <div>
           <label for="replacementCost" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.replacement", { currency: formData.currencyCode })}</label>
-          <input id="replacementCost" type="number" name="replacementCost" value={formData.replacementCost} onInput={handleChange} min="0" step="0.01" class={FIELD} required />
+          <NumberField id="replacementCost" name="replacementCost" value={formData.replacementCost} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("replacementCost", value)} />
         </div>
 
         <div>
           <label for="replacementThreshold" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.threshold")}</label>
-          <input id="replacementThreshold" type="number" name="replacementThreshold" value={formData.replacementThreshold} onInput={handleChange} min="0" max="100" step="1" class={FIELD} required />
+          <NumberField id="replacementThreshold" name="replacementThreshold" value={formData.replacementThreshold} min="0" max="100" step="1" class={FIELD} accept={(value) => value >= 0 && value <= 100} onValue={(value) => setFormData("replacementThreshold", value)} />
           <p class="text-xs text-gray-500 mt-1">{t("costs.wear.thresholdHint")}</p>
         </div>
 

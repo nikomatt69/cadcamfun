@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useRead } from "../../../app/queries.ts"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { FIELD, PANEL, TOOLBAR_BUTTON, TOOLBAR_PRIMARY } from "../../../shared/components/WorkspacePage.tsx"
 import type { ProductionCostsStore } from "../store/costsStore.ts"
 import { t } from "../../../i18n/index.ts"
@@ -71,7 +72,7 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
 
   return (
     <div class={PANEL}>
-      <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.material.editTitle") : t("costs.material.addTitle")}</h3>
+      <h3 class="text-[13px] font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.material.editTitle") : t("costs.material.addTitle")}</h3>
 
       <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
         <div>
@@ -97,7 +98,7 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
         <div>
           <label for="costPerUnit" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.perUnit", { currency: formData.currencyCode })}</label>
           <div class="flex items-center gap-2">
-            <input id="costPerUnit" type="number" name="costPerUnit" value={formData.costPerUnit} onInput={handleChange} min="0" step="0.01" class={FIELD} required />
+            <NumberField id="costPerUnit" name="costPerUnit" value={formData.costPerUnit} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("costPerUnit", value)} />
             <select name="currencyCode" aria-label={t("costs.currency")} value={formData.currencyCode} onChange={handleChange} class={`${FIELD} !w-auto`}>
               <For each={availableCurrencies}>{(currency) => <option value={currency.code}>{currency.symbol} ({currency.code})</option>}</For>
             </select>
@@ -107,13 +108,13 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
 
         <div>
           <label for="wasteFactor" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.waste")}</label>
-          <input id="wasteFactor" type="number" name="wasteFactor" value={formData.wasteFactor} onInput={handleChange} min="0" max="100" step="1" class={FIELD} required />
+          <NumberField id="wasteFactor" name="wasteFactor" value={formData.wasteFactor} min="0" max="100" step="1" class={FIELD} accept={(value) => value >= 0 && value <= 100} onValue={(value) => setFormData("wasteFactor", value)} />
           <p class="text-xs text-gray-500 mt-1">{t("costs.material.wasteHint")}</p>
         </div>
 
         <div>
           <label for="minimumCharge" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.minimum", { currency: formData.currencyCode })}</label>
-          <input id="minimumCharge" type="number" name="minimumCharge" value={formData.minimumCharge} onInput={handleChange} min="0" step="0.01" class={FIELD} />
+          <NumberField id="minimumCharge" name="minimumCharge" value={formData.minimumCharge} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("minimumCharge", value)} />
           <p class="text-xs text-gray-500 mt-1">{t("costs.material.minimumHint")}</p>
         </div>
 

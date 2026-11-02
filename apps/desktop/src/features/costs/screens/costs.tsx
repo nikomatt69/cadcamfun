@@ -78,7 +78,7 @@ export function CostsScreen(): JSX.Element {
       <Show when={error()}><StageError message={`${t("costs.error")}: ${error()}`} /></Show>
       <Show when={result()} fallback={<div class="workspace-empty"><div class="workspace-empty__preview"><CostPreview /></div><h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h3><p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("costs.empty")}</p></div>}>{(r) =>
         <article class={PANEL} aria-label={t("costs.result")}>
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h2>
+          <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h2>
           <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
             <For each={lines(r())}>{([label, value]) => <><dt>{label}</dt><dd class="text-right tabular-nums">{money(value, r().currencyCode)}</dd></>}</For>
             <dt class="font-semibold">{t("costs.total")}</dt><dd class="text-right font-semibold tabular-nums">{money(r().totalCost, r().currencyCode)}</dd>
@@ -89,13 +89,13 @@ export function CostsScreen(): JSX.Element {
           <button type="button" class={`${TOOLBAR_BUTTON} mt-3`} disabled={pending()} onClick={() => void onSave()}>{t("costs.save")}</button>
         </article>}</Show>
       <section>
-        <h2 class="mb-2 font-semibold text-slate-900 dark:text-white">{t("costs.recent")}</h2>
+        <h2 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("costs.recent")}</h2>
         <Show when={saved.loading() && !saved.data()}><StageLoading label={t("common.loading")} /></Show>
         <Show when={saved.error()}><StageError message={`${t("costs.error")}: ${describe(saved.error())}`} /></Show>
         <Show when={saved.data()?.length === 0}><p class="text-sm text-slate-500 dark:text-slate-400">{t("costs.recentEmpty")}</p></Show>
         <ul class="grid gap-2 text-sm">
           <For each={saved.data() ?? []}>{(row) =>
-            <li class={`${PANEL} flex justify-between !p-3 text-slate-800 dark:text-gray-200`}><span>{row.toolpath.name} · {formatDate(row.createdAt)}</span><span>{money(row.totalCost, row.currencyCode)}</span></li>}</For>
+            <li class={`${PANEL} flex justify-between gap-3 !p-3 text-slate-800 dark:text-gray-200`}><span class="min-w-0">{row.toolpath.name} · {formatDate(row.createdAt)}</span><span class="flex-none tabular-nums">{money(row.totalCost, row.currencyCode)}</span></li>}</For>
         </ul>
       </section>
     </div>
