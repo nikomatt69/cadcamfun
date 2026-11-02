@@ -253,7 +253,7 @@ function ModuleCard(props: ModuleData): JSX.Element {
       <ModulePreview module={props.preview} />
       <div class="dash-mod-body">
         <div class="dash-mod-head">
-          <Icon size={15} aria-hidden="true" class="dash-mod-icon" />
+          <Icon size={14} aria-hidden="true" class="dash-mod-icon" />
           <div class="dash-mod-titles">
             <h3 class="dash-mod-title">{props.title}</h3>
             <p class="dash-mod-sub">{props.subtitle}</p>
