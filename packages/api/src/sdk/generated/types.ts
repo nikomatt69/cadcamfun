@@ -1590,6 +1590,7 @@ export type ToolpathGeneratorVerifyPayload = {
               readonly z?: JsonValue
               readonly feed?: JsonValue
             }
+            readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
           }
         | {
             readonly _tag: "Linear"
@@ -1602,6 +1603,7 @@ export type ToolpathGeneratorVerifyPayload = {
               readonly z?: JsonValue
               readonly feed?: JsonValue
             }
+            readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
           }
         | {
             readonly _tag: "Arc"
@@ -1609,6 +1611,7 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly center: { readonly x: number; readonly y: number }
             readonly clockwise: boolean
             readonly feed: number
+            readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
           }
         | { readonly _tag: "Dwell"; readonly seconds: number }
         | { readonly _tag: "Comment"; readonly text: string }
@@ -7135,6 +7138,7 @@ export type ToolpathGeneratorManufactureOutput =
                   to: { x: number; y: number; z: number }
                   rotary?: { a?: number; b?: number; c?: number }
                   expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                  comp?: { mode: "left" | "right" | "off"; register?: number }
                 }
               | {
                   _tag: "Linear"
@@ -7142,6 +7146,7 @@ export type ToolpathGeneratorManufactureOutput =
                   feed: number
                   rotary?: { a?: number; b?: number; c?: number }
                   expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                  comp?: { mode: "left" | "right" | "off"; register?: number }
                 }
               | {
                   _tag: "Arc"
@@ -7149,6 +7154,7 @@ export type ToolpathGeneratorManufactureOutput =
                   center: { x: number; y: number }
                   clockwise: boolean
                   feed: number
+                  comp?: { mode: "left" | "right" | "off"; register?: number }
                 }
               | { _tag: "Dwell"; seconds: number }
               | { _tag: "Comment"; text: string }
@@ -7412,6 +7418,7 @@ export type ToolpathGeneratorParseOutput = {
             to: { x: number; y: number; z: number }
             rotary?: { a?: number; b?: number; c?: number }
             expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+            comp?: { mode: "left" | "right" | "off"; register?: number }
           }
         | {
             _tag: "Linear"
@@ -7419,6 +7426,7 @@ export type ToolpathGeneratorParseOutput = {
             feed: number
             rotary?: { a?: number; b?: number; c?: number }
             expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+            comp?: { mode: "left" | "right" | "off"; register?: number }
           }
         | {
             _tag: "Arc"
@@ -7426,6 +7434,7 @@ export type ToolpathGeneratorParseOutput = {
             center: { x: number; y: number }
             clockwise: boolean
             feed: number
+            comp?: { mode: "left" | "right" | "off"; register?: number }
           }
         | { _tag: "Dwell"; seconds: number }
         | { _tag: "Comment"; text: string }
@@ -7959,6 +7968,7 @@ export type CamSetupGenerateOutput = {
               to: { x: number; y: number; z: number }
               rotary?: { a?: number; b?: number; c?: number }
               expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+              comp?: { mode: "left" | "right" | "off"; register?: number }
             }
           | {
               _tag: "Linear"
@@ -7966,6 +7976,7 @@ export type CamSetupGenerateOutput = {
               feed: number
               rotary?: { a?: number; b?: number; c?: number }
               expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+              comp?: { mode: "left" | "right" | "off"; register?: number }
             }
           | {
               _tag: "Arc"
@@ -7973,6 +7984,7 @@ export type CamSetupGenerateOutput = {
               center: { x: number; y: number }
               clockwise: boolean
               feed: number
+              comp?: { mode: "left" | "right" | "off"; register?: number }
             }
           | { _tag: "Dwell"; seconds: number }
           | { _tag: "Comment"; text: string }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { circle } from "../../src/cad/testing.ts"
-import { makeProgram } from "../../src/cam/ir.ts"
+import { makeProgram, type Move } from "../../src/cam/ir.ts"
 import { ProfileParams, generateProfile } from "../../src/cam/operations/profile.ts"
 import { posts } from "../../src/cam/post/index.ts"
 import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
@@ -95,5 +95,39 @@ describe("controller cutter compensation on the profile", () => {
   test("without the option nothing changes: the tool-centre path is written, no G41/G42", () => {
     const tp = generateProfile(new ProfileParams({ totalDepth: 4, stepdown: 2 } as never), square40, tool6, stock100)
     expect(tp.moves.some((m) => m._tag === "CutterComp")).toBe(false)
+  })
+})
+
+
+describe("merged compensation IR forms", () => {
+  const emit = (moves: ReadonlyArray<Move>, post: keyof typeof posts = "fanuc") => {
+    const profile = generateProfile(params(), square40, tool6, stock100)
+    return posts[post]!.emit(makeProgram("mixed", [{ ...profile, moves }]), {})
+  }
+
+  test("standalone activation and attached cancellation share the same modal state", () => {
+    const text = emit([
+      { _tag: "CutterComp", side: "left", register: 3 },
+      { _tag: "Linear", to: { x: 10, y: 0, z: 0 }, feed: 100, comp: { mode: "off" } }
+    ])
+    expect(text).toContain("G41 D3")
+    expect(text.slice(text.indexOf("G41 D3")).match(/G40/g)).toHaveLength(1)
+  })
+
+  test("attached activation and standalone cancellation use all supported dialects", () => {
+    const moves: ReadonlyArray<Move> = [
+      { _tag: "Linear", to: { x: 10, y: 0, z: 0 }, feed: 100, comp: { mode: "right", register: 2 } },
+      { _tag: "CutterComp", side: "off" }
+    ]
+    for (const post of ["generic", "fanuc", "haas", "okuma", "siemens", "linuxcnc", "mazak", "mitsubishi", "brother"] as const) {
+      const text = emit(moves, post)
+      expect(text).toContain("G42 D2")
+      expect(text.slice(text.indexOf("G42 D2")).match(/G40/g)).toHaveLength(1)
+    }
+    for (const post of ["grbl", "heidenhain"] as const) expect(() => emit(moves, post)).toThrow(/compensation/)
+  })
+
+  test("standalone compensation rejects an invalid register", () => {
+    expect(() => emit([{ _tag: "CutterComp", side: "left", register: 0 }])).toThrow(/positive D register/)
   })
 })
