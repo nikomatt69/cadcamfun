@@ -42,6 +42,7 @@ export function Button(props: ButtonProps): JSX.Element {
   const isDisabled = () => own.disabled === true || own.loading === true
   return (
     <button
+      type="button"
       class={[variantClass(variant()), sizeClass(size()), own.class ?? ""].filter(Boolean).join(" ")}
       disabled={isDisabled()}
       aria-busy={own.loading === true ? "true" : undefined}
@@ -64,6 +65,7 @@ export function IconButton(
   const size = () => own.size ?? "md"
   return (
     <button
+      type="button"
       class={["ui-icon-btn", sizeClass(size()), own.active === true ? "ui-icon-btn-active" : "", own.class ?? ""].filter(Boolean).join(" ")}
       aria-pressed={own.active}
       {...rest}

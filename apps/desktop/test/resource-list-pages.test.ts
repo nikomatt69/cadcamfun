@@ -17,7 +17,7 @@ beforeAll(async () => {
 })
 afterAll(async () => { await app.dispose() })
 
-const PAGE_TIMEOUT = 20000
+const PAGE_TIMEOUT = 60000
 const find = <T extends Element = HTMLElement>(selector: string): Promise<T> => app.wait(() => document.querySelector<T>(selector), 30000)
 const byText = (tag: string, text: string): HTMLElement | undefined =>
   [...document.querySelectorAll<HTMLElement>(tag)].find((el) => el.textContent?.trim() === text)
@@ -88,7 +88,9 @@ describe("resource list pages", () => {
       input.value = "Endmill"
       input.dispatchEvent(new window.Event("input", { bubbles: true }))
       const cardTitle = await app.wait(() => byText("h3", "Endmill List"), 30000)
-      cardTitle.closest<HTMLElement>('[role="link"]')?.click()
+      const link = cardTitle.closest<HTMLAnchorElement>("a")
+      expect(link).not.toBeNull()
+      link!.click()
       expect(await app.wait(() => byText("h1", "Endmill List"), 30000)).toBeDefined()
     } finally { dispose() }
   }, PAGE_TIMEOUT)

@@ -227,6 +227,12 @@ export function Shell(props: ShellProps): JSX.Element {
   })
 
   const settings = (): ReturnType<typeof app.settings.settings> => app.settings.settings()
+  const scrollToTop = (): void => {
+    // The button disappears at the top. Move keyboard focus to the content first
+    // so it is not lost when the button is unmounted.
+    main?.focus({ preventScroll: true })
+    main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })
+  }
   const toolLabel = (): string | undefined => {
     const tool = app.tool()
     return t(`cad.${tool}` as Key)
@@ -246,13 +252,13 @@ export function Shell(props: ShellProps): JSX.Element {
 
         <div class="reference-page-column">
           <Show when={layout() === "page"}><ReferenceBreadcrumbs pathname={location.pathname} /></Show>
-          <main ref={main} class="reference-page-scroll" id="main-content" onScroll={(event) => setShowScrollTop(event.currentTarget.scrollTop > 300)}>
+          <main ref={main} class="reference-page-scroll" id="main-content" tabIndex={-1} onScroll={(event) => setShowScrollTop(event.currentTarget.scrollTop > 300)}>
             <div class={layout() === "workspace" ? "reference-workspace-container" : layout() === "standalone" ? "reference-standalone-container" : "reference-page-container"}>
               {props.children}
             </div>
           </main>
           <Show when={layout() === "page"}><ReferenceFooter /></Show>
-          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={() => main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}><ChevronUp size={20} /></button></Show>
+          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={scrollToTop}><ChevronUp size={20} /></button></Show>
         </div>
 
         <AssistantPanel open={app.panelOpen()} onClose={() => app.setPanelOpen(false)} />

@@ -19,9 +19,10 @@ interface TabsContextValue {
   readonly setValue: (next: string) => void
   readonly baseId: string
   readonly orientation: "horizontal" | "vertical"
-  readonly registerTrigger: (id: string, element: HTMLElement) => void
+  readonly registerTrigger: (id: string, element: HTMLButtonElement) => void
   readonly focusTrigger: (id: string) => void
-  readonly triggers: () => ReadonlyArray<{ id: string; element: HTMLElement; disabled: boolean }>
+  readonly triggers: () => ReadonlyArray<{ id: string; element: HTMLButtonElement }>
+  readonly unregisterTrigger: (id: string, element: HTMLButtonElement) => void
 }
 
 const TabsContext = createContext<TabsContextValue>()
@@ -40,17 +41,20 @@ export function Tabs(props: TabsProps): JSX.Element {
   const [internal, setInternal] = createSignal<string | undefined>(props.defaultValue)
   const value = (): string | undefined => props.value ?? internal()
   const orientation = (): "horizontal" | "vertical" => props.orientation ?? "horizontal"
-  const triggers = createSignal<ReadonlyArray<{ id: string; element: HTMLElement; disabled: boolean }>>([])
+  const triggers = createSignal<ReadonlyArray<{ id: string; element: HTMLButtonElement }>>([])
   const [triggerList, setTriggerList] = triggers
   const setValue = (next: string): void => {
     if (props.value === undefined) setInternal(next)
     props.onChange?.(next)
   }
-  const registerTrigger = (id: string, element: HTMLElement): void => {
+  const registerTrigger = (id: string, element: HTMLButtonElement): void => {
     setTriggerList((current) => {
       const without = current.filter((entry) => entry.id !== id)
-      return [...without, { id, element, disabled: element.hasAttribute("data-disabled") }]
+      return [...without, { id, element }]
     })
+  }
+  const unregisterTrigger = (id: string, element: HTMLButtonElement): void => {
+    setTriggerList((current) => current.filter((entry) => entry.id !== id || entry.element !== element))
   }
   const focusTrigger = (id: string): void => {
     const entry = triggerList().find((entry) => entry.id === id)
@@ -62,6 +66,7 @@ export function Tabs(props: TabsProps): JSX.Element {
     baseId,
     orientation: orientation(),
     registerTrigger,
+    unregisterTrigger,
     focusTrigger,
     triggers: triggerList
   }
@@ -69,8 +74,6 @@ export function Tabs(props: TabsProps): JSX.Element {
     <TabsContext.Provider value={ctx}>
       <div
         class={["ui-tabs", `ui-tabs-${props.variant ?? "default"}`, `ui-tabs-${orientation()}`].join(" ")}
-        role="tablist"
-        aria-orientation={orientation()}
       >
         {props.children}
       </div>
@@ -113,7 +116,7 @@ export function TabsList(props: TabsListProps): JSX.Element {
       : { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
   }
   return (
-    <div class="ui-tabs-list" onClick={measure}>
+    <div class="ui-tabs-list" role="tablist" aria-orientation={orientation()} onClick={measure}>
       <Show when={!reduced() && indicator() !== undefined}>
         <span
           class="ui-tabs-indicator"
@@ -139,18 +142,14 @@ export function TabsTrigger(props: TabsTriggerProps): JSX.Element {
   const panelId = `${ctx.baseId}-panel-${props.value}`
   const active = (): boolean => ctx.value() === props.value
   const setRef = (element: HTMLButtonElement): void => {
-    if (props.disabled === true) element.setAttribute("data-disabled", "")
-    element.setAttribute("role", "tab")
-    element.setAttribute("aria-selected", active() ? "true" : "false")
-    element.setAttribute("aria-controls", panelId)
-    element.setAttribute("id", id)
-    element.setAttribute("tabindex", active() ? "0" : "-1")
     element.addEventListener("keydown", (event) => {
-      const isArrow = event.key === "ArrowRight" || event.key === "ArrowLeft" || event.key === "ArrowDown" || event.key === "ArrowUp"
+      const isArrow = ctx.orientation === "horizontal"
+        ? event.key === "ArrowRight" || event.key === "ArrowLeft"
+        : event.key === "ArrowDown" || event.key === "ArrowUp"
       const isJump = event.key === "Home" || event.key === "End"
       if (!isArrow && !isJump) return
       event.preventDefault()
-      const list = ctx.triggers().filter((t) => !t.disabled)
+      const list = ctx.triggers().filter((t) => !t.element.disabled)
       const idx = list.findIndex((entry) => entry.id === props.value)
       if (idx < 0) return
       const horizontal = ctx.orientation === "horizontal"
@@ -164,11 +163,17 @@ export function TabsTrigger(props: TabsTriggerProps): JSX.Element {
       if (target !== undefined) { ctx.setValue(target.id); ctx.focusTrigger(target.id) }
     })
     ctx.registerTrigger(props.value, element)
+    onCleanup(() => ctx.unregisterTrigger(props.value, element))
   }
   return (
     <button
       ref={setRef}
       type="button"
+      id={id}
+      role="tab"
+      aria-selected={active()}
+      aria-controls={panelId}
+      tabIndex={active() ? 0 : -1}
       class="ui-tabs-trigger"
       classList={{ "ui-tabs-trigger-active": active() }}
       disabled={props.disabled === true}

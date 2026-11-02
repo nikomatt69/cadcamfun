@@ -35,6 +35,7 @@ import { t, type Key } from "../../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { prefersDark } from "../state/settings.ts"
 import { endSession, getSessionToken, sessionVersion } from "../state/session.ts"
+import { displayChord } from "../keybindings/chord.ts"
 
 interface NavItem {
   readonly key: Key
@@ -142,7 +143,10 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
   }
   onMount(() => { document.addEventListener("pointerdown", outside); document.addEventListener("keydown", escape) })
   onCleanup(() => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape) })
-  const shortcut = (): string => (typeof navigator !== "undefined" && navigator.userAgent.includes("Mac") ? "⌘K" : "Ctrl K")
+  const shortcut = (): string | undefined => {
+    const chord = app.keys.keymap().entry("app.palette")?.chords[0]
+    return chord === undefined ? undefined : displayChord(chord, app.keys.platform)
+  }
   return <header ref={header} class="reference-navbar">
     <div class="reference-navbar-inner">
       <div class="reference-navbar-left">
@@ -152,7 +156,7 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
         <button type="button" class="reference-navbar-search" title={t("palette.title")} aria-label={t("palette.title")} onClick={() => { close(); app.setPaletteOpen(true) }}>
           <Search size={14} aria-hidden="true" />
           <span class="reference-navbar-search__label">{t("shell.search")}</span>
-          <kbd class="reference-navbar-kbd">{shortcut()}</kbd>
+          <Show when={shortcut()}>{(keys) => <kbd class="reference-navbar-kbd">{keys()}</kbd>}</Show>
         </button>
       </div>
       <div class="reference-navbar-actions">
@@ -204,7 +208,12 @@ export function ReferenceSidebar(props: { readonly open: boolean; readonly mobil
   }
   return <Show when={!props.mobile || props.open}>
     <Show when={props.mobile}><button type="button" class="reference-sidebar-scrim" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)} /></Show>
-    <aside id="reference-sidebar" class="reference-sidebar panel" classList={{ "is-collapsed": !props.open, "is-mobile": props.mobile }}>
+    <aside id="reference-sidebar" class="reference-sidebar panel" classList={{ "is-collapsed": !props.open, "is-mobile": props.mobile }} onKeyDown={(event) => {
+      if (event.key !== "Escape" || !props.mobile || !props.open || event.defaultPrevented) return
+      event.preventDefault()
+      props.onOpenChange(false)
+      document.querySelector<HTMLButtonElement>('.reference-navbar-menu[aria-controls="reference-sidebar"]')?.focus()
+    }}>
       <div class="reference-sidebar-heading">
         <ReferenceLink href="/" class="reference-sidebar-brand" label={t("shell.brand")} onNavigate={follow}>
           <img src="/icon.png" alt="" />
@@ -212,11 +221,11 @@ export function ReferenceSidebar(props: { readonly open: boolean; readonly mobil
         </ReferenceLink>
         <Show when={props.mobile}><button type="button" class="reference-icon-button ml-auto" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)}><X size={18} /></button></Show>
       </div>
-      <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigationGroups}>{(group) => <section class="reference-nav-section" aria-labelledby={`reference-nav-${group.id}`}>
+      <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigationGroups}>{(group) => <section class="reference-nav-section" aria-label={t(navGroupLabel(group.id))}>
         <Show when={props.open}><h2 id={`reference-nav-${group.id}`} class="reference-nav-section-title">{t(navGroupLabel(group.id))}</h2></Show>
         <For each={group.items}>{(item) => <div class="reference-nav-group">
           <Show when={item.children} fallback={<ReferenceLink href={item.href} class={`reference-nav-item${current(item) ? " is-current" : ""}${item.leavesConsole === true ? " reference-nav-item--exit" : ""}`} current={current(item)} label={t(item.key)} onNavigate={follow}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span></Show><Show when={props.open && item.leavesConsole === true}><ArrowUpRight size={13} aria-hidden="true" class="reference-nav-item__exit" /></Show></ReferenceLink>}>
-            <button type="button" class={`reference-nav-item${current(item) ? " is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={`reference-group-${item.key}`} onClick={() => toggle(item)}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={15} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
+            <button type="button" class={`reference-nav-item${current(item) ? " is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={props.open && expanded()[item.key] ? `reference-group-${item.key}` : undefined} onClick={() => toggle(item)}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={15} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
             <Show when={props.open && expanded()[item.key]}><div class="reference-nav-children" id={`reference-group-${item.key}`}><For each={item.children}>{(child) => <ReferenceLink href={child.href} class={`reference-nav-item${location.pathname === child.href ? " is-current" : ""}`} current={location.pathname === child.href} onNavigate={follow}><child.icon size={15} /><span>{t(child.key)}</span></ReferenceLink>}</For></div></Show>
           </Show>
         </div>}</For>

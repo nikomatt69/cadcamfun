@@ -92,7 +92,7 @@ export function SignUpScreen(): JSX.Element {
             <Notice tone="bad">{error()}</Notice>
           </Show>
 
-          <Button block onClick={handleGoogleSignUp} disabled={busy("google")}>
+          <Button block onClick={handleGoogleSignUp} disabled={isLoading()}>
             {busy("google") ? t("signup.connecting") : t("signup.google")}
           </Button>
 
@@ -116,7 +116,7 @@ export function SignUpScreen(): JSX.Element {
               <TextField id="password" name="password" type="password" required placeholder={t("auth.placeholder.password")} />
             </Field>
 
-            <Button tone="primary" type="submit" block disabled={busy("email")}>
+            <Button tone="primary" type="submit" block disabled={isLoading()}>
               {busy("email") ? t("signup.submitBusy") : t("signup.title")}
             </Button>
           </form>
@@ -126,7 +126,7 @@ export function SignUpScreen(): JSX.Element {
               <Field label={t("auth.magicLabel")} id="magic-email">
                 <TextField id="magic-email" type="email" value={magicLinkEmail()} placeholder={t("auth.placeholder.email")} onInput={setMagicLinkEmail} />
               </Field>
-              <Button block onClick={handleMagicLink} disabled={busy("magic-link")}>
+              <Button block onClick={handleMagicLink} disabled={isLoading()}>
                 {busy("magic-link") ? t("auth.magicSending") : t("auth.magicSend")}
               </Button>
             </div>

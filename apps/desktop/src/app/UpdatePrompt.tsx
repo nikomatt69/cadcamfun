@@ -118,14 +118,18 @@ export function UpdatePrompt(): JSX.Element {
       case "upToDate": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.upToDate", { version: current.version })}</p>
       case "available": return <AvailableBody update={current} />
       case "downloading": return (
-        <div class="space-y-2" data-testid="update-progress">
-          <div class="update-preview" aria-hidden="true"><UpdatePreview /></div>
-          <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.downloading")}</p>
-          <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(current) ?? undefined} aria-label={t("update.downloading")}>
-            <div class={`h-full bg-blue-600 transition-[width] ${percent(current) === undefined ? "w-1/3 animate-pulse" : ""}`} style={percent(current) === undefined ? undefined : { width: `${percent(current)}%` }} />
+        <div class="space-y-3" data-testid="update-progress">
+          <div class="flex items-baseline justify-between gap-4">
+            <p class="text-sm font-medium text-gray-800 dark:text-gray-100">{t("update.downloading")}</p>
+            <Show when={percent(current) !== undefined}>
+              <span class="shrink-0 text-sm font-semibold tabular-nums text-gray-800 dark:text-gray-100">{percent(current)}%</span>
+            </Show>
           </div>
-          <p class="text-xs text-gray-500">
-            {percent(current) === undefined ? formatBytes(current.downloaded) : `${percent(current)}% · ${formatBytes(current.downloaded)} / ${formatBytes(current.total ?? 0)}`}
+          <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(current) ?? undefined} aria-label={t("update.downloading")}>
+            <div class={`h-full rounded-full bg-blue-600 motion-safe:transition-[width] ${percent(current) === undefined ? "w-1/3 motion-safe:animate-pulse" : ""}`} style={percent(current) === undefined ? undefined : { width: `${percent(current)}%` }} />
+          </div>
+          <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+            {percent(current) === undefined ? formatBytes(current.downloaded) : `${formatBytes(current.downloaded)} / ${formatBytes(current.total ?? 0)}`}
           </p>
         </div>
       )

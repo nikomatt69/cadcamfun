@@ -154,7 +154,8 @@ export function ProjectDetailScreen(): JSX.Element {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <For each={rows}>
         {(row) => (
-          <div class={CARD} onClick={() => onOpen(row)} data-testid={`project-card-${row.id}`}>
+          <div class={CARD} data-testid={`project-card-${row.id}`}>
+            <button type="button" aria-label={`${t("projects.open")}: ${row.name}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" onClick={() => onOpen(row)}>
             <div class="flex h-24 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
               <Show when={row.thumbnail} fallback={thumb}>{(src) => <img src={src()} alt={row.name} class="h-full w-full object-contain" />}</Show>
             </div>
@@ -163,6 +164,7 @@ export function ProjectDetailScreen(): JSX.Element {
               <Show when={row.description}><p class="mt-1 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
               <Show when={showDate && row.updatedAt}><div class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{t("projects.column.updated")} {formatDate(row.updatedAt)}</div></Show>
             </div>
+            </button>
             <Show when={actions}><div class="flex justify-end gap-1 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/30">{actions!(row)}</div></Show>
           </div>
         )}

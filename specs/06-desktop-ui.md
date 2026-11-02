@@ -1,5 +1,18 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Stageshow craft pass (2026-11-02)
+
+Status: in progress. The owner requests Stageshow principles across the desktop UI.
+Apply the skill's hierarchy, spacing, restrained motion and accessible interaction to
+the functional Solid interface; illustrative scenes remain decorative and do not
+replace real controls or data. WP6 owns shell, shared UI and feature screens. Preserve
+existing workflows and verify each changed area, including reduced motion and keyboard
+interaction. Full page-by-page visual review remains outstanding.
+
+Change log: 2026-11-02 — updated project card keyboard access, settings alignment and
+wrapping, updater progress presentation, shell focus handling and scene playback when
+the system motion preference changes. Targeted checks are recorded with the work.
+
 ## CAD/CAM refinement and operation tooling (2026-10-26)
 
 Status: in progress. Owner-requested refinement covers CADCanvas, CadPage, CamPage,

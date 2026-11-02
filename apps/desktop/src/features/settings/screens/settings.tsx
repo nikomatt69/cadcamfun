@@ -92,7 +92,7 @@ export function SettingsScreen(): JSX.Element {
   }
 
   const tabPanel = (tab: TabId): JSX.Element => (
-    <div class="p-4 sm:p-6">
+    <div class="min-w-0">
       <Show when={tab === "profile"}><ProfileSettings /></Show>
 
       <Show when={tab === "account"}>
@@ -125,7 +125,7 @@ export function SettingsScreen(): JSX.Element {
                 {isDeleting() ? t("settings.account.deleting") : t("settings.account.delete")}
               </button>
               <Show when={deleteError() !== undefined}>
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{deleteError()}</p>
+                <p role="alert" class="mt-2 text-sm text-red-600 dark:text-red-400">{deleteError()}</p>
               </Show>
             </div>
           </div>
@@ -176,13 +176,13 @@ export function SettingsScreen(): JSX.Element {
               <div class="mt-4 space-y-4">
                 <For each={LOCALE_CODES}>
                   {(code) => (
-                    <div class="flex items-center">
-                      <div class="flex-shrink-0">
+                    <div class="grid grid-cols-[8px_minmax(0,1fr)] items-center gap-3">
+                      <div class="flex h-2 w-2 items-center justify-center" aria-hidden="true">
                         <Show when={code === app.settings.settings().locale}>
                           <span class="inline-block h-2 w-2 rounded-full bg-blue-600" />
                         </Show>
                       </div>
-                      <div class="ml-3">
+                      <div class="min-w-0">
                         <p class="text-sm text-slate-700 dark:text-slate-300">{localeInfo(code).endonym}</p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
                           {code === app.settings.settings().locale ? t("settings.lang.currentLanguage") : localeInfo(code).name}
@@ -285,7 +285,7 @@ export function SettingsScreen(): JSX.Element {
               <fieldset>
                 <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.updates.title")}</legend>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("settings.updates.description")}</p>
-                <div class="mt-3 flex gap-2">
+                <div class="mt-3 flex flex-wrap gap-2">
                   <button type="button" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700" onClick={() => void checkForUpdates().catch(() => toast.error(t("update.checkFailed")))}>{t("settings.updates.check")}</button>
                   <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" onClick={() => void openReleaseNotes().catch(() => undefined)}>{t("update.releaseNotes")}</button>
                 </div>

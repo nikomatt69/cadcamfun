@@ -94,10 +94,10 @@ export function SignInScreen(): JSX.Element {
           </Show>
 
           <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-            <Button block onClick={handleGoogleSignIn} disabled={busy("google")}>
+            <Button block onClick={handleGoogleSignIn} disabled={isLoading()}>
               {busy("google") ? t("signin.busy") : t("signin.google")}
             </Button>
-            <Button block onClick={handlePasskeySignIn} disabled={busy("passkey")}>
+            <Button block onClick={handlePasskeySignIn} disabled={isLoading()}>
               {busy("passkey") ? t("signin.passkeyBusy") : t("signin.passkey")}
             </Button>
           </div>
@@ -119,7 +119,7 @@ export function SignInScreen(): JSX.Element {
               <A href="/auth/forgot-password" class="ent-btn ent-btn--ghost" style={{ "padding-inline": "0" }}>{t("auth.signin.forgot")}</A>
             </div>
 
-            <Button tone="primary" type="submit" block disabled={busy("email")}>
+            <Button tone="primary" type="submit" block disabled={isLoading()}>
               {busy("email") ? t("signin.busy") : t("signin.title")}
             </Button>
           </form>
@@ -129,7 +129,7 @@ export function SignInScreen(): JSX.Element {
               <Field label={t("auth.magicLabel")} id="magic-email">
                 <TextField id="magic-email" type="email" value={magicLinkEmail()} placeholder={t("auth.placeholder.email")} onInput={setMagicLinkEmail} />
               </Field>
-              <Button block onClick={handleMagicLink} disabled={busy("magic-link")}>
+              <Button block onClick={handleMagicLink} disabled={isLoading()}>
                 {busy("magic-link") ? t("auth.magicSending") : t("auth.magicSend")}
               </Button>
             </div>

@@ -40,6 +40,21 @@ export function TwoFactorScreen(): JSX.Element {
   // 2FA status — the legacy status check is a TODO, so this stays false.
   const [is2FAEnabled, setIs2FAEnabled] = createSignal(false)
 
+  const handleTabKey = (event: KeyboardEvent, current: Tab): void => {
+    const index = TABS.findIndex((tab) => tab.id === current)
+    let next = index
+    if (event.key === "ArrowRight") next = (index + 1) % TABS.length
+    else if (event.key === "ArrowLeft") next = (index + TABS.length - 1) % TABS.length
+    else if (event.key === "Home") next = 0
+    else if (event.key === "End") next = TABS.length - 1
+    else return
+    event.preventDefault()
+    const tab = TABS[next]
+    if (tab === undefined) return
+    setActiveTab(tab.id)
+    document.getElementById(`twofactor-tab-${tab.id}`)?.focus()
+  }
+
   // Placeholder functions - da implementare quando gli endpoint saranno disponibili
   const handleEnable2FAClick = (): void => {
     setError(t("twofactor.soon"))
@@ -83,9 +98,13 @@ export function TwoFactorScreen(): JSX.Element {
                 <button
                   type="button"
                   role="tab"
+                  id={`twofactor-tab-${tab.id}`}
+                  aria-controls="twofactor-panel"
                   aria-selected={activeTab() === tab.id}
+                  tabIndex={activeTab() === tab.id ? 0 : -1}
                   class="workspace-tab"
                   onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={(event) => handleTabKey(event, tab.id)}
                 >
                   {t(tab.labelKey)}
                 </button>
@@ -96,6 +115,7 @@ export function TwoFactorScreen(): JSX.Element {
           <Show when={error() !== null}><Notice tone="bad">{error()}</Notice></Show>
           <Show when={success() !== null}><Notice tone="ok">{success()}</Notice></Show>
 
+          <div id="twofactor-panel" role="tabpanel" aria-labelledby={`twofactor-tab-${activeTab()}`}>
           {/* Setup Tab */}
           <Show when={activeTab() === "setup"}>
             <div style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
@@ -203,6 +223,7 @@ export function TwoFactorScreen(): JSX.Element {
               </Show>
             </div>
           </Show>
+          </div>
         </div>
 
         <div class="ent-card__foot" style={{ "text-align": "center" }}>

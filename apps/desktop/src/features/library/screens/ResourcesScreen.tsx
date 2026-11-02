@@ -12,7 +12,7 @@
  * that reloads the list as soon as a generated row lands.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js"
-import { useNavigate, useSearchParams } from "@solidjs/router"
+import { A, useNavigate, useSearchParams } from "@solidjs/router"
 import { Box, Cpu, Grid3x3, Layers, List, Plus, Search, Sparkles, Trash2, Wrench, X, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
@@ -459,7 +459,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                   <div class="flex items-center gap-3">
                                     <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-900"><Icon size={18} class="text-slate-400 dark:text-slate-600" aria-hidden="true" /></div>
                                     <div>
-                                      <div class="text-sm font-medium text-slate-900 dark:text-white">{str(row["name"])}</div>
+                                      <button type="button" class="rounded-sm text-left text-sm font-medium text-slate-900 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-white dark:hover:text-blue-300" onClick={(event) => { event.stopPropagation(); navigate(detailPath(row)) }}>{str(row["name"])}</button>
                                       <Show when={str(row["description"] ?? row["notes"])}><div class="max-w-xs truncate text-xs text-slate-500 dark:text-slate-400">{str(row["description"] ?? row["notes"])}</div></Show>
                                     </div>
                                   </div>
@@ -471,8 +471,8 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                 <td class="whitespace-nowrap px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
                                     <Show when={row["builtin"] === true} fallback={<>
-                                      <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                                      <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                                      <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${str(row["name"])}`} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                      <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${str(row["name"])}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                                     </>}>
                                       <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{t("cad.library.builtIn")}</span>
                                     </Show>
@@ -487,9 +487,10 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   >
                     <div class="workspace-resource-grid">
                       <For each={filtered()}>{(row) => (
-                        <div class={`${CARD} cursor-pointer`} onClick={() => navigate(detailPath(row))} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") navigate(detailPath(row)) }}>
+                        <div class={CARD}>
+                          <A href={detailPath(row)} role="link" aria-label={`${t("projects.open")}: ${str(row["name"])}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500">
                           <CardBanner icon={<Icon size={22} />} badge={meta.badge(row)} leftBadge={row["builtin"] === true ? t("cad.library.builtIn") : row["isPublic"] === true ? t("save.publicProject") : undefined} />
-                          <div class="flex flex-1 flex-col gap-2 p-4">
+                          <div class="flex w-full flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
                             <Show when={str(row["description"] ?? row["notes"])}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{str(row["description"] ?? row["notes"])}</p></Show>
                             <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -499,17 +500,15 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                               <Show when={props.kind === "components" && str(row["projectId"]) !== ""}>
                                 <div class="flex justify-between"><span>{t("library.detail.project")}</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>
                               </Show>
-                              <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{str(row["id"]).substring(0, 8)}...</code></div>
                             </div>
                           </div>
+                          </A>
                           <div class="flex items-center justify-between border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30">
                             <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(str(row["updatedAt"]))}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                              <Show when={row["builtin"] === true} fallback={<>
-                                <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                                <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
-                              </>}>
-                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{t("cad.library.builtIn")}</span>
+                              <Show when={row["builtin"] !== true}>
+                                <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${str(row["name"])}`} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${str(row["name"])}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                               </Show>
                             </div>
                           </div>

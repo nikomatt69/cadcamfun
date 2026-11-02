@@ -224,17 +224,18 @@ export function ProjectsScreen(): JSX.Element {
         >
           <div class="grid grid-cols-1 content-start gap-4 md:grid-cols-2 xl:grid-cols-3">
             <For each={filtered()}>{(row) => (
-              <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(row)} onKeyDown={(event) => { if (event.key === "Enter") open(row) }}>
-                <CardBanner icon={<FolderKanban size={26} aria-hidden="true" />} badge="Project" />
-                <div class="flex flex-1 flex-col gap-2.5 p-4">
+              <div class={CARD}>
+                <button type="button" aria-label={`${t("projects.open")}: ${row.name}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" onClick={() => open(row)}>
+                <CardBanner icon={<FolderKanban size={26} aria-hidden="true" />} />
+                <div class="flex w-full flex-1 flex-col gap-2.5 p-4">
                   <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
                   <Show when={row.description}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{row.description}</p></Show>
                   <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <div class="flex items-center justify-between gap-2"><span>{t("projects.column.drawings")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.drawings}</span></div>
                     <div class="flex items-center justify-between gap-2"><span>{t("projects.column.components")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.components}</span></div>
-                    <div class="flex items-center justify-between gap-2"><span>ID</span><code class="truncate font-mono text-[11px] text-blue-600 dark:text-blue-400">{row.id.substring(0, 8)}…</code></div>
                   </div>
                 </div>
+                </button>
                 <div class="flex items-center justify-between border-t border-slate-200/60 bg-white/60 px-4 py-2.5 backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/40">
                   <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
                   <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
