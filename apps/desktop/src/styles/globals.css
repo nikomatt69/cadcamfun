@@ -1861,3 +1861,13 @@ input:checked + .toggle-slider:before {
 /* =================================================================== */
 /* CSS CLEANUP COMPLETED */
 /* =================================================================== */
+
+/* Reduced motion, one rule for the whole app: an ambient loop (pulse, glow, shimmer, bounce, gradient
+   drift) plays once and stops. Spinners keep turning — they say "working", which is information. */
+@media (prefers-reduced-motion: reduce) {
+  *:not([class*="spin"]):not([class*="Spin"]):not(.animate-spin),
+  *:not([class*="spin"]):not([class*="Spin"]):not(.animate-spin)::before,
+  *:not([class*="spin"]):not([class*="Spin"]):not(.animate-spin)::after {
+    animation-iteration-count: 1 !important;
+  }
+}
