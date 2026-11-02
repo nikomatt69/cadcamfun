@@ -181,7 +181,11 @@ export const blendCandidates = (b: Brep, minAngleDegrees = 0.5): BlendCandidate[
       const intoA = cross3(na, coedgeTangent(b, ei, e.t0, ua.reversed))
       const [rho, h0] = radialAxial(p0, centre, dir)
       // How far each face reaches from the edge along its section (a straight line through the edge's point).
-      const reach = (fi: number) => faceBoundaryPoints(b, fi).reduce((m, p) => { const [r, h] = radialAxial(p, centre, dir); return Math.max(m, Math.hypot(r - rho, h - h0)) }, 0)
+      const reach = (fi: number) => {
+        const far = faceBoundaryPoints(b, fi).reduce((m, p) => { const [r, h] = radialAxial(p, centre, dir); return Math.max(m, Math.hypot(r - rho, h - h0)) }, 0)
+        // A disc (a plane whose only boundary is the rim itself, such as the top of a cylinder) runs on to the axis, not to zero.
+        return far < 1e-9 && b.faces[fi]!.surface.kind === "plane" ? rho : far
+      }
       out.push({
         edge: ei, curve: "circle", a: p0, b: p0, nA: na, nB: nb, faceA: ua.face, faceB: ub.face, convex: dot3(intoA, nb) < 0,
         length: 2 * Math.PI * rho, reachA: reach(ua.face), reachB: reach(ub.face), axis: { origin: centre, dir, radius: rho }, curved: true

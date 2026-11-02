@@ -39,7 +39,8 @@ import { elementMesh } from "../cam/model/element-mesh.ts"
 import { exactReplay, type ExactReplay } from "./history-brep.ts"
 import { bodyCreator, bodyRefs, declaredNeeds, timelinePlan } from "./history-timeline.ts"
 import type { Brep } from "./brep/topology.ts"
-import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
+import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, planarFaceFrame, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
+import { lookupEdgeRefs, lookupRef, planarPickOf, segmentOnEdges, shellOpenFromRefs, type RefBody } from "./history-refs.ts"
 import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
 export type PlaneName = "XY" | "YZ" | "ZX"
@@ -221,6 +222,11 @@ export interface ShellFeature {
   readonly thickness: Dimension
   /** The faces left open: none (a closed hollow), the top or bottom face of the extrusion, or both (a tube). */
   readonly open?: "none" | "top" | "bottom" | "both"
+  /**
+   * The faces left open as persistent references (`face:plate|plate.top`): the top and bottom faces of the extrusion. When present
+   * it replaces `open`, which stays as the migrated-from value; a reference to any other face is refused.
+   */
+  readonly openFaces?: ReadonlyArray<string>
   readonly targets?: ReadonlyArray<string>
 }
 /** Which edges of the bodies a fillet or chamfer takes. */
@@ -232,6 +238,12 @@ export interface EdgeSelection {
   readonly minLength?: Dimension
   /** Also take the rims of curved surfaces (every facet edge of a tessellated hole or cylinder); slow, one Boolean per facet. */
   readonly curved?: boolean
+  /**
+   * Persistent references to the edges (`edge:plate|edge(plate.side0.0,plate.top)`, spec 41): when present they ARE the selection and
+   * the geometric fields above are only the hint they were migrated from. A reference follows its edge through a parameter edit and
+   * a feature inserted upstream; one whose edge is gone fails the feature with a "reference lost" error naming the feature that removed it.
+   */
+  readonly refs?: ReadonlyArray<string>
 }
 export interface FilletFeature {
   readonly id: string
@@ -409,6 +421,8 @@ export interface PushPullFeature {
    * point above is only a hint. A name that no longer exists is reported, never replaced by a nearby face.
    */
   readonly name?: string
+  /** A persistent reference to the face (`face:plate|plate.top`, spec 41): it wins over `name` and `near`, which stay as hints. */
+  readonly ref?: string
   /** Only faces whose outward normal points this way (within 60 degrees) are considered. */
   readonly normal?: readonly [Dimension, Dimension, Dimension]
   readonly distance: Dimension
@@ -429,6 +443,8 @@ export interface DraftFeature {
    * no longer exists is reported, never replaced by a nearby face.
    */
   readonly name?: string
+  /** A persistent reference to the face (`face:plate|plate.side0.0`, spec 41): it wins over `name` and `near`, which stay as hints. */
+  readonly ref?: string
   readonly normal?: readonly [Dimension, Dimension, Dimension]
   readonly angle: Dimension
   /** Pull direction (default +Z). */
@@ -469,13 +485,15 @@ export interface MateFeature {
  *   angle    `base` turned `angle` degrees about a line of it: the u axis (`about: "u"`) or the v axis, through the point `at` along the other axis
  *   points   through three points: u runs from the first to the second, the normal is u x (third - first)
  *   face     on the planar face of a body nearest `near` (`normal` picks between faces, `body` limits the search), at the face's centre
- *            and square to it; `offset` lifts it off the face. The plane follows the face when the history is rebuilt.
+ *            and square to it; `offset` lifts it off the face. The plane follows the face when the history is rebuilt. With `ref`
+ *            (`face:plate|plate.top`, spec 41) the referenced face is the one taken and `near` is only the hint it was made from:
+ *            a hole on that plane stays on the face through a parameter edit or a feature inserted upstream.
  */
 export type PlaneDefinition =
   | { readonly kind: "offset"; readonly base: PlaneRef; readonly distance: Dimension }
   | { readonly kind: "angle"; readonly base: PlaneRef; readonly angle: Dimension; readonly about: "u" | "v"; readonly at?: Dimension }
   | { readonly kind: "points"; readonly points: readonly [readonly [Dimension, Dimension, Dimension], readonly [Dimension, Dimension, Dimension], readonly [Dimension, Dimension, Dimension]] }
-  | { readonly kind: "face"; readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension]; readonly body?: string; readonly offset?: Dimension }
+  | { readonly kind: "face"; readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension]; readonly body?: string; readonly offset?: Dimension; readonly ref?: string }
 export interface PlaneFeature { readonly id: string; readonly type: "plane"; readonly from: PlaneDefinition }
 /** The solid elements of the 3D catalogue a history can place, built by the same code that draws them in the editor. */
 export const PRIMITIVE_ELEMENTS = [
@@ -534,8 +552,20 @@ export interface ImportedBase {
   }
 }
 
-/** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name` and `group` are display. */
+/**
+ * How a body looks and what it is made of: a `#rrggbb` colour and the id of a library material (the CAM workpiece grades and the FEA
+ * materials share ids such as `aluminium-6061-t6`). The material gives the body its density, so the mass of a history follows it.
+ * Neither changes the geometry.
+ */
+export interface Appearance {
+  readonly color?: string
+  readonly material?: string
+}
+
+/** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name`, `group` and `appearance` are display. */
 export interface FeatureMeta {
+  /** The look and material of the bodies this feature creates or changes (the last feature that sets one wins); `History.appearances` overrides it per body. */
+  readonly appearance?: Appearance
   /** Left out of the model together with everything that needs it; nothing is deleted. */
   readonly suppressed?: boolean
   /** Name shown in the timeline in place of the id. */
@@ -565,6 +595,8 @@ export interface Configuration {
   readonly name: string
   readonly values: Readonly<Record<string, number | string>>
   readonly suppressed: ReadonlyArray<string>
+  /** The look and material of bodies in this variant (a part in steel and in aluminium): written into `History.appearances` when it is shown. */
+  readonly appearances?: Readonly<Record<string, Appearance>>
 }
 
 /**
@@ -586,6 +618,10 @@ export interface History {
   /** The named variants of the part and the id of the one the history currently shows. */
   readonly configurations?: ReadonlyArray<Configuration>
   readonly configuration?: string
+  /** The look and material of each body by body id; wins over the `appearance` of the features. */
+  readonly appearances?: Readonly<Record<string, Appearance>>
+  /** Selections converted to persistent references by `migrateSelectionsToRefs` (spec 41): what each one was, so the conversion is recorded. */
+  readonly refMigration?: ReadonlyArray<{ readonly feature: string; readonly field: string; readonly from: string; readonly to: ReadonlyArray<string> }>
 }
 
 /**
@@ -607,7 +643,7 @@ export interface Issue {
   readonly remedy?: string
 }
 
-export interface Body { readonly id: string; readonly mesh: Mesh; readonly feature: string }
+export interface Body { readonly id: string; readonly mesh: Mesh; readonly feature: string; /** Look and material, resolved (`History.appearances` over the features'). */ readonly appearance?: Appearance }
 
 export interface RebuildResult {
   readonly bodies: ReadonlyArray<Body>
@@ -1036,10 +1072,37 @@ export const rebuild = (history: History): RebuildResult => {
     return { error: `the face '${name}' does not exist any more` }
   }
 
+  /**
+   * The exact model before feature `index`, for a feature that carries persistent references (spec 41): the bodies it sees and the
+   * states before it (to say what removed a lost entity). An error when there is nothing to resolve against.
+   */
+  const refContext = (index: number, text: string): { readonly bodies: ReadonlyArray<RefBody>; readonly timeline: ReturnType<typeof exactAt>["timeline"] } | { readonly error: string } => {
+    if (index <= 0) return { error: `the reference '${text}' cannot be resolved: no feature builds a body before it` }
+    try {
+      const exact = exactAt(index)
+      return { bodies: exact.bodies, timeline: exact.timeline }
+    } catch {
+      return { error: `the reference '${text}' cannot be resolved: the exact model of the earlier features did not build` }
+    }
+  }
+  /** The face a reference names, as a point on it (and its normal when planar) for the face search of a push/pull, a draft or a plane. */
+  const refFace = (index: number, text: string): { readonly point: V3; readonly normal?: V3; readonly frame?: ReturnType<typeof planarFaceFrame> } | { readonly error: string } => {
+    const ctx = refContext(index, text)
+    if ("error" in ctx) return ctx
+    const hit = lookupRef(text, ctx.bodies, ctx.timeline, "face")
+    if (!hit.ok) return { error: hit.error }
+    if (hit.indices.length !== 1) return { error: `the reference '${text}' names ${hit.indices.length} faces (it was split); a single face is needed here` }
+    const pick = planarPickOf(hit.brep, hit.indices[0]!)
+    const point = faceCentre(hit.brep, hit.indices[0]!)
+    return typeof pick === "string" ? { point } : { point, normal: pick.normal, frame: planarFaceFrame(hit.brep, pick) }
+  }
+
   // The timeline (spec 58): inactive features are recorded, not built. Lineage: the last feature that changed each body.
   const plan = timelinePlan(history)
   for (const message of plan.problems) issues.push({ feature: "timeline", severity: "warning", message })
   const lastWriter = new Map<string, string>()
+  // The look set by features, by body id (the per-body `History.appearances` is laid over it at the end).
+  const looks = new Map<string, Appearance>()
   // Failed and skipped features, each with the failed feature at its root.
   const broken = new Map<string, string>()
   for (const [featureIndex, f] of history.features.entries()) {
@@ -1300,7 +1363,18 @@ export const rebuild = (history: History): RebuildResult => {
             ...(minLength !== undefined ? { minLength } : {}), ...(f.edges?.curved === true ? { curved: true } : {}),
             ...(within !== undefined ? { within: { min: within.min as [number, number, number], max: within.max as [number, number, number] } } : {})
           }
-          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+          // Edges stored as persistent references are the selection (spec 41): resolved on the exact model before this feature.
+          let refSel: ReturnType<typeof lookupEdgeRefs> | undefined
+          if (f.edges?.refs !== undefined) {
+            const ctx = refContext(featureIndex, f.edges.refs[0] ?? "")
+            if ("error" in ctx) { issues.push({ feature: f.id, severity: "error", message: ctx.error }); break }
+            refSel = lookupEdgeRefs(f.edges.refs, ctx.bodies, ctx.timeline)
+            if (!refSel.ok) { issues.push({ feature: f.id, severity: "error", message: refSel.error }); break }
+            for (const note of refSel.notes) issues.push({ feature: f.id, severity: "warning", message: note })
+            if (refSel.byBody.size === 0) { issues.push({ feature: f.id, severity: "error", message: "The fillet has no edge references" }); break }
+          }
+          const refBodies = refSel !== undefined && refSel.ok ? refSel.byBody : undefined
+          const chosen = bodies.filter((b) => (f.targets === undefined || f.targets.includes(b.id)) && (refBodies === undefined || refBodies.has(b.id)))
           if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: NO_BODY }); break }
           let blended = 0
           let nativeAttempts = 0
@@ -1311,12 +1385,19 @@ export const rebuild = (history: History): RebuildResult => {
           const collided: Array<{ readonly reason: string; readonly fits: (k: number) => boolean }> = []
           // The prefix already has its solved sketches and mesh bodies. Giving it to the exact adapter avoids re-entering
           // this rebuild. A selection made only of sphere/plane or cone/plane rims uses that exact solid for the mesh.
-          const exactBefore = f.edges?.curved === true && style === "fillet" && radiusEnd === undefined
+          const exactBefore = (f.edges?.curved === true || refBodies !== undefined) && style === "fillet" && radiusEnd === undefined
             ? exactAt(history.features.indexOf(f))
             : undefined
+          // A reference selects whatever its edge is (convex or concave, straight or a rim): the filters above do not apply to it.
+          const pickSelector = refBodies !== undefined ? { kind: "both" as const, curved: true } : selector
+          const onRefs = <E extends { readonly a: { x: number; y: number; z: number }; readonly b: { x: number; y: number; z: number } }>(b: Body, edges: ReadonlyArray<E>): E[] => {
+            const own = refBodies?.get(b.id)
+            return own === undefined ? [...edges] : edges.filter((e) => segmentOnEdges(own.brep, own.edges, e.a, e.b, 5e-3))
+          }
           for (const b of chosen) {
             const exact = exactBefore?.bodies.find((body) => body.id === b.id)?.brep
-            const nativeEdges = exact === undefined ? [] : selectBlendEdges(blendCandidates(exact, 25), selector)
+            const ownRefs = refBodies?.get(b.id)
+            const nativeEdges = exact === undefined ? [] : selectBlendEdges(blendCandidates(exact, 25), pickSelector).filter((e) => ownRefs === undefined || ownRefs.edges.has(e.edge))
             if (exact !== undefined && nativeEdges.length > 0 && nativeEdges.every((edge) => isSpherePlaneRim(exact, edge) || isConePlaneRim(exact, edge))) {
               nativeAttempts++
               try {
@@ -1340,7 +1421,8 @@ export const rebuild = (history: History): RebuildResult => {
               continue
             }
             const found = findEdges(b.mesh)
-            const picked = selectEdges(found.edges, selector)
+            const picked = onRefs(b, selectEdges(found.edges, pickSelector))
+            if (refBodies !== undefined && picked.length === 0) { issues.push({ feature: f.id, severity: "error", message: `The edge references of the ${style} found no edge on the mesh of body '${b.id}'` }); continue }
             if (radiusEnd === undefined) {
               const result = blendEdges(b.mesh, picked, radius, style, chamfer)
               if (result.rejected.length > 0) tooSmall.push({ mesh: b.mesh, edges: picked, reason: result.rejected[0]! })
@@ -1394,7 +1476,14 @@ export const rebuild = (history: History): RebuildResult => {
           const t = dim(f.thickness, f.id)
           if (t === undefined) break
           if (!(t > 0)) { issues.push({ feature: f.id, severity: "error", message: `The shell thickness must be positive (it is ${t})` }); break }
-          const open = f.open ?? "none"
+          let open = f.open ?? "none"
+          if (f.openFaces !== undefined) {
+            const ctx = refContext(featureIndex, f.openFaces[0] ?? "")
+            if ("error" in ctx) { issues.push({ feature: f.id, severity: "error", message: ctx.error }); break }
+            const fromRefs = shellOpenFromRefs(f.feature, f.openFaces, ctx.bodies, ctx.timeline)
+            if (!fromRefs.ok) { issues.push({ feature: f.id, severity: "error", message: fromRefs.error }); break }
+            open = fromRefs.open
+          }
           let tool: Mesh | undefined
           const extrusion = extrusions.get(f.feature)
           const revolution = revolutions.get(f.feature)
@@ -1738,6 +1827,15 @@ export const rebuild = (history: History): RebuildResult => {
             const near = d.near.map((x) => dim(x, f.id)), wanted = d.normal?.map((x) => dim(x, f.id))
             const lift = d.offset === undefined ? 0 : dim(d.offset, f.id)
             if (near.some((x) => x === undefined) || wanted?.some((x) => x === undefined) || lift === undefined) break
+            if (d.ref !== undefined) {
+              // A referenced face is the face: its own frame, not a search near a point.
+              const resolved = refFace(featureIndex, d.ref)
+              if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
+              if (resolved.frame === undefined || typeof resolved.frame === "string") { issues.push({ feature: f.id, severity: "error", message: `The reference '${d.ref}' is not a planar face${typeof resolved.frame === "string" ? `: ${resolved.frame}` : ""}` }); break }
+              const fr = resolved.frame
+              planes.set(f.id, { u: fr.u, v: fr.v, n: fr.normal, origin: vadd(fr.centroid, vmul(fr.normal, lift)) })
+              break
+            }
             const candidates = bodies.filter((b) => d.body === undefined || b.id === d.body)
             if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: d.body === undefined ? "There is no body to take a face from" : `Body '${d.body}' does not exist at this point of the history` }); break }
             const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! })
@@ -1764,7 +1862,12 @@ export const rebuild = (history: History): RebuildResult => {
           if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to draft" : `Body '${f.body}' does not exist at this point of the history` }); break }
           let draftNear = { x: near[0]!, y: near[1]!, z: near[2]! }
           let draftHint = wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! }
-          if (f.name !== undefined) {
+          if (f.ref !== undefined) {
+            const resolved = refFace(featureIndex, f.ref)
+            if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
+            draftNear = resolved.point
+            draftHint = resolved.normal
+          } else if (f.name !== undefined) {
             const resolved = namedFacePoint(featureIndex, f.body, f.name)
             if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
             draftNear = resolved.point
@@ -1865,7 +1968,13 @@ export const rebuild = (history: History): RebuildResult => {
           const normalHint = wantedNormal === undefined ? undefined : { x: wantedNormal[0]!, y: wantedNormal[1]!, z: wantedNormal[2]! }
           // A named face is the one that is moved: the point it was authored with may be stale after an edit.
           let selected = nearPoint
-          if (f.name !== undefined) {
+          let selectedHint = normalHint
+          if (f.ref !== undefined) {
+            const resolved = refFace(featureIndex, f.ref)
+            if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
+            selected = resolved.point
+            selectedHint = resolved.normal
+          } else if (f.name !== undefined) {
             const resolved = namedFacePoint(featureIndex, f.body, f.name)
             if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
             selected = resolved.point
@@ -1874,7 +1983,7 @@ export const rebuild = (history: History): RebuildResult => {
           // A curved face (the side of a boss, the wall of a hole, a fillet) is offset along its vertex normals; a flat one by its outline.
           let curved: { readonly body: Body; readonly face: SmoothFace } | undefined
           for (const b of candidates) {
-            const found = findSmoothFace(b.mesh, { near: selected, ...(normalHint !== undefined ? { normal: normalHint } : {}) })
+            const found = findSmoothFace(b.mesh, { near: selected, ...(selectedHint !== undefined ? { normal: selectedHint } : {}) })
             if ("error" in found) continue
             if (curved === undefined || found.face.distance < curved.face.distance) curved = { body: b, face: found.face }
           }
@@ -1883,7 +1992,7 @@ export const rebuild = (history: History): RebuildResult => {
             apply(f.id, tool, distance > 0 ? "union" : "subtract", [curved.body.id], f.id)
             break
           }
-          const pick = pickFace(candidates, selected, normalHint)
+          const pick = pickFace(candidates, selected, selectedHint)
           if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
           const { face, body } = pick
           const local = distance > 0 ? profileSolid(face.loops, -margin, distance) : profileSolid(face.loops, distance, margin)
@@ -1982,6 +2091,17 @@ export const rebuild = (history: History): RebuildResult => {
         else lastWriter.delete(id)
       }
       for (const id of after.keys()) if (!before.has(id)) lastWriter.set(id, f.id)
+      // The look of what the feature made or changed: its own `appearance`, else (a copy by a pattern or a mirror) the look of its source body.
+      for (const [id, mesh] of after) {
+        if (before.get(id) === mesh) continue
+        if (f.appearance !== undefined) { looks.set(id, f.appearance); continue }
+        if (before.has(id)) continue
+        const sources = "bodies" in f && f.bodies !== undefined ? f.bodies : []
+        const source = id.includes(":") ? id.slice(id.indexOf(":") + 1) : sources.length === 1 ? sources[0] : undefined
+        const inherited = source === undefined ? undefined : looks.get(source)
+        if (inherited !== undefined) looks.set(id, inherited)
+      }
+      for (const id of [...looks.keys()]) if (!after.has(id)) looks.delete(id)
       touched.delete(f.id)
       lineage[f.id] = [...touched]
       const failed = issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error")
@@ -2017,7 +2137,12 @@ export const rebuild = (history: History): RebuildResult => {
       if (failed) broken.set(f.id, f.id)
     }
   }
-  return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
+  const dressed = bodies.map((b): Body => {
+    const own = history.appearances?.[b.id], inherited = looks.get(b.id)
+    const merged = own === undefined && inherited === undefined ? undefined : { ...inherited, ...own }
+    return merged === undefined ? b : { ...b, appearance: merged }
+  })
+  return { bodies: dressed, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
 }
 
 /** Whether a feature is meant to take material away from the bodies it meets (so that taking none is worth a warning). */

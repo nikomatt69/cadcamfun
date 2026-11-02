@@ -32,6 +32,17 @@ export const declaredNeeds = (f: Feature): ReadonlyArray<string> => {
   }
 }
 
+/** The persistent references (spec 41) a feature stores: a face of a push/pull, a draft or a plane, the edges of a fillet, the open faces of a shell. */
+export const featureRefs = (f: Feature): ReadonlyArray<string> => {
+  switch (f.type) {
+    case "pushpull": case "draft": return f.ref === undefined ? [] : [f.ref]
+    case "fillet": return f.edges?.refs ?? []
+    case "shell": return f.openFaces ?? []
+    case "plane": return f.from.kind === "face" && f.from.ref !== undefined ? [f.from.ref] : []
+    default: return []
+  }
+}
+
 /** Ids of the bodies `f` names explicitly. */
 export const bodyRefs = (f: Feature): ReadonlyArray<string> => {
   const r = f as Feature & { targets?: ReadonlyArray<string>; bodies?: ReadonlyArray<string>; body?: string; target?: string; tools?: ReadonlyArray<string>; to?: { body?: string } }
@@ -40,6 +51,8 @@ export const bodyRefs = (f: Feature): ReadonlyArray<string> => {
   if (typeof r.target === "string") refs.push(r.target)
   if (typeof r.to?.body === "string") refs.push(r.to.body)
   if (f.type === "plane" && f.from.kind === "face" && f.from.body !== undefined) refs.push(f.from.body)
+  // A reference names the body its entity is on: that body's creator must have built.
+  for (const text of featureRefs(f)) { const m = /^(?:face|edge|vertex):([^|]*)\|/.exec(text); if (m !== null) refs.push(m[1]!) }
   return refs
 }
 
