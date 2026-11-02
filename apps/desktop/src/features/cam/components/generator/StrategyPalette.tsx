@@ -12,7 +12,7 @@
  * The data (categories, palette ids, mapping) lives in `StrategyPalette.data.ts` so a
  * pure-TS runner can test it without rendering Solid components.
  */
-import { For, createSignal, type JSX } from "solid-js"
+import { For, createEffect, createSignal, on, type JSX } from "solid-js"
 import { t } from "../../../../i18n/index.ts"
 import {
   STRATEGY_CATEGORIES,
@@ -319,8 +319,9 @@ export default function StrategyPalette(props: StrategyPaletteProps): JSX.Elemen
   const visible = (): ReadonlyArray<StrategyCategory> =>
     STRATEGY_CATEGORIES.filter((category) => category.family === props.family)
   const [active, setActive] = createSignal<string>(props.activeOperation)
-  // Reflect prop changes when the generator switches family or operation upstream.
-  if (props.activeOperation !== active()) setActive(props.activeOperation)
+  // A variant can share a core operation with other cells. Keep the chosen variant
+  // until the actual operation or machine family changes elsewhere in the UI.
+  createEffect(on([() => props.family, () => props.activeOperation], ([, operation]) => setActive(operation), { defer: true }))
   const onCell = (cellId: string): void => {
     setActive(cellId)
     props.onSelect?.(cellId)
