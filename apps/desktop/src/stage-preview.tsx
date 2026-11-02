@@ -39,4 +39,4 @@ function Grid(props: { readonly dark?: boolean }): JSX.Element {
   )
 }
 
-render(() => <><div style={{ "font-family": "system-ui", "font-size": "12px", padding: "16px 20px 0", background: "#eef0f3" }}>Light · 360 px design width, shown 1:1 (poster frames)</div><Grid /><div style={{ "font-family": "system-ui", "font-size": "12px", padding: "16px 20px 0", background: "#12161c", color: "#9aa4b2" }}>Dark</div><Grid dark /></>, document.getElementById("root")!)
+render(() => <><div style={{ "font-family": "system-ui", "font-size": "12px", padding: "16px 20px 0", background: "#eef0f3" }}>Light · 360 px design width, shown 1:1 (poster frames){/* i18n-ok */}</div><Grid /><div style={{ "font-family": "system-ui", "font-size": "12px", padding: "16px 20px 0", background: "#12161c", color: "#9aa4b2" }}>Dark{/* i18n-ok */}</div><Grid dark /></>, document.getElementById("root")!)

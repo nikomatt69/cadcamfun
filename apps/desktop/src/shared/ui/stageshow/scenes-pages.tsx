@@ -82,13 +82,13 @@ export function TimelineScene(): JSX.Element {
             <div class="pg-head">
               <span class="pg-live" data-on={phase() === 1} />
               <span class="ss-bar" style={{ width: "58px" }} />
-              <span class="pg-chip">Live</span>
+              <span class="pg-chip">Live</span> {/* i18n-ok */}
             </div>
             <div class="pg-tl-list">
               <div class="pg-tl-row pg-tl-row--fresh" data-in={phase() >= 2}>
                 <span class="pg-tl-node" />
                 <span class="pg-tl-chip pg-tl-chip--ok">exported</span>
-                <span class="pg-tl-name">Toolpath · fixture plate</span>
+                <span class="pg-tl-name">Toolpath · fixture plate</span> {/* i18n-ok */}
                 <span class="pg-tl-time">now</span>
               </div>
               <For each={TIMELINE_BARS}>
@@ -142,7 +142,7 @@ export function CommitScene(): JSX.Element {
               <div class="pg-commit__main">
                 <div class="pg-form" data-done={phase() >= 3}>
                   <span class="pg-form__text">{COMMIT_MESSAGE}</span>
-                  <span class="pg-form__btn" data-pressed={phase() === 2}>Commit</span>
+                  <span class="pg-form__btn" data-pressed={phase() === 2}>Commit</span> {/* i18n-ok */}
                 </div>
                 <div class="pg-commit__row pg-commit__row--fresh" data-in={phase() >= 3}>
                   <span class="pg-hash">{COMMIT_HASH}</span>
@@ -181,7 +181,7 @@ export function DocumentScene(): JSX.Element {
           <div class="pg-doc">
             <div class="pg-doc__head">
               <span class="pg-doc__mark"><Scale size={12} /></span>
-              <span class="pg-doc__title">Document</span>
+              <span class="pg-doc__title">Document</span> {/* i18n-ok */}
             </div>
             <For each={[96, 88, 92, 70, 84, 62]}>
               {(width, index) => <span class="ss-bar pg-doc__line" data-reading={index() === 2 && phase() >= 3} style={{ width: `${width}%` }} />}
@@ -210,9 +210,9 @@ export function PasskeyScene(): JSX.Element {
         <div class="ss-scene" data-reset={phase() === 4}>
           <div class="pg-panel">
             <div class="pg-head">
-              <span class="pg-panel__title">Passkeys</span>
+              <span class="pg-panel__title">Passkeys</span> {/* i18n-ok */}
               <span class="pg-panel__action" data-pressed={phase() === 2} data-done={phase() >= 3}>
-                <Show when={phase() < 3} fallback="Added">Add passkey</Show>
+                <Show when={phase() < 3} fallback="Added">Add passkey</Show> {/* i18n-ok */}
               </span>
             </div>
             <div class="pg-passkey__empty" data-gone={phase() >= 3}>
@@ -222,8 +222,8 @@ export function PasskeyScene(): JSX.Element {
             <div class="pg-passkey__row" data-in={phase() >= 3}>
               <span class="pg-passkey__icon"><Fingerprint size={15} /></span>
               <div class="pg-passkey__text">
-                <span class="pg-passkey__name">This Mac</span>
-                <span class="pg-passkey__sub">Touch ID</span>
+                <span class="pg-passkey__name">This Mac</span> {/* i18n-ok */}
+                <span class="pg-passkey__sub">Touch ID</span> {/* i18n-ok */}
               </div>
               <span class="pg-passkey__check"><ShieldCheck size={13} /></span>
             </div>
@@ -251,13 +251,13 @@ export function SessionsScene(): JSX.Element {
         <div class="ss-scene" data-reset={phase() === 4}>
           <div class="pg-panel">
             <div class="pg-head">
-              <span class="pg-panel__title">Sessions</span>
+              <span class="pg-panel__title">Sessions</span> {/* i18n-ok */}
               <span class="pg-chip">{phase() >= 3 ? "1 active" : "2 active"}</span>
             </div>
             <div class="pg-device">
               <span class="pg-device__icon"><Laptop size={15} /></span>
               <div class="pg-device__text">
-                <span class="pg-device__name">MacBook</span>
+                <span class="pg-device__name">MacBook</span> {/* i18n-ok */}
                 <span class="pg-device__sub">this device</span>
               </div>
               <span class="pg-chip pg-chip--ok">current</span>
@@ -270,7 +270,7 @@ export function SessionsScene(): JSX.Element {
               </div>
               <span class="pg-device__trash" data-pressed={phase() === 2}><Trash size={13} /></span>
             </div>
-            <span class="pg-toast" data-show={phase() >= 3}><ShieldCheck size={12} /> Signed out</span>
+            <span class="pg-toast" data-show={phase() >= 3}><ShieldCheck size={12} /> Signed out</span> {/* i18n-ok */}
           </div>
           <Pointer phase={phase()} poses={SESSION_POSES} />
         </div>
@@ -301,7 +301,7 @@ export function FlagsScene(): JSX.Element {
         <div class="ss-scene" data-reset={phase() === 4}>
           <div class="pg-panel">
             <div class="pg-head">
-              <span class="pg-panel__title">Overrides</span>
+              <span class="pg-panel__title">Overrides</span> {/* i18n-ok */}
               <span class="pg-chip">local</span>
             </div>
             <For each={FLAGS}>

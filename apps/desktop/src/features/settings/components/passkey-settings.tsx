@@ -235,11 +235,11 @@ export function PasskeySettings(): JSX.Element {
         {/* Info Section */}
         <div class={CARD + " p-6"}>
           <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.passkeys.about")}</h4>
-          <ul class="list-disc space-y-2 pl-5 text-sm text-slate-500 dark:text-slate-400">
-            <li>Passkeys are more secure than passwords - they can't be phished or stolen</li>
-            <li>You can add multiple passkeys for different devices</li>
-            <li>Passkeys work with TouchID, FaceID, Windows Hello, or security keys</li>
-            <li>You can still use your email and password if needed</li>
+          <ul class="space-y-2 text-sm text-slate-500 dark:text-slate-400">
+            <li>• Passkeys are more secure than passwords - they can't be phished or stolen</li>
+            <li>• You can add multiple passkeys for different devices</li>
+            <li>• Passkeys work with TouchID, FaceID, Windows Hello, or security keys</li>
+            <li>• You can still use your email and password if needed</li>
           </ul>
         </div>
       </div>

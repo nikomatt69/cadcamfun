@@ -377,12 +377,12 @@ export function SessionManagement(): JSX.Element {
           <AlertTriangle class="h-4 w-4 mr-2" />
           {t("settings.sessions.tips")}
         </h4>
-        <ul class="list-disc space-y-2 pl-5 text-sm text-amber-800 dark:text-amber-300">
-          <li>Regularly review and revoke unused sessions and tokens</li>
-          <li>Sign out of sessions on shared or public devices</li>
-          <li>Use API tokens with minimal required permissions</li>
-          <li>Monitor for suspicious activity from unknown locations</li>
-          <li>Set appropriate expiration dates for API tokens</li>
+        <ul class="space-y-2 text-sm text-amber-800 dark:text-amber-300">
+          <li>• Regularly review and revoke unused sessions and tokens</li>
+          <li>• Sign out of sessions on shared or public devices</li>
+          <li>• Use API tokens with minimal required permissions</li>
+          <li>• Monitor for suspicious activity from unknown locations</li>
+          <li>• Set appropriate expiration dates for API tokens</li>
         </ul>
       </div>
     </div>

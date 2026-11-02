@@ -422,7 +422,7 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
       <Show when={agent()}>
         {(name) => <span class="assistant-agent-pill" data-testid="tool-agent">{agentLabel(name())}</span>}
       </Show>
-      <Show when={done()} fallback={<><LoaderCircle size={14} aria-hidden="true" class="animate-spin assistant-status-active" /><span class="assistant-meta-text">{pendingText()}</span></>}>
+      <Show when={done()} fallback={<><LoaderCircle size={14} aria-hidden="true" class="animate-spin assistant-status-active" /><span class="assistant-meta-text">~ {pendingText()}</span></>}>
         <span aria-hidden="true" class="assistant-tool-glyph" data-tone={tone()}><Glyph code={tone() === "error" ? "✕" : view().icon} /></span>
         <span class="assistant-tool-title" data-tone={tone()}>{view().title}</span>
       </Show>
