@@ -57,25 +57,31 @@ export const announcesWork = (text: string): boolean => {
   return !/\?$/.test(last) && ANNOUNCES.test(last)
 }
 
+/** The host's own refusal texts (`permission/next.ts`): a rejected call, a rule that forbids it, a cancelled run. */
+const DENIAL = /permission (?:denied|rejected)|user (?:denied|rejected)|rejected permission|specified a rule which prevents you|execution cancel(?:led|ed)/i
+
 /**
  * Why the turn should go on after the agent stopped, or undefined when it is done: its own plan still has open items, its last
  * tool call failed and it did not fix it, or it ended on an announcement of the next step without taking it. Each is a fact of
  * the turn, not a guess about the request; the answer to a question or a finished job matches none of them.
  */
-export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError"> & { readonly repeatedFailure?: EventMapperState["repeatedFailure"] }, text: string, finish?: string): string | undefined => {
+export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError"> & { readonly repeatedFailure?: EventMapperState["repeatedFailure"]; readonly toolErrors?: ReadonlyMap<string, string> }, text: string, finish?: string): string | undefined => {
   // The same call failed with the same arguments again and again: another nudge would only run it again.
   if (state.repeatedFailure !== undefined) return undefined
   // Native refusal/unknown finishes and a request for missing input are not unfinished agent work.
   if (finish !== undefined && !["stop", "length", "tool-calls", "tool_calls"].includes(finish)) return undefined
   if (/\?\s*$/.test(text.trim())) return undefined
-  if (state.lastToolError && /permission (?:denied|rejected)|user (?:denied|rejected)|execution cancel(?:led|ed)/i.test(state.lastToolError)) return undefined
+  if (state.lastToolError && DENIAL.test(state.lastToolError)) return undefined
   // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
   if (finish === "length") {
     return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_edit action add call, one operation at a time, and keep going until the request is complete and checked."
   }
   const open = state.todos.filter((t) => t.status === "pending" || t.status === "in_progress")
   if (open.length > 0) {
-    return `Your plan still has unfinished items:\n${open.map((t) => `- ${t.content}`).join("\n")}\nContinue with the next one now with the tools. Do not stop to report progress: finish every item, check the result, mark the items completed, and only then report.`
+    // A call the permission mode refused earlier in the turn stays refused: its items are reported, never retried.
+    const denied = [...(state.toolErrors?.entries() ?? [])].filter(([, error]) => DENIAL.test(error)).map(([tool]) => tool)
+    const denial = denied.length > 0 ? ` The ${denied.join(", ")} call(s) were refused by the permission mode earlier: do not retry them or reach the same effect another way; leave the items that need them open and list them for the user in your report.` : ""
+    return `Your plan still has unfinished items:\n${open.map((t) => `- ${t.content}`).join("\n")}\nContinue with the next one now with the tools. Do not stop to report progress: finish every item, check the result, mark the items completed, and only then report.${denial}`
   }
   if (state.lastToolError !== undefined) {
     return `Your last tool call failed: ${state.lastToolError.slice(0, 1_200)}\nRead the full output, including error paths, problems and recovery hints. Fix the named cause on the same tool; never repeat unchanged arguments. Before retrying a mutation, inspect the document: preserve confirmed entity/operation ids and retry only skipped items. Rebuild and verify affected CAD/CAM work after the correction. If it truly cannot be done, say exactly what blocks it and what you tried.`

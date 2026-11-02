@@ -62,7 +62,7 @@ const effectProblems = (problems: ReadonlyArray<string>): Array<Problem> =>
     return { path: where === "root" ? [] : where.split("."), message, ...(expected !== undefined ? { expected } : {}) }
   })
 
-const failureOf = (tool: string, problems: ReadonlyArray<Problem>) => {
+const failureOf = (tool: string, problems: ReadonlyArray<Problem>, usage?: string) => {
   const listed = problems.slice(0, 12).map((problem) => `${problem.path.map(String).join(".") || "root"}: ${problem.message}`)
   const hints = new Set<string>()
   for (const problem of problems) {
@@ -86,6 +86,7 @@ const failureOf = (tool: string, problems: ReadonlyArray<Problem>) => {
       hints.add('Sketch entities use kind: "point", "line", "circle" or "arc"; features and constraints use type. Lines reference point IDs through p1/p2; circles reference a point ID through center. See cad action parametric_validate for a complete validate example.')
     }
   }
+  if (usage !== undefined) hints.add(usage)
   hints.add(`Correct the named fields and retry ${tool}; do not repeat unchanged arguments or switch tools to bypass validation.`)
   return {
     ok: false as const, _tag: "InvalidToolArguments" as const, error: `Invalid arguments for ${tool}.`,
@@ -100,9 +101,10 @@ const formatFailure = (failure: ToolValidationFailure): string =>
   `${failure.error}\n${failure.problems.map((problem) => `- ${problem}`).join("\n")}\n${failure.omittedProblems > 0 ? `${failure.omittedProblems} additional validation problems omitted.\n` : ""}${failure.recovery}\nNo mutation was applied by this call.`
 
 /** Shared by the host's pre-execution guard and the direct tool bridge. */
-export const toolValidationFailure = (tool: string, error: z.ZodError): ToolValidationFailure => failureOf(tool, zodProblems(error.issues))
+export const toolValidationFailure = (tool: string, error: z.ZodError, usage?: string): ToolValidationFailure => failureOf(tool, zodProblems(error.issues), usage)
 
-export const formatToolValidationError = (tool: string, error: z.ZodError): string => formatFailure(toolValidationFailure(tool, error))
+/** `usage` is the fields and call shape of the action the call meant (`tools/usage.ts`), when the caller knows it. */
+export const formatToolValidationError = (tool: string, error: z.ZodError, usage?: string): string => formatFailure(toolValidationFailure(tool, error, usage))
 
 /** The same report for the problems an Effect decode found (`schemaDecoder`). */
 export const formatToolProblems = (tool: string, problems: ReadonlyArray<string>): string => formatFailure(failureOf(tool, effectProblems(problems)))

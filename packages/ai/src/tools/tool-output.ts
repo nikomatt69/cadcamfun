@@ -58,10 +58,19 @@ const shrink = (value: unknown, items: number, chars: number, path: string, omis
   return value
 }
 
+const readMore = (narrowing: ReadonlyArray<string> | undefined): string =>
+  narrowing === undefined ? "Narrow the request (ids, offset, limit) to read the rest here."
+    : narrowing.length > 0 ? `To read the rest here, call this action again with ${narrowing.slice(0, 6).join(", ")} to select or page what you need.`
+      : "This action has no id, offset or limit parameter: ask for a smaller target (one element, operation or range) or use a more specific action to read the rest here."
+
 /** Shrinking schedule: from generous to tight. The last step still keeps every protected field. */
 const STEPS: ReadonlyArray<readonly [number, number]> = [[200, 4000], [80, 2000], [40, 1000], [20, 400], [10, 200], [5, 120], [2, 80], [1, 60], [0, 40]]
 
-export const toolOutput = (value: unknown, budget: number = MODEL_TEXT_BUDGET): ToolOutput => {
+/**
+ * `narrowing` are the parameters of the action that produced `value` which restrict or page its result (`tools/usage.ts`):
+ * the note names them, or says there are none, so the model never retries a larger request of the same size.
+ */
+export const toolOutput = (value: unknown, budget: number = MODEL_TEXT_BUDGET, narrowing?: ReadonlyArray<string>): ToolOutput => {
   const outcome = actionOutcome(value)
   const full = json(value)
   if (full === undefined) {
@@ -76,7 +85,7 @@ export const toolOutput = (value: unknown, budget: number = MODEL_TEXT_BUDGET): 
       fullCharacters: full.length,
       omitted: omissions.slice(0, 20),
       ...(omissions.length > 20 ? { omittedPaths: omissions.length - 20 } : {}),
-      note: "Bounded view of a larger result. The full value was delivered to code_mode and stored with this call; narrow the request (ids, offset, limit) to read the rest here."
+      note: `Bounded view of a larger result. The full value was delivered to code_mode and stored with this call. ${readMore(narrowing)}`
     }
     const text = json(Array.isArray(shrunk) ? { items: shrunk, _preview: preview } : shrunk !== null && typeof shrunk === "object" ? { ...shrunk, _preview: preview } : { value: shrunk, _preview: preview })
     if (text !== undefined && text.length <= budget) return { text, bounded: true, omissions, outcome }

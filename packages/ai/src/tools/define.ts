@@ -13,6 +13,7 @@ import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
 import { formatToolValidationError, toolValidationFailure } from "../tool-validation.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 import { toolOutput } from "./tool-output.ts"
+import { actionUsage, narrowingParameters } from "./usage.ts"
 import type { ActionOutcome } from "../actions/outcome.ts"
 
 /** Trusted transport identity; these fields are supplied by the host/bridge, never by model arguments. */
@@ -80,15 +81,19 @@ export class ToolMediaResult {
  * and the stored part receive, and the bounded text the model reads, which declares anything it leaves out.
  */
 export const toSpec = (definition: ToolDefinition, context: ToolContext): HostToolSpec => {
-  const answer = (value: unknown, files?: ReadonlyArray<FilePart>) => {
-    const out = toolOutput(value)
+  const answer = (value: unknown, files?: ReadonlyArray<FilePart>, action?: unknown) => {
+    const out = toolOutput(value, undefined, action === undefined ? undefined : narrowingParameters(definition.parameters, action))
     return { output: out.text, value, outcome: out.outcome, bounded: out.bounded, ...(files !== undefined ? { files } : {}) }
   }
+  // The host validates with `parameters` and hands the failure over with the error only; the last arguments it parsed name the action.
+  let seen: unknown
   const run = async (input: unknown, call: { signal: AbortSignal; sessionId: string; callId?: string; messageId?: string; executeMutation?: MutationExecutor; taskTarget?: ToolContext["taskTarget"]; validateDelegation?: ToolContext["validateDelegation"] }) => {
     try {
       if (call.signal.aborted) return answer({ ok: false, error: "Tool execution cancelled." })
-      const parsed = definition.parameters.safeParse(sanitizeArguments(input))
-      if (!parsed.success) return answer(toolValidationFailure(definition.id, parsed.error))
+      const sent = sanitizeArguments(input)
+      const parsed = definition.parameters.safeParse(sent)
+      const action = typeof sent === "object" && sent !== null ? (sent as Record<string, unknown>)["action"] : undefined
+      if (!parsed.success) return answer(toolValidationFailure(definition.id, parsed.error, actionUsage(definition.parameters, action)))
       const result = await definition.execute(parsed.data, {
         ...context, signal: call.signal, sessionId: call.sessionId,
         ...(call.callId !== undefined ? { callId: call.callId } : {}),
@@ -97,13 +102,13 @@ export const toSpec = (definition: ToolDefinition, context: ToolContext): HostTo
         ...(call.taskTarget !== undefined ? { taskTarget: call.taskTarget } : {}),
         ...(call.validateDelegation !== undefined ? { validateDelegation: call.validateDelegation } : {})
       })
-      return result instanceof ToolMediaResult ? answer(result.value, result.files) : answer(result)
+      return result instanceof ToolMediaResult ? answer(result.value, result.files, action) : answer(result, undefined, action)
     } catch (error) { return answer({ ok: false, error: safeToolError(error) }) }
   }
   return {
-    id: definition.id, description: definition.description, parameters: lenient(definition.parameters),
+    id: definition.id, description: definition.description, parameters: lenient(definition.parameters, (sanitized) => { seen = sanitized }),
     ...(definition.approval === true ? { approval: true } : {}),
-    formatValidationError: (error) => formatToolValidationError(definition.id, error),
+    formatValidationError: (error) => formatToolValidationError(definition.id, error, actionUsage(definition.parameters, (seen as Record<string, unknown> | null)?.["action"])),
     execute: async (input, call) => (await run(input, call)).output,
     executeWithFiles: run
   }

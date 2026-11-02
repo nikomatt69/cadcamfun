@@ -49,6 +49,20 @@ export const modSpec = (paths: IsolatedPaths, id: string): string => {
   return pathToFileURL(existsSync(file) ? realpathSync(file) : file).href
 }
 
+/** The first syntax error of a module, with its line, or undefined when it parses (and when no parser is available). */
+const syntaxProblem = (source: string): string | undefined => {
+  if (typeof Bun === "undefined") return undefined
+  try {
+    new Bun.Transpiler({ loader: "js" }).transformSync(source)
+    return undefined
+  } catch (cause) {
+    const first = (cause as { position?: { line?: number; column?: number }; message?: string })
+    const message = first.message ?? String(cause)
+    const where = first.position?.line !== undefined ? ` at line ${first.position.line}${first.position.column !== undefined ? `, column ${first.position.column}` : ""}` : ""
+    return `The source has a syntax error${where}: ${message.slice(0, 200)}. Fix it and save again; nothing was stored.`
+  }
+}
+
 /** Reasons a mod source is not acceptable, each a full sentence the model can act on. Empty: the source is fine. */
 export const modSourceProblems = (source: string): ReadonlyArray<string> => {
   const problems: string[] = []
@@ -59,6 +73,11 @@ export const modSourceProblems = (source: string): ReadonlyArray<string> => {
   }
   if (/^\s*import\b/m.test(source) || /\brequire\s*\(/.test(source) || /\bimport\s*\(/.test(source)) {
     problems.push("A mod imports nothing: remove every `import`/`require` and reach what you need through the `on`/`next` hook API.")
+  }
+  // A module the host cannot parse would fail at every host start. Say where, now, before anything is stored or armed.
+  if (problems.length === 0) {
+    const syntax = syntaxProblem(source)
+    if (syntax !== undefined) problems.push(syntax)
   }
   return problems
 }

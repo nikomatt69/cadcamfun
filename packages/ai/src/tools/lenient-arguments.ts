@@ -54,5 +54,10 @@ export const sanitizeArguments = (value: unknown, key = ""): unknown => {
 }
 
 /** The schema the host validates with: the same shape, preceded by `sanitizeArguments`. */
-export const lenient = <S extends z.ZodType>(schema: S): z.ZodType<z.output<S>, unknown> =>
-  z.preprocess((input) => sanitizeArguments(input), schema) as unknown as z.ZodType<z.output<S>, unknown>
+export const lenient = <S extends z.ZodType>(schema: S, observe?: (sanitized: unknown) => void): z.ZodType<z.output<S>, unknown> =>
+  z.preprocess((input) => {
+    const sanitized = sanitizeArguments(input)
+    // The host reports a failed validation with the error only: this keeps the arguments that produced it.
+    observe?.(sanitized)
+    return sanitized
+  }, schema) as unknown as z.ZodType<z.output<S>, unknown>
