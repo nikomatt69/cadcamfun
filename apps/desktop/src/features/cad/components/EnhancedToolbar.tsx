@@ -36,12 +36,10 @@ export interface EnhancedToolbarProps {
   readonly pluginButtons?: JSX.Element
 }
 
-const GLASS_BUTTON = "px-4 py-2 backdrop-blur-sm bg-white/80 dark:bg-gray-800/80 border border-white/40 dark:border-gray-600/40 hover:bg-white/90 dark:hover:bg-gray-700/90 rounded-xl shadow-md flex items-center transition-colors duration-150 motion-reduce:transition-none"
-const ICON_BUTTON = "p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 text-gray-600 dark:text-gray-400 dark:hover:text-white transition-colors duration-150 motion-reduce:transition-none border border-white/40 dark:border-gray-600/40 shadow-sm"
-const TOGGLE_ON = "bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
-const TOGGLE_OFF = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-const hover = { scale: 1.05, backgroundColor: "rgba(59, 130, 246, 0.1)" }
-const press = { scale: 0.95 }
+const GLASS_BUTTON = "px-4 py-2 bg-[color:var(--ent-surface-subtle)] border border-[color:var(--ent-line)] hover:bg-[color:var(--ent-surface-inset)] rounded-xl flex items-center transition-colors duration-150 motion-reduce:transition-none"
+const ICON_BUTTON = "p-3 rounded-xl hover:bg-[color:var(--ent-surface-inset)] text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)] transition-colors duration-150 motion-reduce:transition-none border border-[color:var(--ent-line)]"
+const TOGGLE_ON = "bg-[color:var(--ent-accent-soft)] border-[color:var(--ent-accent)] text-[color:var(--ent-accent)]"
+const TOGGLE_OFF = "bg-[color:var(--ent-surface)] border-[color:var(--ent-line-strong)] hover:bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)]"
 
 /** The editor's top bar: menu, save/import/library, undo/redo, view toggles, CAM link, selection summary, FEA and PMI dialogs. */
 export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Element {
@@ -117,54 +115,54 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
   return (
     <Motion.div
       class="workstation-toolbar flex items-center justify-between w-full text-gray-900 dark:text-white"
-      initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, easing: "ease-out" }}
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, easing: "ease-out" }}
     >
       <Motion.div
-        class="flex w-max rounded-2xl items-center backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 p-2 shadow-md border border-white/30 dark:border-gray-600/30"
-        initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
+        class="flex w-max rounded-2xl items-center bg-[color:var(--ent-surface)] p-2 border border-[color:var(--ent-line)]"
+        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
       >
         <Motion.button
-          class="mr-2 p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 focus:outline-none transition-colors duration-150 motion-reduce:transition-none border border-white/40 dark:border-gray-600/40 shadow-sm"
-          onClick={() => props.setSidebarOpen(!props.sidebarOpen)} hover={hover} press={press} aria-label={t("cad.toggleSidebar")}
+          class="mr-2 p-3 rounded-xl hover:bg-[color:var(--ent-surface-inset)] focus:outline-none transition-colors duration-150 motion-reduce:transition-none border border-[color:var(--ent-line)]"
+          onClick={() => props.setSidebarOpen(!props.sidebarOpen)} aria-label={t("cad.toggleSidebar")}
         >
-          <Menu size={20} class="text-gray-600 dark:text-gray-400" />
+          <Menu size={16} class="text-[color:var(--ent-text-muted)]" />
         </Motion.button>
 
         <div class="ml-6 flex items-center space-x-3">
-          <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title={t("cad.saveProject")} hover={hover} press={press}>
-            <Save size={16} class="text-gray-600 dark:text-gray-400" />
+          <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title={t("cad.saveProject")}>
+            <Save size={16} class="text-[color:var(--ent-text-muted)]" />
           </Motion.button>
           <Show when={props.onShowVersions}>
-            <Motion.button onClick={() => props.onShowVersions?.()} class={GLASS_BUTTON} title={t("save.versions.title")} hover={hover} press={press} data-testid="open-versions">
-              <History size={16} class="text-gray-600 dark:text-gray-400" />
+            <Motion.button onClick={() => props.onShowVersions?.()} class={GLASS_BUTTON} title={t("save.versions.title")} data-testid="open-versions">
+              <History size={16} class="text-[color:var(--ent-text-muted)]" />
             </Motion.button>
           </Show>
-          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title={t("cad.importProject")} hover={hover} press={press}>
-            <Upload size={16} class="text-gray-600 dark:text-gray-400" />
+          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title={t("cad.importProject")}>
+            <Upload size={16} class="text-[color:var(--ent-text-muted)]" />
           </Motion.button>
-          <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title={t("cad.unifiedLibrary")} hover={hover} press={press}>
-            <BookOpen size={16} class="text-gray-600 dark:text-gray-400" />
+          <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title={t("cad.unifiedLibrary")}>
+            <BookOpen size={16} class="text-[color:var(--ent-text-muted)]" />
           </Motion.button>
-          <Motion.button onClick={() => props.setShowCustomElements(true)} class={GLASS_BUTTON} title={t("cad.customElements.open")} hover={hover} press={press}>
-            <Blocks size={16} class="text-gray-600 dark:text-gray-400" />
+          <Motion.button onClick={() => props.setShowCustomElements(true)} class={GLASS_BUTTON} title={t("cad.customElements.open")}>
+            <Blocks size={16} class="text-[color:var(--ent-text-muted)]" />
           </Motion.button>
 
           <Show when={selectedCount() > 0 || elements.selectedElement}>
             <Motion.button
               onClick={createComponentFromSelected}
-              class="px-4 py-2 backdrop-blur-sm bg-green-50/90 dark:bg-green-900/90 border border-green-300/60 dark:border-green-700/60 hover:bg-green-100/90 dark:hover:bg-green-800/90 text-green-700 dark:text-green-300 rounded-xl shadow-md flex items-center transition-colors duration-150 motion-reduce:transition-none"
-              title={t("cad.createComponent.title")} hover={hover} press={press}
-              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+              class="px-4 py-2 bg-[color:var(--ent-accent-soft)] border border-[color:var(--ent-accent)] text-[color:var(--ent-accent)] rounded-xl flex items-center transition-colors duration-150 motion-reduce:transition-none"
+              title={t("cad.createComponent.title")}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             >
               <SquarePlus size={16} class="mr-1.5" />
               <span class="text-sm font-medium">{t("cad.createComponent.title")}</span>
             </Motion.button>
           </Show>
 
-          <div class="h-6 border-l border-white/40 dark:border-gray-600/40 mx-3" />
-          <Motion.button title={t("cad.undo")} onClick={() => elements.undo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCcw size={18} /></Motion.button>
-          <Motion.button title={t("cad.redo")} onClick={() => elements.redo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCw size={18} /></Motion.button>
-          <div class="h-5 border-l border-gray-300 dark:border-gray-700 mx-1" />
+          <div class="h-6 border-l border-[color:var(--ent-line)] mx-3" />
+          <Motion.button title={t("cad.undo")} onClick={() => elements.undo()} class={ICON_BUTTON}><RotateCcw size={16} /></Motion.button>
+          <Motion.button title={t("cad.redo")} onClick={() => elements.redo()} class={ICON_BUTTON}><RotateCw size={16} /></Motion.button>
+          <div class="h-5 border-l border-[color:var(--ent-line-strong)] mx-1" />
 
           <button onClick={() => cad.toggleDimensions()} class={`p-1.5 border shadow-sm rounded-md flex items-center ${cad.showDimensions ? TOGGLE_ON : TOGGLE_OFF}`} title={cad.showDimensions ? t("cad.hideDimensions") : t("cad.showDimensions")}>
             <Maximize size={16} />
@@ -178,7 +176,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
 
           <button
             onClick={openSimulation}
-            class={`p-1.5 border shadow-sm rounded-md flex items-center transition-colors duration-150 motion-reduce:transition-none ${simulationPosition() ? "bg-orange-50 dark:bg-orange-900 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300" : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900 hover:border-orange-300 text-gray-700 dark:text-gray-300 hover:text-orange-700"}`}
+            class={`p-1.5 border shadow-sm rounded-md flex items-center transition-colors duration-150 motion-reduce:transition-none ${simulationPosition() ? TOGGLE_ON : TOGGLE_OFF}`}
             title={t("cad.tb.openFea")}
           >
             <Activity size={16} />
@@ -192,34 +190,34 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           >
             <Ruler size={16} />
           </button>
-          <A href="/cam" class="p-1.5 flex items-center bg-green-600 text-white hover:bg-green-700 border-0 shadow-md rounded-md" title={t("cad.switchCam")}>
+          <A href="/cam" class="p-1.5 flex items-center bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] border-0 rounded-md" title={t("cad.switchCam")}>
             <Wrench size={16} />
             <span class="ml-1.5 text-sm font-medium">{t("cad.cam")}</span>
           </A>
           <Show when={props.pluginButtons}>
-            <div class="h-5 border-l border-gray-300 dark:border-gray-700 mx-1" />
+            <div class="h-5 border-l border-[color:var(--ent-line-strong)] mx-1" />
             {props.pluginButtons}
           </Show>
         </div>
       </Motion.div>
 
-      <Motion.div class="flex items-center space-x-3" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }}>
+      <Motion.div class="flex items-center space-x-3" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
         <Show when={props.selectedLibraryComponent}>
           <Motion.div
-            class="px-4 py-2 backdrop-blur-sm bg-blue-50/90 dark:bg-blue-900/90 border border-blue-200/60 dark:border-blue-800/60 rounded-xl flex items-center shadow-md"
-            initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}
+            class="px-4 py-2 bg-[color:var(--ent-accent-soft)] border border-[color:var(--ent-accent)] rounded-xl flex items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
           >
-            <span class="text-xs text-blue-700 dark:text-blue-300 mr-2">{t("cad.tb.componentSelected")}</span>
+            <span class="text-xs text-[color:var(--ent-accent)] mr-2">{t("cad.tb.componentSelected")}</span>
             <span class="text-sm font-medium">{t("cad.tb.readyPlace")}</span>
             <Motion.button
               onClick={() => props.setIsPlacingComponent(true)}
-              class="ml-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center shadow-md transition-colors duration-150 motion-reduce:transition-none"
-              title={t("cad.tb.placeComponent")} hover={hover} press={press}
+              class="ml-3 px-3 py-1.5 bg-[color:var(--ent-action)] hover:bg-[color:var(--ent-action-hover)] text-[color:var(--ent-action-text)] rounded-xl flex items-center transition-colors duration-150 motion-reduce:transition-none"
+              title={t("cad.tb.placeComponent")}
             >
               <MousePointer size={14} class="mr-1" />
               <span class="text-xs font-medium">{t("cad.tb.place")}</span>
             </Motion.button>
-            <Motion.button onClick={() => props.setSelectedLibraryComponent(null)} class="ml-2 p-1.5 rounded-xl hover:bg-blue-200/80 dark:hover:bg-blue-700/80 text-blue-700 dark:text-blue-300 transition-colors duration-150 motion-reduce:transition-none" hover={hover} press={press} aria-label={t("cad.tb.clearComponent")}>
+            <Motion.button onClick={() => props.setSelectedLibraryComponent(null)} class="ml-2 p-1.5 rounded-xl hover:bg-[color:var(--ent-surface-inset)] text-[color:var(--ent-accent)] transition-colors duration-150 motion-reduce:transition-none" aria-label={t("cad.tb.clearComponent")}>
               <X size={14} />
             </Motion.button>
           </Motion.div>
@@ -228,28 +226,28 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
         <div class="relative z-[1000]">
           <Motion.button
             onClick={() => setShowElementsPopup(!showElementsPopup())}
-            class="px-4 py-2 border border-white/40 dark:border-gray-600/40 rounded-xl flex items-center backdrop-blur-sm bg-white/80 dark:bg-gray-800/80 hover:bg-white/90 dark:hover:bg-gray-700/90 cursor-pointer shadow-md transition-colors duration-150 motion-reduce:transition-none"
-            hover={hover} press={press}
+            class="px-4 py-2 border border-[color:var(--ent-line)] rounded-xl flex items-center bg-[color:var(--ent-surface-subtle)] hover:bg-[color:var(--ent-surface-inset)] cursor-pointer transition-colors duration-150 motion-reduce:transition-none"
+           
           >
-            <span class="text-xs text-gray-500 dark:text-gray-400 mr-2">{t("cad.tb.elementsColon")}</span>
-            <span class="text-sm font-medium">{elements.elements.length}</span>
+            <span class="text-xs text-[color:var(--ent-text-muted)] mr-2">{t("cad.tb.elementsColon")}</span>
+            <span class="text-sm font-medium tabular-nums">{elements.elements.length}</span>
             <Show when={selectedCount() > 0}>
-              <span class="ml-2 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full">{selectedCount()} selected</span>
+              <span class="ml-2 px-2 py-0.5 bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)] text-xs tabular-nums rounded-full">{selectedCount()} selected</span>
             </Show>
-            <ChevronDown size={14} class="ml-1 text-gray-500" />
+            <ChevronDown size={14} class="ml-2 text-[color:var(--ent-text-muted)]" />
           </Motion.button>
 
           <Show when={showElementsPopup()}>
             <Motion.div
               ref={popup}
-              class="absolute top-full right-0 mt-2 w-80 backdrop-blur-md bg-white/95 dark:bg-gray-800/95 border border-white/40 dark:border-gray-600/40 rounded-2xl shadow-xl z-1000"
-              initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.3 }}
+              class="absolute top-full right-0 mt-2 w-80 bg-[color:var(--ent-surface)] border border-[color:var(--ent-line)] rounded-2xl shadow-xl z-1000"
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
               style={{ "pointer-events": "auto" }}
             >
-              <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Selected Elements ({selectedCount()})</h3>
+              <div class="p-3 border-b border-[color:var(--ent-line)] flex justify-between items-center gap-3">
+                <h3 class="text-sm font-semibold text-[color:var(--ent-text)]">Selected Elements ({selectedCount()})</h3>
                 <Show when={selectedCount() > 0}>
-                  <button onClick={createComponentFromSelection} class="px-2 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md flex items-center">
+                  <button onClick={createComponentFromSelection} class="px-2 py-1 bg-[color:var(--ent-action)] hover:bg-[color:var(--ent-action-hover)] text-[color:var(--ent-action-text)] text-xs rounded-md flex items-center">
                     <SquarePlus size={14} class="mr-1" />
                     {t("cad.createComponent.title")}
                   </button>
@@ -257,18 +255,18 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
               </div>
               <div class="max-h-48 overflow-y-auto p-2">
                 <Show when={selectedCount() > 0} fallback={
-                  <div class="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">{t("cad.tb.noneSelected")}</div>
+                  <div class="text-center py-4 text-[color:var(--ent-text-muted)] text-xs">{t("cad.tb.noneSelected")}</div>
                 }>
                   <div class="space-y-1">
                     <For each={selectedElements()}>{(element) =>
-                      <div class="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-gray-700 rounded text-xs">
+                      <div class="flex items-center justify-between gap-3 p-2 bg-[color:var(--ent-surface-subtle)] rounded text-xs">
                         <div class="flex items-center">
                           <div class="w-3 h-3 rounded-full mr-2" style={{ "background-color": typeof element.color === "string" ? element.color : "#1e88e5" }} />
                           <span class="font-medium">{element.type}</span>
-                          <span class="ml-2 text-gray-500 dark:text-gray-400 font-mono">{element.id.substring(0, 12)}...</span>
+                          <span class="ml-2 text-[color:var(--ent-text-muted)] font-mono">{element.id.substring(0, 12)}...</span>
                         </div>
                         <button
-                          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t("cad.tb.copyId")}
+                          class="text-[color:var(--ent-text-faint)] hover:text-[color:var(--ent-text)]" title={t("cad.tb.copyId")}
                           onClick={() => { void copyText(element.id).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}
                         >
                           <Copy size={12} />
@@ -284,10 +282,10 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
 
         <Show when={elements.selectedElement}>{(selected) =>
           <Motion.div
-            class="px-4 py-2 border border-green-200/60 dark:border-green-800/60 rounded-xl flex items-center backdrop-blur-sm bg-green-50/90 dark:bg-green-900/90 shadow-md"
-            initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}
+            class="px-4 py-2 border border-[color:var(--ent-line)] rounded-xl flex items-center bg-[color:var(--ent-surface-subtle)]"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
           >
-            <span class="text-xs text-green-600 dark:text-green-300 mr-2">{t("cad.tb.selectedColon")}</span>
+            <span class="text-xs text-[color:var(--ent-text-muted)] mr-2">{t("cad.tb.selectedColon")}</span>
             <span class="text-sm font-medium">{selected().id.substring(0, 8)}...</span>
           </Motion.div>}
         </Show>
@@ -300,9 +298,9 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             class="fixed z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
             style={{ top: `${position().y}px`, left: `${position().x}px`, width: `${Math.min(1200, window.innerWidth * 0.95)}px`, height: `${Math.min(800, window.innerHeight * 0.9)}px` }}
           >
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-orange-50 dark:bg-orange-900/30">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
               <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center"><Activity size={18} class="text-white" /></div>
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center"><Activity size={16} class="text-white" /></div>
                 <div>
                   <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{t("cad.tb.feaTitle")}</h2>
                   <p class="text-sm text-gray-600 dark:text-gray-400">{t("cad.tb.feaSubtitle")}</p>
@@ -310,23 +308,22 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
               </div>
               <div class="flex items-center space-x-2">
                 <div class="text-xs text-gray-500 dark:text-gray-400 mr-4">
-                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse motion-reduce:animate-none" />{t("cad.tb.systemActive")}</span>
+                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1" />{t("cad.tb.systemActive")}</span>
                 </div>
-                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label={t("cad.drawing.close")}><X size={20} /></button>
+                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label={t("cad.drawing.close")}><X size={16} /></button>
               </div>
             </div>
             <div class="h-[calc(100%-4rem)] overflow-hidden"><SimulationPanel /></div>
-            <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+            <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2">
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">
                   <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />{t("cad.tb.simActive")}</span>
-                  <span>⌨️ Ctrl+Shift+S: Toggle simulation</span>
-                  <span>⌨️ F9: Switch mode</span>
-                  <span>⌨️ Esc: Close</span>
+                  <span>Ctrl+Shift+S: Toggle simulation</span>
+                  <span>F9: Switch mode</span>
+                  <span>Esc: Close</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
                   <span>{t("cad.tb.advancedMode")}</span>
-                  <div class="w-1 h-4 bg-orange-500 rounded-full" />
                 </div>
               </div>
             </div>
@@ -346,13 +343,13 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           >
             <div class="flex items-center justify-between p-4" style={{ "border-bottom": "1px solid var(--panel-border)", "background": "var(--panel-bg-subtle)" }}>
               <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style={{ "background": "var(--panel-accent)" }}><Ruler size={18} class="text-white" /></div>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style={{ "background": "var(--panel-accent)" }}><Ruler size={16} class="text-white" /></div>
                 <div>
                   <h2 class="text-lg font-semibold" style={{ "color": "var(--panel-text)" }}>{t("cad.pmi.title")}</h2>
                   <p class="text-sm" style={{ "color": "var(--panel-text-muted)" }}>{t("cad.pmi.description")}</p>
                 </div>
               </div>
-              <button onClick={() => setPmiPosition(null)} class="p-2 rounded-lg transition-colors" style={{ "color": "var(--panel-text-muted)" }} aria-label={t("cad.drawing.close")}><X size={20} /></button>
+              <button onClick={() => setPmiPosition(null)} class="p-2 rounded-lg transition-colors" style={{ "color": "var(--panel-text-muted)" }} aria-label={t("cad.drawing.close")}><X size={16} /></button>
             </div>
             <div class="h-[calc(100%-4rem)] overflow-y-auto p-4"><PmiPanel embedded /></div>
           </div>

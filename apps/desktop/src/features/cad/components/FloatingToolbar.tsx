@@ -19,7 +19,7 @@ export interface FloatingToolbarProps {
 }
 
 type Mode = "create" | "transform" | "library" | "ai"
-const TOOL_BUTTON = "flex flex-col items-center justify-center gap-1 rounded-md bg-slate-50 p-2 text-xs text-slate-700 hover:bg-slate-100 aria-pressed:bg-blue-50 aria-pressed:text-blue-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:aria-pressed:bg-blue-950 dark:aria-pressed:text-blue-300"
+const TOOL_BUTTON = "flex flex-col items-center justify-center gap-1 rounded-md bg-[color:var(--ent-surface-subtle)] p-2 text-xs text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-inset)] aria-pressed:bg-[color:var(--ent-accent-soft)] aria-pressed:text-[color:var(--ent-accent)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]"
 
 /** The draggable tool window over the canvas: create (tool panel), transform actions, library and AI tabs. */
 export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Element {
@@ -152,12 +152,12 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         on:pointerdown={start} on:pointermove={move} on:pointerup={stop} on:pointercancel={stop}
         on:lostpointercapture={() => { pointerId = undefined; setDragging(false) }} on:keydown={moveWithKeys}>
         <div class="flex items-center space-x-1">
-          <button type="button" aria-expanded={expanded()} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label={expanded() ? t("cad.collapse") : t("cad.expand")}>
+          <button type="button" aria-expanded={expanded()} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-[color:var(--ent-surface-inset)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]" aria-label={expanded() ? t("cad.collapse") : t("cad.expand")}>
             <Show when={expanded()} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
           </button>
-          <span class="text-xs font-medium text-gray-700 dark:text-gray-200">{t("cad.tb.cadTools")}</span>
+          <span class="text-xs font-medium text-[color:var(--ent-text)]">{t("cad.tb.cadTools")}</span>
         </div>
-        <Show when={props.onClose}><button type="button" onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label={t("cad.drawing.close")}><X size={14} /></button></Show>
+        <Show when={props.onClose}><button type="button" onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-[color:var(--ent-surface-inset)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]" aria-label={t("cad.drawing.close")}><X size={14} /></button></Show>
       </div>
 
       <Show when={expanded()}>
@@ -166,7 +166,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
             <For each={availableModes()}>{(tab) =>
               <button type="button"
                 aria-pressed={mode() === tab} onClick={() => setMode(tab)}
-                class={`flex-1 px-2 py-1 text-xs font-medium rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${mode() === tab ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
+                class={`flex-1 px-2 py-1 text-xs font-medium rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)] ${mode() === tab ? "bg-[color:var(--ent-surface)] text-[color:var(--ent-accent)] shadow-sm" : "text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]"}`}
               >{modeLabel(tab)}</button>}
             </For>
           </div>

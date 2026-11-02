@@ -185,22 +185,22 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
       <button
         type="button"
         onClick={openDialog}
-        class="p-1 rounded-full text-blue-600 hover:bg-blue-100 focus:outline-none"
+        class="panel-icon-btn"
         title={t("cad.saveElement.title")}
         aria-label={t("cad.saveElement.title")}
         disabled={!selected()}
       >
-        <Save size={18} />
+        <Save size={16} />
       </button>
 
       <Show when={status()?.kind === "error"}>
-        <div class="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 flex items-center" role="alert">
-          <AlertCircle size={16} class="mr-2" />{status()!.text}
+        <div class="fixed bottom-4 right-4 bg-[color:var(--ent-bad-soft)] border border-[color:var(--ent-bad)] text-[color:var(--ent-bad)] px-4 py-3 rounded z-50 flex items-center" role="alert">
+          <AlertCircle size={16} class="mr-2 shrink-0" aria-hidden="true" />{status()!.text}
         </div>
       </Show>
       <Show when={status()?.kind === "ok"}>
-        <div class="fixed bottom-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50 flex items-center" role="status">
-          <Check size={16} class="mr-2" />{status()!.text}
+        <div class="fixed bottom-4 right-4 bg-[color:var(--ent-ok-soft)] border border-[color:var(--ent-ok)] text-[color:var(--ent-ok)] px-4 py-3 rounded z-50 flex items-center" role="status">
+          <Check size={16} class="mr-2 shrink-0" aria-hidden="true" />{status()!.text}
         </div>
       </Show>
 
@@ -211,7 +211,7 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           <Show when={selected()}>
             {(element) => (
               <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60" data-testid="save-element-preview">
-                <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t("cad.saveElement.preview")}</p>
+                <p class="mb-1 text-[11px] font-semibold text-gray-500">{t("cad.saveElement.preview")}</p>
                 <p class="text-sm font-medium text-gray-800 dark:text-gray-200">{describe(element())}</p>
                 <dl class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
                   <For each={previewOf(element())}>{([key, value]) => (

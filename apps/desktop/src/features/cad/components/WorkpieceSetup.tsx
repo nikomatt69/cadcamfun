@@ -136,14 +136,14 @@ export default function WorkpieceSetup(): JSX.Element {
           <Show when={orphan()}>{(machine) => <option value={machine().id}>{machine().name} ({machineTypeLabel(machine())}) — {t("cad.machineNotInLibrary")}</option>}</Show>
         </select>
         <Show when={error()}>{(message) => (
-          <div class="mt-1 flex items-center gap-2 text-xs text-red-600 dark:text-red-400" role="alert">
+          <div class="mt-1 flex items-center gap-2 text-xs text-[color:var(--ent-bad)]" role="alert">
             <span title={message()}>{t("cad.machineError")}</span>
-            <button type="button" class="text-blue-600 hover:underline dark:text-blue-400" onClick={() => void load()}>{t("cad.machineRetry")}</button>
+            <button type="button" class="text-[color:var(--ent-accent)] hover:underline" onClick={() => void load()}>{t("cad.machineRetry")}</button>
           </div>
         )}</Show>
         <Show when={!loading() && error() === undefined && machines().length === 0}>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t("cad.machineEmpty")} <A href={MACHINES_PATH} class="text-blue-600 hover:underline dark:text-blue-400">{t("cad.machineCreate")}</A>
+          <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">
+            {t("cad.machineEmpty")} <A href={MACHINES_PATH} class="text-[color:var(--ent-accent)] hover:underline">{t("cad.machineCreate")}</A>
           </p>
         </Show>
       </div>
@@ -158,9 +158,9 @@ export default function WorkpieceSetup(): JSX.Element {
         </div>
       </div>
       <Show when={cad.selectedMachine}>{(machine) => (
-        <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-sm">
-          <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-1">{t("cad.machineInformation")}</h4>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
+        <div class="bg-[color:var(--ent-surface-subtle)] p-3 rounded-md text-xs">
+          <h4 class="font-medium text-[color:var(--ent-text)] mb-2">{t("cad.machineInformation")}</h4>
+          <div class="grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums text-[color:var(--ent-text-muted)]">
             <div>{t("cad.machineType")}: <span class="font-medium">{machineTypeLabel(machine())}</span></div>
             <Show when={machineEnvelopeOf(machine())}>{(volume) =>
               <div>{t("cad.machineWorkVolume")}: <span class="font-medium">{volume().x}×{volume().y}×{volume().z} {t("cad.millimeters")}</span></div>}</Show>
@@ -177,7 +177,7 @@ export default function WorkpieceSetup(): JSX.Element {
         <button type="button" onClick={() => setForm(initial())} class="panel-btn">{t("cad.reset")}</button>
         <button type="button" onClick={apply} class="panel-btn panel-btn--primary">{t("cad.canvas.applyChanges")}</button>
       </div>
-      <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+      <div class="text-xs text-[color:var(--ent-text-muted)] mt-2 pt-2 border-t border-[color:var(--ent-line)]">
         <p>The workpiece will be created in the default layer &quot;{layers.layers[0]?.name}&quot; and will be available for both CAD and CAM.</p>
       </div>
     </SidebarSection>

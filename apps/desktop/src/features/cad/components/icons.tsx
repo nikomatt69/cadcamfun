@@ -14,7 +14,7 @@ const PATHS = {
   spline: `<path d="M3,17 C7,21 10,5 17,10 C20,12 21,17 21,17" />`,
   bezier: `<path d="M4,19 C8,10 16,14 20,5" /><circle cx="4" cy="19" r="1.5" /><circle cx="20" cy="5" r="1.5" />`,
   boolUnion: `<circle cx="9" cy="9" r="6" /><circle cx="15" cy="15" r="6" />`,
-  boolSubtract: `<circle cx="9" cy="9" r="6" /><circle cx="15" cy="15" r="6" fill="white" stroke-width="0" />`,
+  boolSubtract: `<circle cx="9" cy="9" r="6" /><circle cx="15" cy="15" r="6" stroke-dasharray="2,2" />`,
   boolIntersect: `<circle cx="9" cy="9" r="6" /><circle cx="15" cy="15" r="6" /><path d="M12,12 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="currentColor" />`,
   extrude: `<polygon points="12,5 19,12 12,19 5,12" /><line x1="12" y1="5" x2="12" y2="2" />`,
   revolution: `<path d="M12,2 L12,22" /><path d="M12,6 C16,6 20,8 20,12 C20,16 16,18 12,18" />`,
@@ -56,5 +56,5 @@ const PATHS = {
 export type IconName = keyof typeof PATHS
 
 export const SvgIcon = (props: { name: IconName; size?: number }): JSX.Element => (
-  <svg viewBox="0 0 24 24" width={props.size ?? 14} height={props.size ?? 14} fill="none" stroke="currentColor" stroke-width="2" innerHTML={PATHS[props.name]} />
+  <svg viewBox="0 0 24 24" width={props.size ?? 16} height={props.size ?? 16} fill="none" stroke="currentColor" stroke-width="2" innerHTML={PATHS[props.name]} />
 )

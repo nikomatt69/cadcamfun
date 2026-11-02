@@ -205,12 +205,12 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
   return (
     <PanelCard title={t("cad.surfacing.title")} testId="cad-surfacing-panel">
       <Note>
-        <Show when={selectedSolid()} fallback={<p class="text-amber-700">{t("cad.surfacing.noSolid")}</p>}>
+        <Show when={selectedSolid()} fallback={<p class="text-[color:var(--ent-warn)]">{t("cad.surfacing.noSolid")}</p>}>
           {(solid) => (
-            <p class="text-blue-700 dark:text-blue-300">
+            <p class="text-[color:var(--ent-accent)]">
               <Box size={12} class="inline mr-1" />
               {String(solid()["name"] ?? solid()["id"])}
-              <span class="ml-1 text-blue-500/80">({String(solid()["type"])})</span>
+              <span class="ml-1 text-[color:var(--ent-text-muted)]">({String(solid()["type"])})</span>
             </p>
           )}
         </Show>
@@ -220,7 +220,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
         <section class="strategy-palette__cat">
           <header class="strategy-palette__cat-head">
             <span class="strategy-palette__cat-bar" data-accent="blue" />
-            <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">{t("cam.operations")}</span>
+            <span class="text-xs font-semibold text-[color:var(--ent-text)]">{t("cam.operations")}</span>
           </header>
           <div class="strategy-palette__grid">
             <For each={OPS}>
@@ -236,9 +236,9 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
                     title={t(cell.title)}
                   >
                     <span class="strategy-cell__icon">
-                      {cell.id === "chamferBox" || cell.id === "chamferCylinderTop" ? <Slice size={18} /> :
-                       cell.id === "shell" ? <Layers size={18} /> :
-                       cell.id === "sweep" ? <Wrench size={18} /> : <Plus size={18} />}
+                      {cell.id === "chamferBox" || cell.id === "chamferCylinderTop" ? <Slice size={16} /> :
+                       cell.id === "shell" ? <Layers size={16} /> :
+                       cell.id === "sweep" ? <Wrench size={16} /> : <Plus size={16} />}
                     </span>
                     <span class="strategy-cell__label">{t(cell.title)}</span>
                   </button>
@@ -252,7 +252,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
       <Show when={op() === "chamferBox" || op() === "chamferCylinderTop"}>
         <div class="space-y-2">
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.distance")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.distance")}</span>
             <NumberField class="panel-input font-mono" value={distance()} step="0.1" accept={(value) => value >= 0.01} onValue={setDistance} />
           </label>
         </div>
@@ -261,11 +261,11 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
       <Show when={op() === "shell"}>
         <div class="space-y-2">
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.thickness")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.thickness")}</span>
             <NumberField class="panel-input font-mono" value={thickness()} step="0.05" accept={(value) => value >= 0.01} onValue={setThickness} />
           </label>
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.openFaces")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.openFaces")}</span>
             <input
               type="text"
               class="panel-input font-mono"
@@ -280,7 +280,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
       <Show when={op() === "sweep"}>
         <div class="space-y-2">
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.profilePoints")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.profilePoints")}</span>
             <textarea
               rows={4}
               class="panel-input font-mono"
@@ -289,7 +289,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             />
           </label>
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.pathPoints")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.pathPoints")}</span>
             <textarea
               rows={4}
               class="panel-input font-mono"
@@ -303,7 +303,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
       <Show when={op() === "loft"}>
         <div class="space-y-2">
           <label class="block">
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.sections")}</span>
+            <span class="mb-1 block text-xs font-medium text-[color:var(--ent-text)]">{t("cad.surfacing.sections")}</span>
             <textarea
               rows={6}
               class="panel-input font-mono"

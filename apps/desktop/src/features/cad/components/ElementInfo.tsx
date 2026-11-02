@@ -10,12 +10,12 @@ import { t } from "../../../i18n/index.ts"
 interface ElementInfoProps { readonly elementId: string; onClose?: () => void }
 type Values = Record<string, any>
 
-const ROW = "flex items-center justify-between py-1 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-const FIELD = "px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 text-right"
+const ROW = "flex items-center justify-between gap-3 py-1 tabular-nums border-b border-[color:var(--ent-line)] last:border-b-0"
+const FIELD = "px-2 py-1 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)] text-right tabular-nums"
 const formatNumber = (n: number | undefined) => (n === undefined ? "N/A" : Number(n.toFixed(2)).toString())
 // Sizes must stay positive; a line is at least one pixel wide.
 const MINIMUM: Readonly<Record<string, number>> = { width: 0.001, height: 0.001, depth: 0.001, radius: 0.001, linewidth: 1 }
-const SECTION_BUTTON = "w-full flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-t"
+const SECTION_BUTTON = "w-full flex items-center justify-between p-2 bg-[color:var(--ent-surface-subtle)] rounded-t"
 
 /** Read/edit panel for one element: general, position, dimensions, appearance, metadata and component children. */
 export default function ElementInfo(props: ElementInfoProps): JSX.Element {
@@ -68,19 +68,19 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
 
   const property = (label: string, value: unknown, unit = "") => (
     <div class={ROW}>
-      <span class="text-sm text-gray-600 dark:text-gray-300">{label}</span>
-      <span class="font-medium">{String(value)}<Show when={unit}><span class="text-xs ml-1 text-gray-500">{unit}</span></Show></span>
+      <span class="text-sm text-[color:var(--ent-text-muted)]">{label}</span>
+      <span class="font-medium">{String(value)}<Show when={unit}><span class="text-xs ml-1 text-[color:var(--ent-text-muted)]">{unit}</span></Show></span>
     </div>
   )
   const editable = (label: string, field: string, type = "text", options?: ReadonlyArray<{ value: string; label: string }>) => (
     <div class={ROW}>
-      <label for={field} class="text-sm text-gray-600 dark:text-gray-300">{label}</label>
+      <label for={field} class="text-sm text-[color:var(--ent-text-muted)]">{label}</label>
       <Show when={type === "select" && options} fallback={
         <Show when={type === "number"} fallback={
         <Show when={type === "checkbox"} fallback={
           <input id={field} type={type} value={edited()[field] ?? ""} onInput={(e) => set(field, e.currentTarget.value)}
-            class={type === "color" ? "w-10 h-8 p-0 border rounded" : `${FIELD} w-24`} />}>
-          <input id={field} type="checkbox" checked={!!edited()[field]} onChange={(e) => set(field, e.currentTarget.checked)} class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            class={type === "color" ? "w-10 h-8 p-0 border border-[color:var(--ent-line-strong)] rounded" : `${FIELD} w-24`} />}>
+          <input id={field} type="checkbox" checked={!!edited()[field]} onChange={(e) => set(field, e.currentTarget.checked)} class="h-4 w-4 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" />
         </Show>}>
           <div class="w-28"><NumberField id={field} label={label} value={edited()[field]} onChange={(value) => set(field, value)} onError={(error) => flag(field, error)} min={MINIMUM[field]} step={field === "linewidth" ? 1 : 0.1} showError={tried()} class={`${FIELD} w-full`} /></div>
         </Show>}>
@@ -91,7 +91,7 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
     </div>
   )
   const section = (key: string, title: string, body: () => JSX.Element) => (
-    <div class="border rounded dark:border-gray-700">
+    <div class="border border-[color:var(--ent-line)] rounded">
       <button class={SECTION_BUTTON} onClick={() => toggle(key)}>
         <span class="font-medium">{title}</span>
         <Show when={expanded()[key]} fallback={<ChevronRight size={16} />}><ChevronDown size={16} /></Show>
@@ -105,20 +105,20 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
       const isDim = () => ["rectangle", "circle", "cube", "sphere", "component"].includes(el().type)
       const sized = () => el().type === "rectangle" || el().type === "cube" || el().type === "component"
       return (
-        <div class="bg-white dark:bg-gray-800 dark:text-white rounded-md shadow-md overflow-hidden">
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 border-b">
+        <div class="bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] rounded-md shadow-md overflow-hidden">
+          <div class="flex justify-between items-center p-3 bg-[color:var(--ent-surface-subtle)] border-b border-[color:var(--ent-line)]">
             <h3 class="font-medium truncate flex-1">
               <Show when={editMode()} fallback={el().name || `${el().type}-${el().id.slice(0, 6)}`}>
-                <input type="text" value={edited()["name"] || ""} onInput={(e) => set("name", e.currentTarget.value)} class="w-full px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600" />
+                <input type="text" value={edited()["name"] || ""} onInput={(e) => set("name", e.currentTarget.value)} class="w-full px-2 py-1 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)]" />
               </Show>
             </h3>
             <div class="flex space-x-1 ml-2">
               <Show when={editMode()} fallback={<>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={startEditing} title={t("cad.info.edit")}><Pencil size={16} /></button>
-                <Show when={props.onClose}><button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" onClick={props.onClose} title={t("cad.info.close")}><X size={16} /></button></Show>
+                <button class="p-1 hover:bg-[color:var(--ent-surface-inset)] rounded" onClick={startEditing} title={t("cad.info.edit")}><Pencil size={16} /></button>
+                <Show when={props.onClose}><button class="p-1 hover:bg-[color:var(--ent-surface-inset)] rounded" onClick={props.onClose} title={t("cad.info.close")}><X size={16} /></button></Show>
               </>}>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-green-600 dark:text-green-400" onClick={saveChanges} title={t("cad.info.save")}><Save size={16} /></button>
-                <button class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-500" onClick={cancelEditing} title={t("cad.assembly.cancel")}><X size={16} /></button>
+                <button class="p-1 hover:bg-[color:var(--ent-surface-inset)] rounded text-[color:var(--ent-ok)]" onClick={saveChanges} title={t("cad.info.save")}><Save size={16} /></button>
+                <button class="p-1 hover:bg-[color:var(--ent-surface-inset)] rounded text-[color:var(--ent-text-muted)]" onClick={cancelEditing} title={t("cad.assembly.cancel")}><X size={16} /></button>
               </Show>
             </div>
           </div>
@@ -166,8 +166,8 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
 
               {section("appearance", "Appearance", () => (
                 <Show when={editMode()} fallback={<>
-                  <div class="flex items-center justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">{t("library.color")}</span>
+                  <div class="flex items-center justify-between gap-3 py-1 border-b border-[color:var(--ent-line)]">
+                    <span class="text-sm text-[color:var(--ent-text-muted)]">{t("library.color")}</span>
                     <div class="flex items-center"><div class="w-4 h-4 rounded mr-2" style={{ "background-color": el().color || "#1e88e5" }} /><span class="font-medium">{el().color || "#1e88e5"}</span></div>
                   </div>
                   <Show when={["line", "rectangle", "circle"].includes(el().type)}>{property("Line Width", formatNumber(el().linewidth), "px")}</Show>
@@ -180,15 +180,15 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
               ))}
 
               <Show when={el().metadata}>{section("metadata", "Metadata", () => (
-                <pre class="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto max-h-40">{JSON.stringify(el().metadata, null, 2)}</pre>
+                <pre class="text-xs bg-[color:var(--ent-surface-inset)] p-2 rounded overflow-auto max-h-40">{JSON.stringify(el().metadata, null, 2)}</pre>
               ))}</Show>
 
               <Show when={el().type === "component" && el().elements && (el().elements as CADElement[]).length > 0}>
                 {section("elements", `Elements (${(el().elements as CADElement[] | undefined)?.length ?? 0})`, () => (
                   <div class="max-h-40 overflow-y-auto">
                     <For each={(el().elements ?? []) as CADElement[]}>{(child, index) =>
-                      <div class="text-sm py-1 border-b border-gray-100 dark:border-gray-700 last:border-b-0 flex items-center">
-                        <div class="w-4 h-4 mr-2 text-gray-600 dark:text-gray-300">
+                      <div class="text-sm py-1 border-b border-[color:var(--ent-line)] last:border-b-0 flex items-center">
+                        <div class="w-4 h-4 mr-2 text-[color:var(--ent-text-muted)]">
                           <Show when={child.type === "rectangle"}><div class="w-4 h-3 border border-current" /></Show>
                           <Show when={child.type === "circle"}><div class="w-4 h-4 rounded-full border border-current" /></Show>
                           <Show when={child.type === "line"}><div class="w-4 h-0.5 bg-current" /></Show>
@@ -204,20 +204,20 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
           </div>
 
           <Show when={!editMode()}>
-            <div class="p-3 border-t">
+            <div class="p-3 border-t border-[color:var(--ent-line)]">
               <div class="flex flex-wrap gap-2">
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" title={t("cad.ribbon.duplicate")}
+                <button class="flex items-center px-3 py-1.5 text-xs bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] rounded hover:bg-[color:var(--ent-action-hover)]" title={t("cad.ribbon.duplicate")}
                   onClick={() => { elements.duplicateElement(el().id); selection.clearSelection() }}><Copy size={12} class="mr-1" />{t("cad.ribbon.duplicate")}</button>
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title={t("cad.move")}
+                <button class="flex items-center px-3 py-1.5 text-xs bg-[color:var(--ent-surface-inset)] rounded hover:bg-[color:var(--ent-line)]" title={t("cad.move")}
                   onClick={() => {
                     useCADStore.getState().setActiveTool("move")
                     if (!useSelectionStore.getState().selectedElementIds.includes(el().id)) useSelectionStore.getState().selectElement(el().id)
                   }}><Move size={12} class="mr-1" />{t("cad.move")}</button>
                 <Show when={el().type === "component"}>
-                  <button class="flex items-center px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600" title={t("cad.info.ungroup")}
+                  <button class="flex items-center px-3 py-1.5 text-xs bg-[color:var(--ent-surface-inset)] rounded hover:bg-[color:var(--ent-line)]" title={t("cad.info.ungroup")}
                     onClick={() => selection.ungroupElement(el().id)}><Layers size={12} class="mr-1" />{t("browser.ungroup")}</button>
                 </Show>
-                <button class="flex items-center px-2.5 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600" title={t("cad.customElements.delete")}
+                <button class="flex items-center px-3 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600" title={t("cad.customElements.delete")}
                   onClick={() => { elements.deleteElement(el().id); selection.clearSelection(); props.onClose?.() }}><Trash2 size={12} class="mr-1" />{t("cad.customElements.delete")}</button>
               </div>
             </div>

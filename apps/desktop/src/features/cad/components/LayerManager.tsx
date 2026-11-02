@@ -69,7 +69,7 @@ export default function LayerManager(): JSX.Element {
                   <button type="button" class="sidebar-layer__name" aria-pressed={store.activeLayer === layer.id} onClick={() => store.setActiveLayer(layer.id)} onDblClick={() => startEdit(layer)} title={t("cad.layers.selectHint")}>
                     <div class="w-4 h-4 rounded-full" style={{ "background-color": layer.color }} />
                     <span class="font-medium">{layer.name}</span>
-                    <Show when={layer.locked}><span class="text-xs text-gray-500">{t("cad.layers.lockedTag")}</span></Show>
+                    <Show when={layer.locked}><span class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.layers.lockedTag")}</span></Show>
                   </button>
                   <div class="sidebar-layer__actions">
                     <button type="button" class={ICON_BUTTON} title={layer.visible ? t("cad.layers.hide") : t("cad.layers.show")} aria-label={`${layer.visible ? t("cad.layers.hide") : t("cad.layers.show")}: ${layer.name}`}
@@ -86,7 +86,7 @@ export default function LayerManager(): JSX.Element {
                     </button>
                     <button type="button" class={ICON_BUTTON} title={t("cad.deleteLayer")} aria-label={`${t("cad.deleteLayer")}: ${layer.name}`} disabled={store.layers.length <= 1}
                       onClick={(e: MouseEvent) => { e.stopPropagation(); remove(layer.id) }}>
-                      <Trash2 size={16} class={store.layers.length <= 1 ? "text-gray-300" : "text-red-500"} />
+                      <Trash2 size={16} class={store.layers.length <= 1 ? "text-[color:var(--ent-text-faint)]" : "text-[color:var(--ent-bad)]"} />
                     </button>
                   </div>
                 </div>
@@ -97,8 +97,8 @@ export default function LayerManager(): JSX.Element {
                     <input type="text" aria-label={t("cad.layerName")} value={editName()} onInput={(e) => setEditName(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); else if (e.key === "Escape") setEditing(null) }} class="panel-input min-w-0 flex-1" autofocus />
                   </div>
                   <div class="flex justify-end space-x-2">
-                    <button type="button" onClick={saveEdit} class="panel-icon-btn text-green-700" aria-label={t("cad.layers.save")}><Save size={14} /></button>
-                    <button type="button" onClick={() => setEditing(null)} class="panel-icon-btn text-red-600" aria-label={t("cad.layers.cancelEdit")}><X size={14} /></button>
+                    <button type="button" onClick={saveEdit} class="panel-icon-btn text-[color:var(--ent-ok)]" aria-label={t("cad.layers.save")}><Save size={14} /></button>
+                    <button type="button" onClick={() => setEditing(null)} class="panel-icon-btn text-[color:var(--ent-bad)]" aria-label={t("cad.layers.cancelEdit")}><X size={14} /></button>
                   </div>
                 </div>
               </Show>

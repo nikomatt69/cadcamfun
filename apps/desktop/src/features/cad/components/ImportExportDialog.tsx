@@ -178,7 +178,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
       <div class="px-6 py-4">
         <label for="file-upload" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("cad.importExport.selectFile")}</label>
         <div class="mb-4 flex flex-col items-center gap-3 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-6 dark:border-gray-600 dark:bg-gray-700/50">
-          <Upload class="h-12 w-12 text-gray-400" /><label for="file-upload" class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cad.importExport.upload")}</label>
+          <Upload class="h-8 w-8 text-gray-400" aria-hidden="true" /><label for="file-upload" class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cad.importExport.upload")}</label>
           <input id="file-upload" name="file-upload" type="file" accept=".json,.cad,.stl,.obj,.ply,.step,.stp,.iges,.igs" class={SAVE_FIELD} onChange={importFile} />
           <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.importExport.formats")}</p>
         </div>

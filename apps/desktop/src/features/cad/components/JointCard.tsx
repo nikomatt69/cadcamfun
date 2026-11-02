@@ -41,11 +41,11 @@ export default function JointCard(): JSX.Element {
       <PanelCard title={t("cad.joint.title")} testId="joint-card" actions={
         <button type="button" class="panel-btn" onClick={() => cad.setPickedJoint(null)}>{t("cad.joint.clear")}</button>
       }>
-        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs tabular-nums">
           <For each={describeJoint(current(), nodeName)}>{(row) =>
             <>
-              <dt class="text-gray-500 dark:text-gray-400">{rowLabel(row.key)}</dt>
-              <dd class="break-words text-gray-900 dark:text-gray-100" data-testid={`joint-${row.key}`}>{row.key === "type" ? jointTypeLabel(current().type) : row.value}</dd>
+              <dt class="text-[color:var(--ent-text-muted)]">{rowLabel(row.key)}</dt>
+              <dd class="break-words text-[color:var(--ent-text)]" data-testid={`joint-${row.key}`}>{row.key === "type" ? jointTypeLabel(current().type) : row.value}</dd>
             </>}
           </For>
         </dl>

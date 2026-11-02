@@ -68,43 +68,43 @@ export default function StatusBar(): JSX.Element {
       testId="cad-status-bar"
       left={
         <>
-          <Seg label={t("cad.status.mode")} value={is2D() ? t("cad.xy") : t("cad.3d")} tone={is2D() ? "blue" : "purple"} />
+          <Seg label={t("cad.status.mode")} value={is2D() ? t("cad.xy") : t("cad.3d")} />
           <Seg label={t("cad.status.tool")} value={transformText()} tone={transform.isTransforming ? "amber" : "neutral"} title={t("cad.status.toolTitle")} />
           <Sep />
-          <Seg label={t("cad.status.material")} value={<span class="capitalize">{workpiece().material}</span>} tone="green" hideBelow="md" />
-          <Seg label={t("cad.status.stock")} value={`${workpiece().width.toFixed(1)} × ${workpiece().height.toFixed(1)} × ${workpiece().depth.toFixed(1)}`} tone="cyan" hideBelow="md" title={t("cad.status.stockTitle")} />
+          <Seg label={t("cad.status.material")} value={<span class="capitalize">{workpiece().material}</span>} hideBelow="md" />
+          <Seg label={t("cad.status.stock")} value={`${workpiece().width.toFixed(1)} × ${workpiece().height.toFixed(1)} × ${workpiece().depth.toFixed(1)}`} hideBelow="md" title={t("cad.status.stockTitle")} />
           <Sep />
-          <Seg value={t("cad.status.grid")} tone="green" pressed={cad.gridVisible} onClick={() => cad.toggleGrid()} title={t("cad.status.toggleGrid")} testId="status-grid" />
-          <Seg value={t("cad.status.axis")} tone="blue" pressed={cad.axisVisible} onClick={() => cad.toggleAxis()} title={t("cad.status.toggleAxis")} testId="status-axis" />
-          <Seg value={t("cad.status.dims")} tone="amber" pressed={cad.showDimensions} onClick={() => cad.toggleDimensions()} title={t("cad.status.toggleDims")} testId="status-dims" />
+          <Seg value={t("cad.status.grid")} pressed={cad.gridVisible} onClick={() => cad.toggleGrid()} title={t("cad.status.toggleGrid")} testId="status-grid" />
+          <Seg value={t("cad.status.axis")} pressed={cad.axisVisible} onClick={() => cad.toggleAxis()} title={t("cad.status.toggleAxis")} testId="status-axis" />
+          <Seg value={t("cad.status.dims")} pressed={cad.showDimensions} onClick={() => cad.toggleDimensions()} title={t("cad.status.toggleDims")} testId="status-dims" />
           <Sep />
           <Seg label={t("cad.status.layer")} value={layer()?.name ?? t("dashboard.metric.unavailable")} hideBelow="lg" title={t("cad.status.layerTitle")} />
           <Seg label={t("cad.status.elements")} value={elements.elements?.length || 0} hideBelow="md" />
           <Show when={hidden() > 0}><Seg label={t("cad.status.hidden")} value={hidden()} tone="muted" hideBelow="lg" /></Show>
           <Show when={selectedCount() > 0}><Seg value={t("cad.selected", { count: selectedCount() })} tone="amber" /></Show>
           <Show when={elements.selectedElement}>
-            {(selected) => <Seg label={t("cad.status.selected")} value={`${selected().type} ${selected().id.substring(0, 6)}`} tone="blue" hideBelow="lg" title={selected().id} />}
+            {(selected) => <Seg label={t("cad.status.selected")} value={`${selected().type} ${selected().id.substring(0, 6)}`} hideBelow="lg" title={selected().id} />}
           </Show>
           <Show when={cad.pickedEntity}>
             {(entity) => <Seg value={entityChip(entity())} tone="amber" hideBelow="lg" testId="status-entity" />}
           </Show>
           <Show when={cad.hoveredEntity !== null && !sameEntity(cad.hoveredEntity, cad.pickedEntity)}>
-            <Seg label={t("cad.sub.hover")} value={entityChip(cad.hoveredEntity!)} tone="cyan" hideBelow="lg" testId="status-entity-hover" />
+            <Seg label={t("cad.sub.hover")} value={entityChip(cad.hoveredEntity!)} tone="muted" hideBelow="lg" testId="status-entity-hover" />
           </Show>
           <Show when={pickedJoint()}>
-            {(joint) => <Seg label={t("cad.joint.title")} value={`${joint().name} · ${jointTypeLabel(joint().type)}`} tone="amber" hideBelow="lg" testId="status-joint" title={joint().id} />}
+            {(joint) => <Seg label={t("cad.joint.title")} value={`${joint().name} · ${jointTypeLabel(joint().type)}`} hideBelow="lg" testId="status-joint" title={joint().id} />}
           </Show>
           <Show when={bounds()}>
-            {(box) => <Seg label={t("cad.status.size")} value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} tone="cyan" hideBelow="xl" title={t("cad.status.sizeTitle")} />}
+            {(box) => <Seg label={t("cad.status.size")} value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} hideBelow="xl" title={t("cad.status.sizeTitle")} />}
           </Show>
         </>
       }
       right={
         <>
           <span class="flex items-center gap-2 font-mono tabular-nums" title={t("cad.status.cursor")}>
-            <span class="text-blue-400">{t("cad.field.x")}</span><span class="text-blue-200">{mm(elements.mousePosition?.x)}</span>
-            <span class="text-amber-400">{t("cad.field.y")}</span><span class="text-amber-200">{mm(elements.mousePosition?.y)}</span>
-            <Show when={!is2D()}><span class="text-emerald-400">Z</span><span class="text-emerald-200">{mm(elements.mousePosition?.z)}</span></Show>
+            <span class="text-gray-500">{t("cad.field.x")}</span><span class="min-w-[5ch] text-right text-gray-200">{mm(elements.mousePosition?.x)}</span>
+            <span class="text-gray-500">{t("cad.field.y")}</span><span class="min-w-[5ch] text-right text-gray-200">{mm(elements.mousePosition?.y)}</span>
+            <Show when={!is2D()}><span class="text-gray-500">Z</span><span class="min-w-[5ch] text-right text-gray-200">{mm(elements.mousePosition?.z)}</span></Show>
           </span>
           <span class="hidden text-gray-500 2xl:inline">{hint()}</span>
           <Sep />

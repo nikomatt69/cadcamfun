@@ -17,6 +17,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
 import { Cog, HelpCircle, Layers, Maximize2, Minimize2, Move, RotateCw, Sliders } from "lucide-solid"
+import { NumberField } from "./property-inputs/NumberField.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore, type PickedEntity } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -1460,7 +1461,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       {props.children}
 
       <Show when={invalidItems().length > 0}>
-        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-red-900/90 px-3 py-2 text-xs text-white shadow-lg" role="alert" data-testid="invalid-elements">
+        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-red-900 px-3 py-2 text-xs text-white shadow-lg" role="alert" data-testid="invalid-elements">
           <p class="font-semibold">{t("cad.invalid.title", { count: invalidItems().length })}</p>
           <ul class="mt-1 space-y-0.5">
             <For each={invalidItems().slice(0, 4)}>{(item) => (
@@ -1474,11 +1475,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       <FlatPatternOverlay />
 
       <Show when={pickedSub()}>
-        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
       </Show>
 
       <Show when={issueItems().length > 0}>
-        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-amber-900/90 px-3 py-2 text-xs text-white shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
+        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-amber-900 px-3 py-2 text-xs text-white shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
           <p class="font-semibold">{t("cad.issues.title", { count: issueItems().length })}</p>
           <ul class="mt-1 space-y-0.5">
             <For each={issueItems().slice(0, 4)}>{(item) => (
@@ -1541,9 +1542,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           </Show>
           <Show when={showPerformance()}>
             <div class="cad-viewport-popover p-3">
-              <h3 class="text-lg font-semibold mb-3">{t("cad.canvas.perfEvents")}</h3>
+              <h3 class="text-sm font-semibold mb-3">{t("cad.canvas.perfEvents")}</h3>
               <div class="mb-4" data-testid="look-tier">
-                <h4 class="text-sm font-medium mb-2">{t("cad.canvas.visualQuality")}</h4>
+                <h4 class="text-xs font-semibold mb-2">{t("cad.canvas.visualQuality")}</h4>
                 <div class="flex gap-1" role="radiogroup" aria-label={t("cad.canvas.visualQuality")}>
                   <For each={LOOK_TIERS}>{(tier) =>
                     <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
@@ -1553,7 +1554,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("cad.canvas.qualityHint")}</p>
               </div>
               <div class="mb-4">
-                <h4 class="text-sm font-medium mb-2">{t("cad.canvas.memory")}</h4>
+                <h4 class="text-xs font-semibold mb-2">{t("cad.canvas.memory")}</h4>
                 <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">
                   <div>JS Heap: {(memory().used / 1024 / 1024).toFixed(1)}MB</div>
                   <div>Total Heap: {(memory().total / 1024 / 1024).toFixed(1)}MB</div>
@@ -1626,10 +1627,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
           <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
         </select>
-        <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "#0288d1" : "rgba(0,0,0,0.7)" }}
+        <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "var(--panel-accent)" : "#111827" }}
           aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
         <Show when={sheetSource() !== undefined}>
-          <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showFlatPattern ? "#d32f2f" : "rgba(0,0,0,0.7)" }}
+          <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showFlatPattern ? "var(--panel-accent)" : "#111827" }}
             aria-pressed={cad.showFlatPattern} title={t("cad.flat.toggle")} data-testid="show-flat-pattern" onClick={() => cad.setShowFlatPattern(!cad.showFlatPattern)}>{t("cad.flat")}</button>
         </Show>
       </div>
@@ -1637,7 +1638,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         <button
           type="button"
           class="rounded-md px-2 py-1 text-[11px] text-white"
-          style={{ "background-color": cad.section.enabled ? "#f57c00" : "rgba(0,0,0,0.7)" }}
+          style={{ "background-color": cad.section.enabled ? "var(--panel-accent)" : "#111827" }}
           aria-pressed={cad.section.enabled}
           title={t("cad.section")}
           onClick={() => {
@@ -1650,13 +1651,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           <div class="cad-viewport-footer__section-fields">
             <For each={SECTION_AXES}>{(axis) => (
               <button type="button" aria-pressed={cad.section.axis === axis} aria-label={`${t("cad.section.axis")} ${axis.toUpperCase()}`}
-                class="rounded px-1.5 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "#f57c00" : "#374151" }}
+                class="rounded px-2 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "var(--panel-accent)" : "#374151" }}
                 onClick={() => cad.setSection({ axis })}>{axis}</button>
             )}</For>
             <input type="range" aria-label={t("cad.section.constant")} min={sectionRange().min} max={sectionRange().max} step="0.5" value={cad.section.position}
               onInput={(event) => cad.setSection({ position: Number(event.currentTarget.value) })} />
-            <input type="number" aria-label={t("cad.section.constant")} class="w-16 rounded bg-gray-700 px-1 text-right" step="0.5" value={cad.section.position}
-              onInput={(event) => { const next = Number(event.currentTarget.value); if (Number.isFinite(next)) cad.setSection({ position: next }) }} />
+            <span class="w-16"><NumberField label={t("cad.section.constant")} class="w-full rounded bg-gray-700 px-2 py-0.5 text-right tabular-nums" step={0.5} value={cad.section.position}
+              onChange={(next) => cad.setSection({ position: next })} /></span>
             <label class="flex items-center gap-1"><input type="checkbox" checked={cad.section.inverted} onChange={(event) => cad.setSection({ inverted: event.currentTarget.checked })} />{t("cad.section.invert")}</label>
           </div>
         </Show>
@@ -1665,13 +1666,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           {props.footerActions}
           <CaptureButtons mode="cad" />
           <button type="button" onClick={toggleFullscreen} class="panel-icon-btn" title={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"} aria-label={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"}>
-            <Show when={isFullscreen()} fallback={<Maximize2 size={18} />}><Minimize2 size={18} /></Show>
+            <Show when={isFullscreen()} fallback={<Maximize2 size={16} />}><Minimize2 size={16} /></Show>
           </button>
         </div>
       </div>
       <div class="absolute bottom-4 left-4">
-        <button onClick={() => app.keys.setHelpOpen(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-colors motion-reduce:transition-none duration-200" title={shortcutsTitle()}>
-          <HelpCircle size={18} />
+        <button onClick={() => app.keys.setHelpOpen(true)} class="p-2 bg-[color:var(--ent-surface)] rounded-full text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] shadow-md transition-colors motion-reduce:transition-none duration-200" title={shortcutsTitle()}>
+          <HelpCircle size={16} />
         </button>
       </div>
     </div>

@@ -5,6 +5,7 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { fea } from "@cadcamfun/core"
+import { X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { Field, Grid, Group, NumberField, Note, Segmented, INPUT } from "../../../shared/components/panel/ui.tsx"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -18,8 +19,8 @@ const ANALYSES: ReadonlyArray<FemForm["analysis"]> = ["static", "thermal_stress"
 const SWEEP = ["steel-s235", "steel-c45", "stainless-304", "aluminium-6061-t6", "aluminium-7075-t6", "titanium-ti6al4v", "brass-c360", "abs"]
 const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 const f = (v: number, d = 2): string => (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toPrecision(d + 1))
-const BTN = "px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 disabled:opacity-50"
-const BTN_PRIMARY = "px-3 py-1.5 rounded-lg text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+const BTN = "px-3 py-1.5 rounded-lg text-sm font-medium border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] hover:bg-[color:var(--ent-surface-subtle)] disabled:opacity-50"
+const BTN_PRIMARY = "px-3 py-1.5 rounded-lg text-sm font-semibold text-[color:var(--ent-action-text)] bg-[color:var(--ent-action)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
 
 const fieldKey = (name: FieldName) => `sim.f.${name}` as const
 const analysisKey = (a: FemForm["analysis"]) => `sim.an.${a}` as const
@@ -249,20 +250,20 @@ export default function SimulationPanel(): JSX.Element {
         <For each={r.modes?.filter((m) => !m.rigid) ?? []}>{(m, i) => <li>{t("sim.sum.freq", { n: i() + 1, value: f(m.frequencyHz) })}</li>}</For>
         <For each={r.buckling ?? []}>{(b, i) => <li>{t("sim.sum.buckling", { n: i() + 1, value: f(b.factor) })}</li>}</For>
         <Show when={s.massKg !== undefined}><li>{t("sim.sum.mass", { value: f(s.massKg!, 3) })}</li></Show>
-        <li class="text-gray-500">{t("sim.sum.mesh", { elements: r.meshSummary.elements, dofs: r.meshSummary.dofs, ms: r.solver.milliseconds })}</li>
+        <li class="text-[color:var(--ent-text-muted)]">{t("sim.sum.mesh", { elements: r.meshSummary.elements, dofs: r.meshSummary.dofs, ms: r.solver.milliseconds })}</li>
       </ul>
     )
   }
 
   const femView = (): JSX.Element => (
     <div class="flex h-full min-h-0">
-      <div class="w-[300px] shrink-0 overflow-y-auto p-3 border-r border-gray-200 dark:border-gray-700">{controls()}</div>
+      <div class="w-[300px] shrink-0 overflow-y-auto p-3 border-r border-[color:var(--ent-line)]">{controls()}</div>
       <div class="flex-1 min-w-0 flex flex-col">
         <div class="relative flex-1 min-h-[220px]" ref={host}>
           <Show when={result()} fallback={<CADCanvas width="100%" height="100%" allowDragDrop keyboard={false} />}>
             <canvas ref={canvas} class="absolute inset-0 w-full h-full touch-none cursor-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onWheel={wheel} />
-            <div class="absolute top-2 left-2 flex flex-wrap items-center gap-2 bg-white/85 dark:bg-gray-900/85 rounded-lg px-2 py-1 text-sm">
-              <span class="text-gray-500">{t("sim.field")}</span>
+            <div class="absolute top-2 left-2 flex flex-wrap items-center gap-2 bg-[color:var(--ent-surface)] shadow-sm rounded-lg px-3 py-2 text-xs">
+              <span class="text-[color:var(--ent-text-muted)]">{t("sim.field")}</span>
               <select class={INPUT} value={field()} onChange={(e) => setField(e.currentTarget.value as FieldName)}>
                 <For each={fields()}>{(n) => <option value={n}>{t(fieldKey(n))}</option>}</For>
               </select>
@@ -272,36 +273,36 @@ export default function SimulationPanel(): JSX.Element {
                 </select>
               </Show>
               <label class="flex items-center gap-1"><input type="checkbox" checked={deform()} onChange={(e) => setDeform(e.currentTarget.checked)} />{t("sim.deformed")}</label>
-              <button class="text-xs underline" onClick={() => { setResult(undefined); setFindings([]) }}>×</button>
+              <button class="p-1 rounded hover:bg-[color:var(--ent-surface-inset)]" aria-label={t("common.close")} onClick={() => { setResult(undefined); setFindings([]) }}><X size={12} aria-hidden="true" /></button>
             </div>
           </Show>
         </div>
-        <div class="max-h-[42%] overflow-y-auto p-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <div class="max-h-[42%] overflow-y-auto p-3 border-t border-[color:var(--ent-line)] space-y-2">
           <Show when={message()}>{(m) => <Note kind="bad" role="alert">{m()}</Note>}</Show>
           <Show when={result()}>{(r) => summary(r())}</Show>
           <Show when={findings().length > 0}>
-            <h4 class="text-xs font-semibold uppercase text-gray-500">{t("sim.findings")}</h4>
+            <h4 class="mb-1 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("sim.findings")}</h4>
             <For each={findings()}>{(x) =>
               <Note kind={x.severity === "critical" ? "bad" : x.severity === "warning" ? "warn" : "info"}>
-                {x.message}<Show when={x.suggestion}><div class="text-gray-500">{t("sim.next", { text: x.suggestion! })}</div></Show>
+                {x.message}<Show when={x.suggestion}><div class="text-[color:var(--ent-text-muted)]">{t("sim.next", { text: x.suggestion! })}</div></Show>
               </Note>}
             </For>
           </Show>
           <Show when={convergence()}>{(c) =>
             <div class="text-sm">
-              <h4 class="text-xs font-semibold uppercase text-gray-500">{t("sim.conv.title")}</h4>
+              <h4 class="mb-1 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("sim.conv.title")}</h4>
               <For each={c().levels}>{(l) => <div>{t("sim.conv.row", { size: f(l.size), elements: l.elements, value: f(l.value) })}{l.changePercent !== undefined ? ` (${l.changePercent > 0 ? "+" : ""}${l.changePercent}%)` : ""}</div>}</For>
               <Note kind={c().singularity ? "warn" : c().converged ? "ok" : "info"}>{c().advice}</Note>
             </div>}
           </Show>
           <Show when={sweep()}>{(s) =>
             <div class="text-sm">
-              <h4 class="text-xs font-semibold uppercase text-gray-500">{t("sim.compare.title")}</h4>
+              <h4 class="mb-1 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("sim.compare.title")}</h4>
               <For each={s().rows.filter((r) => r.ok)}>{(r) => <div>{t("sim.compare.row", { name: r.name, sf: r.minSafetyFactor !== undefined ? f(r.minSafetyFactor) : "-", mass: r.massKg !== undefined ? f(r.massKg, 3) : "-" })}</div>}</For>
               <Note kind="info">{s().advice}</Note>
             </div>}
           </Show>
-          <Show when={result() !== undefined}><p class="text-xs text-gray-500">{t("sim.limits")}</p></Show>
+          <Show when={result() !== undefined}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("sim.limits")}</p></Show>
         </div>
       </div>
     </div>
@@ -317,7 +318,7 @@ export default function SimulationPanel(): JSX.Element {
           <For each={s().clashes}>{(c) => <Note kind="bad">{t("sim.int.clash", { a: c.a, b: c.b, volume: f(c.volume) })}</Note>}</For>
           <Show when={s().touching > 0}><p>{t("sim.int.touching", { n: s().touching })}</p></Show>
           <For each={s().undetermined}>{(u) => <Note kind="warn">{t("sim.int.undetermined", { a: u.a, b: u.b, reason: u.reason })}</Note>}</For>
-          <For each={s().closest}>{(g) => <p class="text-gray-500">{t("sim.int.closest", { a: g.a, b: g.b, distance: f(g.distance) })}</p>}</For>
+          <For each={s().closest}>{(g) => <p class="text-[color:var(--ent-text-muted)]">{t("sim.int.closest", { a: g.a, b: g.b, distance: f(g.distance) })}</p>}</For>
         </div>}
       </Show>
     </div>
@@ -346,9 +347,9 @@ export default function SimulationPanel(): JSX.Element {
 
   return (
     <div class="h-full flex flex-col pb-10 min-h-0">
-      <div class="flex gap-1 px-3 pt-2 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex gap-1 px-3 pt-2 border-b border-[color:var(--ent-line)]">
         <For each={[["fem", t("sim.tab.fem")], ["interference", t("sim.tab.interference")], ["mass", t("sim.tab.mass")]] as const}>{([id, label]) =>
-          <button class={`px-3 py-1.5 text-sm rounded-t-lg ${tab() === id ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-semibold" : "text-gray-600 dark:text-gray-400"}`} aria-pressed={tab() === id} onClick={() => { setTab(id); setMessage(undefined) }}>{label}</button>}
+          <button class={`px-3 py-1.5 text-sm rounded-t-lg ${tab() === id ? "bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)] font-semibold" : "text-[color:var(--ent-text-muted)]"}`} aria-pressed={tab() === id} onClick={() => { setTab(id); setMessage(undefined) }}>{label}</button>}
         </For>
       </div>
       <div class="flex-1 min-h-0">

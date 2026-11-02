@@ -1,4 +1,5 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -37,17 +38,17 @@ export default function FlatPatternOverlay(): JSX.Element {
 
   return (
     <Show when={cad.showFlatPattern && source() !== undefined}>
-      <div class="absolute bottom-16 left-3 z-40 rounded-md bg-gray-900/90 text-white shadow-lg" style={{ width: `${WIDTH}px` }} data-testid="flat-pattern" role="group" aria-label={t("cad.flat.title")}>
-        <div class="flex items-center gap-2 px-2 py-1 text-[11px]">
+      <div class="absolute bottom-16 left-3 z-40 rounded-md bg-gray-900 text-white shadow-lg" style={{ width: `${WIDTH}px` }} data-testid="flat-pattern" role="group" aria-label={t("cad.flat.title")}>
+        <div class="flex items-center gap-2 px-3 py-1.5 text-[11px]">
           <span class="font-semibold">{t("cad.flat.title")}</span>
           <Show when={views().length > 1}>
-            <select class="rounded bg-gray-800 px-1 py-0.5" aria-label={t("cad.flat.sheet")} value={view()?.featureId} onChange={(event) => setChosen(event.currentTarget.value)}>
+            <select class="rounded bg-gray-800 px-2 py-1" aria-label={t("cad.flat.sheet")} value={view()?.featureId} onChange={(event) => setChosen(event.currentTarget.value)}>
               <For each={views()}>{(candidate) => <option value={candidate.featureId} selected={candidate.featureId === view()?.featureId}>{candidate.featureId}</option>}</For>
             </select>
           </Show>
-          <button type="button" class="ml-auto rounded px-1.5 hover:bg-gray-700" title={t("common.close")} aria-label={t("common.close")} onClick={() => cad.setShowFlatPattern(false)}>×</button>
+          <button type="button" class="ml-auto rounded p-1 hover:bg-gray-700" title={t("common.close")} aria-label={t("common.close")} onClick={() => cad.setShowFlatPattern(false)}><X size={12} aria-hidden="true" /></button>
         </div>
-        <Show when={view()} fallback={<p class="px-2 pb-2 text-[11px] text-gray-300" data-testid="flat-pattern-empty">{t("cad.flat.empty")}</p>}>
+        <Show when={view()} fallback={<p class="px-3 pb-3 text-[11px] text-gray-300" data-testid="flat-pattern-empty">{t("cad.flat.empty")}</p>}>
           {(current) =>
             <>
               <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={t("cad.flat.summary", { length: formatMm(current().length), width: formatMm(current().width), bends: current().bends })}>
@@ -60,7 +61,7 @@ export default function FlatPatternOverlay(): JSX.Element {
                     transform={text.rotate ? `rotate(-90 ${text.x} ${text.y})` : undefined}>{text.text}</text>}
                 </For>
               </svg>
-              <p class="px-2 pb-1.5 text-[11px] text-gray-300" data-testid="flat-pattern-summary">{t("cad.flat.summary", { length: formatMm(current().length), width: formatMm(current().width), bends: current().bends })}</p>
+              <p class="px-3 pb-3 text-[11px] tabular-nums text-gray-300" data-testid="flat-pattern-summary">{t("cad.flat.summary", { length: formatMm(current().length), width: formatMm(current().width), bends: current().bends })}</p>
             </>}
         </Show>
       </div>

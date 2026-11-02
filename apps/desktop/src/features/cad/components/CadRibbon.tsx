@@ -1,5 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2 } from "lucide-solid"
+import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2, Cylinder } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -8,6 +8,7 @@ import { useLayerStore } from "../store/layerStore.ts"
 import type { SurfacingOp } from "./SurfacingPanel.tsx"
 import type { BooleanOperation } from "../lib/sceneHelpers.ts"
 import { SvgIcon } from "./icons.tsx"
+import { NumberField } from "./property-inputs/NumberField.tsx"
 import { ElementForm, formPositionFor } from "./ToolPanel.tsx"
 import { useAppOptional } from "../../../shared/state/context.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
@@ -87,26 +88,26 @@ export default function CadRibbon(props: Props): JSX.Element {
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.surface")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.surface")}</span>
       <div class="cad-ribbon-actions">
-        <Action label={t("cad.surfacing.chamferBox")} icon={<Wrench size={13} />} active={props.operation === "chamferBox"} onClick={() => props.onSurface("chamferBox")} />
-        <Action label={t("cad.surfacing.chamferCylTop")} icon={<Wrench size={13} />} active={props.operation === "chamferCylinderTop"} onClick={() => props.onSurface("chamferCylinderTop")} />
-        <Action label={t("cad.surfacing.shell")} icon={<Box size={13} />} active={props.operation === "shell"} onClick={() => props.onSurface("shell")} />
-        <Action label={t("cad.surfacing.sweep")} icon={<SvgIcon name="sweep" size={13} />} active={props.operation === "sweep"} onClick={() => props.onSurface("sweep")} />
-        <Action label={t("cad.surfacing.loft")} icon={<Layers size={13} />} active={props.operation === "loft"} onClick={() => props.onSurface("loft")} />
+        <Action label={t("cad.surfacing.chamferBox")} icon={<Wrench size={14} />} active={props.operation === "chamferBox"} onClick={() => props.onSurface("chamferBox")} />
+        <Action label={t("cad.surfacing.chamferCylTop")} icon={<Wrench size={14} />} active={props.operation === "chamferCylinderTop"} onClick={() => props.onSurface("chamferCylinderTop")} />
+        <Action label={t("cad.surfacing.shell")} icon={<Box size={14} />} active={props.operation === "shell"} onClick={() => props.onSurface("shell")} />
+        <Action label={t("cad.surfacing.sweep")} icon={<SvgIcon name="sweep" size={14} />} active={props.operation === "sweep"} onClick={() => props.onSurface("sweep")} />
+        <Action label={t("cad.surfacing.loft")} icon={<Layers size={14} />} active={props.operation === "loft"} onClick={() => props.onSurface("loft")} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.combine")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.combine")}</span>
       <div class="cad-ribbon-actions">
-        <Action label={t("cad.ribbon.union")} icon={<SvgIcon name="boolUnion" size={13} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("union")} />
-        <Action label={t("cad.ribbon.subtract")} icon={<SvgIcon name="boolSubtract" size={13} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("subtract")} />
-        <Action label={t("cad.ribbon.intersect")} icon={<SvgIcon name="boolIntersect" size={13} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("intersect")} />
+        <Action label={t("cad.ribbon.union")} icon={<SvgIcon name="boolUnion" size={14} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("union")} />
+        <Action label={t("cad.ribbon.subtract")} icon={<SvgIcon name="boolSubtract" size={14} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("subtract")} />
+        <Action label={t("cad.ribbon.intersect")} icon={<SvgIcon name="boolIntersect" size={14} />} disabled={booleanBlocked()} onClick={() => props.onBoolean("intersect")} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.inspect")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.inspect")}</span>
       <div class="cad-ribbon-actions">
-        <Action label={t("cad.section")} icon={<Scissors size={13} />} active={cad.section.enabled} onClick={toggleSection} />
-        <Action label={t("cad.explode.title")} icon={<Maximize2 size={13} />} active={cad.explodedView.enabled}
+        <Action label={t("cad.section")} icon={<Scissors size={14} />} active={cad.section.enabled} onClick={toggleSection} />
+        <Action label={t("cad.explode.title")} icon={<Maximize2 size={14} />} active={cad.explodedView.enabled}
           disabled={!props.ready || (!cad.explodedView.enabled && cad.explodablePartCount < 2)}
           hint={t("cad.explode.hint")} onClick={() => cad.setExplodedView({ enabled: !cad.explodedView.enabled })} />
       </div>
@@ -114,23 +115,23 @@ export default function CadRibbon(props: Props): JSX.Element {
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.edit")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.edit")}</span>
       <div class="cad-ribbon-actions">
-        <Action label={t("cad.ribbon.duplicate")} icon={<CopyPlus size={13} />} disabled={creationBlocked() || !singleSelected()}
+        <Action label={t("cad.ribbon.duplicate")} icon={<CopyPlus size={14} />} disabled={creationBlocked() || !singleSelected()}
           onClick={() => { const element = singleSelected(); if (element) elements.duplicateElement(element.id) }} />
-        <Action label={t("cad.ribbon.copy")} icon={<Copy size={13} />} disabled={!singleSelected()} onClick={copySelection} />
-        <Action label={t("cad.ribbon.paste")} icon={<Clipboard size={13} />} disabled={creationBlocked() || !elements.clipboard} onClick={() => elements.pasteElement()} />
+        <Action label={t("cad.ribbon.copy")} icon={<Copy size={14} />} disabled={!singleSelected()} onClick={copySelection} />
+        <Action label={t("cad.ribbon.paste")} icon={<Clipboard size={14} />} disabled={creationBlocked() || !elements.clipboard} onClick={() => elements.pasteElement()} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.create")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.create")}</span>
       <div class="cad-ribbon-actions">
-        <Action label={t("cad.drawing.title")} icon={<FileText size={13} />} disabled={!props.ready || !elements.elements.some(e => e.type === "parametric")} onClick={() => props.onDrawing?.()} />
-        <Action label={t("cad.ribbon.parametric")} hint={hintFor("parametric", t("cad.ribbon.parametric"))} icon={<Box size={13} />} disabled={creationBlocked()} onClick={() => setCreatePart("parametric")} />
+        <Action label={t("cad.drawing.title")} icon={<FileText size={14} />} disabled={!props.ready || !elements.elements.some(e => e.type === "parametric")} onClick={() => props.onDrawing?.()} />
+        <Action label={t("cad.ribbon.parametric")} hint={hintFor("parametric", t("cad.ribbon.parametric"))} icon={<Box size={14} />} disabled={creationBlocked()} onClick={() => setCreatePart("parametric")} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.sketch")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.sketch")}</span>
       <div class="cad-ribbon-actions">
-        <For each={[{ type: "line", label: t("cad.ribbon.line"), icon: <Minus size={13} /> }, { type: "circle", label: t("cad.ribbon.circle"), icon: <Circle size={13} /> }, { type: "rectangle", label: t("cad.ribbon.rectangle"), icon: <Square size={13} /> }] as const}>{tool =>
+        <For each={[{ type: "line", label: t("cad.ribbon.line"), icon: <Minus size={14} /> }, { type: "circle", label: t("cad.ribbon.circle"), icon: <Circle size={14} /> }, { type: "rectangle", label: t("cad.ribbon.rectangle"), icon: <Square size={14} /> }] as const}>{tool =>
           <Action label={tool.label} hint={hintFor(tool.type, tool.label)} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
         }</For>
       </div>
@@ -138,7 +139,7 @@ export default function CadRibbon(props: Props): JSX.Element {
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.solids")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.solids")}</span>
       <div class="cad-ribbon-actions">
-        <For each={[{ type: "cube", label: t("cad.ribbon.box"), icon: <Box size={13} /> }, { type: "cylinder", label: t("cad.ribbon.cylinder"), icon: <SvgIcon name="cylinder" size={13} /> }, { type: "sphere", label: t("cad.ribbon.sphere"), icon: <Circle size={13} /> }, { type: "cone", label: t("cad.ribbon.cone"), icon: <Triangle size={13} /> }, { type: "torus", label: t("cad.ribbon.torus"), icon: <SvgIcon name="torus" size={13} /> }] as const}>{tool =>
+        <For each={[{ type: "cube", label: t("cad.ribbon.box"), icon: <Box size={14} /> }, { type: "cylinder", label: t("cad.ribbon.cylinder"), icon: <Cylinder size={14} /> }, { type: "sphere", label: t("cad.ribbon.sphere"), icon: <Circle size={14} /> }, { type: "cone", label: t("cad.ribbon.cone"), icon: <Triangle size={14} /> }, { type: "torus", label: t("cad.ribbon.torus"), icon: <SvgIcon name="torus" size={14} /> }] as const}>{tool =>
           <Action label={tool.label} hint={hintFor(tool.type, tool.label)} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
         }</For>
       </div>
@@ -160,7 +161,7 @@ export default function CadRibbon(props: Props): JSX.Element {
               value={cad.explodedView.amount} onInput={event => cad.setExplodedView({ amount: Number(event.currentTarget.value) })} />
             <output class="w-9 tabular-nums">{Math.round(cad.explodedView.amount * 100)}%</output>
           </label>
-          <Action label={t("cad.explode.assemble")} icon={<Box size={13} />} onClick={() => cad.setExplodedView({ enabled: false })} />
+          <Action label={t("cad.explode.assemble")} icon={<Box size={14} />} onClick={() => cad.setExplodedView({ enabled: false })} />
         </div>
       </div>
     </Show>
@@ -172,9 +173,9 @@ export default function CadRibbon(props: Props): JSX.Element {
             const axis = event.currentTarget.value
             if (isSectionAxis(axis)) cad.setSection({ axis })
           }}><option value="x">{t("cad.field.x")}</option><option value="y">{t("cad.field.y")}</option><option value="z">Z</option></select>
-          <label class="cad-ribbon-position"><input type="number" aria-label={t("cad.section.constant")} value={cad.section.position} step="0.5"
-            onInput={event => { const position = event.currentTarget.valueAsNumber; if (Number.isFinite(position)) cad.setSection({ position }) }} /><span>{t("cad.millimeters")}</span></label>
-          <Action label={t("cad.section.invert")} icon={<FlipHorizontal2 size={13} />} active={cad.section.inverted}
+          <label class="cad-ribbon-position"><span class="w-[70px]"><NumberField label={t("cad.section.constant")} value={cad.section.position} step={0.5}
+            onChange={position => cad.setSection({ position })} class="w-full" /></span><span>{t("cad.millimeters")}</span></label>
+          <Action label={t("cad.section.invert")} icon={<FlipHorizontal2 size={14} />} active={cad.section.inverted}
             onClick={() => cad.setSection({ inverted: !cad.section.inverted })} />
         </div>
       </div>

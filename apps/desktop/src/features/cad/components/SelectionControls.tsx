@@ -18,7 +18,7 @@ interface SelectionControlsProps {
   readonly bounds?: SelectionBounds | null | undefined
 }
 
-const ACTION = "flex-1 flex items-center justify-center px-2 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs"
+const ACTION = "flex-1 flex items-center justify-center px-2 py-1.5 bg-[color:var(--ent-surface-subtle)] hover:bg-[color:var(--ent-surface-inset)] rounded text-xs"
 
 /** The selection panel on the canvas: selection tool, multi-select, visibility/lock, duplicate, layer move, component, delete. */
 export default function SelectionControls(props: SelectionControlsProps): JSX.Element {
@@ -38,9 +38,9 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
   const moveToLayer = (layerId: string) => { props.onMoveToLayer(layerId); setShowLayerDropdown(false) }
 
   return (
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex flex-col">
-      <div class="mb-2 pb-2 border-b dark:border-gray-700">
-        <button type="button" aria-pressed={props.isSelectionMode} class={`flex items-center px-3 py-1.5 rounded text-sm w-full ${props.isSelectionMode ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
+    <div class="bg-[color:var(--ent-surface)] rounded-lg shadow-lg p-2 flex flex-col">
+      <div class="mb-2 pb-2 border-b border-[color:var(--ent-line)]">
+        <button type="button" aria-pressed={props.isSelectionMode} class={`flex items-center px-3 py-1.5 rounded text-sm w-full ${props.isSelectionMode ? "bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)]" : "bg-[color:var(--ent-surface-inset)] text-[color:var(--ent-text)]"}`}
           onClick={() => props.onSelectionModeChange(!props.isSelectionMode)}>
           <Wrench size={16} class="mr-2" />
           {t("cad.sel.tool")}
@@ -48,16 +48,16 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
       </div>
 
       <Show when={hasSelection()}>
-        <div class="mb-2 text-sm text-gray-700 dark:text-gray-300">
-          <div class="flex justify-between items-center">
+        <div class="mb-2 text-sm text-[color:var(--ent-text)]">
+          <div class="flex justify-between items-center gap-3">
             <span>{t("cad.selected", { count: count() })}</span>
-            <Show when={props.bounds}>{(b) => <span class="text-xs text-gray-500">{Math.round(b().width)}×{Math.round(b().height)}×{Math.round(b().depth)}</span>}</Show>
+            <Show when={props.bounds}>{(b) => <span class="text-xs tabular-nums text-[color:var(--ent-text-muted)]">{Math.round(b().width)}×{Math.round(b().height)}×{Math.round(b().depth)}</span>}</Show>
           </div>
         </div>
       </Show>
 
       <div class="mb-2 flex items-center">
-        <button type="button" aria-pressed={props.isMultiSelectMode} class={`flex items-center px-2 py-1 rounded text-xs ${props.isMultiSelectMode ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}
+        <button type="button" aria-pressed={props.isMultiSelectMode} class={`flex items-center px-2 py-1 rounded text-xs ${props.isMultiSelectMode ? "bg-[color:var(--ent-ok-soft)] text-[color:var(--ent-ok)]" : "bg-[color:var(--ent-surface-inset)] text-[color:var(--ent-text)]"}`}
           onClick={props.onMultiSelectModeToggle}>
           <Show when={props.isMultiSelectMode} fallback={<><ToggleLeft size={14} class="mr-1" />{t("cad.explorer.multi")}</>}>
             <ToggleRight size={14} class="mr-1" />{t("cad.explorer.multi")}
@@ -80,14 +80,14 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
             <button type="button" class={ACTION} onClick={() => useCADStore.getState().setActiveTool("move")} title={t("cad.sel.move")}><Move size={12} class="mr-1" />{t("cad.move")}</button>
           </div>
           <div class="relative">
-            <button type="button" aria-expanded={showLayerDropdown()} class="w-full flex items-center justify-center px-2 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs"
+            <button type="button" aria-expanded={showLayerDropdown()} class="w-full flex items-center justify-center px-2 py-1.5 bg-[color:var(--ent-surface-subtle)] hover:bg-[color:var(--ent-surface-inset)] rounded text-xs"
               onClick={() => setShowLayerDropdown(!showLayerDropdown())} title={t("cad.sel.moveToLayer")}>
               <Layers size={12} class="mr-1" />{t("cad.sel.moveToLayer")}
             </button>
             <Show when={showLayerDropdown()}>
-              <div class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded shadow-lg z-10 max-h-40 overflow-y-auto">
+              <div class="absolute top-full left-0 right-0 mt-1 bg-[color:var(--ent-surface)] border border-[color:var(--ent-line)] rounded shadow-lg z-10 max-h-40 overflow-y-auto">
                 <For each={layers.layers}>{(layer) =>
-                  <button type="button" class="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" onClick={() => moveToLayer(layer.id)}>
+                  <button type="button" class="w-full text-left px-2 py-1.5 text-xs hover:bg-[color:var(--ent-surface-inset)] flex items-center" onClick={() => moveToLayer(layer.id)}>
                     <div class="w-2 h-2 rounded-full mr-2" style={{ "background-color": layer.color }} />
                     {layer.name}
                   </button>}</For>
@@ -95,7 +95,7 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
             </Show>
           </div>
           <Show when={count() > 1}>
-            <button type="button" class="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-xs" onClick={props.onCreateComponent} title={t("cad.sel.createComponent")}>
+            <button type="button" class="w-full flex items-center justify-center px-2 py-1.5 bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] rounded text-xs" onClick={props.onCreateComponent} title={t("cad.sel.createComponent")}>
               <Box size={12} class="mr-1" />{t("cad.createComponent.title")}
             </button>
           </Show>

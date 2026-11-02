@@ -1,4 +1,5 @@
 import { Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
+import { prefersReducedMotion } from "../../../shared/ui/animated-section.tsx"
 
 interface DragDropIndicatorProps {
   readonly position: { x: number; y: number; z: number }
@@ -9,6 +10,8 @@ interface DragDropIndicatorProps {
 export default function DragDropIndicator(props: DragDropIndicatorProps): JSX.Element {
   const [visible, setVisible] = createSignal(true)
   onMount(() => {
+    // The marker stays lit for people who asked for reduced motion; it blinks only to be found on a busy canvas.
+    if (prefersReducedMotion()) return
     const timer = setInterval(() => setVisible((v) => !v), 400)
     onCleanup(() => clearInterval(timer))
   })
@@ -20,7 +23,7 @@ export default function DragDropIndicator(props: DragDropIndicatorProps): JSX.El
       <div class="absolute pointer-events-none z-50" style={placement()}>
         <div class="flex flex-col items-center">
           <div class="w-8 h-8 rounded-full border-2 border-blue-500 flex items-center justify-center"><div class="w-2 h-2 bg-blue-500 rounded-full" /></div>
-          <div class="mt-2 px-2 py-1 bg-black bg-opacity-75 text-white text-xs rounded">
+          <div class="mt-2 px-2 py-1 bg-black text-white text-xs tabular-nums rounded">
             {props.position.x.toFixed(1)}, {props.position.y.toFixed(1)}, {props.position.z.toFixed(1)}
           </div>
         </div>

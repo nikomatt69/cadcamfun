@@ -2,7 +2,7 @@ import { Show, type JSX } from "solid-js"
 import WorkspaceNavigation from "../../../shared/components/workspace-navigation.tsx"
 import { SidebarTabs, SidebarCollapse } from "../../../shared/components/panel/sidebar.tsx"
 import {
-  Box, Circle, Layers, List, Wrench
+  Box, Circle, Layers, List, Slash, Square, Wrench
 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import ToolPanel from "./ToolPanel.tsx"
@@ -33,11 +33,11 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
       <Show when={props.activeSidebarTab === "tools"}>
         <div class="space-y-4 w-full flex flex-col items-center">
           <div class="flex flex-col items-center">
-            <button class="panel-icon-btn" title={t("cad.ribbon.line")} aria-label={t("cad.ribbon.line")} onClick={openTools}><div class="transform rotate-45"><Box size={20} /></div></button>
-            <button class="panel-icon-btn" title={t("cad.ribbon.rectangle")} aria-label={t("cad.ribbon.rectangle")} onClick={openTools}><Box size={20} /></button>
-            <button class="panel-icon-btn" title={t("cad.ribbon.circle")} aria-label={t("cad.ribbon.circle")} onClick={openTools}><Circle size={20} class="text-gray-600" /></button>
-            <button class="panel-icon-btn" title={t("cad.ribbon.box")} aria-label={t("cad.ribbon.box")} onClick={openTools}><Box size={20} class="text-gray-600" /></button>
-            <button class="panel-icon-btn" title={t("cad.ribbon.sphere")} aria-label={t("cad.ribbon.sphere")} onClick={openTools}><Circle size={20} class="text-gray-600" /></button>
+            <button class="panel-icon-btn" title={t("cad.ribbon.line")} aria-label={t("cad.ribbon.line")} onClick={openTools}><Slash size={16} /></button>
+            <button class="panel-icon-btn" title={t("cad.ribbon.rectangle")} aria-label={t("cad.ribbon.rectangle")} onClick={openTools}><Square size={16} /></button>
+            <button class="panel-icon-btn" title={t("cad.ribbon.circle")} aria-label={t("cad.ribbon.circle")} onClick={openTools}><Circle size={16} /></button>
+            <button class="panel-icon-btn" title={t("cad.ribbon.box")} aria-label={t("cad.ribbon.box")} onClick={openTools}><Box size={16} /></button>
+            <button class="panel-icon-btn" title={t("cad.ribbon.sphere")} aria-label={t("cad.ribbon.sphere")} onClick={openTools}><Circle size={16} /></button>
           </div>
         </div>
       </Show>

@@ -2,6 +2,7 @@ import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { ArrowDown, ArrowUp, ChevronsUp, Delete, Eye, EyeOff, X } from "lucide-solid"
 import {
   RECIPES, addFeature, analyzeManufacturability, buildRecipe, runModelScript, dimensionInDegrees, dimensionValue, dimensionsOf, removalImpact, removeImported, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, resolveParameters, setDimension,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
@@ -18,7 +19,7 @@ const INPUT = "panel-input font-mono"
 const SMALL = "panel-btn"
 
 const SELECT = "panel-input"
-const SEVERITY_TONE: Readonly<Record<string, string>> = { error: "text-red-700", warning: "text-amber-700", info: "text-gray-600 dark:text-gray-300" }
+const SEVERITY_TONE: Readonly<Record<string, string>> = { error: "text-[color:var(--ent-bad)]", warning: "text-[color:var(--ent-warn)]", info: "text-[color:var(--ent-text-muted)]" }
 
 const SCRIPT_STARTER = `// A bracket: parameters, a sketch, an extrusion, a hole pattern, a rib and a chamfer.
 m.param("width", 60).param("depth", 40).param("thick", 8)
@@ -83,11 +84,11 @@ export default function ParametricPanel(props: { readonly element: Element; read
   const stateOf = (id: string): { readonly text: string; readonly tone: string } | undefined => {
     const state = built()?.states[id]
     if (state === undefined || state.state === "ok") return undefined
-    if (state.state === "suppressed") return { text: "suppressed", tone: "text-gray-500" }
-    if (state.state === "suppressed-by") return { text: `suppressed by ${state.by}`, tone: "text-gray-500" }
-    if (state.state === "rolled-back") return { text: "rolled back", tone: "text-gray-500" }
-    if (state.state === "skipped") return { text: `not built: ${state.by} failed`, tone: "text-red-700" }
-    return { text: "failed", tone: "text-red-700" }
+    if (state.state === "suppressed") return { text: "suppressed", tone: "text-[color:var(--ent-text-muted)]" }
+    if (state.state === "suppressed-by") return { text: `suppressed by ${state.by}`, tone: "text-[color:var(--ent-text-muted)]" }
+    if (state.state === "rolled-back") return { text: "rolled back", tone: "text-[color:var(--ent-text-muted)]" }
+    if (state.state === "skipped") return { text: `not built: ${state.by} failed`, tone: "text-[color:var(--ent-bad)]" }
+    return { text: "failed", tone: "text-[color:var(--ent-bad)]" }
   }
   const inactive = (id: string): boolean => { const s = built()?.states[id]?.state; return s !== undefined && s !== "ok" && s !== "failed" }
   /**
@@ -282,27 +283,27 @@ export default function ParametricPanel(props: { readonly element: Element; read
   return (
     <PanelCard title={t("cad.ribbon.parametric")} testId="parametric-panel">
       <div>
-        <Show when={built()} fallback={<p class="text-sm text-red-600">{t("cad.param.rebuildFailed")}</p>}>{(result) =>
-          <p class="text-xs text-gray-600 dark:text-gray-300" data-testid="parametric-summary">
+        <Show when={built()} fallback={<p class="text-xs text-[color:var(--ent-bad)]">{t("cad.param.rebuildFailed")}</p>}>{(result) =>
+          <p class="text-xs text-[color:var(--ent-text-muted)]" data-testid="parametric-summary">
             {result().bodies.length} solid{result().bodies.length === 1 ? "" : "s"}, {format(historyVolume(result()) / 1000)} cm³
           </p>}
         </Show>
-        <Show when={error()}><p class="mt-1 text-xs text-red-600" role="alert">{error()}</p></Show>
+        <Show when={error()}><p class="mt-1 text-xs text-[color:var(--ent-bad)]" role="alert">{error()}</p></Show>
       </div>
 
       <ParametersSection history={history()} locked={props.locked} edit={edit} />
       <ConfigurationsSection history={history()} locked={props.locked} edit={edit} fail={setError} />
 
       <div>
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.imported")}</h5>
+        <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.param.imported")}</h5>
         <ul class="mb-2 space-y-1" data-testid="imported-bodies">
           <For each={history().bases ?? []}>{(base) =>
-            <li class="flex items-center justify-between gap-2 rounded-md border border-gray-200 p-2 text-sm dark:border-gray-600" data-testid={`base-${base.id}`}>
+            <li class="flex items-center justify-between gap-2 rounded-md border border-[color:var(--ent-line)] p-2 text-xs" data-testid={`base-${base.id}`}>
               <span class="min-w-0 truncate">
                 <span class="font-medium">{base.source?.name ?? base.id}</span>
-                <span class="ml-2 text-xs text-gray-500">{base.id} · {base.brep.faces.length} faces{base.source?.healed !== undefined && base.source.healed.verticesTightened + base.source.healed.verticesWelded + base.source.healed.edgesWelded > 0 ? " · healed" : ""}</span>
+                <span class="ml-2 text-xs text-[color:var(--ent-text-muted)]">{base.id} · {base.brep.faces.length} faces{base.source?.healed !== undefined && base.source.healed.verticesTightened + base.source.healed.verticesWelded + base.source.healed.edgesWelded > 0 ? " · healed" : ""}</span>
               </span>
-              <button type="button" class={SMALL} disabled={props.locked} aria-label={`Remove ${base.id}`} title={t("cad.param.removeImported")} onClick={() => dropImported(base.id)}>✕</button>
+              <button type="button" class={SMALL} disabled={props.locked} aria-label={`Remove ${base.id}`} title={t("cad.param.removeImported")} onClick={() => dropImported(base.id)}><X size={12} aria-hidden="true" /></button>
             </li>}
           </For>
         </ul>
@@ -312,18 +313,18 @@ export default function ParametricPanel(props: { readonly element: Element; read
             onChange={(e) => { const input = e.currentTarget; void importStep(input.files?.[0]).then(() => { input.value = "" }) }} />
         </label>
         <Show when={importLines().length > 0}>
-          <ul class="mb-2 space-y-0.5 text-xs text-gray-600 dark:text-gray-300" data-testid="import-report">
+          <ul class="mb-2 space-y-0.5 text-xs text-[color:var(--ent-text-muted)]" data-testid="import-report">
             <For each={importLines()}>{(line) => <li>{line}</li>}</For>
           </ul>
         </Show>
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("subscription.features")}</h5>
+        <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("subscription.features")}</h5>
         <ol class="space-y-3">
           <For each={history().features}>{(feature, index) => <>
-            <li class={`rounded-md border border-gray-200 p-2 dark:border-gray-600 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
+            <li class={`rounded-md border border-[color:var(--ent-line)] p-2 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
               <div class="mb-1 flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <span class={`text-sm font-medium ${feature.suppressed === true ? "line-through" : ""}`}>{feature.name ?? feature.id}</span>
-                  <span class="ml-2 text-xs text-gray-500">{describe(feature)}</span>
+                  <span class={`text-xs font-medium ${feature.suppressed === true ? "line-through" : ""}`}>{feature.name ?? feature.id}</span>
+                  <span class="ml-2 text-xs text-[color:var(--ent-text-muted)]">{describe(feature)}</span>
                   <Show when={stateOf(feature.id)}>{(state) =>
                     <span class={`ml-2 text-xs ${state().tone}`} data-testid={`state-${feature.id}`}>{state().text}</span>}
                   </Show>
@@ -331,16 +332,16 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 <div class="flex shrink-0 gap-1">
                   <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? t("cam.gen.kp.release") : "Suppress"} ${feature.id}`}
                     title={feature.suppressed === true ? "Release: build it again" : "Suppress: leave it, and what needs it, out of the model (nothing is deleted)"}
-                    onClick={() => edit((h) => withSuppressed(h, [feature.id], feature.suppressed !== true))}>{feature.suppressed === true ? "◉" : "◌"}</button>
+                    onClick={() => edit((h) => withSuppressed(h, [feature.id], feature.suppressed !== true))}><Show when={feature.suppressed === true} fallback={<EyeOff size={12} aria-hidden="true" />}><Eye size={12} aria-hidden="true" /></Show></button>
                   <button type="button" class={SMALL} disabled={props.locked || history().rollback === feature.id} aria-label={`Roll back to ${feature.id}`}
-                    title={t("cad.param.rollBack")} onClick={() => edit((h) => withRollback(h, feature.id))}>⤒</button>
-                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title={t("cad.param.earlier")}>↑</button>
-                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title={t("update.later")}>↓</button>
+                    title={t("cad.param.rollBack")} onClick={() => edit((h) => withRollback(h, feature.id))}><ChevronsUp size={12} aria-hidden="true" /></button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title={t("cad.param.earlier")} aria-label={t("cad.param.earlier")}><ArrowUp size={12} aria-hidden="true" /></button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title={t("update.later")} aria-label={t("update.later")}><ArrowDown size={12} aria-hidden="true" /></button>
                   <button type="button" class={SMALL} disabled={props.locked} title={t("cad.param.deleteDeps")} aria-label={`${t("cad.customElements.delete")} ${feature.id}`}
-                    onClick={() => deleteFeature(feature.id, "all")}>✕</button>
+                    onClick={() => deleteFeature(feature.id, "all")}><X size={12} aria-hidden="true" /></button>
                   <Show when={index() < history().features.length - 1}>
                     <button type="button" class={SMALL} disabled={props.locked} title={t("cad.parametric.deleteOnly")} aria-label={`${t("cad.parametric.deleteOnly")} ${feature.id}`}
-                      onClick={() => deleteFeature(feature.id, "none")}>⌫</button>
+                      onClick={() => deleteFeature(feature.id, "none")}><Delete size={12} aria-hidden="true" /></button>
                   </Show>
                 </div>
               </div>
@@ -349,35 +350,35 @@ export default function ParametricPanel(props: { readonly element: Element; read
               </Show>
               <Show when={feature.type === "extrude"}>
                 <div class="mb-1 grid grid-cols-2 gap-x-2" data-testid={`treatments-${feature.id}`}>
-                  <label class="block text-xs text-gray-600 dark:text-gray-300">
-                    <span class="block">edge treatment</span>
+                  <label class="block text-xs text-[color:var(--ent-text-muted)]">
+                    <span class="mb-1 block">edge treatment</span>
                     <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} edge treatment`} value={(feature as Feature & { type: "extrude" }).edge?.style ?? ""}
                       onChange={(event) => setTreatment(feature as Feature & { type: "extrude" }, "edge", event.currentTarget.value)}>
                       <option value="">none</option><option value="chamfer">chamfer</option><option value="fillet">fillet</option>
                     </select>
                   </label>
-                  <label class="block text-xs text-gray-600 dark:text-gray-300">
-                    <span class="block">corner treatment</span>
+                  <label class="block text-xs text-[color:var(--ent-text-muted)]">
+                    <span class="mb-1 block">corner treatment</span>
                     <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} corner treatment`} value={(feature as Feature & { type: "extrude" }).corner?.style ?? ""}
                       onChange={(event) => setTreatment(feature as Feature & { type: "extrude" }, "corner", event.currentTarget.value)}>
                       <option value="">none</option><option value="chamfer">chamfer</option><option value="fillet">fillet</option>
                     </select>
                   </label>
                 </div>
-                <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`draft-${feature.id}`}>
-                  <span class="block">draft angle (deg, empty = none)</span>
+                <label class="mb-1 block text-xs text-[color:var(--ent-text-muted)]" data-testid={`draft-${feature.id}`}>
+                  <span class="mb-1 block">draft angle (deg, empty = none)</span>
                   <DimensionField value={(feature as Feature & { type: "extrude" }).taper} context={{ ...context(), degrees: true, optional: true }} disabled={props.locked} label={`${feature.id} draft angle input`} onCommit={(stored) => patchFeature(feature.id, { taper: stored })} />
                 </label>
               </Show>
               <Show when={feature.type === "sweep"}>
-                <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`bend-${feature.id}`}>
-                  <span class="block">bend radius (mm, empty = mitred corners)</span>
+                <label class="mb-1 block text-xs text-[color:var(--ent-text-muted)]" data-testid={`bend-${feature.id}`}>
+                  <span class="mb-1 block">bend radius (mm, empty = mitred corners)</span>
                   <DimensionField value={(feature as Feature & { type: "sweep" }).bendRadius} context={{ ...context(), optional: true }} disabled={props.locked} label={`${feature.id} bend radius input`} onCommit={(stored) => patchFeature(feature.id, { bendRadius: stored })} />
                 </label>
               </Show>
               <Show when={feature.type === "hole"}>
-                <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300">
-                  <span class="block">hole kind</span>
+                <label class="mb-1 block text-xs text-[color:var(--ent-text-muted)]">
+                  <span class="mb-1 block">hole kind</span>
                   <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} hole kind`} value={(feature as Feature & { type: "hole" }).kind ?? "simple"}
                     onChange={(event) => setHoleKind(feature as Feature & { type: "hole" }, event.currentTarget.value)}>
                     <option value="simple">simple</option><option value="counterbore">counterbore</option><option value="countersink">countersink</option>
@@ -386,33 +387,33 @@ export default function ParametricPanel(props: { readonly element: Element; read
               </Show>
               <Show when={feature.type === "fillet"}>
                 <div class="mb-1 grid grid-cols-2 gap-x-2" data-testid={`fillet-${feature.id}`}>
-                  <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">style</span>
+                  <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">style</span>
                     <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} style`} value={(feature as Feature & { type: "fillet" }).style ?? "fillet"}
                       onChange={(event) => { const style = event.currentTarget.value; patchFeature(feature.id, { style, ...(style === "fillet" ? { secondDistance: undefined, angle: undefined } : {}) }) }}>
                       <option value="fillet">fillet</option><option value="chamfer">chamfer</option>
                     </select></label>
-                  <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">edges</span>
+                  <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">edges</span>
                     <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} edge kind`} value={(feature as Feature & { type: "fillet" }).edges?.kind ?? "convex"}
                       onChange={(event) => patchFeature(feature.id, { edges: { ...(feature as Feature & { type: "fillet" }).edges, kind: event.currentTarget.value } })}>
                       <option value="convex">convex (outside)</option><option value="concave">concave (inside)</option><option value="both">both</option>
                     </select></label>
-                  <label class="col-span-2 flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
+                  <label class="col-span-2 flex items-center gap-1 text-xs text-[color:var(--ent-text-muted)]">
                     <input type="checkbox" disabled={props.locked} aria-label={`${feature.id} include curved rims`} checked={(feature as Feature & { type: "fillet" }).edges?.curved === true}
                       onChange={(event) => patchFeature(feature.id, { edges: { ...(feature as Feature & { type: "fillet" }).edges, curved: event.currentTarget.checked ? true : undefined } })} />
                     <span>include curved-surface rims (slow)</span>
                   </label>
                   <Show when={(feature as Feature & { type: "fillet" }).style === "chamfer"}>
-                    <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">second distance (mm, empty = equal)</span>
+                    <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">second distance (mm, empty = equal)</span>
                       <DimensionField value={(feature as Feature & { type: "fillet" }).secondDistance} context={{ ...context(), optional: true }} disabled={props.locked} label={`${feature.id} second distance input`} onCommit={(stored) => patchFeature(feature.id, { secondDistance: stored, ...(stored !== undefined ? { angle: undefined } : {}) })} />
                     </label>
-                    <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">angle (°, empty = no angle)</span>
+                    <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">angle (°, empty = no angle)</span>
                       <DimensionField value={(feature as Feature & { type: "fillet" }).angle} context={{ ...context(), degrees: true, optional: true }} disabled={props.locked} label={`${feature.id} chamfer angle input`} onCommit={(stored) => patchFeature(feature.id, { angle: stored, ...(stored !== undefined ? { secondDistance: undefined } : {}) })} />
                     </label>
                   </Show>
                 </div>
               </Show>
               <Show when={feature.type === "sheet" ? built()?.flatPatterns[feature.id] : undefined}>{(developed) =>
-                <div class="mb-1 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300" data-testid={`flat-pattern-${feature.id}`}>
+                <div class="mb-1 flex items-center gap-2 text-xs text-[color:var(--ent-text-muted)]" data-testid={`flat-pattern-${feature.id}`}>
                   <span>flat pattern {format(developed().length)} mm, {developed().bends.length} bend{developed().bends.length === 1 ? "" : "s"}</span>
                   <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.id} flat pattern DXF`}
                     onClick={() => {
@@ -423,7 +424,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 </div>}
               </Show>
               <Show when={feature.type === "shell"}>
-                <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`shell-${feature.id}`}><span class="block">open face</span>
+                <label class="mb-1 block text-xs text-[color:var(--ent-text-muted)]" data-testid={`shell-${feature.id}`}><span class="mb-1 block">open face</span>
                   <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} open face`} value={(feature as Feature & { type: "shell" }).open ?? "none"}
                     onChange={(event) => patchFeature(feature.id, { open: event.currentTarget.value })}>
                     <option value="none">none (closed hollow)</option><option value="top">top</option><option value="bottom">bottom</option><option value="both">both (tube)</option>
@@ -431,8 +432,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
               </Show>
               <div class="grid grid-cols-2 gap-x-2 gap-y-1">
                 <For each={dimensionsOf(feature)}>{(dimension) =>
-                  <label class="block text-xs text-gray-600 dark:text-gray-300">
-                    <span class="block truncate" title={dimension.label}>{dimension.label}</span>
+                  <label class="block text-xs text-[color:var(--ent-text-muted)]">
+                    <span class="mb-1 block truncate" title={dimension.label}>{dimension.label}</span>
                     <DimensionField value={dimension.value} context={{ ...context(), degrees: dimensionInDegrees(dimension) }} disabled={props.locked} label={`${feature.id} ${dimension.label}`}
                       onCommit={(stored) => { if (stored !== undefined) edit((h) => setDimension(h, feature.id, dimension.path, stored)) }} />
                   </label>}
@@ -440,12 +441,12 @@ export default function ParametricPanel(props: { readonly element: Element; read
               </div>
               <Show when={issuesOf(feature.id).length > 0}>
                 <ul class="mt-1 space-y-0.5" data-testid={`issues-${feature.id}`}>
-                  <For each={issuesOf(feature.id)}>{(issue) => <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`} role={issue.severity === "error" ? "alert" : undefined}>{issue.message}<Show when={issue.remedy}>{(remedy) => <span class="block text-gray-600 dark:text-gray-300" data-testid={`remedy-${feature.id}`}>{remedy()}</span>}</Show></li>}</For>
+                  <For each={issuesOf(feature.id)}>{(issue) => <li class={`text-xs ${issue.severity === "error" ? "text-[color:var(--ent-bad)]" : "text-[color:var(--ent-warn)]"}`} role={issue.severity === "error" ? "alert" : undefined}>{issue.message}<Show when={issue.remedy}>{(remedy) => <span class="block text-[color:var(--ent-text-muted)]" data-testid={`remedy-${feature.id}`}>{remedy()}</span>}</Show></li>}</For>
                 </ul>
               </Show>
             </li>
             <Show when={history().rollback === feature.id}>
-              <li class="flex items-center justify-between gap-2 rounded-md border-2 border-dashed border-sky-500 px-2 py-1 text-xs text-sky-700 dark:text-sky-300" data-testid="rollback-bar">
+              <li class="flex items-center justify-between gap-2 rounded-md border border-dashed border-[color:var(--ent-accent)] px-2 py-1 text-xs text-[color:var(--ent-accent)]" data-testid="rollback-bar">
                 <span>{t("cad.param.rolledBack")}</span>
                 <button type="button" class={SMALL} disabled={props.locked} onClick={() => edit((h) => withRollback(h, undefined))}>{t("cad.param.rollToEnd")}</button>
               </li>
@@ -454,7 +455,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
           </For>
         </ol>
         <div class="mt-2" data-testid="add-feature">
-          <span class="block text-xs text-gray-500">{t("cad.param.addFeature")}</span>
+          <span class="block text-xs text-[color:var(--ent-text-muted)]">{t("cad.param.addFeature")}</span>
           <div class="mt-1 flex flex-wrap gap-1">
             <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "convex")}>{t("cad.param.filletAllOutside")}</button>
             <button type="button" class={SMALL} disabled={props.locked} onClick={() => addFillet("fillet", "vertical")}>{t("cad.param.filletVertical")}</button>
@@ -477,15 +478,15 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div class="panel-subsection" data-testid="dfm-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.manufacturability")}</h5>
-        <div class="grid grid-cols-3 gap-1">
-          <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">process</span>
+        <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.param.manufacturability")}</h5>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">process</span>
             <select class={SELECT} aria-label={t("cad.param.process")} value={process()} onChange={(event) => setProcess(event.currentTarget.value as DfmProcess)}>
               <option value="mill">mill</option><option value="turn">turn</option><option value="print">print</option>
             </select></label>
-          <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">cutter Ø (mm)</span>
+          <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">cutter Ø (mm)</span>
             <input class={INPUT} value={cutter()} aria-label={t("cad.param.cutterDia")} onInput={(event) => setCutter(event.currentTarget.value)} /></label>
-          <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">material</span>
+          <label class="block text-xs text-[color:var(--ent-text-muted)]"><span class="mb-1 block">material</span>
             <select class={SELECT} aria-label={t("cad.viewMaterial")} value={material()} onChange={(event) => setMaterial(event.currentTarget.value as DfmMaterial)}>
               <option value="metal">metal</option><option value="cast">cast</option><option value="plastic">plastic</option>
             </select></label>
@@ -493,7 +494,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         <button type="button" class={`${SMALL} mt-1`} disabled={checking()} onClick={runCheck}>{checking() ? "Checking…" : "Check design rules"}</button>
         <Show when={report()}>{(r) =>
           <div class="mt-2 space-y-1" data-testid="dfm-report">
-            <p class={`text-xs font-medium ${r().ok ? "text-green-700" : "text-red-700"}`}>
+            <p class={`text-xs font-medium ${r().ok ? "text-[color:var(--ent-ok)]" : "text-[color:var(--ent-bad)]"}`}>
               {r().ok ? "No errors" : `${issuesBy("error").length} error(s)`}, {issuesBy("warning").length} warning(s), {issuesBy("info").length} note(s)
               <Show when={r().metrics.minWallMm !== null}> · thinnest wall {format(r().metrics.minWallMm ?? 0)} {t("cad.millimeters")}</Show>
             </p>
@@ -502,7 +503,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 <div class={`text-xs ${SEVERITY_TONE[severity] ?? ""}`} data-testid={`dfm-${issue.code}`}>
                   <span class="font-medium">{issue.code}</span>{issue.feature ? ` · ${issue.feature}` : ""}: {issue.message}
                   <Show when={issue.measured !== undefined && issue.required !== undefined}><span class="ml-1 font-mono">({format(issue.measured ?? 0)} vs {format(issue.required ?? 0)})</span></Show>
-                  <Show when={issue.fix}><div class="text-gray-500">Fix: {issue.fix}</div></Show>
+                  <Show when={issue.fix}><div class="text-[color:var(--ent-text-muted)]">Fix: {issue.fix}</div></Show>
                 </div>}
               </For>}
             </For>
@@ -511,17 +512,17 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div class="panel-subsection" data-testid="recipes-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.recipes")}</h5>
+        <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.param.recipes")}</h5>
         <select class={SELECT} aria-label={t("cad.param.recipe")} disabled={props.locked} value={recipeName()} onChange={(event) => { setRecipeName(event.currentTarget.value); setRecipeInput({}); setRecipeResult(undefined) }}>
           <For each={RECIPES}>{(r) => <option value={r.name}>{r.title}</option>}</For>
         </select>
         <Show when={recipe()}>{(spec) =>
           <div class="mt-1">
-            <p class="text-xs text-gray-500">{spec().description}</p>
+            <p class="text-xs text-[color:var(--ent-text-muted)]">{spec().description}</p>
             <div class="mt-1 grid grid-cols-2 gap-x-2 gap-y-1">
               <For each={spec().params}>{(param) =>
-                <label class="block text-xs text-gray-600 dark:text-gray-300">
-                  <span class="block truncate" title={param.description}>{param.name}</span>
+                <label class="block text-xs text-[color:var(--ent-text-muted)]">
+                  <span class="mb-1 block truncate" title={param.description}>{param.name}</span>
                   <Show when={param.type === "boolean"} fallback={
                     <Show when={param.options} fallback={
                       <input class={INPUT} disabled={props.locked} aria-label={`Recipe ${param.name}`} placeholder={param.type === "array" ? "[{\"diameter\":20,\"length\":40}]" : param.default === undefined ? "" : String(param.default)}
@@ -541,7 +542,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         </Show>
         <button type="button" class={`${SMALL} mt-1`} disabled={props.locked} onClick={applyRecipe}>{t("cad.param.replaceRecipe")}</button>
         <Show when={recipeResult()}>{(r) =>
-          <div class="mt-1 text-xs text-gray-600 dark:text-gray-300" data-testid="recipe-result">
+          <div class="mt-1 text-xs text-[color:var(--ent-text-muted)]" data-testid="recipe-result">
             <p>{r().summary}</p>
             <ul class="list-disc pl-4"><For each={r().rules}>{(rule) => <li>{rule}</li>}</For></ul>
           </div>}
@@ -549,22 +550,22 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <div class="panel-subsection" data-testid="script-section">
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.script")}</h5>
-        <p class="text-xs text-gray-500">{t("cad.param.jsAgainst")} <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
+        <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.param.script")}</h5>
+        <p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.param.jsAgainst")} <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
         <textarea class={`${INPUT} mt-1 h-40`} spellcheck={false} aria-label={t("cad.param.modelScript")} disabled={props.locked} value={script()} onInput={(event) => setScript(event.currentTarget.value)} />
         <div class="mt-1 flex items-center gap-2">
           <button type="button" class={SMALL} disabled={props.locked} onClick={runScript}>{t("cad.param.runScript")}</button>
           <button type="button" class={SMALL} disabled={props.locked} onClick={() => setScript(SCRIPT_STARTER)}>{t("cad.param.starter")}</button>
-          <Show when={scriptNote()}><span class="text-xs text-gray-600 dark:text-gray-300" data-testid="script-result">{scriptNote()}</span></Show>
+          <Show when={scriptNote()}><span class="text-xs text-[color:var(--ent-text-muted)]" data-testid="script-result">{scriptNote()}</span></Show>
         </div>
       </div>
 
       <Show when={(built()?.issues.length ?? 0) > 0}>
         <div class="panel-subsection" data-testid="parametric-issues">
-          <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.problems")}</h5>
+          <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.param.problems")}</h5>
           <ul class="space-y-1">
             <For each={built()?.issues ?? []}>{(issue) =>
-              <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`}><span class="font-medium">{issue.feature}</span>: {issue.message}</li>}
+              <li class={`text-xs ${issue.severity === "error" ? "text-[color:var(--ent-bad)]" : "text-[color:var(--ent-warn)]"}`}><span class="font-medium">{issue.feature}</span>: {issue.message}</li>}
             </For>
           </ul>
         </div>

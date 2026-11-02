@@ -18,33 +18,33 @@ export default function SnapSettings(): JSX.Element {
   }
   const settings = snap.snapSettings
   return (
-    <div class="sidebar-snap bg-white dark:bg-gray-800 rounded-md shadow-sm p-4">
+    <div class="sidebar-snap bg-[color:var(--ent-surface)] rounded-md shadow-sm p-4">
       <h3 class="text-sm font-medium mb-2">{t("cad.snapSettings")}</h3>
       <div class="mb-3">
         <label class="flex items-center">
-          <input type="checkbox" checked={settings().enabled} onChange={() => snap.updateSnapSettings({ enabled: !settings().enabled })} class="mr-2 h-4 w-4 rounded text-blue-600" />
+          <input type="checkbox" checked={settings().enabled} onChange={() => snap.updateSnapSettings({ enabled: !settings().enabled })} class="mr-2 h-4 w-4 rounded text-[color:var(--ent-accent)]" />
           <span class="text-sm">{t("cad.enableSnapping")}</span>
-          <Show when={chordOf("cad.snap.toggle")}>{(chord) => <kbd class="ml-2 text-[10px] text-gray-500">{chord()}</kbd>}</Show>
+          <Show when={chordOf("cad.snap.toggle")}>{(chord) => <kbd class="ml-3 text-[11px] text-[color:var(--ent-text-muted)]">{chord()}</kbd>}</Show>
         </label>
       </div>
       <div class="grid grid-cols-2 gap-2">
         <For each={Object.entries(settings().types)}>{([type, enabled]) =>
           <label class="flex items-center">
-            <input type="checkbox" checked={enabled} onChange={() => snap.toggleSnapType(type as SnapType)} disabled={!settings().enabled} class="mr-2 h-4 w-4 rounded text-blue-600" />
+            <input type="checkbox" checked={enabled} onChange={() => snap.toggleSnapType(type as SnapType)} disabled={!settings().enabled} class="mr-2 h-4 w-4 rounded text-[color:var(--ent-accent)]" />
             <span class="text-xs" title={NEEDS_START.has(type) ? t("cad.snap.needsStart") : undefined} classList={{ "opacity-60": NEEDS_START.has(type) }}>{type}{NEEDS_START.has(type) ? " ↦" : ""}</span>
-            <Show when={chordOf(`cad.snap.type.${type}`)}>{(chord) => <kbd class="ml-auto text-[10px] text-gray-500">{chord()}</kbd>}</Show>
+            <Show when={chordOf(`cad.snap.type.${type}`)}>{(chord) => <kbd class="ml-auto pl-2 text-[11px] text-[color:var(--ent-text-muted)]">{chord()}</kbd>}</Show>
           </label>}
         </For>
       </div>
       <div class="mt-3">
-        <label class="block text-xs mb-1">{t("cad.snap.gridSize")}</label>
+        <label class="mb-1 block text-xs">{t("cad.snap.gridSize")}</label>
         <input type="range" min="1" max="50" value={settings().gridSize} onInput={(event) => snap.updateSnapSettings({ gridSize: Number(event.currentTarget.value) })} disabled={!settings().enabled} class="w-full" />
-        <div class="flex justify-between text-xs text-gray-500"><span>1</span><span>{settings().gridSize}</span><span>50</span></div>
+        <div class="flex justify-between gap-2 text-xs tabular-nums text-[color:var(--ent-text-muted)]"><span>1</span><span>{settings().gridSize}</span><span>50</span></div>
       </div>
       <div class="mt-3">
-        <label class="block text-xs mb-1">{t("cad.snap.snapTolerance")}</label>
+        <label class="mb-1 block text-xs">{t("cad.snap.snapTolerance")}</label>
         <input type="range" min="1" max="20" value={settings().tolerance} onInput={(event) => snap.updateSnapSettings({ tolerance: Number(event.currentTarget.value) })} disabled={!settings().enabled} class="w-full" />
-        <div class="flex justify-between text-xs text-gray-500"><span>1px</span><span>{settings().tolerance}px</span><span>20px</span></div>
+        <div class="flex justify-between gap-2 text-xs tabular-nums text-[color:var(--ent-text-muted)]"><span>1px</span><span>{settings().tolerance}px</span><span>20px</span></div>
       </div>
     </div>
   )

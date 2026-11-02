@@ -157,8 +157,8 @@ export default function PropertyPanel(): JSX.Element {
       <Match when={field.type === "colorList"}><ColorListInput value={properties()[field.name] || []} onChange={(value) => set(field.name, value)} disabled={disabled()} label={field.label} /></Match>
       <Match when={field.type === "checkbox"}>
         <div class="flex items-center">
-          <input type="checkbox" id={field.name} name={field.name} checked={!!properties()[field.name]} onChange={change} disabled={disabled()} class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600" />
-          <span class="ml-2 block text-sm text-gray-900 dark:text-gray-300">{field.label}</span>
+          <input type="checkbox" id={field.name} name={field.name} checked={!!properties()[field.name]} onChange={change} disabled={disabled()} class="h-4 w-4 text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)] border-[color:var(--ent-line-strong)] rounded" />
+          <span class="ml-2 block text-xs text-[color:var(--ent-text)]">{field.label}</span>
         </div>
       </Match>
       <Match when={field.type === "color"}>
@@ -190,10 +190,10 @@ export default function PropertyPanel(): JSX.Element {
         <PanelCard title={t("cad.elementProperties")} testId="property-panel" actions={<>
             <SaveElementToLibrary />
             <button onClick={() => elements.duplicateElement(selected().id)} class="panel-icon-btn" title={t("cad.duplicate")} disabled={locked()}>
-              <Copy size={18} class={locked() ? "text-gray-400" : ""} />
+              <Copy size={16} class={locked() ? "text-[color:var(--ent-text-faint)]" : ""} />
             </button>
             <button onClick={() => { if (window.confirm(t("cad.prop.confirmDelete"))) elements.deleteElement(selected().id) }} class="panel-icon-btn panel-icon-btn--danger" title={t("cad.deleteElement")} disabled={locked()}>
-              <Trash2 size={18} class={locked() ? "text-gray-400" : ""} />
+              <Trash2 size={16} class={locked() ? "text-[color:var(--ent-text-faint)]" : ""} />
             </button>        </>}>
 
 
@@ -210,9 +210,9 @@ export default function PropertyPanel(): JSX.Element {
               <label class={LABEL}>{t("cad.layer")}</label>
               <div class="flex items-center">
                 <div class="w-4 h-4 rounded-full mr-2" style={{ "background-color": layer()?.color || "#cccccc" }} />
-                <span class="text-sm text-gray-700 dark:text-gray-300">
+                <span class="text-xs text-[color:var(--ent-text)]">
                   {layer()?.name || t("cad.explorer.unknownLayer")}
-                  <Show when={layer()?.locked}><span class="ml-2 text-xs text-gray-500">{t("cad.layers.lockedTag")}</span></Show>
+                  <Show when={layer()?.locked}><span class="ml-2 text-xs text-[color:var(--ent-text-muted)]">{t("cad.layers.lockedTag")}</span></Show>
                 </span>
               </div>
             </div>
@@ -236,13 +236,13 @@ export default function PropertyPanel(): JSX.Element {
             </Show>
 
             <Show when={tried() && Object.keys(errors()).length > 0}>
-              <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">{t("cad.prop.fixValues")}</p>
+              <p class="text-xs text-[color:var(--ent-bad)]" role="alert" data-testid="property-errors">{t("cad.prop.fixValues")}</p>
             </Show>
             <div class="panel-edit-actions">
               <Show when={editing()} fallback={
                 <button type="button" onClick={() => setEditing(true)} class="panel-btn panel-btn--primary" disabled={locked()}>{t("cad.editProperties")}</button>
               }>
-              <span class="mr-auto text-xs text-gray-500 dark:text-gray-400">{changed() ? "Enter applies · Esc cancels" : "Type a value: 12,5 · 12.5 · 40/2+3"}</span>
+              <span class="mr-auto text-xs text-[color:var(--ent-text-muted)]">{changed() ? "Enter applies · Esc cancels" : "Type a value: 12,5 · 12.5 · 40/2+3"}</span>
               <button type="button" onClick={cancel} class="panel-btn">{t("common.cancel")}</button>
               <button type="submit" class="panel-btn panel-btn--primary" disabled={locked()}>{t("cad.surfacing.run")}</button>
               </Show>
@@ -261,12 +261,12 @@ export default function PropertyPanel(): JSX.Element {
 
         <Show when={canMakeParametric(selected())}>
           <div class="panel-section panel-section__body">
-            <p class="text-sm text-gray-600 dark:text-gray-300">Turn this {String(selected().type)} into a parametric part: its measures become named parameters you can edit or drive by a formula.</p>
+            <p class="text-xs text-[color:var(--ent-text-muted)]">Turn this {String(selected().type)} into a parametric part: its measures become named parameters you can edit or drive by a formula.</p>
             <div class="flex flex-wrap gap-2">
               <button type="button" class="panel-btn panel-btn--primary" disabled={locked()} onClick={() => convert(false)}>{t("cad.prop.makeParametric")}</button>
               <button type="button" class="panel-btn" disabled={locked()} onClick={() => { if (window.confirm(t("cad.prop.confirmReplace"))) convert(true) }}>{t("cad.prop.replaceParametric")}</button>
             </div>
-            <Show when={conversion() !== ""}><p class="text-xs text-gray-500 dark:text-gray-400">{conversion()}</p></Show>
+            <Show when={conversion() !== ""}><p class="text-xs text-[color:var(--ent-text-muted)]">{conversion()}</p></Show>
           </div>
         </Show>
 
