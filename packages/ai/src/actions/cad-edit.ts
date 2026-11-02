@@ -17,7 +17,7 @@ import { defineWireAction, type ActionContext, type ActionSpec } from "./action.
 import { holeInputProblem } from "./cad.ts"
 import { runCadExport } from "./export.ts"
 import {
-  runParametricConvert, runParametricCreate, runParametricRecipeCreate, runParametricTimeline, runParametricUpdate
+  runParametricConvert, runParametricCreate, runParametricEdit, runParametricRecipeCreate, runParametricTimeline, runParametricUpdate
 } from "./parametric.ts"
 
 const INPUTS = { ...CAD_ACTION_INPUTS, ...PARAMETRIC_ACTION_INPUTS }
@@ -300,6 +300,11 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad_edit.parametric_timeline", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_timeline"],
     run: (input, context) => runParametricTimeline(input, context)
+  }),
+  defineWireAction({
+    id: "cad_edit.parametric_edit", kind: "write", replaces: "cad_parametric",
+    parameters: INPUTS["cad_edit.parametric_edit"],
+    run: (input, context) => runParametricEdit(input, context)
   }),
   defineWireAction({
     id: "cad_edit.parametric_recipe_create", kind: "write", replaces: "cad_parametric",

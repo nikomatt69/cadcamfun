@@ -17,13 +17,14 @@ type Input<K extends keyof typeof INPUTS> = (typeof INPUTS)[K]["Type"]
 
 /** The parametric calls that read or write the drawing; the rest are answered by this package itself. */
 export type ParametricHandlerInput =
-  | { action: "inspect"; elementId: string }
+  | { action: "inspect"; elementId: string; feature?: string }
   | { action: "convert"; elementId: string; depth?: number; name?: string; create: boolean }
   | { action: "validate"; history: History }
   | { action: "test"; elementId: string; cases: Input<"cad.parametric_test">["cases"] }
   | { action: "create"; history: History; name: string; x?: number; y?: number; z?: number; layer?: string }
   | { action: "update"; elementId: string; parameters: Input<"cad_edit.parametric_update">["parameters"]; expectedRevision: string }
   | ({ action: "timeline" } & Input<"cad_edit.parametric_timeline">)
+  | ({ action: "edit" } & Input<"cad_edit.parametric_edit">)
 
 /** Where a new parametric part is placed, in mm. */
 type Placement = { readonly x?: number; readonly y?: number; readonly z?: number; readonly layer?: string }
@@ -91,7 +92,8 @@ const unavailable = { ok: false, error: "Parametric project tools are unavailabl
 const of = <T extends ParametricHandlerInput>(input: T, context: ActionContext) =>
   context.handlers.parametric === undefined ? unavailable : context.handlers.parametric(context.projectId, input)
 
-export const runParametricInspect = (input: Input<"cad.parametric_inspect">, context: ActionContext) => of({ action: "inspect", elementId: input.elementId }, context)
+export const runParametricInspect = (input: Input<"cad.parametric_inspect">, context: ActionContext) =>
+  of({ action: "inspect", elementId: input.elementId, ...(input.feature !== undefined ? { feature: input.feature } : {}) }, context)
 export const runParametricTest = (input: Input<"cad.parametric_test">, context: ActionContext) => of({ action: "test", elementId: input.elementId, cases: input.cases }, context)
 
 /** A sheet is a read-only derived artifact, never a new drawing or a change to the part. */
@@ -131,6 +133,9 @@ export const runParametricUpdate = (input: Input<"cad_edit.parametric_update">, 
 
 /** Suppress / release / roll back / move on a stored part (spec 58); the host applies core's timeline functions and checks the revision. */
 export const runParametricTimeline = (input: Input<"cad_edit.parametric_timeline">, context: ActionContext) => of({ action: "timeline", ...input }, context)
+
+/** Parameters, any dimension and the features of a stored part edited in one atomic list (`parametric-edit.ts` applies them in the host). */
+export const runParametricEdit = (input: Input<"cad_edit.parametric_edit">, context: ActionContext) => of({ action: "edit", ...input }, context)
 
 /** The history given inline, or read from an existing parametric part; an error result when neither works. */
 const historyOf = async (input: { elementId?: string; history?: unknown }, context: ActionContext): Promise<{ readonly history: History } | { readonly error: unknown }> => {

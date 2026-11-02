@@ -13,7 +13,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - inspect_origins: ids?, layerId?, offset?, limit?; origins, bounds, distance from zero.
 - drawing: elementId or history, options?; dimensioned PDF/SVG; GDT, datums, balloons in options.
 - parametric_validate: history; validate before storing.
-- parametric_inspect: elementId; parameters and revision.
+- parametric_inspect: elementId, feature?; parameters, revision, dimension paths.
 - parametric_test: elementId, cases (1-12); dimensional checks, variants.
 - parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material? (metal|cast|plastic), minWall?, envelope?.
 - parametric_exact: elementId or history, includeStep?, name?; exact body or why mesh-only.

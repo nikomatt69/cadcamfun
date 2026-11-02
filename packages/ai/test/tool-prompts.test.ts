@@ -55,7 +55,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       const text = toolPrompt(id)
       expect(text, id).not.toContain("{{")
       // 4 200 since cad simulate (finite-element studies, spec 48) joined the cad tool with its 28 parameters; the detail lives in the fea-simulation skill.
-      expect(text.length, id).toBeLessThan(4200)
+      // 4 400 since cad_edit parametric_edit (structural edits of a stored part: parameters, any dimension, features) joined cad_edit.
+      expect(text.length, id).toBeLessThan(4400)
       // An exposure's prompt is read only by the specialist it is granted to, never with the main catalogue.
       if (!Object.hasOwn(ACTION_EXPOSURES, id)) total += text.length
     }
@@ -73,7 +74,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // of library, vcs, vcs_edit, mods and mods_edit, the repeated surface limits and the mods preamble; no action or rule was removed.
     // +350: cad_edit export / cam_edit export (STL, OBJ, 3MF, STEP, IGES and NC files stored in the project export folder).
     // +200: cad simulate (run, converge, materials, library; spec 48).
-    expect(total).toBeLessThan(33_500)
+    // +300: cad_edit parametric_edit (set_parameter ... ungroup_features) and the hole thread / tolerance / fit fields.
+    expect(total).toBeLessThan(33_900)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

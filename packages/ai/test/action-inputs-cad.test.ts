@@ -108,6 +108,20 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
     accept: [{ elementId: "a", expectedRevision: "r1", suppress: ["f1"] }, { elementId: "a", expectedRevision: "r1", rollback: "f2" }, { elementId: "a", expectedRevision: "r1", rollForward: true }, { elementId: "a", expectedRevision: "r1", move: { feature: "f1", to: 2 } }],
     refuse: [{ elementId: "a", expectedRevision: "r1" }, { elementId: "a", expectedRevision: "r1", suppress: [] }, { elementId: "a", expectedRevision: "r1", rollback: "f2", rollForward: true }, { elementId: "a", suppress: ["f1"] }, { elementId: "a", expectedRevision: "r1", move: { feature: "f1", to: 80 } }]
   },
+  "cad_edit.parametric_edit": {
+    accept: [
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_parameter", name: "w", value: 60 }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_dimension", feature: "e1", path: "depth", value: "w / 2" }, { op: "remove_feature", id: "h1", cascade: true }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "fillet", radius: "r", edges: { parallel: "z" } }, after: "e1" }] }
+    ],
+    refuse: [
+      { elementId: "a", expectedRevision: "r1", edits: [] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_parameter", name: "1w", value: 3 }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_dimension", feature: "e1", path: "depth" }] },
+      { elementId: "a", edits: [{ op: "set_parameter", name: "w", value: 3 }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "extrude", depth: 3 } }] }
+    ]
+  },
   "cad_edit.parametric_recipe_create": { accept: [{ recipe: "flange" }, { recipe: "flange", name: "F", z: 0 }], refuse: [{ recipe: "flange", name: "" }] },
   "cad_edit.parametric_convert": { accept: [{ elementId: "a" }], refuse: [{ elementId: "" }] }
 }

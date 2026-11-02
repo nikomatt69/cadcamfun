@@ -17,6 +17,7 @@ const ROUTES: Readonly<Record<string, readonly [tool: "cad" | "cad_edit", action
   create: ["cad_edit", "parametric_create"],
   update: ["cad_edit", "parametric_update"],
   timeline: ["cad_edit", "parametric_timeline"],
+  edit: ["cad_edit", "parametric_edit"],
   exact: ["cad", "parametric_exact"]
 }
 

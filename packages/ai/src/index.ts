@@ -75,6 +75,7 @@ export {
 export { backgroundToolContributionsFor, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
 
 export * from "./parametric.ts"
+export * from "./parametric-edit.ts"
 // The handler contract is the one callers narrow on (`Extract<..., { action: "test" }>`). The action-parameter
 // union carries no `action` discriminant — `defineActionTool` adds it as the tool discriminator — so exporting it
 // here would only invite callers to narrow a union on a key it does not have.
