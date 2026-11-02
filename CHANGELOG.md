@@ -3,6 +3,20 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.66 (November 2026)
+
+## Sidecar
+
+- Introduce cad-scene job for streamlined exact scene operations in worker; refactor handlers to utilize sceneJob for shell, offset, motion, and exchange tasks
+
+## AI
+
+- Stop a turn that repeats the same failing tool call three times; restore plan/build reminder wording
+
+## Documentation
+
+- Regenerate the harness inventory after the cad-scene job
+
 ## v0.1.65 (November 2026)
 
 ## Sidecar
