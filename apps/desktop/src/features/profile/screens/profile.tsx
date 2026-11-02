@@ -84,7 +84,7 @@ export function ProfileScreen(): JSX.Element {
         <Show when={withDescription}>
           <p class="mt-1 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{item.description ?? t("profile.noDescription")}</p>
         </Show>
-        <p class="mt-1.5 text-[10.5px] tabular-nums text-slate-500 dark:text-slate-400">{t("profile.updated", { date: shortDate(item.updatedAt) })}</p>
+        <p class="mt-1.5 text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{t("profile.updated", { date: shortDate(item.updatedAt) })}</p>
       </div>
     </A>
   )
@@ -94,7 +94,7 @@ export function ProfileScreen(): JSX.Element {
       <span class="flex h-7 w-7 flex-none items-center justify-center rounded-[4px] border border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">{icon}</span>
       <div class="min-w-0">
         <p class="text-[15px] font-semibold leading-5 tabular-nums text-slate-900 dark:text-white">{value ?? "—"}</p>
-        <p class="truncate text-[10.5px] text-slate-500 dark:text-slate-400">{label}</p>
+        <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">{label}</p>
       </div>
     </div>
   )
@@ -141,7 +141,7 @@ export function ProfileScreen(): JSX.Element {
                       <div class="flex min-w-0 items-center gap-2">
                         <Mail size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
-                          <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.email")}</p>
+                          <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.email")}</p>
                           <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().email}</p>
                         </div>
                       </div>
@@ -150,7 +150,7 @@ export function ProfileScreen(): JSX.Element {
                       <div class="flex min-w-0 items-center gap-2">
                         <MapPin size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
-                          <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.location")}</p>
+                          <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.location")}</p>
                           <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().location}</p>
                         </div>
                       </div>
@@ -158,7 +158,7 @@ export function ProfileScreen(): JSX.Element {
                     <div class="flex min-w-0 items-center gap-2">
                       <Calendar size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                       <div class="min-w-0">
-                        <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.joined")}</p>
+                        <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.joined")}</p>
                         <p class="truncate text-[11.5px] tabular-nums text-slate-700 dark:text-slate-200">{formatMonth(me().createdAt ?? "")}</p>
                       </div>
                     </div>

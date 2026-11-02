@@ -100,7 +100,7 @@ function SubscriptionCard(): JSX.Element {
                 <span class="text-sm font-medium text-slate-900 dark:text-white">{features().name || t("subscription.free")}</span>
                 <Show when={isOnTrial()}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Clock size={12} aria-hidden="true" class="mr-1" />{t("subscription.trial")}
+                    <Clock size={12} aria-hidden="true" class="mr-1.5" />{t("subscription.trial")}
                   </span>
                 </Show>
               </dd>

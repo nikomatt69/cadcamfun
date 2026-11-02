@@ -104,14 +104,14 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
               <div class="ent-card__head">
                 <h3 class="ent-section__title">{t("admin.ff.available")}</h3>
               </div>
-              <div class="ent-card__body" style={{ display: "grid", "grid-template-columns": "repeat(auto-fill, minmax(min(100%, 13rem), 1fr))", gap: "4px", "max-height": "15rem", "overflow-y": "auto" }}>
+              <div class="ent-card__body" style={{ display: "grid", "grid-template-columns": "repeat(auto-fill, minmax(min(100%, 13rem), 1fr))", gap: "6px", "max-height": "15rem", "overflow-y": "auto" }}>
                 <For each={[...allFeatures]}>
                   {(feature) => (
-                    <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "6px", padding: "4px 6px", "border-radius": "var(--ent-radius)", background: "var(--ent-surface-subtle)" }}>
+                    <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "8px", padding: "4px 8px", "border-radius": "var(--ent-radius)", background: "var(--ent-surface-subtle)" }}>
                       <span style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap", "font-size": "11px", color: "var(--ent-text-muted)" }}>
                         {feature.replace(/_/g, " ")}
                       </span>
-                      <span style={{ display: "flex", gap: "2px", "flex-shrink": "0" }}>
+                      <span style={{ display: "flex", gap: "4px", "flex-shrink": "0" }}>
                         <button
                           type="button"
                           class="ent-btn ent-btn--ghost"
@@ -121,7 +121,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
                           title={t("mcp.settings.enable")}
                           onClick={() => addUserOverride(feature, true)}
                         >
-                          <Check size={12} aria-hidden="true" />
+                          <Check size={14} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
@@ -132,7 +132,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
                           title={t("mcp.settings.disable")}
                           onClick={() => addUserOverride(feature, false)}
                         >
-                          <X size={12} aria-hidden="true" />
+                          <X size={14} aria-hidden="true" />
                         </button>
                       </span>
                     </div>
@@ -150,7 +150,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
           <div class="ent-card__body" style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))", gap: "16px" }}>
             <div>
               <h4 class="ent-section__title">{t("admin.ff.aiCat")}</h4>
-              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "2px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
+              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "4px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
                 <li>{t("admin.ff.aiAssistant")}</li>
                 <li>{t("admin.ff.aiVision")}</li>
                 <li>{t("admin.ff.aiAutonomous")}</li>
@@ -159,7 +159,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
             </div>
             <div>
               <h4 class="ent-section__title">{t("admin.ff.cadcamCat")}</h4>
-              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "2px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
+              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "4px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
                 <li>{t("admin.ff.advancedCad")}</li>
                 <li>{t("admin.ff.modeling")}</li>
                 <li>{t("admin.ff.camOperations")}</li>

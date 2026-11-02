@@ -147,7 +147,7 @@ export function CompanionPanel(): JSX.Element {
                           />
                           <button
                             type="button"
-                            class={copied() ? `${SECONDARY} flex items-center gap-1` : `${PRIMARY} flex items-center gap-1`}
+                            class={copied() ? `${SECONDARY} flex items-center gap-2` : `${PRIMARY} flex items-center gap-2`}
                             onClick={() => void copyLink()}
                             aria-label={t("companion.pair.copy")}
                           >

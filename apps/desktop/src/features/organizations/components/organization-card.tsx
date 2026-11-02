@@ -43,12 +43,12 @@ export function OrganizationCard(props: OrganizationCardProps): JSX.Element {
         <div class="mt-auto space-y-1.5 text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
           <div class="flex items-center justify-between gap-2"><span>{t("org.card.members")}</span><span class={BADGE}>{props.memberCount}</span></div>
           <div class="flex items-center justify-between gap-2"><span>{t("org.card.projects")}</span><span class={BADGE}>{props.projectCount}</span></div>
-          <div class="flex items-center justify-between gap-2"><span>ID</span><code class="truncate font-mono text-[10.5px] text-blue-700 dark:text-blue-300">{props.org.id.substring(0, 8)}…</code></div>
+          <div class="flex items-center justify-between gap-2"><span>ID</span><code class="truncate font-mono text-[11px] text-blue-700 dark:text-blue-300">{props.org.id.substring(0, 8)}…</code></div>
         </div>
       </div>
       <div class="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/30">
         <span class="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t("org.card.member")}</span>
-        <span class="flex items-center gap-1 text-[11px] tabular-nums text-slate-500 dark:text-slate-400"><Calendar size={12} aria-hidden="true" />{formatDateYear(props.org.createdAt)}</span>
+        <span class="flex items-center gap-1.5 text-[11px] tabular-nums text-slate-500 dark:text-slate-400"><Calendar size={12} aria-hidden="true" />{formatDateYear(props.org.createdAt)}</span>
       </div>
     </A>
   )

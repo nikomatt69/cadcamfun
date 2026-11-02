@@ -54,8 +54,8 @@
 .reference-page-container [role="tablist"] {
   display: flex;
   align-items: stretch;
-  gap: 2px;
-  padding: 3px;
+  gap: 4px;
+  padding: 4px;
   overflow-x: auto;
   border: 1px solid var(--page-border);
   border-radius: 5px;

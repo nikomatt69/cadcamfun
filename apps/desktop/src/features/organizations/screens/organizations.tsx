@@ -102,7 +102,7 @@ export function OrganizationsScreen(): JSX.Element {
             <input type="search" name="search" class={`${FIELD} pl-8`} placeholder={t("org.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
+        <button type="button" class="inline-flex items-center gap-2 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
         <Show when={orgs.data() !== undefined}>
           <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400" role="status">{filtered().length} / {orgs.data()?.length ?? 0} {t("shell.organizations")}</p>
         </Show>
