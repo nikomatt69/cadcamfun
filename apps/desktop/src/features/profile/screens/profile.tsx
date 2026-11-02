@@ -142,7 +142,7 @@ export function ProfileScreen(): JSX.Element {
                         <Mail size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
                           <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.email")}</p>
-                          <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().email}</p>
+                          <p class="truncate text-xs text-slate-700 dark:text-slate-200">{me().email}</p>
                         </div>
                       </div>
                     </Show>
@@ -151,7 +151,7 @@ export function ProfileScreen(): JSX.Element {
                         <MapPin size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
                           <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.location")}</p>
-                          <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().location}</p>
+                          <p class="truncate text-xs text-slate-700 dark:text-slate-200">{me().location}</p>
                         </div>
                       </div>
                     </Show>
@@ -159,13 +159,13 @@ export function ProfileScreen(): JSX.Element {
                       <Calendar size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                       <div class="min-w-0">
                         <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("profile.joined")}</p>
-                        <p class="truncate text-[11.5px] tabular-nums text-slate-700 dark:text-slate-200">{formatMonth(me().createdAt ?? "")}</p>
+                        <p class="truncate text-xs tabular-nums text-slate-700 dark:text-slate-200">{formatMonth(me().createdAt ?? "")}</p>
                       </div>
                     </div>
                   </div>
 
                   <Show when={typeof me().bio === "string" && (me().bio?.length ?? 0) > 0}>
-                    <p class="mt-2 border-t border-slate-200 pt-2 text-[11.5px] leading-5 text-slate-600 dark:border-slate-700/70 dark:text-slate-300">{me().bio}</p>
+                    <p class="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600 dark:border-slate-700/70 dark:text-slate-300">{me().bio}</p>
                   </Show>
                 </div>
 

@@ -224,7 +224,7 @@ export function ProviderSettings(): JSX.Element {
         disabled={ai.catalogueRefreshing()} onClick={() => void ai.refreshCatalogue()}>
         {ai.catalogueRefreshing() ? t("ai.catalogue.refreshing") : t("ai.catalogue.refresh")}
       </button>
-      <Show when={ai.catalogueError()}>{(error) => <p role="alert" class="text-xs text-red-500">{error()}</p>}</Show>
+      <Show when={ai.catalogueError()}>{(error) => <p role="alert" class="assistant-status-error text-xs">{error()}</p>}</Show>
       <Show when={ai.providers().length > 0}>
         <div class="text-xs text-gray-500" data-testid="ai-catalogue-counts">
           {t("ai.catalogue.providerCount", { count: ai.providers().length })} ·{" "}

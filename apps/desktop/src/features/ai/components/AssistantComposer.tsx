@@ -133,7 +133,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
             disabled={running() || props.files.length >= MAX_ATTACHMENTS}
             onClick={() => picker()?.click()}
           >
-            <Plus size={16} aria-hidden="true" />
+            <Plus size={14} aria-hidden="true" />
           </button>
           <div class="assistant-compose-field">
             <textarea

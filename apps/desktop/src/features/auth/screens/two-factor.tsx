@@ -122,7 +122,7 @@ export function TwoFactorScreen(): JSX.Element {
               <Show
                 when={qrCode() !== null}
                 fallback={
-                  <div style={{ display: "flex", "flex-direction": "column", gap: "10px", "align-items": "flex-start" }}>
+                  <div style={{ display: "flex", "flex-direction": "column", gap: "12px", "align-items": "flex-start" }}>
                     <h2 class="ent-section__title">{t("twofactor.enableTitle")}</h2>
                     <p class="ent-header__description">{t("twofactor.enableBody")}</p>
                     <Button tone="primary" onClick={handleEnable2FAClick} disabled={isLoading() || is2FAEnabled()}>
@@ -133,11 +133,11 @@ export function TwoFactorScreen(): JSX.Element {
               >
                 <div style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
                   <h2 class="ent-section__title">{t("twofactor.scanTitle")}</h2>
-                  <div class="ent-card" style={{ padding: "14px", display: "flex", "justify-content": "center" }}>
+                  <div class="ent-card" style={{ padding: "16px", display: "flex", "justify-content": "center" }}>
                     <img src={qrCode() ?? ""} alt={t("twofactor.qrAlt")} style={{ width: "176px", height: "176px" }} />
                   </div>
                   <p class="ent-header__description">{t("twofactor.scanBody")}</p>
-                  <form style={{ display: "flex", "flex-direction": "column", gap: "10px" }} onSubmit={handleVerifySetup}>
+                  <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleVerifySetup}>
                     <Field label={t("twofactor.verifyCode")} id="code">
                       <TextField id="code" value={verificationCode()} required placeholder={t("twofactor.codePlaceholder")} onInput={setVerificationCode} />
                     </Field>
@@ -159,7 +159,7 @@ export function TwoFactorScreen(): JSX.Element {
               <Show
                 when={!otpSent()}
                 fallback={
-                  <form style={{ display: "flex", "flex-direction": "column", gap: "10px" }} onSubmit={handleVerifyOTPClick}>
+                  <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleVerifyOTPClick}>
                     <Field label={t("twofactor.otpLabel")} id="otp">
                       <TextField id="otp" value={verificationCode()} required placeholder={t("twofactor.otpPlaceholder")} onInput={setVerificationCode} />
                     </Field>
@@ -188,7 +188,7 @@ export function TwoFactorScreen(): JSX.Element {
               </div>
 
               <Show when={is2FAEnabled()}>
-                <div style={{ display: "flex", "flex-direction": "column", gap: "10px" }}>
+                <div style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
                   <div class="ent-card">
                     <div class="ent-card__head"><h3 class="ent-section__title">{t("twofactor.backupCodes")}</h3></div>
                     <div class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "8px" }}>
@@ -216,7 +216,7 @@ export function TwoFactorScreen(): JSX.Element {
               </Show>
 
               <Show when={!is2FAEnabled()}>
-                <div style={{ display: "flex", "flex-direction": "column", gap: "10px", "align-items": "flex-start" }}>
+                <div style={{ display: "flex", "flex-direction": "column", gap: "12px", "align-items": "flex-start" }}>
                   <p class="ent-header__description">{t("twofactor.notEnabled")}</p>
                   <Button tone="primary" onClick={() => setActiveTab("setup")}>{t("twofactor.enable")}</Button>
                 </div>
