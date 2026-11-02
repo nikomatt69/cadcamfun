@@ -12,11 +12,11 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 ## Totals
 
-- Actions: **126** in **15** tools (read 72, write 48, destructive 6).
-- Actions with an identified execution path: **126/126**.
-- Actions named in their tool prompt: **126/126**.
-- Actions mentioned by at least one test file: **125/126**.
-- Actions with a declared result schema: **126/126**.
+- Actions: **127** in **15** tools (read 73, write 48, destructive 6).
+- Actions with an identified execution path: **127/127**.
+- Actions named in their tool prompt: **127/127**.
+- Actions mentioned by at least one test file: **126/127**.
+- Actions with a declared result schema: **127/127**.
 - Prompt files: **63** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **26** (plus user skills from the store); composer commands: **42**.
 
@@ -31,7 +31,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `library` | read | 5 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1445 |
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1230 |
 | `library_edit` | destructive | 7 | primary:build, machinist | 3059 |
-| `memory` | read | 2 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 837 |
+| `memory` | read | 3 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 985 |
 | `memory_edit` | write | 2 | primary:build | 1211 |
 | `research` | read | 2 | primary:build, primary:plan, researcher, editor, modeler, machinist, planner, diagnostician, optimizer | 1213 |
 | `vcs` | read | 4 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1401 |
@@ -123,13 +123,13 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cam.analyze` (was `cam_analyze_gcode`) | read | — | gcode, operationId, machineType | handler `machine` → `apps/sidecar/src/http/workspace.ts:79`<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1188` | yes | declared | machine-kinematics.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-streaming-performance.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
 | `cam.stock` (was `cam_stock`) | read | — | — | handler `stock` → `apps/sidecar/src/http/workspace.ts:72`, `apps/sidecar/src/http/workspace.ts:153` (+2) | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
 | `cam.vision` (was `cam_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:854` | yes | declared | vision-capture.test.ts, ai-cam-chain.test.ts |
-| `cam.chain_suggest` (was `cam_operations_suggest_chain`) | read | — | fromOperationId, materialHint, toolHint | handler `suggestChain` → `apps/sidecar/src/services/ai.ts:1552` | yes | declared | ai-cam-chain.test.ts |
-| `cam.materials` | read | — | query | handler `machines` → `apps/sidecar/src/http/workspace.ts:284`, `apps/sidecar/src/services/ai.ts:1301` | yes | declared | cam-kernel-actions.test.ts, ai-cam-chain.test.ts |
+| `cam.chain_suggest` (was `cam_operations_suggest_chain`) | read | — | fromOperationId, materialHint, toolHint | handler `suggestChain` → `apps/sidecar/src/services/ai.ts:1553` | yes | declared | ai-cam-chain.test.ts |
+| `cam.materials` | read | — | query | handler `machines` → `apps/sidecar/src/http/workspace.ts:284`, `apps/sidecar/src/services/ai.ts:1302` | yes | declared | cam-kernel-actions.test.ts, ai-cam-chain.test.ts |
 | `cam.cutting_data` | read | — | material*, cut*, tool*, machine, depth, ae, ap, scallop | handler `machine` → `apps/sidecar/src/http/workspace.ts:79` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, skills.test.ts |
 | `cam.turn` | read | — | profile*, stock*, stepdown, allowance, feedMmRev, rpm, machine, machineConfig | local (core cam.kernel.findMachine, core cam.kernel.kernelMachineOfConfig, core cam.kernel.planTurning) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
 | `cam.manufacture` | read | — | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, breadth, tabs, subprograms, nativeCycles, tcp, smoothing, postDefinition, postDefinitionId, print | handler `manufacture` → `apps/sidecar/src/services/ai.ts:384` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, ai-cam-chain.test.ts, cam-subprograms.test.ts |
 | `cam.job` | read | — | op*, material*, machine, part*, tools, quality, setups*, nc | local (in-package implementation) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-job-action.test.ts |
-| `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:1566` | yes | declared | ai-cam-chain.test.ts |
+| `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:1567` | yes | declared | ai-cam-chain.test.ts |
 | `cam.lathe` | read | — | stock*, contour, bore, tools*, operations*, material, post | local (in-package implementation) — `packages/ai/src/actions/cam-breadth-process.ts` | yes | declared | cam-breadth-actions.test.ts |
 | `cam.process` | read | — | gcode, operationId, tool*, material*, machine, stock*, rpm, mode*, post | handler `machine` → `apps/sidecar/src/http/workspace.ts:79`<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1188` | yes | declared | cam-breadth-actions.test.ts |
 | `cam.post_test` | read | — | post*, gcode, expected | local (core cam.programOfNc, core cam.testPost) — `packages/ai/src/actions/cam-breadth-process.ts` | yes | declared | cam-breadth-actions.test.ts |
@@ -151,45 +151,46 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:1603` | yes | declared | action-inputs.test.ts |
-| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:1604` | yes | declared | action-inputs.test.ts |
-| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:1289` | yes | declared | action-inputs.test.ts |
-| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:1290` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
-| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:1605` | yes | declared | action-inputs.test.ts |
+| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:1604` | yes | declared | action-inputs.test.ts |
+| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:1605` | yes | declared | action-inputs.test.ts |
+| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:1290` | yes | declared | action-inputs.test.ts |
+| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:1291` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
+| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:1606` | yes | declared | action-inputs.test.ts |
 
 ### `parts`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `parts.save` (was `cad_component_save`) | write | component | ids*, name*, description, type, isPublic | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:1606` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:1614` | yes | declared | action-inputs.test.ts |
-| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:1619` | yes | declared | action-inputs.test.ts, auto-mode.test.ts |
+| `parts.save` (was `cad_component_save`) | write | component | ids*, name*, description, type, isPublic | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:1607` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:1615` | yes | declared | action-inputs.test.ts |
+| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:1620` | yes | declared | action-inputs.test.ts, auto-mode.test.ts |
 
 ### `library_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:1620` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius, tipAngle, threadPitch, holderDiameter, holderLength, stickout, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:1621` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, description, controller, post, axes, axisTable, spindle, feed, rigidity, workVolume, travel, table, rotary, turning, workOffsets, probing, toolChanger, coolant, accuracy, reference, kinematics, postProcessor, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1622` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_library_item` | write | library | id, name*, category*, type*, data*, description, properties, tags, isPublic | contribution `library_edit.upsert_library_item` → `apps/sidecar/src/services/ai.ts:1623` | yes | declared | action-inputs.test.ts |
-| `library_edit.set_cost` | write | library | kind*, id, materialId, toolId, name, costPerUnit, wasteFactor, minimumCharge, wearRatePerMeter, replacementCost, replacementThreshold, machineHourlyRate, operatorHourlyRate, setupTime, currencyCode | contribution `library_edit.set_cost` → `apps/sidecar/src/services/ai.ts:1624` | yes | declared | action-inputs.test.ts |
-| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1625` | yes | declared | action-inputs.test.ts |
-| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1626` | yes | declared | action-inputs.test.ts, auto-mode.test.ts |
+| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:1621` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius, tipAngle, threadPitch, holderDiameter, holderLength, stickout, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:1622` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, description, controller, post, axes, axisTable, spindle, feed, rigidity, workVolume, travel, table, rotary, turning, workOffsets, probing, toolChanger, coolant, accuracy, reference, kinematics, postProcessor, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1623` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_library_item` | write | library | id, name*, category*, type*, data*, description, properties, tags, isPublic | contribution `library_edit.upsert_library_item` → `apps/sidecar/src/services/ai.ts:1624` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_cost` | write | library | kind*, id, materialId, toolId, name, costPerUnit, wasteFactor, minimumCharge, wearRatePerMeter, replacementCost, replacementThreshold, machineHourlyRate, operatorHourlyRate, setupTime, currencyCode | contribution `library_edit.set_cost` → `apps/sidecar/src/services/ai.ts:1625` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1626` | yes | declared | action-inputs.test.ts |
+| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1627` | yes | declared | action-inputs.test.ts, auto-mode.test.ts |
 
 ### `memory`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `memory.recall` (was `memory_recall`) | read | — | prefix | handler `recall` → `apps/sidecar/src/services/ai.ts:1278` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts |
-| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:1279` | yes | declared | action-inputs.test.ts |
+| `memory.brain_read` | read | — | file, offset, maxChars | handler `brain` → `apps/sidecar/src/services/ai.ts:1279` | yes | declared | action-inputs.test.ts, brain-read.test.ts |
+| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:1280` | yes | declared | action-inputs.test.ts |
 
 ### `memory_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `memory_edit.remember` (was `memory_remember`) | write | memory | key*, value* | handler `remember` → `apps/sidecar/src/services/ai.ts:1277` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts, ai.test.ts |
-| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:1279`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:1284` | yes | declared | action-inputs.test.ts |
+| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:1280`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:1285` | yes | declared | action-inputs.test.ts |
 
 ### `research`
 
@@ -281,7 +282,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1577 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1445 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3059 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 837 | prompt-corpus.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 985 | prompt-corpus.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1211 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/mods.txt` | tool description | tools/prompts/index.ts toolPrompt | 1023 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/mods_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2432 | auto-mode.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts |
