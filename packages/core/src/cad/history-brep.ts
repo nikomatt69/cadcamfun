@@ -1242,8 +1242,16 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
                 const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
                 for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
                 // A feature the mesh rebuild refuses (a radius wider than the faces, two blends that collide on a face) is skipped by
-                // this replay altogether (see `failed`), so a refused edge here is only a warning, as before.
-                bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
+                // this replay altogether (see `failed`). An edge the mesh rebuild blended but the exact blend refuses would leave a body
+                // that is not the model (an un-blended edge), so the body keeps its mesh and says which edge and why.
+                bodies[bodies.indexOf(b)] = {
+                  ...b,
+                  exact: res.failures.length > 0
+                    ? no(`exact ${style} failed: ${res.failures[0]}`)
+                    : res.rejected.length > 0
+                      ? no(`exact ${style} is incomplete: ${res.rejected.length} of ${picked.length} selected edges could not be blended (${res.rejected[0]})`)
+                      : ok(res.brep)
+                }
               } else {
                 // One edge at a time (each cut changes the edge indices), matched again by its end points on the current body;
                 // the radius runs from the lexicographically smaller end, as in the mesh rebuild.
