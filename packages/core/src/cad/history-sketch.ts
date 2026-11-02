@@ -5,7 +5,7 @@
  * answer, which names constraints by `id` or `<type>#<n>`, back to the constraints the feature stores.
  */
 import type { Dimension } from "./expr.ts"
-import { rebuild, type DimConstraint, type Feature, type History } from "./history.ts"
+import { rebuild, type DimConstraint, type Feature, type History, type RebuildResult } from "./history.ts"
 import type { TimelineEdit } from "./history-edit.ts"
 import type { SolveStatus } from "./sketch-model.ts"
 
@@ -63,14 +63,15 @@ const sketchOf = (history: History, featureId: string): (Feature & { readonly ty
 
 /**
  * The state of the constraints of sketch `featureId`, from a replay of the features up to and including it (what comes after cannot
- * change the sketch). `undefined` when the feature is not a sketch.
+ * change the sketch). `undefined` when the feature is not a sketch. A caller that already holds the replay of this very history passes it
+ * as `replay` and nothing is rebuilt.
  */
-export const sketchReport = (history: History, featureId: string): SketchReport | undefined => {
+export const sketchReport = (history: History, featureId: string, replay?: RebuildResult): SketchReport | undefined => {
   const feature = sketchOf(history, featureId)
   if (feature === undefined) return undefined
   const at = history.features.findIndex((f) => f.id === featureId)
   const { rollback: _marker, ...rest } = history
-  const built = rebuild({ ...rest, features: history.features.slice(0, at + 1) })
+  const built = replay ?? rebuild({ ...rest, features: history.features.slice(0, at + 1) })
   const solved = built.sketches[featureId]?.solve
   const own = feature.sketch.constraints
   const names = constraintNames(own)

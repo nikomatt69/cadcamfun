@@ -3,22 +3,19 @@ import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, removeImported, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
+  RECIPES, addFeature, analyzeManufacturability, buildRecipe, runModelScript, dimensionInDegrees, dimensionValue, dimensionsOf, removalImpact, removeImported, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, resolveParameters, setDimension,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
 import { importStepIntoHistory } from "../lib/importStep.ts"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
+import { parseNumberText } from "../lib/numberText.ts"
+import { DimensionField } from "./property-inputs/DimensionField.tsx"
+import { ParametersSection } from "./parametric/ParametersSection.tsx"
+import { SketchConstraintsSection } from "./parametric/SketchConstraintsSection.tsx"
+import { ConfigurationsSection } from "./parametric/ConfigurationsSection.tsx"
 
 const INPUT = "panel-input font-mono"
 const SMALL = "panel-btn"
-
-const STATUS: Readonly<Record<string, { readonly text: string; readonly tone: string }>> = {
-  "fully-constrained": { text: "fully constrained", tone: "text-green-700" },
-  "under-constrained": { text: "under-constrained", tone: "text-amber-700" },
-  "over-constrained": { text: "over-constrained", tone: "text-amber-700" },
-  conflicting: { text: "conflicting", tone: "text-red-700" },
-  failed: { text: "failed", tone: "text-red-700" }
-}
 
 const SELECT = "panel-input"
 const SEVERITY_TONE: Readonly<Record<string, string>> = { error: "text-red-700", warning: "text-amber-700", info: "text-gray-600 dark:text-gray-300" }
@@ -43,10 +40,13 @@ const format = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFix
 export default function ParametricPanel(props: { readonly element: Element; readonly locked: boolean }): JSX.Element {
   const elements = useElementsStore()
   const [error, setError] = createSignal("")
-  const [newName, setNewName] = createSignal("")
-  const [newValue, setNewValue] = createSignal("")
+  /** Which sketches have their constraint list open: kept here because a row is rebuilt whenever its feature is edited. */
+  const [openSketches, setOpenSketches] = createSignal<ReadonlySet<string>>(new Set())
+  const toggleSketch = (id: string) => setOpenSketches((open) => { const next = new Set(open); if (!next.delete(id)) next.add(id); return next })
   const history = (): History => props.element["history"] as History
   const resolved = createMemo(() => resolveParameters(history().parameters))
+  /** What a dimension field checks a typed formula against: the resolved parameters, and the ones that failed. */
+  const context = createMemo(() => ({ values: resolved().values, failed: resolved().errors }))
   const built = createMemo(() => { try { return rebuild(history()) } catch { return undefined } })
 
   /** Applies an edit; a refused one (a name in use, a dimension that does not exist) is shown, not thrown. */
@@ -90,12 +90,17 @@ export default function ParametricPanel(props: { readonly element: Element; read
     return { text: "failed", tone: "text-red-700" }
   }
   const inactive = (id: string): boolean => { const s = built()?.states[id]?.state; return s !== undefined && s !== "ok" && s !== "failed" }
-  const asValue = (text: string): number | string => { const t = text.trim(); return t !== "" && Number.isFinite(Number(t)) ? Number(t) : t }
-
-  const addParameter = () => {
-    const name = newName().trim()
-    if (name === "" || newValue().trim() === "") { setError("A parameter needs a name and a value or formula"); return }
-    if (edit((h) => setParameter(h, name, asValue(newValue())))) { setNewName(""); setNewValue("") }
+  /**
+   * Deleting a feature: the confirmation lists what goes with it (`all`: the features that reference it and those that only act on
+   * its bodies) or what will fail without it (`none`: the feature alone is removed and the replay marks the rest failed / skipped).
+   */
+  const deleteFeature = (id: string, dependents: "all" | "none") => {
+    const impact = removalImpact(history(), id)
+    const referencing = impact.declared.join(", "), acting = impact.lineage.join(", ")
+    const lines = [dependents === "all" ? t("cad.param.confirmDeleteFeature", { id }) : t("cad.parametric.confirmDeleteOnly", { id })]
+    if (referencing !== "") lines.push(t(dependents === "all" ? "cad.parametric.impact.referencing" : "cad.parametric.impact.willFail", { list: referencing }))
+    if (acting !== "") lines.push(t(dependents === "all" ? "cad.parametric.impact.acting" : "cad.parametric.impact.willFail", { list: acting }))
+    if (window.confirm(lines.join("\n"))) edit((h) => removeFeature(h, id, { dependents }))
   }
 
   const describe = (feature: Feature): string => {
@@ -157,7 +162,12 @@ export default function ParametricPanel(props: { readonly element: Element; read
     const taken = new Set(history().features.map((f) => f.id))
     for (let n = 1; ; n++) if (!taken.has(`${base}${n}`)) return `${base}${n}`
   }
-  const append = (feature: Feature) => edit((h) => ({ ...h, features: [...h.features, feature] }))
+  /** A new feature goes at the end, or right after the rollback marker while the model is rolled back (the marker moves onto it). */
+  const append = (feature: Feature) => edit((h) => {
+    const added = addFeature(h, feature)
+    if (added.refusal !== undefined) throw new RangeError(added.refusal)
+    return added.history
+  })
   const addFillet = (style: "fillet" | "chamfer", where: "convex" | "vertical" | "top") => {
     const bounds = built()?.bodies.map((b) => meshBounds(b.mesh)) ?? []
     if (bounds.length === 0) { setError("There is no solid to round yet"); return }
@@ -213,7 +223,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
   const [report, setReport] = createSignal<DfmReport | undefined>(undefined)
   const [checking, setChecking] = createSignal(false)
   const runCheck = () => {
-    const toolDiameter = Number(cutter())
+    const parsedCutter = parseNumberText(cutter(), { min: 0 })
+    const toolDiameter = parsedCutter.ok ? parsedCutter.value : Number.NaN
     if (!Number.isFinite(toolDiameter) || toolDiameter <= 0) { setError("The cutter diameter must be a positive number"); return }
     setChecking(true)
     // Let the button repaint before the synchronous analysis runs.
@@ -279,32 +290,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
         <Show when={error()}><p class="mt-1 text-xs text-red-600" role="alert">{error()}</p></Show>
       </div>
 
-      <div>
-        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.customElements.parameters")}</h5>
-        <div class="space-y-1">
-          <For each={Object.entries(history().parameters)}>{([name, definition]) =>
-            <div class="grid grid-cols-[6rem_1fr_auto] items-center gap-1" data-testid={`parameter-${name}`}>
-              <button type="button" class="truncate text-left text-sm font-mono text-blue-700 hover:underline disabled:no-underline" title={t("projects.rename")} disabled={props.locked}
-                onClick={() => { const next = window.prompt(`Rename '${name}' to`, name); if (next && next !== name) edit((h) => renameParameter(h, name, next)) }}>{name}</button>
-              <div>
-                <input class={INPUT} value={String(definition)} disabled={props.locked} aria-label={`Parameter ${name}`}
-                  onChange={(event) => edit((h) => setParameter(h, name, asValue(event.currentTarget.value)))} />
-                <Show when={resolved().errors[name]} fallback={<Show when={typeof definition === "string"}><span class="text-xs text-gray-500">= {format(resolved().values[name] ?? NaN)}</span></Show>}>
-                  <span class="text-xs text-red-600">{resolved().errors[name]}</span>
-                </Show>
-              </div>
-              <button type="button" class={SMALL} disabled={props.locked} title={(() => { const u = usesOf(history(), name); return u.parameters.length + u.features.length > 0 ? `Used by ${[...u.parameters, ...u.features].join(", ")}` : t("cad.customElements.delete") })()}
-                onClick={() => edit((h) => removeParameter(h, name))}>✕</button>
-            </div>}
-          </For>
-          <div class="grid grid-cols-[6rem_1fr_auto] items-center gap-1">
-            <input class={INPUT} placeholder="name" value={newName()} onInput={(event) => setNewName(event.currentTarget.value)} disabled={props.locked} aria-label={t("cad.param.newName")} />
-            <input class={INPUT} placeholder={t("cad.param.valueExample")} value={newValue()} onInput={(event) => setNewValue(event.currentTarget.value)} disabled={props.locked} aria-label={t("cad.param.newValue")}
-              onKeyDown={(event) => { if (event.key === "Enter") addParameter() }} />
-            <button type="button" class={SMALL} disabled={props.locked} onClick={addParameter}>{t("cad.add")}</button>
-          </div>
-        </div>
-      </div>
+      <ParametersSection history={history()} locked={props.locked} edit={edit} />
+      <ConfigurationsSection history={history()} locked={props.locked} edit={edit} fail={setError} />
 
       <div>
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("cad.param.imported")}</h5>
@@ -340,11 +327,6 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   <Show when={stateOf(feature.id)}>{(state) =>
                     <span class={`ml-2 text-xs ${state().tone}`} data-testid={`state-${feature.id}`}>{state().text}</span>}
                   </Show>
-                  <Show when={feature.type === "sketch" ? built()?.sketches[feature.id] : undefined}>{(sketch) =>
-                    <span class={`ml-2 text-xs ${STATUS[sketch().solve.status]?.tone ?? ""}`}>
-                      {STATUS[sketch().solve.status]?.text ?? sketch().solve.status}{sketch().solve.dof > 0 ? `, ${sketch().solve.dof} free` : ""}
-                    </span>}
-                  </Show>
                 </div>
                 <div class="flex shrink-0 gap-1">
                   <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? t("cam.gen.kp.release") : "Suppress"} ${feature.id}`}
@@ -354,10 +336,17 @@ export default function ParametricPanel(props: { readonly element: Element; read
                     title={t("cad.param.rollBack")} onClick={() => edit((h) => withRollback(h, feature.id))}>⤒</button>
                   <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title={t("cad.param.earlier")}>↑</button>
                   <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title={t("update.later")}>↓</button>
-                  <button type="button" class={SMALL} disabled={props.locked} title={t("cad.param.deleteDeps")}
-                    onClick={() => { if (window.confirm(t("cad.param.confirmDeleteFeature", { id: feature.id }))) edit((h) => removeFeature(h, feature.id)) }}>✕</button>
+                  <button type="button" class={SMALL} disabled={props.locked} title={t("cad.param.deleteDeps")} aria-label={`${t("cad.customElements.delete")} ${feature.id}`}
+                    onClick={() => deleteFeature(feature.id, "all")}>✕</button>
+                  <Show when={index() < history().features.length - 1}>
+                    <button type="button" class={SMALL} disabled={props.locked} title={t("cad.parametric.deleteOnly")} aria-label={`${t("cad.parametric.deleteOnly")} ${feature.id}`}
+                      onClick={() => deleteFeature(feature.id, "none")}>⌫</button>
+                  </Show>
                 </div>
               </div>
+              <Show when={feature.type === "sketch" && built()?.sketches[feature.id] !== undefined ? (feature as Feature & { type: "sketch" }) : undefined}>{(sketch) =>
+                <SketchConstraintsSection history={history()} locked={props.locked} edit={edit} feature={sketch()} replay={built()} open={openSketches().has(feature.id)} toggle={() => toggleSketch(feature.id)} fail={setError} />}
+              </Show>
               <Show when={feature.type === "extrude"}>
                 <div class="mb-1 grid grid-cols-2 gap-x-2" data-testid={`treatments-${feature.id}`}>
                   <label class="block text-xs text-gray-600 dark:text-gray-300">
@@ -377,15 +366,13 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 </div>
                 <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`draft-${feature.id}`}>
                   <span class="block">draft angle (deg, empty = none)</span>
-                  <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} draft angle input`} value={String((feature as Feature & { type: "extrude" }).taper ?? "")}
-                    onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { taper: text === "" ? undefined : asValue(text) }) }} />
+                  <DimensionField value={(feature as Feature & { type: "extrude" }).taper} context={{ ...context(), degrees: true, optional: true }} disabled={props.locked} label={`${feature.id} draft angle input`} onCommit={(stored) => patchFeature(feature.id, { taper: stored })} />
                 </label>
               </Show>
               <Show when={feature.type === "sweep"}>
                 <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`bend-${feature.id}`}>
                   <span class="block">bend radius (mm, empty = mitred corners)</span>
-                  <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} bend radius input`} value={String((feature as Feature & { type: "sweep" }).bendRadius ?? "")}
-                    onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { bendRadius: text === "" ? undefined : asValue(text) }) }} />
+                  <DimensionField value={(feature as Feature & { type: "sweep" }).bendRadius} context={{ ...context(), optional: true }} disabled={props.locked} label={`${feature.id} bend radius input`} onCommit={(stored) => patchFeature(feature.id, { bendRadius: stored })} />
                 </label>
               </Show>
               <Show when={feature.type === "hole"}>
@@ -416,12 +403,10 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   </label>
                   <Show when={(feature as Feature & { type: "fillet" }).style === "chamfer"}>
                     <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">second distance (mm, empty = equal)</span>
-                      <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} second distance input`} value={String((feature as Feature & { type: "fillet" }).secondDistance ?? "")}
-                        onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { secondDistance: text === "" ? undefined : asValue(text), ...(text !== "" ? { angle: undefined } : {}) }) }} />
+                      <DimensionField value={(feature as Feature & { type: "fillet" }).secondDistance} context={{ ...context(), optional: true }} disabled={props.locked} label={`${feature.id} second distance input`} onCommit={(stored) => patchFeature(feature.id, { secondDistance: stored, ...(stored !== undefined ? { angle: undefined } : {}) })} />
                     </label>
                     <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">angle (°, empty = no angle)</span>
-                      <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} chamfer angle input`} value={String((feature as Feature & { type: "fillet" }).angle ?? "")}
-                        onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { angle: text === "" ? undefined : asValue(text), ...(text !== "" ? { secondDistance: undefined } : {}) }) }} />
+                      <DimensionField value={(feature as Feature & { type: "fillet" }).angle} context={{ ...context(), degrees: true, optional: true }} disabled={props.locked} label={`${feature.id} chamfer angle input`} onCommit={(stored) => patchFeature(feature.id, { angle: stored, ...(stored !== undefined ? { secondDistance: undefined } : {}) })} />
                     </label>
                   </Show>
                 </div>
@@ -448,8 +433,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 <For each={dimensionsOf(feature)}>{(dimension) =>
                   <label class="block text-xs text-gray-600 dark:text-gray-300">
                     <span class="block truncate" title={dimension.label}>{dimension.label}</span>
-                    <input class={INPUT} value={String(dimension.value)} disabled={props.locked} aria-label={`${feature.id} ${dimension.label}`}
-                      onChange={(event) => edit((h) => setDimension(h, feature.id, dimension.path, asValue(event.currentTarget.value)))} />
+                    <DimensionField value={dimension.value} context={{ ...context(), degrees: dimensionInDegrees(dimension) }} disabled={props.locked} label={`${feature.id} ${dimension.label}`}
+                      onCommit={(stored) => { if (stored !== undefined) edit((h) => setDimension(h, feature.id, dimension.path, stored)) }} />
                   </label>}
                 </For>
               </div>

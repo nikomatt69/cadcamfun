@@ -130,6 +130,12 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
   return out
 }
 
+/**
+ * True when the dimension is stored in degrees (a draft, a hole angle, a pattern span, ...), so a field must read `45°` as 45 and not
+ * convert it to radians. The labels of `dimensionsOf` mark them `(deg)`; sketch `angle` constraints are radians and are not marked.
+ */
+export const dimensionInDegrees = (ref: DimensionRef): boolean => /\(deg\)/.test(ref.label)
+
 /** Writes `value` at `path` inside `target`, copying the objects and arrays on the way. */
 const setAt = (target: unknown, path: ReadonlyArray<string>, value: unknown): unknown => {
   if (path.length === 0) return value

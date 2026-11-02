@@ -11,6 +11,7 @@ import {
 import { parameterProblem, removeFeature, removalImpact, removeParameter, renameParameter, setParameter, plateTemplate } from "./history-edit.ts"
 import { groupFeatures } from "./history-edit.ts"
 import { withRollback, withSuppressed } from "./history-timeline.ts"
+import { parameterTable, setParameterNote } from "./parameter-table.ts"
 import { RECIPES, buildRecipe } from "./recipes.ts"
 
 setDefaultTimeout(120_000)
@@ -315,5 +316,48 @@ describe("configurations", () => {
     expect((h.features.find((f) => f.id === "hole1") as Feature).suppressed).toBe(true)
     h = setConfigurationSuppressed(h, "wide", ["hole1"], false).history
     expect(h.features.find((f) => f.id === "hole1")?.suppressed).toBeUndefined()
+  })
+})
+
+describe("parameter table", () => {
+  test("rows carry value, kind, dependencies, users, comments and unit warnings", () => {
+    let h = plateTemplate()
+    h = setParameter(h, "tilt", "30deg")
+    h = setParameter(h, "half", "width / 2")
+    h = setParameter(h, "bad", "width + tilt")
+    h = setParameter(h, "ratio", "width / half")
+    h = setParameterNote(h, "width", { comment: "overall X", kind: "length", favorite: true })
+    const rows = Object.fromEntries(parameterTable(h).map((r) => [r.name, r]))
+    expect(rows["width"]).toMatchObject({ value: 60, kind: "length", declared: true, comment: "overall X", favorite: true })
+    expect(rows["width"]!.usedBy.parameters.sort()).toEqual(["bad", "half", "ratio"])
+    expect(rows["width"]!.usedBy.features).toContain("sketch1")
+    expect(rows["half"]).toMatchObject({ value: 30, kind: "length", dependsOn: ["width"] })
+    expect(rows["tilt"]).toMatchObject({ kind: "angle" })
+    expect(rows["tilt"]!.value).toBeCloseTo(Math.PI / 6, 12)
+    expect(rows["bad"]!.warnings[0]).toContain("mixes length with angle")
+    expect(rows["ratio"]!.kind).toBe("any")
+    expect(rows["depth"]!.warnings).toEqual([])
+  })
+
+  test("a declared kind that contradicts the formula is a warning, a loop is flagged on every member", () => {
+    let h = setParameterNote(setParameter(plateTemplate(), "span", "width * 2"), "width", { kind: "length" })
+    h = setParameterNote(h, "span", { kind: "angle" })
+    expect(parameterTable(h).find((r) => r.name === "span")!.warnings.join()).toContain("declared as angle")
+    const loop: History = { ...plateTemplate(), parameters: { a: "b + 1", b: "a + 1", c: 3 } }
+    const rows = parameterTable(loop)
+    expect(rows.filter((r) => r.inCycle).map((r) => r.name).sort()).toEqual(["a", "b"])
+    expect(rows.find((r) => r.name === "a")!.error).toContain("circular definition")
+    expect(rows.find((r) => r.name === "c")!.inCycle).toBe(false)
+  })
+
+  test("notes are merged, cleared and dropped when empty", () => {
+    let h = setParameterNote(plateTemplate(), "width", { comment: "  x  " })
+    expect(h.notes).toEqual({ width: { comment: "x" } })
+    h = setParameterNote(h, "width", { favorite: true })
+    expect(h.notes).toEqual({ width: { comment: "x", favorite: true } })
+    h = setParameterNote(h, "width", { comment: "" })
+    h = setParameterNote(h, "width", { favorite: false })
+    expect(h.notes).toBeUndefined()
+    expect(() => setParameterNote(plateTemplate(), "nope", { comment: "x" })).toThrow("No parameter")
   })
 })
