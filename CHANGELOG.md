@@ -3,6 +3,27 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.67 (November 2026)
+
+## Desktop
+
+- PMI and library skills, grounded cutting-data/compare/chain guidance, stale lathe and sheet claims fixed; /plan /build /todos /init /review /rewind composer commands
+
+## Sidecar
+
+- Memory.brain_read reads the host's whole project memory or habits file, paged
+- Context survives long sessions better: stale-snapshot note, larger project memory with honest truncation, cut notes name recall, richer compaction summary
+
+## AI
+
+- Specialists report why they stopped, recovery survives bad records, kernel queue reports moving positions
+- Validation errors teach the action's fields, bounded results name how to page, mods are syntax-checked, denials are final
+- Cam.job and cam.lathe run in the scoped kernel worker instead of the sidecar's event loop
+
+## Documentation
+
+- Regenerate the harness inventory after the four-agent round
+
 ## v0.1.66 (November 2026)
 
 ## Sidecar
