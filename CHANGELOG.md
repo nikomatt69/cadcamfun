@@ -3,6 +3,17 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.63 (November 2026)
+
+## Desktop
+
+- Hidden-line no longer makes a part without edge lines vanish (found in a real WebGL render of all six display modes)
+- Identical parts share one build and their geometry (shape pool with 64-bit shape key, reference-counted geometry disposal, sceneCost measure); tests count geometries, vertices and draw calls
+- Joints are selectable (pick by glyph, hover/picked highlight, status chip and property card) and a NumberField opacity control for solids in the property panel; tests, 11 locales
+- Sheet-metal flat pattern overlay (outline, bend lines, developed-length dimensions, follows the history) and display mode / sketches / flat pattern persisted per project with safe storage; tests, 11 locales
+- Shape fingerprint skips placement names on the element only (a sketch point, control point or parameter called x was invisible to a rebuild); group renames stay free, configuration changes rebuild; tests
+- Pick the corners of an exact solid (vertex > edge > face) with hover and click, status chip, own-geometry dot highlight (sub-entity + tests, 11 locales)
+
 ## v0.1.62 (November 2026)
 
 ## Core
