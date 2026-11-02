@@ -48,7 +48,7 @@ html.dark .auth-shell {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: var(--ui-radius-lg);
-  background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
+  background: rgb(37, 99, 235);
   color: white;
   box-shadow: 0 12px 28px -12px rgba(37, 99, 235, 0.5);
 }
@@ -202,7 +202,7 @@ html.dark .ai-conversation {
   border-radius: var(--ui-radius-lg);
   font-size: 0.9375rem;
   line-height: 1.5;
-  background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
+  background: rgb(37, 99, 235);
   color: white;
 }
 .ai-message-assistant .ai-message-content {
@@ -269,7 +269,7 @@ html.dark .ai-composer-input { color: rgb(241, 245, 249); }
   font-size: 2rem;
   font-weight: 700;
   color: white;
-  background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
+  background: rgb(37, 99, 235);
   box-shadow: 0 12px 28px -12px rgba(37, 99, 235, 0.5);
 }
 .profile-sections {
@@ -319,7 +319,7 @@ html.dark .legal-card p { color: rgb(203, 213, 225); }
   font-size: clamp(4rem, 12vw, 7rem);
   font-weight: 700;
   letter-spacing: -0.04em;
-  background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
+  background: rgb(37, 99, 235);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -412,7 +412,7 @@ html.dark .costs-row-total-label { color: rgb(241, 245, 249); }
   width: 4rem;
   height: 4rem;
   border-radius: 1.25rem;
-  background: linear-gradient(135deg, rgb(124, 58, 237), rgb(236, 72, 153));
+  background: rgb(124, 58, 237);
   color: white;
   margin-bottom: 1rem;
   box-shadow: 0 12px 28px -12px rgba(124, 58, 237, 0.5);
@@ -422,7 +422,7 @@ html.dark .costs-row-total-label { color: rgb(241, 245, 249); }
   letter-spacing: -0.025em;
   font-weight: 700;
   margin: 0 0 0.5rem;
-  background: linear-gradient(120deg, rgb(37, 99, 235), rgb(124, 58, 237), rgb(236, 72, 153));
+  background: rgb(37, 99, 235);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -474,7 +474,7 @@ html.dark .waitlist-body { color: rgb(148, 163, 184); }
   aspect-ratio: 1;
   border-radius: var(--ui-radius-2xl);
   background:
-    linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(168, 85, 247, 0.18)),
+    rgba(59, 130, 246, 0.18),
     rgba(255, 255, 255, 0.4);
   backdrop-filter: var(--ui-blur-md);
   -webkit-backdrop-filter: var(--ui-blur-md);
@@ -483,7 +483,7 @@ html.dark .waitlist-body { color: rgb(148, 163, 184); }
 }
 html.dark .detail-thumbnail {
   background:
-    linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(168, 85, 247, 0.18)),
+    rgba(59, 130, 246, 0.18),
     rgba(17, 24, 39, 0.4);
   border-color: rgba(51, 65, 85, 0.7);
 }
