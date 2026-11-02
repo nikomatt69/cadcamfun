@@ -90,7 +90,7 @@ export function GitProfileSettings(): JSX.Element {
           <button
             type="submit"
             disabled={saving() || !changed()}
-            class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+            class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             <Show when={saving()}>
               <div aria-hidden="true" class="h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-white border-t-transparent" />

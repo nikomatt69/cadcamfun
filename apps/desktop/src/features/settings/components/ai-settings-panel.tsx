@@ -1,7 +1,7 @@
 /** AI settings reuse the shell AI provider; non-secret preferences live in sidecar KV. */
 import { Show, createSignal, onMount, type JSX } from "solid-js"
 import {
-  AlertTriangle, Clock, Cpu, Database, DollarSign, RefreshCw, Save, Server, Shield, Sliders, Zap
+  AlertTriangle, ChevronDown, Clock, Cpu, Database, DollarSign, RefreshCw, Save, Server, Shield, Sliders, Zap
 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -49,15 +49,7 @@ const testConnection = async (endpointPath: string, apiKey: string | undefined):
 }
 
 const Chevron = (props: { readonly open: boolean }): JSX.Element => (
-  <svg
-    class={`ml-1 w-4 h-4 transform transition-transform ${props.open ? "rotate-180" : ""}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-  </svg>
+  <ChevronDown size={16} aria-hidden="true" class={`ml-1.5 transform transition-transform ${props.open ? "rotate-180" : ""}`} />
 )
 
 interface ToggleRowProps {
@@ -154,7 +146,7 @@ export function AISettingsPanel(): JSX.Element {
             type="button"
             onClick={() => void handleSaveSettings()}
             disabled={isSaving() || isLoading()}
-            class="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+            class="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving()
               ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
@@ -212,7 +204,7 @@ export function AISettingsPanel(): JSX.Element {
           <div class="flex justify-between items-center">
             <div>
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                <Server size={16} class="mr-1.5 text-blue-500" />
+                <Server size={14} class="mr-1.5 text-blue-500" />
                 {t("settings.ai.mcp")}
               </label>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -257,7 +249,7 @@ export function AISettingsPanel(): JSX.Element {
                       placeholder="/api/mcp-protocol"
                       value={settings().mcpEndpoint ?? "/api/mcp-protocol"}
                       onInput={(event) => updateSettings({ mcpEndpoint: event.currentTarget.value })}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {t("settings.ai.mcpDefault")}
@@ -275,7 +267,7 @@ export function AISettingsPanel(): JSX.Element {
                       value={mcpApiKey()}
                       autocomplete="off"
                       onInput={(event) => setMcpApiKey(event.currentTarget.value)}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     />
                   </div>
 
@@ -287,7 +279,7 @@ export function AISettingsPanel(): JSX.Element {
                       id="mcp-strategy"
                       value={settings().mcpStrategy}
                       onChange={(event) => updateSettings({ mcpStrategy: event.currentTarget.value as McpStrategy })}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     >
                       <option value="aggressive">{t("settings.ai.strategyAggressive")}</option>
                       <option value="balanced">{t("settings.ai.strategyBalanced")}</option>
@@ -324,7 +316,7 @@ export function AISettingsPanel(): JSX.Element {
                       type="button"
                       onClick={() => void runMcpTest()}
                       disabled={mcpTestStatus() === "testing"}
-                      class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors duration-150 ease-out hover:bg-white disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                      class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
                     >
                       {mcpTestStatus() === "testing"
                         ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
@@ -447,7 +439,7 @@ export function AISettingsPanel(): JSX.Element {
                 disabled
                 class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Database size={14} class="mr-1" />
+                <Database size={14} class="mr-1.5" />
                 {t("settings.ai.clearCache")}
               </button>
 
@@ -456,7 +448,7 @@ export function AISettingsPanel(): JSX.Element {
                 onClick={() => ai.clear()}
                 class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
               >
-                <RefreshCw size={14} class="mr-1" />
+                <RefreshCw size={14} class="mr-1.5" />
                 {t("settings.ai.clearHistory")}
               </button>
             </div>
@@ -467,7 +459,7 @@ export function AISettingsPanel(): JSX.Element {
       {/* Performance summary */}
       <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-4">
         <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-          <Zap size={16} class="mr-1 text-yellow-500" />
+          <Zap size={14} class="mr-1.5 text-yellow-500" />
           {t("settings.ai.stats")}
         </h3>
 
@@ -488,7 +480,7 @@ export function AISettingsPanel(): JSX.Element {
         <Show when={settings().mcpEnabled}>
           <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-              <Server size={12} class="mr-1 text-blue-500" />
+              <Server size={14} class="mr-1.5 text-blue-500" />
               {t("settings.ai.mcpStats")}
             </h4>
             <div class="flex space-x-4">
@@ -515,11 +507,11 @@ export function AISettingsPanel(): JSX.Element {
         <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <div class="flex items-center justify-between">
             <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
-              <DollarSign size={12} class="mr-1" />
+              <DollarSign size={14} class="mr-1.5" />
               {t("settings.ai.costPerK", { cost: "--" })}
             </div>
             <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
-              <Clock size={12} class="mr-1" />
+              <Clock size={14} class="mr-1.5" />
               {t("settings.ai.lastUpdate", { time: new Date(performance.lastSync).toLocaleTimeString() })}
             </div>
           </div>

@@ -32,9 +32,9 @@ const PlanIcon = (props: { readonly plan: string }): JSX.Element => {
 }
 
 /** Card surface — the neutral translucent panel of the list pages. */
-const CARD = "rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
-const PRIMARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-const SECONDARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/70 bg-white/70 px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+const CARD = "rounded-xl border border-slate-200/70 bg-white dark:border-slate-700/50 dark:bg-slate-900"
+const PRIMARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+const SECONDARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/70 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
 
 export function SubscriptionSettings(): JSX.Element {
   const app = useApp()
@@ -103,7 +103,7 @@ export function SubscriptionSettings(): JSX.Element {
                 <span class="text-sm font-medium text-slate-900 dark:text-white">{features().name || t("subscription.free")}</span>
                 <Show when={isOnTrial()}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Clock class="mr-1 h-3 w-3" />
+                    <Clock class="mr-1.5 h-3.5 w-3.5" />
                     {t("subscription.trial")}
                   </span>
                 </Show>

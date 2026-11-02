@@ -265,10 +265,10 @@ export function ProfileSettings(): JSX.Element {
   const completeness = (): number => getProfileCompleteness()
 
   const fieldClass = (invalid: boolean): string =>
-    `w-full rounded-md border px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ${
+    `w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 ${
       !isEditing()
         ? "cursor-not-allowed border-slate-200/70 bg-slate-50/80 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
-        : "border-slate-200/70 bg-white/80 text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
+        : "border-slate-200/70 bg-white text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
     }${invalid ? " border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-500" : ""}`
 
   return (
@@ -283,9 +283,9 @@ export function ProfileSettings(): JSX.Element {
         <button
           type="button"
           onClick={() => setIsEditing(!isEditing())}
-          class={`rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors duration-150 ease-out ${
+          class={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 ease-out ${
             isEditing()
-              ? "border border-slate-200/70 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+              ? "border border-slate-200/70 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
@@ -294,7 +294,7 @@ export function ProfileSettings(): JSX.Element {
       </div>
 
       {/* Profile Completeness */}
-      <div class="rounded-xl border border-slate-200/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
+      <div class="rounded-xl border border-slate-200/70 bg-white p-5 dark:border-slate-700/50 dark:bg-slate-900">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.profile.completeness")}</h3>
           <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{completeness()}%</span>
@@ -311,7 +311,7 @@ export function ProfileSettings(): JSX.Element {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Photo & Basic Info */}
         <div class="lg:col-span-1">
-          <div class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
+          <div class="rounded-xl border border-slate-200/70 bg-white p-6 dark:border-slate-700/50 dark:bg-slate-900">
             {/* Profile Photo */}
             <div class="text-center">
               <div class="relative inline-block">
@@ -337,7 +337,7 @@ export function ProfileSettings(): JSX.Element {
                   <button
                     type="button"
                     onClick={() => fileInput?.click()}
-                    class="absolute bottom-2 right-2 rounded-full bg-blue-600 p-2 text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700"
+                    class="absolute bottom-2 right-2 rounded-full bg-blue-600 p-2 text-white transition-colors duration-150 ease-out hover:bg-blue-700"
                   >
                     <Camera class="h-4 w-4" />
                   </button>
@@ -357,7 +357,7 @@ export function ProfileSettings(): JSX.Element {
                   <button
                     type="button"
                     onClick={() => fileInput?.click()}
-                    class="w-full rounded-lg border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                    class="w-full rounded-lg border border-slate-200/70 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
                   >
                     {t("settings.profile.uploadPhoto")}
                   </button>
@@ -443,37 +443,37 @@ export function ProfileSettings(): JSX.Element {
               <div class="flex flex-wrap gap-2">
                 <Show when={userStats().totalDesigns >= 10}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Star class="h-3 w-3 mr-1" />
+                    <Star class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeExpert")}
                   </span>
                 </Show>
                 <Show when={userStats().projectsCount >= 5}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <TrendingUp class="h-3 w-3 mr-1" />
+                    <TrendingUp class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeActive")}
                   </span>
                 </Show>
                 <Show when={profile.data() !== undefined}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <ShieldCheck class="h-3 w-3 mr-1" />
+                    <ShieldCheck class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeVerified")}
                   </span>
                 </Show>
                 <Show when={userStats().toolpathsCount >= 3}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <SettingsIcon class="h-3 w-3 mr-1" />
+                    <SettingsIcon class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeCam")}
                   </span>
                 </Show>
                 <Show when={userStats().totalDesigns >= 50}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Star class="h-3 w-3 mr-1" />
+                    <Star class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeMaster")}
                   </span>
                 </Show>
                 <Show when={userStats().projectsCount === 0 && userStats().totalDesigns === 0}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <User class="h-3 w-3 mr-1" />
+                    <User class="h-3.5 w-3.5 mr-1.5" />
                     {t("settings.profile.badgeNew")}
                   </span>
                 </Show>
@@ -484,7 +484,7 @@ export function ProfileSettings(): JSX.Element {
 
         {/* Right Column - Profile Details */}
         <div class="lg:col-span-2">
-          <div class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
+          <div class="rounded-xl border border-slate-200/70 bg-white p-6 dark:border-slate-700/50 dark:bg-slate-900">
             <div class="space-y-6">
               {/* Basic Information */}
               <div>
@@ -514,7 +514,7 @@ export function ProfileSettings(): JSX.Element {
                       type="email"
                       value={profileData().email}
                       disabled
-                      class="w-full cursor-not-allowed rounded-md border border-slate-200/70 bg-slate-50/80 px-2.5 py-1.5 text-sm text-slate-500 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
+                      class="w-full cursor-not-allowed rounded-md border border-slate-200/70 bg-slate-50/80 px-2.5 py-1.5 text-sm text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
                     />
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("settings.profile.emailLocked")}</p>
                   </div>
@@ -593,10 +593,10 @@ export function ProfileSettings(): JSX.Element {
                   disabled={!isEditing()}
                   rows={4}
                   placeholder={t("settings.profile.bioPlaceholder")}
-                  class={`w-full resize-none rounded-md border px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ${
+                  class={`w-full resize-none rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 ${
                     !isEditing()
                       ? "cursor-not-allowed border-slate-200/70 bg-slate-50/80 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
-                      : "border-slate-200/70 bg-white/80 text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
+                      : "border-slate-200/70 bg-white text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
                   }`}
                 />
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -642,7 +642,7 @@ export function ProfileSettings(): JSX.Element {
                         }
                       }}
                       placeholder={t("settings.profile.skillPlaceholder")}
-                      class="w-full rounded-md border border-slate-200/70 bg-white/80 px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
+                      class="w-full rounded-md border border-slate-200/70 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
                     />
 
                     <Show when={showSkillSuggestions()}>
@@ -739,7 +739,7 @@ export function ProfileSettings(): JSX.Element {
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              class="rounded-lg border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+              class="rounded-lg border border-slate-200/70 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
             >
               {t("common.cancel")}
             </button>
@@ -747,7 +747,7 @@ export function ProfileSettings(): JSX.Element {
               type="button"
               onClick={() => void handleSave()}
               disabled={isUploading()}
-              class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+              class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
             >
               <Show when={isUploading()}>
                 <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

@@ -103,8 +103,8 @@ const DeviceIcon = (props: { readonly deviceInfo: DeviceInfo }): JSX.Element => 
 }
 
 /** Card surface — the neutral translucent panel of the list pages. */
-const CARD = "rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
-const SECONDARY_BUTTON = "inline-flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white/70 px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+const CARD = "rounded-xl border border-slate-200/70 bg-white dark:border-slate-700/50 dark:bg-slate-900"
+const SECONDARY_BUTTON = "inline-flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
 const ICON_BUTTON = "rounded-md p-1.5 text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 
 export function SessionManagement(): JSX.Element {
@@ -240,12 +240,12 @@ export function SessionManagement(): JSX.Element {
                     </h5>
                     <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                       <p class="flex items-center">
-                        <Clock class="h-3 w-3 mr-1" />
+                        <Clock class="h-3.5 w-3.5 mr-1.5" />
                         {t("settings.sessions.lastActive", { when: formatTimeAgo(session.lastActivity) })}
                       </p>
                       <Show when={session.location !== undefined}>
                         <p class="flex items-center">
-                          <MapPin class="h-3 w-3 mr-1" />
+                          <MapPin class="h-3.5 w-3.5 mr-1.5" />
                           {session.location?.city}, {session.location?.country} ({session.location?.ip})
                         </p>
                       </Show>
