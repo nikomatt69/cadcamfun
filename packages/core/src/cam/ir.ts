@@ -39,11 +39,23 @@ export const RotarySchema = Schema.Struct({
 })
 export type Rotary = typeof RotarySchema.Type
 
+/**
+ * Cutter radius compensation in force for a move (G41 / G42, cancelled with G40). The IR carries the **programmed
+ * contour**; the control offsets it by the radius in the D register. `register` is the D number, default the tool
+ * number the post gives the cutter; `mode: "off"` cancels the compensation on that move (a lead-out).
+ */
+export const CompensationSchema = Schema.Struct({
+  mode: Schema.Literals(["left", "right", "off"]),
+  register: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0)))
+})
+export type Compensation = typeof CompensationSchema.Type
+
 export const RapidSchema = Schema.TaggedStruct("Rapid", {
   to: Vec3Schema,
   rotary: Schema.optionalKey(RotarySchema),
   /** Words the control computes (`macro.ts`); `to` stays the nominal position. */
-  expr: Schema.optionalKey(WordExprSchema)
+  expr: Schema.optionalKey(WordExprSchema),
+  comp: Schema.optionalKey(CompensationSchema)
 })
 
 export const LinearSchema = Schema.TaggedStruct("Linear", {
@@ -51,7 +63,8 @@ export const LinearSchema = Schema.TaggedStruct("Linear", {
   /** mm/min. */
   feed: Positive,
   rotary: Schema.optionalKey(RotarySchema),
-  expr: Schema.optionalKey(WordExprSchema)
+  expr: Schema.optionalKey(WordExprSchema),
+  comp: Schema.optionalKey(CompensationSchema)
 })
 
 /** Arc in the XY plane; helical when `to.z` differs from the start Z. */
@@ -59,7 +72,8 @@ export const ArcSchema = Schema.TaggedStruct("Arc", {
   to: Vec3Schema,
   center: Vec2Schema,
   clockwise: Schema.Boolean,
-  feed: Positive
+  feed: Positive,
+  comp: Schema.optionalKey(CompensationSchema)
 })
 
 export const DwellSchema = Schema.TaggedStruct("Dwell", { seconds: NonNegative })
