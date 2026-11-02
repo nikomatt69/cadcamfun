@@ -125,19 +125,19 @@ export function PluginsScreen(): JSX.Element {
     overlays={<>
     <Show when={installOpen()}>
       <div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeInstall() }}>
-        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-lg bg-white p-6  dark:bg-slate-900">
-          <div class="mb-4 flex items-center justify-between"><h2 id="install-plugin-heading" class="text-base font-semibold">{t("plugins.install")}</h2><button onClick={closeInstall} disabled={pending()} aria-label={t("common.close")}><X size={20} /></button></div>
+        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-lg bg-white p-6 dark:bg-slate-900">
+          <div class="mb-4 flex items-center justify-between"><h2 id="install-plugin-heading" class="text-base font-semibold">{t("plugins.install")}</h2><button type="button" onClick={closeInstall} disabled={pending()} aria-label={t("common.close")}><X size={20} /></button></div>
           <div class="mb-4 border-b border-slate-200 dark:border-slate-700"><span class="inline-block border-b-2 border-blue-600 px-4 py-2 text-sm font-medium text-blue-600">{t("plugins.uploadFile")}</span></div>
           <button type="button" class="mb-6 w-full rounded-lg border-2 border-dashed p-6 text-center" classList={{ "border-blue-500 bg-blue-50 dark:bg-blue-900/10": dragging(), "border-green-500 bg-green-50 dark:bg-green-900/10": !!file(), "border-slate-300 dark:border-slate-700": !dragging() && !file() }} disabled={pending()} onClick={() => picker?.click()} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); chooseFile(e.dataTransfer?.files[0]) }}>
             <Show when={file()} fallback={<><Upload class="mx-auto mb-2 text-slate-400" size={32} /><p class="mb-1 font-medium text-slate-700 dark:text-slate-300">{t("plugins.dropPackage")}</p><p class="text-sm text-slate-500">{t("plugins.browsePackage")}</p></>}>{(selected) => <><CheckCircle class="mx-auto mb-2 text-green-500" size={36} /><p class="font-medium text-green-600">{selected().name}</p><p class="mt-1 text-sm text-slate-500">{(selected().size / 1024).toFixed(1)} KB</p></>}</Show>
           </button>
           <input ref={picker} type="file" accept=".zip,.vsix" class="hidden" onChange={(e) => { chooseFile(e.currentTarget.files?.[0]); e.currentTarget.value = "" }} />
           <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
-          <div class="flex justify-end gap-3"><button class="rounded-md px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-gray-700" disabled={pending()} onClick={closeInstall}>{t("common.cancel")}</button><button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" disabled={pending() || !file()} onClick={() => void install()}><Upload size={16} class="mr-2" />{pending() ? t("plugins.installing") : t("plugins.install")}</button></div>
+          <div class="flex justify-end gap-3"><button type="button" class="rounded-md px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-gray-700" disabled={pending()} onClick={closeInstall}>{t("common.cancel")}</button><button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" disabled={pending() || !file()} onClick={() => void install()}><Upload size={16} class="mr-2" />{pending() ? t("plugins.installing") : t("plugins.install")}</button></div>
         </div>
       </div>
     </Show>
-    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-lg bg-white p-6  dark:bg-slate-900"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
+    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-lg bg-white p-6 dark:bg-slate-900"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
     </>}
   >
     <Toast message={notice()} />
@@ -159,11 +159,11 @@ export function PluginsScreen(): JSX.Element {
                 <h2 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{plugin.manifest.name || plugin.id}</h2>
                 <p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
                 <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <div class="flex justify-between"><span>{t("plugins.detail.statusLabel")}</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-slate-200/80 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
-                  <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
+                  <div class="flex justify-between gap-3"><span>{t("plugins.detail.statusLabel")}</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-slate-200/80 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
+                  <div class="flex justify-between gap-3"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
                 </div>
               </div>
-              <div class="flex items-center justify-end gap-1 border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30" onClick={(e) => e.stopPropagation()}>
+              <div class="flex items-center justify-end gap-1 border-t border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800" onClick={(e) => e.stopPropagation()}>
                 <button type="button" class={ICON_BUTTON} classList={{ "!text-green-600": plugin.enabled }} title={plugin.enabled ? t("plugins.disable") : t("plugins.enable")} aria-label={`${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}: ${plugin.manifest.name || plugin.id}`} aria-pressed={plugin.enabled} disabled={pending()} onClick={() => void toggle(plugin.id, plugin.enabled)}>
                   <Show when={plugin.enabled} fallback={<ToggleLeft size={16} aria-hidden="true" />}><ToggleRight size={16} aria-hidden="true" /></Show>
                 </button>
@@ -336,7 +336,7 @@ export function PluginDetailScreen(): JSX.Element {
     }>
       <Show when={!plugin.error()} fallback={
         <div class="mx-auto max-w-4xl p-4 md:p-8">
-          <div class="relative mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+          <div class="relative mb-4 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">
             <strong class="font-medium">{t("plugins.detail.errorLoading")} </strong>
             <span class="block sm:inline">{describe(plugin.error())}</span>
           </div>
@@ -345,7 +345,7 @@ export function PluginDetailScreen(): JSX.Element {
       }>
         <Show when={plugin.data()} fallback={
           <div class="mx-auto max-w-4xl p-4 md:p-8">
-            <div class="mb-4 rounded border border-yellow-400 bg-yellow-100 px-4 py-3 text-yellow-700" role="alert">
+            <div class="mb-4 rounded-lg bg-yellow-100 px-4 py-3 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-200" role="alert">
               <strong class="font-medium">{t("plugins.detail.notFoundTitle")}</strong>
             </div>
             <A href="/plugins" class="mt-4 inline-block text-blue-600 hover:underline dark:text-blue-400">{t("plugins.detail.backToPlugins")}</A>
@@ -383,7 +383,7 @@ export function PluginDetailScreen(): JSX.Element {
                   </Show>
                 </p>
                 <p class="mt-1 truncate text-xs text-slate-400">
-                  {t("plugins.detail.idLabel")}<code class="rounded bg-slate-100 p-0.5 dark:bg-slate-900">{current().id}</code>
+                  {t("plugins.detail.idLabel")}<code class="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-900">{current().id}</code>
                 </p>
               </div>
             </div>
@@ -394,7 +394,7 @@ export function PluginDetailScreen(): JSX.Element {
                 type="button"
                 disabled={pending()}
                 onClick={() => void uninstall()}
-                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-red-600 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded-md bg-red-600 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.uninstalling")}</>}>
                   {t("plugins.uninstall")}
@@ -408,7 +408,7 @@ export function PluginDetailScreen(): JSX.Element {
                     type="button"
                     disabled={pending()}
                     onClick={() => void toggleEnabled(true)}
-                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-green-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded-md bg-green-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.activating")}</>}>
                       {t("plugins.detail.activate")}
@@ -420,7 +420,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => void toggleEnabled(false)}
-                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-yellow-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded-md bg-yellow-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.deactivating")}</>}>
                     {t("plugins.detail.deactivate")}
@@ -433,7 +433,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => setShowSettings(true)}
-                  class="whitespace-nowrap rounded bg-slate-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="whitespace-nowrap rounded-md bg-slate-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("plugins.detail.configure")}
                 </button>
@@ -464,7 +464,7 @@ export function PluginDetailScreen(): JSX.Element {
                 </div>
               </Show>
               <Show when={readmeError()}>
-                <div class="relative mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+                <div class="relative mb-4 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">
                   <strong class="mr-2 font-medium">{t("plugins.detail.readmeError")}</strong>
                   <span class="block sm:inline">{readmeError()}</span>
                 </div>
@@ -472,7 +472,7 @@ export function PluginDetailScreen(): JSX.Element {
               <Show when={readme() !== undefined && !generating()}>
                 <div>
                   <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
-                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-slate-100 p-1 text-xs dark:bg-slate-900">README.md</code> {t("plugins.detail.readmeHelp2")} {/* i18n-ok filename */}
+                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-900">README.md</code> {t("plugins.detail.readmeHelp2")} {/* i18n-ok filename */}
                   </p>
                   <textarea
                     readOnly
@@ -481,7 +481,7 @@ export function PluginDetailScreen(): JSX.Element {
                     class="h-96 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-800 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200"
                   />
                   {/* No markdown renderer ships with the desktop build, so the preview shows the raw Markdown. */}
-                  <h3 class="mb-2 mt-4 border-t pt-4 text-md font-semibold">{t("plugins.detail.preview")}</h3>
+                  <h3 class="mb-2 mt-4 border-t pt-4 text-sm font-semibold">{t("plugins.detail.preview")}</h3>
                   <div class="prose prose-sm max-w-none rounded border p-4 dark:prose-invert">
                     <pre class="whitespace-pre-wrap font-sans text-sm">{readme()}</pre>
                   </div>
@@ -501,7 +501,7 @@ export function PluginDetailScreen(): JSX.Element {
 
           {/* Action Error Display */}
           <Show when={actionError()}>
-            <div class="relative mb-6 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+            <div class="relative mb-6 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">
               <strong class="font-medium">{t("plugins.detail.actionFailed")} </strong>
               <span class="block sm:inline">{actionError()}</span>
               <button
@@ -541,7 +541,7 @@ export function PluginDetailScreen(): JSX.Element {
             <div class="space-y-6 lg:col-span-1">
               <DetailSection title={t("plugins.detail.statusDetails")}>
                 <dl class="space-y-2">
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-3">
                     <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.statusLabel")}</dt>
                     <dd>
                       <Show when={current().enabled} fallback={<StatusBadge label={t("plugins.disabled")} type="warning" />}>
@@ -549,31 +549,31 @@ export function PluginDetailScreen(): JSX.Element {
                       </Show>
                     </dd>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-3">
                     <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.clientHost")}</dt>
                     {/* v6 has no client-side plugin host, so the badge is always "Inactive". */}
                     <dd><StatusBadge label={t("plugins.detail.inactive")} type="info" /></dd>
                   </div>
                   <Show when={current().state === "error"}>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3">
                       <dt class="font-medium text-red-600 dark:text-red-400">{t("plugins.detail.lastError")}</dt>
                       <dd class="text-right text-xs text-red-600 dark:text-red-400">
                         {current().lastError ?? t("plugins.detail.unknownError")}
                       </dd>
                     </div>
                   </Show>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-3">
                     <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.version")}:</dt>
                     <dd>{current().manifest.version}</dd>
                   </div>
                   <Show when={current().manifest.author !== undefined && current().manifest.author.length > 0}>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3">
                       <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.author")}:</dt>
                       <dd>{current().manifest.author}</dd>
                     </div>
                   </Show>
                   <Show when={current().manifest.license !== undefined}>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3">
                       <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.licenseLabel")}</dt>
                       <dd>{current().manifest.license}</dd>
                     </div>
@@ -593,13 +593,13 @@ export function PluginDetailScreen(): JSX.Element {
                       </dd>
                     </div>
                   </Show>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-3">
                     <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.installedLabel")}</dt>
                     <dd title={new Date(current().installedAt).toLocaleString()}>
                       {new Date(current().installedAt).toLocaleDateString()}
                     </dd>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-3">
                     <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.updatedLabel")}</dt>
                     <dd title={new Date(current().updatedAt).toLocaleString()}>
                       {new Date(current().updatedAt).toLocaleDateString()}

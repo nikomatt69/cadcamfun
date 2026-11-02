@@ -37,7 +37,7 @@ export interface PluginSettingsDialogProps {
 }
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+  "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
 
 const label = (key: string): string => {
   const spaced = key.replace(/([A-Z])/g, " $1")
