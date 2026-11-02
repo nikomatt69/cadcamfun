@@ -21,7 +21,7 @@
  * mitred corner, not a rolling-ball vertex patch.
  */
 import { booleanMesh, mergeMeshes, rotateMesh } from "./csg.ts"
-import { chamferRefusal, chamferSetbacks } from "./blend-spec.ts"
+import { chamferRefusal, chamferSetbacks, stripCollisionReasons, type BlendStrip } from "./blend-spec.ts"
 import type { Mesh } from "./solid.ts"
 import { meshOf } from "./solid.ts"
 import { loftSolid, sweepSolid, type P3 } from "./sweep-loft.ts"
@@ -240,6 +240,55 @@ const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer", c
   return { points: out, flat: out.map((q) => ({ x: dot(q, u), y: dot(q, v) })), basis: [u, v] }
 }
 
+/** The width an edge's blend takes on each of its two faces: the tangent length of a fillet, the setbacks of a chamfer (undefined when the callout has no solution: `section` then names why). */
+const stripWidths = (edge: BlendEdge, size: number, style: "fillet" | "chamfer", chamfer?: { readonly secondDistance?: number; readonly angle?: number }): { readonly onA: number; readonly onB: number } | undefined => {
+  if (style === "fillet") {
+    const tangent = size * Math.tan(Math.acos(Math.max(-1, Math.min(1, dot(edge.nA, edge.nB)))) / 2)
+    return Number.isFinite(tangent) ? { onA: tangent, onB: tangent } : undefined
+  }
+  if (chamfer === undefined) return { onA: size, onB: size }
+  return chamferSetbacks({ distance: size, ...chamfer }, edge.nA, edge.nB)
+}
+
+/** Per edge (by index), why its strip collides with another selected edge's on a face they share (see `stripConflicts`); an index that is missing is free. */
+const collisions = (edges: ReadonlyArray<BlendEdge>, size: number, style: "fillet" | "chamfer", chamfer?: { readonly secondDistance?: number; readonly angle?: number }): Map<number, string> => {
+  const strips: BlendStrip[] = [], at: number[] = []
+  edges.forEach((edge, k) => {
+    const w = stripWidths(edge, size, style, chamfer)
+    if (w === undefined || typeof section(edge, size, style, chamfer) === "string") return
+    strips.push({ edge, onA: [w.onA, w.onA], onB: [w.onB, w.onB] })
+    at.push(k)
+  })
+  const linear = style === "fillet" || chamfer?.secondDistance === undefined
+  return new Map([...stripCollisionReasons(strips, style, size, linear)].map(([i, reason]) => [at[i]!, reason] as const))
+}
+
+/**
+ * Per edge (by index), why the strip of its variable fillet collides with another selected edge's on a face they share. The
+ * radius runs from `radius` at the lexicographically smaller end of an edge to `radiusEnd` at the other (the rule the history
+ * and the exact replay use), and the widths run linearly with it, so the ends decide.
+ */
+export const variableCollisions = (edges: ReadonlyArray<BlendEdge>, radius: number, radiusEnd: number): Map<number, string> =>
+  radiiCollisions(edges, (edge) => {
+    const flip = edge.b.x < edge.a.x || (edge.b.x === edge.a.x && (edge.b.y < edge.a.y || (edge.b.y === edge.a.y && edge.b.z < edge.a.z)))
+    return flip ? [radiusEnd, radius] : [radius, radiusEnd]
+  })
+
+/** As `variableCollisions`, with the radii at the `a` and `b` end of each edge given by `radii`. */
+const radiiCollisions = (edges: ReadonlyArray<BlendEdge>, radii: (edge: BlendEdge) => readonly [number, number]): Map<number, string> => {
+  const strips: BlendStrip[] = [], at: number[] = []
+  let biggest = 0
+  edges.forEach((edge, k) => {
+    const [rA, rB] = radii(edge)
+    biggest = Math.max(biggest, rA, rB)
+    const wa = stripWidths(edge, rA, "fillet"), wb = stripWidths(edge, rB, "fillet")
+    if (wa === undefined || wb === undefined || typeof section(edge, Math.max(rA, rB), "fillet") === "string") return
+    strips.push({ edge, onA: [wa.onA, wb.onA], onB: [wa.onB, wb.onB] })
+    at.push(k)
+  })
+  return new Map([...stripCollisionReasons(strips, "fillet", biggest, true)].map(([i, reason]) => [at[i]!, reason] as const))
+}
+
 /**
  * Blends the selected edges of the mesh. Each edge is cut (convex) or filled (concave) in turn; an edge that cannot be blended
  * (the radius is wider than the faces, or the faces are nearly parallel) is left alone and named in `rejected`.
@@ -252,10 +301,13 @@ export const blendEdges = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: 
   const rejected: string[] = []
   let vertices = 0
   const done: BlendEdge[] = []
-  for (const edge of edges) {
+  // Two edges on the two sides of one face whose blends together take more than the face is wide are refused, not built wrongly.
+  const colliding = collisions(edges, radius, style, chamfer)
+  for (const [k, edge] of edges.entries()) {
     const name = `edge ${edge.a.x.toFixed(2)},${edge.a.y.toFixed(2)},${edge.a.z.toFixed(2)} to ${edge.b.x.toFixed(2)},${edge.b.y.toFixed(2)},${edge.b.z.toFixed(2)}`
     const cut = section(edge, radius, style, chamfer)
     if (typeof cut === "string") { rejected.push(`${name}: ${cut}`); continue }
+    if (colliding.has(k)) { rejected.push(`${name}: ${colliding.get(k)}`); continue }
     const e = unit(sub(edge.b, edge.a))
     const overrun = 0.01
     try {
@@ -287,11 +339,13 @@ export const blendEdgesVariable = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, 
   let current = mesh
   let blended = 0
   const rejected: string[] = []
-  for (const edge of edges) {
+  const colliding = radiiCollisions(edges, () => [radiusA, radiusB])
+  for (const [k, edge] of edges.entries()) {
     const name = `edge ${edge.a.x.toFixed(2)},${edge.a.y.toFixed(2)},${edge.a.z.toFixed(2)} to ${edge.b.x.toFixed(2)},${edge.b.y.toFixed(2)},${edge.b.z.toFixed(2)}`
     const cutA = section(edge, radiusA, "fillet"), cutB = section(edge, radiusB, "fillet")
     if (typeof cutA === "string") { rejected.push(`${name}: ${cutA}`); continue }
     if (typeof cutB === "string") { rejected.push(`${name}: ${cutB}`); continue }
+    if (colliding.has(k)) { rejected.push(`${name}: ${colliding.get(k)}`); continue }
     const e = unit(sub(edge.b, edge.a))
     const overrun = 0.01
     try {

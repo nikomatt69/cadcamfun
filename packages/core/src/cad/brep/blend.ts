@@ -29,7 +29,7 @@ import { BooleanError, booleanBrep } from "./boolean.ts"
 import { makeSphere, polyhedron } from "./primitives.ts"
 import { extrudeProfile, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
 import { edgeUses, mergeBreps, type Brep } from "./topology.ts"
-import { chamferRefusal, chamferSetbacks } from "../blend-spec.ts"
+import { chamferRefusal, chamferSetbacks, stripCollisionReasons, type BlendStrip } from "../blend-spec.ts"
 import { loftBrep, loftSection } from "./loft.ts"
 import { BudgetExceeded } from "./budget.ts"
 import { blendSpherePlaneRim, isSpherePlaneRim } from "./blend-sphere-plane.ts"
@@ -491,6 +491,32 @@ const cornerTools = (b: Brep, done: ReadonlyArray<BlendCandidate>, r: number, g:
 }
 
 /**
+ * Per edge (by index into `edges`), why its blend collides with another selected edge's on a face they share: the face between
+ * two parallel blended edges is narrower than their two strips together (see `stripConflicts` in `cad/blend-spec.ts`; the mesh
+ * blend applies the same rule). `radii(edge)` gives the size at the edge's `a` and `b` ends; only straight edges are checked.
+ */
+export const blendCollisions = (edges: ReadonlyArray<BlendCandidate>, style: "fillet" | "chamfer", radii: (e: BlendCandidate) => readonly [number, number], chamfer?: { readonly secondDistance?: number; readonly angle?: number }): Map<number, string> => {
+  const strips: BlendStrip[] = [], at: number[] = []
+  let biggest = 0
+  const widths = (e: BlendCandidate, size: number): { readonly onA: number; readonly onB: number } | undefined => {
+    if (style === "fillet") { const t = size * Math.tan(Math.acos(Math.max(-1, Math.min(1, dot3(e.nA, e.nB)))) / 2); return Number.isFinite(t) ? { onA: t, onB: t } : undefined }
+    if (chamfer === undefined) return { onA: size, onB: size }
+    return chamferSetbacks({ distance: size, ...chamfer }, e.nA, e.nB)
+  }
+  edges.forEach((e, k) => {
+    if (e.curve !== "line") return
+    const [rA, rB] = radii(e)
+    biggest = Math.max(biggest, rA, rB)
+    const wa = widths(e, rA), wb = widths(e, rB)
+    if (wa === undefined || wb === undefined) return
+    strips.push({ edge: e, onA: [wa.onA, wb.onA], onB: [wa.onB, wb.onB] })
+    at.push(k)
+  })
+  const linear = style === "fillet" || chamfer?.secondDistance === undefined
+  return new Map([...stripCollisionReasons(strips, style, biggest, linear)].map(([i, reason]) => [at[i]!, reason] as const))
+}
+
+/**
  * Blends the selected edges of `b` (candidates found by `blendCandidates` on this same B-rep) with a fillet of radius `size` or
  * a chamfer of setback `size`, one edge after the other. An edge that cannot be blended is named in `rejected` and left alone.
  */
@@ -506,7 +532,7 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
   const done: BlendCandidate[] = []
   const describeFailure = (err: unknown): string => err instanceof BooleanError ? `exact Boolean failed: ${err.message}` : err instanceof Error ? err.message : String(err)
   // Every edge's tool comes from the original body, so they are all built first.
-  const built: Array<{ readonly edge: BlendCandidate; readonly tool: Brep; readonly box: Box }> = []
+  let built: Array<{ readonly edge: BlendCandidate; readonly tool: Brep; readonly box: Box }> = []
   for (const e of edges) {
     try {
       if (isSpherePlaneRim(b, e)) {
@@ -526,6 +552,13 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
       if (err instanceof BudgetExceeded) throw err
       failures.push(`${describeBlendEdge(e)}: ${describeFailure(err)}`)
     }
+  }
+  // Two edges on the two sides of one face whose blends together take more than the face is wide are refused, not built wrongly
+  // (the edges that were refused above on their own do not count: they are not blended).
+  const colliding = blendCollisions(built.map((x) => x.edge), style, () => [size, size], options.chamfer)
+  if (colliding.size > 0) {
+    for (const [k, why] of colliding) rejected.push(`${describeBlendEdge(built[k]!.edge)}: ${why}`)
+    built = built.filter((_, k) => !colliding.has(k))
   }
   // Tools whose boxes are apart go into one Boolean (an operand of several disjoint solids): a plate's dozens of edges take a
   // few Booleans instead of one each, and every Boolean re-cuts the faces the others leave. Batches form only within runs of

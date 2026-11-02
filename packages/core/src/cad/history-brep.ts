@@ -34,6 +34,7 @@ import { makeThreadBrep, makeThreadGrooveBrep } from "./thread-brep.ts"
 import {
   blendBrep,
   blendCandidates,
+  blendCollisions,
   variableFillet,
   booleanBrep,
   BooleanError,
@@ -1240,13 +1241,20 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
               if (radiusEnd === undefined) {
                 const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
                 for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
+                // A feature the mesh rebuild refuses (a radius wider than the faces, two blends that collide on a face) is skipped by
+                // this replay altogether (see `failed`), so a refused edge here is only a warning, as before.
                 bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
               } else {
                 // One edge at a time (each cut changes the edge indices), matched again by its end points on the current body;
                 // the radius runs from the lexicographically smaller end, as in the mesh rebuild.
                 let current = b.exact.brep
-                let failed: string | undefined
-                for (const want of picked) {
+                // The strips of two edges on the two sides of a face must fit in it (the cuts below are one edge at a time).
+                const collisions = blendCollisions(picked, "fillet", (e) => {
+                  const flip = e.b.x < e.a.x || (e.b.x === e.a.x && (e.b.y < e.a.y || (e.b.y === e.a.y && e.b.z < e.a.z)))
+                  return flip ? [radiusEnd, size] : [size, radiusEnd]
+                })
+                let failed: string | undefined = collisions.size > 0 ? [...collisions.values()][0] : undefined
+                if (failed === undefined) for (const want of picked) {
                   const flip = want.b.x < want.a.x || (want.b.x === want.a.x && (want.b.y < want.a.y || (want.b.y === want.a.y && want.b.z < want.a.z)))
                   const near = (p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number }) => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-6
                   const cand = blendCandidates(current, 25).find((c) => (near(c.a, want.a) && near(c.b, want.b)) || (near(c.a, want.b) && near(c.b, want.a)))

@@ -79,3 +79,124 @@ export const chamferRefusal = (spec: ChamferSpec, nA: Vec3, nB: Vec3): string | 
   }
   return undefined
 }
+
+// ================================================================ strips that collide on a shared face
+
+/** What the overlap check needs of an edge: the mesh's `BlendEdge` and the B-rep's `BlendCandidate` both have these fields. */
+export interface StripEdge {
+  readonly a: Vec3
+  readonly b: Vec3
+  /** Outward unit normals of the two faces. */
+  readonly nA: Vec3
+  readonly nB: Vec3
+  readonly convex: boolean
+  readonly length: number
+}
+
+/** One blended edge as the check sees it: the width of the strip it takes on each face, at its `a` end and at its `b` end. */
+export interface BlendStrip {
+  readonly edge: StripEdge
+  readonly onA: readonly [number, number]
+  readonly onB: readonly [number, number]
+}
+
+/** Two blended edges whose strips cross on the face between them (the edge of `index` conflicts with the one of `other`). */
+export interface StripConflict {
+  readonly index: number
+  readonly other: number
+  /** Which face of `index` the strips share. */
+  readonly face: "A" | "B"
+  /** How wide the face is between the two edges, mm. */
+  readonly available: number
+  /** The most the two strips take together along their overlap, mm. */
+  readonly needed: number
+}
+
+const sub = (p: Vec3, q: Vec3): Vec3 => ({ x: p.x - q.x, y: p.y - q.y, z: p.z - q.z })
+const cross = (p: Vec3, q: Vec3): Vec3 => ({ x: p.y * q.z - p.z * q.y, y: p.z * q.x - p.x * q.z, z: p.x * q.y - p.y * q.x })
+const dot = (p: Vec3, q: Vec3): number => p.x * q.x + p.y * q.y + p.z * q.z
+const norm = (p: Vec3): number => Math.hypot(p.x, p.y, p.z)
+const unitOf = (e: StripEdge): Vec3 => { const d = sub(e.b, e.a), l = norm(d) || 1; return { x: d.x / l, y: d.y / l, z: d.z / l } }
+
+/**
+ * The direction into face A (or B) of an edge, in the face's plane and square to the edge: the material of a convex edge lies
+ * behind the other face, the fill of a concave one in front of it.
+ */
+const inward = (e: StripEdge, side: "A" | "B", dir: Vec3): Vec3 => {
+  const n = side === "A" ? e.nA : e.nB, other = side === "A" ? e.nB : e.nA
+  const d = cross(n, dir), l = norm(d) || 1
+  const sign = dot(d, other) * (e.convex ? -1 : 1) >= 0 ? 1 : -1
+  return { x: (sign * d.x) / l, y: (sign * d.y) / l, z: (sign * d.z) / l }
+}
+
+/**
+ * The blended edges whose strips collide. An edge blend takes a strip of each of its two faces (a fillet of radius r on an edge
+ * between faces at the angle alpha takes r * tan(alpha / 2) of each; a chamfer takes its setbacks). Two parallel blended edges on
+ * the two sides of one face leave the face `s` mm wide between them, and their strips must fit in it: when they take more than
+ * `s` together the two tangent lines cross, the face is eaten away and the cutting tools of the two edges overlap, so the solid
+ * that comes out is not the one asked for (a 60 x 40 plate with its four vertical edges rounded at R30 came out 56.55 mm long).
+ * The widths run linearly along an edge, so the overlap is checked at its two ends. Strips of edges that are not parallel (the
+ * two edges at a corner) meet at the vertex, which the corner blend handles; they are not conflicts.
+ *
+ * Every pair is reported once for each of its edges, so the caller can name the edge that was refused.
+ */
+export const stripConflicts = (strips: ReadonlyArray<BlendStrip>): StripConflict[] => {
+  const out: StripConflict[] = []
+  for (let i = 0; i < strips.length; i++) for (let j = i + 1; j < strips.length; j++) {
+    const si = strips[i]!, sj = strips[j]!
+    const di = unitOf(si.edge), dj = unitOf(sj.edge)
+    if (norm(cross(di, dj)) > 0.02) continue
+    for (const sideI of ["A", "B"] as const) for (const sideJ of ["A", "B"] as const) {
+      const ni = sideI === "A" ? si.edge.nA : si.edge.nB, nj = sideJ === "A" ? sj.edge.nA : sj.edge.nB
+      if (dot(ni, nj) < 0.9999) continue
+      const between = sub(sj.edge.a, si.edge.a)
+      if (Math.abs(dot(between, ni)) > 2e-3) continue
+      // Edge j must lie ahead of edge i in the direction its face runs, and its own face must run back towards i.
+      const ahead = inward(si.edge, sideI, di)
+      const back = inward(sj.edge, sideJ, dj)
+      const s = dot(between, ahead)
+      if (!(s > 1e-6) || dot(ahead, back) > -0.5) continue
+      // The overlap of the two edges along edge i's line.
+      const tj0 = dot(between, di), tj1 = dot(sub(sj.edge.b, si.edge.a), di)
+      const lo = Math.max(0, Math.min(tj0, tj1)), hi = Math.min(si.edge.length, Math.max(tj0, tj1))
+      if (!(hi - lo > 1e-6)) continue
+      const wi = sideI === "A" ? si.onA : si.onB, wj = sideJ === "A" ? sj.onA : sj.onB
+      const widthI = (t: number): number => wi[0] + (wi[1] - wi[0]) * (si.edge.length > 0 ? t / si.edge.length : 0)
+      // `tj0` is where j's `a` end lies along i's line; the width of j runs from there (its a end) to tj1 (its b end).
+      const widthJ = (t: number): number => wj[0] + (wj[1] - wj[0]) * (tj1 !== tj0 ? Math.min(1, Math.max(0, (t - tj0) / (tj1 - tj0))) : 0)
+      const needed = Math.max(widthI(lo) + widthJ(lo), widthI(hi) + widthJ(hi))
+      if (needed <= s + 1e-6) continue
+      out.push({ index: i, other: j, face: sideI, available: s, needed }, { index: j, other: i, face: sideJ, available: s, needed })
+    }
+  }
+  return out
+}
+
+/**
+ * For each strip (by index) that collides, the reason of its tightest conflict (the one that allows the smallest size), so the
+ * limit a person is told is the one that holds for every pair. See `stripConflictReason` for `style`, `size` and `linear`.
+ */
+export const stripCollisionReasons = (strips: ReadonlyArray<BlendStrip>, style: "fillet" | "chamfer", size: number, linear: boolean): Map<number, string> => {
+  const tightest = new Map<number, StripConflict>()
+  for (const c of stripConflicts(strips)) {
+    const seen = tightest.get(c.index)
+    if (seen === undefined || c.available / c.needed < seen.available / seen.needed) tightest.set(c.index, c)
+  }
+  return new Map([...tightest].map(([index, c]) => [index, stripConflictReason(c, style, size, linear)] as const))
+}
+
+/** The largest size at or below `size` that fits a conflict whose strips grow in proportion to the size, rounded down to 0.01 mm. */
+export const stripConflictLimit = (c: StripConflict, size: number): number => Math.floor((size * c.available) / c.needed * 100 + 1e-6) / 100
+
+/**
+ * The text of a conflict for the edge it refuses. `linear` says the strips grow in proportion to the size (a fillet; a chamfer of
+ * one distance or of a distance and an angle), so the largest size that fits can be named; else the room the strips need is.
+ */
+export const stripConflictReason = (c: StripConflict, style: "fillet" | "chamfer", size: number, linear: boolean): string => {
+  const word = style === "chamfer" ? "chamfer" : "fillet"
+  const noun = style === "chamfer" ? "distance" : "radius"
+  const room = `the face between this edge and the opposite blended edge is only ${c.available.toFixed(2)} mm wide, but the two ${word}s need ${c.needed.toFixed(2)} mm of it`
+  return linear
+    ? `${noun} ${size} exceeds the maximum ${stripConflictLimit(c, size)} for this edge: ${room}`
+    : `the ${word} does not fit: ${room}`
+}

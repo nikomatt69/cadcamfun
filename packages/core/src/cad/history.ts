@@ -33,7 +33,7 @@ import { findPlanarFace, type PlanarFace } from "./face-edit.ts"
 import { findSmoothFace, type SmoothFace } from "./smooth-face.ts"
 import { metricThread } from "./fasteners.ts"
 export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
-import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-blend.ts"
+import { blendEdges, blendEdgesVariable, findEdges, selectEdges, variableCollisions } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 import { exactReplay, type ExactReplay } from "./history-brep.ts"
@@ -1306,7 +1306,9 @@ export const rebuild = (history: History): RebuildResult => {
           let nativeAttempts = 0
           // A fillet that does not fit every selected edge fails as a whole (spec 58 T5): the bodies are put back as they were.
           const unfilleted = new Map(chosen.map((b) => [b.id, b.mesh] as const))
-          const tooSmall: Array<{ readonly mesh: Mesh; readonly edges: ReturnType<typeof selectEdges> }> = []
+          const tooSmall: Array<{ readonly mesh: Mesh; readonly edges: ReturnType<typeof selectEdges>; readonly reason: string }> = []
+          // Variable fillets whose strips collide on a shared face: the reason, and whether both radii scaled by k (0..1) fit.
+          const collided: Array<{ readonly reason: string; readonly fits: (k: number) => boolean }> = []
           // The prefix already has its solved sketches and mesh bodies. Giving it to the exact adapter avoids re-entering
           // this rebuild. A selection made only of sphere/plane or cone/plane rims uses that exact solid for the mesh.
           const exactBefore = f.edges?.curved === true && style === "fillet" && radiusEnd === undefined
@@ -1341,17 +1343,25 @@ export const rebuild = (history: History): RebuildResult => {
             const picked = selectEdges(found.edges, selector)
             if (radiusEnd === undefined) {
               const result = blendEdges(b.mesh, picked, radius, style, chamfer)
-              if (result.rejected.length > 0) tooSmall.push({ mesh: b.mesh, edges: picked })
+              if (result.rejected.length > 0) tooSmall.push({ mesh: b.mesh, edges: picked, reason: result.rejected[0]! })
               blended += result.blended
               for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
               bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }
             } else {
               // One edge at a time, the radius running from the lexicographically smaller end (the exact replay's rule).
               let mesh = b.mesh
+              // The strips of two edges on the two sides of a face must fit in it (the edges are cut one at a time below, so the
+              // check runs on the whole selection here).
+              const colliding = variableCollisions(picked, radius, radiusEnd)
+              if (colliding.size > 0) {
+                collided.push({ reason: [...colliding.values()][0]!, fits: (k) => variableCollisions(picked, radius * k, radiusEnd * k).size === 0 })
+                for (const why of [...colliding.values()].slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
+                continue
+              }
               for (const edge of picked) {
                 const flip = edge.b.x < edge.a.x || (edge.b.x === edge.a.x && (edge.b.y < edge.a.y || (edge.b.y === edge.a.y && edge.b.z < edge.a.z)))
                 const result = blendEdgesVariable(mesh, [edge], flip ? radiusEnd : radius, flip ? radius : radiusEnd)
-                if (result.rejected.length > 0) tooSmall.push({ mesh, edges: [edge] })
+                if (result.rejected.length > 0) tooSmall.push({ mesh, edges: [edge], reason: result.rejected[0]! })
                 blended += result.blended
                 for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
                 mesh = result.mesh
@@ -1359,19 +1369,22 @@ export const rebuild = (history: History): RebuildResult => {
               bodies[bodies.indexOf(b)] = { ...b, mesh }
             }
           }
-          if (tooSmall.length > 0) {
+          if (tooSmall.length > 0 || collided.length > 0) {
             for (const b of chosen) { const i = bodies.findIndex((x) => x.id === b.id); if (i >= 0) bodies[i] = { ...bodies[i]!, mesh: unfilleted.get(b.id)! } }
             const word = style === "chamfer" ? "chamfer" : "fillet"
             // The largest size every selected edge takes, by bisection on the same meshes, then rounded down and checked again.
-            const fits = (r: number) => tooSmall.every((t) => blendEdges(t.mesh, t.edges, r, style, chamfer).rejected.length === 0)
+            const fits = (r: number) => tooSmall.every((t) => blendEdges(t.mesh, t.edges, r, style, chamfer).rejected.length === 0) && collided.every((c) => c.fits(r / Math.max(radius, radiusEnd ?? 0)))
             let lo = 0, hi = radiusEnd === undefined ? radius : Math.max(radius, radiusEnd)
-            for (let k = 0; k < 14; k++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid }
-            const step = lo >= 10 ? 1 : lo >= 1 ? 0.1 : 0.01
-            const safe = Math.floor(lo / step) * step
+            for (let k = 0; k < 16; k++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid }
+            // The size is reported to 0.01 mm: rounded to the nearest when that fits (a limit of exactly 20 mm), else down.
+            const nearest = Math.round(lo * 100) / 100
+            const safe = nearest > 0 && fits(nearest) ? nearest : Math.floor(lo * 100) / 100
             const remedy = safe > 0 && fits(safe)
               ? `Use a ${word} size of at most ${Number(safe.toFixed(2))} mm (checked on every selected edge), or select fewer edges.`
               : `No ${word} size fits every selected edge: select fewer edges.`
-            issues.push({ feature: f.id, severity: "error", message: `The ${word} does not fit: some selected edges cannot take ${radiusEnd === undefined ? `${radius} mm` : `${radius} to ${radiusEnd} mm`} (the body is left as it was)`, remedy })
+            // The first reason says which edge and why (the face is narrower than the blends need, the faces are too short, ...).
+            const why = tooSmall[0]?.reason ?? collided[0]!.reason
+            issues.push({ feature: f.id, severity: "error", message: `The ${word} does not fit: some selected edges cannot take ${radiusEnd === undefined ? `${radius} mm` : `${radius} to ${radiusEnd} mm`} (the body is left as it was); ${why}`, remedy })
           } else if (blended === 0 && nativeAttempts === 0) {
             issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
           }
