@@ -32,6 +32,7 @@ const pct = (seconds: number, duration: number): string => `${duration > 0 ? Mat
 
 export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element {
   let track: HTMLDivElement | undefined
+  let seekingPointer: number | undefined
   const seekAt = (event: PointerEvent): void => {
     if (!track || props.duration <= 0) return
     const box = track.getBoundingClientRect()
@@ -48,8 +49,17 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
         ref={track}
         class="simulation-timeline__track relative h-6 flex-1 cursor-pointer overflow-hidden rounded bg-white/10"
         role="slider" aria-label={t("cam.timeline.seek")} aria-valuemin={0} aria-valuemax={props.duration} aria-valuenow={props.seconds} tabIndex={0}
-        onPointerDown={(event) => { if (event.button !== 0 || !event.isPrimary) return; event.currentTarget.focus(); event.currentTarget.setPointerCapture?.(event.pointerId); seekAt(event) }}
-        onPointerMove={(event) => { if (event.buttons & 1) seekAt(event) }}
+        onPointerDown={(event) => {
+          if (event.button !== 0 || !event.isPrimary) return
+          seekingPointer = event.pointerId
+          event.currentTarget.focus()
+          event.currentTarget.setPointerCapture?.(event.pointerId)
+          seekAt(event)
+        }}
+        onPointerMove={(event) => { if (event.pointerId === seekingPointer && (event.buttons & 1)) seekAt(event) }}
+        onPointerUp={(event) => { if (event.pointerId === seekingPointer) seekingPointer = undefined }}
+        onPointerCancel={(event) => { if (event.pointerId === seekingPointer) seekingPointer = undefined }}
+        onLostPointerCapture={(event) => { if (event.pointerId === seekingPointer) seekingPointer = undefined }}
         onKeyDown={(event) => {
           if (event.altKey || event.ctrlKey || event.metaKey) return
           const step = event.shiftKey ? 10 : 1

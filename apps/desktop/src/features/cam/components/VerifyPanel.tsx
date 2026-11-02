@@ -8,7 +8,7 @@
  */
 import { VerifyPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createEffect, type JSX } from "solid-js"
-import { AlertTriangle, Check, Sparkles } from "lucide-solid"
+import { AlertTriangle, Check, MessageCircle } from "lucide-solid"
 import { cam as camCore } from "@cadcamfun/core"
 import { t } from "../../../i18n/index.ts"
 import { fixVerificationPrompt } from "../../ai/lib/ask.ts"
@@ -106,21 +106,22 @@ export default function VerifyPanel(): JSX.Element {
       </button>
       <Show when={cam.gcode.trim().length === 0}>
         <div class="overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><VerifyPreview /></div>
-        <p class="text-xs text-gray-500">{t("cam.verify.empty")}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.verify.empty")}</p>
       </Show>
 
       <Show when={verify.error}>
-        <div class="p-3 bg-red-50 rounded-md flex items-start" role="alert">
+        <div class="flex items-start rounded-md bg-red-50 p-3 dark:bg-red-950" role="alert">
           <AlertTriangle class="text-red-500 mr-2 flex-shrink-0 mt-0.5" size={18} />
-          <p class="text-sm text-red-800">{verify.error}</p>
+          <p class="text-sm text-red-800 dark:text-red-200">{verify.error}</p>
         </div>
       </Show>
 
       <Show when={verify.report}>
         {(report) => (
           <div class="space-y-3" data-testid="verify-report">
+            <Show when={stale()}><p class="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200" role="status" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
             <div
-              class={`p-3 rounded-md flex items-center ${report().ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}
+              class={`flex items-center rounded-md p-3 ${stale() ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200" : report().ok ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200" : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"}`}
               role="status"
               data-ok={report().ok}
             >
@@ -129,15 +130,14 @@ export default function VerifyPanel(): JSX.Element {
             </div>
             <Show when={errors() > 0}>
               <button type="button" class="panel-btn panel-btn--block" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
-                <Sparkles size={16} />{t("cam.verify.askAssistant")}
+                <MessageCircle size={16} aria-hidden="true" />{t("cam.verify.askAssistant")}
               </button>
             </Show>
-            <Show when={stale()}><p class="text-xs text-yellow-700 dark:text-yellow-300" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
 
             <ul class="space-y-1" data-testid="verify-issues">
               <For each={sortedIssues(report().issues)}>
                 {(issue) => (
-                  <li class={`text-xs p-2 rounded ${issue.severity === "error" ? "bg-red-50 text-red-800" : issue.severity === "warning" ? "bg-yellow-50 text-yellow-800" : "bg-gray-50 text-gray-700"}`} data-code={issue.code}>
+                  <li class={`text-xs p-2 rounded ${issue.severity === "error" ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200" : issue.severity === "warning" ? "bg-yellow-50 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200" : "bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200"}`} data-code={issue.code}>
                     <span class="font-semibold">{issue.code}</span>
                     <Show when={issue.line !== undefined}><span class="ml-1 opacity-70">({t("cam.verify.line", { line: issue.line! })})</span></Show>
                     <Show when={issue.count > 1}><span class="ml-1 opacity-70">×{issue.count}</span></Show>
@@ -148,10 +148,10 @@ export default function VerifyPanel(): JSX.Element {
             </ul>
 
             <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs" data-testid="verify-stats">
-              <dt class="text-gray-500">{t("cam.verify.removed")}</dt><dd>{mm3(report().stats.removedVolume)}</dd>
-              <dt class="text-gray-500">{t("cam.verify.remaining")}</dt><dd>{mm3(report().stats.remainingVolume)}</dd>
-              <dt class="text-gray-500">{t("cam.verify.airCut")}</dt><dd class="tabular-nums">{report().stats.airCutLength.toFixed(1)} {t("cad.millimeters")}</dd>
-              <dt class="text-gray-500">{t("cam.verify.resolution")}</dt><dd class="tabular-nums">{report().stats.cellSize.toFixed(2)} {t("cad.millimeters")}</dd>
+              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.removed")}</dt><dd class="tabular-nums">{mm3(report().stats.removedVolume)}</dd>
+              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.remaining")}</dt><dd class="tabular-nums">{mm3(report().stats.remainingVolume)}</dd>
+              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.airCut")}</dt><dd class="tabular-nums">{report().stats.airCutLength.toFixed(1)} {t("cad.millimeters")}</dd>
+              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.resolution")}</dt><dd class="tabular-nums">{report().stats.cellSize.toFixed(2)} {t("cad.millimeters")}</dd>
             </dl>
 
             <div>
