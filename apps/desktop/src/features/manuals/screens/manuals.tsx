@@ -29,7 +29,7 @@ function ManualCard(props: { readonly entry: ManualEntry }): JSX.Element {
     <p class="manual-collection">{entry().collection}</p>
     <div class="manual-card-bottom">
       <span class="manual-language"><Globe size={12} aria-hidden="true" />{t(entry().language === "en" ? "manuals.english" : "manuals.multipleLanguages")}</span>
-      <a class="manual-open" href={entry().url} target="_blank" rel="noopener noreferrer" onClick={open} aria-label={t("manuals.openTitle", { title: entry().title })}>{t("manuals.open")}<ExternalLink size={13} aria-hidden="true" /></a>
+      <a class="manual-open" href={entry().url} target="_blank" rel="noopener noreferrer" onClick={open} aria-label={t("manuals.openTitle", { title: entry().title })}>{t("manuals.open")}<ExternalLink size={12} aria-hidden="true" /></a>
     </div>
     <span class="manual-source">{source()}</span>
   </article>
@@ -61,14 +61,14 @@ export default function ManualsScreen(): JSX.Element {
         <select class={FIELD} id="manual-publisher" value={publisher()} onChange={(event) => filter({ publisher: event.currentTarget.value })}><option value="">{t("manuals.allPublishers")}</option><For each={publishers}>{(name) => <option value={name}>{name}</option>}</For></select>
       </div>}>
       <p class="manuals-subtitle">{t("manuals.subtitle")}</p>
-      <aside class="manuals-access-note"><Globe size={17} aria-hidden="true" /><div><strong>{t("manuals.onDemand")}</strong><p>{t("manuals.onDemandHint")}</p></div></aside>
+      <aside class="manuals-access-note"><Globe size={16} aria-hidden="true" /><div><strong>{t("manuals.onDemand")}</strong><p>{t("manuals.onDemandHint")}</p></div></aside>
       <nav class="manuals-manufacturers" aria-label={t("manuals.featured")}><For each={manufacturers}>{(name) => <button type="button" class={TOOLBAR_BUTTON} aria-pressed={publisher() === name} onClick={() => filter({ publisher: publisher() === name ? "" : name, category: "", q: "" })}>{name}</button>}</For></nav>
       <div class="manuals-content">
-        <div class="manuals-search-row"><div class="manuals-search"><Search size={17} aria-hidden="true" /><input class={FIELD} type="search" aria-label={t("manuals.search")} placeholder={t("manuals.searchPlaceholder")} value={query()} onInput={(event) => filter({ q: event.currentTarget.value })} /><Show when={query()}><button type="button" aria-label={t("manuals.clear")} onClick={() => filter({ q: "" })}><X size={15} /></button></Show></div><Show when={filtered()}><button type="button" class={TOOLBAR_BUTTON} onClick={clear}>{t("manuals.clear")}</button></Show></div>
+        <div class="manuals-search-row"><div class="manuals-search"><Search size={16} aria-hidden="true" /><input class={FIELD} type="search" aria-label={t("manuals.search")} placeholder={t("manuals.searchPlaceholder")} value={query()} onInput={(event) => filter({ q: event.currentTarget.value })} /><Show when={query()}><button type="button" aria-label={t("manuals.clear")} onClick={() => filter({ q: "" })}><X size={15} /></button></Show></div><Show when={filtered()}><button type="button" class={TOOLBAR_BUTTON} onClick={clear}>{t("manuals.clear")}</button></Show></div>
         <p class="manuals-result-count" role="status" aria-live="polite">{t("manuals.results", { count: results().length })}</p>
         <Show when={results().length > 0} fallback={<StageEmpty icon={<BookOpen size={30} aria-hidden="true" />} title={t("manuals.empty")} hint={t("manuals.emptyHint")}><button type="button" class={TOOLBAR_BUTTON} onClick={clear}>{t("manuals.clear")}</button></StageEmpty>}>
           <div class="manuals-grid"><For each={visible()}>{(entry) => <ManualCard entry={entry} />}</For></div>
-          <Show when={pages() > 1}><nav class="manuals-pagination" aria-label={t("manuals.pagination")}><button type="button" class={TOOLBAR_BUTTON} disabled={page() === 1} onClick={() => setParams({ page: page() - 1 })}><ChevronLeft size={15} />{t("manuals.previous")}</button><span>{t("manuals.page", { page: page(), pages: pages() })}</span><button type="button" class={TOOLBAR_BUTTON} disabled={page() === pages()} onClick={() => setParams({ page: page() + 1 })}>{t("manuals.next")}<ChevronRight size={15} /></button></nav></Show>
+          <Show when={pages() > 1}><nav class="manuals-pagination" aria-label={t("manuals.pagination")}><button type="button" class={TOOLBAR_BUTTON} disabled={page() === 1} onClick={() => setParams({ page: page() - 1 })}><ChevronLeft size={16} />{t("manuals.previous")}</button><span>{t("manuals.page", { page: page(), pages: pages() })}</span><button type="button" class={TOOLBAR_BUTTON} disabled={page() === pages()} onClick={() => setParams({ page: page() + 1 })}>{t("manuals.next")}<ChevronRight size={16} /></button></nav></Show>
         </Show>
       </div>
     </WorkspacePage>

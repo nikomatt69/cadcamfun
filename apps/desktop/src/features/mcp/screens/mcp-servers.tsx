@@ -108,7 +108,7 @@ export function McpDirectoryScreen(): JSX.Element {
           </div>
         </label>
         <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
-        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{countLabel()}</p>
+        <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400" role="status">{countLabel()}</p>
       </>}
     >
       <Show when={!config.loading()} fallback={<div class="flex items-center justify-center p-8"><McpLoading /></div>}>
@@ -224,7 +224,7 @@ export function McpServerDetailsScreen(): JSX.Element {
           <div class="mb-4 text-lg text-red-700 dark:text-red-300">{error() ?? t("mcp.detail.notFound")}</div>
           <Motion.div hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }} press={{ scale: 0.95 }}>
             <A href="/mcp/directory">
-              <button class="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 px-4 py-2.5 text-white shadow-lg shadow-gray-500/25 hover:from-gray-600 hover:to-gray-700">
+              <button class="inline-flex items-center rounded-lg bg-gray-600 px-4 py-2.5 text-white hover:bg-gray-700">
                 <ArrowLeft size={16} class="mr-2" />
                 {t("mcp.detail.back")}
               </button>
@@ -294,8 +294,8 @@ export function McpServerDetailsScreen(): JSX.Element {
                   <div class="flex flex-wrap gap-3">
                     <Motion.button
                       class={`inline-flex items-center rounded-xl px-4 py-2.5 font-medium text-white shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server()?.enabled
-                        ? "bg-gradient-to-r from-red-500 to-pink-600 shadow-red-500/25 hover:from-red-600 hover:to-pink-700"
-                        : "bg-gradient-to-r from-green-500 to-emerald-600 shadow-green-500/25 hover:from-green-600 hover:to-emerald-700"}`}
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-green-600 hover:bg-green-700"}`}
                       onClick={() => void toggleStatus()}
                       hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }}
                       press={{ scale: 0.95 }}
@@ -306,7 +306,7 @@ export function McpServerDetailsScreen(): JSX.Element {
 
                     <Motion.div hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }} press={{ scale: 0.95 }}>
                       <A href={`/settings/mcp/edit/${encodeURIComponent(server()?.id ?? "")}`}>
-                        <button class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 px-4 py-2.5 text-white shadow-lg shadow-blue-500/25 hover:from-blue-600 hover:to-cyan-700">
+                        <button class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700">
                           <Pencil size={16} class="mr-2" />
                           {t("mcp.detail.editConfiguration")}
                         </button>

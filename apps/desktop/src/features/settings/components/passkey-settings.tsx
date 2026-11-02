@@ -10,6 +10,7 @@
  * Styling is the workstation vocabulary: neutral translucent surfaces, one accent
  * (blue), no hover scaling.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createSignal, onMount, type JSX } from "solid-js"
 import { AlertTriangle, Computer, Fingerprint, Phone, Plus, ShieldCheck, Trash } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
@@ -178,10 +179,7 @@ export function PasskeySettings(): JSX.Element {
           <Show
             when={!loading()}
             fallback={
-              <div class="p-8 text-center">
-                <div class="mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-500" />
-                <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.passkeys.loading")}</p>
-              </div>
+              <LoadingState label={t("settings.passkeys.loading")} rows={3} />
             }
           >
             <Show
@@ -197,7 +195,7 @@ export function PasskeySettings(): JSX.Element {
               <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
                 <For each={passkeys()}>
                   {(passkey) => (
-                    <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <div class="flex items-center space-x-4">
                         <DeviceIcon transports={passkey.transports ?? []} />
                         <div>

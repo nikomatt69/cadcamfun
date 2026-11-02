@@ -154,11 +154,11 @@ export function KeybindingsSettings(): JSX.Element {
                   <span class="flex flex-wrap items-center gap-2">
                     <For each={row.entry.chords} fallback={<span class="text-xs text-slate-400">{t("keys.unbound")}</span>}>{(chord) =>
                       <span class="inline-flex items-center gap-1 rounded-md border border-transparent hover:border-slate-300 dark:hover:border-slate-600">
-                        <button type="button" class="px-1" aria-label={`${row.label}: ${displayChord(chord, keys.platform)}`} onClick={() => startRecording(row.command, formatChord(chord))}><ChordKeys chord={chord} platform={keys.platform} /></button>
-                        <button type="button" class="px-1 text-xs text-slate-400 hover:text-red-600" aria-label={`${t("keys.unbound")} ${displayChord(chord, keys.platform)}`} onClick={() => remove(row.command, formatChord(chord))}>×</button>
+                        <button type="button" class="rounded px-2 py-1" aria-label={`${row.label}: ${displayChord(chord, keys.platform)}`} onClick={() => startRecording(row.command, formatChord(chord))}><ChordKeys chord={chord} platform={keys.platform} /></button>
+                        <button type="button" class="rounded px-2 py-1 text-xs text-slate-400 hover:text-red-600" aria-label={`${t("keys.unbound")} ${displayChord(chord, keys.platform)}`} onClick={() => remove(row.command, formatChord(chord))}>×</button>
                       </span>}
                     </For>
-                    <button type="button" class="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300" onClick={() => startRecording(row.command, undefined)}>+ {t("keys.add")}</button>
+                    <button type="button" class="rounded-md border border-dashed border-slate-300 px-3 py-1 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300" onClick={() => startRecording(row.command, undefined)}>+ {t("keys.add")}</button>
                     <Show when={row.entry.customised}>
                       <button type="button" class="text-xs text-slate-500 underline" onClick={() => { keys.reset(row.command.id); setPending(undefined) }}>{t("keys.reset")}</button>
                     </Show>
@@ -178,7 +178,7 @@ export function KeybindingsSettings(): JSX.Element {
                   <div class="mt-2 flex flex-wrap items-center gap-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
                     <span>{pending()!.message}</span>
                     <Show when={pending()!.reassignable}>
-                      <button type="button" class="rounded bg-red-600 px-2 py-0.5 text-xs text-white" onClick={() => { const p = pending()!; commit(p.id, withChord(p.id, p.chord, p.replaces), p.replaces, true) }}>{t("keys.reassign")}</button>
+                      <button type="button" class="rounded-md bg-red-600 px-3 py-1 text-xs text-white" onClick={() => { const p = pending()!; commit(p.id, withChord(p.id, p.chord, p.replaces), p.replaces, true) }}>{t("keys.reassign")}</button>
                     </Show>
                     <button type="button" class="text-xs underline" onClick={() => setPending(undefined)}>{t("keys.cancel")}</button>
                   </div>

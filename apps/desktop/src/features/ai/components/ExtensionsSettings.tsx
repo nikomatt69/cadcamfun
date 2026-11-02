@@ -1,3 +1,4 @@
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import RefreshCw from "lucide-solid/icons/refresh-cw"
@@ -92,7 +93,7 @@ export function ExtensionsSettings(): JSX.Element {
         </div>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.mcpHint")}</p>
         <Show when={ai.projectId()} fallback={<p class="text-xs assistant-meta-text">{t("ai.extensions.projectRequired")}</p>}>
-          <Show when={servers.loading}><p class="text-xs assistant-meta-text" role="status">{t("ai.extensions.loading")}</p></Show>
+          <Show when={servers.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
           <ul class="space-y-1">
             <For each={servers()?.projectId === ai.projectId() ? servers()?.servers : []}>{(server) => (
               <li class="assistant-list-card gap-2">
@@ -123,7 +124,7 @@ export function ExtensionsSettings(): JSX.Element {
       <section class="space-y-2">
         <h3 class="text-sm font-medium">{t("ai.extensions.plugins")}</h3>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.pluginsHint")}</p>
-        <Show when={plugins.loading}><p class="text-xs assistant-meta-text" role="status">{t("ai.extensions.loading")}</p></Show>
+        <Show when={plugins.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
         <ul class="space-y-1"><For each={plugins()?.plugins}>{(plugin) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{plugin.name}</strong><span class="text-xs assistant-meta-text">{plugin.version} · {t("ai.extensions.toolCount", { count: plugin.tools })}{plugin.mods > 0 ? ` · ${t("ai.extensions.modCount", { count: plugin.mods })}` : ""}{plugin.modes > 0 ? ` · ${t("ai.extensions.modeCount", { count: plugin.modes })}` : ""}</span></div>
           <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Power size={13} aria-hidden="true" /></button>
@@ -147,7 +148,7 @@ export function ExtensionsSettings(): JSX.Element {
           <button type="button" class="assistant-icon-action" disabled={busy() || mods.loading} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await modActions.refetch() })}><RefreshCw size={13} aria-hidden="true" /></button>
         </div>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.modsHint")}</p>
-        <Show when={mods.loading}><p class="text-xs assistant-meta-text" role="status">{t("ai.extensions.loading")}</p></Show>
+        <Show when={mods.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
         <ul class="space-y-1"><For each={mods()?.mods}>{(mod) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{mod.name}</strong><span class="text-xs assistant-meta-text">{mod.description} · {mod.origin === "plugin" ? t("ai.extensions.modFromPlugin", { name: mod.pluginId ?? "" }) : t("ai.extensions.modWrittenBy", { origin: mod.origin })}</span></div>
           <Show when={mod.origin !== "plugin"}>

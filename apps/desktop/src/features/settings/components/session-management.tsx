@@ -12,6 +12,7 @@
  * Styling is the workstation vocabulary: neutral translucent surfaces, one accent
  * (blue), status colours only where they carry meaning.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import {
   AlertTriangle, CheckCircle, Clock, Database, Key, Laptop, MapPin, RefreshCw,
@@ -216,7 +217,7 @@ export function SessionManagement(): JSX.Element {
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={authSessions}>
             {(session) => (
-              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <DeviceIcon deviceInfo={session.deviceInfo} />
                   <div>
@@ -274,7 +275,7 @@ export function SessionManagement(): JSX.Element {
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={mcpSessions}>
             {(session) => (
-              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <Wifi class={`h-5 w-5 ${getStatusColor(session.status)}`} />
                   <div>
@@ -315,16 +316,13 @@ export function SessionManagement(): JSX.Element {
         </div>
 
         <Show when={tokens.loading()}>
-          <div class="p-8 text-center">
-            <div class="mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-500" />
-            <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.sessions.loading")}</p>
-          </div>
+          <LoadingState label={t("settings.sessions.loading")} rows={3} />
         </Show>
 
         <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={apiTokens()}>
             {(token) => (
-              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <div class="mx-2 flex items-center justify-between rounded-lg p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <Key class={`h-5 w-5 ${token.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`} />
                   <div>

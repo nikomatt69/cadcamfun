@@ -3,6 +3,7 @@
  * restore and merge they make in a project's history, and the assistant's commits on their behalf as `<name> (AI)`.
  * The sidecar creates it from the account the first time it is read, so there is always one to show.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { Show, createEffect, createSignal, type JSX } from "solid-js"
 import { GitBranch } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
@@ -64,7 +65,7 @@ export function GitProfileSettings(): JSX.Element {
       </h3>
       <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("vcs.profile.description")}</p>
       <Show when={profile.loading()}>
-        <p role="status" class="text-sm text-slate-500">{t("common.loading")}</p>
+        <LoadingState label={t("common.loading")} rows={2} />
       </Show>
       <Show when={profile.error()}>
         <div role="alert" class="flex items-center gap-3 text-sm text-red-600 dark:text-red-400">

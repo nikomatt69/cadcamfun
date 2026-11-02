@@ -52,7 +52,7 @@ export function ContextGauge(props: { readonly alwaysShow?: boolean; readonly co
           transform="rotate(-90 9 9)"
         />
       </svg>
-      <Show when={!props.compact && metrics().percent !== undefined && ai.contextTokens() > 0}><span>{metrics().percent}%</span></Show>
+      <Show when={!props.compact && metrics().percent !== undefined && ai.contextTokens() > 0}><span class="tabular-nums">{metrics().percent}%</span></Show>
     </>
   )
   return (

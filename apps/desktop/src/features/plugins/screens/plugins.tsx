@@ -165,7 +165,7 @@ export function PluginsScreen(): JSX.Element {
               </div>
               <div class="flex items-center justify-end gap-1 border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30" onClick={(e) => e.stopPropagation()}>
                 <button type="button" class={ICON_BUTTON} classList={{ "!text-green-600": plugin.enabled }} title={plugin.enabled ? t("plugins.disable") : t("plugins.enable")} aria-label={`${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}: ${plugin.manifest.name || plugin.id}`} aria-pressed={plugin.enabled} disabled={pending()} onClick={() => void toggle(plugin.id, plugin.enabled)}>
-                  <Show when={plugin.enabled} fallback={<ToggleLeft size={18} aria-hidden="true" />}><ToggleRight size={18} aria-hidden="true" /></Show>
+                  <Show when={plugin.enabled} fallback={<ToggleLeft size={16} aria-hidden="true" />}><ToggleRight size={16} aria-hidden="true" /></Show>
                 </button>
                 <A class={ICON_BUTTON} href={`/plugins/${encodeURIComponent(plugin.id)}`} title={t("plugins.info")} aria-label={`${t("plugins.info")}: ${plugin.manifest.name}`}><Info size={16} aria-hidden="true" /></A>
                 <button type="button" class={ICON_BUTTON} title={t("plugins.uninstall")} aria-label={`${t("plugins.uninstall")}: ${plugin.manifest.name}`} disabled={pending()} onClick={() => setRemoving(plugin.id)}><Trash2 size={16} aria-hidden="true" /></button>
@@ -491,7 +491,7 @@ export function PluginDetailScreen(): JSX.Element {
                     readOnly
                     value={readme()}
                     aria-label={t("plugins.detail.readmeAria")}
-                    class="h-96 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-800 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200"
+                    class="h-96 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-800 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200"
                   />
                   {/* No markdown renderer ships with the desktop build, so the preview shows the raw Markdown. */}
                   <h3 class="mb-2 mt-4 border-t pt-4 text-md font-semibold">{t("plugins.detail.preview")}</h3>
@@ -601,7 +601,7 @@ export function PluginDetailScreen(): JSX.Element {
                           rel="noopener noreferrer"
                           class="inline-flex items-center text-sm text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          {t("plugins.detail.view")} <ExternalLink size={14} class="ml-1" />
+                          {t("plugins.detail.view")} <ExternalLink size={16} class="ml-1" />
                         </a>
                       </dd>
                     </div>
