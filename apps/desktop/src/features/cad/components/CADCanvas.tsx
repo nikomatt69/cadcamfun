@@ -38,7 +38,7 @@ import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
-import { createSectionHelper } from "../lib/sectionHelper.ts"
+import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
 import DragDropIndicator from "./DragDropIndicator.tsx"
 import SelectionControls from "./SelectionControls.tsx"
@@ -582,6 +582,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     scene.add(createSectionHelper(section.axis, section.position, section.inverted, modelBox()))
     invalidate()
   })
+  // A closed solid cut open shows the inside of its far walls: the cut is filled flat, as in a section drawing. The caps depend on
+  // whether a section is on and on the parts, not on where the plane is, so dragging the slider does not rebuild them.
+  createEffect(() => {
+    rebuilds()
+    const on = cad.section.enabled
+    if (!ready() || !scene) return
+    const roots = cadObjects()
+    if (on) addSectionCaps(roots); else removeSectionCaps(roots)
+    // The caps are meshes under the parts: the visual style dresses them again.
+    for (const root of roots) root.userData.displayKey = undefined
+    invalidate()
+  })
   /** The extent of the model along the section axis: the slider's range. */
   const sectionRange = createMemo((): { min: number; max: number } => {
     rebuilds(); elements.elements
@@ -706,6 +718,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   createEffect(() => {
     rebuilds()
     const mode = cad.displayMode
+    cad.section.enabled
     const selected = new Set(selectedIds())
     if (!ready()) return
     let changed = false

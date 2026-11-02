@@ -115,7 +115,9 @@ export const applyDisplayMode = (root: THREE.Object3D, mode: DisplayMode, ghoste
     const base = (object.userData.displayRenderOrder ??= object.renderOrder) as number
     object.renderOrder = plan.fill === "depth-only" ? Math.min(base, -1) : base
     const materials = Array.isArray(object.material) ? object.material : [object.material]
-    for (const material of materials) dress(material as DisplayMaterial, plan)
+    // The flat fill of a section cut is never drawn as triangles: in a wireframe the cut is open.
+    const look = object.userData.isSectionCap === true && plan.fill === "triangles" ? { ...plan, fill: "invisible" as const } : plan
+    for (const material of materials) dress(material as DisplayMaterial, look)
   })
   root.userData.displayKey = key
   return true
