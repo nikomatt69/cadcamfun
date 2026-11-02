@@ -137,7 +137,7 @@ const toolHandlers = Effect.gen(function*() {
   /** Every heavy tool call belongs to the admitted invocation, including older handlers without a signal parameter. */
   const runOwnedKernelJob: typeof runKernelJob = (name, input, options = {}) => {
     const signal = options.signal ?? actingCell.turn(local).signal
-    return runKernelJob(name, input, { ...options, ...(signal !== undefined ? { signal } : {}) })
+    return runKernelJob(name, input, { priority: "assistant", ...options, ...(signal !== undefined ? { signal } : {}) })
   }
   /** One exact-kernel scene operation in a worker; the result type is the one of the named operation. */
   const sceneJob = async <O extends keyof CadSceneResult>(input: Extract<CadSceneInput, { readonly op: O }>): Promise<CadSceneResult[O]> =>

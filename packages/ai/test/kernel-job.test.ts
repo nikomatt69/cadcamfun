@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobEffect, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
+import { KERNEL_ASSISTANT_WORKERS, KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobEffect, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
 import { parseHistory } from "../src/parametric.ts"
@@ -236,6 +236,20 @@ describe("the job queue, the shared runs and the result cache", () => {
     expect(peak).toBeLessThanOrEqual(KERNEL_WORKERS)
     expect(outcomes.filter((o) => o === "busy")).toHaveLength(1)
     expect(outcomes.filter((o) => o === "ok")).toHaveLength(KERNEL_WORKERS + KERNEL_QUEUE_LIMIT)
+    expect(kernelJobStats().running).toBe(0)
+    expect(kernelJobStats().waiting).toBe(0)
+  })
+
+  test("the assistant never holds the last worker: a person's request starts at once while assistant jobs wait", async () => {
+    clearKernelJobCache()
+    const assistant = Array.from({ length: KERNEL_WORKERS + 2 }, (_, i) => runKernelJob("cam-plan", distinct(600 + i), { priority: "assistant" }).then((r) => r.status))
+    expect(kernelJobStats().running).toBe(KERNEL_ASSISTANT_WORKERS)
+    expect(kernelJobStats().waiting).toBe(KERNEL_WORKERS + 2 - KERNEL_ASSISTANT_WORKERS)
+    // With a single worker there is nothing to reserve; with more, the person's job takes the reserved one without waiting.
+    const person = runKernelJob("cam-plan", distinct(700)).then((r) => r.status)
+    expect(kernelJobStats().running).toBe(KERNEL_WORKERS === 1 ? 1 : KERNEL_ASSISTANT_WORKERS + 1)
+    expect(await person).toBe("ok")
+    expect((await Promise.all(assistant)).every((status) => status === "ok")).toBe(true)
     expect(kernelJobStats().running).toBe(0)
     expect(kernelJobStats().waiting).toBe(0)
   })

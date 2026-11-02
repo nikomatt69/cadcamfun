@@ -112,8 +112,17 @@ export const kernelJobHistory = (): ReadonlyArray<KernelJobRecord> => [...histor
 
 /** The workers are a resource of the machine, not of a request: one set of slots per process. */
 const slots = Semaphore.makeUnsafe(KERNEL_WORKERS)
+/**
+ * Who asked: a person at the editor (a panel button, a route) or the assistant working on its own. The assistant may hold all but one
+ * worker, so a request from a person always finds a slot that no assistant job holds instead of waiting behind a long program.
+ */
+export type KernelJobPriority = "interactive" | "assistant"
+/** Workers the assistant may hold at once: the pool minus one reserved for people (the whole pool when it has a single worker). */
+export const KERNEL_ASSISTANT_WORKERS = Math.max(1, KERNEL_WORKERS - 1)
+const assistantSlots = Semaphore.makeUnsafe(KERNEL_ASSISTANT_WORKERS)
 /** Jobs holding a slot and jobs waiting for one (the semaphore does not count its waiters). */
 let running = 0
+let runningAssistant = 0
 let waiting = 0
 
 /**
@@ -232,6 +241,8 @@ export const runKernelJobInline = <K extends KernelJobName>(name: K, input: Kern
 export interface JobOptions {
   readonly deadlineMs?: number
   readonly onProgress?: (progress: KernelJobProgress) => void
+  /** `interactive` (the default) or `assistant`: see `KernelJobPriority`. Jobs of the assistant's own tools say `assistant`. */
+  readonly priority?: KernelJobPriority
   /** A different worker module (tests of a worker that dies); the kernel's own by default. */
   readonly workerUrl?: string
 }
@@ -312,7 +323,8 @@ const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]
     })
     if (closing) return refuse("cancelled", `Kernel job ${name} was refused: the server is shutting down.`)
     if (waiting >= KERNEL_QUEUE_LIMIT) return refuse("busy", `Kernel job ${name} was refused: ${waiting} jobs are already waiting for one of the ${KERNEL_WORKERS} workers. Try again when one has finished.`)
-    const announced = running >= KERNEL_WORKERS
+    const assistant = options.priority === "assistant"
+    const announced = assistant ? runningAssistant >= KERNEL_ASSISTANT_WORKERS || running >= KERNEL_WORKERS : running >= KERNEL_WORKERS
     if (announced) options.onProgress?.({ stage: "queued", ahead: waiting })
     const place: Place = { announced, tell: (ahead) => options.onProgress?.({ stage: "queued", ahead }) }
     line.push(place)
@@ -321,6 +333,7 @@ const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]
       waiting--
       leaveLine(place)
       running++
+      if (assistant) runningAssistant++
       ranFrom = performance.now()
       if (closing) return Effect.fail(new KernelJobError(name, "cancelled", `Kernel job ${name} was stopped: the server is shutting down.`))
       // A worker is about to take memory: when the process already holds more than its share, the cached programs go first.
@@ -334,10 +347,11 @@ const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]
         record(name, error.reason, times(), undefined, id)
       })),
       Effect.onInterrupt(() => Effect.sync(() => { counters.aborted++; record(name, "cancelled", times(), undefined, id) })),
-      Effect.ensuring(Effect.sync(() => { running-- }))
+      Effect.ensuring(Effect.sync(() => { running--; if (assistant) runningAssistant-- }))
     )
     // Interrupted while still waiting for a slot: it leaves the queue without ever holding one.
-    return slots.withPermits(1)(inSlot).pipe(Effect.onInterrupt(() => Effect.sync(() => {
+    const slotted = assistant ? assistantSlots.withPermits(1)(slots.withPermits(1)(inSlot)) : slots.withPermits(1)(inSlot)
+    return slotted.pipe(Effect.onInterrupt(() => Effect.sync(() => {
       if (ranFrom !== undefined) return
       waiting--
       leaveLine(place)
@@ -361,6 +375,7 @@ const shared = <K extends KernelJobName>(key: string, name: K, input: KernelJobs
       const run = execute(name, input, {
         ...(options.deadlineMs !== undefined ? { deadlineMs: options.deadlineMs } : {}),
         ...(options.workerUrl !== undefined ? { workerUrl: options.workerUrl } : {}),
+        ...(options.priority !== undefined ? { priority: options.priority } : {}),
         onProgress: (progress) => { created.last = progress; for (const to of [...created.listeners]) to(progress) }
       }).pipe(
         Effect.tap((value) => Effect.sync(() => results.set(key, { value, bytes: bytesOf(name, value) }))),
