@@ -10,6 +10,7 @@ import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
 import { formatGridStep } from "../../../viewport/grid-lod.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
+import { CaptureButtons } from "../../../viewport/CaptureButtons.tsx"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -1618,6 +1619,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </div>
         <div class="cad-viewport-footer__actions">
           {props.footerActions}
+          <CaptureButtons mode="cad" />
           <button type="button" onClick={toggleFullscreen} class="panel-icon-btn" title={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"} aria-label={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"}>
             <Show when={isFullscreen()} fallback={<Maximize2 size={18} />}><Minimize2 size={18} /></Show>
           </button>

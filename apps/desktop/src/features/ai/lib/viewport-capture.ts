@@ -96,6 +96,19 @@ const onScreen = (canvas: HTMLCanvasElement): boolean => canvas.isConnected && c
 /** A sheet is drawn off screen on purpose: it only has to exist and have pixels. */
 const drawn = (canvas: HTMLCanvasElement): boolean => canvas.width > 0 && canvas.height > 0
 
+/**
+ * The live frame of a mode for a person-facing capture (screenshot, video): the canvas right after a
+ * fresh render, at its own resolution. The caller must read the pixels synchronously — a WebGL canvas
+ * does not keep them past the current task. The program sheet is the fallback only when asked for.
+ */
+export const visibleFrame = (mode: "cad" | "cam", options: { readonly sheet?: boolean } = {}): { readonly canvas: HTMLCanvasElement; readonly kind: "viewport" | "sheet" } | undefined => {
+  const frame = newestFrame(viewports, mode, (candidate) => onScreen(candidate.canvas))
+  if (frame !== undefined) return { canvas: frame.canvas, kind: "viewport" }
+  if (options.sheet !== true) return undefined
+  const sheet = newestFrame(sheets, mode, (candidate) => drawn(candidate.canvas))
+  return sheet === undefined ? undefined : { canvas: sheet.canvas, kind: "sheet" }
+}
+
 export const captureVisibleViewport = (mode: "cad" | "cam"): ViewportCapture => {
   const frame = newestFrame(viewports, mode, (candidate) => onScreen(candidate.canvas))
   const sheet = newestFrame(sheets, mode, (candidate) => drawn(candidate.canvas))

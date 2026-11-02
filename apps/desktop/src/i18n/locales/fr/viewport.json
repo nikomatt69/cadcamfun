@@ -28,5 +28,12 @@
   "cad.depth": "Profondeur",
   "cad.snapSettings": "Paramètres d'accrochage",
   "cad.enableSnapping": "Activer l'accrochage",
-  "viewport.editor2d": "Éditeur de dessin 2D"
+  "viewport.editor2d": "Éditeur de dessin 2D",
+  "viewport.capture.screenshot": "Capture d’écran",
+  "viewport.capture.record": "Enregistrer une vidéo",
+  "viewport.capture.stop": "Arrêter l’enregistrement ({time})",
+  "viewport.capture.saved": "{name} enregistré",
+  "viewport.capture.failed": "Échec de la capture : {reason}",
+  "viewport.capture.unavailable": "Ouvrez d’abord la vue 3D.",
+  "viewport.capture.unsupported": "L’enregistrement vidéo n’est pas disponible dans cette webview."
 }

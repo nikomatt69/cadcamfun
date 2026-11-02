@@ -28,5 +28,12 @@
   "cad.depth": "गहराई",
   "cad.snapSettings": "स्नैप सेटिंग्स",
   "cad.enableSnapping": "स्नैपिंग सक्षम करें",
-  "viewport.editor2d": "2D ड्राइंग संपादक"
+  "viewport.editor2d": "2D ड्राइंग संपादक",
+  "viewport.capture.screenshot": "स्क्रीनशॉट",
+  "viewport.capture.record": "वीडियो रिकॉर्ड करें",
+  "viewport.capture.stop": "रिकॉर्डिंग रोकें ({time})",
+  "viewport.capture.saved": "{name} सहेजा गया",
+  "viewport.capture.failed": "कैप्चर विफल: {reason}",
+  "viewport.capture.unavailable": "पहले 3D व्यू खोलें।",
+  "viewport.capture.unsupported": "इस वेबव्यू में वीडियो रिकॉर्डिंग उपलब्ध नहीं है।"
 }

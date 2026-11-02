@@ -28,5 +28,12 @@
   "cad.depth": "Profundidade",
   "cad.snapSettings": "Configurações de encaixe",
   "cad.enableSnapping": "Ativar encaixe",
-  "viewport.editor2d": "Editor de desenho 2D"
+  "viewport.editor2d": "Editor de desenho 2D",
+  "viewport.capture.screenshot": "Captura de ecrã",
+  "viewport.capture.record": "Gravar vídeo",
+  "viewport.capture.stop": "Parar gravação ({time})",
+  "viewport.capture.saved": "{name} guardado",
+  "viewport.capture.failed": "Falha na captura: {reason}",
+  "viewport.capture.unavailable": "Abra primeiro a vista 3D.",
+  "viewport.capture.unsupported": "A gravação de vídeo não está disponível neste webview."
 }

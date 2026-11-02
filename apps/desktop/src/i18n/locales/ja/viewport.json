@@ -28,5 +28,12 @@
   "cad.depth": "深さ",
   "cad.snapSettings": "スナップ設定",
   "cad.enableSnapping": "スナップを有効にする",
-  "viewport.editor2d": "2D図面エディタ"
+  "viewport.editor2d": "2D図面エディタ",
+  "viewport.capture.screenshot": "スクリーンショット",
+  "viewport.capture.record": "動画を録画",
+  "viewport.capture.stop": "録画を停止 ({time})",
+  "viewport.capture.saved": "{name} を保存しました",
+  "viewport.capture.failed": "キャプチャに失敗しました: {reason}",
+  "viewport.capture.unavailable": "先に3Dビューを開いてください。",
+  "viewport.capture.unsupported": "このWebViewでは動画の録画は利用できません。"
 }
