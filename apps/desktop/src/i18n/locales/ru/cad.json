@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Развертка",
   "cad.flat.sheet": "Элемент листа",
   "cad.flat.empty": "Не удалось построить развертку ни одного листового элемента детали.",
-  "cad.flat.summary": "Длина развертки {length} мм, ширина {width} мм, сгибов: {bends}"
+  "cad.flat.summary": "Длина развертки {length} мм, ширина {width} мм, сгибов: {bends}",
+  "cad.joint.title": "Соединение",
+  "cad.joint.clear": "Снять выбор",
+  "cad.joint.name": "Имя",
+  "cad.joint.type": "Тип",
+  "cad.joint.parent": "Родитель",
+  "cad.joint.child": "Дочерний",
+  "cad.joint.origin": "Начало",
+  "cad.joint.axis": "Ось",
+  "cad.joint.secondaryAxis": "Вторая ось",
+  "cad.joint.limits": "Пределы",
+  "cad.joint.value": "Значение"
 }

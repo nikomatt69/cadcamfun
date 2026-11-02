@@ -5,6 +5,8 @@ import { useApp } from "../../../shared/state/context.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { useCADStore, type PickedEntity } from "../store/cadStore.ts"
 import { describeSubEntity } from "../lib/sub-entity.ts"
+import { useAssemblyStore } from "../store/assemblyStore.ts"
+import { jointTypeLabel } from "./JointCard.tsx"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -33,6 +35,7 @@ export default function StatusBar(): JSX.Element {
   const selection = useSelectionStore()
   const layers = useLayerStore()
   const transform = useTransformControlsStore()
+  const assembly = useAssemblyStore()
 
   const workpiece = () => ({
     width: cad.workpiece?.width || 100,
@@ -56,6 +59,7 @@ export default function StatusBar(): JSX.Element {
   }
   const layer = () => layers.layers.find((candidate) => candidate.id === layers.activeLayer)
   const bounds = () => (selectedCount() > 0 ? selection.getSelectionBounds() : null)
+  const pickedJoint = () => { const id = cad.pickedJoint; assembly.assemblyState; return id === null ? undefined : assembly.getJointById(id) }
   const hidden = () => elements.elements.filter((element) => element.visible === false).length
 
   return (
@@ -86,6 +90,9 @@ export default function StatusBar(): JSX.Element {
           </Show>
           <Show when={cad.hoveredEntity !== null && !sameEntity(cad.hoveredEntity, cad.pickedEntity)}>
             <Seg label={t("cad.sub.hover")} value={entityChip(cad.hoveredEntity!)} tone="cyan" hideBelow="lg" testId="status-entity-hover" />
+          </Show>
+          <Show when={pickedJoint()}>
+            {(joint) => <Seg label={t("cad.joint.title")} value={`${joint().name} · ${jointTypeLabel(joint().type)}`} tone="amber" hideBelow="lg" testId="status-joint" title={joint().id} />}
           </Show>
           <Show when={bounds()}>
             {(box) => <Seg label={t("cad.status.size")} value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} tone="cyan" hideBelow="xl" title={t("cad.status.sizeTitle")} />}

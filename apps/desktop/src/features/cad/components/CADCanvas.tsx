@@ -11,7 +11,7 @@ import { formatGridStep } from "../../../viewport/grid-lod.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
 import { CaptureButtons } from "../../../viewport/CaptureButtons.tsx"
-import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
@@ -39,7 +39,7 @@ import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { applySketchVisibility } from "../lib/history-view.ts"
 import { applyDetailLevel } from "../lib/detail-level.ts"
-import { createJointMarkers } from "../lib/joint-markers.ts"
+import { applyJointSelection, createJointMarkers, describeJoint, pickJointMarker, type JointPick } from "../lib/joint-markers.ts"
 import { useAssemblyStore } from "../store/assemblyStore.ts"
 import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, pixelRadiusAt, sameSubEntity, type SubEntityPick, type SubHighlightKind, type VertexPicking } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
@@ -278,6 +278,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   /** The ray of the last `setPointer` and the screen tolerance for the corners of exact solids (snapping priority vertex > edge > face). */
   const vertexPicking = (): VertexPicking | undefined =>
     camera && container ? { ray: raycaster.ray.clone(), radiusAt: pixelRadiusAt(camera, container.clientHeight || 1) } : undefined
+  const jointAt = (): JointPick | undefined => { const picking = vertexPicking(); return picking === undefined ? undefined : pickJointMarker(jointMarkers, picking) }
   const entityOf = (sub: SubEntityPick): PickedEntity => ({ elementId: sub.elementId, kind: sub.kind, index: sub.index, ...(sub.coords !== undefined ? { coords: sub.coords } : {}) })
   const elementIdAt = (): string | null => {
     lastHits = []
@@ -807,9 +808,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const box = modelBox()
       jointMarkers = createJointMarkers(joints, box.isEmpty() ? 100 : box.getBoundingSphere(new THREE.Sphere()).radius, offset)
       scene.add(jointMarkers)
+      applyJointSelection(jointMarkers, untrack(() => cad.pickedJoint), untrack(() => cad.hoveredJoint))
     }
+    // A picked joint that is gone (removed, hidden) is no longer picked.
+    const picked = untrack(() => cad.pickedJoint)
+    if (picked !== null && (!show || !joints.some((joint) => joint.id === picked))) cad.setPickedJoint(null)
     invalidate()
   })
+  createEffect(() => { if (applyJointSelection(jointMarkers, cad.pickedJoint, cad.hoveredJoint)) invalidate() })
 
   // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
   createEffect(() => {
@@ -1107,6 +1113,15 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (!move || !container || !scene || !camera) return
       setPointer(move)
       if (raycaster.intersectObjects(controlPoints).length > 0) { container.style.cursor = "pointer"; return }
+      // A joint glyph is drawn over the model, so it is under the cursor before any part is.
+      const joint = jointAt()
+      if ((joint?.jointId ?? null) !== cad.hoveredJoint) cad.setHoveredJoint(joint?.jointId ?? null)
+      if (joint !== undefined) {
+        container.style.cursor = "pointer"
+        if (hoveredId() !== null) setHoveredId(null)
+        if (hoveredSub() !== undefined) { setHoveredSub(undefined); cad.setHoveredEntity(null) }
+        return
+      }
       const id = gizmo?.axis ? null : elementIdAt()
       if (id !== hoveredId()) {
         setHoveredId(id)
@@ -1193,6 +1208,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click
     setPointer(event)
+    // A joint glyph under the cursor is the click's target: the joint becomes the picked one and the selection is left alone.
+    const joint = jointAt()
+    if (joint !== undefined) { cad.setPickedJoint(joint.jointId); return }
+    if (cad.pickedJoint !== null) cad.setPickedJoint(null)
     const id = elementIdAt()
     if (id && !isLocked(id)) {
       selection.selectElement(id, down.additive)

@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import type { Joint, JointType } from "../types/assembly.ts"
+import type { VertexPicking } from "./sub-entity.ts"
 
 /**
  * The joints of the assembly in the 3D view. The assembly model keeps joints as data (type, origin, axis, limits); nothing drew them,
@@ -74,7 +75,98 @@ export const createJointMarker = (joint: Joint, size: number, offset: { readonly
   group.userData.isJointMarker = true
   group.userData.jointId = joint.id
   group.userData.jointType = joint.type
+  // The glyph is picked by distance from the ray to its origin: about the ring's size, never less than the pixel tolerance.
+  group.userData.pickRadius = size * 0.7
   return group
+}
+
+// ------------------------------------------------------------------------------------------------------- picking
+
+export interface JointPick {
+  readonly jointId: string
+  /** How far along the ray the joint's origin is. */
+  readonly distance: number
+}
+
+/**
+ * The joint whose glyph is under the cursor, or undefined. A glyph is drawn on top of the model (no depth test), so it is picked
+ * wherever it is seen: the joint whose origin is nearest to the ray among those within `max(pick radius of the glyph, pixel tolerance)`.
+ */
+export const pickJointMarker = (markers: THREE.Object3D | undefined, picking: VertexPicking): JointPick | undefined => {
+  if (markers === undefined) return undefined
+  markers.updateWorldMatrix(true, true)
+  const world = new THREE.Vector3()
+  let best: { jointId: string; distance: number; miss: number } | undefined
+  for (const child of markers.children) {
+    const jointId = child.userData.jointId as string | undefined
+    if (jointId === undefined || child.visible === false) continue
+    world.setFromMatrixPosition(child.matrixWorld)
+    const along = world.clone().sub(picking.ray.origin).dot(picking.ray.direction)
+    if (along <= 0) continue
+    const miss = picking.ray.distanceToPoint(world)
+    const radius = Math.max(Number(child.userData.pickRadius) || 0, picking.radiusAt(along))
+    if (miss > radius) continue
+    // Nearest to the ray, then nearest to the eye.
+    if (best === undefined || miss < best.miss - 1e-9 || (Math.abs(miss - best.miss) <= 1e-9 && along < best.distance)) best = { jointId, distance: along, miss }
+  }
+  return best === undefined ? undefined : { jointId: best.jointId, distance: best.distance }
+}
+
+export const JOINT_HIGHLIGHT = { hover: 0x00e5ff, picked: 0xffab00 } as const
+const HIGHLIGHT_SCALE = 1.35
+
+/**
+ * Colours the glyph of the picked joint amber and the hovered one cyan (and draws the picked one larger); every other glyph returns to the
+ * colour of its type. Returns whether anything changed, so the canvas asks for a frame only then.
+ */
+export const applyJointSelection = (markers: THREE.Object3D | undefined, picked: string | null, hovered: string | null): boolean => {
+  if (markers === undefined) return false
+  let changed = false
+  for (const child of markers.children) {
+    const jointId = child.userData.jointId as string | undefined
+    if (jointId === undefined) continue
+    const lines = child.children[0] as THREE.LineSegments | undefined
+    const material = lines?.material as THREE.LineBasicMaterial | undefined
+    if (material === undefined) continue
+    const base = (material.userData.baseColor ??= material.color.getHex()) as number
+    const color = jointId === picked ? JOINT_HIGHLIGHT.picked : jointId === hovered ? JOINT_HIGHLIGHT.hover : base
+    if (material.color.getHex() !== color) { material.color.setHex(color); changed = true }
+    const scale = jointId === picked ? HIGHLIGHT_SCALE : 1
+    if (child.scale.x !== scale) { child.scale.setScalar(scale); changed = true }
+  }
+  return changed
+}
+
+// ----------------------------------------------------------------------------------------------------- description
+
+export interface JointRow {
+  readonly key: "name" | "type" | "parent" | "child" | "origin" | "axis" | "secondaryAxis" | "limits" | "value"
+  readonly value: string
+}
+
+const num = (value: number): string => String(Number(value.toFixed(3)))
+const vec = (v: { readonly x: number; readonly y: number; readonly z: number }): string => `${num(v.x)}, ${num(v.y)}, ${num(v.z)}`
+
+/** The rows the property chip shows for a joint (`nodeName` turns a node id into the node's name). Only what the joint has. */
+export const describeJoint = (joint: Joint, nodeName: (id: string) => string = (id) => id): ReadonlyArray<JointRow> => {
+  const rows: JointRow[] = [
+    { key: "name", value: joint.name }, { key: "type", value: joint.type },
+    { key: "parent", value: nodeName(joint.parent) }, { key: "child", value: nodeName(joint.child) },
+    { key: "origin", value: vec(joint.origin) }, { key: "axis", value: vec(joint.primaryAxis) }
+  ]
+  if (joint.secondaryAxis !== undefined) rows.push({ key: "secondaryAxis", value: vec(joint.secondaryAxis) })
+  const limits = joint.limits
+  if (limits !== undefined) {
+    // Turns are in degrees, slides in drawing units; the legacy rotation / translation names are read when the current ones are absent.
+    const turn = [limits.minAngle ?? limits.minRotation, limits.maxAngle ?? limits.maxRotation] as const
+    const slide = [limits.minDistance ?? limits.minTranslation, limits.maxDistance ?? limits.maxTranslation] as const
+    const range = (pair: readonly [number | undefined, number | undefined], unit: string): string | undefined =>
+      pair[0] === undefined && pair[1] === undefined ? undefined : `${pair[0] === undefined ? "–" : num(pair[0])} … ${pair[1] === undefined ? "–" : num(pair[1])} ${unit}`
+    const text = [range(turn, "°"), range(slide, "mm")].filter((part): part is string => part !== undefined).join(" · ")
+    if (text !== "") rows.push({ key: "limits", value: text })
+  }
+  if (typeof joint.value === "number") rows.push({ key: "value", value: num(joint.value) })
+  return rows
 }
 
 /** The size of a joint glyph for a drawing of the given radius: a few percent of it, never smaller than a screw or larger than a part. */

@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Sviluppo lamiera",
   "cad.flat.sheet": "Feature lamiera",
   "cad.flat.empty": "Nessuna feature lamiera di questo pezzo si può sviluppare.",
-  "cad.flat.summary": "Lunghezza sviluppata {length} mm, larghezza {width} mm, {bends} pieghe"
+  "cad.flat.summary": "Lunghezza sviluppata {length} mm, larghezza {width} mm, {bends} pieghe",
+  "cad.joint.title": "Giunto",
+  "cad.joint.clear": "Deseleziona",
+  "cad.joint.name": "Nome",
+  "cad.joint.type": "Tipo",
+  "cad.joint.parent": "Genitore",
+  "cad.joint.child": "Figlio",
+  "cad.joint.origin": "Origine",
+  "cad.joint.axis": "Asse",
+  "cad.joint.secondaryAxis": "Secondo asse",
+  "cad.joint.limits": "Limiti",
+  "cad.joint.value": "Valore"
 }

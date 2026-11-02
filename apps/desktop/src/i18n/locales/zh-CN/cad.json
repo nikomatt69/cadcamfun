@@ -1044,5 +1044,16 @@
   "cad.flat.title": "展开图",
   "cad.flat.sheet": "钣金特征",
   "cad.flat.empty": "此零件的钣金特征均无法展开。",
-  "cad.flat.summary": "展开长度 {length} mm，宽度 {width} mm，折弯 {bends} 处"
+  "cad.flat.summary": "展开长度 {length} mm，宽度 {width} mm，折弯 {bends} 处",
+  "cad.joint.title": "关节",
+  "cad.joint.clear": "取消选择",
+  "cad.joint.name": "名称",
+  "cad.joint.type": "类型",
+  "cad.joint.parent": "父级",
+  "cad.joint.child": "子级",
+  "cad.joint.origin": "原点",
+  "cad.joint.axis": "轴",
+  "cad.joint.secondaryAxis": "第二轴",
+  "cad.joint.limits": "限位",
+  "cad.joint.value": "当前值"
 }

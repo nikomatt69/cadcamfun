@@ -1044,5 +1044,16 @@
   "cad.flat.title": "समतल पैटर्न",
   "cad.flat.sheet": "शीट फ़ीचर",
   "cad.flat.empty": "इस भाग की कोई शीट-मेटल फ़ीचर विकसित नहीं की जा सकी।",
-  "cad.flat.summary": "विकसित लंबाई {length} मिमी, चौड़ाई {width} मिमी, मोड़ {bends}"
+  "cad.flat.summary": "विकसित लंबाई {length} मिमी, चौड़ाई {width} मिमी, मोड़ {bends}",
+  "cad.joint.title": "जोड़",
+  "cad.joint.clear": "चयन हटाएँ",
+  "cad.joint.name": "नाम",
+  "cad.joint.type": "प्रकार",
+  "cad.joint.parent": "मूल",
+  "cad.joint.child": "उप",
+  "cad.joint.origin": "मूल बिंदु",
+  "cad.joint.axis": "अक्ष",
+  "cad.joint.secondaryAxis": "दूसरा अक्ष",
+  "cad.joint.limits": "सीमाएँ",
+  "cad.joint.value": "मान"
 }

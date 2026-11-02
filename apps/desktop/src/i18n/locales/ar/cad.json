@@ -1044,5 +1044,16 @@
   "cad.flat.title": "المخطط المفرود",
   "cad.flat.sheet": "ميزة الصفيحة",
   "cad.flat.empty": "تعذر فرد أي ميزة صفيحة معدنية في هذا الجزء.",
-  "cad.flat.summary": "الطول المفرود {length} مم، العرض {width} مم، عدد الثنيات {bends}"
+  "cad.flat.summary": "الطول المفرود {length} مم، العرض {width} مم، عدد الثنيات {bends}",
+  "cad.joint.title": "الوصلة",
+  "cad.joint.clear": "إلغاء التحديد",
+  "cad.joint.name": "الاسم",
+  "cad.joint.type": "النوع",
+  "cad.joint.parent": "الأصل",
+  "cad.joint.child": "الفرع",
+  "cad.joint.origin": "نقطة الأصل",
+  "cad.joint.axis": "المحور",
+  "cad.joint.secondaryAxis": "المحور الثاني",
+  "cad.joint.limits": "الحدود",
+  "cad.joint.value": "القيمة"
 }

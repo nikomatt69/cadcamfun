@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Desarrollo de chapa",
   "cad.flat.sheet": "Operación de chapa",
   "cad.flat.empty": "No se pudo desarrollar ninguna operación de chapa de esta pieza.",
-  "cad.flat.summary": "Longitud desarrollada {length} mm, ancho {width} mm, {bends} pliegues"
+  "cad.flat.summary": "Longitud desarrollada {length} mm, ancho {width} mm, {bends} pliegues",
+  "cad.joint.title": "Unión",
+  "cad.joint.clear": "Deseleccionar",
+  "cad.joint.name": "Nombre",
+  "cad.joint.type": "Tipo",
+  "cad.joint.parent": "Padre",
+  "cad.joint.child": "Hijo",
+  "cad.joint.origin": "Origen",
+  "cad.joint.axis": "Eje",
+  "cad.joint.secondaryAxis": "Segundo eje",
+  "cad.joint.limits": "Límites",
+  "cad.joint.value": "Valor"
 }

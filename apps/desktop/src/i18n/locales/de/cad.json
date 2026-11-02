@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Abwicklung",
   "cad.flat.sheet": "Blech-Feature",
   "cad.flat.empty": "Kein Blech-Feature dieses Teils konnte abgewickelt werden.",
-  "cad.flat.summary": "Abgewickelte Länge {length} mm, Breite {width} mm, {bends} Biegungen"
+  "cad.flat.summary": "Abgewickelte Länge {length} mm, Breite {width} mm, {bends} Biegungen",
+  "cad.joint.title": "Verbindung",
+  "cad.joint.clear": "Abwählen",
+  "cad.joint.name": "Name",
+  "cad.joint.type": "Typ",
+  "cad.joint.parent": "Übergeordnet",
+  "cad.joint.child": "Untergeordnet",
+  "cad.joint.origin": "Ursprung",
+  "cad.joint.axis": "Achse",
+  "cad.joint.secondaryAxis": "Zweite Achse",
+  "cad.joint.limits": "Grenzen",
+  "cad.joint.value": "Wert"
 }

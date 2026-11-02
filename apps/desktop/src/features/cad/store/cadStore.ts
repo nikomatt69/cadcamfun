@@ -135,6 +135,11 @@ interface CADState {
   /** The face, edge or corner under the cursor (null: none), for the status chip. */
   hoveredEntity: PickedEntity | null;
   setHoveredEntity: (entity: PickedEntity | null) => void;
+  /** The joint whose glyph the person clicked (its id in the assembly), and the one under the cursor. */
+  pickedJoint: string | null;
+  setPickedJoint: (id: string | null) => void;
+  hoveredJoint: string | null;
+  setHoveredJoint: (id: string | null) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -152,6 +157,10 @@ export const useCADStore = create<CADState>((set, get) => ({
   setPickedEntity: (entity) => set({ pickedEntity: entity }),
   hoveredEntity: null,
   setHoveredEntity: (entity) => set({ hoveredEntity: entity }),
+  pickedJoint: null,
+  setPickedJoint: (id) => set({ pickedJoint: id }),
+  hoveredJoint: null,
+  setHoveredJoint: (id) => set({ hoveredJoint: id }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

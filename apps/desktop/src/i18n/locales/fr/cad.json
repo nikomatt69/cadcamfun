@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Développé de tôle",
   "cad.flat.sheet": "Fonction tôle",
   "cad.flat.empty": "Aucune fonction tôle de cette pièce n'a pu être développée.",
-  "cad.flat.summary": "Longueur développée {length} mm, largeur {width} mm, {bends} plis"
+  "cad.flat.summary": "Longueur développée {length} mm, largeur {width} mm, {bends} plis",
+  "cad.joint.title": "Liaison",
+  "cad.joint.clear": "Désélectionner",
+  "cad.joint.name": "Nom",
+  "cad.joint.type": "Type",
+  "cad.joint.parent": "Parent",
+  "cad.joint.child": "Enfant",
+  "cad.joint.origin": "Origine",
+  "cad.joint.axis": "Axe",
+  "cad.joint.secondaryAxis": "Second axe",
+  "cad.joint.limits": "Limites",
+  "cad.joint.value": "Valeur"
 }

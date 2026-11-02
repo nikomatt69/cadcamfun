@@ -1044,5 +1044,16 @@
   "cad.flat.title": "Planificação de chapa",
   "cad.flat.sheet": "Recurso de chapa",
   "cad.flat.empty": "Nenhum recurso de chapa desta peça pôde ser planificado.",
-  "cad.flat.summary": "Comprimento planificado {length} mm, largura {width} mm, {bends} dobras"
+  "cad.flat.summary": "Comprimento planificado {length} mm, largura {width} mm, {bends} dobras",
+  "cad.joint.title": "Junta",
+  "cad.joint.clear": "Desmarcar",
+  "cad.joint.name": "Nome",
+  "cad.joint.type": "Tipo",
+  "cad.joint.parent": "Pai",
+  "cad.joint.child": "Filho",
+  "cad.joint.origin": "Origem",
+  "cad.joint.axis": "Eixo",
+  "cad.joint.secondaryAxis": "Segundo eixo",
+  "cad.joint.limits": "Limites",
+  "cad.joint.value": "Valor"
 }
