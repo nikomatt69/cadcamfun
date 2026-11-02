@@ -193,13 +193,13 @@ export function ProjectsScreen(): JSX.Element {
           <X size={13} aria-hidden="true" />{t("manuals.clear")}
         </button>
         <section aria-labelledby="recent-heading">
-          <h2 id="recent-heading" class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
+          <h2 id="recent-heading" class="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
           <Show when={app.recents().length > 0} fallback={<p class="text-xs text-slate-500 dark:text-slate-400">{t("projects.recentEmpty")}</p>}>
             <ul class="flex flex-col gap-0.5">
               <For each={app.recents()}>{(recent) => (
                 <li class="flex min-h-7 items-center justify-between gap-2 rounded-[4px] px-1.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">
                   <button type="button" class="truncate text-left text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200" onClick={() => open(recent)}>{recent.name}</button>
-                  <span class="shrink-0 text-[10.5px] tabular-nums text-slate-500">{formatRecent(recent.openedAt)}</span>
+                  <span class="shrink-0 text-[11px] tabular-nums text-slate-500">{formatRecent(recent.openedAt)}</span>
                 </li>
               )}</For>
             </ul>
@@ -215,7 +215,7 @@ export function ProjectsScreen(): JSX.Element {
         <Show
           when={filtered().length > 0}
           fallback={
-            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} preview={search() === "" ? "projects" : undefined} title={t("profile.emptyProjects")} hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
+            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} preview={search() === "" ? "projects" : undefined} title={t("profile.emptyProjects")} hint={search() !== "" ? t("pages.no.toolpaths.match.your.search.criteria") : t("projects.empty")}>
               <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("projects.create")}</button>}>
                 <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
               </Show>

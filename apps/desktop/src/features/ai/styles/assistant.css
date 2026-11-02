@@ -1467,6 +1467,12 @@
   background: var(--assistant-surface);
 }
 
+.assistant-thinking-subtitle {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--assistant-muted);
+}
+
 .assistant-thinking-title {
   font-size: 12px;
   font-weight: 500;

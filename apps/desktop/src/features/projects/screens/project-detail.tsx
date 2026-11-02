@@ -141,7 +141,7 @@ export function ProjectDetailScreen(): JSX.Element {
   const stop = (action: () => void) => (event: MouseEvent): void => { event.stopPropagation(); action() }
   /** Version history of one item: the commits that touched its file in the project's repository. */
   const historyButton = (directory: "drawings" | "components" | "toolpaths", row: Card): JSX.Element => (
-    <button type="button" class={ICON_BUTTON} title={t("vcs.tab.history")} aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={16} /></button>
+    <button type="button" class={ICON_BUTTON} title={t("vcs.tab.history")} aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={14} aria-hidden="true" /></button>
   )
 
   const empty = (icon: JSX.Element, title: string, text: string, label: string, kind: ModalKind, preview: "cad" | "cam" | "library"): JSX.Element => (
@@ -194,8 +194,8 @@ export function ProjectDetailScreen(): JSX.Element {
       backLabel={t("pages.back.to.projects")}
       actions={<Show when={project()}>
         <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>{t("vcs.title")}</button>
-        <button type="button" class={TOOLBAR_BUTTON} onClick={() => open("edit")}><Edit size={16} aria-hidden="true" />{t("cad.ribbon.edit")}</button>
-        <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} aria-hidden="true" />{t("projects.delete")}</button>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => open("edit")}><Edit size={14} aria-hidden="true" />{t("cad.ribbon.edit")}</button>
+        <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={14} aria-hidden="true" />{t("projects.delete")}</button>
       </Show>}
     >
       <div class="mx-auto w-full max-w-7xl">
@@ -218,9 +218,9 @@ export function ProjectDetailScreen(): JSX.Element {
                     <div class="min-w-0">
                       <h2 class="truncate text-[13px] font-semibold text-slate-900 dark:text-white">{current().name}</h2>
                       <Show when={current().description}><p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{current().description}</p></Show>
-                      <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-                        <div class="flex items-center gap-1"><Clock size={13} aria-hidden="true" /><span>{t("plugins.detail.updatedLabel")} {formatDate(current().updatedAt)}</span></div>
-                        <div class="flex items-center gap-1"><Users size={13} aria-hidden="true" /><span>{current().organizationId ? t("shell.organization") : t("pages.personal")}</span></div>
+                      <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">">
+                        <div class="flex items-center gap-2"><Clock size={14} aria-hidden="true" /><span>{t("plugins.detail.updatedLabel")} {formatDate(current().updatedAt)}</span></div>
+                        <div class="flex items-center gap-2"><Users size={14} aria-hidden="true" /><span>{current().organizationId ? t("shell.organization") : t("pages.personal")}</span></div>
                       </div>
                     </div>
                   </div>
@@ -237,9 +237,9 @@ export function ProjectDetailScreen(): JSX.Element {
                     {cards(drawings(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><Grid size={28} /></div>, (row) => navigate(`/cad?drawingId=${row.id}`), (row) => (
                       <>
                         {historyButton("drawings", row)}
-                        <button type="button" class={ICON_BUTTON} title={t("browser.duplicate")} aria-label={`Duplicate ${row.name}`} onClick={stop(() => void duplicateDrawing(row))}><Copy size={16} /></button>
-                        <button type="button" class={ICON_BUTTON} title={t("cad.download")} aria-label={`Download ${row.name}`} onClick={stop(() => void downloadDrawing(row))}><Download size={16} /></button>
-                        <button type="button" class={`${ICON_BUTTON} hover:!text-red-600`} title={t("projects.delete")} aria-label={`Delete ${row.name}`} onClick={stop(() => void deleteDrawing(row))}><Trash2 size={16} /></button>
+                        <button type="button" class={ICON_BUTTON} title={t("browser.duplicate")} aria-label={`Duplicate ${row.name}`} onClick={stop(() => void duplicateDrawing(row))}><Copy size={14} aria-hidden="true" /></button>
+                        <button type="button" class={ICON_BUTTON} title={t("cad.download")} aria-label={`Download ${row.name}`} onClick={stop(() => void downloadDrawing(row))}><Download size={14} aria-hidden="true" /></button>
+                        <button type="button" class={`${ICON_BUTTON} hover:!text-red-600`} title={t("projects.delete")} aria-label={`Delete ${row.name}`} onClick={stop(() => void deleteDrawing(row))}><Trash2 size={14} aria-hidden="true" /></button>
                       </>
                     ), true)}
                   </Show>

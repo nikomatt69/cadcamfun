@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "../../../app/screen-queries.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { t } from "../../../i18n/index.ts"
 import { readGithubToken, saveGithubToken } from "../../../app/github-token.ts"
+import { ArrowLeft } from "lucide-solid"
 import { WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
 import { CommitScene } from "../../../shared/ui/stageshow/index.ts"
 
@@ -410,7 +411,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
           <p class="text-sm text-slate-500">{t("vcs.workflows.empty")}</p>
         </Show>
 
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
           <input class={INPUT} placeholder={t("vcs.workflows.name")} value={newName()} onInput={(e) => setNewName(e.currentTarget.value)} />
           <button class={BTN} onClick={startNew}>{t("vcs.workflows.create")}</button>
         </div>
@@ -432,7 +433,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
                   onInput={(e) => setDraft(e.currentTarget.value)}
                 />
                 <p class="text-xs text-slate-500">{t("vcs.workflows.stepsHint")}</p>
-                <div class="flex gap-2">
+                <div class="flex items-center gap-2">
                   <input class={INPUT} placeholder={t("vcs.workflows.savePrompt")} value={commitMessage()} onInput={(e) => setCommitMessage(e.currentTarget.value)} />
                   <button class={PRIMARY} disabled={busy() || !commitMessage().trim()} onClick={save}>{t("vcs.workflows.save")}</button>
                   <button class={BTN} onClick={() => { setEditing(false); setDraft(file().content) }}>{t("projects.cancel")}</button>
@@ -499,7 +500,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
                 <li>
                   <button type="button" aria-pressed={selected()?.oid === c.oid} class={`w-full rounded-md px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${selected()?.oid === c.oid ? "bg-blue-50 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`} onClick={() => selectCommit(c)}>
                     <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
-                    <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1 text-xs text-blue-700">{b}</span>}</For>
+                    <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1.5 text-xs text-blue-700">{b}</span>}</For>
                     <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-slate-500">{t("vcs.history.merge")}</span></Show>
                     <span class="block text-xs text-slate-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</span>
                   </button>
@@ -531,7 +532,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
               )}
             </For>
           </ul>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-2">
             <input class={INPUT} placeholder={t("vcs.branches.name")} value={newBranch()} onInput={(e) => setNewBranch(e.currentTarget.value)} />
             <button class={PRIMARY} disabled={busy() || !newBranch().trim() || head() === null} onClick={createBranch}>{t("vcs.branches.create")}</button>
           </div>
@@ -542,7 +543,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
         <section class="space-y-4">
           <Show when={!openPull()} fallback={
             <div class={`${CARD} space-y-3`}>
-              <button class={BTN} onClick={() => setOpenPull(undefined)}>←</button>
+              <button type="button" class={BTN} aria-label={t("common.back")} onClick={() => setOpenPull(undefined)}><ArrowLeft size={14} aria-hidden="true" /></button>
               <h2 class="text-lg font-medium">#{(loadedPull()?.pullRequest ?? openPull()!.pull).number} {(loadedPull()?.pullRequest ?? openPull()!.pull).title}<span class={PILL((loadedPull()?.pullRequest ?? openPull()!.pull).state)}>{(loadedPull()?.pullRequest ?? openPull()!.pull).state}</span><Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
               <p class="text-sm text-slate-500">{(loadedPull()?.pullRequest ?? openPull()!.pull).head} → {(loadedPull()?.pullRequest ?? openPull()!.pull).base}</p>
               <Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).body}><p class="text-sm">{(loadedPull()?.pullRequest ?? openPull()!.pull).body}</p></Show>
@@ -570,7 +571,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
             <div class={`${CARD} space-y-2`}>
               <h3 class="font-medium">{t("vcs.pulls.open")}</h3>
               <input class={INPUT} placeholder={t("vcs.pulls.title")} value={prTitle()} onInput={(e) => setPrTitle(e.currentTarget.value)} />
-              <div class="flex gap-2">
+              <div class="flex items-center gap-2">
                 <select class={INPUT} aria-label={t("vcs.pulls.head")} value={prHead()} onChange={(e) => setPrHead(e.currentTarget.value)}><For each={Object.keys(branches())}>{(b) => <option value={b}>{b}</option>}</For></select>
                 <select class={INPUT} aria-label={t("vcs.pulls.base")} value={prBase()} onChange={(e) => setPrBase(e.currentTarget.value)}><For each={Object.keys(branches())}>{(b) => <option value={b}>{b}</option>}</For></select>
               </div>
@@ -610,7 +611,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
           <label class="block text-sm">{t("vcs.github.remote")}<input class={`${INPUT} mt-1`} placeholder="owner/repo" value={remote()} onInput={(e) => setRemote(e.currentTarget.value)} /></label>
           <label class="block text-sm">{t("vcs.github.token")}<input type="password" autocomplete="off" class={`${INPUT} mt-1`} value={token()} onInput={(e) => setToken(e.currentTarget.value)} /></label>
           <p class="text-xs text-slate-500">{t("vcs.github.tokenHint")}</p>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-2">
             <button class={BTN} disabled={busy()} onClick={saveRemote}>{t("vcs.github.save")}</button>
             <button class={PRIMARY} disabled={busy() || !remote().trim() || !token().trim()} onClick={() => sync("push")}>{t("vcs.github.push")}</button>
             <button class={BTN} disabled={busy() || !remote().trim() || !token().trim()} onClick={() => sync("pull")}>{t("vcs.github.pull")}</button>

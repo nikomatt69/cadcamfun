@@ -271,9 +271,14 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
               <div class="ui-dots" aria-label={t("ai.thinking")}>
                 <span /><span /><span />
               </div>
-              <span class="assistant-thinking-title">
-                {t("ai.thinking.processing")}
-              </span>
+              <div class="flex flex-col">
+                <span class="assistant-thinking-title">
+                  {t("ai.thinking.processing")}
+                </span>
+                <span class="assistant-thinking-subtitle">
+                  {t("ai.runtime.streaming")}
+                </span>
+              </div>
             </div>
           </Show>
           <Show when={planAwaitingApproval(ai.agent(), ai.status(), ai.messages())}>
