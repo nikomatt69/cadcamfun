@@ -106,11 +106,11 @@ export function Modal(props: ModalProps): JSX.Element {
             ref={onDialogRef}
             class={props.variant === "workspace" ? "bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-2rem)] overflow-y-auto" : sizeClass(size())}
             style={props.variant === "workspace" ? { "font-family": '"CADCAM Rounded", sans-serif', "font-size": "12px", "line-height": "1.4" } : undefined}
-            // Entry: scale 0.96 + y 24, never scale(0) (Emil). Exit mirrors
+            // Entry: scale 0.98 + y 12, never scale(0) (Emil). Exit mirrors
             // entry so the modal returns where it came from.
-            initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
             animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-            exit={reduced() ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
+            exit={reduced() ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
             transition={{ duration: 0.24, easing: [0.23, 1, 0.32, 1] }}
             role="dialog"
             aria-modal="true"
