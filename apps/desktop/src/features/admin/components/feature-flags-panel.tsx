@@ -13,25 +13,32 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { Check, Settings, Shield, X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
-import { ADMIN_EMAILS, LOCAL_ADMIN_EMAIL, featureFlagService, isAdminUser } from "./feature-flags.ts"
-import { Button, Field, Notice, SectionHeader, TextField } from "../../../shared/components/enterprise.tsx"
+import { ADMIN_EMAILS, LOCAL_ADMIN_EMAIL, featureFlagService, isAdminUser, type FeatureFlag } from "./feature-flags.ts"
+import { Field, Notice, SectionHeader, TextField } from "../../../shared/components/enterprise.tsx"
 import { FlagsScene } from "../../../shared/ui/stageshow/index.ts"
 
 export function AdminFeatureFlagsPanel(): JSX.Element | null {
   const [selectedUser, setSelectedUser] = createSignal("")
+  const [revision, setRevision] = createSignal(0)
 
   if (!isAdminUser(LOCAL_ADMIN_EMAIL)) return null
 
   const allFeatures = featureFlagService.getAllFeatureFlags()
   const countWith = (prefix: string): number => allFeatures.filter((flag) => flag.startsWith(prefix)).length
 
-  const addUserOverride = (userId: string, feature: string, enabled: boolean): void => {
+  const userId = (): string => selectedUser().trim()
+  const overridden = (feature: FeatureFlag): boolean | undefined => {
+    void revision()
+    return featureFlagService.listOverrides(userId()).find((entry) => entry.featureFlag === feature)?.enabled
+  }
+  const addUserOverride = (feature: FeatureFlag, enabled: boolean): void => {
     featureFlagService.addAdminOverride({
-      userId,
-      featureFlag: feature as never,
+      userId: userId(),
+      featureFlag: feature,
       enabled,
       reason: `Admin override - ${enabled ? "enabled" : "disabled"} by admin`
     })
+    setRevision((value) => value + 1)
   }
 
   return (
@@ -83,7 +90,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
             />
           </Field>
 
-          <Show when={!selectedUser()}>
+          <Show when={!userId()}>
             <div
               aria-hidden="true"
               style={{ "max-width": "28rem", overflow: "hidden", border: "1px solid var(--ent-border)", "border-radius": "var(--ent-radius)" }}
@@ -92,7 +99,7 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
             </div>
           </Show>
 
-          <Show when={selectedUser()}>
+          <Show when={userId()}>
             <div class="ent-card">
               <div class="ent-card__head">
                 <h3 class="ent-section__title">{t("admin.ff.available")}</h3>
@@ -108,18 +115,22 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
                         <button
                           type="button"
                           class="ent-btn ent-btn--ghost"
-                          style={{ "min-height": "20px", padding: "0 6px", "font-size": "11px", color: "var(--ent-ok)" }}
-                          title={feature}
-                          onClick={() => addUserOverride(selectedUser(), feature, true)}
+                          style={{ "min-height": "28px", padding: "0 8px", "font-size": "11px", color: "var(--ent-ok)", background: overridden(feature) === true ? "var(--ent-ok-soft)" : undefined }}
+                          aria-label={`${t("mcp.settings.enable")}: ${feature.replace(/_/g, " ")}`}
+                          aria-pressed={overridden(feature) === true}
+                          title={t("mcp.settings.enable")}
+                          onClick={() => addUserOverride(feature, true)}
                         >
                           <Check size={12} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
                           class="ent-btn ent-btn--ghost"
-                          style={{ "min-height": "20px", padding: "0 6px", "font-size": "11px", color: "var(--ent-bad)" }}
-                          title={feature}
-                          onClick={() => addUserOverride(selectedUser(), feature, false)}
+                          style={{ "min-height": "28px", padding: "0 8px", "font-size": "11px", color: "var(--ent-bad)", background: overridden(feature) === false ? "var(--ent-bad-soft)" : undefined }}
+                          aria-label={`${t("mcp.settings.disable")}: ${feature.replace(/_/g, " ")}`}
+                          aria-pressed={overridden(feature) === false}
+                          title={t("mcp.settings.disable")}
+                          onClick={() => addUserOverride(feature, false)}
                         >
                           <X size={12} aria-hidden="true" />
                         </button>

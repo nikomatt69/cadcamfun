@@ -1,17 +1,13 @@
 /**
  * `ConversationDetail` — port of `.reference/src/components/chat/ConversationDetail.tsx`.
  *
- * The legacy component renders three shapes: a spinner while `fetchConversation` runs,
- * the "Seleziona una conversazione" empty state when the store has no active
- * conversation, and the thread itself. v6 exposes no conversation endpoint, so the store
- * can never hold one and the empty state is the honest, permanent answer — the thread,
- * the composer, the typing indicator and the uploaders all sit behind that branch.
- *
- * The props mirror the legacy call site (`conversationId`, `organizationId`, `onBack`)
- * so the page keeps reading like the original; nothing else is reachable.
+ * The desktop API does not expose a conversation feed. A direct conversation URL
+ * therefore explains the unavailable feature instead of appearing to load a thread,
+ * while keeping a route back to the list.
  */
-import type { JSX } from "solid-js"
+import { Show, type JSX } from "solid-js"
 import { t } from "../../../i18n/index.ts"
+import { TOOLBAR_BUTTON } from "../../../shared/components/WorkspacePage.tsx"
 import { ChatEmpty } from "./chat-empty.tsx"
 
 export interface ConversationDetailProps {
@@ -20,6 +16,13 @@ export interface ConversationDetailProps {
   readonly onBack?: () => void
 }
 
-export function ConversationDetail(_props: ConversationDetailProps): JSX.Element {
-  return <ChatEmpty title={t("chat.select")} hint={t("chat.selectHintDetail")} />
+export function ConversationDetail(props: ConversationDetailProps): JSX.Element {
+  return <div class="flex h-full min-h-64 flex-col">
+    <Show when={props.onBack}>
+      <div class="border-b border-slate-200 p-3 dark:border-slate-700/70">
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => props.onBack?.()}>{t("chat.backToChat")}</button>
+      </div>
+    </Show>
+    <div class="flex flex-1 items-center justify-center"><ChatEmpty title={t("chat.title")} hint={t("legacy.chatGap")} /></div>
+  </div>
 }

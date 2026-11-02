@@ -19,7 +19,7 @@
 import { Show, type JSX } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { Building, MessageSquare } from "lucide-solid"
-import { StageEmpty, StageLoading, TOOLBAR_PRIMARY, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
+import { StageEmpty, StageError, StageLoading, TOOLBAR_PRIMARY, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 import { ConversationList } from "../components/conversation-list.tsx"
@@ -65,11 +65,11 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
     </WorkspaceDetail>
   )
 
-  /** The two-column layout: the conversation list and the main panel, filling the page. */
+  /** The thread stacks below navigation when the page column is narrow. */
   const columns = (main: JSX.Element): JSX.Element => (
-    <div class="flex min-h-[480px] flex-1 gap-3">
-      <div class={`w-1/3 ${CHAT_PANEL}`}><ConversationList organizationId={params.id} /></div>
-      <div class={`w-2/3 ${CHAT_PANEL}`}>{main}</div>
+    <div class="grid min-h-[480px] flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]">
+      <div class={CHAT_PANEL}><ConversationList organizationId={params.id} /></div>
+      <div class={CHAT_PANEL}>{main}</div>
     </div>
   )
 
@@ -85,10 +85,16 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
 
   return (
     <Show when={organization.data() !== undefined || !organization.loading()} fallback={loadingBlock()}>
+      <Show when={!organization.error()} fallback={
+        <WorkspaceDetail title={t("chat.title")} backHref="/organizations" backLabel={t("chat.backToOrgs")}>
+          <StageError message={`${t("common.error")}: ${organization.error()}`} />
+        </WorkspaceDetail>
+      }>
       <Show when={organization.data()} fallback={notFoundBlock()}>
         <WorkspaceDetail title={title()} subtitle={organization.data()?.name} backHref={backHref()} backLabel={backLabel()}>
           {columns(mainPanel())}
         </WorkspaceDetail>
+      </Show>
       </Show>
     </Show>
   )
