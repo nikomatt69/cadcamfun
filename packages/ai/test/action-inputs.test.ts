@@ -52,6 +52,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "library_edit.delete": { accept: [{ kind: "tool", id: "t", confirm: true }], refuse: [{ kind: "tool", id: "t" }, { kind: "part", id: "t", confirm: true }] },
   "memory.recall": { accept: [{}, { prefix: "cam." }], refuse: [{ prefix: 1 }] },
   "memory.context_read": { accept: [{}], refuse: [[]] },
+  "memory.brain_read": { accept: [{}, { file: "habits", offset: 10, maxChars: 500 }], refuse: [{ file: "other" }, { maxChars: 0 }, { offset: -1 }] },
   "memory_edit.remember": { accept: [{ key: "units.default", value: "mm" }], refuse: [{ key: "has space", value: "mm" }, { key: "k", value: "" }, { key: "k".repeat(81), value: "v" }] },
   "memory_edit.context_update": { accept: [{ heading: "Tolerances", content: "ISO 2768-m" }], refuse: [{ heading: "", content: "x" }, { heading: "h", content: "" }, { heading: "h".repeat(81), content: "x" }] },
   "research.search": { accept: [{ query: "6061 cutting speed" }, { query: "x", numResults: 8 }], refuse: [{ query: "" }, { query: "x", numResults: 9 }, { query: "x", numResults: 1.5 }] },

@@ -129,6 +129,11 @@ export interface ToolHandlersShape {
   recall(prefix?: string): Promise<unknown>
   /** The project's standing AI context (`ai.projectcontext.<projectId>`): the CAD/CAM answer to `AGENTS.md`. */
   projectContext(projectId: string): Promise<unknown>
+  /**
+   * The host's own memory files for the project, read whole and paged (the context block carries only a bounded excerpt). Absent in a
+   * host without an embedded AI host; the action then says so.
+   */
+  brain?(projectId: string, input: { readonly file: "memory" | "habits"; readonly offset: number; readonly maxChars: number }): Promise<unknown>
   /** Replaces that document; returns what the store actually kept, never what the caller intended to write. */
   saveProjectContext(projectId: string, text: string): Promise<unknown>
   /** Components that are instantiated in the active CAD drawing. */

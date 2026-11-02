@@ -58,6 +58,36 @@ export const readProjectMemoryFiles = async (host: ProjectHost): Promise<Project
   return value
 }
 
+/** An explicit, paged read may go further than the injected excerpt, but a runaway file is still refused rather than loaded. */
+const MAX_READ_BYTES = 1024 * 1024
+
+export interface BrainPage {
+  readonly ok: true
+  readonly file: "memory" | "habits"
+  readonly offset: number
+  readonly content: string
+  readonly totalChars: number
+  readonly nextOffset: number | null
+}
+
+/**
+ * One page of a Brain file, so the assistant can read what the bounded context excerpt cut. A missing file is an empty document, not
+ * a failure; a file over `MAX_READ_BYTES` is refused with its size.
+ */
+export const readBrainPage = async (directory: string, file: "memory" | "habits", offset: number, maxChars: number): Promise<BrainPage | { readonly ok: false; readonly error: string }> => {
+  const handle = Bun.file(file === "memory" ? projectMemoryFile(directory) : projectHabitsFile(directory))
+  try {
+    if (!(await handle.exists())) return { ok: true, file, offset, content: "", totalChars: 0, nextOffset: null }
+    if (handle.size > MAX_READ_BYTES) return { ok: false, error: `The ${file} file is ${handle.size} bytes, over the ${MAX_READ_BYTES} bytes this action reads.` }
+    const text = await handle.text()
+    const content = text.slice(offset, offset + maxChars)
+    const end = offset + content.length
+    return { ok: true, file, offset, content, totalChars: text.length, nextOffset: end < text.length ? end : null }
+  } catch (error) {
+    return { ok: false, error: `The ${file} file could not be read: ${error instanceof Error ? error.message : String(error)}` }
+  }
+}
+
 export const invalidateProjectMemoryFiles = (directory?: string): void => {
   if (directory === undefined) cache.clear()
   else cache.delete(directory)

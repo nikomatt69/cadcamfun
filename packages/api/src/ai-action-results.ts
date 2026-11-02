@@ -261,6 +261,7 @@ const libraryDeleted = Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Li
 
 const recalled = Schema.Array(Schema.StructWithRest(Schema.Struct({ key: str }), [record]))
 const contextDocument = Schema.Struct({ text: str, updatedAt: Schema.optionalKey(str) })
+const brainDocument = Schema.Struct({ ok: Schema.Literal(true), file: Schema.Literals(["memory", "habits"]), offset: int, content: str, totalChars: int, nextOffset: nullable(int) })
 const remembered = Schema.Struct({ ok: Schema.Literal(true), key: str })
 const contextUpdated = Schema.Struct({ ok: Schema.Literal(true), text: str, updatedAt: Schema.optionalKey(str), changed: Schema.Boolean })
 /** Excerpts are untrusted text: the result says where they came from, never what to do with them. */
@@ -444,6 +445,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
 
   "memory.recall": read(recalled),
   "memory.context_read": read(contextDocument),
+  "memory.brain_read": read(brainDocument),
   "memory_edit.remember": write(["memory"], remembered),
   "memory_edit.context_update": write(["context"], contextUpdated),
 

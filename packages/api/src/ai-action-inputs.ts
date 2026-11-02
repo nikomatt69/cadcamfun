@@ -262,6 +262,12 @@ export type ResearchSearchInput = typeof ResearchSearchInput.Type
 export const MEMORY_ACTION_INPUTS = {
   "memory.recall": Schema.Struct({ prefix: Schema.optionalKey(Schema.String) }),
   "memory.context_read": empty,
+  /** The memory the host keeps for the project (what earlier sessions established) or the working habits file, read whole and paged. */
+  "memory.brain_read": Schema.Struct({
+    file: withDefault(Schema.Literals(["memory", "habits"]), "memory"),
+    offset: withDefault(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 0),
+    maxChars: withDefault(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 20_000 })), 10_000)
+  }),
   "memory_edit.remember": Schema.Struct({
     key: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]{1,80}$/)),
     value: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2000))

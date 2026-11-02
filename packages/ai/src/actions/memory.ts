@@ -22,6 +22,11 @@ export const MEMORY_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
+    id: "memory.brain_read", kind: "read", parameters: INPUTS["memory.brain_read"],
+    run: async (input, { handlers, projectId }) =>
+      handlers.brain?.(projectId, input) ?? { ok: false, error: "The host memory files are not available in this host: use memory action recall and context_read." }
+  }),
+  defineWireAction({
     id: "memory.context_read", kind: "read", replaces: "project_context", parameters: INPUTS["memory.context_read"],
     run: async (_input, { handlers, projectId }) => {
       const entry = await handlers.projectContext(projectId)

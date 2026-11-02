@@ -5,7 +5,7 @@ import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiModes, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type HostToolContext, type ProviderId, type ToolHandlersShape,
-  modToolContributions, modSpecs, isolatedPaths, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
+  modToolContributions, modSpecs, isolatedPaths, projectScratchDir, readBrainPage, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, pmi, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
@@ -1276,6 +1276,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     remember: async (key, value) => { await run(ensureTurnActive); await run(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await run(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
+    brain: async (projectId, input) => readBrainPage(projectScratchDir(isolatedPaths(appConfig.dataDir), projectId), input.file, input.offset, input.maxChars),
     projectContext: async (projectId) => {
       const entry = await run(kv.get(projectContextKey(projectId)))
       // An absent row is an empty document, not a failure: a project that never had rules reads as blank.
