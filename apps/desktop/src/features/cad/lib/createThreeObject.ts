@@ -9,6 +9,7 @@ import { createDisplayEdgeLines, createLines, polylineToSegments } from "../../.
 import { initializeElementTransform } from "./element-transform.ts";
 import { applyMaterialLook, elementMaterialName } from "../../../viewport/render-look.ts";
 import { currentLookTier } from "../../../viewport/render-look-setting.ts";
+import { buildExtraElement, isExtraElement } from "./extra-elements.ts";
 
 /** The edges of solids and curves: a mid-dark grey that lets the face colour show through, not black, so a part reads as one body and not as a drawing of one. */
 const EDGE_STYLE = { color: 0x59606a, opacity: 0.45 } as const
@@ -2400,6 +2401,8 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
       }
 
       default:
+        // text / extrude / grid / tube / lathe: created by the toolbar, built in `extra-elements.ts`.
+        if (isExtraElement(element.type)) return buildExtraElement(element, originOffset);
         console.warn(`Unknown element type: ${element.type}`);
         return null;
     }
