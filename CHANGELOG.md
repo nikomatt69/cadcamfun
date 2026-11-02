@@ -3,6 +3,15 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.72 (November 2026)
+
+## Desktop
+
+- Stageshow refine chat components
+- Stageshow refine chat
+- Stageshow refine ai styles
+- Stageshow refine ai components
+
 ## v0.1.71 (November 2026)
 
 ## Desktop
