@@ -54,6 +54,7 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
   const notFoundBlock = (): JSX.Element => (
     <WorkspaceDetail title={t("chat.title")} backHref="/organizations" backLabel={t("chat.backToOrgs")}>
       <StageEmpty
+        preview="lost"
         icon={isConversation() ? <MessageSquare size={24} aria-hidden="true" /> : <Building size={24} aria-hidden="true" />}
         title={isConversation() ? t("chat.convNotFound") : t("chat.orgNotFound")}
         hint={isConversation() ? t("chat.convNotFoundBody") : t("chat.orgNotFoundBody")}
