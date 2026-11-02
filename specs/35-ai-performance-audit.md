@@ -95,6 +95,17 @@ The goal remains active until the broader owner-requested architecture and perfo
   through the compiled HTTP action interface and receives `ok: true` with one body from its embedded worker.
 - Full-repository tests, native WebKit acceptance and real-provider latency benchmarks were not run.
 
+### Continuation: exact scene operations in the worker (2026-11-02)
+
+The remaining synchronous exact work in the assistant's CAD handlers now runs through one scoped job, `cad-scene`
+(`packages/ai/src/cad-scene-job.ts`): shell (preview and build), offset (preview and build), distance, motion study, exact
+STEP/IGES exchange, fastening, and the fillet, boss, hole and free-form face edits that return a body. The sidecar handlers keep
+authorization, revisions and persistence; they call the job through a typed helper (`sceneJob`) so each operation keeps its own
+result type, and failures read through `kernelFailed` (a deadline or cancel is explained, an internal fault is not leaked). The
+job is cacheable and byte-accounted like `cad-hole`. `packages/ai/test/cad-scene-job.test.ts` checks every operation worker against
+inline (exchange headers carry the write time and are masked), data-not-exception answers, cancellation and the cache. Still
+synchronous: the parametric `validate`/`inspect` paths and project rebuilds; they stay open.
+
 ### Continuation: exports, progress evidence and host timing
 
 - CAD inline-history export rebuilds and encodes in one pure worker job. Exporting saved elements acquires

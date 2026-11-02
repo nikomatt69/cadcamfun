@@ -131,7 +131,7 @@ const active = new Set<() => void>()
 let closing = false
 
 /** The jobs whose result is a pure function of the input, so an identical request can share a run or take the last result. */
-const CACHEABLE: ReadonlySet<KernelJobName> = new Set(["cam-manufacture", "cam-plan", "cam-generate", "cad-analyze", "cad-step", "cad-setups", "cad-hole", "cad-assembly", "cad-rebuild", "cad-sheet", "cad-naming", "cad-export-bodies", "cad-export-scene", "parametric-report", "parametric-diagnosis", "parametric-timeline", "parametric-edit"])
+const CACHEABLE: ReadonlySet<KernelJobName> = new Set(["cam-manufacture", "cam-plan", "cam-generate", "cad-analyze", "cad-step", "cad-setups", "cad-hole", "cad-scene", "cad-assembly", "cad-rebuild", "cad-sheet", "cad-naming", "cad-export-bodies", "cad-export-scene", "parametric-report", "parametric-diagnosis", "parametric-timeline", "parametric-edit"])
 
 /** What a result holds in memory, roughly: the program text dominates (the IR and the claims weigh a few times its size). */
 const bytesOf = (name: KernelJobName, value: unknown): number => {
@@ -142,7 +142,7 @@ const bytesOf = (name: KernelJobName, value: unknown): number => {
   if (name === "cam-generate") return (value as KernelJobs["cam-generate"]["output"]).response.gcode.length * 3 + 100_000
   // A STEP file is text of the size of the model; the other CAD results are reports and edited scenes of a few hundred kilobytes.
   if (name === "cad-step") return ((value as KernelJobs["cad-step"]["output"]).step?.length ?? 0) * 2 + 100_000
-  if (name === "cad-hole") return JSON.stringify(value).length * 2 + 50_000
+  if (name === "cad-hole" || name === "cad-scene") return JSON.stringify(value).length * 2 + 50_000
   if (name === "cad-naming" || name === "cad-export-bodies" || name === "cad-export-scene") return JSON.stringify(value).length * 2 + 4_096
   if (name.startsWith("parametric-")) return JSON.stringify(value).length * 2 + 4_096
   if (name === "cad-sheet") return (value as KernelJobs["cad-sheet"]["output"]).svg.length * 3 + 100_000

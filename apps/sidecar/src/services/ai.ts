@@ -41,7 +41,7 @@ import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
 import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
-import { KernelJobError, featureEditOf, normalizeElementBatch, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { type CadSceneInput, type CadSceneResult, KernelJobError, featureEditOf, normalizeElementBatch, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -139,6 +139,9 @@ const toolHandlers = Effect.gen(function*() {
     const signal = options.signal ?? actingCell.turn(local).signal
     return runKernelJob(name, input, { ...options, ...(signal !== undefined ? { signal } : {}) })
   }
+  /** One exact-kernel scene operation in a worker; the result type is the one of the named operation. */
+  const sceneJob = async <O extends keyof CadSceneResult>(input: Extract<CadSceneInput, { readonly op: O }>): Promise<CadSceneResult[O]> =>
+    (await runOwnedKernelJob("cad-scene", input)) as CadSceneResult[O]
   /** Runs the kernel in its worker, announcing the run on the project's live stream (desktop and phone follow the same progress). */
   const manufactureRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-manufacture">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
@@ -703,8 +706,8 @@ const toolHandlers = Effect.gen(function*() {
     cadShell: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
-      try { return { ...cad.sceneShell(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? []), ...where(loaded) } }
-      catch (error) { return { ok: false, error: `The shell analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+      try { return { ...await sceneJob({ op: "shell", elements: loaded.elements, id: input.id, thickness: input.thickness, ...(input.open !== undefined ? { open: input.open } : {}), ...(input.wallByFace !== undefined ? { wallByFace: input.wallByFace } : {}) }), ...where(loaded) } }
+      catch (error) { return kernelFailed("The shell analysis failed", error) }
     },
     cadStoreBodies: async (projectId, bodies) => {
       { const denied = await refused(projectId); if (denied) return denied }
@@ -723,19 +726,14 @@ const toolHandlers = Effect.gen(function*() {
       if (input.format === "parasolid") return cad.brep.parasolidDiagnostic()
       const loaded = await load(projectId)
       try {
-        const scene = cad.sceneParts(cad.selectElements(loaded.elements, input.ids)), ids = input.ids === undefined ? undefined : new Set(input.ids)
-        const parts = scene.parts.filter((p) => ids === undefined || ids.has(p.id))
-        const missing = input.ids?.filter((id) => !parts.some((p) => p.id === id)) ?? []
-        if (parts.length === 0 || missing.length > 0 || scene.skipped.length > 0) return { ok: false, error: "Some requested elements have no exact solid to export.", skipped: scene.skipped, missing }
-        const content = input.format === "iges" ? cad.brep.writeIgesBreps(parts) : cad.brep.writeStepBreps(parts)
-        return { ok: true, format: input.format, content, parts: parts.length, warnings: [], ...where(loaded) }
-      } catch (error) { return { ok: false, error: `Exact export failed: ${error instanceof Error ? error.message : String(error)}` } }
+        return { ...await sceneJob({ op: "exchange", elements: loaded.elements, format: input.format, ...(input.ids !== undefined ? { ids: input.ids } : {}) }), ...where(loaded) }
+      } catch (error) { return kernelFailed("Exact export failed", error) }
     },
     cadFasten: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId, true)
       try {
-        const r = cad.fastenScene(loaded.elements, { ...(input.washers !== undefined ? { washers: input.washers } : {}) })
+        const r = await sceneJob({ op: "fasten", elements: loaded.elements, ...(input.washers !== undefined ? { washers: input.washers } : {}) })
         const unfastened = r.unfastened.slice(0, 20).map((u) => ({ bodies: u.bodies, at: u.at, reason: u.reason }))
         if (r.elements.length === 0) return { ok: true, added: [], plans: 0, existing: r.existing, unfastened, skipped: r.skipped, note: r.unfastened.length > 0 ? "No stack of holes could be fastened; the reasons are listed." : "Every shared hole already has its fastener, or the drawing has none." }
         if (r.elements.length > 400) return { ok: false, error: `${r.elements.length} fasteners would be inserted; fasten fewer parts at a time.` }
@@ -745,7 +743,7 @@ const toolHandlers = Effect.gen(function*() {
           ok: true, added: created.map((e) => ({ id: e.id, name: e.name, role: (e["metadata"] as { fastener?: { role?: string } } | undefined)?.fastener?.role })),
           plans: r.plans.length, existing: r.existing, unfastened, skipped: r.skipped, ...where(loaded)
         }
-      } catch (error) { return { ok: false, error: `Fastening failed: ${error instanceof Error ? error.message : String(error)}` } }
+      } catch (error) { return kernelFailed("Fastening failed", error) }
     },
     cadExportBodies: async (projectId, ids, signal) => {
       { const denied = await refused(projectId); if (denied) return { ok: false as const, error: (denied as { error?: string }).error ?? "Not allowed." } }
@@ -773,23 +771,23 @@ const toolHandlers = Effect.gen(function*() {
     cadOffset: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
-      try { const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance); return { ...(r.ok ? r.report : r), ...where(loaded) } }
-      catch (error) { return { ok: false, error: `The offset analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+      try { const r = await sceneJob({ op: "offset", elements: loaded.elements, id: input.id, distance: input.distance }); return { ...(r.ok ? r.report : r), ...where(loaded) } }
+      catch (error) { return kernelFailed("The offset analysis failed", error) }
     },
     cadMotion: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
-      try { return { ...cad.sceneMotion(loaded.elements, input.model, input.sweep), ...where(loaded) } }
-      catch (error) { return { ok: false, error: `The motion study failed: ${error instanceof Error ? error.message : String(error)}` } }
+      try { return { ...await sceneJob({ op: "motion", elements: loaded.elements, model: input.model, sweep: input.sweep }), ...where(loaded) } }
+      catch (error) { return kernelFailed("The motion study failed", error) }
     },
     cadBuildShell: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        const r = cad.sceneShellBody(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? [])
+        const r = await sceneJob({ op: "shell-body", elements: loaded.elements, id: input.id, thickness: input.thickness, ...(input.open !== undefined ? { open: input.open } : {}), ...(input.wallByFace !== undefined ? { wallByFace: input.wallByFace } : {}) })
         if (!r.ok) return r
         return storeKernelBody(loaded, r.brep, `${r.report.name} shell`)
-      } catch (error) { return { ok: false, error: `The shell construction failed: ${error instanceof Error ? error.message : String(error)}` } }
+      } catch (error) { return kernelFailed("The shell construction failed", error) }
     },
     cadHole: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
@@ -809,7 +807,7 @@ const toolHandlers = Effect.gen(function*() {
         if (input.nurbs !== undefined) {
           const edit = cad.nurbsEditOf(input)
           if (typeof edit === "string") return { ok: false, error: edit }
-          const n = cad.sceneNurbsEditBody(loaded.elements, input.id, input.nurbs, edit)
+          const n = await sceneJob({ op: "nurbs-body", elements: loaded.elements, id: input.id, nurbs: input.nurbs, edit })
           if (!n.ok) return n
           const label = edit.mode === "draft" ? `${edit.angle}°` : `${edit.distance > 0 ? "+" : ""}${edit.distance}`
           return storeKernelBody(loaded, n.brep, `${n.report.name} free-form face ${input.nurbs} ${edit.mode} ${label}`, {
@@ -817,20 +815,20 @@ const toolHandlers = Effect.gen(function*() {
           })
         }
         if (input.fillet !== undefined) {
-          const f = cad.sceneFilletEditBody(loaded.elements, input.id, input.fillet, input.radius!)
+          const f = await sceneJob({ op: "fillet-body", elements: loaded.elements, id: input.id, fillet: input.fillet, radius: input.radius! })
           if (!f.ok) return f
           return storeKernelBody(loaded, f.brep, `${f.report.name} fillet ${input.fillet} R${input.radius}`, {
             action: "ai.cad.fillet_edit", details: { source: input.id, fillet: input.fillet, radius: input.radius, volumeChange: f.report.volumeChange }
           })
         }
         if (input.boss !== undefined) {
-          const b = cad.sceneBossEditBody(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
+          const b = await sceneJob({ op: "boss-body", elements: loaded.elements, id: input.id, boss: input.boss, diameter: input.diameter!, taper: input.taper ?? 0 })
           if (!b.ok) return b
           return storeKernelBody(loaded, b.brep, `${b.report.name} boss ${input.boss} Ø${input.diameter}${input.taper ? ` ${input.taper}°` : ""}`, {
             action: "ai.cad.boss_edit", details: { source: input.id, boss: input.boss, diameter: input.diameter, ...(input.taper ? { taper: input.taper } : {}), volumeChange: b.report.volumeChange }
           })
         }
-        const r = cad.sceneHoleEditBody(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
+        const r = await sceneJob({ op: "hole-body", elements: loaded.elements, id: input.id, hole: input.hole!, change: input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" } })
         if (!r.ok) return r
         return storeKernelBody(loaded, r.brep, `${r.report.name} hole ${input.hole} ${input.diameter !== undefined ? `Ø${input.diameter}${input.taper ? ` ${input.taper}°` : ""}` : "filled"}`, {
           action: "ai.cad.hole_edit", details: { source: input.id, hole: input.hole, ...(input.diameter !== undefined ? { diameter: input.diameter, ...(input.taper ? { taper: input.taper } : {}) } : { fill: true }), volumeChange: r.report.volumeChange }
@@ -841,16 +839,16 @@ const toolHandlers = Effect.gen(function*() {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance)
+        const r = await sceneJob({ op: "offset", elements: loaded.elements, id: input.id, distance: input.distance })
         if (!r.ok) return r
         return storeKernelBody(loaded, r.brep, `${r.report.name} offset`)
-      } catch (error) { return { ok: false, error: `The offset construction failed: ${error instanceof Error ? error.message : String(error)}` } }
+      } catch (error) { return kernelFailed("The offset construction failed", error) }
     },
     cadDistance: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
-      try { return { ...cad.sceneDistance(loaded.elements, input.firstId, input.secondId), ...where(loaded) } }
-      catch (error) { return { ok: false, error: `The distance analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+      try { return { ...await sceneJob({ op: "distance", elements: loaded.elements, firstId: input.firstId, secondId: input.secondId }), ...where(loaded) } }
+      catch (error) { return kernelFailed("The distance analysis failed", error) }
     },
     webSearch: async (input, signal) => appConfig.aiOffline ? { ok: false, error: "Web search is disabled in offline mode." } : searchWeb(input, signal),
     vision: async (projectId, mode, focus, signal) => {

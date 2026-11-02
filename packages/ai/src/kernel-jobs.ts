@@ -9,6 +9,7 @@ import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExa
 import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } from "./parametric.ts"
 import { parametricDiagnosis, parametricExact, parametricTimeline } from "./parametric-jobs.ts"
 import { editHistory } from "./parametric-edit.ts"
+import { cadScene } from "./cad-scene-job.ts"
 import { normalizeElement } from "./element-catalog.ts"
 import { groupIntoComponents } from "./component-grouping.ts"
 
@@ -187,6 +188,8 @@ export interface KernelJobs {
   readonly "cad-setups": { readonly input: CadSetupsInput; readonly output: ReturnType<typeof cadSetups> }
   readonly "cad-hole": { readonly input: CadHoleInput; readonly output: ReturnType<typeof cadHole> }
   readonly "cad-assembly": { readonly input: CadAssemblyInput; readonly output: ReturnType<typeof cadAssembly> }
+  /** Shell, offset, distance, motion study, exact exchange, fastening and the body-returning feature edits (`cad-scene-job.ts`). */
+  readonly "cad-scene": { readonly input: Parameters<typeof cadScene>[0]; readonly output: ReturnType<typeof cadScene> }
   readonly "cad-rebuild": { readonly input: CadRebuildInput; readonly output: ReturnType<typeof cadRebuild> }
   /** A STEP file as base bodies of a history (spec 72 step 2.2). Not cached: the input is the file. */
   readonly "cad-import-step": { readonly input: CadImportStepInput; readonly output: ReturnType<typeof cadImportStep> }
@@ -227,6 +230,7 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cad-setups": cadSetups,
   "cad-hole": cadHole,
   "cad-assembly": cadAssembly,
+  "cad-scene": cadScene,
   "cad-rebuild": cadRebuild,
   "cad-import-step": cadImportStep,
   "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)

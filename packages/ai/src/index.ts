@@ -95,6 +95,7 @@ export { acceptPart, type AcceptanceCheck, type AcceptanceReport, type CheckResu
 export { KERNEL_CACHE_BYTES, KERNEL_CACHE_ENTRIES, KERNEL_HISTORY_SIZE, KERNEL_JOB_DEADLINE_MS, KERNEL_LEAK_GRACE_MS, KERNEL_MEMORY_SHARE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, reopenKernelJobs, shutdownKernelJobs, kernelWorkerUrl, runKernelJob, runKernelJobEffect, runKernelJobInline, type JobOptions, type KernelJobFailure, type RunOptions } from "./kernel-job.ts"
 export type { KernelJobOutcome, KernelJobRecord } from "./kernel-job.ts"
 export { featureEditOf } from "./kernel-jobs.ts"
+export type { CadSceneInput, CadSceneResult } from "./cad-scene-job.ts"
 export type { CadFeatureEdit, CadFeatureRequest, KernelJobName, KernelJobProgress, KernelJobs } from "./kernel-jobs.ts"
 
 export { MOD_TOOL_IDS, modToolContributions, modToolIds } from "./nikcli/mod-tools.ts"
