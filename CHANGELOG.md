@@ -3,6 +3,41 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.68 (November 2026)
+
+## Core
+
+- Analytics screen at desktop parity (counters, trend, latest activity), gateway admits the four user-scoped analytics reads; ignore .agents
+- Appearance (colour + library material) per body, per feature result and per configuration in the history schema; Body.appearance from the replay; mass from the material density (bodyMasses, historyMass)
+- Persistent references stored in features (spec 41 N4/N5): fillet edges, push/pull and draft faces, face planes (holes) and shell open faces resolve by ref in the mesh and exact replay with 'reference lost' errors; migrateSelectionsToRefs converts old selections without loss
+- A disc face reaches the axis, so the cylinder top rim fillet builds exactly; an exact fillet that leaves edges unblended drops the exact body with the reason instead of staying un-filleted
+
+## Desktop
+
+- Stageshow rehearsal notes
+- Ambient animation loops stop under prefers-reduced-motion, spinners keep turning
+- CAD toolbar and panels drop decorative gradients and transition-all, loading uses the skeleton, tabular status numerals
+- Craft pass over CAM, toolpaths, library, costs, analytics (gradients, spinners, transition-all, scale hovers, tight controls, tabular numerals)
+- Flatten decorative colour gradients (blue-violet-pink, blue-cyan) to a single accent
+- Craft pass over account, billing, profile, organizations and org chat; chat scene
+- Modal enters with a shorter, calmer rise
+- CAD panels take typed numbers through NumberField, drop stock AI sparkle icons, calm viewport control motion
+- Craft pass on system surfaces - skeleton loading, no purple gradients or stock sparkles, calmer card and toast motion
+- Analytics loading states use the skeleton instead of spinners
+- CAM verify/cost/trend scenes, ribbon icons, neutral analytics icons, reduced-motion in G-code editor
+- CAD scenes for the explorer, drawing sheet and PMI empty states
+- Stageshow scenes for phone pairing, updates and background agents
+- Project detail empty tabs show the matching Stageshow scene
+- Stageshow scenes for sign-in, sign-up, one-time code, waitlist and pricing
+- Library, connect and assistant scenes; StageEmpty previews on library, plugins, MCP
+- A finished plan in the Plan agent offers 'Build this plan' (switches to Build and runs it)
+- Stageshow illustrations in the dashboard modules, empty/loading states and error screens
+- /compact <focus> tells the summary what to concentrate on, for that compaction only
+
+## Sidecar
+
+- Kernel queue reserves a worker for people; the assistant's jobs run with assistant priority
+
 ## v0.1.67 (November 2026)
 
 ## Desktop
