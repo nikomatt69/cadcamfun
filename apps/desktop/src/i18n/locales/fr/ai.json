@@ -527,6 +527,8 @@
   "ai.cmd.todos.desc": "Afficher le plan de l'agent : étapes faites, celle en cours, celles en attente",
   "ai.cmd.todos.empty": "L'agent n'a pas encore de plan dans cette conversation.",
   "ai.cmd.plan": "Mode plan",
+  "ai.plan.build": "Exécuter ce plan",
+  "ai.plan.build.hint": "Passer en mode Build et exécuter le plan ci-dessus",
   "ai.cmd.plan.desc": "Passer à l'agent Plan : il lit et planifie, il ne modifie rien. Le texte après /plan est planifié aussitôt",
   "ai.cmd.build": "Mode build",
   "ai.cmd.build.desc": "Passer à l'agent Build, qui modifie le dessin et le programme FAO",

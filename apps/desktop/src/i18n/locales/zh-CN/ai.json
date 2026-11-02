@@ -527,6 +527,8 @@
   "ai.cmd.todos.desc": "显示智能体自己的计划：已完成、进行中和等待中的步骤",
   "ai.cmd.todos.empty": "此对话中智能体还没有计划。",
   "ai.cmd.plan": "计划模式",
+  "ai.plan.build": "执行此计划",
+  "ai.plan.build.hint": "切换到 Build 模式并执行上面的计划",
   "ai.cmd.plan.desc": "切换到 Plan 智能体：只读取和规划，不做任何修改。/plan 之后的文字会立即开始规划",
   "ai.cmd.build": "构建模式",
   "ai.cmd.build.desc": "切换到 Build 智能体，它会编辑图纸和 CAM 程序",

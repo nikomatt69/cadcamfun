@@ -527,6 +527,8 @@
   "ai.cmd.todos.desc": "Show the agent's own plan: steps done, the one under way, those waiting",
   "ai.cmd.todos.empty": "The agent has no plan in this conversation yet.",
   "ai.cmd.plan": "Plan mode",
+  "ai.plan.build": "Build this plan",
+  "ai.plan.build.hint": "Switch to Build mode and carry out the plan above",
   "ai.cmd.plan.desc": "Switch to the Plan agent: it reads and plans, it never changes anything. Text after /plan is planned at once",
   "ai.cmd.build": "Build mode",
   "ai.cmd.build.desc": "Switch to the Build agent, which edits the drawing and the CAM program",

@@ -527,6 +527,8 @@
   "ai.cmd.todos.desc": "Mostra il piano dell'agente: passi completati, quello in corso, quelli in attesa",
   "ai.cmd.todos.empty": "L'agente non ha ancora un piano in questa conversazione.",
   "ai.cmd.plan": "Modalità piano",
+  "ai.plan.build": "Esegui questo piano",
+  "ai.plan.build.hint": "Passa alla modalità Build ed esegui il piano qui sopra",
   "ai.cmd.plan.desc": "Passa all'agente Plan: legge e pianifica, non modifica nulla. Il testo dopo /plan viene pianificato subito",
   "ai.cmd.build": "Modalità build",
   "ai.cmd.build.desc": "Passa all'agente Build, che modifica il disegno e il programma CAM",

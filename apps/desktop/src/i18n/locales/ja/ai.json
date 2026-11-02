@@ -527,6 +527,8 @@
   "ai.cmd.todos.desc": "エージェント自身の計画を表示します。完了、実行中、待機中のステップ",
   "ai.cmd.todos.empty": "この会話にはまだエージェントの計画がありません。",
   "ai.cmd.plan": "プランモード",
+  "ai.plan.build": "このプランを実行",
+  "ai.plan.build.hint": "Buildモードに切り替えて、上のプランを実行します",
   "ai.cmd.plan.desc": "Plan エージェントに切り替えます。読み取りと計画のみで、何も変更しません。/plan の後のテキストはすぐに計画されます",
   "ai.cmd.build": "ビルドモード",
   "ai.cmd.build.desc": "図面と CAM プログラムを編集する Build エージェントに切り替えます",

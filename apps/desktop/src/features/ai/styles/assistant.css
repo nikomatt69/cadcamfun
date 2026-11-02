@@ -3402,6 +3402,30 @@ html.dark .assistant-surface .assistant-field:focus {
   line-height: 1.45;
 }
 
+/* Plan approval: one action under a finished plan */
+.assistant-plan-approval {
+  display: flex;
+  justify-content: flex-start;
+  padding: 6px 0 2px;
+}
+
+.assistant-plan-approval-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--assistant-surface);
+  color: var(--assistant-ink);
+  border: 1px solid var(--assistant-line-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assistant-plan-approval-button:hover {
+  background: var(--assistant-raised);
+}
+
 /* Jump to Latest Floating Button */
 .assistant-jump-latest {
   position: absolute;

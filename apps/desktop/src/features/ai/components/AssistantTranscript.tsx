@@ -10,12 +10,14 @@
 import { For, Index, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import CircleGauge from "lucide-solid/icons/circle-gauge"
+import Hammer from "lucide-solid/icons/hammer"
 import Search from "lucide-solid/icons/search"
 import Sparkles from "lucide-solid/icons/sparkles"
 import X from "lucide-solid/icons/x"
 import { t } from "../../../i18n/index.ts"
 import { MessageBubble } from "./MessageBubble.tsx"
 import { filterMessages } from "../lib/search.ts"
+import { BUILD_PLAN_PROMPT, planAwaitingApproval } from "../lib/plan-approval.ts"
 import { useAiStore } from "../store/context.tsx"
 
 export interface AssistantTranscriptProps {
@@ -157,11 +159,8 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
           fallback={
             /* --- Empty state: the mark, the promise, then the lede. --- */
             <div class="assistant-empty flex flex-1 flex-col items-center justify-center text-center">
-              <div class="relative mb-5">
-                <div class="assistant-emblem" aria-hidden="true">
-                  <Sparkles size={19} />
-                </div>
-              </div>
+              {/* What the assistant does, shown rather than a mark: a prompt becomes a part. */}
+              <div class="assistant-empty-preview" aria-hidden="true"><AssistantPreview /></div>
               <div class="assistant-empty-copy">
                 <h3 class="mb-2">
                   {t("ai.empty.title")}
@@ -261,6 +260,19 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                   {t("ai.runtime.streaming")}
                 </span>
               </div>
+            </div>
+          </Show>
+          <Show when={planAwaitingApproval(ai.agent(), ai.status(), ai.messages())}>
+            <div class="assistant-plan-approval" data-testid="ai-plan-approval">
+              <button
+                type="button"
+                class="assistant-plan-approval-button"
+                title={t("ai.plan.build.hint")}
+                onClick={() => { ai.setAgent("build"); void ai.send(BUILD_PLAN_PROMPT) }}
+              >
+                <Hammer size={14} aria-hidden="true" />
+                <span>{t("ai.plan.build")}</span>
+              </button>
             </div>
           </Show>
         </Show>
