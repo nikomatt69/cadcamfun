@@ -98,3 +98,23 @@ one that creates two equally good candidates (`ambiguous`); a randomised test pe
 ## 7. Order
 
 N1 → N2/N3 → N4 → N5 (fillet first, then shell and draft) → N7 → N6, N8. N1 is also what makes spec 43 blends testable.
+
+## 8. Change log
+
+- 2026-10-31 (CAD-A round): **N1, N2, N3 built; N7 built for the read side.** API for other lanes (all in `@cadcamfun/core`, `cad/brep`):
+  - Provenance: `provenanceOf(result, operands)` returns, per result face, the operand faces it descends from with a relation
+    (`same | trimmed | split | merged | offset | new`, `flipped`), the operand faces with no descendant (`deleted`) and the split sets;
+    `edgeLineage`, `vertexLineage` derive edge and vertex ancestry. Recorded by `booleanBrep` (incl. the displacement recovery),
+    `transformBrep`, `mergeBreps`, `compactBrep`, `sewSolids`, `pushPullFace` (offset face) and `uniqueFaceNames`; a derived solid that
+    nothing recorded is `new` for every face. The table lives with the object (a WeakMap): it does not survive a worker boundary or JSON.
+  - Keys: `topologyKeys(brep)` (face = unique name; edge = `edge(faceA,faceB)[@{end faces}][#k]`; vertex = `vertex(f1,f2,f3..)`), `makeRef`,
+    `refToString`/`parseRef` (`face:plate|plate.top`), `namingHealth`. Keys use names and incidence only; `#k` ordinals are the weakest tier
+    and are reported (`ordinal`, `siblings`). `uniqueFaceNames` now resolves in rounds so corner patches are named by their blends.
+  - Resolve: `resolveKey`, `resolveAcross` (lineage chain) and, on a rebuilt history, `resolveInHistory(rebuild, ref)` /
+    `resolveAfterEdit(rebuild, ref)` / `entityRefs` / `namingReport` (`cad/history-naming.ts`; needs `ExactRebuild.timeline`, new). Outcomes
+    `exact | split | merged | deleted | ambiguous`; `deleted` names the feature; `exact` carries `moved` when the entity is far from its hint.
+  - Tests: `brep/provenance.test.ts` (13), `history-naming-edits.test.ts` (17: 50 parametric edit rebuilds at -20..+20 % with identical key
+    sets, every ref exact, analytic volumes; split / deleted / merged / ambiguous / edge-split cases).
+  - AI: `cad.kernel` (ops `health | refs | resolve`) + skill `cad-naming`; tests `packages/ai/test/cad-kernel-naming.test.ts`.
+  - Open: **N4/N5** (features storing refs: the history schema still selects by index/near/box, `migrate.ts` conversion), N6 (drawings, CAM),
+    N8 (desktop badge), the 200-run random perturbation of the recipe parts, and fillet/shell/draft features that accept `ref` strings.
