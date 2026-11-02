@@ -253,7 +253,7 @@ const boxOf = (pts: Iterable<Vec3>): { lo: Vec3; hi: Vec3 } => {
 
 // ================================================================ curve fitting
 
-interface FittedCurve {
+export interface FittedCurve {
   readonly curve: Curve3
   readonly t0: number
   readonly t1: number
@@ -279,7 +279,7 @@ const conicOf = (sa: Surface, sb: Surface): { readonly frame: Frame; readonly a:
 }
 
 /** Line, circle, the surfaces' exact conic, or an interpolating cubic B-spline through exact points of a curve. */
-const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?: { readonly frame: Frame; readonly a: number; readonly b: number }): FittedCurve => {
+export const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?: { readonly frame: Frame; readonly a: number; readonly b: number }): FittedCurve => {
   const n = pts.length
   const P0 = pts[0]!, Pn = closed ? pts[0]! : pts[n - 1]!
   // Line.
