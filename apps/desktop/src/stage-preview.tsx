@@ -1,7 +1,8 @@
 import { render } from "solid-js/web"
 import type { JSX } from "solid-js"
 import {
-  AnalyticsScene, CommitScene, DocumentScene, FlagsScene, PasskeyScene, SessionsScene, TimelineScene
+  AnalyticsScene, CommitScene, DocumentScene, FlagsScene, GCodeScene, GeneratorScene, MachineScene,
+  OperationScene, PasskeyScene, SessionsScene, SimulationScene, TimelineScene, ToolScene
 } from "./shared/ui/stageshow/index.ts"
 
 // `?still=1` shows every poster, the frame a reduced-motion user and a screenshot get.
