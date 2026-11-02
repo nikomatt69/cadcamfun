@@ -71,8 +71,9 @@ describe("flanged bearing housing", () => {
     const checked = await tool("cad", { action: "parametric_validate", history: housingHistory(boltD) })
     expect(checked.ok).toBe(true)
     expect(checked.verification).toMatchObject({ verdict: "valid", bodies: 1, closedSolid: true, sketchesFullyConstrained: true, throughHoles: 1 + P.bolts })
-    // Exact when the kernel finishes inside the interactive budget (1.5 s); otherwise the mesh volume, which is within 0.05 %, and it says so.
-    expect(checked.verification.exactBodies === 1 || typeof checked.verification.exactPending === "string").toBe(true)
+    // The exact view is a budget of counted work, not of time: this part is always exact, however loaded the machine is.
+    expect(checked.verification.exactBodies).toBe(1)
+    expect(checked.verification.exactPending).toBeUndefined()
     expect(checked.verification.sizeMm.x).toBeCloseTo(130, 0)
     expect(checked.verification.sizeMm.z).toBeCloseTo(40, 1)
     expect(Math.abs(checked.verification.volumeMm3 - housingVolume({ ...P, boltD })) / housingVolume({ ...P, boltD })).toBeLessThan(5e-4)

@@ -29,25 +29,46 @@ export const decodeStartHistory = (value: unknown): ReturnType<typeof decodeHist
   return probe.success ? { success: true, data: { ...probe.data, features: [] } } : probe
 }
 
-/** Time the exact view may add to every validation report (the assistant's hot path, on the sidecar's thread). */
-export const REPORT_EXACT_BUDGET_MS = 1_500
+/**
+ * Work the exact view may add to every validation report (the assistant's hot path, on the sidecar's thread), in the kernel's
+ * counted steps (`brep.workSteps`: a face pair of a Boolean, a face tessellated, a feature replayed, 256 iterations of a surface
+ * intersection). The count of one history is the same on every machine at any load, so the verdict does not depend on timing:
+ * a part is `exactPending` only when it is big, never because the machine was busy. About one step per millisecond of an idle
+ * machine: a plate of 12 filleted edges takes about 3 300, a recipe part or an enclosure a few hundred to a thousand, a plate
+ * with 36 holes 3 000, one with 64 holes 10 500 (that one is pending, and `parametric_exact` finishes it).
+ */
+export const REPORT_EXACT_WORK_STEPS = 6_000
+/**
+ * The clock behind that work budget: a safety net for a loop the steps do not count, and the bound of what the report may hold
+ * the thread for, set so far above the time the work budget takes that a loaded machine does not reach it with a normal part.
+ */
+export const REPORT_EXACT_BUDGET_MS = 30_000
 /** Time `parametric_exact`, which the assistant asks for on purpose, may take. */
 export const EXACT_ACTION_BUDGET_MS = 60_000
 
+/** What the exact work may spend: a clock cap and, for a verdict that must not depend on the clock, a deterministic amount of work. */
+export interface ExactBudget {
+  readonly ms: number
+  readonly work?: number
+}
+
 /**
  * The exact (B-rep) view of each body, from the same rebuild: exact volume and area, genus, face count and surface kinds, or the
- * reason a body has only its mesh. Never throws; a failure is reported as the body's reason. The exact work stops after
- * `budgetMs` (the bodies then say so), so a heavy history never holds the thread that serves every other tool.
+ * reason a body has only its mesh. Never throws; a failure is reported as the body's reason. The exact work stops when its
+ * budget is spent (the bodies then say so), so a heavy history never holds the thread that serves every other tool. The default
+ * is the report's budget: a work budget of counted steps, deterministic, under a generous clock cap. A number is a clock cap alone
+ * (`parametric_exact`, which the assistant asks for on purpose, takes as long as it needs up to a minute).
  */
-export const exactReport = (history: History, result: ReturnType<typeof rebuild>, budgetMs = REPORT_EXACT_BUDGET_MS) => {
+export const exactReport = (history: History, result: ReturnType<typeof rebuild>, budget: ExactBudget | number = { ms: REPORT_EXACT_BUDGET_MS, work: REPORT_EXACT_WORK_STEPS }) => {
   const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d
+  const { ms, work } = typeof budget === "number" ? { ms: budget, work: undefined } : budget
   let warnings: ReadonlyArray<string> = []
   try {
-    const exact = brep.withBudget(budgetMs, () => {
+    const exact = brep.withBudget(ms, () => {
       const replay = rebuildExact(history, result)
       warnings = [...new Set(replay.warnings)]
       return exactSummary(replay)
-    })
+    }, work)
     const bodies = exact.map((b) =>
       b.exact
         ? {

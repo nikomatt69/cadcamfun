@@ -54,9 +54,9 @@ export const verificationOf = (history: History, report: Report): Verification =
   }
   // A body the exact kernel did not get to within the interactive budget is not a defect of the part: the volume then comes from the
   // mesh and `parametric_exact` finishes the job. A body the exact kernel cannot model at all is something to say out loud.
-  const pending = exact.filter((b) => !b.exact && "reason" in b && /time budget/.test(String(b.reason)))
+  const pending = exact.filter((b) => !b.exact && "reason" in b && /(time|work) budget/.test(String(b.reason)))
   for (const body of exact) {
-    if (!body.exact && "reason" in body && !/time budget/.test(String(body.reason))) attention.push(`Body '${body.id}' has no exact model (${String(body.reason)}): it is fine for the view and STL, not for STEP or machining by features.`)
+    if (!body.exact && "reason" in body && !/(time|work) budget/.test(String(body.reason))) attention.push(`Body '${body.id}' has no exact model (${String(body.reason)}): it is fine for the view and STL, not for STEP or machining by features.`)
   }
   for (const solid of report.solids) {
     if (solid.shells > 1) {
@@ -93,7 +93,7 @@ export const verificationOf = (history: History, report: Report): Verification =
     exactBodies: exact.filter((b) => b.exact).length,
     sketchesFullyConstrained: loose.length === 0,
     ...(report.warnings.length > 0 ? { exactWarnings: report.warnings.slice(0, 3) } : {}),
-    ...(pending.length > 0 ? { exactPending: `${pending.length} body(ies) were not finished inside the interactive time budget; the volume is the mesh volume (about 0.05 % low on round parts). Call parametric_exact for the exact volume and validity before quoting mass or exporting STEP.` } : {}),
+    ...(pending.length > 0 ? { exactPending: `${pending.length} body(ies) were too much work for the interactive budget (a big model, not a busy machine); the volume is the mesh volume (about 0.05 % low on round parts). Call parametric_exact for the exact volume and validity before quoting mass or exporting STEP.` } : {}),
     attention
   }
 }
@@ -106,6 +106,11 @@ export const recoveryHint = (message: string, history: History): string | undefi
     return `Define '${unknown[1]}' in parameters (value or expression) or fix the spelling.${known.length > 0 ? ` Defined: ${known.slice(0, 12).join(", ")}${known.length > 12 ? ", ..." : ""}.` : " The history has no parameters yet."}`
   }
   if (/leaves no cavity|shell/i.test(message)) return "Use a wall below half the thinnest dimension, or open a face (open: top). "
+  // Two blended edges across one face take a strip each; the kernel names the largest size that fits (and the issue's remedy the
+  // largest for every edge), so the move is to use it, not to guess a smaller number.
+  if (/exceeds the maximum|strips collide/i.test(message)) {
+    return "Two blended edges across a face need their strips to fit its width: use the maximum named in the message or less, or select fewer edges (edges.within / parallel) so opposite edges are not rounded together."
+  }
   if (/Not blended|Native curved fillet|blend/i.test(message)) {
     return "Lower the radius below half the shortest adjacent edge and half the thinnest wall, select fewer edges (edges.within / parallel), or use a chamfer of the same size."
   }
@@ -127,7 +132,8 @@ export const diagnose = (history: History, report: Report): Diagnosis => {
   const errors = report.issues.filter((i) => i.severity === "error")
   const roots = errors.filter((i) => !i.message.startsWith("Not built:"))
   const rootCauses = (roots.length > 0 ? roots : errors).slice(0, 6).map((i) => {
-    const hint = recoveryHint(i.message, history)
+    // The kernel's own remedy (the largest size that fits every selected edge) is more exact than the general move, so it comes first.
+    const hint = [i.remedy, recoveryHint(i.message, history)].filter((x): x is string => x !== undefined).join(" ") || undefined
     return { feature: i.feature, message: i.message, ...(hint !== undefined ? { hint } : {}) }
   })
   const hollow = report.bodyCount === 0 || (report.volumeMm3 ?? 0) <= 1e-9
