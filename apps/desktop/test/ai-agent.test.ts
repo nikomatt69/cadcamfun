@@ -271,7 +271,10 @@ describe("a conversation shared with the phone", () => {
         push({ type: "done", sessionId: "ses_shared", text: "Written from the phone." }, 14)
         // The turn ended: the window is idle again and a message goes out as a new turn.
         await w("idle-again", () => q<HTMLElement>("button.assistant-send") ? true : undefined)
-        expect((q('[data-testid="ai-panel"]')?.textContent ?? "").match(/Written from the phone\./g)?.length).toBe(1)
+        // The answer is in exactly one assistant message of the transcript (the screen-reader announcement repeats it on purpose, outside the messages).
+        const written = Array.from(document.querySelectorAll('[data-testid="ai-panel"] [data-role="assistant"]')).filter((message) => message.textContent?.includes("Written from the phone."))
+        expect(written.length).toBe(1)
+        expect((written[0]?.textContent ?? "").match(/Written from the phone\./g)?.length).toBe(1)
         // The tail of a turn this window did not show (no start seen) is never applied on its own.
         push({ type: "delta", sessionId: "ses_shared", text: "Stray tail." }, 15)
         await flush(150)
