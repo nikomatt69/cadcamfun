@@ -139,7 +139,7 @@ export default function MachineSelect(): JSX.Element {
               </button>
 
               <Show when={defaults().length > 0}>
-                <p class="px-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t("cam.machine.builtin")}</p>
+                <p class="px-1 pt-2 text-[11px] font-semibold text-gray-500 dark:text-gray-500">{t("cam.machine.builtin")}</p>
                 <For each={defaults()}>{(machine) => (
                   <button
                     type="button"

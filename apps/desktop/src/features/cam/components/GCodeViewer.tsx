@@ -206,7 +206,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
         <Show when={!props.gcode}>
           <div class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             <div class="rounded-lg p-6 text-center">
-              <h3 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">{t("cam.gen.viewer.noGcode")}</h3>
+              <h3 class="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{t("cam.gen.viewer.noGcode")}</h3>
               <p class="text-gray-600 dark:text-gray-300">{t("cam.verify.empty")}</p>
             </div>
           </div>
@@ -274,8 +274,8 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
 
       {/* Dettagli statistici avanzati */}
       <Show when={toolPath().length > 0}>
-        <div class="bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white shadow-md rounded-md p-4 mt-4 mx-2 mb-2">
-          <h3 class="text-lg font-medium text-gray-900 mb-2">{t("cam.gen.viewer.analysis")}</h3>
+        <div class="bg-gray-50 dark:bg-gray-800 dark:text-white rounded-md p-4 mt-4 mx-2 mb-2">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">{t("cam.gen.viewer.analysis")}</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="p-3 bg-gray-50 rounded-md">
               <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.totalPoints")}</p>
@@ -328,7 +328,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
       <Show when={showScrollTop()}>
         <button
           onClick={() => container?.scrollTo({ top: 0, behavior: "smooth" })}
-          class="fixed bottom-6 right-6 p-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none transition-colors duration-150 z-10"
+          class="fixed bottom-6 right-6 p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 focus:outline-none transition-colors duration-150 z-10"
           aria-label={t("cam.gen.viewer.toStart")}
         >
           <ChevronUp size={20} />

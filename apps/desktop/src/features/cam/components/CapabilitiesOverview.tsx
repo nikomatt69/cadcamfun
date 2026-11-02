@@ -122,10 +122,10 @@ export default function CapabilitiesOverview(): JSX.Element {
       <div class="flex items-center gap-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-700">
         <Wrench size={14} class="text-blue-600 dark:text-blue-400" />
         <div>
-          <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
             {t("cam.features.subtitle")}
           </div>
-          <div class="text-[12px] font-bold text-gray-900 dark:text-white">
+          <div class="text-[12px] font-semibold text-gray-900 dark:text-white">
             {t("cam.features.title")}
           </div>
         </div>

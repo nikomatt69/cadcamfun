@@ -9,10 +9,10 @@ export function LatheSection(): JSX.Element {
   const gen = useGeneratorStore()
   return (
     <Show when={gen.settings.machineType === "lathe"}>
-      <div class="mb-6">
+      <div class="mb-4">
         <div class="flex items-center justify-between cursor-pointer" onClick={() => gen.toggleSection("lathe")}>
-          <h3 class="text-lg font-medium text-gray-900">{t("cam.gen.lathe.params")}</h3>
-          <Show when={gen.expanded.lathe} fallback={<ChevronDown size={18} />}><ChevronUp size={18} /></Show>
+          <h3 class="text-sm font-semibold text-gray-900">{t("cam.gen.lathe.params")}</h3>
+          <Show when={gen.expanded.lathe} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
         </div>
         <Show when={gen.expanded.lathe}>
           <div class="mt-3 space-y-4">

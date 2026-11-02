@@ -1,5 +1,5 @@
 import { For, Show, createEffect, on, type JSX } from "solid-js"
-import { Cpu } from "lucide-solid"
+import { Cpu, LoaderCircle, MessageCircle } from "lucide-solid"
 import { useApp } from "../../../../shared/state/context.ts"
 import { useAiStore } from "../../../ai/index.ts"
 import { geometryOf } from "../../lib/job.ts"
@@ -15,12 +15,7 @@ const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
 }
 
 function Spinner(props: { readonly class: string }): JSX.Element {
-  return (
-    <svg class={props.class} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-    </svg>
-  )
+  return <LoaderCircle class={props.class} size={16} aria-hidden="true" />
 }
 
 /**
@@ -84,7 +79,7 @@ export function AiSection(): JSX.Element {
           <h4 class="text-sm font-medium text-blue-800 mb-2">{t("cam.gen.ai.suggestions")}</h4>
           <Show
             when={!gen.isAIProcessing}
-            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin motion-reduce:animate-none h-5 w-5 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
+            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin h-4 w-4 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
           >
             <Show when={gen.aiSuggestions.length > 0} fallback={<p class="text-sm text-blue-600">{t("cam.gen.ai.enableHint")}</p>}>
               <ul class="space-y-2">
@@ -112,13 +107,11 @@ export function AiSection(): JSX.Element {
             />
             <button
               type="button"
-              class="absolute right-2 top-2 text-blue-600"
+              class="absolute right-1 top-1 flex-none rounded-md p-1.5 text-blue-600 hover:bg-gray-100"
               aria-label={t("cam.ai.send")}
               onClick={() => gen.addAiSuggestion(t("cam.ai.replyNoAI", { material: gen.settings.material }) + t("cam.ai.replyTry"))}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-              </svg>
+              <MessageCircle size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

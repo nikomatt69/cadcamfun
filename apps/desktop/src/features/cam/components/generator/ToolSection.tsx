@@ -98,7 +98,7 @@ export function ToolSection(): JSX.Element {
           <div class="text-xs text-gray-500">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
         </div>
         <div class="flex items-center">
-          <div class="w-20 h-20 mr-4 bg-white rounded-md border border-gray-200 flex items-center justify-center">
+          <div class="w-20 h-20 mr-4 flex-none bg-white rounded-md border border-gray-200 flex items-center justify-center">
             <Show when={gen.settings.machineType === "mill"} fallback={<ToolSketch />}>
               <ToolSilhouette cutter={cam.kernel.settingsCutter(gen.settings)} height={76} />
             </Show>
