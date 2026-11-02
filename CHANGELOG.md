@@ -3,6 +3,28 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.61 (November 2026)
+
+## Core
+
+- The exact-circle interior-vertex filter applies only to circle-seeded curves (aligned seed 78 fell back to the displacement); regression test
+- Coaxial tests accept an empty sliver within the volume tolerance, tilted placement checked relatively, near-miss rings
+- A sphere just inside a coaxial cylinder is a near miss for the general path, not an empty intersection (R7 case regressed by the rings path)
+- Industrial housing scenario and parametric verification (agent stopped by rate limit, unverified)
+
+## Sidecar
+
+- Shaft/gear, sheet-metal channel and bolted-assembly scenarios against the real kernel
+
+## AI
+
+- Raise the tool description budget to 36 000 (build verification result joined cad and cad_edit)
+- Teach the verification/diagnosis loop; drop the stale RebuildFailed and no-FE claims; align the tool description ceiling with corpus.ts; regenerate the harness inventory
+
+## Documentation
+
+- Spec 42 6.4 and spec 72 change log for CAD round 4 (R5 gate 189/200, coaxial, corner Booleans, joint-run fixes)
+
 ## v0.1.60 (November 2026)
 
 ## Desktop
