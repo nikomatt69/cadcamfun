@@ -218,7 +218,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <div class="min-w-0">
                       <h2 class="truncate text-[13px] font-semibold text-slate-900 dark:text-white">{current().name}</h2>
                       <Show when={current().description}><p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{current().description}</p></Show>
-                      <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">">
+                      <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
                         <div class="flex items-center gap-2"><Clock size={14} aria-hidden="true" /><span>{t("plugins.detail.updatedLabel")} {formatDate(current().updatedAt)}</span></div>
                         <div class="flex items-center gap-2"><Users size={14} aria-hidden="true" /><span>{current().organizationId ? t("shell.organization") : t("pages.personal")}</span></div>
                       </div>
