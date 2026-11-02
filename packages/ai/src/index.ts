@@ -100,3 +100,6 @@ export type { CadFeatureEdit, CadFeatureRequest, KernelJobName, KernelJobProgres
 export { MOD_TOOL_IDS, modToolContributions, modToolIds } from "./nikcli/mod-tools.ts"
 export { modSpecs, readModIndex, saveMod, setModEnabled, removeMod, type ModRecord } from "./nikcli/mods.ts"
 export { isolatedPaths } from "./nikcli/isolation.ts"
+
+export { analyzeParametric } from "./parametric-analysis.ts"
+export { normalizeElementBatch } from "./element-normalization.ts"

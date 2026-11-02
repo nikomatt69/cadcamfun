@@ -1,38 +1,27 @@
 Write, enable, disable or remove a mod: a standing rule that survives a restart.
-A mod is a small extension module the host runs; it acts on the whole application.
+Call with action and its fields. A mod runs in the host and affects the whole application, not just this drawing/session; inspect existing source/state first.
 
 Authoring (the only shape the store accepts)
-- Plain ESM, dependency-free: no `import`, no `require`; everything reachable arrives on the hook's `$` argument.
-- Export `register(on, options)`; register hooks with `on(event, matcher?, hook)`. The matcher compares event fields
-  with a value, an array of allowed values or a RegExp.
-- A hook is `async ($, e, next)` and `e` is frozen: `return next(e)` observes, `return next({ ...e, field })` rewrites,
-  `return { deny: "reason" }` refuses, `await next(e)` and returning a changed result wraps. A hook that throws or runs
-  long is skipped; add `.catch(...)` on the object `on(...)` returns when the rule must fail closed.
-- Events (fields of `e`; what a hook may answer): tool.call (tool, input -> a result, `{ deny }` or `{ result }`; "never allow this"), tool.check (patterns, rule -> allow, ask or deny with a reason; "always confirm"), prompt.submit (text, context[] -> add text only the model reads), session.start/end, turn.start/step/complete, session.compact, skill.prompt, command.run/describe, spawn/offer, ui.render/press/input/select.
-- The `$` API (each item is also an event name, e.g. `fs.read`): ui, tool.register (dispose() removes it), command.register, prompt.submit/fill, turn.abort, session, model.complete/classify, mcp.call, settings.read, env.get/set, fs, process.run/spawn, http.fetch, store (machine-wide, 4 MiB), state, clock.
+- Dependency-free ESM: no import/require. Export register(on, options); register on(event, matcher?, hook). Matchers accept values, arrays or RegExp.
+- A hook is async ($, e, next), with frozen e. next(e) observes, next({...e, field}) rewrites, {deny:"reason"} refuses; awaiting next(e) allows result wrapping. Throwing/slow hooks are skipped; use the registration's .catch(...) for fail-closed rules.
+- Events include tool.call (tool,input), tool.check (patterns,rule), prompt.submit (text,context), session.start/end/compact, turn.start/step/complete, skill.prompt, command.run/describe, spawn/offer and ui.*. Choose the narrow event; do not alter unrelated calls.
+- $ API: ui, tool.register (dispose removes it), command.register, prompt.submit/fill, turn.abort, session, model.complete/classify, mcp.call, settings.read, env.get/set, fs, process.run/spawn, http.fetch, store (machine-wide, 4 MiB), state, clock. No invented globals, secrets in storage, or project payloads in logs/external calls.
 
 Actions
-- save: write or replace one mod's source. A new mod stays disabled unless `enable: true`; `enable: false` stops a
-  running one; an absent flag keeps the current state. Replacing source you did not write: ask first.
-- set_enabled: arm or stop one mod; an armed mod is consent to run it.
-- remove: delete the module and its record. Not reversible.
-- Every call is confirmed by the person first.
+- save: create/replace source; new mods default disabled, enable true arms, false stops, absent preserves state. Ask before replacing another author's source.
+- set_enabled: arm/stop. Every call requires native human approval.
+- remove: delete source and record permanently.
 
 Parameters
 - save: id (lower-case file name, up to 40 characters, e.g. `confirm_deletes`), name? (up to 60), description (what it hooks and why, up to 200), source (up to 20000 characters), enable?.
 - set_enabled: id, enabled. remove: id.
 
 Result (JSON)
-- save and set_enabled: ok, id, enabled, events[] (the events the live host reports for it now) and reloaded.
-- remove: ok, id, removed: true. A refused source: ok:false with every problem the checker found.
-- A mod that was armed but did not load (the host refused it) answers ok:false and is disabled again; read it back,
-  fix the source, then enable it.
-- If reload or inspection fails, the stored state is kept with a note; read it again before assuming its hooks are active.
+- save/set_enabled: ok, id, enabled, events[], reloaded. remove: ok, id, removed:true. Read refusal problems before correcting source.
+- Refused loading disables the mod again. Reload/inspection failures may retain stored state with a note: reread before assuming hooks are active.
 
 Rules
-- Enable, change or remove a mod only when the user asks or after they agree to your offer.
-- The user reads every mod's source in Extensions and can switch it off or delete it; write readable source. Changes apply from the next turn.
-- Keep it small and single-purpose; never store secrets in it.
+- Change/enable/remove only when requested or agreed. Write readable single-purpose source; the user can review it in Extensions. Changes apply from the next turn.
 
 Do not use it
 - To read, list or review mods: `mods`.

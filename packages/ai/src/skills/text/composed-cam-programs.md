@@ -1,8 +1,8 @@
 # Composing CAM programs
 
-A real part has many operations. Plan them in this order and do not skip ahead.
+A real part has many operations. Select only those its geometry and setup need. The strategy names below belong to the native manufacture planner unless explicitly described as legacy create types; load the matching schema rather than transferring names between routes.
 
-1. Probe the work offset (cam_edit action create with `type: "probing"`). Use the result as the zero.
+1. Establish the confirmed work offset. Plan probing only when requested/supported (legacy create type probing); simulated probe moves are not a physical measurement or an automatic update of the real machine zero.
 2. Face the top (`face`) to establish a reference plane.
 3. Rough (`roughing` or `adaptive`), leaving a small allowance (0.1 to 0.3 mm).
 4. Rest-machine what the big tool could not reach (`rest`) with a smaller tool. In `cam.manufacture` a surface operation with `mode: "rest"` works from the stock the earlier operations really left (no `restFrom` needed).
@@ -21,7 +21,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 - Deep pockets: `adaptive` then `rest`.
 - `cam.setup_sheet` (operationId of a saved kernel program) gives the shop sheet read from the stored artifact: part and stock, work offset and zero, the tools by number with stick-out and cutting time, the operations in program order with cutting data, times and removal, the evidence claims. The desktop kernel panel and `GET /api/toolpaths/:id/setup-sheet` give the printable page; a printer program has none.
 - A hole drilled along another axis than the setup's is plugged before the 2.5D features are read: the setup machines its own holes, the others are listed in the plan notes and `machining.sideHoles`, and `cad.setups` tells which setup drills them. When the part cannot be read as it is (an undercut, a pocket that opens sideways, an overhang) the recognition reads its shadow from above, fills what is hidden, and counts the hidden faces in `machining.hiddenFaces`: the program is a preview whose `part-coverage` stays unresolved, never a claim of the whole part. Islands standing in a pocket of an exact solid (STEP, Boolean, history) are read from the B-rep: the pocket is roughed around them, their walls get their own finish pass, and the cutter is limited to the narrowest gap (`cad` `exact` reports `machining.islands`). A pocket cut into an island is refused to the surface strategies.
-- Lathe body: `facing`, then `turning_od`, then `parting`; `threading_od` if needed.
+- Lathe body: cam action lathe operations face, rough, finish and part, with thread when needed. These are planner operations, not legacy cam_edit create type names. cam action turn remains the separate point-tool profile preview.
 - Five-axis mill: pick the machine by its rotary words. `trunnion-5ax` writes A+C, `trunnion-5ax-bc` writes B+C on the same cutting blocks (simultaneous). `cam.materials` lists each preset's `fiveAxis` layout, pivot and tilt range: choose from that, never guess. A `multiaxis` operation on a machine without `fiveAxis` fails.
 - Reading a five-axis result: `stock.fiveAxis` is the voxel bracket of the turned moves (removed/remaining lower–upper, mm³, `voxelMm`); the height-field volumes do not cover those moves, and `material-removed` stays unresolved. Do not quote a single removed volume for a five-axis program.
 - Lathe in its own mode: turning is X (diameter) and Z with the part turning in the chuck (C spins). A 5-axis lathe is a mill-turn centre: X/Y/Z plus a B milling head (B0 axial, B90 radial) and the C spindle positioned for milling. Turning-only programs carry no B/Y words; do not invent a B axis for them.
@@ -40,4 +40,4 @@ A flip is a new setup with its own stock, origin, work offset, fixtures and tool
 
 ## Verifying each operation
 
-For every operation: cam_edit action generate, then cam action analyze, then cam_edit action verify. Fix by cause, regenerate, verify again. After three rounds on the same finding, report the blocker. Report what was modelled; never write "safe".
+For legacy operations: cam action plan_check with the current revision, create/update, generate, analyze the full stored NC, verify and cam action review. A dedicated verifier uses cam_verify action generate/verify. For manufacture/turn, use the matching preview/store route and returned identity/claims; never regenerate its NC with legacy generate. Diagnose before changing input, retain successful work and respect the returned refinement limit (at most three per drawing/stock revision). Report modelled coverage and unresolved findings; never write "safe".

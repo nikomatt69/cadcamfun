@@ -1,9 +1,10 @@
 Save drawing elements as a reusable component, insert a saved component, or delete it.
+Call with action and its fields. Drawing ids select source elements; componentId identifies a saved part.
 
 Actions
-- save: gather existing elements by id into a named component of this project; children are stored relative to the group's origin. Description, type and visibility are the component's library metadata and travel with the save.
-- insert: place a stored component in the active drawing, optionally moved, turned or scaled; returns the new element ids.
-- delete: remove a saved component by id. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
+- save: save existing elements as a named project component, children relative to its origin, with library metadata.
+- insert: place a saved component, optionally transformed; returns new drawing ids.
+- delete: remove saved component, not its drawing instances. confirm true requires requested deletion; host approval still applies.
 
 Parameters (mm, degrees)
 - save: ids (the elements to gather), name, description, type, isPublic.
@@ -11,12 +12,11 @@ Parameters (mm, degrees)
 - delete: componentId, confirm (true).
 
 Result (JSON)
-- ok; save the componentId and the number of children; insert the new ids and the elements; delete the removed id.
-- ok:false names what is wrong (unknown id, nothing selected, a component with no elements, or a write you may not do).
+- ok; save returns componentId/child count, insert ids/elements, delete removed id. ok:false explains missing ids, empty parts or denied writes.
 
 Do not use it
 - To look up a component: library.lookup_component.
-- To move a part already in the drawing: cad_edit.transform, which is cheaper than saving and re-inserting.
+- To move an instance: cad_edit.transform.
 
 After it
-- cad.check, and describe the drawing again if the count matters.
+- Verify returned ids and cad.check after insertion. A saved component is not an inserted instance; retry only after checking what the prior call stored.

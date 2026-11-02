@@ -1,19 +1,20 @@
 Read-only version control: branch status, uncommitted changes, diffs and pull requests.
-Optional: a job never depends on it.
+Call with action and its fields. Use history when requested or needed for recovery.
 
 Actions
-- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it when the request involves history.
+- status: checked-out branch, uncommitted files, branches and open pull requests.
 - checkpoints: saved engineering states and the current project revision for an explicit restore.
 - diff: entity-level changes between two revisions (property path, before, after); `from` defaults to main.
 - list_pull_requests: the project's pull requests with their review verdicts.
 
 Parameters
 - status: none.
+- checkpoints: none.
 - diff: from (branch, tag or commit id; defaults to main), to (defaults to HEAD).
 - list_pull_requests: state (open|merged|closed, default open).
 
 Result (JSON)
-- ok; status the branch, dirty paths and open pull requests; diff one entry per changed entity; list_pull_requests the verdicts.
+- ok; status: branch/dirty paths/PRs; diff: changed entities; list_pull_requests: verdicts.
 
 Do not use it
 - To record work: vcs_edit starts a change, commits, restores, opens the pull request and runs the workflows.
@@ -23,4 +24,4 @@ After it
 - Read the diff before writing a pull-request body; cite what changed by name.
 
 When it fails
-- Say it in one line and continue the CAD/CAM work; a missing history or a refused call is never a reason to stop, and it is not retried in a loop.
+- Report the failure once. Continue independent CAD/CAM work; if the requested restore/review depends on history, report that blocker. Never invent a revision or retry unchanged input in a loop.

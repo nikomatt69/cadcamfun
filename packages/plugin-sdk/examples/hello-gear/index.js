@@ -6176,9 +6176,54 @@ var SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyr
 var BOOLEANS = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
 var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 * Math.PI / 2, 2 * Math.PI];
 // packages/core/src/cad/expr.ts
-var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
+var UNITS = {
+  um: { factor: 0.001, unit: "length" },
+  mm: { factor: 1, unit: "length" },
+  cm: { factor: 10, unit: "length" },
+  m: { factor: 1000, unit: "length" },
+  in: { factor: 25.4, unit: "length" },
+  ft: { factor: 304.8, unit: "length" },
+  thou: { factor: 0.0254, unit: "length" },
+  deg: { factor: Math.PI / 180, unit: "angle" },
+  rad: { factor: 1, unit: "angle" }
+};
+var f1 = (run, help, takes, gives) => ({ arity: 1, run: (a) => run(a[0]), help, ...takes ? { takes } : {}, ...gives ? { gives } : {} });
+var FUNCTIONS = {
+  sin: f1(Math.sin, "sin(angle)", "angle", "any"),
+  cos: f1(Math.cos, "cos(angle)", "angle", "any"),
+  tan: f1(Math.tan, "tan(angle)", "angle", "any"),
+  sinh: f1(Math.sinh, "sinh(x)"),
+  cosh: f1(Math.cosh, "cosh(x)"),
+  tanh: f1(Math.tanh, "tanh(x)"),
+  asin: f1(Math.asin, "asin(x): an angle", undefined, "angle"),
+  acos: f1(Math.acos, "acos(x): an angle", undefined, "angle"),
+  atan: f1(Math.atan, "atan(x): an angle", undefined, "angle"),
+  atan2: { arity: 2, run: (a) => Math.atan2(a[0], a[1]), gives: "angle", help: "atan2(y, x): an angle" },
+  sqrt: f1(Math.sqrt, "sqrt(x)"),
+  cbrt: f1(Math.cbrt, "cbrt(x)"),
+  abs: f1(Math.abs, "abs(x)", undefined, "args"),
+  min: { arity: "variadic", run: (a) => Math.min(...a), gives: "args", help: "min(a, b, ...)" },
+  max: { arity: "variadic", run: (a) => Math.max(...a), gives: "args", help: "max(a, b, ...)" },
+  clamp: { arity: 3, run: (a) => Math.min(Math.max(a[0], a[1]), a[2]), gives: "args", help: "clamp(x, low, high)" },
+  mod: { arity: 2, run: (a) => a[0] - a[1] * Math.floor(a[0] / a[1]), gives: "args", help: "mod(x, n): the remainder with the sign of n" },
+  floor: f1(Math.floor, "floor(x)", undefined, "args"),
+  ceil: f1(Math.ceil, "ceil(x)", undefined, "args"),
+  round: f1(Math.round, "round(x)", undefined, "args"),
+  trunc: f1(Math.trunc, "trunc(x)", undefined, "args"),
+  pow: { arity: 2, run: (a) => Math.pow(a[0], a[1]), help: "pow(x, y)" },
+  exp: f1(Math.exp, "exp(x)"),
+  ln: f1(Math.log, "ln(x): natural logarithm"),
+  log10: f1(Math.log10, "log10(x)"),
+  log2: f1(Math.log2, "log2(x)"),
+  sign: f1(Math.sign, "sign(x)"),
+  hypot: { arity: "variadic", run: (a) => Math.hypot(...a), gives: "args", help: "hypot(a, b, ...)" },
+  deg: f1((x) => x * 180 / Math.PI, "deg(radians): the number of degrees", "angle", "any"),
+  rad: f1((x) => x * Math.PI / 180, "rad(degrees): an angle", undefined, "angle"),
+  if: { arity: 3, run: (a) => a[0] !== 0 ? a[1] : a[2], gives: "args", help: "if(condition, then, else): only the chosen branch is evaluated" }
+};
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
 // packages/core/src/cad/brep/math.ts
+var MODEL_TOL = 0.000001;
 var glCache = new Map;
 var TRIANGLE_RULE = (() => {
   const out = [];
@@ -6322,35 +6367,116 @@ var TAU4 = 2 * Math.PI;
 var meshOfTessellation = new WeakMap;
 var parametricCache = new Map;
 
+// packages/core/src/cam/kernel/identity.ts
+var K = new Uint32Array([
+  1116352408,
+  1899447441,
+  3049323471,
+  3921009573,
+  961987163,
+  1508970993,
+  2453635748,
+  2870763221,
+  3624381080,
+  310598401,
+  607225278,
+  1426881987,
+  1925078388,
+  2162078206,
+  2614888103,
+  3248222580,
+  3835390401,
+  4022224774,
+  264347078,
+  604807628,
+  770255983,
+  1249150122,
+  1555081692,
+  1996064986,
+  2554220882,
+  2821834349,
+  2952996808,
+  3210313671,
+  3336571891,
+  3584528711,
+  113926993,
+  338241895,
+  666307205,
+  773529912,
+  1294757372,
+  1396182291,
+  1695183700,
+  1986661051,
+  2177026350,
+  2456956037,
+  2730485921,
+  2820302411,
+  3259730800,
+  3345764771,
+  3516065817,
+  3600352804,
+  4094571909,
+  275423344,
+  430227734,
+  506948616,
+  659060556,
+  883997877,
+  958139571,
+  1322822218,
+  1537002063,
+  1747873779,
+  1955562222,
+  2024104815,
+  2227730452,
+  2361852424,
+  2428436474,
+  2756734187,
+  3204031479,
+  3329325298
+]);
+
 // packages/core/src/cad/brep/lineage-record.ts
 var STEPS = new WeakMap;
 
-// packages/core/src/cad/brep/boolean.ts
+// packages/core/src/cad/brep/predicates.ts
+var EPS2 = 2 ** -53;
+var ERR_O2D = (3 + 16 * EPS2) * EPS2;
+var ERR_O3D = (7 + 56 * EPS2) * EPS2;
+var ERR_INCIRCLE = (10 + 96 * EPS2) * EPS2;
+var SPLITTER = 2 ** 27 + 1;
+
+// packages/core/src/cad/brep/contact.ts
 var TAU5 = Math.PI * 2;
-var VOLUMES = new WeakMap;
-var SETS = new WeakMap;
 
 // packages/core/src/cad/brep/primitives.ts
 var TAU6 = Math.PI * 2;
 
+// packages/core/src/cad/brep/tolerance.ts
+var LOOSE_TOLERANCE = 10 * MODEL_TOL;
+
+// packages/core/src/cad/brep/boolean.ts
+var TAU7 = Math.PI * 2;
+var VOLUMES = new WeakMap;
+var SETS = new WeakMap;
+
 // packages/core/src/cad/thread-brep.ts
 var TAN302 = Math.tan(Math.PI / 6);
 // packages/core/src/cad/brep/sweep.ts
-var TAU7 = Math.PI * 2;
+var TAU8 = Math.PI * 2;
 var CORNER_TURN2 = 10 * Math.PI / 180;
 // packages/core/src/cad/brep/step.ts
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/features.ts
-var TAU8 = 2 * Math.PI;
+var TAU9 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;
 // packages/core/src/cad/brep/boss-edit.ts
-var TAU9 = 2 * Math.PI;
+var TAU10 = 2 * Math.PI;
 var MAX_GAP2 = Math.PI / 3;
 // packages/core/src/cad/brep/chain-edit.ts
-var TAU10 = 2 * Math.PI;
+var TAU11 = 2 * Math.PI;
 var TANGENT = Math.cos(0.5 * Math.PI / 180);
 // packages/core/src/cad/brep/fillet-edit.ts
-var TAU11 = 2 * Math.PI;
+var TAU12 = 2 * Math.PI;
 var MAX_ARC = Math.PI - 0.001;
 // packages/core/src/cad/brep/naming.ts
 var UNIQUE = new WeakMap;
@@ -6368,13 +6494,16 @@ var CRC_TABLE = (() => {
   return t;
 })();
 // packages/core/src/cad/brep/iges.ts
-var TAU12 = Math.PI * 2;
+var TAU13 = Math.PI * 2;
 // packages/core/src/cad/brep/naming-keys.ts
 var CACHE = new WeakMap;
+// packages/core/src/cad/history-brep.ts
+var BASE_TAGS = new WeakMap;
+
 // packages/core/src/cad/history.ts
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
 // packages/core/src/cad/sketch-edit.ts
-var TAU13 = Math.PI * 2;
+var TAU14 = Math.PI * 2;
 // packages/core/src/cad/kinematics.ts
 var RAD = Math.PI / 180;
 // packages/core/src/cad/parametric-from-element.ts
@@ -6410,12 +6539,51 @@ var SOLIDS2 = {
 var FLAT = ["rectangle", "circle", "polygon", "ellipse", "triangle"];
 var CONTAINERS = new Set(["component", "group"]);
 var CONVERTIBLE_TYPES = [...Object.keys(SOLIDS2), ...FLAT, ...CONTAINERS];
+// packages/core/src/cad/history-sketch.ts
+var DIMENSION_TYPES = new Set(["distance", "distanceX", "distanceY", "length", "radius", "diameter", "angle"]);
 // packages/core/src/cad/element-transform.ts
 var DEG = Math.PI / 180;
 // packages/core/src/cad/scene-evidence.ts
 var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible", "locked", "selected", "color", "opacity", "wireframe", "linewidth", "originalData"]);
 // packages/core/src/cad/dfm.ts
 var GRAZING = Math.cos(65 * Math.PI / 180);
+// packages/core/src/cad/exchange/zip.ts
+var CRC_TABLE2 = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0;n < 256; n++) {
+    let c = n;
+    for (let k = 0;k < 8; k++)
+      c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+var huffman = (lengths, n) => {
+  const counts = new Uint16Array(16);
+  for (let i = 0;i < n; i++)
+    counts[lengths[i]]++;
+  const offsets = new Uint16Array(16);
+  for (let i = 1;i < 15; i++)
+    offsets[i + 1] = offsets[i] + counts[i];
+  const symbols = new Uint16Array(n);
+  for (let i = 0;i < n; i++)
+    if (lengths[i] !== 0)
+      symbols[offsets[lengths[i]]++] = i;
+  return { counts, symbols };
+};
+var FIXED_LIT = (() => {
+  const l = new Uint8Array(288);
+  l.fill(8, 0, 144);
+  l.fill(9, 144, 256);
+  l.fill(7, 256, 280);
+  l.fill(8, 280, 288);
+  return huffman(l, 288);
+})();
+var FIXED_DIST = huffman(new Uint8Array(30).fill(5), 30);
+// packages/core/src/cad/assembly/model.ts
+var bodyCache = new WeakMap;
+// packages/core/src/cad/assembly/mates.ts
+var RAD2 = Math.PI / 180;
 // packages/core/src/cam/kernel/materials.ts
 var m = (x) => x;
 var MATERIALS = [
@@ -7401,7 +7569,7 @@ var CONTAINERS2 = new Set(["component", "group", "assembly"]);
 var cache = new WeakMap;
 
 // packages/core/src/cam/swarf-walls.ts
-var TAU14 = 2 * Math.PI;
+var TAU15 = 2 * Math.PI;
 var MAX_GAP3 = Math.PI / 3;
 
 // packages/core/src/cam/setup.ts
@@ -7453,22 +7621,29 @@ var RotarySchema = Struct({
   b: optionalKey2(Finite),
   c: optionalKey2(Finite)
 });
+var CompensationSchema = Struct({
+  mode: Literals(["left", "right", "off"]),
+  register: optionalKey2(Int.check(isGreaterThan2(0)))
+});
 var RapidSchema = TaggedStruct("Rapid", {
   to: Vec3Schema,
   rotary: optionalKey2(RotarySchema),
-  expr: optionalKey2(WordExprSchema)
+  expr: optionalKey2(WordExprSchema),
+  comp: optionalKey2(CompensationSchema)
 });
 var LinearSchema = TaggedStruct("Linear", {
   to: Vec3Schema,
   feed: Positive,
   rotary: optionalKey2(RotarySchema),
-  expr: optionalKey2(WordExprSchema)
+  expr: optionalKey2(WordExprSchema),
+  comp: optionalKey2(CompensationSchema)
 });
 var ArcSchema2 = TaggedStruct("Arc", {
   to: Vec3Schema,
   center: Vec2Schema,
   clockwise: Boolean3,
-  feed: Positive
+  feed: Positive,
+  comp: optionalKey2(CompensationSchema)
 });
 var DwellSchema = TaggedStruct("Dwell", { seconds: NonNegative });
 var CommentSchema = TaggedStruct("Comment", { text: String4 });
@@ -7476,6 +7651,13 @@ var OrientSchema = TaggedStruct("Orient", {
   a: optionalKey2(Finite),
   b: optionalKey2(Finite),
   c: optionalKey2(Finite)
+});
+var SpindleOrientSchema = TaggedStruct("SpindleOrient", {
+  angle: optionalKey2(Finite)
+});
+var CutterCompSchema = TaggedStruct("CutterComp", {
+  side: Literals(["left", "right", "off"]),
+  register: optionalKey2(Int.check(isGreaterThanOrEqualTo2(1)))
 });
 var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream", "bore"]);
 var CycleSchema = TaggedStruct("Cycle", {
@@ -7495,6 +7677,8 @@ var MoveSchema = Union2([
   CommentSchema,
   CycleSchema,
   OrientSchema,
+  SpindleOrientSchema,
+  CutterCompSchema,
   AssignSchema,
   MacroCallSchema,
   IfSchema,
@@ -7580,7 +7764,7 @@ var decodeStock = decodeUnknownEffect2(StockSchema);
 var encodeStock = encodeEffect(StockSchema);
 // packages/core/src/cam/indexing.ts
 var DEG2 = 180 / Math.PI;
-var RAD2 = Math.PI / 180;
+var RAD3 = Math.PI / 180;
 // packages/core/src/cam/params.ts
 var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
 var Positive3 = Finite.check(isGreaterThan2(0));
@@ -7619,6 +7803,7 @@ class ProfileParams extends Class3("cam/ProfileParams")(Struct({
   leadRadius: withDefault2(Positive3, 2),
   rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
   tabs: withDefault2(ArraySchema(TabSchema), []),
+  compensation: withDefault2(Literals(["none", "controller"]), "none"),
   arcFit: withDefault2(Boolean3, false),
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
@@ -7654,6 +7839,130 @@ class DrillParams extends Class3("cam/DrillParams")(Struct({
   pitch: optionalKey2(Positive3)
 }).check(heightsOrdered).check(makeFilter2((p) => p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch"))) {
 }
+// packages/core/src/cam/kernel/cutters.ts
+var HOLDER = { diameter: 40, length: 50 };
+var flat = (d, flutes, material = "carbide", coating = "altin", suffix = "") => ({
+  id: `flat-${d}${suffix}`,
+  name: `End mill \xD8${d} ${flutes}F ${material === "carbide" ? "carbide" : "HSS"} ${coating === "none" ? "uncoated" : coating.toUpperCase()}`,
+  kind: "flat",
+  diameter: d,
+  flutes,
+  material,
+  coating,
+  fluteLength: Math.max(3, Math.round(d * 2.5)),
+  shankDiameter: Math.max(3, Math.ceil(d < 3 ? 3 : d)),
+  stickout: Math.max(12, Math.round(d * 3.5 + 8)),
+  holder: HOLDER
+});
+var ball = (d) => ({
+  id: `ball-${d}`,
+  name: `Ball end mill \xD8${d} 2F carbide`,
+  kind: "ball",
+  diameter: d,
+  flutes: 2,
+  material: "carbide",
+  coating: "altin",
+  fluteLength: Math.max(3, Math.round(d * 2)),
+  shankDiameter: Math.max(3, d < 3 ? 3 : d),
+  stickout: Math.max(15, Math.round(d * 4 + 10)),
+  holder: HOLDER
+});
+var drill = (d) => ({
+  id: `drill-${d}`,
+  name: `Drill \xD8${d} carbide 140\xB0`,
+  kind: "drill",
+  diameter: d,
+  flutes: 2,
+  material: "carbide",
+  coating: "tin",
+  angle: 140,
+  fluteLength: Math.round(d * 5 + 4),
+  shankDiameter: Math.max(3, Math.ceil(d)),
+  stickout: Math.round(d * 5 + 15),
+  holder: HOLDER
+});
+var REAMER_SIZES = [3, 4, 5, 6, 8, 10, 12];
+var reamDrill = (d) => Math.round((d - (d <= 6 ? 0.2 : 0.3)) * 10) / 10;
+var DRILL_SIZES = [...new Set([
+  ...METRIC_THREADS.filter((t) => t.d <= 20).flatMap((t) => [t.tapDrill, t.clearance.medium]),
+  ...REAMER_SIZES.map(reamDrill),
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  10,
+  12
+])].sort((a, b) => a - b);
+var tap2 = (d, pitch) => ({
+  id: `tap-m${d}`,
+  name: `Machine tap M${d}x${pitch} HSS-E TiCN form C`,
+  kind: "tap",
+  diameter: d,
+  flutes: d <= 5 ? 3 : 4,
+  material: "hss-co",
+  coating: "ticn",
+  pitch,
+  fluteLength: Math.round(d * 2.5 + 4),
+  shankDiameter: Math.max(3.5, Math.round(d * 0.8 * 10) / 10),
+  stickout: Math.round(d * 6 + 25),
+  holder: HOLDER
+});
+var countersink = (d, angle) => ({
+  id: `csk-${d}-${angle}`,
+  name: `Countersink \xD8${d} ${angle}\xB0 carbide`,
+  kind: "countersink",
+  diameter: d,
+  flutes: 3,
+  material: "carbide",
+  coating: "tin",
+  angle,
+  tipDiameter: Math.round(d * 0.1 * 10) / 10,
+  fluteLength: Math.ceil(d / 2 / Math.tan(angle * Math.PI / 360)) + 1,
+  shankDiameter: d <= 12 ? 8 : 12,
+  stickout: Math.round(d * 2 + 20),
+  holder: HOLDER
+});
+var reamer = (d) => ({
+  id: `reamer-${d}`,
+  name: `Reamer \xD8${d} H7 carbide 6F`,
+  kind: "reamer",
+  diameter: d,
+  flutes: 6,
+  material: "carbide",
+  coating: "tin",
+  fluteLength: Math.round(d * 3 + 6),
+  shankDiameter: Math.max(3, Math.ceil(d)),
+  stickout: Math.round(d * 5 + 20),
+  holder: HOLDER
+});
+var DEFAULT_CUTTERS = [
+  ...[1, 2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : d <= 12 ? 3 : 4)),
+  ...[2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : 3, "carbide", "zrn", "-n")),
+  ...[1, 2, 3, 4, 6, 8, 10].map(ball),
+  { id: "bull-6-r0.5", name: "Bull nose \xD86 R0.5 4F carbide", kind: "bull", diameter: 6, flutes: 4, material: "carbide", coating: "altin", cornerRadius: 0.5, fluteLength: 15, shankDiameter: 6, stickout: 30, holder: HOLDER },
+  { id: "bull-10-r1", name: "Bull nose \xD810 R1 4F carbide", kind: "bull", diameter: 10, flutes: 4, material: "carbide", coating: "altin", cornerRadius: 1, fluteLength: 22, shankDiameter: 10, stickout: 40, holder: HOLDER },
+  { id: "facemill-50", name: "Face mill \xD850 5 inserts", kind: "facemill", diameter: 50, flutes: 5, material: "carbide", coating: "ticn", fluteLength: 6, shankDiameter: 22, stickout: 45, holder: { diameter: 50, length: 40 } },
+  { id: "spot-6", name: "Spot drill \xD86 90\xB0", kind: "spot", diameter: 6, flutes: 2, material: "carbide", coating: "tin", angle: 90, fluteLength: 6, shankDiameter: 6, stickout: 25, holder: HOLDER },
+  { id: "spot-10", name: "Spot drill \xD810 90\xB0", kind: "spot", diameter: 10, flutes: 2, material: "carbide", coating: "tin", angle: 90, fluteLength: 8, shankDiameter: 10, stickout: 35, holder: HOLDER },
+  { id: "chamfer-12", name: "Chamfer mill \xD812 90\xB0", kind: "chamfer", diameter: 12, flutes: 4, material: "carbide", coating: "tin", angle: 90, tipDiameter: 0.5, fluteLength: 6, shankDiameter: 12, stickout: 35, holder: HOLDER },
+  { id: "chamfer-20", name: "Chamfer mill \xD820 90\xB0", kind: "chamfer", diameter: 20, flutes: 4, material: "carbide", coating: "tin", angle: 90, tipDiameter: 1, fluteLength: 10, shankDiameter: 16, stickout: 45, holder: HOLDER },
+  { id: "engraver-60", name: "Engraver 60\xB0 tip 0.2", kind: "engraver", diameter: 3, flutes: 1, material: "carbide", coating: "none", angle: 60, tipDiameter: 0.2, fluteLength: 3, shankDiameter: 3, stickout: 20, holder: HOLDER },
+  ...[0.5, 0.7, 0.8, 1, 1.25, 1.5, 1.75, 2].map((pitch) => {
+    const d = pitch <= 0.8 ? 2.4 : pitch <= 1 ? 4.6 : pitch <= 1.5 ? 6.4 : 8.8;
+    return { id: `threadmill-p${pitch}`, name: `Thread mill \xD8${d} P${pitch}`, kind: "threadmill", diameter: d, flutes: 3, material: "carbide", coating: "tin", pitch, fluteLength: Math.round(d * 2.5), shankDiameter: Math.max(4, Math.ceil(d)), stickout: Math.round(d * 4 + 15), holder: HOLDER };
+  }),
+  ...METRIC_THREADS.filter((t) => t.d >= 3 && t.d <= 12).map((t) => tap2(t.d, t.pitch)),
+  ...REAMER_SIZES.map(reamer),
+  ...DRILL_SIZES.map(drill),
+  ...[[12, 90], [16, 90], [20, 90], [16, 82], [20, 100]].map(([d, a]) => countersink(d, a)),
+  { id: "boringbar-b16", name: "Back-boring bar \xD816 on \xD86 body", kind: "boringbar", diameter: 16, flutes: 1, material: "carbide", coating: "tin", neckDiameter: 6, headHeight: 3, fluteLength: 40, shankDiameter: 6, stickout: 60, holder: HOLDER },
+  { id: "tslot-12x4", name: "T-slot cutter \xD812 x 4", kind: "tslot", diameter: 12, flutes: 4, material: "carbide", coating: "altin", neckDiameter: 5, headHeight: 4, fluteLength: 12, shankDiameter: 6, stickout: 30, holder: HOLDER },
+  { id: "tslot-20x6", name: "T-slot cutter \xD820 x 6", kind: "tslot", diameter: 20, flutes: 6, material: "carbide", coating: "altin", neckDiameter: 8, headHeight: 6, fluteLength: 16, shankDiameter: 10, stickout: 40, holder: HOLDER },
+  { id: "dovetail-12-60", name: "Dovetail cutter \xD812 60\xB0", kind: "dovetail", diameter: 12, flutes: 4, material: "carbide", coating: "altin", angle: 60, neckDiameter: 6, headHeight: 4, fluteLength: 10, shankDiameter: 8, stickout: 30, holder: HOLDER }
+];
 // packages/core/src/cam/operations/face.ts
 class FaceParams extends Class3("cam/FaceParams")(Struct({
   ...OperationFields,
@@ -7760,7 +8069,59 @@ class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
   flute: withDefault2(Finite.check(isBetween({ minimum: 0.5, maximum: 6 })), 2)
 }).check(heightsOrdered)) {
 }
-var RAD3 = Math.PI / 180;
+var RAD4 = Math.PI / 180;
+// packages/core/src/cam/post/cutter-comp.ts
+var isoCutterComp = {
+  on: (side, register) => `${side === "left" ? "G41" : "G42"} D${register}`,
+  off: "G40"
+};
+
+// packages/core/src/cam/post/five-axis-frame.ts
+var tipMinutes = new WeakMap;
+
+// packages/core/src/cam/post/macro-syntax.ts
+var KLARTEXT_PREFIX = "KT:";
+
+// packages/core/src/cam/post/workplane.ts
+var DEG3 = 180 / Math.PI;
+var RAD5 = Math.PI / 180;
+var clamp1 = (v) => Math.max(-1, Math.min(1, v));
+var near0 = 0.000000001;
+var eulerZXZ = (m) => {
+  const j = Math.acos(clamp1(m[8]));
+  if (Math.sin(j) > near0)
+    return { i: Math.atan2(m[2], -m[5]) * DEG3, j: j * DEG3, k: Math.atan2(m[6], m[7]) * DEG3 };
+  return { i: Math.atan2(m[3], m[0]) * DEG3, j: j * DEG3, k: 0 };
+};
+var refuseLegacy = (control, call) => {
+  if (call.plane.legacy === true) {
+    throw new RangeError(`${control}: legacy cycle 19 WORKING PLANE is a Heidenhain word; this control has no such cycle, so the tilted plane is refused instead of being written as another word`);
+  }
+};
+var fanucTiltedPlane = {
+  set: (c) => {
+    refuseLegacy("Fanuc", c);
+    const e = eulerZXZ(c.matrix);
+    return [
+      "G91 G28 Z0",
+      "G90",
+      `G68.2 X${c.origin.x} Y${c.origin.y} Z${c.origin.z} I${c.angle(e.i)} J${c.angle(e.j)} K${c.angle(e.k)}`,
+      "G53.1"
+    ];
+  },
+  reset: (c) => {
+    refuseLegacy("Fanuc", c);
+    return ["G91 G28 Z0", "G90", "G69", ...c.rotaryAxes.length > 0 ? [`G0 ${c.rotaryAxes.map((a) => `${a}${c.number(0)}`).join(" ")}`] : []];
+  }
+};
+
+// packages/core/src/cam/post/spindle-orient.ts
+var isoSpindleOrient = { angled: false, blocks: () => ["M19"] };
+var klartextSpindleOrient = {
+  angled: true,
+  blocks: (a) => [`${KLARTEXT_PREFIX}CYCL DEF 13.0 ORIENTATION`, `${KLARTEXT_PREFIX}CYCL DEF 13.1 ANGLE${a}`, `${KLARTEXT_PREFIX}CYCL CALL`]
+};
+
 // packages/core/src/cam/post/fanuc.ts
 var fanucProgramNumber = (program) => {
   const requested = Number(program.metadata?.["programNumber"]);
@@ -7781,7 +8142,11 @@ var fanucDialect = {
   dwell: "milliseconds",
   uppercaseComments: true,
   rotary: true,
+  spindleOrient: isoSpindleOrient,
+  cutterComp: isoCutterComp,
   tcp: "G43.4",
+  tiltedPlane: fanucTiltedPlane,
+  inverseTime: { on: "G93", off: "G94" },
   smoothing: { on: () => ["G5.1 Q1"], off: ["G5.1 Q0"] },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
   subprograms: fanucSubprograms,
@@ -7800,6 +8165,9 @@ var genericDialect = {
   dwell: "seconds",
   uppercaseComments: false,
   rotary: true,
+  spindleOrient: isoSpindleOrient,
+  cutterComp: isoCutterComp,
+  inverseTime: { on: "G93", off: "G94" },
   begin: () => [],
   setup: ["G90", "G17", "G94"],
   toolChange: (n) => [`T${n} M6`],
@@ -7813,10 +8181,13 @@ var heidenhainDialect = {
   id: "heidenhain",
   canned: false,
   rigidTap: undefined,
+  cutterComp: undefined,
   arcModes: ["ijk"],
   arcLimits: { helical: false, fullCircle: false },
   commentStyle: "semicolon",
-  tcp: { on: () => "M128", off: () => "M129" }
+  tcp: { on: () => "M128", off: () => "M129" },
+  inverseTime: undefined,
+  spindleOrient: klartextSpindleOrient
 };
 var START_M = new Set(["M3", "M4", "M7", "M8", "M128"]);
 var END_M = new Set(["M0", "M1", "M2", "M5", "M9", "M30", "M129"]);
@@ -7828,7 +8199,31 @@ var mazakDialect = {
   rigidTap: {},
   cycleCodes: { tap: "G84.2" },
   tcp: "G43.4",
+  tiltedPlane: undefined,
   smoothing: undefined
+};
+
+// packages/core/src/cam/post/mitsubishi.ts
+var mitsubishiDialect = {
+  ...fanucDialect,
+  id: "mitsubishi",
+  rigidTap: undefined,
+  smoothing: undefined,
+  tiltedPlane: undefined
+};
+
+// packages/core/src/cam/post/brother.ts
+var brotherDialect = {
+  ...fanucDialect,
+  id: "brother",
+  rigidTap: undefined,
+  smoothing: undefined,
+  tiltedPlane: undefined,
+  tcp: undefined,
+  tcpLimits: undefined,
+  inverseTime: undefined,
+  rotary: false,
+  toolChange: (n) => [`G100 T${n} M6`, `G43 H${n}`]
 };
 // packages/core/src/cam/testing/heidenhain.ts
 var NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)";
@@ -7842,7 +8237,7 @@ var printable = /^[\x20-\x7E]*$/;
 var template = String4.check(isMaxLength(LINE_MAX, { message: `a line is at most ${LINE_MAX} characters` }), isPattern2(printable, { message: "a line is printable ASCII (no control character, no line break)" }));
 var lines = (max) => ArraySchema(template).check(isMaxLength(max, { message: `at most ${max} lines` }));
 var gWord = String4.check(isPattern2(/^[GM]\d{1,3}(?:\.\d)?$/, { message: "a G or M code such as G43.4 or M128" }));
-var BASE_POSTS = ["generic", "linuxcnc", "fanuc", "haas", "grbl", "siemens", "heidenhain", "okuma", "mazak"];
+var BASE_POSTS = ["generic", "linuxcnc", "fanuc", "haas", "grbl", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"];
 var Tcp = Union2([
   Struct({ kind: Literal2("offset"), code: String4.check(isPattern2(/^G\d{1,3}(?:\.\d)?$/, { message: "a G code such as G43.4" })) }),
   Struct({ kind: Literal2("blocks"), on: template, off: template, end: optionalKey2(template) })
@@ -8012,179 +8407,6 @@ var MotionTrackSchema = Struct({
   paths: ArraySchema(MotionPathTrackSchema),
   unsupported: ArraySchema(Struct({ line: Index, word: String4 }))
 });
-
-// packages/core/src/cam/kernel/identity.ts
-var K = new Uint32Array([
-  1116352408,
-  1899447441,
-  3049323471,
-  3921009573,
-  961987163,
-  1508970993,
-  2453635748,
-  2870763221,
-  3624381080,
-  310598401,
-  607225278,
-  1426881987,
-  1925078388,
-  2162078206,
-  2614888103,
-  3248222580,
-  3835390401,
-  4022224774,
-  264347078,
-  604807628,
-  770255983,
-  1249150122,
-  1555081692,
-  1996064986,
-  2554220882,
-  2821834349,
-  2952996808,
-  3210313671,
-  3336571891,
-  3584528711,
-  113926993,
-  338241895,
-  666307205,
-  773529912,
-  1294757372,
-  1396182291,
-  1695183700,
-  1986661051,
-  2177026350,
-  2456956037,
-  2730485921,
-  2820302411,
-  3259730800,
-  3345764771,
-  3516065817,
-  3600352804,
-  4094571909,
-  275423344,
-  430227734,
-  506948616,
-  659060556,
-  883997877,
-  958139571,
-  1322822218,
-  1537002063,
-  1747873779,
-  1955562222,
-  2024104815,
-  2227730452,
-  2361852424,
-  2428436474,
-  2756734187,
-  3204031479,
-  3329325298
-]);
-
-// packages/core/src/cam/kernel/cutters.ts
-var HOLDER = { diameter: 40, length: 50 };
-var flat = (d, flutes, material = "carbide", coating = "altin", suffix = "") => ({
-  id: `flat-${d}${suffix}`,
-  name: `End mill \xD8${d} ${flutes}F ${material === "carbide" ? "carbide" : "HSS"} ${coating === "none" ? "uncoated" : coating.toUpperCase()}`,
-  kind: "flat",
-  diameter: d,
-  flutes,
-  material,
-  coating,
-  fluteLength: Math.max(3, Math.round(d * 2.5)),
-  shankDiameter: Math.max(3, Math.ceil(d < 3 ? 3 : d)),
-  stickout: Math.max(12, Math.round(d * 3.5 + 8)),
-  holder: HOLDER
-});
-var ball = (d) => ({
-  id: `ball-${d}`,
-  name: `Ball end mill \xD8${d} 2F carbide`,
-  kind: "ball",
-  diameter: d,
-  flutes: 2,
-  material: "carbide",
-  coating: "altin",
-  fluteLength: Math.max(3, Math.round(d * 2)),
-  shankDiameter: Math.max(3, d < 3 ? 3 : d),
-  stickout: Math.max(15, Math.round(d * 4 + 10)),
-  holder: HOLDER
-});
-var drill2 = (d) => ({
-  id: `drill-${d}`,
-  name: `Drill \xD8${d} carbide 140\xB0`,
-  kind: "drill",
-  diameter: d,
-  flutes: 2,
-  material: "carbide",
-  coating: "tin",
-  angle: 140,
-  fluteLength: Math.round(d * 5 + 4),
-  shankDiameter: Math.max(3, Math.ceil(d)),
-  stickout: Math.round(d * 5 + 15),
-  holder: HOLDER
-});
-var REAMER_SIZES = [3, 4, 5, 6, 8, 10, 12];
-var reamDrill = (d) => Math.round((d - (d <= 6 ? 0.2 : 0.3)) * 10) / 10;
-var DRILL_SIZES = [...new Set([
-  ...METRIC_THREADS.filter((t) => t.d <= 20).flatMap((t) => [t.tapDrill, t.clearance.medium]),
-  ...REAMER_SIZES.map(reamDrill),
-  2,
-  3,
-  4,
-  5,
-  6,
-  7,
-  8,
-  10,
-  12
-])].sort((a, b) => a - b);
-var tap2 = (d, pitch) => ({
-  id: `tap-m${d}`,
-  name: `Machine tap M${d}x${pitch} HSS-E TiCN form C`,
-  kind: "tap",
-  diameter: d,
-  flutes: d <= 5 ? 3 : 4,
-  material: "hss-co",
-  coating: "ticn",
-  pitch,
-  fluteLength: Math.round(d * 2.5 + 4),
-  shankDiameter: Math.max(3.5, Math.round(d * 0.8 * 10) / 10),
-  stickout: Math.round(d * 6 + 25),
-  holder: HOLDER
-});
-var reamer = (d) => ({
-  id: `reamer-${d}`,
-  name: `Reamer \xD8${d} H7 carbide 6F`,
-  kind: "reamer",
-  diameter: d,
-  flutes: 6,
-  material: "carbide",
-  coating: "tin",
-  fluteLength: Math.round(d * 3 + 6),
-  shankDiameter: Math.max(3, Math.ceil(d)),
-  stickout: Math.round(d * 5 + 20),
-  holder: HOLDER
-});
-var DEFAULT_CUTTERS = [
-  ...[1, 2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : d <= 12 ? 3 : 4)),
-  ...[2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : 3, "carbide", "zrn", "-n")),
-  ...[1, 2, 3, 4, 6, 8, 10].map(ball),
-  { id: "bull-6-r0.5", name: "Bull nose \xD86 R0.5 4F carbide", kind: "bull", diameter: 6, flutes: 4, material: "carbide", coating: "altin", cornerRadius: 0.5, fluteLength: 15, shankDiameter: 6, stickout: 30, holder: HOLDER },
-  { id: "bull-10-r1", name: "Bull nose \xD810 R1 4F carbide", kind: "bull", diameter: 10, flutes: 4, material: "carbide", coating: "altin", cornerRadius: 1, fluteLength: 22, shankDiameter: 10, stickout: 40, holder: HOLDER },
-  { id: "facemill-50", name: "Face mill \xD850 5 inserts", kind: "facemill", diameter: 50, flutes: 5, material: "carbide", coating: "ticn", fluteLength: 6, shankDiameter: 22, stickout: 45, holder: { diameter: 50, length: 40 } },
-  { id: "spot-6", name: "Spot drill \xD86 90\xB0", kind: "spot", diameter: 6, flutes: 2, material: "carbide", coating: "tin", angle: 90, fluteLength: 6, shankDiameter: 6, stickout: 25, holder: HOLDER },
-  { id: "spot-10", name: "Spot drill \xD810 90\xB0", kind: "spot", diameter: 10, flutes: 2, material: "carbide", coating: "tin", angle: 90, fluteLength: 8, shankDiameter: 10, stickout: 35, holder: HOLDER },
-  { id: "chamfer-12", name: "Chamfer mill \xD812 90\xB0", kind: "chamfer", diameter: 12, flutes: 4, material: "carbide", coating: "tin", angle: 90, tipDiameter: 0.5, fluteLength: 6, shankDiameter: 12, stickout: 35, holder: HOLDER },
-  { id: "chamfer-20", name: "Chamfer mill \xD820 90\xB0", kind: "chamfer", diameter: 20, flutes: 4, material: "carbide", coating: "tin", angle: 90, tipDiameter: 1, fluteLength: 10, shankDiameter: 16, stickout: 45, holder: HOLDER },
-  { id: "engraver-60", name: "Engraver 60\xB0 tip 0.2", kind: "engraver", diameter: 3, flutes: 1, material: "carbide", coating: "none", angle: 60, tipDiameter: 0.2, fluteLength: 3, shankDiameter: 3, stickout: 20, holder: HOLDER },
-  ...[0.5, 0.7, 0.8, 1, 1.25, 1.5, 1.75, 2].map((pitch) => {
-    const d = pitch <= 0.8 ? 2.4 : pitch <= 1 ? 4.6 : pitch <= 1.5 ? 6.4 : 8.8;
-    return { id: `threadmill-p${pitch}`, name: `Thread mill \xD8${d} P${pitch}`, kind: "threadmill", diameter: d, flutes: 3, material: "carbide", coating: "tin", pitch, fluteLength: Math.round(d * 2.5), shankDiameter: Math.max(4, Math.ceil(d)), stickout: Math.round(d * 4 + 15), holder: HOLDER };
-  }),
-  ...METRIC_THREADS.filter((t) => t.d >= 3 && t.d <= 12).map((t) => tap2(t.d, t.pitch)),
-  ...REAMER_SIZES.map(reamer),
-  ...DRILL_SIZES.map(drill2)
-];
 
 // packages/core/src/cam/kernel/cutting-data.ts
 var FERROUS = new Set(["P", "M", "K", "S", "H"]);
@@ -8541,7 +8763,7 @@ var SOLID_TYPES2 = new Set([
 ]);
 
 // packages/core/src/cam/viewer/rotary.ts
-var RAD4 = Math.PI / 180;
+var RAD6 = Math.PI / 180;
 
 // packages/core/src/cam/viewer/machine-setup.ts
 var INTERNAL_TOOLS = new Set(["boring"]);
@@ -8560,9 +8782,11 @@ var PART = new Set(["WALL-OUTER", "WALL-INNER", "SKIN", "FILL", "BRIDGE"]);
 // packages/core/src/cam/print/program.ts
 var KNOWN_G = new Set([0, 1, 2, 3, 4, 10, 11, 17, 18, 19, 20, 21, 28, 29, 90, 91, 92]);
 var KNOWN_M = new Set([0, 1, 17, 18, 73, 82, 83, 84, 104, 105, 106, 107, 109, 116, 140, 141, 190, 191, 200, 201, 203, 204, 205, 220, 221, 400, 410, 412, 420, 500, 501, 503, 572, 600, 620, 621, 900, 907, 955, 991, 1002, 1004, 1005, 2000]);
+var vals = new Float64Array(26);
+var present = new Uint8Array(26);
 
 // packages/core/src/cam/print/printability.ts
-var DEG3 = Math.PI / 180;
+var DEG4 = Math.PI / 180;
 // packages/core/src/cam/viewer/collisions.ts
 var HEAD_SIDE = new Set(["head", "spindle", "fork"]);
 var PART_SIDE = new Set(["table", "cradle", "platter"]);
@@ -8662,9 +8886,14 @@ var VerifyResponseSchema = Struct({
   stats: VerifyStatsSchema,
   preview: VerifyPreviewSchema
 });
+// packages/core/src/cam/model/features.ts
+var DEG5 = Math.PI / 180;
 // packages/core/src/cam/kernel/contracts.ts
 var PROFILE_LEAD_INS = ["direct", "arc", "ramp", "helix"];
 var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
+// packages/core/src/pmi/pmi.ts
+var KINDS = new Set(["dimensional-size", "dimensional-location", "geometric-tolerance", "datum", "datum-target", "surface-texture", "note"]);
+var REF_KINDS = new Set(["face", "edge", "vertex"]);
 // packages/core/src/cam/kernel/machines.ts
 var kernMicroHd = (taper) => ({
   id: `kern-micro-hd-${taper}`,
@@ -8757,6 +8986,26 @@ var MACHINES = [
     toolChangeSeconds: 5
   },
   {
+    id: "mitsubishi-vmc",
+    name: "Mitsubishi MELDAS vertical mill (BT40, 12 000 rpm, 11 kW)",
+    kind: "mill",
+    post: "mitsubishi",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 800, width: 450, gap: 30 },
+    rapidFeed: 30000,
+    toolChangeSeconds: 6
+  },
+  {
+    id: "brother-speedio",
+    name: "Brother Speedio class compact mill (BT30, 16 000 rpm, 5.5 kW)",
+    kind: "mill",
+    post: "brother",
+    limits: { maxRpm: 16000, minRpm: 100, maxFeed: 50000, powerKw: 5.5, torqueNm: 24, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 20 },
+    rapidFeed: 50000,
+    toolChangeSeconds: 1.2
+  },
+  {
     id: "hsc-mill",
     name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)",
     kind: "mill",
@@ -8846,7 +9095,7 @@ var PRINTERS = [
 var MACHINE_CATALOGUE = [...MACHINES, ...LATHES, ...PRINTERS];
 var DEFAULT_MACHINE = MACHINES[0];
 // packages/core/src/cam/kernel/machine-profile.ts
-var POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"];
+var POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"];
 var MACHINE_KINDS = ["mill", "lathe", "printer", "laser"];
 var AXIS_IDS = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"];
 var positive = Finite.check(isGreaterThan2(0));
@@ -9071,11 +9320,17 @@ var machineConfigOf = (machine) => {
   };
 };
 var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
+// packages/core/src/cam/kernel/tridexel.ts
+var SCRATCH = 64;
+var loBuf = new Float64Array(SCRATCH);
+var hiBuf = new Float64Array(SCRATCH);
+var keep = new Float32Array(1024);
+
 // packages/core/src/cam/kernel/head.ts
-var DEG4 = Math.PI / 180;
+var DEG6 = Math.PI / 180;
 
 // packages/core/src/cam/kernel/collision.ts
-var DEG5 = Math.PI / 180;
+var DEG7 = Math.PI / 180;
 // packages/core/src/drawing/title-block.ts
 var DOCUMENT_TYPES = ["part", "assembly", "cam-setup", "cam-program", "sketch"];
 var DOCUMENT_STATUSES = ["draft", "in-review", "released", "obsolete"];
@@ -9123,7 +9378,7 @@ var ring2 = ArraySchema(point).check(isMinLength(3), isMaxLength(20000));
 var CutterSchema = Struct({
   id,
   name: String4.check(isMaxLength(120)),
-  kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
+  kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"]),
   diameter: positive2,
   flutes: Int.check(isBetween({ minimum: 1, maximum: 24 })),
   material: Literals(["hss", "hss-co", "carbide", "pcd"]),
@@ -9132,6 +9387,8 @@ var CutterSchema = Struct({
   angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
   tipDiameter: optionalKey2(nonNegative2),
   pitch: optionalKey2(positive2),
+  neckDiameter: optionalKey2(positive2),
+  headHeight: optionalKey2(positive2),
   fluteLength: positive2,
   shankDiameter: positive2,
   stickout: positive2,
@@ -9139,6 +9396,26 @@ var CutterSchema = Struct({
   maxRpm: optionalKey2(positive2),
   number: optionalKey2(Int.check(isBetween({ minimum: 1, maximum: 999 })))
 });
+var HoleCycleSchema = Union2([
+  Struct({ kind: Literal2("countersink"), diameter: positive2 }),
+  Struct({
+    kind: Literal2("deep"),
+    peck: positive2,
+    retract: Literals(["full", "chip-break"]),
+    peckReduction: optionalKey2(nonNegative2),
+    minPeck: optionalKey2(positive2),
+    chipBreakRetract: optionalKey2(positive2),
+    fullRetractEvery: optionalKey2(Int.check(isGreaterThanOrEqualTo2(0))),
+    dwell: optionalKey2(nonNegative2)
+  }),
+  Struct({ kind: Literal2("back-bore"), diameter: positive2, pilotDiameter: positive2, face: Finite }),
+  Struct({
+    kind: Literal2("tilted"),
+    peck: optionalKey2(nonNegative2),
+    chipBreak: optionalKey2(Boolean3),
+    sites: ArraySchema(Struct({ entry: vec3, direction: vec3, depth: positive2 })).check(isMinLength(1), isMaxLength(5000))
+  })
+]);
 var overrides = {
   id,
   name: optionalKey2(String4.check(isMaxLength(120))),
@@ -9167,10 +9444,11 @@ var OperationSpecSchema = Union2([
     finish: optionalKey2(Boolean3),
     tabs: optionalKey2(ArraySchema(Struct({ position: Finite.check(isBetween({ minimum: 0, maximum: 1 })), width: positive2, height: positive2 })).check(isMaxLength(64))),
     leadIn: optionalKey2(Literals(PROFILE_LEAD_INS)),
-    leadRadius: optionalKey2(positive2)
+    leadRadius: optionalKey2(positive2),
+    compensation: optionalKey2(Literals(["none", "controller"]))
   }),
   Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive2, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2) }),
-  Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot", "tap", "ream"])) }),
+  Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot", "tap", "ream"])), cycle: optionalKey2(HoleCycleSchema) }),
   Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive2, pitch: positive2, internal: Boolean3, top: Finite, length: positive2, rightHand: optionalKey2(Boolean3) }),
   Struct({ ...overrides, strategy: Literal2("engrave"), paths: ArraySchema(Struct({ points: ArraySchema(point).check(isMinLength(2)), closed: Boolean3 })).check(isMinLength(1), isMaxLength(2000)), top: Finite, depth: positive2 }),
   Struct({ ...overrides, strategy: Literal2("chamfer"), loops: ArraySchema(Struct({ points: ring2, side: Literals(["outside", "inside"]) })).check(isMinLength(1), isMaxLength(2000)), top: Finite, width: positive2, tipOffset: optionalKey2(nonNegative2) }),
@@ -9226,7 +9504,42 @@ var PrintRequirementSchema = Struct({
   relativeExtrusion: optionalKey2(Boolean3)
 });
 // packages/core/src/cam/kernel/engagement.ts
-var TAU15 = Math.PI * 2;
+var TAU16 = Math.PI * 2;
+// packages/core/src/cam/program/op.ts
+var OperationSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  elementIds: ArraySchema(String4),
+  params: ToolpathSettingsSchema,
+  tool: ToolSchema,
+  pocket: optionalKey2(Int.check(isGreaterThanOrEqualTo2(1))),
+  enabled: Boolean3,
+  fromPreviousStock: Boolean3
+});
+// packages/core/src/cam/program/setup.ts
+var PostConfigSchema = Struct({
+  postId: Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"]),
+  decimals: Int.check(isBetween({ minimum: 0, maximum: 6 })),
+  useCannedCycles: Boolean3,
+  arcMode: Literals(["ijk", "radius", "linearize"]),
+  header: Boolean3,
+  tolerance: Finite.check(isGreaterThanOrEqualTo2(0)),
+  lineNumbers: optionalKey2(Struct({ start: Int, step: Int.check(isGreaterThanOrEqualTo2(1)) })),
+  stamp: optionalKey2(String4),
+  programNumberBase: Int.check(isGreaterThanOrEqualTo2(1))
+});
+var SetupGroupingSchema = Literals(["single", "perTool", "perOperation"]);
+var SetupSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  machineType: Literals(["mill", "lathe", "3dprinter"]),
+  workOffset: Literals(["G54", "G55", "G56", "G57", "G58", "G59"]),
+  stock: optionalKey2(StockSchema),
+  post: PostConfigSchema,
+  grouping: SetupGroupingSchema,
+  retractBeforeToolChange: Boolean3,
+  operations: ArraySchema(OperationSchema)
+});
 // packages/core/src/drawing/sheet.ts
 var LAYERS = [
   { id: "frame", name: "FRAME", color: "#000000", width: 0.7 },
@@ -9240,8 +9553,138 @@ var LAYERS = [
 ];
 var WIDTH = Object.fromEntries(LAYERS.map((l) => [l.id, l.width]));
 var COLOR = Object.fromEntries(LAYERS.map((l) => [l.id, l.color]));
+// packages/core/src/drawing/pdf.ts
+var PT_PER_MM = 72 / 25.4;
 // packages/core/src/preview/companion.ts
 var FEATURE_STRUCTURE = new Set(["id", "type", "sketch", "plane", "from", "entities", "constraints", "shapes", "history", "profiles"]);
+// packages/core/src/sim-fea/materials.ts
+var m2 = (x) => x;
+var MATERIALS2 = [
+  m2({ id: "steel-s235", name: "Structural steel S235", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 235, ultimateMPa: 360, conductivity: 50, specificHeat: 490, expansion: 0.000012, maxServiceC: 400, enduranceMPa: 160 }),
+  m2({ id: "steel-c45", name: "Carbon steel C45", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 490, ultimateMPa: 700, conductivity: 46, specificHeat: 470, expansion: 0.0000115, maxServiceC: 400, enduranceMPa: 300 }),
+  m2({ id: "steel-42crmo4", name: "Alloy steel 42CrMo4 (QT)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.29, density: 7850, yieldMPa: 800, ultimateMPa: 1000, conductivity: 42, specificHeat: 460, expansion: 0.0000123, maxServiceC: 450, enduranceMPa: 480 }),
+  m2({ id: "steel-tool-d2", name: "Tool steel D2 (hardened)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.28, density: 7700, yieldMPa: 1500, ultimateMPa: 1900, conductivity: 20, specificHeat: 460, expansion: 0.0000104, maxServiceC: 400 }),
+  m2({ id: "stainless-304", name: "Stainless steel 304", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.29, density: 8000, yieldMPa: 215, ultimateMPa: 505, conductivity: 16, specificHeat: 500, expansion: 0.0000173, maxServiceC: 800, enduranceMPa: 240 }),
+  m2({ id: "stainless-316l", name: "Stainless steel 316L", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.3, density: 8000, yieldMPa: 205, ultimateMPa: 515, conductivity: 16, specificHeat: 500, expansion: 0.000016, maxServiceC: 800, enduranceMPa: 240 }),
+  m2({ id: "stainless-17-4ph", name: "Stainless steel 17-4PH (H1025)", family: "stainless", ductility: "ductile", youngGPa: 197, poisson: 0.27, density: 7800, yieldMPa: 1000, ultimateMPa: 1070, conductivity: 18, specificHeat: 460, expansion: 0.0000108, maxServiceC: 315 }),
+  m2({ id: "aluminium-6061-t6", name: "Aluminium 6061-T6", family: "aluminium", ductility: "ductile", youngGPa: 68.9, poisson: 0.33, density: 2700, yieldMPa: 276, ultimateMPa: 310, conductivity: 167, specificHeat: 896, expansion: 0.0000236, maxServiceC: 150, enduranceMPa: 96 }),
+  m2({ id: "aluminium-7075-t6", name: "Aluminium 7075-T6", family: "aluminium", ductility: "ductile", youngGPa: 71.7, poisson: 0.33, density: 2810, yieldMPa: 503, ultimateMPa: 572, conductivity: 130, specificHeat: 960, expansion: 0.0000234, maxServiceC: 120, enduranceMPa: 159 }),
+  m2({ id: "aluminium-5083", name: "Aluminium 5083-H111", family: "aluminium", ductility: "ductile", youngGPa: 70.3, poisson: 0.33, density: 2660, yieldMPa: 145, ultimateMPa: 290, conductivity: 117, specificHeat: 900, expansion: 0.0000238, maxServiceC: 100 }),
+  m2({ id: "titanium-ti6al4v", name: "Titanium Ti-6Al-4V", family: "titanium", ductility: "ductile", youngGPa: 113.8, poisson: 0.342, density: 4430, yieldMPa: 880, ultimateMPa: 950, conductivity: 6.7, specificHeat: 526, expansion: 0.0000086, maxServiceC: 350, enduranceMPa: 510 }),
+  m2({ id: "copper-c11000", name: "Copper C11000 (ETP)", family: "copper", ductility: "ductile", youngGPa: 117, poisson: 0.34, density: 8940, yieldMPa: 70, ultimateMPa: 220, conductivity: 388, specificHeat: 385, expansion: 0.000017, maxServiceC: 200 }),
+  m2({ id: "brass-c360", name: "Brass C36000 (free-cutting)", family: "copper", ductility: "ductile", youngGPa: 97, poisson: 0.31, density: 8500, yieldMPa: 310, ultimateMPa: 385, conductivity: 115, specificHeat: 380, expansion: 0.0000205, maxServiceC: 200 }),
+  m2({ id: "inconel-718", name: "Inconel 718", family: "nickel", ductility: "ductile", youngGPa: 200, poisson: 0.29, density: 8190, yieldMPa: 1030, ultimateMPa: 1240, conductivity: 11.4, specificHeat: 435, expansion: 0.000013, maxServiceC: 650, enduranceMPa: 480 }),
+  m2({ id: "cast-iron-gg25", name: "Grey cast iron EN-GJL-250", family: "cast-iron", ductility: "brittle", youngGPa: 110, poisson: 0.26, density: 7200, yieldMPa: 250, ultimateMPa: 250, compressiveMPa: 850, conductivity: 46, specificHeat: 500, expansion: 0.000011, maxServiceC: 350 }),
+  m2({ id: "cast-iron-gjs400", name: "Ductile iron EN-GJS-400-15", family: "cast-iron", ductility: "ductile", youngGPa: 169, poisson: 0.275, density: 7100, yieldMPa: 250, ultimateMPa: 400, conductivity: 36, specificHeat: 500, expansion: 0.0000115, maxServiceC: 350 }),
+  m2({ id: "magnesium-az31b", name: "Magnesium AZ31B", family: "magnesium", ductility: "ductile", youngGPa: 45, poisson: 0.35, density: 1770, yieldMPa: 200, ultimateMPa: 260, conductivity: 96, specificHeat: 1000, expansion: 0.000026, maxServiceC: 120 }),
+  m2({ id: "pla", name: "PLA (printed)", family: "polymer", ductility: "brittle", youngGPa: 3.5, poisson: 0.36, density: 1240, yieldMPa: 50, ultimateMPa: 50, compressiveMPa: 80, conductivity: 0.13, specificHeat: 1800, expansion: 0.000068, maxServiceC: 55 }),
+  m2({ id: "abs", name: "ABS", family: "polymer", ductility: "ductile", youngGPa: 2.3, poisson: 0.35, density: 1050, yieldMPa: 40, ultimateMPa: 44, conductivity: 0.17, specificHeat: 1400, expansion: 0.00009, maxServiceC: 85 }),
+  m2({ id: "petg", name: "PETG", family: "polymer", ductility: "ductile", youngGPa: 2.1, poisson: 0.38, density: 1270, yieldMPa: 50, ultimateMPa: 53, conductivity: 0.2, specificHeat: 1200, expansion: 0.00006, maxServiceC: 70 }),
+  m2({ id: "nylon-pa12", name: "Nylon PA12", family: "polymer", ductility: "ductile", youngGPa: 1.7, poisson: 0.4, density: 1010, yieldMPa: 45, ultimateMPa: 48, conductivity: 0.23, specificHeat: 1700, expansion: 0.0001, maxServiceC: 90 })
+];
+// packages/core/src/sim-fea/element.ts
+var TET10_EDGES = [[0, 1], [1, 2], [0, 2], [0, 3], [1, 3], [2, 3]];
+var tet10Shape = (L, out) => {
+  for (let i = 0;i < 4; i++)
+    out[i] = L[i] * (2 * L[i] - 1);
+  for (let e = 0;e < 6; e++) {
+    const [a, b] = TET10_EDGES[e];
+    out[4 + e] = 4 * L[a] * L[b];
+  }
+};
+var tet10DShape = (L, out) => {
+  out.fill(0);
+  for (let i = 0;i < 4; i++)
+    out[i * 4 + i] = 4 * L[i] - 1;
+  for (let e = 0;e < 6; e++) {
+    const [a, b] = TET10_EDGES[e];
+    out[(4 + e) * 4 + a] = 4 * L[b];
+    out[(4 + e) * 4 + b] = 4 * L[a];
+  }
+};
+var tri6Shape = (s, out) => {
+  for (let i = 0;i < 3; i++)
+    out[i] = s[i] * (2 * s[i] - 1);
+  out[3] = 4 * s[0] * s[1];
+  out[4] = 4 * s[1] * s[2];
+  out[5] = 4 * s[2] * s[0];
+};
+// packages/core/src/sim-fea/quadrature.ts
+var gaussLegendre01 = (n) => {
+  const x = [], w = [];
+  for (let i = 0;i < n; i++) {
+    let z = Math.cos(Math.PI * (i + 0.75) / (n + 0.5));
+    let dp = 1;
+    for (let it = 0;it < 100; it++) {
+      let p0 = 1, p1 = z;
+      for (let k = 2;k <= n; k++) {
+        const p2 = ((2 * k - 1) * z * p1 - (k - 1) * p0) / k;
+        p0 = p1;
+        p1 = p2;
+      }
+      dp = n * (z * p1 - p0) / (z * z - 1);
+      const dz = p1 / dp;
+      z -= dz;
+      if (Math.abs(dz) < 0.000000000000001)
+        break;
+    }
+    x.push((1 - z) / 2);
+    w.push(1 / ((1 - z * z) * dp * dp));
+  }
+  return { x, w };
+};
+var conicalTetRule = (n) => {
+  const g = gaussLegendre01(n);
+  const points = [];
+  const weights = [];
+  for (let i = 0;i < n; i++)
+    for (let j = 0;j < n; j++)
+      for (let k = 0;k < n; k++) {
+        const u = g.x[i], v = g.x[j], w = g.x[k];
+        const x = u, y = v * (1 - u), z = w * (1 - u) * (1 - v);
+        points.push([1 - x - y - z, x, y, z]);
+        weights.push(g.w[i] * g.w[j] * g.w[k] * (1 - u) * (1 - u) * (1 - v));
+      }
+  return { points, weights: Float64Array.from(weights) };
+};
+var A4 = 0.5854101966249685;
+var B4 = 0.1381966011250105;
+var TET4 = {
+  points: [[A4, B4, B4, B4], [B4, A4, B4, B4], [B4, B4, A4, B4], [B4, B4, B4, A4]],
+  weights: Float64Array.from([1 / 24, 1 / 24, 1 / 24, 1 / 24])
+};
+var TET27 = conicalTetRule(3);
+var TET64 = conicalTetRule(4);
+var TA = 0.445948490915965;
+var TB = 0.091576213509771;
+var TRI6 = {
+  points: [
+    [TA, TA, 1 - 2 * TA],
+    [TA, 1 - 2 * TA, TA],
+    [1 - 2 * TA, TA, TA],
+    [TB, TB, 1 - 2 * TB],
+    [TB, 1 - 2 * TB, TB],
+    [1 - 2 * TB, TB, TB]
+  ],
+  weights: Float64Array.from([0.223381589678011, 0.223381589678011, 0.223381589678011, 0.109951743655322, 0.109951743655322, 0.109951743655322])
+};
+
+// packages/core/src/sim-fea/assemble.ts
+var tabulate = (points) => points.map((L) => {
+  const N = new Float64Array(10), dN = new Float64Array(40);
+  tet10Shape(L, N);
+  tet10DShape(L, dN);
+  return { N, dN };
+});
+var TAB4 = tabulate(TET4.points);
+var TAB27 = tabulate(TET27.points);
+var TAB64 = tabulate(TET64.points);
+var NODAL_VOLUME_SHARE = Float64Array.from([-1 / 20, -1 / 20, -1 / 20, -1 / 20, 1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]);
+var faceShapes = TRI6.points.map((s) => {
+  const N = new Float64Array(6);
+  tri6Shape(s, N);
+  return N;
+});
 // packages/plugin-sdk/examples/hello-gear/index.ts
 var gearEntity = (id) => ({
   ...baseEntity(id),

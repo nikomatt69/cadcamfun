@@ -1,4 +1,5 @@
 Save project notes and standing context so the next conversation starts where this one stopped.
+Call with action and its fields. Read the current note/section before replacing it; other sessions share this project's memory.
 
 Actions
 - remember: store one note under a stable key; writing the key again replaces it.
@@ -13,5 +14,5 @@ Result (JSON)
 
 Do not use it
 - To read them first: memory.
-- Keep notes to confirmed, reusable facts: setup, machine and work offset, material, workholding, named design constraints, user corrections. Never store secrets, speculative geometry, failed operations or conversation transcripts.
+- Keep confirmed reusable facts, units, source and relevant drawing/setup identity. Do not store secrets, transient revisions, speculative geometry, failed operations, private reasoning or transcripts. Session progress belongs in the native plan/goal, not shared project rules.
 - The standing context changes every later conversation in this project: write only what the user confirmed.

@@ -152,7 +152,7 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cad.parametric_validate", kind: "read", replaces: "cad_parametric",
     parameters: INPUTS["cad.parametric_validate"],
-    run: (input) => runParametricValidate(input)
+    run: (input, context) => runParametricValidate(input, context)
   }),
   defineWireAction({
     id: "cad.parametric_inspect", kind: "read", replaces: "cad_parametric",

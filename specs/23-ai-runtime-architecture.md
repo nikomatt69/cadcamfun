@@ -39,7 +39,53 @@ Host isolation also sets the pinned SDK's `NIKCLI_DISABLE_SHARE`: the existing `
 denies publishing but does not prevent native share-sync event listeners and deferred database reads.
 Sharing remains disabled as before; unused synchronization must not tax every session event or outlive teardown.
 
+## Parametric responsiveness continuation (2026-11-02)
+
+The owner requested committing the verified increment and continuing. WP8 owns pure parametric worker
+jobs, the existing parametric action adapters and their tests; WP4 owns `ai-parametric.ts`, the parametric
+handler in `ai.ts` and existing parametric integration tests. Validation/diagnosis, recipe reports, exact
+inspection, parameter changes, timeline checks and structural edits must compute in scoped workers.
+The sidecar still authorizes, freezes the target, checks expected revision and commits through the
+existing drawing repository. Complete immutable-input reports may share bounded content-keyed work;
+callers receive independent copies of cached evidence. Keep all geometric checks, failure diagnoses,
+warnings, history revision hashes and result shapes. Test variants never persist changes, carry the
+invocation cancellation signal and remain bounded by the existing worker queue.
+
+Element normalization also rebuilds nested parametric histories. Its pure implementation remains the
+single validation authority; tool/sidecar batch adapters use the worker only when a batch contains a
+parametric element, including within a component/group. Ordinary primitives retain their cheap path.
+
+## Project and session context continuation (2026-11-02)
+
+The owner requests nikcli-style context adapted to CAD/CAM: native history/plan belongs to its session,
+rules and durable facts belong to its authorized project, and the live observation belongs to that turn's
+explicit drawing. WP4 owns `ai-context.ts`, its use in `http/ai.ts`, and existing context tests. A project-wide
+editor snapshot must not inject another drawing's selection/geometry into a bound session. When it does
+not match, use the authorized target drawing's saved data with clear provenance, never another editor's
+state. Keep context budgets, append-only observations and `includeContext=false` behavior. Session ids
+are carried through the assembly seam; project facts stay intentionally shared across that project's sessions.
+
 ## Decision and evidence
+
+### Tool and prompt coherence continuation (2026-11-02)
+
+The owner reports failed operations and requests a thorough prompt rewrite connected to the actual kernels.
+WP8 owns the primary, specialist, workflow, model-family and tool prompts, their assembly contracts and
+tests, and delegation action normalization; WP3 owns its canonical brief schema in
+`packages/api/src/ai-action-inputs.ts` and generated API reference. Audit actual native requests and stored tool outcomes
+before attributing failures to the registry. Deferred discovery must expose real schemas, reused once
+loaded; read-only preparation and delegation must serve the requested edit rather than replace it.
+Delegation reports may be supplied as a bounded string or bounded string checklist, normalized into the
+same internal brief before admission. Reject other shapes with actionable validation; never silently
+drop user constraints. Preserve project/session permissions, kernel verification and prompt budgets.
+No prompt or mocked provider test establishes general model competence or production tool latency.
+This includes WP8 on-demand skill text: references must name current catalogue actions and make
+preparation conditional on the task, rather than reintroducing removed mandatory reads. WP4 owns
+correction of stale recovery instructions in the existing AI service/export/transform adapters.
+The pinned host also starts Requesty remote model discovery despite the configured
+`NIKCLI_DISABLE_MODELS_FETCH` flag. WP8 may patch that discovery at the existing mandatory host-patch
+seam to honor the flag, keeping bundled model data and selected-provider inference unchanged. The same
+patch must be asserted at source import and compiled build time; do not introduce a global fetch patch.
 
 Reference checkout: `/Volumes/SSD/Projects/nikcli`, inspected on 2026-10-09. The application uses published `sdk-next@1.428.0`; reference-checkout APIs are architectural evidence, not an assumed surface of the pinned bundle.
 

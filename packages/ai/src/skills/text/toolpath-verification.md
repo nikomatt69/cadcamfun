@@ -1,6 +1,6 @@
 # Reading a verification report
 
-cam_edit action verify replays the G-code on a height-field model of the stock. It answers "does this program damage anything it knows about", never "is this safe on the machine".
+cam_edit action verify (cam_verify action verify for the dedicated verifier) replays the stored programHash on a height-field model of stock. It neither regenerates NC nor proves physical machine safety. Reuse a report only while its program, drawing and settings identity remains current; cam action review reports freshness.
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
@@ -16,4 +16,4 @@ cam_edit action verify replays the G-code on a height-field model of the stock. 
 
 Always state what was modelled (`modelled` in the result): without a holder, fixtures or a target part those checks did not run. Volume and air-cut numbers are planning figures. An InterpreterWarning means part of the program was never replayed, so the rest of the report does not cover it. Never write "safe", "certified" or "collision-free": write "no errors found in what was modelled".
 
-Files: after a verification `cam_edit` `export` writes the stored program (`kind:"program"`, `extension` nc|tap|gcode|ngc|mpf|h|txt as the controller wants) or the stock it leaves (`kind:"stock"`, stl|stl_ascii|obj|3mf) into the project export folder. The stock mesh is the verified height field at its cell size (`cellMm`), faceted and unable to hold an undercut; `thinCells` counts cells cut through to the stock bottom. It refuses when the program, the settings or the drawing changed since the verification: verify again, then export.
+Files: cam_edit action export writes a stored program (kind:program, extension nc|tap|gcode|ngc|mpf|h|txt) or verified remaining stock (kind:stock, format stl|stl_ascii|obj|3mf). Exporting NC is not verification or release. Stock export requires current verification and returns cellMm and thinCells; it is a faceted height field and cannot represent undercuts. If its evidence is stale, verify the actual stored program again. Report the returned file key, size and hash; no file exists until storage succeeds.

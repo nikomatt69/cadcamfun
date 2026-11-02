@@ -161,7 +161,7 @@ describe("an editing specialist inside a real host turn", () => {
     expect(names.filter((n) => !SUBAGENTS.editor.tools.includes(n) && n !== "skill" && n !== "invalid" && n !== "code_mode" && n !== "search_tools" && n !== "question")).toEqual([])
     expect(editorRequests[0]!.model).toBe("fake-model")
     // Its instructions are the editor's, not the main agent's.
-    expect(JSON.stringify(editorRequests[0]!.messages[0])).toContain("smallest change")
+    expect(editorRequests[0]!.messages[0]?.content).toContain(SUBAGENTS.editor.prompt)
 
     // The tool ran against the project that asked, not a shared one.
     expect(handlerCalls).toContainEqual({ name: "describeDrawing", projectId: "project-42" })

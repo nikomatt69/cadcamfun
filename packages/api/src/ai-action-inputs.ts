@@ -291,12 +291,23 @@ export const AgentBriefValue = Schema.Struct({
   unit: Schema.optionalKey(trimmed(20))
 })
 
+/** Both natural report forms decode to one bounded instruction; the wire schema advertises both. */
+export const AgentBriefReport = Schema.Union([
+  trimmed(1_000),
+  Schema.Array(trimmed(1_000)).check(Schema.isMinLength(1), Schema.isMaxLength(30)).pipe(
+    Schema.decodeTo(
+      trimmed(1_000),
+      SchemaTransformation.transform({ decode: (items) => items.join("\n"), encode: (text) => [text] })
+    )
+  )
+]).annotate({ description: "Expected findings as text or a nonempty list of text items (at most 1000 characters total). Example: [\"Changed element IDs\", \"Dimensions checked\"]." })
+
 export const AgentBrief = Schema.Struct({
   objective: trimmed(1_000),
   ids: Schema.optionalKey(Schema.Array(trimmed(200)).check(Schema.isMaxLength(50))),
   values: Schema.optionalKey(Schema.Array(AgentBriefValue).check(Schema.isMaxLength(50))),
   limits: Schema.optionalKey(Schema.Array(trimmed(500)).check(Schema.isMaxLength(30))),
-  report: Schema.optionalKey(trimmed(1_000))
+  report: Schema.optionalKey(AgentBriefReport)
 })
 
 export const VCS_ACTION_INPUTS = {

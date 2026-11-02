@@ -1,4 +1,5 @@
 Generate the G-code of an existing operation and verify its toolpath; nothing else.
+Call with action and its fields. Verify the stored programHash, not a preview or a prior revision.
 
 Actions
 - generate: store the NC of the operation from its current settings; return its programHash, size and a preview head.

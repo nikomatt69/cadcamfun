@@ -59,6 +59,14 @@ describe("agentJobPrompt", () => {
     expect(agentJobPrompt({ brief: { objective: "  List the open operations.  " } })).toEqual({ ok: true, prompt: "Objective: List the open operations." })
   })
 
+  test("report lists preserve every requested finding in the specialist prompt", () => {
+    expect(agentJobPrompt({ brief: { objective: "Check the part", report: [" Changed IDs ", "Dimensions checked"] } }))
+      .toEqual({ ok: true, prompt: "Objective: Check the part\n\nExpected report, in addition to your usual final message: Changed IDs\nDimensions checked" })
+    for (const report of [[], [""], ["   "], ["IDs", 3], { ids: true }, ["x".repeat(600), "y".repeat(600)], Array(31).fill("x")]) {
+      expect(agentJobPrompt({ brief: { objective: "Check the part", report } })).toMatchObject({ ok: false })
+    }
+  })
+
   test("a free prompt given with a brief follows it as details", () => {
     const job = agentJobPrompt({ brief: { objective: "Check the part" }, prompt: "Start with the holes." })
     expect(job).toEqual({ ok: true, prompt: "Objective: Check the part\n\nDetails:\nStart with the holes." })
@@ -109,6 +117,22 @@ describe("the agent.start input", () => {
     const wire = nikcliWireSchema(input)
     expect(wire.safeParse({ description: "d", brief }).success).toBe(true)
     expect(wire.safeParse({ description: "d", brief: { ids: ["a"] } }).success).toBe(false)
+  })
+
+  test("wire and action decode accept report lists and normalize them before admission", async () => {
+    const value = { description: "inspect", brief: { objective: "Check the part", report: ["Changed IDs", "Dimensions checked"] } }
+    expect(nikcliWireSchema(input).safeParse(value).success).toBe(true)
+    const decoded = await Effect.runPromise(Schema.decodeUnknownEffect(VCS_ACTION_INPUTS["agent.start"])(value))
+    expect(decoded.brief?.report).toBe("Changed IDs\nDimensions checked")
+    let received: unknown
+    const outcome = await executeActionOutcome(actionById("agent.start")!, value, {
+      handlers: {} as ToolHandlersShape, projectId: "p", contributions: { "agent.start": async (args) => { received = args; return { id: "job-1", status: "queued", agent: "researcher", description: "inspect" } } }
+    })
+    expect(outcome.kind).toBe("succeeded")
+    expect(received).toMatchObject({ brief: { report: "Changed IDs\nDimensions checked" } })
+    for (const report of [[], [""], ["IDs", false], { ids: true }, ["x".repeat(600), "y".repeat(600)]]) {
+      expect(await decodes({ ...value, brief: { ...value.brief, report } })).toBe(false)
+    }
   })
 
   test("the action layer refuses an objective-less brief before the delegation runs", async () => {
@@ -164,8 +188,9 @@ describe("what the model and the specialists read", () => {
     const first = text.split("\n")[0]!
     expect(first.length).toBeLessThanOrEqual(100)
     expect(text).toContain("start returns at once")
-    expect(text).toContain("Do not wait")
-    expect(text).toContain("ONE block")
+    expect(text).toContain("without polling")
+    expect(text).toContain("Start independent jobs together")
+    expect(text).toContain("report (string or string list")
     expect(text).toContain("brief")
     expect(text).toContain("objective")
   })
@@ -173,7 +198,7 @@ describe("what the model and the specialists read", () => {
   test("every specialist knows the brief format and keeps its final message headings", () => {
     for (const id of SUBAGENT_IDS) {
       const prompt = specialistPrompt(id)
-      expect(prompt, id).toContain("A brief has Objective")
+      expect(prompt, id).toContain("Objective, Ids, Values/units, Limits and Expected report")
       expect(prompt, id).toContain("Final message")
       expect(prompt, id).not.toContain("{{report}}")
     }

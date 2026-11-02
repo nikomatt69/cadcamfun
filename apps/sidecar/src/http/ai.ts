@@ -204,13 +204,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
    * What the assistant knows before the first word: the caller's context, the project context the UI keeps in the
    * key-value store and notes belonging only to that project.
    */
-  const aiContext = makeAiContext({ kv, projects, host })
+  const aiContext = makeAiContext({ kv, projects, host, drawings })
   /** The turn's context through the one assembly (`ai-context.ts`): authorised sources, one budget, a manifest. */
-  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; drawingId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
+  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; sessionId?: string | undefined; drawingId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
     const actor = yield* CurrentUser
     const assembly = yield* aiContext.assembleParts({
       actorId: actor.id, includeContext: payload.includeContext !== false,
       ...(payload.projectId !== undefined ? { projectId: payload.projectId } : {}),
+      ...(payload.sessionId !== undefined ? { sessionId: payload.sessionId } : {}),
       ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}),
       ...(payload.context !== undefined ? { explicit: payload.context } : {})
     }).pipe(Effect.mapError(() => new BadRequest({ message: "Project not found or inaccessible" })))

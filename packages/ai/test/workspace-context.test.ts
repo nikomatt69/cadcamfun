@@ -80,7 +80,11 @@ describe("workspace context", () => {
 
   test("the system prompt carries the workflow, attachments and when to ask", () => {
     const prompt = systemPrompt("ctx")
-    for (const phrase of ["Workflow:", "cad action check", "cad_edit action import", "Asking:", "a mill turns the tool"]) expect(prompt).toContain(phrase)
+    expect(prompt).toMatch(/execute a useful bounded step.*read its result/i)
+    expect(prompt).toContain("cad action check")
+    expect(prompt).toContain("cad_edit action import")
+    expect(prompt).toMatch(/ask only for consequential information tools cannot establish/i)
+    expect(prompt).toMatch(/a mill turns the cutter.*Z0 at stock top/i)
     expect(prompt).not.toContain("{{")
   })
 })
@@ -133,6 +137,14 @@ describe("context evidence and recovery regressions", () => {
 
   test("main agent distinguishes completed events, stale checks and uncertain writes", () => {
     const prompt = systemPrompt()
-    for (const evidence of ["Tool output and recovery:", "Check errors, skipped items, warnings and revision", "inspect fresh state before retrying", "Never replay a write blind", "revision conflicts", "invalidate CAM checks", "CAD origins, machine offsets"]) expect(prompt).toContain(evidence)
+    for (const rule of [
+      /read status, errors, warnings, skipped items, confirmed ids and revision/i,
+      /completed call can contain a failed operation/i,
+      /uncertain mutation: inspect current state before retrying/i,
+      /do not replay a write blindly/i,
+      /revision conflict: inspect the exact target/i,
+      /changes stale affected CAM evidence: regenerate and verify/i,
+      /CAD coordinates, scene origins and CNC work offsets are distinct/i
+    ]) expect(prompt).toMatch(rule)
   })
 })

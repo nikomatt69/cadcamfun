@@ -17,6 +17,9 @@ import {
 import { Effect, Option } from "effect"
 import type { KvStore } from "./kv.ts"
 import type { ProjectRepo } from "../repos/project-repo.ts"
+import type { DrawingRepo } from "../repos/drawing-repo.ts"
+
+const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
 export class ContextAccessDenied extends Error {
   constructor() {
@@ -29,14 +32,15 @@ export interface AiContextDeps {
   readonly kv: KvStore["Service"]
   readonly projects: ProjectRepo["Service"]
   readonly host: Option.Option<AiHost["Service"]>
+  readonly drawings?: DrawingRepo["Service"]
 }
 
-export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
+export const makeAiContext = ({ kv, projects, host, drawings }: AiContextDeps) => {
   const read = <A>(label: string, effect: Effect.Effect<A, unknown>, fallback: A) =>
     effect.pipe(Effect.catch((error) => Effect.logWarning(`Unable to load ${label}`, error).pipe(Effect.as(fallback))))
 
   /** Reads the sources the request may see; fails with `ContextAccessDenied` before reading anything it may not. */
-  const sources = (request: ContextRequest, snapshotBudget?: number) => Effect.gen(function*() {
+  const sources = Effect.fn("AiContext.sources")(function*(request: ContextRequest, snapshotBudget?: number) {
     const out: ContextSource[] = []
     if (request.explicit?.trim()) out.push({ id: "client-observation", kind: "observation", label: "editor state sent with this message", text: request.explicit.trim() })
     if (!request.includeContext) return out
@@ -45,10 +49,30 @@ export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
       const access = yield* projects.find(request.actorId, projectId).pipe(Effect.mapError(() => new ContextAccessDenied()))
       if (!access) return yield* Effect.fail(new ContextAccessDenied())
       const snapshot = yield* read("saved AI context", kv.get(`ai.context.${projectId}`), undefined)
-      if (snapshot) out.push({
+      const saved = snapshot?.value !== null && typeof snapshot?.value === "object" && !Array.isArray(snapshot.value)
+        ? snapshot.value as Record<string, unknown> : undefined
+      const matchingProject = saved?.["projectId"] === undefined || saved["projectId"] === projectId
+      const matchingDrawing = request.drawingId === undefined || saved?.["drawingId"] === request.drawingId
+      if (snapshot && matchingProject && matchingDrawing) out.push({
         id: "workspace-snapshot", kind: "ui-snapshot", label: "saved editor snapshot", at: Date.parse(snapshot.updatedAt),
         text: typeof snapshot.value === "string" ? snapshot.value : renderWorkspaceContext(snapshot.value, { projectId, ...(snapshotBudget !== undefined ? { budget: snapshotBudget } : {}) })
       })
+      else if (request.drawingId !== undefined && drawings !== undefined) {
+        const drawing = yield* read("the session's saved drawing", drawings.find(request.actorId, request.drawingId), undefined)
+        if (drawing?.project.id === projectId) {
+          const data = record(drawing.data)
+          const settings = record(data["settings"])
+          const origin = record(record(data["setup"])["originOffset"])
+          const provenance = "Saved drawing state; live selection unavailable.\n"
+          out.push({ id: "stored-drawing", kind: "observation", label: "authorized saved drawing; live selection unavailable", at: Date.parse(drawing.updatedAt),
+            text: provenance + renderWorkspaceContext({
+              page: "cad", name: drawing.name, projectId, drawingId: drawing.id, capturedAt: drawing.updatedAt,
+              elements: data["elements"], layers: data["layers"], workpiece: data["stock"],
+              tolerance: settings["tolerance"], decimals: settings["decimals"], displayUnits: settings["units"],
+              ...(Object.keys(origin).length > 0 ? { coordinateSystem: { originOffset: origin, elementRotationUnit: "degrees" } } : {})
+            }, { projectId, ...(snapshotBudget !== undefined ? { budget: Math.max(0, snapshotBudget - provenance.length) } : {}) }) })
+        }
+      }
       const document = yield* read("the project AI context", kv.get(projectContextKey(projectId)), undefined)
       out.push({ id: "project-rules", kind: "requirement", label: "project rules", text: renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text) })
       // Brain's files live in the project's scratch folder; without an embedded host there is no Brain and no habits file.

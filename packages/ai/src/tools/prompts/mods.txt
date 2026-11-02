@@ -1,12 +1,11 @@
 List and read the mods (hook extensions) the assistant built here and what the host has loaded.
+Call with action and its fields; inspect stored source separately from live events.
 
-A mod is a small extension module (a nikcli mod) the assistant can author: it exports `register(on, options)` and hooks
-events such as `tool.call`, `tool.result`, `prompt.submit` and `session.start` to observe, rewrite, refuse or wrap a call, or to add
-prompt text. Mods keep a standing rule the user wants ("always ask before deleting", "note the units in every answer") alive without repeating it in the conversation.
+A mod exports `register(on, options)` and hooks events to observe, rewrite, refuse or wrap calls, or add prompt text. Stored source is not proof that the live host loaded it.
 
 Actions
-- list: every mod the application stores, with the events the live host reports for it (empty when not loaded).
-- read: one mod's full source, so it can be reviewed before it is enabled or edited.
+- list: stored mods and live events (empty when unloaded).
+- read: full source for review before editing/enabling.
 
 Parameters
 - list: none.

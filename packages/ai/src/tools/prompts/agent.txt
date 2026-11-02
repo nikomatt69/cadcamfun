@@ -1,7 +1,7 @@
 Delegate a bounded job to a background specialist; its report wakes this conversation.
-It has only the tools that job needs and does not see this conversation. The job shows as a task card.
+Call with action and its fields. A specialist receives your brief, not this conversation; include the target, constraints and evidence it needs.
 
-start returns at once. Do not wait or poll: keep working, or end your turn; the completion wakes you with the report. Start independent jobs together, as several agent calls in ONE block; they run concurrently. Start a dependent job after the report it needs. Writing specialists (editor, modeler, machinist, verifier, optimizer) run one at a time per project.
+start returns at once by default; completion wakes this conversation. Continue independent work without polling. Do not claim completion while required reports are pending. Start independent jobs together; consume prerequisite reports before dependent work. Writing specialists (editor, modeler, machinist, verifier, optimizer) run one at a time per project; do not edit their target concurrently.
 
 Actions
 - start: one job for a researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer.
@@ -11,9 +11,9 @@ Actions
 
 Parameters
 - start: description (one line), agent (or subagent_type), brief and/or prompt (one is required), background (default true; false only when the next step cannot start without the report).
-- brief: objective (required: what to achieve), ids (real ids your tools returned), values ({name, value, unit}), limits (what not to change or exceed), report (what the final message must add). prompt: the job as free text, or detail beside a brief.
+- brief: objective (required), ids (real returned ids), values ({name,value,unit}), limits (constraints), report (string or string list, e.g. ["changed ids", "checks and limits"]). prompt: free-text job or details beside brief.
 - read, cancel: taskId.
 
-Result: start gives the task (the finished task with background false).
+Result: start gives the admitted task (the terminal task with background false). Read status and errors: acceptance is not successful execution. list/read/cancel address this session's tasks only.
 
-Do not use it to do what you can do yourself. Check an editor's report (cad.describe, cad.check) before telling the user it is done. The report is not shown to the user: answer in your own words.
+Do not use it for trivial work or to bypass permissions. Check claimed edits against current geometry and evidence before accepting a report. The report is not shown to the user: answer in your own words.

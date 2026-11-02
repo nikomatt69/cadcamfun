@@ -113,5 +113,6 @@ The desktop calls `settle_session` when the user starts a new conversation or cl
 
 ## 6. Change log
 
+- 2026-11-02: bound-session observations must match both the authorized project and explicit drawing. A snapshot from another drawing is replaced by that target's authorized saved data, marked as saved state with live selection unavailable. Native history/plan stays session-scoped; project rules, Brain files and durable notes remain project-scoped. `includeContext: false` performs no stored-context reads. Unit and real repository tests cover same-project drawings and foreign-project rejection. This does not implement the pending lifecycle actions in §2.3.
 - 2026-10-14: corrected Status: source search shows `start_session` / `settle_session` absent from the API contract, the sidecar and the desktop; §2.3 and criteria 5–7 are pending (AI-11 Step 0). Documentation only.
 - v1 (2026-10-11): contract for the per-project context document, the bounded rendering of the Brain-owned files, and the `start_session` / `settle_session` lifecycle actions. Evidence read from the pinned `sdk-next@1.428.0` bundle; no host API is re-implemented here.

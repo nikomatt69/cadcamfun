@@ -1,6 +1,6 @@
 # Multi-setup and five-axis jobs: plan, run, read the verdict
 
-Use `cam` action `job` to compose and check a job with several fixings, a bar or casting as stock, fixtures and five-axis operations. The part is inline (`part.elements` or `part.meshes`); everything runs in process and nothing is stored. A finished job still goes to `cam_edit manufacture` for storage.
+Use cam action job to compose/check several fixings, bar/casting stock, fixtures and five-axis operations. The part is inline (part.elements or part.meshes); job stores nothing. cam_edit action manufacture is a separate persisted generation route, not an import of arbitrary job NC: replan supported setups through its schema and inspect its returned identity/claims. Report unsupported persistence instead of claiming the job was saved.
 
 ## The loop
 1. `job` with `op: "plan"`: one entry per setup with the operations the kernel would run, what it cannot machine (`unmachined`), and the coverage of the orientations. Fix the setups until `uncoveredMm2` is 0 or you can say why the rest needs a rotary process.

@@ -11,6 +11,13 @@ import { CADCAM_SKILLS } from "../skills/index.ts"
 import { TOOL_PROMPT_IDS, toolPrompt } from "../tools/prompts/index.ts"
 import { agentSystemPrompt, FAMILY_SAMPLE_MODELS, MODE_PROMPTS, modelFamilyPrompt } from "./system.ts"
 import * as workflows from "./workflows.ts"
+import delegation from "./awareness/delegation.txt" with { type: "text" }
+import research from "./awareness/research.txt" with { type: "text" }
+import mods from "./awareness/mods.txt" with { type: "text" }
+import planMode from "./reminders/plan-mode.txt" with { type: "text" }
+import buildSwitch from "./reminders/build-switch.txt" with { type: "text" }
+import compaction from "../nikcli/prompts/compaction.txt" with { type: "text" }
+import memory from "../nikcli/prompts/memory.txt" with { type: "text" }
 
 /** Where a text goes: always in the system prompt, as a tool's description, loaded on demand, or in a one-shot call. */
 export type PromptKind = "static" | "description" | "skill" | "workflow"
@@ -30,6 +37,8 @@ export const promptCorpus = (): ReadonlyArray<PromptEntry> => [
   // One sample model id per family (`FAMILY_SAMPLE_MODELS`), read through the same function a turn uses.
   ...Object.entries(FAMILY_SAMPLE_MODELS).map(([family, model]) => ({ source: `family/${family}`, kind: "static" as const, text: modelFamilyPrompt(model) })),
   ...SUBAGENT_IDS.map((role) => ({ source: `specialist/${role}`, kind: "static" as const, text: specialistPrompt(role) })),
+  ...Object.entries({ delegation, research, mods, planMode, buildSwitch, compaction, memory })
+    .map(([name, text]) => ({ source: `support/${name}`, kind: "static" as const, text: text.trim() })),
   ...TOOL_PROMPT_IDS.map((tool) => ({ source: `tool/${tool}`, kind: "description" as const, text: toolPrompt(tool) })),
   ...CADCAM_SKILLS.map((skill) => ({ source: `skill/${skill.name}`, kind: "skill" as const, text: skill.body })),
   ...Object.entries(workflows).filter((entry): entry is [string, workflows.PromptTemplate] => isTemplate(entry[1]))

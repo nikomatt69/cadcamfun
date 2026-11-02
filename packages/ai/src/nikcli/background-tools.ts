@@ -7,6 +7,8 @@ import type { ActionContribution } from "../actions/action.ts"
 import type { BackgroundTaskManagerInterface, BackgroundTaskOwner } from "./background-tasks.ts"
 import { SUBAGENT_IDS, SUBAGENTS, isSubagentId, subagentCatalogue } from "./agents.ts"
 import type { ToolContext } from "../tools/define.ts"
+import { AgentBriefReport } from "@cadcamfun/api"
+import { Schema } from "effect"
 
 /** A readable refusal instead of a thrown error when the model names a specialist that does not exist. */
 const refuse = (message: string) => ({ ok: false, error: message })
@@ -26,7 +28,8 @@ export type AgentJob = { readonly ok: true; readonly prompt: string } | { readon
 
 const failJob = (error: string): AgentJob => ({ ok: false, error })
 
-const BRIEF_SHAPE = `brief takes { objective, ids?: string[], values?: [{ name, value, unit? }], limits?: string[], report?: string }.`
+const BRIEF_SHAPE = `brief takes { objective, ids?: string[], values?: [{ name, value, unit? }], limits?: string[], report?: string | string[] }.`
+const decodeReport = Schema.decodeUnknownOption(AgentBriefReport)
 
 /**
  * The one place a delegation becomes the specialist's prompt. A free `prompt` alone is passed on as written; a structured
@@ -69,7 +72,9 @@ export const agentJobPrompt = (input: Record<string, unknown>): AgentJob => {
       values.push(unit === "" ? `${name}: ${value}` : `${name}: ${value} ${unit}`)
     }
   }
-  const report = trimmedText(fields["report"])
+  const reportValue = fields["report"] === undefined ? undefined : decodeReport(fields["report"])
+  if (reportValue?._tag === "None") return failJob(`brief.report must be text or a nonempty list of strings, at most 1000 characters total. ${BRIEF_SHAPE}`)
+  const report = reportValue?._tag === "Some" ? reportValue.value : ""
   const section = (title: string, items: ReadonlyArray<string>): string[] => (items.length === 0 ? [] : [`${title}:`, ...items.map((item) => `- ${item}`), ""])
   const lines = [
     `Objective: ${objective}`, "",

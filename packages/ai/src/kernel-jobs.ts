@@ -7,6 +7,10 @@ import { cadKernelReport } from "./actions/cad-kernel-report.ts"
 import { cadExport, cadExportBodies, cadExportScene, camStockExport } from "./actions/export-kernel.ts"
 import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
 import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } from "./parametric.ts"
+import { parametricDiagnosis, parametricExact, parametricTimeline } from "./parametric-jobs.ts"
+import { editHistory } from "./parametric-edit.ts"
+import { normalizeElement } from "./element-catalog.ts"
+import { groupIntoComponents } from "./component-grouping.ts"
 
 // ---------------------------------------------------------------- the exact CAD kernel
 // The B-rep kernel's heavy operations (analysis, STEP export, setup planning, a feature edit, assembly interference): the same
@@ -156,6 +160,12 @@ export const cadImportStep = ({ step, history, idPrefix, tolerance, keepAccepted
 type ManufacturingInput = cam.kernel.ManufacturingJob & cam.kernel.PrepareOptions
 
 export interface KernelJobs {
+  readonly "cad-group": { readonly input: { readonly entries: ReadonlyArray<{ readonly index: number; readonly element: Record<string, unknown> }> }; readonly output: ReturnType<typeof groupIntoComponents> }
+  readonly "cad-normalize": { readonly input: { readonly elements: ReadonlyArray<Record<string, unknown>> }; readonly output: ReadonlyArray<ReturnType<typeof normalizeElement>> }
+  readonly "parametric-diagnosis": { readonly input: Parameters<typeof parametricDiagnosis>[0]; readonly output: ReturnType<typeof parametricDiagnosis> }
+  readonly "parametric-timeline": { readonly input: Parameters<typeof parametricTimeline>[0]; readonly output: ReturnType<typeof parametricTimeline> }
+  readonly "parametric-exact": { readonly input: Parameters<typeof parametricExact>[0]; readonly output: ReturnType<typeof parametricExact> }
+  readonly "parametric-edit": { readonly input: { readonly history: Parameters<typeof editHistory>[0]; readonly edits: Parameters<typeof editHistory>[1] }; readonly output: ReturnType<typeof editHistory> }
   readonly "cad-export-scene": { readonly input: Parameters<typeof cadExportScene>[0]; readonly output: ReturnType<typeof cadExportScene> }
   readonly "cad-export": { readonly input: Parameters<typeof cadExport>[0]; readonly output: ReturnType<typeof cadExport> }
   readonly "cad-export-bodies": { readonly input: Parameters<typeof cadExportBodies>[0]; readonly output: ReturnType<typeof cadExportBodies> }
@@ -194,6 +204,12 @@ export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.Genera
 export type KernelJobName = keyof KernelJobs
 
 export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]["input"], report?: (progress: KernelJobProgress) => void) => KernelJobs[K]["output"] } = {
+  "cad-group": ({ entries }: { readonly entries: ReadonlyArray<{ readonly index: number; readonly element: Record<string, unknown> }> }) => groupIntoComponents(entries),
+  "cad-normalize": ({ elements }) => elements.map((element) => normalizeElement(element)),
+  "parametric-diagnosis": parametricDiagnosis,
+  "parametric-timeline": parametricTimeline,
+  "parametric-exact": parametricExact,
+  "parametric-edit": ({ history, edits }) => editHistory(history, edits),
   "cad-export-scene": cadExportScene,
   "cad-export": cadExport,
   "cad-export-bodies": cadExportBodies,

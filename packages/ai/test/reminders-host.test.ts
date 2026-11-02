@@ -3,6 +3,7 @@ import { Effect, Scope, Stream } from "effect"
 import { createHostSession, hostChatStream } from "../src/nikcli/chat.ts"
 import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
 import { PRIMARIES } from "../src/nikcli/primaries.ts"
+import { BUILD_SWITCH_REMINDER, PLAN_MODE_REMINDER } from "../src/prompts/reminders.ts"
 import { makeNikCliRuntime } from "../src/nikcli/runtime.ts"
 import { startFakeOpenAi } from "./helpers/fake-openai.ts"
 import { sharedDataDir } from "./helpers/host-env.ts"
@@ -20,9 +21,9 @@ await Effect.runPromise(runtime.setProviderKey("fake", "sk-fake-test-key"))
 afterAll(async () => { await Effect.runPromise(Scope.close(scope, { _tag: "Success", value: undefined } as never)); fake.stop() })
 
 const model = { providerID: "fake", modelID: "fake-model" } as const
-const count = (request: { messages: ReadonlyArray<unknown> }, needle: string): number => JSON.stringify(request.messages).split(needle).length - 1
-const PLAN = "Plan mode is active"
-const SWITCH = "mode has changed from plan to build"
+const count = (request: { messages: ReadonlyArray<unknown> }, needle: string): number => JSON.stringify(request.messages).split(JSON.stringify(needle).slice(1, -1)).length - 1
+const PLAN = PLAN_MODE_REMINDER
+const SWITCH = BUILD_SWITCH_REMINDER
 
 describe("primary-change reminders in the host session", () => {
   test("Plan gets its rules once, the switch to Build gets its reminder once", async () => {

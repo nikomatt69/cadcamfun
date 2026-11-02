@@ -2,7 +2,9 @@
  * Timeline edits of a stored part through the assistant's `cad_edit.parametric_timeline` (spec 58 T7), over the real sidecar and its
  * database: what is stored is read back by inspection, and the exact model of the stored part follows the timeline.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
+// Timeline cases perform multiple scoped worker reads and revision-checked writes.
+setDefaultTimeout(30_000)
 import { plateTemplate } from "@cadcamfun/core"
 import type { ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"

@@ -1,67 +1,32 @@
 /** Project adaptation of the existing parametric kernel. Tests never persist a variant. */
 import { createHash } from "node:crypto"
-import { moveFeatureTo, rebuild, usesOf, withRollback, withSuppressed, type History } from "@cadcamfun/core"
-import { decodeHistory, diagnose, type Diagnosis, KernelJobError, parametricReport, runKernelJob, verificationOf, type ParametricHandlerInput } from "@cadcamfun/ai"
+import { usesOf, type History } from "@cadcamfun/core"
+import { analyzeParametric, decodeHistory, type Diagnosis, KernelJobError, parametricReport, runKernelJob, verificationOf, type ParametricHandlerInput } from "@cadcamfun/ai"
 
 export const historyRevision = (history: unknown): string => createHash("sha256").update(JSON.stringify(history)).digest("hex")
 
-export const inspectParametric = (history: unknown) => {
+export const inspectParametric = async (history: unknown, signal?: AbortSignal) => {
   const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false, error: "Stored parametric history is invalid.", problems: decoded.problems.slice(0, 8) }
-  const report = parametricReport(decoded.data)
-  return {
-    // The verdict first (what the assistant reads), then the full rebuild report; a failure also says where it started.
-    verification: verificationOf(decoded.data, report), ...(report.ok ? {} : { diagnosis: diagnose(decoded.data, report) }),
-    ...report, history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) }))
-  }
+  const analysis = await analyzeParametric(decoded.data, signal)
+  return { ...analysis, history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) })) }
 }
 
 /** The compact verdict to put beside a stored change (a create, update, edit or timeline step): the rebuild report is kept by the caller. */
 export const verificationFor = (history: History, report: ReturnType<typeof parametricReport>) => verificationOf(history, report)
 
-export const changeParameters = (history: unknown, parameters: Readonly<Record<string, number | string>>) => {
+export const changeParameters = async (history: unknown, parameters: Readonly<Record<string, number | string>>, signal?: AbortSignal) => {
   const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false as const, error: "Stored parametric history is invalid." }
   const unknown = Object.keys(parameters).filter((name) => !Object.hasOwn(decoded.data.parameters, name))
   if (unknown.length > 0) return { ok: false as const, error: `Unknown parameters: ${unknown.join(", ")}. This part's parameters are: ${Object.keys(decoded.data.parameters).join(", ") || "(none)"}. parametric_update changes existing ones; add a new one with parametric_edit set_parameter.` }
   const next = { ...decoded.data, parameters: { ...decoded.data.parameters, ...parameters } }
-  return { ok: true as const, history: next, report: parametricReport(next) }
+  const { verification: _verification, diagnosis, ...report } = await analyzeParametric(next, signal)
+  return { ok: true as const, history: next, report, ...(diagnosis !== undefined ? { diagnosis } : {}) }
 }
 
-/**
- * A timeline edit of a stored part (spec 58): releases, then suppressions, then a move, then the rollback marker, all through core's
- * pure timeline functions. Refused, with nothing stored, when a feature id is unknown, a move crosses a dependency, or the edit makes
- * a feature fail that built before; a model left with fewer bodies (everything suppressed) is a valid configuration, not a failure.
- */
-export const editTimeline = (history: unknown, input: Extract<ParametricHandlerInput, { action: "timeline" }>) => {
-  const decoded = decodeHistory(history)
-  if (!decoded.success) return { ok: false as const, error: "Stored parametric history is invalid." }
-  let next: History = decoded.data
-  try {
-    if (input.release !== undefined) next = withSuppressed(next, input.release, false)
-    if (input.suppress !== undefined) next = withSuppressed(next, input.suppress, true)
-    if (input.move !== undefined) {
-      const moved = moveFeatureTo(next, input.move.feature, input.move.to)
-      if (moved.refusal !== undefined) return { ok: false as const, error: `Not moved: ${moved.refusal}` }
-      next = moved.history
-    }
-    if (input.rollForward === true) next = withRollback(next, undefined)
-    if (input.rollback !== undefined) next = withRollback(next, input.rollback)
-  } catch (error) {
-    if (error instanceof RangeError) return { ok: false as const, error: error.message }
-    throw error
-  }
-  // A history written with the timeline fields says so; one that no longer uses them goes back to the plain form.
-  const usesTimeline = next.rollback !== undefined || next.groups !== undefined || next.features.some((f) => f.suppressed === true)
-  if (usesTimeline) next = { ...next, version: 2 }
-  else { const { version: _version, ...plain } = next; next = plain }
-  const key = (i: { feature: string; message: string }) => `${i.feature}\u0000${i.message}`
-  const before = new Set(rebuild(decoded.data).issues.filter((i) => i.severity === "error").map(key))
-  const report = parametricReport(next)
-  const introduced = report.issues.filter((i) => i.severity === "error" && !before.has(key(i)))
-  if (introduced.length > 0) return { ok: false as const, error: "The timeline was not changed: it makes features fail that built before.", problems: introduced.map((i) => `${i.feature}: ${i.message}`) }
-  return { ok: true as const, history: next, report }
-}
+export const editTimeline = async (history: unknown, input: Extract<ParametricHandlerInput, { action: "timeline" }>, signal?: AbortSignal) =>
+  structuredClone(await runKernelJob("parametric-timeline", { history, input }, { signal }))
 
 /**
  * Each case rebuilds a variant; a case with `checks` is also measured (AI-11 Step 10) in a kernel worker with a deadline, so a
@@ -70,7 +35,7 @@ export const editTimeline = (history: unknown, input: Extract<ParametricHandlerI
  */
 export const testParametric = async (history: unknown, input: Extract<ParametricHandlerInput, { action: "test" }>, signal?: AbortSignal) => {
   const cases = await Promise.all(input.cases.map(async (c) => {
-    const changed = changeParameters(history, c.parameters)
+    const changed = await changeParameters(history, c.parameters, signal)
     if (!changed.ok) return { name: c.name, passed: false, error: changed.error }
     const report = changed.report
     const acceptance = c.checks === undefined || !report.ok ? undefined

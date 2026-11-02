@@ -1,14 +1,14 @@
-Commit work, start branches and open pull requests; version control is optional.
-Edit and commit on the checked-out branch, main included; no branch is required.
+Commit work, start branches, save checkpoints and open pull requests.
+Call with action and its fields. Commit only when requested; the checked-out branch may be main.
 
 Actions
-- start_change: create an ai/<topic> branch from main and check it out, only when the user wants a reviewable change or a pull request.
-- commit: record the current edits with a short imperative message that says what changed and why.
+- start_change: create/check out ai/<topic> from main when a review branch is requested.
+- commit: record current edits; imperative message states what changed and why.
 - checkpoint: save drawing, components, operations, stock and used libraries without moving the checked-out branch. Carries this conversation and optional task lineage.
 - restore_checkpoint: restore a whole engineering checkpoint only on explicit request and native approval. Read vcs.checkpoints first; stale expectedRevision refuses the restore. Saved NC verification becomes stale and must be checked again.
 - restore: roll the named ids back to an earlier commit. Destructive: send confirm true only after the user asked for it; the host still asks before the tool runs.
-- open_pull_request: open the pull request from the checked-out branch into main.
-- run_workflows: run the project's .cadcamfun/workflows on the checked-out branch and report the runs.
+- open_pull_request: checked-out branch into main.
+- run_workflows: run .cadcamfun/workflows on the checked-out branch.
 
 Parameters
 - start_change: topic (up to 80 characters; it names the branch).
@@ -27,7 +27,7 @@ Do not use it
 - Never merge a pull request and never push to GitHub: a person does that.
 
 After it
-- Check what you wrote with vcs.diff. Open a pull request only when you are on an ai/* branch.
+- Inspect status/diff before recording changes; report the returned commit/checkpoint id. Open a pull request only on an ai/* branch. A checkpoint saves engineering state, not proof that its NC remains verified.
 
 When it fails
-- Report it in one line and continue the CAD/CAM work; never retry the same failing call in a loop. No history, no profile, a refused call: none of them is a reason to stop.
+- Report the failed action once. Continue independent work; a failed requested commit or restore remains unfinished. Never replay an ambiguous write without inspecting its outcome.

@@ -1,4 +1,5 @@
 Search the web for technical sources and read files the user attached (text, code, G-code).
+Call with action and its fields. To discover executable tools use native search_tools, not web search.
 
 Actions
 - search: web search over technical sources; returns URLs and bounded excerpts.
@@ -9,7 +10,7 @@ Parameters
 - read_attachment: attachment (the file name), offset (default 0), maxChars (1-20000, default 10000).
 
 Result (JSON)
-- search: the results with their sources; read_attachment: {content, totalChars, nextOffset} - only the returned page was read.
+- search: URLs and excerpts, not a full-page read; cite the actual source and state gaps. read_attachment: {content, totalChars, nextOffset}; continue from nextOffset only when more text is needed.
 - ok:false names what was missing (an attachment that was never uploaded, an offset past the end).
 
 Do not use it

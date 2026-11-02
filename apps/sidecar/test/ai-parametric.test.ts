@@ -1,8 +1,10 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { plateTemplate } from "@cadcamfun/core"
-import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
+import { buildTools, clearKernelJobCache, kernelJobHistory, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
 import { makeParametricRunner } from "./helpers/parametric.ts"
+// These integration cases now cross scoped worker startup and queueing, including several consecutive model checks.
+setDefaultTimeout(30_000)
 let app: Awaited<ReturnType<typeof makeApp>>
 let handlers: ToolHandlersShape
 let projectId: string
@@ -17,6 +19,19 @@ beforeAll(async () => {
 })
 afterAll(async () => { await app.dispose() })
 describe("project parametric tools", () => {
+  test("validate, create and inspect reuse the complete report for the same history", async () => {
+    clearKernelJobCache()
+    const previous = new Set(kernelJobHistory().map((job) => job.id))
+    const history = plateTemplate()
+    expect((await run({ action: "validate", history })).ok).toBe(true)
+    const created = await run({ action: "create", name: "Shared report", history })
+    expect(created.ok).toBe(true)
+    expect((await run({ action: "inspect", elementId: created.ids[0] })).ok).toBe(true)
+    const reports = kernelJobHistory().filter((job) => job.job === "parametric-report" && !previous.has(job.id))
+    expect(reports.filter((job) => job.outcome === "completed")).toHaveLength(1)
+    expect(reports.filter((job) => job.outcome === "cached").length).toBeGreaterThanOrEqual(2)
+  })
+
   test("cases report failures without mutating the drawing", async () => {
     const before = await run({ action: "inspect", elementId })
     const report = await run({ action: "test", elementId, cases: [
@@ -35,5 +50,15 @@ describe("project parametric tools", () => {
     expect((await run({ action: "update", elementId, expectedRevision: before.revision, parameters: { width: 90 } })).ok).toBe(false)
     expect((await run({ action: "update", elementId, expectedRevision: changed.revision, parameters: { thick: -1 } })).ok).toBe(false)
     expect((await run({ action: "inspect", elementId })).revision).toBe(changed.revision)
+  })
+
+  test("generic edits use the same geometry validation and store nothing for an invalid parametric batch", async () => {
+    const before = await run({ action: "inspect", elementId })
+    const rejected = await handlers.modifyEntities(projectId, [{ id: elementId, changes: { parameters: { thick: -1 } } }])
+    expect(rejected).toMatchObject({ ok: false })
+    expect((await run({ action: "inspect", elementId })).revision).toBe(before.revision)
+    const accepted = await handlers.modifyEntities(projectId, [{ id: elementId, changes: { parameters: { width: 85 } } }])
+    expect(accepted).toMatchObject({ ok: true, modified: 1 })
+    expect((await run({ action: "inspect", elementId })).bounds.max.x).toBeCloseTo(85, 2)
   })
 })

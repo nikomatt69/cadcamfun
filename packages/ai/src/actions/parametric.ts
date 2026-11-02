@@ -7,9 +7,9 @@
  * are different actions even though the same function answers both.
  */
 import { PARAMETRIC_ACTION_INPUTS as INPUTS } from "@cadcamfun/api"
-import { analyzeManufacturability, brep, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, requireThread, type History } from "@cadcamfun/core"
-import { EXACT_ACTION_BUDGET_MS, decodeHistory, exactReport, parametricReport } from "../parametric.ts"
-import { diagnose, verificationOf } from "../parametric-verification.ts"
+import { analyzeManufacturability, buildRecipe, drawing, keywayFor, METRIC_THREADS, requireThread, type History } from "@cadcamfun/core"
+import { decodeHistory } from "../parametric.ts"
+import { analyzeParametric } from "../parametric-analysis.ts"
 import { KernelJobError, runKernelJob } from "../kernel-job.ts"
 import type { ActionContext } from "./action.ts"
 
@@ -62,8 +62,8 @@ const runRecipe = async (
   }
   const parsed = decodeHistory(built.history)
   if (!parsed.success) return { ok: false, error: `The ${input.recipe} recipe produced a history the schema refuses: ${parsed.problems.slice(0, 3).join("; ")}` }
-  const report = parametricReport(parsed.data)
-  const result = { ok: report.ok, recipe: built.recipe, summary: built.summary, derived: built.derived, rules: built.rules, history: parsed.data, verification: verificationOf(parsed.data, report), report }
+  const { verification, diagnosis: _diagnosis, ...report } = await analyzeParametric(parsed.data, context.signal)
+  const result = { ok: report.ok, recipe: built.recipe, summary: built.summary, derived: built.derived, rules: built.rules, history: parsed.data, verification, report }
   if (!create) return result
   if (!report.ok) return { ...result, error: "The generated part did not rebuild cleanly, so it was not created." }
   if (context.handlers.parametric === undefined) return { ...result, ok: false, error: "Parametric project tools are unavailable in this host." }
@@ -72,7 +72,7 @@ const runRecipe = async (
     action: "create", history: parsed.data, name,
     ...(input.x !== undefined ? { x: input.x } : {}), ...(input.y !== undefined ? { y: input.y } : {}),
     ...(input.z !== undefined ? { z: input.z } : {}), ...(input.layer !== undefined ? { layer: input.layer } : {})
-  })
+  }, context.signal)
   const createdOk = asRecord(created)?.["ok"] !== false
   if (!createdOk) return { ...result, ok: false, error: typeof asRecord(created)?.["error"] === "string" ? String(asRecord(created)!["error"]) : "The part was built but could not be stored.", created }
   // The same handles a parametric create returns, so the next call does not have to dig them out of `created`.
@@ -87,17 +87,15 @@ export const runParametricConvert = (input: Input<"cad_edit.parametric_convert">
   of({ action: "convert", elementId: input.elementId, create: true, ...(input.depth !== undefined ? { depth: input.depth } : {}), ...(input.name !== undefined ? { name: input.name } : {}) }, context)
 
 /** The rebuild report with its verdict in front, and for a history that does not build, the feature where it went wrong and the usual fix. */
-export const runParametricValidate = (input: Input<"cad.parametric_validate">) => {
-  const report = parametricReport(input.history)
-  return { verification: verificationOf(input.history, report), ...(report.ok ? {} : { diagnosis: diagnose(input.history, report) }), ...report }
-}
+export const runParametricValidate = async (input: Input<"cad.parametric_validate">, context: ActionContext) =>
+  analyzeParametric(input.history, context.signal)
 export const runParametricFastener = (input: Input<"cad.parametric_fastener">) => lookupFastener(input)
 export const runParametricRecipe = (input: Input<"cad.parametric_recipe">, context: ActionContext) => runRecipe(input, context, false)
 export const runParametricRecipeCreate = (input: Input<"cad_edit.parametric_recipe_create">, context: ActionContext) => runRecipe(input, context, true)
 
 const unavailable = { ok: false, error: "Parametric project tools are unavailable in this host." }
 const of = <T extends ParametricHandlerInput>(input: T, context: ActionContext) =>
-  context.handlers.parametric === undefined ? unavailable : context.handlers.parametric(context.projectId, input)
+  context.handlers.parametric === undefined ? unavailable : context.handlers.parametric(context.projectId, input, context.signal)
 
 export const runParametricInspect = (input: Input<"cad.parametric_inspect">, context: ActionContext) =>
   of({ action: "inspect", elementId: input.elementId, ...(input.feature !== undefined ? { feature: input.feature } : {}) }, context)
@@ -123,7 +121,7 @@ export const runParametricDrawing = async (input: Input<"cad.drawing">, context:
     const stored = asRecord(await context.handlers.cadTitleBlock?.(context.projectId, { action: "inspect" }))
     const block = stored?.["ok"] === true && asRecord(stored["titleBlock"]) !== undefined ? drawing.sheetOptionsOfTitleBlock(stored["titleBlock"] as drawing.CompleteTitleBlock) : {}
     // In a worker like the other kernel work: a sheet of a large part never stops the sidecar's other requests.
-    const sheet = await runKernelJob("cad-sheet", { history: history!, options: { ...block, ...(input.options ?? {}) } })
+    const sheet = await runKernelJob("cad-sheet", { history: history!, options: { ...block, ...(input.options ?? {}) } }, { signal: context.signal })
     return { ok: true, mutated: false, ...sheet, elementId: input.elementId, revision, projectId, drawingId }
   } catch (cause) {
     return { ok: false, error: cause instanceof KernelJobError && cause.explained ? cause.message : cause instanceof Error ? cause.message : "The drawing could not be generated." }
@@ -149,38 +147,17 @@ const historyOf = async (input: { elementId?: string; history?: unknown }, conte
   if ((input.elementId === undefined) === (input.history === undefined)) return { error: { ok: false, error: "Send exactly one of elementId (an existing parametric part) or history." } }
   if (input.history !== undefined) return { history: input.history as History }
   if (context.handlers.parametric === undefined) return { error: unavailable }
-  const inspected = asRecord(await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }))
+  const inspected = asRecord(await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }, context.signal))
   if (inspected === undefined || inspected["ok"] === false) return { error: inspected ?? { ok: false, error: "The part could not be read." } }
   const decoded = decodeHistory(inspected["history"])
   if (!decoded.success) return { error: { ok: false, error: "The part has no readable parametric history." } }
   return { history: decoded.data }
 }
 
-/** STEP text returned inline up to this size; larger files are only summarised. */
-const STEP_INLINE_LIMIT = 400_000
-
-/**
- * The exact B-rep of each body of a part: exact volume, area, centroid, through-holes, faces and surface kinds, or why a
- * body has only its mesh; optionally the STEP AP214 file of the exact bodies.
- */
 export const runParametricExact = async (input: Input<"cad.parametric_exact">, context: ActionContext) => {
   const got = await historyOf(input, context)
   if ("error" in got) return got.error
-  const result = rebuild(got.history)
-  const exact = exactReport(got.history, result, EXACT_ACTION_BUDGET_MS)
-  const out: Record<string, unknown> = { ok: !result.issues.some((i) => i.severity === "error"), bodies: exact.bodies, warnings: [...new Set(exact.warnings)], issues: result.issues.slice(0, 20) }
-  if (input.includeStep === true) {
-    const step = brep.withBudget(EXACT_ACTION_BUDGET_MS, () => historyToStep(got.history, input.name ?? "part"))
-    out["exported"] = step.exported
-    out["skipped"] = step.skipped
-    out["warnings"] = [...new Set([...exact.warnings, ...step.warnings])]
-    if (step.step !== undefined) {
-      out["stepBytes"] = step.step.length
-      if (step.step.length <= STEP_INLINE_LIMIT) out["step"] = step.step
-      else out["stepNote"] = `The STEP file is ${step.step.length} characters; export it from the part instead of inline.`
-    }
-  }
-  return out
+  return runKernelJob("parametric-exact", { history: got.history, ...(input.includeStep !== undefined ? { includeStep: input.includeStep } : {}), ...(input.name !== undefined ? { name: input.name } : {}) }, { signal: context.signal })
 }
 
 /** Manufacturability of a history, or of an existing part read first; neither rebuilds geometry to answer. */

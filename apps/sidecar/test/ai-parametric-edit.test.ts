@@ -2,7 +2,9 @@
  * Structural edits of a stored part through the assistant's `cad_edit.parametric_edit`, over the real sidecar and its database:
  * what is stored is read back by inspection, and the exact model of the stored part follows every edit.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
+// Real worker startup and multiple checked commits belong to each integration case.
+setDefaultTimeout(30_000)
 import { plateTemplate, type History } from "@cadcamfun/core"
 import type { ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"

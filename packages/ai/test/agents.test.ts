@@ -348,7 +348,9 @@ describe("the nikcli-style roster for CAD/CAM", () => {
       const spec = SUBAGENTS[id]
       expect(spec.title.length, id).toBeGreaterThan(3)
       expect(spec.host, id).toBe(`cadcam-${id}`)
-      expect(spec.prompt, id).toContain("You are a specialist agent of the CAD/CAM assistant")
+      expect(spec.prompt, id).toMatch(/parent.*scoped job/i)
+      expect(spec.prompt, id).toMatch(/authorized project\/drawing and owned targets/i)
+      expect(spec.prompt, id).toMatch(/cannot delegate, create goals, commit/i)
       expect(spec.prompt, id).toContain("Final message")
       prompts.add(spec.prompt)
       expect(config.agent[spec.host]!.mode, id).toBe("subagent")

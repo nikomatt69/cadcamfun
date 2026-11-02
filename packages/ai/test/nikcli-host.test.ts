@@ -34,6 +34,7 @@ const viewportPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP
 const added: Array<{ projectId: string; elements: ReadonlyArray<Record<string, unknown>> }> = []
 const modified: Array<{ projectId: string; changes: ReadonlyArray<Record<string, unknown>> }> = []
 const handlerCalls: string[] = []
+const delegated: unknown[] = []
 const stubHandlers = new Proxy({} as ToolHandlersShape, {
   get: (_target, name: string) => async (projectId: string, elements: ReadonlyArray<Record<string, unknown>>) => {
     handlerCalls.push(name)
@@ -67,7 +68,12 @@ const runtime: NikCliRuntime = await Effect.runPromise(
     dataDir: sharedDataDir,
     providers: [...defaultProviderSpecs(), fakeProvider],
     systemPrompt: "You are a CAD test assistant.",
-    toolsFor: (projectId) => [probeTool, ...buildTools(stubHandlers, projectId)],
+    toolsFor: (projectId) => [probeTool, ...buildTools(stubHandlers, projectId, [], {
+      "agent.start": async (input) => {
+        delegated.push(input)
+        return { id: "fixture-task", description: "Inspect the assigned geometry", status: "queued" }
+      }
+    })],
     hostLogs: (level, line) => { if (level === 'warn' || level === 'error') console.log('HOSTLOG', line.slice(0, 300)) }
   }).pipe(Scope.provide(scope))
 )
@@ -85,6 +91,26 @@ const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry",
 const content = (events: ReadonlyArray<AiEvent>) => events.filter((e) => !PROGRESS.has(e.type))
 
 describe("embedded nikcli host", () => {
+  test("a malformed delegation report can recover with a report list without losing its requested findings", async () => {
+    const host = await Effect.runPromise(runtime.host("agent-report-recovery"))
+    const sessionId = await Effect.runPromise(createHostSession(host, "agent-report-recovery"))
+    const before = delegated.length
+    let stage = 0
+    script = () => {
+      stage++
+      if (stage <= 2) return { toolCalls: [{ name: "agent", args: {
+        action: "start", description: "Inspect the assigned geometry", agent: "researcher",
+        brief: { objective: "Inspect the existing part", report: stage === 1 ? { findings: true } : ["Element IDs", "Dimensions and unresolved checks"] }
+      } }] }
+      return { text: "The inspection task was admitted." }
+    }
+    const events = await collect(hostChatStream({ host, sessionId, model, message: "Inspect the assigned geometry", autoContinues: 0 }))
+    expect(delegated).toHaveLength(before + 1)
+    expect(delegated.at(-1)).toMatchObject({ brief: { report: "Element IDs\nDimensions and unresolved checks" } })
+    expect(events.filter((event) => event.type === "tool_result")).toHaveLength(2)
+    expect(events.at(-1)?.type).toBe("done")
+  }, 120_000)
+
   test("Auto creates and edits without approval, while Code Mode cannot delete or write version control", async () => {
     const host = await Effect.runPromise(runtime.host("project-auto-edits"))
     let stage = 0

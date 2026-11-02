@@ -12,7 +12,7 @@ Three kinds of input, three routes. Pick by what the user attached (the message 
 
 ## Image of a drawing or a photo
 - Look first, then list what you read: every dimension with its unit, the view it belongs to, tolerances and notes. Say what is unreadable or missing instead of filling it in.
-- Build from the numbers with cad_edit action add: the base solid from the overall size, features one by one (holes as cylinders and one boolean-subtract, pockets, fillets as spheres/tori or a revolution profile, chamfers as extrusion profiles). A hole with a tolerance gets the middle of the limits.
+- Build nominal geometry from the dimensions: parametric_create for dimension-driven features, add for suitable independent solids. Use actual holes/fillets/chamfers instead of cosmetic substitutes where exact geometry matters. Retain the drawing's nominal hole and tolerance; a machining target or allowance is a separate explicit choice.
 - Three-view drawings: front gives X and Z, top gives X and Y, side gives Y and Z. Check that the same size read from two views agrees; if not, ask which is right.
 - A photo has no scale: ask for one known dimension, then derive the rest and label them as estimates.
 - After building, compare against the numbers you read: cad action describe gives the bounds; report any difference.

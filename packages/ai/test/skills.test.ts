@@ -6,6 +6,7 @@ import { ELEMENT_SPECS } from "../src/element-catalog.ts"
 import { buildHostConfig } from "../src/nikcli/config.ts"
 import { CADCAM_SKILLS, installSkills, skillMarkdown } from "../src/skills/index.ts"
 import { TOOL_IDS } from "../src/tools/catalogue.ts"
+import { cadEditTool } from "../src/tools/cad_edit.ts"
 
 const dir = mkdtempSync(join(tmpdir(), "skills-"))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -47,10 +48,49 @@ describe("cadcam skills", () => {
   test("the prompt and the skill make 3D the default, and 2D a sketch the user asked for", async () => {
     const { systemPrompt } = await import("../src/prompts/system.ts")
     const prompt = systemPrompt()
-    expect(prompt).toContain("Build everything in 3D")
+    expect(prompt).toMatch(/physical parts, build in 3D/)
     expect(prompt).toContain("cad_edit action add")
     expect(prompt).toContain("never use it to represent an object")
     expect(CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!.body).toContain("built in 3D, always")
+  })
+
+  test("the documented batch program accepts structured results and preserves partial failures", async () => {
+    const body = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")?.body ?? ""
+    const source = body.match(/`(const elements = Array\.from[\s\S]*?)`/)?.[1]
+    expect(source).toBeDefined()
+    if (source === undefined) return
+    // Execute the trusted checked-in example against the real input schema and a structured-output fixture.
+    const evaluate = new Function("tools", `return (async () => { ${source} })()`) as
+      (tools: { cad_edit: (input: unknown) => Promise<unknown> }) => Promise<unknown>
+    for (const result of [
+      { ok: true, ids: ["stored-pin"] },
+      { ok: true, ids: ["stored-pin"], skipped: [{ index: 2, error: "Rejected fixture item" }] },
+      { ok: false, error: "Drawing revision changed" }
+    ]) {
+      const inputs: unknown[] = []
+      const actual = await evaluate({ cad_edit: async (input) => {
+        const parsed = cadEditTool.parameters.parse(input)
+        inputs.push(parsed)
+        expect(parsed).toMatchObject({ action: "add" })
+        if (typeof parsed === "object" && parsed !== null && "elements" in parsed && Array.isArray(parsed.elements)) {
+          expect(parsed.elements).toHaveLength(8)
+        }
+        return result
+      } })
+      expect(inputs).toHaveLength(1)
+      expect(actual).toEqual(!result.ok || "skipped" in result ? result : { ids: result.ids })
+    }
+  })
+
+  test("continuation skills preserve scope, typed edits and bounded recovery", () => {
+    const body = (name: string) => CADCAM_SKILLS.find((skill) => skill.name === name)?.body ?? ""
+    expect(body("project-auto-memory")).toContain("do not repeat memory and drawing reads before every tool")
+    expect(body("project-auto-memory")).toContain("Specialists receive your brief")
+    expect(body("parametric-design")).toContain("Nested sketch.entities and sketch.constraints are arrays")
+    expect(body("parametric-design")).toContain("cad action parametric_inspect, then cad_edit action parametric_update")
+    expect(body("cam-operation-workflow")).toContain("Do not repeat unchanged failures")
+    expect(body("version-control-cadcam")).toContain("Commit only when requested")
+    expect(body("precision-and-tolerances")).toContain("not an instruction to alter nominal CAD")
   })
 
   test("the agent is allowed to load skills and still has no shell or file tools", () => {

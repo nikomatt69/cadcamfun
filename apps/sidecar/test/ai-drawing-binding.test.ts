@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { buildTools, clearKernelJobCache, kernelJobStats } from "@cadcamfun/ai"
 import { plateTemplate } from "@cadcamfun/core"
-import { Context, Effect } from "effect"
+import { Context, Effect, Option } from "effect"
 import { DrawingRepo, drawingContentHash } from "../src/repos/drawing-repo.ts"
+import { ProjectRepo } from "../src/repos/project-repo.ts"
+import { makeAiContext } from "../src/services/ai-context.ts"
 import { ActingUser } from "../src/services/acting-user.ts"
 import { KvStore } from "../src/services/kv.ts"
 import { LocalProfile } from "../src/services/local-profile.ts"
@@ -49,10 +51,25 @@ describe("a turn is bound to the drawing it was admitted for", () => {
     const kv = Context.get(services, KvStore)
     const user = Context.get(services, LocalProfile).user
     const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Two drawings" } })).body.id
-    const first = (await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "First", data: { elements: [] } } })).body.id
+    const first = (await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "First", data: {
+      elements: [], settings: { tolerance: 0.0005, decimals: 5, units: "in" },
+      stock: { width: 100, height: 80, depth: 15, x: 50, y: 40, topZ: 15 },
+      setup: { originOffset: { x: 10, y: 20, z: 30 } }
+    } } })).body.id
     const second = (await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Second", data: { elements: [] } } })).body.id
     // A second window opened the other drawing: the editor snapshot now names it.
     await Effect.runPromise(kv.set(`ai.context.${projectId}`, { projectId, drawingId: second }))
+
+    const contextReader = makeAiContext({ kv, projects: Context.get(services, ProjectRepo), drawings: Context.get(services, DrawingRepo), host: Option.none() })
+    const briefing = await Effect.runPromise(contextReader.assembleParts({ actorId: user.id, projectId, drawingId: first, sessionId: "turn-first", includeContext: true }))
+    expect(briefing.observation.text).toContain('drawing "First"')
+    expect(briefing.observation.text).toContain("live selection unavailable")
+    expect(briefing.observation.text).toContain("0.0005 mm")
+    expect(briefing.observation.text).toContain("5 decimals shown")
+    expect(briefing.observation.text).toContain("in on screen")
+    expect(briefing.observation.text).toContain("100×80×15 mm")
+    expect(briefing.observation.text).toContain("CAD origin offset (10, 20, 30) mm")
+    expect(briefing.observation.text).not.toContain(second)
 
     expect(await acting.bind(projectId, "turn-first", user, "Build a plate", first)).toBe(true)
     const tools = buildTools(await app.toolHandlers(), projectId)

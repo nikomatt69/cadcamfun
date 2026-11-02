@@ -1,7 +1,8 @@
-Read-only: inspect the drawing (elements, solids, assemblies, DFM); compute sketches, mates, sheets.
+Inspect drawing elements, solids, assemblies and DFM; compute sketches, mates and sheets.
+Call with action and its fields; stores no geometry.
 
 Actions and Parameters (lengths mm; history and joint angles degrees)
-- describe: counts, bounds, layers; none; start here.
+- describe: counts, bounds, layers; none; use when the drawing context is missing or stale.
 - check: sizes, operands, duplicates, floating parts; none.
 - relations: firstId, secondId; bounds, placement, dependencies.
 - grep: query, layerId?, parametricOnly?, includeParameters?, offset?, limit?; search properties, parameters, revisions.
@@ -40,7 +41,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 Paging: limit goes up to 500 on inspect_elements, inspect_origins and inspect_search (ids too; defaults 10, 10, 20) and up to 200 on grep (default 20).
 
 Result (JSON)
-ok, findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; revisions guard updates.
+ok, findings or problems; paging gives total/nextOffset: omitted pages are unread. Reuse element ids and revisions only for this target. Bounds and screenshots do not prove exact validity.
 
 Do not use it
-To write use cad_edit; to machine use cam/cam_edit. Consult fusion-360-modelling for history features.
+For writes: cad_edit; machining: cam/cam_edit. History: fusion-360-modelling skill.

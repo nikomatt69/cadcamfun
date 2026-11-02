@@ -1,10 +1,11 @@
 # Micron-level work
 
-Dimensions keep every decimal you give, so precision is a matter of what you write and what you check.
+Preserve meaningful input precision and distinguish numerical geometry, machining targets and measured acceptance. A detailed decimal value is not evidence of achieved manufacturing accuracy.
 
 ## Writing the model
-- 1 micron = 0.001 mm. Three different numbers, never mixed up: the nominal is the size the drawing names (25), the limits are the two sizes the part may measure (25 H7: 25.000 to 25.021 mm), and the target is the size you machine to, normally the middle of the limits (25 H7: 25.0105 mm; a 25 g6 shaft, limits 24.980 to 24.993 mm: 24.9865 mm). Dimension and label with the nominal and its fit; model and machine at the target; report a measurement against the limits.
-- Round shapes are meshes: give `tolerance: 0.001` on every round element (or `segments`), otherwise a radius of 50 mm is off by 0.24 mm. If the result carries `warnings`, the mesh could not reach it: say the deviation it did reach.
+- 1 micron = 0.001 mm. Keep three numbers separate: nominal drawing size, acceptance limits and an explicitly chosen machining target. For example, 25 H7 gives 25.000 to 25.021 mm and a midpoint of 25.0105 mm; a midpoint is a candidate target, not an instruction to alter nominal CAD. Preserve the design nominal/fit, report the chosen machining allowance or offset separately, and compare actual measurements against the limits.
+- Worked shaft example: 25 g6, limits 24.980 to 24.993 mm: 24.9865 mm is the candidate midpoint; retain the 25 mm nominal and validate the applicable fit table/edition for the drawing.
+- Round geometry may have an exact body plus a display/export tessellation. Choose supported tolerance/segments for the required artifact; do not force micron meshes on unrelated parts. Read achieved deviation and warnings instead of assuming requested tolerance was reached.
 - Never round for readability. Report sizes with the decimals that matter.
 
 ## ISO 286 tolerance grades (micron, nominal size ranges in mm)
@@ -20,9 +21,9 @@ An H hole starts at its nominal size and goes up by the grade; a shaft size has 
 
 ## Machining it
 - Roughing leaves 0.1-0.3 mm; one or two finishing passes take 0.05-0.2 mm with a light stepdown. Set `tolerance` 0.001 or finer and `finishingPass` true.
-- G-code is written to 0.001 mm: it cannot express anything finer, so a tolerance under about 3 microns is a matter for the machine, the tool and the setup, not for the program.
+- Check the actual post's coordinate precision and rounding in stored NC; legacy output commonly uses 0.001 mm. A finer requested tolerance does not increase the written precision or prove machine accuracy.
 - Tool wear, tool deflection, thermal growth and the machine's own accuracy are not modelled. Say so; propose a first-off measurement and an offset correction.
 
 ## Checking it
-- cam_edit action verify is exact in height and one cell wide sideways. For micron checks narrow `stock` to the feature (a few mm), `resolution` 0.002-0.005, `tolerance` 0.001, and give the finished part in `targetSolids`.
+- cam_edit action verify (cam_verify for the dedicated verifier) uses sampled stock/target geometry. Give targetSolids, suitable resolution/tolerance and the actual stock bounds; read cell size, coarsening and modelling limits. A local crop is a partial study and cannot replace full-program fixture, stock and travel coverage.
 - A pass means "no gouge beyond the tolerance at that resolution", never "in tolerance on the machine".

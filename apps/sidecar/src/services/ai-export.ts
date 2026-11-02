@@ -40,7 +40,7 @@ export const stockOfVerification = (
   data: Record<string, unknown>, gcode: string | null, current: { readonly revision: string; readonly requestRevision: string; readonly programRevision: string }
 ): Stock => {
   const evidence = record(data["verification"])
-  if (evidence["revision"] === undefined) return { ok: false, error: "The operation has no verification yet: run cam_edit verify first, then export its stock." }
+  if (evidence["revision"] === undefined) return { ok: false, error: "The operation has no verification yet: run cam_verify action verify first, then export its stock." }
   const programHash = cam.kernel.sha256(gcode ?? "")
   if (gcode === null || gcode === "" || evidence["programRevision"] !== current.programRevision || evidence["programHash"] !== programHash) {
     return { ok: false, error: "The stored program changed since it was verified. Verify it again, then export the stock." }

@@ -61,6 +61,7 @@ export const REGISTRATION_MARKER = [
 export const PROFILE_REMINDER_MARKER = "    async function reminderImpl(worktree) {\n      const info = await readImpl();"
 export const ENVIRONMENT_MARKER = "    async function environmentImpl(ctx, config) {\n      const project = ctx.project;"
 export const SSE_CANCEL_MARKER = "              ctl.abort(err);\n              reader.cancel(err);\n              reject(err);"
+export const REQUESTY_DISCOVERY_MARKER = '      const requestyDiscovery = isProviderAllowed("requesty") ? (async () => {'
 
 /** The file the patched loader reads in each Instance's directory (`runtime.ts` writes it in the project's scratch folder). */
 export const INSTANCE_CONFIG_FILE = "nikcli.json"
@@ -99,6 +100,9 @@ export interface HostPatch {
 }
 
 export const HOST_PATCHES: ReadonlyArray<HostPatch> = [
+  // Metadata is seeded by the application. The native Requesty exception otherwise makes an unconfigured network
+  // request on every provider-state build and waits up to five seconds, including unrelated projects and providers.
+  { name: "isolated-provider-discovery", marker: REQUESTY_DISCOVERY_MARKER, replacement: '      const requestyDiscovery = !Flag.disableModelsFetch() && isProviderAllowed("requesty") ? (async () => {' },
   // Aborting fetch rejects the underlying reader too. Its cancellation must be observed, otherwise a normal inactivity
   // timeout escapes as an unhandled rejection instead of the processor's typed session error.
   { name: "sse-timeout-cancellation", marker: SSE_CANCEL_MARKER, replacement: "              ctl.abort(err);\n              void reader.cancel(err).catch(() => undefined);\n              reject(err);" },

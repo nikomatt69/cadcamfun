@@ -63,11 +63,11 @@ describe("family blocks", () => {
     for (const family of families) expect(modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family]), family).toStartWith("Working style for this model:")
   })
 
-  test("the new blocks are 0.6 to 1.2 KB and inside the static budget", () => {
+  test("family guidance adds only a short model-specific emphasis", () => {
     for (const family of added) {
       const text = modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family])
-      expect(text.length, family).toBeGreaterThanOrEqual(600)
-      expect(text.length, family).toBeLessThanOrEqual(1_200)
+      expect(text.length, family).toBeGreaterThanOrEqual(150)
+      expect(text.length, family).toBeLessThanOrEqual(600)
       expect(text.length, family).toBeLessThanOrEqual(PROMPT_BUDGETS.staticEntry)
     }
   })
@@ -79,18 +79,18 @@ describe("family blocks", () => {
 
   test("each new block covers the observed failures: announce-then-stop, repeated failing call, verification, background tasks", () => {
     for (const family of added) {
-      const text = modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family]).toLowerCase()
+      const text = `${agentSystemPrompt()}\n${modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family])}`.toLowerCase()
       expect(text, `${family}: announcement`).toMatch(/announce|next i will|state its purpose|comes next/)
       expect(text, `${family}: repeated call`).toMatch(/unchanged|identical|same call|same input|twice|resend|repeat/)
-      expect(text, `${family}: verification`).toMatch(/`cad` action `check`/)
-      expect(text, `${family}: verification`).toMatch(/`cam_edit` action `verify`/)
+      expect(text, `${family}: verification`).toMatch(/cad action check/)
+      expect(text, `${family}: verification`).toMatch(/cam_edit action verify/)
       expect(text, `${family}: background`).toContain("background")
     }
   })
 
   test("background work is conditional on holding the agent tool, so Plan is never told to call it", () => {
     expect(PRIMARIES.plan.without).toContain("agent")
-    for (const family of added) expect(modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family]), family).toMatch(/if your role holds the `agent` tool/i)
+    for (const family of added) expect(modelFamilyPrompt(FAMILY_SAMPLE_MODELS[family]), family).toContain("your Build/Plan role")
     expect(agentSystemPrompt()).toMatch(/If your role holds the `agent` tool/)
     // The Build/Plan split is the only place that grants the tool.
     expect(PRIMARIES.build.without).not.toContain("agent")

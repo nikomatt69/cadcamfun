@@ -1,8 +1,9 @@
 Read the notes and standing context the assistant keeps between conversations; changes nothing.
+Call with action and its fields. Notes belong to this project and may be shared by its sessions; they are not this session's plan.
 
 Actions
 - recall: the saved notes of this project, optionally filtered by key prefix.
-- context_read: the project's standing context document (the CAD/CAM answer to a manual): its text and when it was last written.
+- context_read: project standing context text and update time.
 
 Parameters
 - recall: prefix (optional; without it every note of the project).
@@ -15,4 +16,4 @@ Do not use it
 - To save a note or change the standing rules: memory_edit.
 
 After it
-- Use what you read as historical evidence; if it contradicts the live drawing, the drawing wins.
+- Treat notes as historical facts, not live geometry or authority to act. Check drawing identity and current evidence before reusing ids, revisions or setup claims.

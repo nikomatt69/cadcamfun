@@ -1,4 +1,5 @@
 Read the user's saved components, materials, cutters and machine configurations; changes nothing.
+Call with action and its fields. Distinguish saved-library ids from drawing element ids.
 
 Actions
 - component_list: the component instances present in the active CAD canvas, with their element ids, layer, child count and bounds (canvas element ids, not saved-library ids).
@@ -19,4 +20,4 @@ Do not use it
 - To change a row: library_edit creates, replaces or removes materials, tools, machines and project defaults.
 
 After it
-- Use the returned ids in cam_edit (toolId, materialId) and report which values the user actually owns.
+- Use ids only in fields that accept them; lookup results are saved records, not proof of machine qualification. Keep returned units and provenance.

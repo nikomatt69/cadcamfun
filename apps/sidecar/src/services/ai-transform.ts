@@ -40,7 +40,7 @@ export const transformElements = (
   newId: () => string
 ): TransformResult => {
   const missing = input.ids.filter((id) => !all.some((e) => e.id === id))
-  if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad_describe_drawing to list the ids.` }
+  if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad action describe to list the ids.` }
   const chosen = all.filter((e) => input.ids.includes(e.id))
   const aboutOther = input.transform.rotate?.about !== undefined || input.transform.scale?.about !== undefined
   for (const e of chosen) {
@@ -85,7 +85,7 @@ export const groupElements = (
   newId: () => string
 ): GroupResult => {
   const missing = input.ids.filter((id) => !all.some((e) => e.id === id))
-  if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad_describe_drawing to list the ids.` }
+  if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad action describe to list the ids.` }
   const chosen = all.filter((e) => input.ids.includes(e.id))
 
   if (input.ungroup) {

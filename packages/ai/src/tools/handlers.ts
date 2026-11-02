@@ -89,7 +89,7 @@ export interface ToolHandlersShape {
   cadDistance?(projectId: string, input: CadDistanceInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
-  parametric?(projectId: string, input: ParametricHandlerInput): Promise<unknown>
+  parametric?(projectId: string, input: ParametricHandlerInput, signal?: AbortSignal): Promise<unknown>
   addEntities(projectId: string, entities: ReadonlyArray<unknown>): Promise<unknown>
   /** Substring search over the drawing that returns each parametric hit's parameters with its revision. */
   grep(projectId: string, input: CadGrepInput): Promise<unknown>

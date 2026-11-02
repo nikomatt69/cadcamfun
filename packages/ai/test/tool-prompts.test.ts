@@ -3,7 +3,7 @@ import { cam } from "@cadcamfun/core"
 import { ELEMENT_TYPES } from "../src/element-catalog.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
 import { SYSTEM_TEXTS } from "./helpers/system-texts.ts"
-import { ACTION_CATALOGUE, nameOf, toolOf } from "../src/actions/catalogue.ts"
+import { exposedActions, nameOf } from "../src/actions/catalogue.ts"
 import { TOOL_IDS, buildTools } from "../src/tools/catalogue.ts"
 import { TOOL_PROMPT_IDS, rawToolPrompt, toolPrompt } from "../src/tools/prompts/index.ts"
 import { readdirSync } from "node:fs"
@@ -13,7 +13,7 @@ const handlers = new Proxy({} as never, { get: () => async () => ({ ok: true }) 
 const tools = buildTools(handlers, "p")
 /** Every action of a tool, with the parameter keys its own schema declares. */
 const actionsOf = (tool: string): Array<{ name: string; keys: string[] }> =>
-  ACTION_CATALOGUE.filter((action) => toolOf(action) === tool).map((action) => ({
+  exposedActions(tool).map((action) => ({
     name: nameOf(action),
     keys: Object.keys((action.parameters as unknown as { shape: Record<string, unknown> }).shape)
   }))
@@ -35,7 +35,7 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       expect(text, tool).toContain("Parameters")
       expect(text, tool).toMatch(/Result|result/)
       for (const action of actionsOf(tool)) {
-        expect(text, `${tool} must document the action "${action.name}"`).toContain(action.name)
+        expect(text, `${tool} must name action "${action.name}" in a bullet label`).toMatch(new RegExp(`^- (?:[a-z_]+, )*${action.name}(?:, [a-z_]+)*:`, "m"))
         for (const key of action.keys) expect(text, `${tool}.${action.name} must document "${key}"`).toContain(key)
       }
     }
@@ -47,6 +47,25 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       expect(text.split("\n")[0]!.length, tool).toBeGreaterThan(20)
       expect(text, tool).toContain("Do not use it")
     }
+  })
+
+  test("tool guidance distinguishes invocation, discovery and recoverable partial writes", () => {
+    for (const id of TOOL_PROMPT_IDS) {
+      expect(toolPrompt(id).split("\n\n")[0], `${id} must explain the action discriminator`).toMatch(/\baction\b/)
+    }
+    expect(toolPrompt("research")).toContain("native search_tools, not web search")
+    expect(toolPrompt("cad_edit")).toContain("Never replay successful items")
+    expect(toolPrompt("cad_edit")).toContain("Reinspect on stale revision")
+    expect(toolPrompt("cam_edit")).toContain("Never regenerate a manufacture/turn program through legacy generate")
+    expect(toolPrompt("library_edit")).toContain("omit unknown optional values instead of inventing them")
+  })
+
+  test("shared context and asynchronous work do not imply session completion", () => {
+    expect(toolPrompt("memory")).toContain("not this session's plan")
+    expect(toolPrompt("memory_edit")).toContain("Session progress belongs in the native plan/goal")
+    expect(toolPrompt("agent")).toContain("acceptance is not successful execution")
+    expect(toolPrompt("agent")).toContain("Do not claim completion while required reports are pending")
+    expect(toolPrompt("vcs_edit")).toContain("a failed requested commit or restore remains unfinished")
   })
 
   test("placeholders are filled, the catalogue is smaller than the per-verb baseline, and the element table moved to a skill", () => {

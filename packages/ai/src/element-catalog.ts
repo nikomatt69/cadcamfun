@@ -4,7 +4,7 @@
  * shape, so the assistant can build what the editor can show: solids, revolved and extruded profiles,
  * lofts, sweeps, booleans, curves, mechanical parts and architecture, not only 2D sketches.
  *
- * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
+ * Lengths are millimetres; element rotation and parametric revolve/pattern angles are degrees. `x`, `y`, `z` place the element (its centre for solids).
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
 import { decodeHistory } from "./parametric.ts"
@@ -293,3 +293,20 @@ export const withDefaultTolerance = (element: Record<string, unknown>, tolerance
 
 /** Most elements one cad_edit action add call may carry: a call is written by the model token by token, and a huge one is cut off by its output limit. */
 export const MAX_ELEMENTS_PER_CALL = 40
+
+/** Detect heavy history validation without rebuilding or recursing through arbitrary object data. */
+export const hasParametricElements = (elements: ReadonlyArray<Record<string, unknown>>): boolean => {
+  const pending = [...elements]
+  const seen = new Set<object>()
+  while (pending.length > 0) {
+    const element = pending.pop()
+    if (element === undefined) break
+    if (seen.has(element)) continue
+    seen.add(element)
+    if (element["type"] === "parametric") return true
+    if ((element["type"] === "component" || element["type"] === "group") && Array.isArray(element["elements"])) {
+      for (const child of element["elements"]) if (child !== null && typeof child === "object" && !Array.isArray(child)) pending.push(child as Record<string, unknown>)
+    }
+  }
+  return false
+}

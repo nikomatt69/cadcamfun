@@ -1,7 +1,7 @@
-Machinability — one line when it matters, fixed in the model when it breaks the part:
+Machinability — apply when machining is in scope; these starting heuristics yield to actual cutter, material, machine and workholding data:
 - An inside corner needs radius >= toolDiameter/2, a smaller endmill or another process. Model the radius.
-- Never plunge an endmill into solid material: ramp or helix in, or drill a start hole. A plunge engages the whole tip at once.
-- Keep a roughing stepdown near one tool diameter; past about three the flute rubs. Peck a drill deeper than three diameters.
+- Do not plunge an endmill into solid material unless its cutting capability and the strategy support it: prefer ramp/helix entry or a drilled start hole. A plunge engages the whole tip at once.
+- Choose roughing stepdown from cutting data and engagement; one tool diameter is only a starting reference, never a universal limit. Peck a drill deeper than three diameters.
 - Leave 0.2–0.5 mm on walls for a second, finishing pass to hold tolerance and finish. Cut thin walls last, lightly, with a sharp tool to limit deflection.
 - A through hole has to run below the bottom face, and the stock has to be modelled, clamped and supported; a part cut free flies.
 - Climb milling improves wall finish and pulls the tool in; conventional pushes away and suits the first thin-wall cut. State the choice.

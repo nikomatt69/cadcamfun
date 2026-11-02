@@ -41,7 +41,7 @@ import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
 import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
-import { KernelJobError, diagnose, editHistory, featureEditOf, normalizeElement, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { KernelJobError, featureEditOf, normalizeElementBatch, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -909,11 +909,12 @@ const toolHandlers = Effect.gen(function*() {
         ...where(loaded)
       }
     },
-    parametric: async (projectId, input) => {
+    parametric: async (projectId, input, requestedSignal) => {
+      const signal = requestedSignal ?? actingCell.turn(local).signal
       { const denied = await refused(projectId); if (denied) return denied }
-      if (input.action === "validate") return inspectParametric(input.history)
+      if (input.action === "validate") return inspectParametric(input.history, signal)
       if (input.action === "create") {
-        const report = inspectParametric(input.history)
+        const report = await inspectParametric(input.history, signal)
         if (!report.ok) return { ...report, ok: false, error: failureMessage(report, "Nothing was created") }
         const added = await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }]) as Record<string, unknown>
         if (added["ok"] !== true) return added
@@ -927,7 +928,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!source) return { ok: false, error: "Element not found in the active drawing.", ...where(loaded) }
         const converted = cad.parametricFromElement(source, input.depth === undefined ? {} : { depth: input.depth })
         if ("error" in converted) return { ok: false, error: converted.error, ...where(loaded) }
-        const report = inspectParametric(converted.history)
+        const report = await inspectParametric(converted.history, signal)
         const origin = { id: source.id, type: source.type }
         if (!report.ok) return { ...report, source: origin, notes: converted.notes, ...(input.create ? { ok: false, error: "The converted history does not rebuild into a valid solid; nothing was created." } : {}) }
         const read = { ...report, source: origin, placement: converted.placement, notes: converted.notes, ...where(loaded) }
@@ -946,21 +947,21 @@ const toolHandlers = Effect.gen(function*() {
       if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }
       const history = element["history"]
       if (input.action === "inspect") {
-        const inspected = inspectParametric(history)
+        const inspected = await inspectParametric(history, signal)
         // The dimensions a structural edit can bind (path, label, value); a history the schema refuses has none to list.
         return { ...inspected, ...("history" in inspected ? { features: outlineHistory(inspected.history, input.feature) } : {}), elementId: element.id, ...where(loaded) }
       }
-      if (input.action === "test") return { ...(await testParametric(history, input)), elementId: element.id, ...where(loaded) }
+      if (input.action === "test") return { ...(await testParametric(history, input, signal)), elementId: element.id, ...where(loaded) }
       if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
       if (input.action === "timeline") {
-        const edited = editTimeline(history, input)
+        const edited = await editTimeline(history, input, signal)
         if (!edited.ok) return { ...edited, ...where(loaded) }
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
         return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report), report: edited.report, ...where(loaded) }
       }
       if (input.action === "edit") {
-        const edited = editHistory(history, input.edits)
+        const edited = structuredClone(await runOwnedKernelJob("parametric-edit", { history, edits: input.edits }, { signal }))
         if (!edited.ok) return { ...edited, ...where(loaded) }
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
@@ -969,10 +970,10 @@ const toolHandlers = Effect.gen(function*() {
           applied: edited.applied, ...(edited.removed.length > 0 ? { removed: edited.removed } : {}), ...where(loaded)
         }
       }
-      const changed = changeParameters(history, input.parameters)
+      const changed = await changeParameters(history, input.parameters, signal)
       if (!changed.ok) return { ...changed, ...where(loaded) }
       if (!changed.report.ok) {
-        return { ...changed.report, verification: verificationFor(changed.history, changed.report), diagnosis: diagnose(changed.history, changed.report), error: failureMessage({ diagnosis: diagnose(changed.history, changed.report) }, "The parameters were not changed: the variant fails and the part is untouched"), ...where(loaded) }
+        return { ...changed.report, verification: verificationFor(changed.history, changed.report), diagnosis: changed.diagnosis, error: failureMessage({ diagnosis: changed.diagnosis }, "The parameters were not changed: the variant fails and the part is untouched"), ...where(loaded) }
       }
       const updated = { ...element, history: changed.history }
       await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
@@ -987,7 +988,7 @@ const toolHandlers = Effect.gen(function*() {
     addElements: async (projectId, rawInput) => {
       let raw = rawInput
       // Whoever calls this gets the same guarantees as the tool: defaults filled, types and counts checked, nothing added on error.
-      const checked = raw.map((input) => normalizeElement(input))
+      const checked = await normalizeElementBatch(raw, actingCell.turn(local).signal)
       const problems = checked.flatMap((result, index) => (result.ok ? [] : [`elements[${index}]: ${result.error}`]))
       if (problems.length > 0) return { ok: false, error: "Nothing was added.", problems }
       raw = checked.flatMap((result) => (result.ok ? [result.element] : []))
@@ -1011,19 +1012,25 @@ const toolHandlers = Effect.gen(function*() {
     modifyEntities: async (projectId, changes) => {
       const loaded = await load(projectId, true)
       const missing = changes.filter((c) => !loaded.elements.some((e) => e.id === c.id)).map((c) => c.id)
-      if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad_describe_drawing to list the ids.`, ...where(loaded) }
+      if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad action describe to list the ids.`, ...where(loaded) }
       const updated: Element[] = []
       const refused: string[] = []
+      const candidates = loaded.elements.flatMap((element) => {
+        const change = changes.find((candidate) => candidate.id === element.id)
+        return change ? [{ before: element, after: applyChanges(element, change.changes as Record<string, unknown>) }] : []
+      })
+      // Parametric histories rebuild during normalization. Validate the whole edit in one scoped job before storing anything.
+      const checks = await normalizeElementBatch(candidates.flatMap(({ before, after }) => [before, after]), actingCell.turn(local).signal)
+      const nextById = new Map(candidates.map(({ before, after }, index) => {
+        const original = checks[index * 2]
+        const changed = checks[index * 2 + 1]
+        // Elements that were already invalid (for example legacy hand-built data) retain their compatibility behavior.
+        if (original?.ok && changed && !changed.ok) refused.push(`${before.id}: ${changed.error}`)
+        return [before.id, after] as const
+      }))
       const elements = loaded.elements.map((e) => {
-        const change = changes.find((c) => c.id === e.id)
-        if (!change) return e
-        const next = applyChanges(e, change.changes as Record<string, unknown>)
-        // The element must still be one the editor can draw: right field types, a history that still builds a solid. An element
-        // that was not valid to begin with (made by hand in the editor) is not judged.
-        if (normalizeElement(e).ok) {
-          const after = normalizeElement(next)
-          if (!after.ok) { refused.push(`${e.id}: ${after.error}`); return e }
-        }
+        const next = nextById.get(e.id)
+        if (!next) return e
         updated.push(next)
         return next
       })
@@ -1082,7 +1089,7 @@ const toolHandlers = Effect.gen(function*() {
       const printer = decodePrinter(split.printer)
       // A lathe works from its stock size and a probe from the machine, so only drawing-based operations need elements.
       const needsElements = settings.machineType !== "lathe" && settings.operationType !== "probing"
-      if (needsElements && elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_add_elements first." }
+      if (needsElements && elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_edit action add first." }
       const geometry = {
         geometryType: "selected" as const,
         selectedElements: elements.filter((e) => e.type !== "workpiece"),
@@ -1145,7 +1152,7 @@ const toolHandlers = Effect.gen(function*() {
     compareSetups: async (projectId, candidates) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
-      if (loaded.data["stock"] === undefined) return { ok: false, error: "Configure explicit stock with cam_stock before comparing removal and cutter setups." }
+      if (loaded.data["stock"] === undefined) return { ok: false, error: "Configure explicit stock with cam_edit action stock_set before comparing removal and cutter setups." }
       const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: loaded.elements.filter((e) => e.type !== "workpiece"), stock: loaded.data["stock"] })
       const results: unknown[] = []
       for (const candidate of candidates) {
@@ -1315,7 +1322,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!found.canWrite) return { ok: false, error: `The acting user may not delete this ${kind}.` }
         await run(ensureTurnActive)
         await run(kind === "material" ? materials.remove(id) : tools.remove(id))
-        return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify_toolpath." }
+        return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify action verify." }
       }
       if (kind === "library_item") {
         const found = await run(libraryItems.find(acting().id, id))

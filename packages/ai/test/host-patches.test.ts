@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
-import { applyHostPatches, ENVIRONMENT_MARKER, HOST_PATCHES, HostPatchError, INSTANCE_CONFIG_MARKER, MEDIA_RULE_MARKER, REGISTRATION_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
+import { applyHostPatches, ENVIRONMENT_MARKER, HOST_PATCHES, HostPatchError, INSTANCE_CONFIG_MARKER, MEDIA_RULE_MARKER, REGISTRATION_MARKER, REQUESTY_DISCOVERY_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
 
 /** The marker must exist exactly once in the pinned bundle; a bump that moves it fails here, not in a user's chat. */
 describe("host patch: images in tool results", () => {
@@ -29,6 +29,16 @@ describe("host patch: images in tool results", () => {
 /** Partial compatibility is an explicit error: every patch is reported, and a bundle missing any of them is refused. */
 describe("host patch report", () => {
   const bundle = readFileSync(createRequire(import.meta.url).resolve("@nikcli-ai/sdk-next"), "utf8")
+
+  test("disabled metadata fetching also skips Requesty discovery and preserves the bundled catalogue", () => {
+    expect(bundle.split(REQUESTY_DISCOVERY_MARKER)).toHaveLength(2)
+    const patched = patchHostSource(bundle)
+    const start = patched.indexOf("const requestyDiscovery =")
+    const discovery = patched.slice(start, patched.indexOf("const ollama =", start))
+    expect(discovery).toContain('!Flag.disableModelsFetch() && isProviderAllowed("requesty")')
+    expect(discovery).toContain('const database = mapValues(modelsDev, fromModelsDevProvider);')
+    expect(discovery).toContain("if (requesty && requestyDiscovery)")
+  })
 
   test("the pinned bundle takes every patch, each exactly once", () => {
     const { report, source } = applyHostPatches(bundle)

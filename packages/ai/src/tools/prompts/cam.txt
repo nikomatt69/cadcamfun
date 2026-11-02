@@ -1,4 +1,5 @@
 Read CAM data: machine, stock, toolpaths, G-code, materials, cutting data and evidence; read-only.
+Call with action and its fields; previews do not persist programs.
 
 Actions and Parameters (mm, mm/min, rpm)
 - machine: machineType (mill|lathe|3dprinter), gcode or operationId, params, at (seconds). Viewer timeline, tooling, B/C poses, limits.
@@ -29,4 +30,4 @@ Do not use it
 - For writes or stored verification: use cam_edit. For geometry: use cad.
 
 After it
-- Create/update with the checked revision, then generate, analyze full NC, verify and review evidence.
+- Use the matching route: manufacture/turn previews precede their matching cam_edit action; legacy operations use plan_check, create/update, generate, analyze full NC, verify and review. Reuse evidence only while drawing, stock, settings and program identity match.

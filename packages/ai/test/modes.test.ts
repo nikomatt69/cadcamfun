@@ -44,7 +44,7 @@ describe("assistant modes", () => {
 describe("systemPrompt with mode and context", () => {
   test("embeds the mode block when a mode is provided", () => {
     const prompt = systemPrompt(undefined, "cam")
-    expect(prompt).toContain("CAM operations")
+    expect(prompt).toContain(modePrefix("cam"))
     expect(prompt).not.toContain("{{mode}}")
   })
 
@@ -62,35 +62,33 @@ describe("systemPrompt with mode and context", () => {
   })
 })
 describe("agent-chosen focus and background delegation", () => {
-  test("general mode states there is no user-selected mode and focus is at will", () => {
+  test("general focus follows the task while preserving the Build/Plan role", () => {
     const general = modePrefix("general")
-    expect(general).toMatch(/no user-selected mode/i)
-    expect(general).toMatch(/choose the focus|at will/i)
-    expect(general).toMatch(/never limits the tools|does not limit the tools/i)
+    expect(general).toMatch(/choose.*focus as the request requires/i)
+    expect(general).toMatch(/focus never grants tools or overrides the Build\/Plan role/i)
   })
 
-  test("every mode is an agent-chosen focus that does not limit tools", () => {
-    for (const mode of ASSISTANT_MODES.filter((candidate) => candidate !== "general")) {
-      const text = modePrefix(mode)
-      expect(text).toMatch(/chosen by you, not the user/i)
-      expect(text).toMatch(/never limits your tools/i)
-      expect(text).toMatch(/switch focus at will/i)
+  test("every focus inherits task-driven tool access from the shared agent contract", () => {
+    for (const mode of ASSISTANT_MODES) {
+      const prompt = systemPrompt(undefined, mode)
+      expect(prompt).toContain(modePrefix(mode))
+      expect(prompt).toMatch(/focus.*guides attention, never grants access/i)
+      expect(prompt).toMatch(/follow your role's actual permissions/i)
     }
   })
 
-  test("the Build prompt carries the background-delegation pattern, like nikcli's awareness blocks", async () => {
+  test("Build delegation saves time without replacing the next prerequisite", async () => {
     const { PRIMARIES } = await import("../src/nikcli/primaries.ts")
     const prompt = PRIMARIES.build.focus
-    expect(prompt).toMatch(/background subagents/i)
-    expect(prompt).toMatch(/background by default/i)
-    expect(prompt).toMatch(/several background calls in one block/i)
-    expect(prompt).toMatch(/keep doing non-overlapping work/i)
-    expect(prompt).toMatch(/never delegate what blocks the next step/i)
-    expect(prompt).toMatch(/one at a time per project/i)
-    expect(prompt).toMatch(/only when it materially helps/i)
+    expect(prompt).toMatch(/background specialists.*scoped tools/i)
+    expect(prompt).toMatch(/independent.*materially saves time/i)
+    expect(prompt).toMatch(/start independent jobs together.*non-overlapping work/i)
+    expect(prompt).toMatch(/editing specialists queue one at a time per project/i)
+    expect(prompt).toMatch(/do not delegate merely because it is long/i)
     expect(prompt).toMatch(/one active researcher per parent/i)
-    // Plan cannot delegate or write: its prompt must not teach delegation or mods as its own actions.
-    expect(PRIMARIES.plan.focus).not.toMatch(/background subagents/i)
+    expect(PRIMARIES.plan.delegates).toBe(false)
+    expect(PRIMARIES.plan.without).toContain("agent")
+    expect(PRIMARIES.plan.focus).not.toMatch(/delegate with the `agent` tool/i)
     expect(PRIMARIES.plan.canEdit).toBe(false)
   })
 })
@@ -108,12 +106,12 @@ describe("model family working style (nikcli's per-family system prompts)", () =
   })
 
   test("Claude gets the base prompt untouched; the others get their block after the mode", async () => {
-    const { systemPrompt } = await import("../src/prompts/system.ts")
+    const { systemPrompt, modelFamilyPrompt } = await import("../src/prompts/system.ts")
     const base = systemPrompt("ctx")
     expect(systemPrompt("ctx", undefined, "claude-sonnet-5-5")).toBe(base)
     const gpt4 = systemPrompt("ctx", undefined, "gpt-4o")
     expect(gpt4.startsWith(base)).toBe(true)
-    expect(gpt4).toContain("Keep going until the request is completely resolved")
-    expect(systemPrompt("ctx", undefined, "gpt-5").slice(base.length)).toContain("short sentence")
+    expect(gpt4.slice(base.length).trim()).toBe(modelFamilyPrompt("gpt-4o"))
+    expect(systemPrompt("ctx", undefined, "gpt-5").slice(base.length).trim()).toBe(modelFamilyPrompt("gpt-5"))
   })
 })

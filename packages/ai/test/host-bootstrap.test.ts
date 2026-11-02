@@ -15,17 +15,32 @@ test("bootstrap registers a saved MiniMax coding-plan key without a model call",
     id: "minimax-coding-plan", name: "MiniMax Coding Plan", env: ["MINIMAX_API_KEY"], npm: "@ai-sdk/openai-compatible", api: "https://api.minimax.io/v1",
     models: { "MiniMax-M3": { id: "MiniMax-M3", name: "MiniMax M3", tool_call: true, attachment: false, limit: { context: 200000, output: 32000 }, modalities: { input: ["text"], output: ["text"] }, cost: { input: 0, output: 0 } } }
   } }))
-  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const runtime = yield* makeNikCliRuntime({ dataDir: sharedDataDir, providers: defaultProviderSpecs(), systemPrompt: "test", toolsFor: () => [] })
-    yield* runtime.setProviderKey("minimax-coding-plan", "test-bootstrap-key")
-    const host = yield* runtime.host("bootstrap-minimax")
-    const providers = yield* Effect.promise(() => host.client.provider.list())
-    expect(providers.connected).toContain("minimax-coding-plan")
-    expect(providers.all.find((provider) => provider.id === "minimax-coding-plan")?.models).toHaveProperty("MiniMax-M3")
-    const peers = yield* Effect.all([runtime.host("peer-a"), runtime.host("peer-b")], { concurrency: "unbounded" })
-    expect(peers.map((peer) => peer.projectId)).toEqual(["peer-a", "peer-b"])
-    const session = yield* Effect.promise(() => host.client.session.create({ title: "bootstrap regression" }))
-    expect(session.id.length).toBeGreaterThan(0)
-    yield* Effect.promise(() => host.client.session.remove({ sessionID: session.id }))
-  })))
+  const nativeFetch = globalThis.fetch
+  let requestyCalls = 0
+  globalThis.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
+    const url = args[0] instanceof Request ? args[0].url : String(args[0])
+    if (url.startsWith("https://router.requesty.ai/")) {
+      requestyCalls++
+      throw new Error("Unexpected unconfigured provider discovery")
+    }
+    return nativeFetch(...args)
+  }, nativeFetch)
+  try {
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const runtime = yield* makeNikCliRuntime({ dataDir: sharedDataDir, providers: defaultProviderSpecs(), systemPrompt: "test", toolsFor: () => [] })
+      yield* runtime.setProviderKey("minimax-coding-plan", "test-bootstrap-key")
+      const host = yield* runtime.host("bootstrap-minimax")
+      const providers = yield* Effect.promise(() => host.client.provider.list())
+      expect(providers.connected).toContain("minimax-coding-plan")
+      expect(providers.all.find((provider) => provider.id === "minimax-coding-plan")?.models).toHaveProperty("MiniMax-M3")
+      const peers = yield* Effect.all([runtime.host("peer-a"), runtime.host("peer-b")], { concurrency: "unbounded" })
+      expect(peers.map((peer) => peer.projectId)).toEqual(["peer-a", "peer-b"])
+      const session = yield* Effect.promise(() => host.client.session.create({ title: "bootstrap regression" }))
+      expect(session.id.length).toBeGreaterThan(0)
+      yield* Effect.promise(() => host.client.session.remove({ sessionID: session.id }))
+    })))
+    expect(requestyCalls).toBe(0)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
 }, 90000)

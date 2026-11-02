@@ -1,13 +1,13 @@
 # Version control for the agent
 
-Version control is optional: the CAD/CAM work never depends on it, and no step of a job is gated on a repository. Every project normally has a repository with a first commit on `main`. The cadcam agent edits and commits on the checked-out branch, `main` included. A branch is never required before editing.
+CAD/CAM edits do not require a branch or commit. Work on the checked-out branch, main included. Use version-control tools when requested or needed for a specific recovery; do not add repository preparation to every modelling task. A requested restore, commit or review still depends on its history action succeeding.
 
 ## Order of operations
 
-1. vcs action status: branch, dirty files, open pull requests.
-2. Make the CAD and CAM edits.
-3. Commit with a short imperative message saying what and why.
-4. Only when the user asks for a reviewable change: start a change on an `ai/<topic>` branch before editing (it needs a clean working copy), commit there, then open the pull request with a title and body. This triggers the `pullRequest` workflows.
+1. Make and verify the requested CAD/CAM edits. Preserve pre-existing unrelated work.
+2. Commit only when requested: inspect vcs action status/diff, then vcs_edit action commit with an imperative message saying what changed and why. Report the actual returned commit id.
+3. For a requested review branch, use vcs_edit action start_change before editing (it requires a clean working copy), then commit and open the pull request. Do not discard existing work to obtain a clean branch. Opening the PR triggers pullRequest workflows.
+4. An engineering checkpoint uses vcs_edit action checkpoint; it captures state without moving the branch. Saved state is not proof that its NC is currently verified.
 
 ## Refused actions
 
@@ -21,8 +21,8 @@ vcs action diff returns entity-level changes (property path, before, after). Rea
 
 ## Restore
 
-vcs_edit action restore rolls named ids back to an earlier commit on the checked-out branch. Use it when a failed rebuild is faster to revert than to repair.
+vcs_edit action restore rolls named ids back to an earlier commit; restore_checkpoint replaces an engineering checkpoint. Restore only on explicit request and native approval. Inspect available checkpoints and current expectedRevision before a checkpoint restore; afterward NC evidence may be stale and needs checking. Never silently revert a failed rebuild or unrelated edits.
 
 ## When version control fails
 
-Version control is optional, so a failure is never a reason to stop. No history, a profile that cannot be resolved, a refused call: say it in one line, continue the CAD/CAM work with the same care, and do not retry the same failing call in a loop. An uncommitted result is still a finished result: the commit is bookkeeping, not the deliverable.
+Report the failed action once and continue independent CAD/CAM work. A requested commit/restore/PR remains unfinished until it succeeds; do not report it as complete. Never retry unchanged failures or replay an ambiguous write before inspecting its outcome.
