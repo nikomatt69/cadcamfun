@@ -3,6 +3,7 @@ import {
   DIMENSION_TYPES, addSketchConstraint, removeSketchConstraint, resolveParameters, setConstraintDriven, sketchReport,
   type ConstraintState, type DimConstraint, type Feature, type History, type RebuildResult
 } from "@cadcamfun/core"
+import { ChevronDown, ChevronRight, Parentheses, Ruler, X } from "lucide-solid"
 import { t } from "../../../../i18n/index.ts"
 import { DimensionField } from "../property-inputs/DimensionField.tsx"
 import type { SectionProps } from "./ParametersSection.tsx"
@@ -11,14 +12,14 @@ const SMALL = "panel-btn"
 const SELECT = "panel-input"
 
 const STATE_TONE: Readonly<Record<ConstraintState, string>> = {
-  ok: "text-gray-500", redundant: "text-amber-700", conflict: "text-red-700", driven: "text-sky-700"
+  ok: "text-[color:var(--ent-text-muted)]", redundant: "text-[color:var(--ent-warn)]", conflict: "text-[color:var(--ent-bad)]", driven: "text-[color:var(--ent-accent)]"
 }
 const STATUS_KEY = {
   "fully-constrained": "cad.parametric.status.fully", "under-constrained": "cad.parametric.status.under", "over-constrained": "cad.parametric.status.over",
   conflicting: "cad.parametric.status.conflicting", failed: "cad.parametric.status.failed", unsolved: "cad.parametric.status.unsolved"
 } as const
 const STATUS_TONE: Readonly<Record<string, string>> = {
-  "fully-constrained": "text-green-700", "under-constrained": "text-amber-700", "over-constrained": "text-amber-700", conflicting: "text-red-700", failed: "text-red-700", unsolved: "text-red-700"
+  "fully-constrained": "text-[color:var(--ent-ok)]", "under-constrained": "text-[color:var(--ent-warn)]", "over-constrained": "text-[color:var(--ent-warn)]", conflicting: "text-[color:var(--ent-bad)]", failed: "text-[color:var(--ent-bad)]", unsolved: "text-[color:var(--ent-bad)]"
 }
 
 /** What each constraint kind refers to (entity kinds) and whether it carries a dimension: the "add constraint" form is built from this. */
@@ -81,47 +82,47 @@ export function SketchConstraintsSection(props: SectionProps & { readonly featur
       <Show when={report()}>{(r) =>
         <>
           <button type="button" class="flex w-full items-center gap-2 text-left text-xs" aria-expanded={props.open} onClick={props.toggle}>
-            <span>{props.open ? "▾" : "▸"}</span>
+            <Show when={props.open} fallback={<ChevronRight size={12} aria-hidden="true" />}><ChevronDown size={12} aria-hidden="true" /></Show>
             <span class="font-medium">{t("cad.parametric.sketch.constraints")} ({r().rows.length + r().generated})</span>
             <span class={STATUS_TONE[r().status]} data-testid={`sketch-status-${props.feature.id}`}>{t(STATUS_KEY[r().status])}</span>
-            <Show when={r().dof > 0}><span class="text-gray-500" data-testid={`sketch-dof-${props.feature.id}`}>{t("cad.parametric.sketch.dof", { count: r().dof })}</span></Show>
+            <Show when={r().dof > 0}><span class="text-[color:var(--ent-text-muted)]" data-testid={`sketch-dof-${props.feature.id}`}>{t("cad.parametric.sketch.dof", { count: r().dof })}</span></Show>
           </button>
           <Show when={r().status === "conflicting" || r().status === "failed" || r().status === "unsolved"}>
-            <p class="text-xs text-red-600" role="alert" data-testid={`sketch-problem-${props.feature.id}`}>{r().message}</p>
+            <p class="text-xs text-[color:var(--ent-bad)]" role="alert" data-testid={`sketch-problem-${props.feature.id}`}>{r().message}</p>
           </Show>
-          <Show when={r().conflictSet.length > 0}><p class="text-xs text-red-600">{t("cad.parametric.sketch.conflictSet", { list: r().conflictSet.join(", ") })}</p></Show>
+          <Show when={r().conflictSet.length > 0}><p class="text-xs text-[color:var(--ent-bad)]">{t("cad.parametric.sketch.conflictSet", { list: r().conflictSet.join(", ") })}</p></Show>
           <Show when={props.open}>
             <ul class="mt-1 space-y-1" data-testid={`constraint-list-${props.feature.id}`}>
               <For each={r().rows}>{(row) => {
                 const c = props.feature.sketch.constraints[row.index]!
                 const dim = "value" in c
                 return (
-                  <li class="grid grid-cols-[1fr_auto] items-start gap-1 text-xs" data-testid={`constraint-${props.feature.id}-${row.index}`}>
+                  <li class="grid grid-cols-[1fr_auto] items-start gap-2 text-xs" data-testid={`constraint-${props.feature.id}-${row.index}`}>
                     <div class="min-w-0">
                       <span class="font-mono">{row.name}</span>
-                      <span class="ml-1 text-gray-500">{row.refs.join(" ")}</span>
+                      <span class="ml-1 text-[color:var(--ent-text-muted)]">{row.refs.join(" ")}</span>
                       <span class={`ml-1 ${STATE_TONE[row.state]}`}>{t(`cad.parametric.state.${row.state}`)}</span>
                       <Show when={dim}>
                         <span class="ml-1 font-mono">{String((c as { value: number | string }).value)}</span>
-                        <Show when={row.measured !== undefined}><span class="ml-1 text-gray-500">{t("cad.parametric.sketch.measured", { value: Number((degrees(c) ? (row.measured! * 180) / Math.PI : row.measured!).toPrecision(8)) })}{degrees(c) ? "°" : ""}</span></Show>
+                        <Show when={row.measured !== undefined}><span class="ml-1 text-[color:var(--ent-text-muted)]">{t("cad.parametric.sketch.measured", { value: Number((degrees(c) ? (row.measured! * 180) / Math.PI : row.measured!).toPrecision(8)) })}{degrees(c) ? "°" : ""}</span></Show>
                       </Show>
                     </div>
                     <div class="flex gap-1">
                       <Show when={DIMENSION_TYPES.has(c.type)}>
                         <button type="button" class={SMALL} disabled={props.locked} aria-label={`${row.state === "driven" ? t("cad.parametric.sketch.makeDriving") : t("cad.parametric.sketch.makeReference")} ${row.name}`}
                           title={row.state === "driven" ? t("cad.parametric.sketch.makeDriving") : t("cad.parametric.sketch.makeReference")}
-                          onClick={() => run(() => setConstraintDriven(props.history, props.feature.id, row.index, row.state !== "driven"))}>{row.state === "driven" ? "⟂" : "( )"}</button>
+                          onClick={() => run(() => setConstraintDriven(props.history, props.feature.id, row.index, row.state !== "driven"))}><Show when={row.state === "driven"} fallback={<Parentheses size={12} aria-hidden="true" />}><Ruler size={12} aria-hidden="true" /></Show></button>
                       </Show>
                       <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("cad.parametric.sketch.removeConstraint")} ${row.name}`} title={t("cad.parametric.sketch.removeConstraint")}
-                        onClick={() => run(() => removeSketchConstraint(props.history, props.feature.id, row.index))}>✕</button>
+                        onClick={() => run(() => removeSketchConstraint(props.history, props.feature.id, row.index))}><X size={12} aria-hidden="true" /></button>
                     </div>
                   </li>
                 )
               }}</For>
             </ul>
-            <Show when={r().generated > 0}><p class="text-xs text-gray-500">{t("cad.parametric.sketch.generated", { count: r().generated })}</p></Show>
-            <Show when={Object.keys(r().freedom).length > 0}><p class="text-xs text-gray-500" data-testid={`sketch-free-${props.feature.id}`}>{t("cad.parametric.sketch.free", { list: Object.entries(r().freedom).map(([id, n]) => `${id} (${n})`).join(", ") })}</p></Show>
-            <div class="mt-1 flex flex-wrap items-start gap-1" data-testid={`add-constraint-${props.feature.id}`}>
+            <Show when={r().generated > 0}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.parametric.sketch.generated", { count: r().generated })}</p></Show>
+            <Show when={Object.keys(r().freedom).length > 0}><p class="text-xs text-[color:var(--ent-text-muted)]" data-testid={`sketch-free-${props.feature.id}`}>{t("cad.parametric.sketch.free", { list: Object.entries(r().freedom).map(([id, n]) => `${id} (${n})`).join(", ") })}</p></Show>
+            <div class="mt-2 flex flex-wrap items-start gap-2" data-testid={`add-constraint-${props.feature.id}`}>
               <select class={SELECT} disabled={props.locked} aria-label={t("cad.parametric.sketch.constraintType")} value={type()} onChange={(event) => { setType(event.currentTarget.value); setPicks({}); setValue(undefined); setNonce((n) => n + 1) }}>
                 <For each={Object.keys(FORMS)}>{(name) => <option value={name}>{name}</option>}</For>
               </select>

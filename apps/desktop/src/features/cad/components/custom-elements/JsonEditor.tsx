@@ -285,8 +285,8 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
         </div>
       </Show>
 
-      <div class="px-3 py-1 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
-        <div class="flex justify-between">
+      <div class="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
+        <div class="flex justify-between gap-3">
           <span>{section() === "geometry" ? t("cad.customElements.geometryFunction") : section() === "material" ? t("cad.customElements.materialFunction") : t("cad.customElements.parametersConfiguration")}</span>
           <span>{t("cad.customElements.linesAndChars", { lines: lineCount(), chars: currentCode().length })}</span>
         </div>

@@ -13,8 +13,8 @@ interface ColorListInputProps {
 }
 
 const PRESETS = ["#FF0000", "#FF9900", "#FFCC00", "#33CC00", "#0099FF", "#6633CC", "#CC33FF", "#FF3399", "#000000", "#666666", "#999999", "#CCCCCC", "#FFFFFF", "#996633", "#006633", "#003366"]
-const TRIGGER = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-[#F8FBFF] dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-50 flex justify-between items-center gap-2 text-gray-700 dark:text-blue-400"
-const LABEL = "block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1"
+const TRIGGER = "w-full px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md text-xs bg-[color:var(--ent-surface)] hover:bg-[color:var(--ent-surface-subtle)] flex justify-between items-center gap-2 text-[color:var(--ent-text)]"
+const LABEL = "block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1"
 
 const hex = (color: ColorValue): string =>
   `#${[color.r, color.g, color.b].map((channel) => Math.floor(channel * 255).toString(16).padStart(2, "0")).join("")}`
@@ -72,7 +72,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
         <div class="grid gap-4 lg:grid-cols-2">
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.input.colors")}</h4>
+              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.input.colors")}</h4>
               <button
                 type="button"
                 onClick={() => { setCurrent(null); setCurrentHex("#000000") }}
@@ -106,7 +106,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
           </section>
 
           <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.input.picker")}</h4>
+            <h4 class="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.input.picker")}</h4>
             <div class="space-y-3">
               <input
                 type="color"
@@ -138,7 +138,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
                     <button
                       type="button"
                       onClick={() => setCurrentHex(color)}
-                      class="h-6 w-6 rounded-full border border-gray-300 transition-transform hover:scale-110 dark:border-gray-600"
+                      class="h-6 w-6 rounded-full border border-gray-300 transition-shadow hover:ring-2 hover:ring-blue-400 dark:border-gray-600"
                       style={{ "background-color": color }}
                       title={color}
                       aria-label={`Use ${color}`}

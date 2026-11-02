@@ -7,7 +7,7 @@
  */
 import { Show, createEffect, onCleanup, onMount, type JSX } from "solid-js"
 import * as THREE from "three"
-import { RefreshCcw } from "lucide-solid"
+import { MousePointer2, Package, RefreshCcw, ZoomIn } from "lucide-solid"
 import { t } from "../../../../i18n/index.ts"
 import type { CustomElementDefinition } from "../../types/customElements.ts"
 import { triangleCount } from "../../lib/customElements/evaluate.ts"
@@ -209,20 +209,20 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
       <Show when={!props.object && !props.isLoading}>
         <div class="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
           <div class="text-center">
-            <div class="text-2xl mb-2">📦</div>
+            <Package size={24} class="mx-auto mb-2" aria-hidden="true" />
             <div>{t("cad.customElements.noPreview")}</div>
             <div class="text-sm">{t("cad.customElements.noPreviewHint")}</div>
           </div>
         </div>
       </Show>
 
-      <div class="absolute bottom-3 left-3 rounded-lg border border-slate-700/60 bg-slate-950/80 px-3 py-2 text-[10px] leading-4 text-slate-100 shadow-lg backdrop-blur">
-        <div>🖱️ {t("cad.customElements.dragRotate")}</div>
-        <div>🔘 {t("cad.customElements.scrollZoom")}</div>
+      <div class="absolute bottom-3 left-3 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] leading-4 text-slate-100 shadow-lg">
+        <div class="flex items-center gap-2"><MousePointer2 size={12} aria-hidden="true" />{t("cad.customElements.dragRotate")}</div>
+        <div class="flex items-center gap-2"><ZoomIn size={12} aria-hidden="true" />{t("cad.customElements.scrollZoom")}</div>
       </div>
 
       <Show when={props.object && !props.isLoading}>
-        <div class="absolute left-3 top-3 rounded-lg border border-slate-700/60 bg-slate-950/80 px-3 py-2 text-[10px] leading-4 text-slate-100 shadow-lg backdrop-blur">
+        <div class="absolute left-3 top-3 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] leading-4 tabular-nums text-slate-100 shadow-lg">
           <div>{t("cad.customElements.triangles", { count: triangles() ?? 0 })}</div>
           <div>
             {t("cad.customElements.objectType")}: {props.object?.type}

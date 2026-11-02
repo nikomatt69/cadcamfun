@@ -16,8 +16,8 @@ interface ElementListInputProps {
 
 const NOUN: Record<ListType, string> = { element: "elements", edge: "edges", face: "faces", opening: "openings" }
 const TITLE: Record<ListType, string> = { element: "Select elements", edge: "Select edges", face: "Select faces", opening: "Configure openings" }
-const TRIGGER = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-[#F8FBFF] dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-50 flex justify-between items-center gap-2 text-gray-700 dark:text-blue-400"
-const LABEL = "block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1"
+const TRIGGER = "w-full px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md text-xs bg-[color:var(--ent-surface)] hover:bg-[color:var(--ent-surface-subtle)] flex justify-between items-center gap-2 text-[color:var(--ent-text)]"
+const LABEL = "block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1"
 /** How many rows the list draws at once: a mesh can hold thousands of faces. */
 const LIMIT = 400
 
@@ -157,7 +157,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
         <div class="grid gap-4 lg:grid-cols-2">
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("plugins.available")}</h4>
+              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("plugins.available")}</h4>
               <span class="text-xs text-gray-500 dark:text-gray-400">{filtered().length} shown</span>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
@@ -186,7 +186,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
 
           <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
             <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("cad.status.selected")}</h4>
+              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.status.selected")}</h4>
               <Show when={selected().length > 0}>
                 <button type="button" onClick={() => setSelected([])} class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">{t("cad.input.clearAll")}</button>
               </Show>

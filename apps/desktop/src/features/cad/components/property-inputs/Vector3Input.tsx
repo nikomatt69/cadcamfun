@@ -17,7 +17,7 @@ interface Vector3InputProps {
   readonly showUnit?: boolean
 }
 
-const INPUT = "w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
+const INPUT = "w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs tabular-nums focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
 
 /** Edits X/Y/Z of a vector (rotations, scales...). */
 export function Vector3Input(props: Vector3InputProps): JSX.Element {

@@ -59,7 +59,7 @@ export default function CustomElementAssistant(props: {
         <span class="rounded-lg bg-blue-600 p-2 text-white"><Boxes size={17} /></span>
         <div><h3 class="text-sm font-semibold text-slate-900 dark:text-white">{t("cad.customElements.assistantHeading")}</h3><p class="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{t("cad.customElements.assistantDescription")}</p></div>
       </div>
-      <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="custom-element-assistant-prompt">{t("cad.customElements.assistantPromptLabel")}</label>
+      <label class="text-xs font-semibold text-slate-500" for="custom-element-assistant-prompt">{t("cad.customElements.assistantPromptLabel")}</label>
       <textarea id="custom-element-assistant-prompt" class="min-h-36 w-full resize-y rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white" value={brief()} onInput={(event) => setBrief(event.currentTarget.value)} placeholder={t("cad.customElements.assistantPlaceholder")} />
       <div class="flex flex-wrap gap-2">
         <For each={["A mounting bracket with two slotted holes", "A knurled adjustment knob with a center bore", "A cable gland with threaded body and hex nut"]}>

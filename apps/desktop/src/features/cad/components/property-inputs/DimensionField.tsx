@@ -16,7 +16,7 @@ export interface DimensionFieldProps {
   readonly testId?: string | undefined
 }
 
-const INVALID = "border-red-500 focus:border-red-500"
+const INVALID = "border-[color:var(--ent-bad)] focus:border-[color:var(--ent-bad)]"
 
 /**
  * A dimension of a parametric history. Plain text (never `type=number`), so `12,5`, `12.5`, `40/2+3` and `width / 2` are typed as
@@ -81,8 +81,8 @@ export function DimensionField(props: DimensionFieldProps): JSX.Element {
         onChange={(event) => commit(event.currentTarget.value)}
         onBlur={() => { focused = false }}
       />
-      <Show when={error()}>{(message) => <p class="mt-0.5 text-xs text-red-600 dark:text-red-400" role="alert">{message()}</p>}</Show>
-      <Show when={error() === null ? preview() : null}>{(text) => <span class="text-xs text-gray-500" data-testid={props.testId === undefined ? undefined : `${props.testId}-value`}>{text()}</span>}</Show>
+      <Show when={error()}>{(message) => <p class="mt-1 text-xs text-[color:var(--ent-bad)]" role="alert">{message()}</p>}</Show>
+      <Show when={error() === null ? preview() : null}>{(text) => <span class="mt-1 block text-xs tabular-nums text-[color:var(--ent-text-muted)]" data-testid={props.testId === undefined ? undefined : `${props.testId}-value`}>{text()}</span>}</Show>
     </div>
   )
 }

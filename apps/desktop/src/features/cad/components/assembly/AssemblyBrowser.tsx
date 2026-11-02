@@ -7,7 +7,7 @@ import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
  * a kind) rather than the legacy `prompt`, so the panel never blocks the editor.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-solid"
+import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-solid"
 import { t, type Key } from "../../../../i18n/index.ts"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 import type { AssemblyNode, NodeType } from "../../types/assembly.ts"
@@ -40,17 +40,17 @@ function Row(props: {
   return (
     <div>
       <div
-        class={`py-1 px-2 flex items-center gap-1 text-sm ${store.activeNodeId === props.node.id ? "bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"}`}
+        class={`py-1 px-2 flex items-center gap-1 text-xs ${store.activeNodeId === props.node.id ? "bg-[color:var(--ent-accent-soft)] border-l-2 border-[color:var(--ent-accent)]" : "hover:bg-[color:var(--ent-surface-subtle)]"}`}
         style={{ "padding-left": `${props.depth * 12 + 4}px` }}
       >
         <Show when={children().length > 0} fallback={<span class="h-7 w-7 shrink-0" aria-hidden="true" />}>
           <button type="button" class="panel-icon-btn shrink-0" aria-expanded={open()} aria-label={t("browser.toggleSection", { name: props.node.name })} onClick={() => props.toggle(props.node.id)}>
-            <Show when={open()} fallback={<ChevronRight class="w-3 h-3 text-gray-500" />}><ChevronDown class="w-3 h-3 text-gray-500" /></Show>
+            <Show when={open()} fallback={<ChevronRight class="w-3 h-3 text-[color:var(--ent-text-muted)]" />}><ChevronDown class="w-3 h-3 text-[color:var(--ent-text-muted)]" /></Show>
           </button>
         </Show>
-        <button type="button" class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-pressed={store.activeNodeId === props.node.id} onClick={() => props.onSelect(props.node.id)}>
-          <span class="min-w-0 truncate text-gray-900 dark:text-gray-100">{props.node.name || `${props.node.type} ${props.node.id.slice(0, 4)}`}</span>
-          <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{t(KIND_LABEL[props.node.type])}</span>
+        <button type="button" class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]" aria-pressed={store.activeNodeId === props.node.id} onClick={() => props.onSelect(props.node.id)}>
+          <span class="min-w-0 truncate text-[color:var(--ent-text)]">{props.node.name || `${props.node.type} ${props.node.id.slice(0, 4)}`}</span>
+          <span class="shrink-0 text-xs text-[color:var(--ent-text-muted)]">{t(KIND_LABEL[props.node.type])}</span>
         </button>
       </div>
       <Show when={children().length > 0 && open()}>
@@ -104,9 +104,9 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
 
   return (
     <PanelCard title={t("cad.assembly.structure")} actions={<>
-<div class="flex items-center gap-1">
+<div class="flex items-center gap-2">
           <button type="button" class="panel-btn" aria-expanded={adding()} onClick={() => setAdding(!adding())}>
-            {adding() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.add")}`}
+            <Show when={adding()} fallback={<><Plus size={12} aria-hidden="true" />{t("cad.assembly.add")}</>}>{t("cad.assembly.cancel")}</Show>
           </button>
           <Show when={selected()}>
             <button type="button" class="panel-icon-btn panel-icon-btn--danger" onClick={removeSelected} title={t("cad.assembly.deleteNode")} aria-label={t("cad.assembly.deleteNode")}>
@@ -118,7 +118,7 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
 
 
       <Show when={adding()}>
-        <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+        <div class="p-3 border-b border-[color:var(--ent-line)] space-y-2">
           <input
             type="text"
             aria-label={t("cad.assembly.nodeName")}
@@ -139,7 +139,7 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
 
       <div class="overflow-y-auto max-h-80">
         <Show when={roots().length > 0} fallback={
-          <div class="py-3 px-4 text-sm text-gray-500 dark:text-gray-400 italic">{t("cad.assembly.noNodes")}</div>
+          <div class="py-3 px-3 text-xs text-[color:var(--ent-text-muted)]">{t("cad.assembly.noNodes")}</div>
         }>
           <div class="py-1">
             <For each={roots()}>{(node) => <Row node={node} depth={0} childrenOf={childrenOf} expanded={expanded} toggle={toggle} onSelect={(id) => { store.setActiveNode(id); props.onNodeSelect?.(id) }} />}</For>

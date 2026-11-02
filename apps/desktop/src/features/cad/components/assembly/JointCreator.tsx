@@ -8,6 +8,8 @@ import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { t, type Key } from "../../../../i18n/index.ts"
+import { NumberField as DimensionInput } from "../property-inputs/NumberField.tsx"
+import { Plus } from "lucide-solid"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 import type { AssemblyNode, Joint, JointLimits, JointType } from "../../types/assembly.ts"
 
@@ -41,14 +43,8 @@ const AXIS_PRESETS: ReadonlyArray<{ readonly label: string; readonly value: { x:
 
 const NumberField = (props: { label: string; value: number; step?: number; onChange: (value: number) => void }): JSX.Element => (
   <label class="block">
-    <span class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{props.label}</span>
-    <input
-      type="number"
-      class="panel-input"
-      value={props.value}
-      step={props.step ?? 0.1}
-      onInput={(event) => props.onChange(Number.parseFloat(event.currentTarget.value) || 0)}
-    />
+    <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{props.label}</span>
+    <DimensionInput label={props.label} class="panel-input tabular-nums" value={props.value} step={props.step ?? 0.1} onChange={props.onChange} />
   </label>
 )
 
@@ -95,22 +91,22 @@ export default function JointCreator(props: JointCreatorProps): JSX.Element {
   return (
     <PanelCard title={t("cad.assembly.joints")} actions={<>
 <button type="button" class="panel-btn" onClick={() => setShowForm(!showForm())}>
-          {showForm() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.addJoint")}`}
+          <Show when={showForm()} fallback={<><Plus size={12} aria-hidden="true" />{t("cad.assembly.addJoint")}</>}>{t("cad.assembly.cancel")}</Show>
         </button>
     </>}>
 
 
       <Show when={showForm()}>
-        <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-3">
+        <div class="p-3 border-b border-[color:var(--ent-line)] space-y-3">
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.jointType")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.jointType")}</span>
             <select class="panel-input" value={jointType()} onChange={(event) => setJointType(event.currentTarget.value as JointType)}>
               <For each={JOINT_TYPES}>{(type) => <option value={type}>{t(JOINT_LABEL[type])}</option>}</For>
             </select>
           </label>
 
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.parentNode")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.parentNode")}</span>
             <select class="panel-input" value={parentId()} onChange={(event) => setParentId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectParent")}</option>
               <For each={options()}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
@@ -118,7 +114,7 @@ export default function JointCreator(props: JointCreatorProps): JSX.Element {
           </label>
 
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.childNode")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.childNode")}</span>
             <select class="panel-input" value={childId()} disabled={!parentId()} onChange={(event) => setChildId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectChild")}</option>
               <For each={options().filter((node) => node.id !== parentId())}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
@@ -126,17 +122,17 @@ export default function JointCreator(props: JointCreatorProps): JSX.Element {
           </label>
 
           <div>
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.jointOrigin")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.jointOrigin")}</span>
             <VectorField value={origin()} onChange={setOrigin} />
           </div>
 
           <Show when={NEEDS_AXIS.has(jointType())}>
             <div>
-              <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.primaryAxis")}</span>
+              <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.primaryAxis")}</span>
               <VectorField value={primaryAxis()} onChange={setPrimaryAxis} />
-              <div class="flex gap-1 mt-1">
+              <div class="flex gap-2 mt-2">
                 <For each={AXIS_PRESETS}>{(preset) =>
-                  <button type="button" class={`px-2 py-0.5 text-xs rounded border ${primaryAxis().x === preset.value.x && primaryAxis().y === preset.value.y && primaryAxis().z === preset.value.z ? "border-blue-500 text-blue-600" : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400"}`} onClick={() => setPrimaryAxis({ ...preset.value })}>
+                  <button type="button" class={`px-2 py-0.5 text-xs rounded border ${primaryAxis().x === preset.value.x && primaryAxis().y === preset.value.y && primaryAxis().z === preset.value.z ? "border-[color:var(--ent-accent)] text-[color:var(--ent-accent)]" : "border-[color:var(--ent-line-strong)] text-[color:var(--ent-text-muted)]"}`} onClick={() => setPrimaryAxis({ ...preset.value })}>
                     {preset.label}
                   </button>
                 }</For>
@@ -168,12 +164,12 @@ export default function JointCreator(props: JointCreatorProps): JSX.Element {
 
       <div class="overflow-y-auto max-h-80">
         <Show when={Object.keys(joints()).length === 0} fallback={
-          <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+          <ul class="divide-y divide-[color:var(--ent-line)]">
             <For each={Object.values(joints())}>{(joint) =>
-              <li class="px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 flex justify-between items-center">
+              <li class="gap-3 px-3 py-2 hover:bg-[color:var(--ent-surface-subtle)] flex justify-between items-center">
                 <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-white capitalize">{joint.type}</div>
-                  <div class="text-xs text-gray-600 dark:text-gray-400">
+                  <div class="text-xs font-medium text-[color:var(--ent-text)] capitalize">{joint.type}</div>
+                  <div class="text-xs text-[color:var(--ent-text-muted)]">
                     {nodes()[joint.parent]?.name ?? joint.parent.slice(0, 4)} → {nodes()[joint.child]?.name ?? joint.child.slice(0, 4)}
                   </div>
                 </div>
@@ -184,7 +180,7 @@ export default function JointCreator(props: JointCreatorProps): JSX.Element {
             }</For>
           </ul>
         }>
-          <div class="py-3 px-4 text-sm text-gray-500 dark:text-gray-400 italic">{t("cad.assembly.noJoints")}</div>
+          <div class="py-3 px-3 text-xs text-[color:var(--ent-text-muted)]">{t("cad.assembly.noJoints")}</div>
         </Show>
       </div>
     </PanelCard>

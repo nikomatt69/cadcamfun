@@ -16,7 +16,7 @@ import { useAssemblyStore } from "../../store/assemblyStore.ts"
 type Skipped = ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
 
 const fmt = (x: number, d = 2) => x.toLocaleString(undefined, { maximumFractionDigits: d })
-const grid = "grid grid-cols-[1.5rem_1fr_2.5rem_4.5rem] gap-x-2"
+const grid = "grid grid-cols-[1.5rem_1fr_2.5rem_4.5rem] gap-x-2 gap-y-1 tabular-nums"
 const button = "panel-btn"
 
 export default function AssemblyAutomation(): JSX.Element {
@@ -62,7 +62,7 @@ export default function AssemblyAutomation(): JSX.Element {
 
   const SkippedList = (props: { readonly items: Skipped }) => (
     <Show when={props.items.length > 0}>
-      <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="automation-skipped">
+      <p class="text-xs text-[color:var(--ent-warn)]" data-testid="automation-skipped">
         {t("cad.automation.skipped")}: <For each={props.items}>{(s) => <span class="mr-2">{s.name} ({s.reason})</span>}</For>
       </p>
     </Show>
@@ -74,14 +74,14 @@ export default function AssemblyAutomation(): JSX.Element {
       <div class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <button type="button" class={button} disabled={busy() !== undefined} onClick={fasten}>{busy() === "fasten" ? t("cad.automation.working") : t("cad.automation.fasten")}</button>
-          <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
+          <label class="flex items-center gap-1 text-xs text-[color:var(--ent-text-muted)]">
             <input type="checkbox" checked={washers()} onChange={(e) => setWashers(e.currentTarget.checked)} />
             {t("cad.automation.washers")}
           </label>
         </div>
         <Show when={fastened()}>
           {(r) => (
-            <div class="space-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="fasten-result">
+            <div class="space-y-1 text-xs text-[color:var(--ent-text)]" data-testid="fasten-result">
               <p>{t("cad.automation.inserted")}: {r().plans.length} · {t("cad.automation.alreadyFastened")}: {r().existing}</p>
               <ul class="space-y-0.5">
                 <For each={r().plans}>{(p) => (
@@ -90,12 +90,12 @@ export default function AssemblyAutomation(): JSX.Element {
                     {p.nut !== undefined ? ` + ${p.nut.designation}` : ""}
                     {` · ${t("cad.automation.grip")} ${fmt(p.grip)} mm`}
                     {p.engagement !== undefined ? ` · ${t("cad.automation.engagement")} ${fmt(p.engagement)} mm` : ""}
-                    <For each={p.warnings}>{(w) => <span class="block text-amber-700 dark:text-amber-300">{w}</span>}</For>
+                    <For each={p.warnings}>{(w) => <span class="block text-[color:var(--ent-warn)]">{w}</span>}</For>
                   </li>
                 )}</For>
               </ul>
               <Show when={r().unfastened.length > 0}>
-                <ul class="text-amber-700 dark:text-amber-300">
+                <ul class="text-[color:var(--ent-warn)]">
                   <For each={r().unfastened}>{(u) => <li>{u.bodies.join(" / ")}: {u.reason}</li>}</For>
                 </ul>
               </Show>
@@ -109,7 +109,7 @@ export default function AssemblyAutomation(): JSX.Element {
         <button type="button" class={button} disabled={busy() !== undefined} onClick={joints}>{busy() === "joints" ? t("cad.automation.working") : t("cad.automation.joints")}</button>
         <Show when={jointed()}>
           {(r) => (
-            <div class="space-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="joints-result">
+            <div class="space-y-1 text-xs text-[color:var(--ent-text)]" data-testid="joints-result">
               <p>{t("cad.automation.jointsAdded")}: {r().added} · {t("cad.automation.alreadyJoined")}: {r().existing}</p>
               <ul><For each={r().joints}>{(j) => <li>{j}</li>}</For></ul>
               <SkippedList items={r().skipped} />
@@ -126,14 +126,14 @@ export default function AssemblyAutomation(): JSX.Element {
             const expected = () => r().interferences.filter((i) => i.kind === "expected")
             return (
               <div class="space-y-1 text-xs" data-testid="interference-result">
-                <p class={hard().length === 0 && r().undetermined.length === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>
+                <p class={hard().length === 0 && r().undetermined.length === 0 ? "text-[color:var(--ent-ok)]" : "text-[color:var(--ent-bad)]"}>
                   {hard().length === 0 && r().undetermined.length === 0 ? t("cad.automation.noClash") : `${t("cad.automation.clashes")}: ${hard().length}`}
                   {` · ${t("cad.automation.pairsChecked")}: ${r().checked}`}
                 </p>
-                <ul class="text-gray-700 dark:text-gray-300">
-                  <For each={hard()}>{(i) => <li class="text-red-700 dark:text-red-300">{name(i.a)} × {name(i.b)}: {fmt(i.volume, 3)} mm³</li>}</For>
+                <ul class="text-[color:var(--ent-text)]">
+                  <For each={hard()}>{(i) => <li class="text-[color:var(--ent-bad)]">{name(i.a)} × {name(i.b)}: {fmt(i.volume, 3)} mm³</li>}</For>
                   <For each={expected()}>{(i) => <li>{name(i.a)} × {name(i.b)}: {fmt(i.volume, 3)} mm³ ({i.note})</li>}</For>
-                  <For each={r().undetermined}>{(u) => <li class="text-amber-700 dark:text-amber-300">{name(u.a)} × {name(u.b)}: {u.reason}</li>}</For>
+                  <For each={r().undetermined}>{(u) => <li class="text-[color:var(--ent-warn)]">{name(u.a)} × {name(u.b)}: {u.reason}</li>}</For>
                 </ul>
                 <SkippedList items={r().skipped} />
               </div>
@@ -146,7 +146,7 @@ export default function AssemblyAutomation(): JSX.Element {
         <button type="button" class={button} disabled={busy() !== undefined} onClick={clearance}>{busy() === "clearance" ? t("cad.automation.working") : t("cad.automation.clearance")}</button>
         <Show when={gaps()}>
           {(g) => (
-            <div class="space-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="clearance-result">
+            <div class="space-y-1 text-xs text-[color:var(--ent-text)]" data-testid="clearance-result">
               <Show when={g().length > 0} fallback={<p>{t("cad.automation.noNeighbours")}</p>}>
                 <ul>
                   <For each={g()}>{(c) => <li data-testid="clearance-row">{c.aName} × {c.bName}: {c.overlap ? t("cad.automation.overlap") : `${fmt(c.distance, 3)} mm`}</li>}</For>
@@ -165,17 +165,17 @@ export default function AssemblyAutomation(): JSX.Element {
         <Show when={bom()}>
           {(b) => (
             <div data-testid="bom-result">
-              <div role="table" class="text-xs text-gray-700 dark:text-gray-300">
+              <div role="table" class="text-xs text-[color:var(--ent-text)]">
                 <div role="row" class={`${grid} font-semibold`}>
                   <span role="columnheader">#</span><span role="columnheader">{t("cad.automation.part")}</span>
-                  <span role="columnheader">{t("cad.automation.qty")}</span><span role="columnheader">{t("cad.automation.mass")}</span>
+                  <span role="columnheader" class="text-right">{t("cad.automation.qty")}</span><span role="columnheader" class="text-right">{t("cad.automation.mass")}</span>
                 </div>
                 <For each={b().rows}>{(row) => (
                   <div role="row" class={grid} data-testid="bom-row">
                     <span role="cell">{row.item}</span>
                     <span role="cell">{row.designation ?? row.name}{row.material !== undefined ? ` (${row.material})` : ""}</span>
-                    <span role="cell">{row.quantity}</span>
-                    <span role="cell">{row.mass === undefined ? "–" : `${fmt(row.mass * row.quantity)} g`}</span>
+                    <span role="cell" class="text-right">{row.quantity}</span>
+                    <span role="cell" class="text-right">{row.mass === undefined ? "–" : `${fmt(row.mass * row.quantity)} g`}</span>
                   </div>
                 )}</For>
               </div>
@@ -185,7 +185,7 @@ export default function AssemblyAutomation(): JSX.Element {
         </Show>
       </div>
 
-      <Show when={error()}><p class="text-xs text-red-700 dark:text-red-300">{error()}</p></Show>
+      <Show when={error()}><p class="text-xs text-[color:var(--ent-bad)]">{error()}</p></Show>
     </PanelCard>
   )
 }

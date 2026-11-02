@@ -5,7 +5,8 @@
  * definition itself (type, default, range, options) behind a disclosure.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-solid"
+import { ChevronDown, ChevronRight, Plus, SlidersHorizontal, Trash2 } from "lucide-solid"
+import { NumberField } from "../property-inputs/NumberField.tsx"
 import { t } from "../../../../i18n/index.ts"
 import type { CustomElementDefinition, CustomElementParameter } from "../../types/customElements.ts"
 
@@ -31,14 +32,14 @@ function ValueControl(props: {
   switch (parameter().type) {
     case "number":
       return (
-        <input
-          type="number"
-          class={FIELD}
+        <NumberField
+          label={parameter().label ?? props.name}
+          class={FIELD + " tabular-nums"}
           value={typeof value() === "number" ? value() as number : 0}
           min={parameter().min}
           max={parameter().max}
           step={parameter().step ?? 0.1}
-          onInput={(event) => props.onChange(Number.parseFloat(event.currentTarget.value) || 0)}
+          onChange={props.onChange}
         />
       )
     case "boolean":
@@ -113,8 +114,8 @@ export default function ParameterControls(props: ParameterControlsProps): JSX.El
 
   return (
     <div class="p-4 h-full overflow-y-auto bg-white dark:bg-gray-800">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">{t("cad.customElements.parameters")}</h3>
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h3 class="text-base font-medium text-gray-900 dark:text-white">{t("cad.customElements.parameters")}</h3>
         <button type="button" onClick={() => setAdding(!adding())} class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center gap-1">
           <Plus class="w-4 h-4" />
           <span>{t("cad.customElements.add")}</span>
@@ -237,7 +238,7 @@ export default function ParameterControls(props: ParameterControlsProps): JSX.El
 
       <Show when={entries().length === 0}>
         <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-          <div class="text-2xl mb-2">⚙️</div>
+          <SlidersHorizontal size={24} class="mx-auto mb-2" aria-hidden="true" />
           <div>{t("cad.customElements.noParameters")}</div>
           <div class="text-sm">{t("cad.customElements.noParametersHint")}</div>
         </div>

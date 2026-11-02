@@ -18,6 +18,7 @@ import { TOLERANCE_PRESETS, isTolerance } from "@cadcamfun/core"
 import { setDisplayUnits, setDocumentTolerance } from "../../../../shared/state/document-settings.ts"
 import { useApp } from "../../../../shared/state/context.ts"
 import { DISPLAY_UNITS, UNIT_TABLE, formatLength, fromDisplay, isDisplayUnits, toDisplay } from "../../../../viewport/units.ts"
+import { NumberField } from "../property-inputs/NumberField.tsx"
 import { ExplorerScene } from "../../../../shared/ui/stageshow/scenes-cad.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
 import type { Browser } from "./browserState.ts"
@@ -41,10 +42,10 @@ export function BrowserToolbar(props: { readonly browser: Browser }): JSX.Elemen
   const count = (): number => selection.selectedElementIds.length
   const selected = () => elements.elements.filter((element) => selection.selectedElementIds.includes(element.id))
   return (
-    <div class="workstation-browser-toolbar border-b border-gray-200 dark:border-gray-700 space-y-2" data-testid="browser-toolbar">
+    <div class="workstation-browser-toolbar border-b border-[color:var(--ent-line)] space-y-2" data-testid="browser-toolbar">
       <div class="flex items-center justify-between gap-2">
         <select
-          class="text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 flex-1"
+          class="text-xs px-2 py-1 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)] flex-1 min-w-0"
           aria-label={t("browser.groupElements")}
           value={b.mode()}
           onChange={(event) => b.setMode(event.currentTarget.value as GroupMode)}
@@ -63,7 +64,7 @@ export function BrowserToolbar(props: { readonly browser: Browser }): JSX.Elemen
         <button class={ICON} title={t("browser.askAiTitle")} aria-label={t("browser.askAi")} disabled={count() === 0} onClick={() => ask(selectionPrompt(selected()))}><MessageSquare size={14} /></button>
         <button class={ICON} title={t("browser.ungroup")} aria-label={t("browser.ungroup")} disabled={b.selectedGroups().length === 0} onClick={b.ungroupSelection}><Ungroup size={14} /></button>
         <select
-          class="text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-40"
+          class="text-xs px-2 py-1 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)] disabled:opacity-40"
           aria-label={t("browser.moveToLayerLabel")}
           disabled={count() === 0}
           value=""
@@ -84,13 +85,13 @@ export function RenameName(props: { readonly id: string; readonly name: string; 
     <Show
       when={b.renaming() === props.id}
       fallback={
-        <span class="flex-1 min-w-0 truncate font-medium text-gray-900 dark:text-gray-100" onDblClick={(event) => { event.stopPropagation(); b.startRename(props.id) }} title={t("browser.renameHint")}>
+        <span class="flex-1 min-w-0 truncate font-medium text-[color:var(--ent-text)]" onDblClick={(event) => { event.stopPropagation(); b.startRename(props.id) }} title={t("browser.renameHint")}>
           {props.name}
         </span>
       }
     >
       <input
-        class="flex-1 min-w-0 text-sm px-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+        class="flex-1 min-w-0 text-sm px-2 py-0.5 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)]"
         value={props.name}
         aria-label={t("browser.elementName")}
         ref={(input) => queueMicrotask(() => { input.focus(); input.select() })}
@@ -113,13 +114,13 @@ export function RowActions(props: { readonly id: string; readonly visible: boole
   return (
     <div class="workstation-row-actions flex items-center space-x-0.5 ml-1" data-testid={`row-actions-${props.id}`}>
       <button class={`${MINI} ${props.locked ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`} title={props.locked ? t("browser.unlock") : t("browser.lock")} aria-label={props.locked ? t("browser.unlock") : t("browser.lock")} onClick={stop(() => b.toggleLocked(props.id))}>
-        <Show when={props.locked} fallback={<Unlock size={12} />}><Lock size={12} class="text-orange-500" /></Show>
+        <Show when={props.locked} fallback={<Unlock size={12} />}><Lock size={12} class="text-[color:var(--ent-warn)]" /></Show>
       </button>
       <button class={`${MINI} ${props.visible ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : ""}`} title={props.visible ? t("browser.hide") : t("browser.show")} aria-label={props.visible ? t("browser.hide") : t("browser.show")} onClick={stop(() => b.toggleVisible(props.id))}>
-        <Show when={props.visible} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} /></Show>
+        <Show when={props.visible} fallback={<EyeOff size={12} class="text-[color:var(--ent-text-faint)]" />}><Eye size={12} /></Show>
       </button>
       <button class={`${MINI} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`} title={t("browser.duplicate")} aria-label={t("browser.duplicate")} onClick={stop(() => b.duplicate(props.id))}><Copy size={12} /></button>
-      <button class={`${MINI} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-red-500`} title={t("browser.delete")} aria-label={t("browser.delete")} onClick={stop(() => b.remove(props.id))}><Trash2 size={12} /></button>
+      <button class={`${MINI} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[color:var(--ent-bad)]`} title={t("browser.delete")} aria-label={t("browser.delete")} onClick={stop(() => b.remove(props.id))}><Trash2 size={12} /></button>
     </div>
   )
 }
@@ -145,35 +146,35 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
     return items.length > 0 && items.every((element) => flag === "visible" ? element?.visible !== false : element?.locked === true)
   }
   return (
-    <Show when={props.roots.length > 0 || b.mode() === "layer"} fallback={<div class="p-3"><ExplorerScene /><p class="px-1 pb-1 text-xs text-center text-gray-500 dark:text-gray-400">{props.emptyText ?? t("browser.empty")}</p></div>}>
+    <Show when={props.roots.length > 0 || b.mode() === "layer"} fallback={<div class="p-3"><ExplorerScene /><p class="px-1 pb-1 text-xs text-center text-[color:var(--ent-text-muted)]">{props.emptyText ?? t("browser.empty")}</p></div>}>
       <For each={sections()}>
         {(section) => {
           const layer = () => layerOf(section.id)
           return (
             <div data-testid={`browser-section-${section.id}`}>
               <Show when={b.mode() !== "flat"}>
-                <div class="group flex items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border-y border-gray-200 dark:border-gray-700 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                <div class="group flex items-center px-3 py-1.5 bg-[color:var(--ent-surface-subtle)] border-y border-[color:var(--ent-line)] text-xs font-semibold text-[color:var(--ent-text-muted)]">
                   <button class={MINI} aria-label={t("browser.toggleSection", { name: section.label })} aria-expanded={b.isSectionOpen(section.id)} onClick={() => b.toggleSection(section.id)}>
                     <Show when={b.isSectionOpen(section.id)} fallback={<ChevronRight size={14} />}><ChevronDown size={14} /></Show>
                   </button>
                   <Show when={layer()}>{(l) => <span class="w-2.5 h-2.5 rounded-full mr-2" style={{ "background-color": l().color }} />}</Show>
                   <span class="flex-1 truncate">{section.label}</span>
-                  <span class="mr-2 px-1.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px]">{section.items.length}</span>
+                  <span class="mr-2 px-1.5 rounded-full bg-[color:var(--ent-surface-inset)] text-[11px] tabular-nums">{section.items.length}</span>
                   <Show when={layer()}>
                     {(l) => (
                       <>
                         <button class={`${MINI} normal-case`} title={t("browser.makeActive")} aria-label={t("browser.activate", { name: section.label })} onClick={() => layers.setActiveLayer(l().id)}>
-                          <Crosshair size={12} class={layers.activeLayer === l().id ? "text-blue-500" : "text-gray-400"} />
+                          <Crosshair size={12} class={layers.activeLayer === l().id ? "text-[color:var(--ent-accent)]" : "text-[color:var(--ent-text-faint)]"} />
                         </button>
-                        <button class={`${MINI} text-red-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`} title={t("browser.deleteLayerTitle")} aria-label={t("browser.deleteLayer", { name: section.label })} onClick={() => b.deleteLayer(l().id)}><Trash2 size={12} /></button>
+                        <button class={`${MINI} text-[color:var(--ent-bad)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`} title={t("browser.deleteLayerTitle")} aria-label={t("browser.deleteLayer", { name: section.label })} onClick={() => b.deleteLayer(l().id)}><Trash2 size={12} /></button>
                       </>
                     )}
                   </Show>
                   <button class={MINI} title={t("browser.showHideAll")} aria-label={t("browser.toggleVisibility", { name: section.label })} onClick={() => b.setSectionFlag("visible", section)}>
-                    <Show when={flagOf(section, "visible")} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} /></Show>
+                    <Show when={flagOf(section, "visible")} fallback={<EyeOff size={12} class="text-[color:var(--ent-text-faint)]" />}><Eye size={12} /></Show>
                   </button>
                   <button class={MINI} title={t("browser.lockUnlockAll")} aria-label={t("browser.toggleLock", { name: section.label })} onClick={() => b.setSectionFlag("locked", section)}>
-                    <Show when={flagOf(section, "locked")} fallback={<Unlock size={12} class="text-gray-400" />}><Lock size={12} class="text-orange-500" /></Show>
+                    <Show when={flagOf(section, "locked")} fallback={<Unlock size={12} class="text-[color:var(--ent-text-faint)]" />}><Lock size={12} class="text-[color:var(--ent-warn)]" /></Show>
                   </button>
                 </div>
               </Show>
@@ -188,9 +189,9 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
   )
 }
 
-const TOGGLE_ROW = "flex items-center w-full px-2 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 text-gray-700 dark:text-gray-300"
+const TOGGLE_ROW = "flex items-center w-full px-3 py-1.5 text-xs text-left hover:bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)]"
 
-const SELECT = "text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 max-w-[9rem]"
+const SELECT = "text-xs px-2 py-1 border border-[color:var(--ent-line-strong)] rounded bg-[color:var(--ent-surface)] max-w-[9rem]"
 
 /**
  * Fusion's "Document Settings" and "Origin" folders: the unit the drawing is shown in, the drawing tolerance, the workpiece, and
@@ -202,58 +203,57 @@ export function OriginBlock(): JSX.Element {
   const cad = useCADStore()
   const settings = () => app.settings.settings()
   const [custom, setCustom] = createSignal(false)
-  const [problem, setProblem] = createSignal<string | undefined>()
   const presets = createMemo(() => (TOLERANCE_PRESETS.includes(settings().tolerance) ? TOLERANCE_PRESETS : [...TOLERANCE_PRESETS, settings().tolerance].sort((a, b) => b - a)))
   const decimals = () => settings().decimals
   const length = (mm: number): string => formatLength(mm, settings().units, decimals())
   const row = (label: string, on: boolean, toggle: () => void, icon: JSX.Element, testId: string): JSX.Element => (
     <button type="button" class={TOGGLE_ROW} onClick={toggle} aria-pressed={on} data-testid={testId}>
-      <span class="mr-2 text-gray-500">{icon}</span>
+      <span class="mr-2 text-[color:var(--ent-text-muted)]">{icon}</span>
       <span class="flex-1">{label}</span>
-      <Show when={on} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} /></Show>
+      <Show when={on} fallback={<EyeOff size={12} class="text-[color:var(--ent-text-faint)]" />}><Eye size={12} /></Show>
     </button>
   )
   const onTolerance = (value: string): void => {
     if (value === "custom") { setCustom(true); return }
     setCustom(false)
-    setProblem(undefined)
     setDocumentTolerance(app, Number(value))
   }
   const onCustom = (typed: number): void => {
     const mm = fromDisplay(typed, settings().units)
-    if (!isTolerance(mm)) { setProblem(`${length(0.0001)} to ${length(10)}`); return }
-    setProblem(undefined)
-    setDocumentTolerance(app, mm)
+    if (isTolerance(mm)) setDocumentTolerance(app, mm)
   }
   return (
-    <details class="sidebar-browser-origin border-b border-gray-200 dark:border-gray-700" data-testid="browser-origin" open>
-      <summary class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 cursor-pointer select-none">{t("browser.documentOrigin")}</summary>
+    <details class="sidebar-browser-origin border-b border-[color:var(--ent-line)]" data-testid="browser-origin" open>
+      <summary class="px-3 py-2 text-xs font-semibold text-[color:var(--ent-text-muted)] cursor-pointer select-none">{t("browser.documentOrigin")}</summary>
       <div class="pb-1">
         <label class={TOGGLE_ROW}>
-          <span class="mr-2 text-gray-500"><Ruler size={14} /></span><span class="flex-1">{t("browser.units")}</span>
+          <span class="mr-2 text-[color:var(--ent-text-muted)]"><Ruler size={14} /></span><span class="flex-1">{t("browser.units")}</span>
           <select class={SELECT} aria-label={t("browser.units")} value={settings().units} onChange={(event) => { const units = event.currentTarget.value; if (isDisplayUnits(units)) setDisplayUnits(app, units) }}>
             <For each={DISPLAY_UNITS}>{(unit) => <option value={unit}>{UNIT_TABLE[unit].label}</option>}</For>
           </select>
         </label>
         <label class={TOGGLE_ROW}>
-          <span class="mr-2 text-gray-500"><Crosshair size={14} /></span><span class="flex-1">{t("browser.tolerance")}</span>
+          <span class="mr-2 text-[color:var(--ent-text-muted)]"><Crosshair size={14} /></span><span class="flex-1">{t("browser.tolerance")}</span>
           <select class={SELECT} aria-label={t("browser.tolerance")} value={custom() ? "custom" : String(settings().tolerance)} onChange={(event) => onTolerance(event.currentTarget.value)}>
             <For each={presets()}>{(preset) => <option value={String(preset)}>{length(preset)}</option>}</For>
             <option value="custom">{t("browser.custom")}</option>
           </select>
         </label>
         <Show when={custom()}>
-          <div class="px-2 pb-1">
-            <input
-              type="number" step="any" aria-label={t("browser.customTolerance")} data-testid="browser-custom-tolerance"
-              class={`${SELECT} w-full`} placeholder={t("browser.toleranceIn", { unit: UNIT_TABLE[settings().units].label })}
+          <div class="px-3 pb-2">
+            <NumberField
+              label={t("browser.customTolerance")}
+              class={`${SELECT} w-full`}
               value={toDisplay(settings().tolerance, settings().units)}
-              onChange={(event) => onCustom(event.currentTarget.valueAsNumber)}
+              min={toDisplay(0.0001, settings().units)}
+              max={toDisplay(10, settings().units)}
+              step={toDisplay(0.001, settings().units)}
+              onChange={onCustom}
             />
-            <Show when={problem()}><p class="text-[11px] text-red-600" role="alert">{t("browser.allowed", { range: problem() ?? "" })}</p></Show>
+            <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{t("browser.toleranceIn", { unit: UNIT_TABLE[settings().units].label })}</p>
           </div>
         </Show>
-        <div class={TOGGLE_ROW}><span class="mr-2 text-gray-500"><Maximize size={14} /></span><span class="flex-1">{t("browser.workpiece")}</span><span class="font-mono">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
+        <div class={TOGGLE_ROW}><span class="mr-2 text-[color:var(--ent-text-muted)]"><Maximize size={14} /></span><span class="flex-1">{t("browser.workpiece")}</span><span class="font-mono tabular-nums">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
         {row(t("browser.axes"), cad.axisVisible, () => cad.toggleAxis(), <Layers size={14} />, "browser-toggle-axes")}
         {row(t("browser.grid"), cad.gridVisible, () => cad.toggleGrid(), <Grid3x3 size={14} />, "browser-toggle-grid")}
         {row(t("browser.dimensions"), cad.showDimensions, () => cad.toggleDimensions(), <Ruler size={14} />, "browser-toggle-dimensions")}

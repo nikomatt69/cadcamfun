@@ -29,8 +29,8 @@ export default function AssemblyPanel(): JSX.Element {
           <button type="button" class="panel-btn" onClick={() => store.redo()}>
             {t("cad.assembly.redo")}
           </button>
-          <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 sm:ml-2">
-            <input type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-blue-600" checked={store.showJoints} onChange={(event) => store.setJointsVisibility(event.currentTarget.checked)} />
+          <label class="flex items-center gap-1 text-xs text-[color:var(--ent-text-muted)] sm:ml-2">
+            <input type="checkbox" class="rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)]" checked={store.showJoints} onChange={(event) => store.setJointsVisibility(event.currentTarget.checked)} />
             {t("cad.assembly.showJoints")}
           </label>
         </div>

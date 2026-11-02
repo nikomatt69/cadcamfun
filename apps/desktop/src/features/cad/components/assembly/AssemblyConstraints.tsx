@@ -6,6 +6,7 @@ import { NumberField, PanelCard } from "../../../../shared/components/panel/ui.t
  * orientation. `distance` and `angle` carry a value; the rest carry none.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
+import { Plus } from "lucide-solid"
 import { t, type Key } from "../../../../i18n/index.ts"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 import type { AssemblyNode, Constraint, ConstraintType } from "../../types/assembly.ts"
@@ -62,22 +63,22 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
   return (
     <PanelCard title={t("cad.assembly.constraints")} actions={<>
 <button type="button" class="panel-btn" onClick={() => setShowForm(!showForm())}>
-          {showForm() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.addConstraint")}`}
+          <Show when={showForm()} fallback={<><Plus size={12} aria-hidden="true" />{t("cad.assembly.addConstraint")}</>}>{t("cad.assembly.cancel")}</Show>
         </button>
     </>}>
 
 
       <Show when={showForm()}>
-        <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-3">
+        <div class="p-3 border-b border-[color:var(--ent-line)] space-y-3">
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.constraintType")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.constraintType")}</span>
             <select class="panel-input" value={constraintType()} onChange={(event) => setConstraintType(event.currentTarget.value as ConstraintType)}>
               <For each={CONSTRAINT_TYPES}>{(type) => <option value={type}>{t(CONSTRAINT_LABEL[type])}</option>}</For>
             </select>
           </label>
 
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.firstEntity")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.firstEntity")}</span>
             <select class="panel-input" value={firstEntityId()} onChange={(event) => setFirstEntityId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectEntity")}</option>
               <For each={entities()}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
@@ -85,7 +86,7 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
           </label>
 
           <label class="block">
-            <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.secondEntity")}</span>
+            <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.secondEntity")}</span>
             <select class="panel-input" value={secondEntityId()} onChange={(event) => setSecondEntityId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectEntity")}</option>
               <For each={entities()}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
@@ -94,14 +95,14 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
 
           <Show when={constraintType() === "distance"}>
             <label class="block">
-              <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.distance")}</span>
+              <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.distance")}</span>
               <NumberField class="panel-input" value={distance()} step="0.1" accept={(value) => value >= 0} onValue={setDistance} />
             </label>
           </Show>
 
           <Show when={constraintType() === "angle"}>
             <label class="block">
-              <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.angleDegrees")}</span>
+              <span class="block text-xs text-[color:var(--ent-text-muted)] mb-1">{t("cad.assembly.angleDegrees")}</span>
               <NumberField class="panel-input" value={angle()} step="1" accept={(value) => value >= 0 && value <= 360} onValue={setAngle} />
             </label>
           </Show>
@@ -116,12 +117,12 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
 
       <div class="overflow-y-auto max-h-80">
         <Show when={Object.keys(constraints()).length === 0} fallback={
-          <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+          <ul class="divide-y divide-[color:var(--ent-line)]">
             <For each={Object.values(constraints())}>{(constraint) =>
-              <li class="px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 flex justify-between items-center">
+              <li class="gap-3 px-3 py-2 hover:bg-[color:var(--ent-surface-subtle)] flex justify-between items-center">
                 <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-white capitalize">{t(CONSTRAINT_LABEL[constraint.type])}</div>
-                  <div class="text-xs text-gray-600 dark:text-gray-400">
+                  <div class="text-xs font-medium text-[color:var(--ent-text)] capitalize">{t(CONSTRAINT_LABEL[constraint.type])}</div>
+                  <div class="text-xs text-[color:var(--ent-text-muted)]">
                     {nodes()[constraint.entityA]?.name ?? constraint.entityA.slice(0, 4)} ↔ {nodes()[constraint.entityB]?.name ?? constraint.entityB.slice(0, 4)}
                     <Show when={constraint.parameters["distance"] !== undefined}>{` (${constraint.parameters["distance"]})`}</Show>
                     <Show when={constraint.parameters["angle"] !== undefined}>{` (${constraint.parameters["angle"]}°)`}</Show>
@@ -134,7 +135,7 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
             }</For>
           </ul>
         }>
-          <div class="py-3 px-4 text-sm text-gray-500 dark:text-gray-400 italic">{t("cad.assembly.noConstraints")}</div>
+          <div class="py-3 px-3 text-xs text-[color:var(--ent-text-muted)]">{t("cad.assembly.noConstraints")}</div>
         </Show>
       </div>
     </PanelCard>

@@ -219,7 +219,7 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
 
             <Show when={store.editorMode === "create"}>
               <div class="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-slate-200 py-2 dark:border-slate-700">
-                <span class="sticky left-0 shrink-0 bg-white pr-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:bg-slate-800">{t("cad.customElements.templates")}</span>
+                <span class="sticky left-0 shrink-0 bg-white pr-1 text-[11px] font-semibold text-slate-500 dark:bg-slate-800">{t("cad.customElements.templates")}</span>
                 <For each={Object.keys(customElementTemplates)}>
                   {(key) => <button type="button" class="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-blue-950/40 dark:hover:text-blue-300" onClick={() => handleApplyTemplate(key)}>{customElementTemplates[key]?.name ?? key}</button>}
                 </For>

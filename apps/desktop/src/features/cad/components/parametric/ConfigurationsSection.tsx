@@ -3,6 +3,7 @@ import {
   activateConfiguration, addConfiguration, compareConfigurations, designTable, removeConfiguration, renameConfiguration, resolveParameters, setConfigurationSuppressed, setConfigurationValue,
   type ConfigurationMeasure, type History
 } from "@cadcamfun/core"
+import { ChevronDown, ChevronRight, Pencil, X } from "lucide-solid"
 import { t } from "../../../../i18n/index.ts"
 import { DimensionField } from "../property-inputs/DimensionField.tsx"
 import { formatNumber } from "../../lib/numberText.ts"
@@ -39,25 +40,25 @@ export function ConfigurationsSection(props: SectionProps & { fail(message: stri
 
   return (
     <div data-testid="configurations-section">
-      <button type="button" class="mb-1 flex w-full items-center gap-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500" aria-expanded={open()} onClick={() => setOpen(!open())}>
-        <span>{open() ? "▾" : "▸"}</span>{t("cad.parametric.configs")} ({table().configurations.length})
+      <button type="button" class="mb-2 flex w-full items-center gap-2 text-left text-xs font-semibold text-[color:var(--ent-text-muted)]" aria-expanded={open()} onClick={() => setOpen(!open())}>
+        <Show when={open()} fallback={<ChevronRight size={12} aria-hidden="true" />}><ChevronDown size={12} aria-hidden="true" /></Show>{t("cad.parametric.configs")} ({table().configurations.length})
       </button>
       <Show when={open()}>
-        <p class="mb-1 text-xs text-gray-500">{t("cad.parametric.configs.hint")}</p>
+        <p class="mb-1 text-xs text-[color:var(--ent-text-muted)]">{t("cad.parametric.configs.hint")}</p>
         <ul class="space-y-1">
           <For each={table().configurations}>{(config) =>
-            <li class="flex items-center justify-between gap-1 rounded-md border border-gray-200 p-1 text-sm dark:border-gray-600" data-testid={`configuration-${config.id}`}>
-              <span class={config.active ? "font-semibold" : ""}>{config.name}<Show when={config.active}><span class="ml-1 text-xs text-green-700">{t("cad.parametric.configs.shown")}</span></Show></span>
+            <li class="flex items-center justify-between gap-2 rounded-md border border-[color:var(--ent-line)] p-2 text-xs" data-testid={`configuration-${config.id}`}>
+              <span class={config.active ? "font-semibold" : ""}>{config.name}<Show when={config.active}><span class="ml-1 text-xs text-[color:var(--ent-ok)]">{t("cad.parametric.configs.shown")}</span></Show></span>
               <span class="flex gap-1">
                 <button type="button" class={SMALL} disabled={props.locked || config.active} aria-label={`${t("cad.parametric.configs.show")} ${config.name}`} onClick={() => run((h) => activateConfiguration(h, config.id))}>{t("cad.parametric.configs.show")}</button>
                 <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("projects.rename")} ${config.name}`}
-                  onClick={() => { const next = window.prompt(t("cad.parametric.renamePrompt", { name: config.name }), config.name); if (next && next !== config.name) run((h) => renameConfiguration(h, config.id, next)) }}>✎</button>
-                <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("cad.customElements.delete")} ${config.name}`} onClick={() => run((h) => removeConfiguration(h, config.id))}>✕</button>
+                  onClick={() => { const next = window.prompt(t("cad.parametric.renamePrompt", { name: config.name }), config.name); if (next && next !== config.name) run((h) => renameConfiguration(h, config.id, next)) }}><Pencil size={12} aria-hidden="true" /></button>
+                <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("cad.customElements.delete")} ${config.name}`} onClick={() => run((h) => removeConfiguration(h, config.id))}><X size={12} aria-hidden="true" /></button>
               </span>
             </li>}
           </For>
         </ul>
-        <div class="mt-1 flex gap-1">
+        <div class="mt-2 flex gap-2">
           <input class="panel-input" placeholder={t("cad.parametric.configs.name")} aria-label={t("cad.parametric.configs.name")} value={name()} disabled={props.locked}
             onInput={(event) => setName(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === "Enter") add() }} />
           <button type="button" class={SMALL} disabled={props.locked} onClick={add}>{t("cad.parametric.configs.add")}</button>
@@ -69,27 +70,27 @@ export function ConfigurationsSection(props: SectionProps & { fail(message: stri
               <span class="font-medium" role="columnheader">{t("cad.customElements.parameters")}</span>
               <For each={table().configurations}>{(c) => <span class="font-medium" role="columnheader">{c.name}</span>}</For>
               <For each={table().parameters}>{(p) => <>
-                <span class={`font-mono ${p.varies ? "" : "text-gray-500"}`} role="rowheader">{p.name}</span>
+                <span class={`font-mono ${p.varies ? "" : "text-[color:var(--ent-text-muted)]"}`} role="rowheader">{p.name}</span>
                 <For each={table().configurations}>{(c) =>
                   <DimensionField value={p.values[c.id]} context={context()} disabled={props.locked} label={`${c.name} ${p.name}`}
                     onCommit={(stored) => { if (stored !== undefined) run((h) => setConfigurationValue(h, c.id, p.name, stored)) }} />}
                 </For>
               </>}</For>
               <For each={suppressing()}>{(f) => <>
-                <span role="rowheader">{f.id} <span class="text-gray-500">{t("cad.parametric.configs.suppressed")}</span></span>
+                <span role="rowheader">{f.id} <span class="text-[color:var(--ent-text-muted)]">{t("cad.parametric.configs.suppressed")}</span></span>
                 <For each={table().configurations}>{(c) =>
                   <input type="checkbox" checked={f.suppressed[c.id] === true} disabled={props.locked} aria-label={`${c.name} ${f.id} ${t("cad.parametric.configs.suppressed")}`}
                     onChange={(event) => run((h) => setConfigurationSuppressed(h, c.id, [f.id], event.currentTarget.checked))} />}
                 </For>
               </>}</For>
             </div>
-            <p class="mt-1 text-xs text-gray-500">{t("cad.parametric.configs.varying", { count: varying().length + suppressing().length })}</p>
+            <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{t("cad.parametric.configs.varying", { count: varying().length + suppressing().length })}</p>
           </div>
           <button type="button" class={`${SMALL} mt-1`} onClick={compare}>{t("cad.parametric.configs.compare")}</button>
           <Show when={measures()}>{(rows) =>
             <ul class="mt-1 space-y-0.5 text-xs" data-testid="configuration-measures">
               <For each={rows()}>{(m) =>
-                <li class={m.errors > 0 ? "text-red-700" : ""}>
+                <li class={m.errors > 0 ? "text-[color:var(--ent-bad)]" : ""}>
                   {m.name}: {m.refusal ?? `${t("cad.parametric.configs.volume", { volume: formatNumber(Number((m.volume / 1000).toPrecision(6))) })}${m.errors > 0 ? ` · ${t("cad.parametric.configs.errors", { count: m.errors })}` : ""}`}
                 </li>}
               </For>
