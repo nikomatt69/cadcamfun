@@ -22,13 +22,15 @@ const withConfigurations = (history: History, configurations: ReadonlyArray<Conf
 const suppressedIds = (history: History): ReadonlyArray<string> => history.features.filter((f) => f.suppressed === true).map((f) => f.id)
 
 /** The state the history is in now, as a configuration's content: every parameter and the suppressed features. */
-export const currentState = (history: History): Pick<Configuration, "values" | "suppressed"> => ({ values: { ...history.parameters }, suppressed: suppressedIds(history) })
+export const currentState = (history: History): Pick<Configuration, "values" | "suppressed" | "appearances"> => ({
+  values: { ...history.parameters }, suppressed: suppressedIds(history), ...(history.appearances !== undefined ? { appearances: history.appearances } : {})
+})
 
 /** The history with the active configuration holding what the history shows now (a no-op without one). */
 export const syncConfiguration = (history: History): History => {
   const active = history.configuration
   if (active === undefined || !(history.configurations ?? []).some((c) => c.id === active)) return history
-  return withConfigurations(history, (history.configurations ?? []).map((c) => (c.id === active ? { ...c, ...currentState(history) } : c)), active)
+  return withConfigurations(history, (history.configurations ?? []).map((c) => { if (c.id !== active) return c; const { appearances: _own, ...rest } = c; return { ...rest, ...currentState(history) } }), active)
 }
 
 /** The configurations, with the active one brought up to date with the live values. */
@@ -76,7 +78,10 @@ export const activateConfiguration = (history: History, id: string): TimelineEdi
     const { suppressed: _flag, ...rest } = f
     return rest as Feature
   })
-  return { history: withConfigurations({ ...synced, parameters, features }, synced.configurations ?? [], id) }
+  // The look and material of the variant (a configuration that never recorded one leaves the live table as it is).
+  const { appearances: _live, ...unpainted } = synced
+  const painted = target.appearances !== undefined ? { ...unpainted, ...(Object.keys(target.appearances).length > 0 ? { appearances: target.appearances } : {}) } : synced
+  return { history: withConfigurations({ ...painted, parameters, features }, synced.configurations ?? [], id) }
 }
 
 /** A configuration renamed (the name is unique, case-insensitively). */

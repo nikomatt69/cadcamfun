@@ -552,8 +552,20 @@ export interface ImportedBase {
   }
 }
 
-/** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name` and `group` are display. */
+/**
+ * How a body looks and what it is made of: a `#rrggbb` colour and the id of a library material (the CAM workpiece grades and the FEA
+ * materials share ids such as `aluminium-6061-t6`). The material gives the body its density, so the mass of a history follows it.
+ * Neither changes the geometry.
+ */
+export interface Appearance {
+  readonly color?: string
+  readonly material?: string
+}
+
+/** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name`, `group` and `appearance` are display. */
 export interface FeatureMeta {
+  /** The look and material of the bodies this feature creates or changes (the last feature that sets one wins); `History.appearances` overrides it per body. */
+  readonly appearance?: Appearance
   /** Left out of the model together with everything that needs it; nothing is deleted. */
   readonly suppressed?: boolean
   /** Name shown in the timeline in place of the id. */
@@ -583,6 +595,8 @@ export interface Configuration {
   readonly name: string
   readonly values: Readonly<Record<string, number | string>>
   readonly suppressed: ReadonlyArray<string>
+  /** The look and material of bodies in this variant (a part in steel and in aluminium): written into `History.appearances` when it is shown. */
+  readonly appearances?: Readonly<Record<string, Appearance>>
 }
 
 /**
@@ -604,6 +618,8 @@ export interface History {
   /** The named variants of the part and the id of the one the history currently shows. */
   readonly configurations?: ReadonlyArray<Configuration>
   readonly configuration?: string
+  /** The look and material of each body by body id; wins over the `appearance` of the features. */
+  readonly appearances?: Readonly<Record<string, Appearance>>
   /** Selections converted to persistent references by `migrateSelectionsToRefs` (spec 41): what each one was, so the conversion is recorded. */
   readonly refMigration?: ReadonlyArray<{ readonly feature: string; readonly field: string; readonly from: string; readonly to: ReadonlyArray<string> }>
 }
@@ -627,7 +643,7 @@ export interface Issue {
   readonly remedy?: string
 }
 
-export interface Body { readonly id: string; readonly mesh: Mesh; readonly feature: string }
+export interface Body { readonly id: string; readonly mesh: Mesh; readonly feature: string; /** Look and material, resolved (`History.appearances` over the features'). */ readonly appearance?: Appearance }
 
 export interface RebuildResult {
   readonly bodies: ReadonlyArray<Body>
@@ -1085,6 +1101,8 @@ export const rebuild = (history: History): RebuildResult => {
   const plan = timelinePlan(history)
   for (const message of plan.problems) issues.push({ feature: "timeline", severity: "warning", message })
   const lastWriter = new Map<string, string>()
+  // The look set by features, by body id (the per-body `History.appearances` is laid over it at the end).
+  const looks = new Map<string, Appearance>()
   // Failed and skipped features, each with the failed feature at its root.
   const broken = new Map<string, string>()
   for (const [featureIndex, f] of history.features.entries()) {
@@ -2073,6 +2091,17 @@ export const rebuild = (history: History): RebuildResult => {
         else lastWriter.delete(id)
       }
       for (const id of after.keys()) if (!before.has(id)) lastWriter.set(id, f.id)
+      // The look of what the feature made or changed: its own `appearance`, else (a copy by a pattern or a mirror) the look of its source body.
+      for (const [id, mesh] of after) {
+        if (before.get(id) === mesh) continue
+        if (f.appearance !== undefined) { looks.set(id, f.appearance); continue }
+        if (before.has(id)) continue
+        const sources = "bodies" in f && f.bodies !== undefined ? f.bodies : []
+        const source = id.includes(":") ? id.slice(id.indexOf(":") + 1) : sources.length === 1 ? sources[0] : undefined
+        const inherited = source === undefined ? undefined : looks.get(source)
+        if (inherited !== undefined) looks.set(id, inherited)
+      }
+      for (const id of [...looks.keys()]) if (!after.has(id)) looks.delete(id)
       touched.delete(f.id)
       lineage[f.id] = [...touched]
       const failed = issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error")
@@ -2108,7 +2137,12 @@ export const rebuild = (history: History): RebuildResult => {
       if (failed) broken.set(f.id, f.id)
     }
   }
-  return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
+  const dressed = bodies.map((b): Body => {
+    const own = history.appearances?.[b.id], inherited = looks.get(b.id)
+    const merged = own === undefined && inherited === undefined ? undefined : { ...inherited, ...own }
+    return merged === undefined ? b : { ...b, appearance: merged }
+  })
+  return { bodies: dressed, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
 }
 
 /** Whether a feature is meant to take material away from the bodies it meets (so that taking none is worth a warning). */
