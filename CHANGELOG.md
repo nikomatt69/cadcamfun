@@ -3,6 +3,44 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.57 (November 2026)
+
+## Core
+
+- Regenerate API artifacts and test merged compensation modes
+- Validate trimmed surface intersections against patch boundaries
+- Patch x patch SSI (ssi.ts) with parameter-range trimming and the R5 200-pair gate harness (ssi-gate.ts)
+- Post emitter compensation changes and IR/type support
+- Coaxial surface-surface intersection handling in boolean and intersect, with test
+- Print bodies adjustments saved from agent worktree
+- Coaxial sphere x cylinder/cone intersect in closed-form circles, exact line x quadric edge hits, interior SSI vertices matched by fit not snap radius (sphere 1e-6..1e-3 mm off a cylinder: solved in place)
+- Cutter radius compensation from the kernel, CutterComp IR move, G41/G42/G40 per dialect, profile compensation controller (spec 72 P2-3)
+- An open intersection curve that stops short of a vertex it points at is marched on to it (fully rounded box: 0 displaced of 32 Booleans, volume 8e-11)
+- Heidenhain posts the opt-in legacy cycle 19 tilted plane and the replay reads it
+
+## Desktop
+
+- Selection panel translates its count and shows the three sizes
+- Status bar shows the picked face or edge; no ambient occlusion in see-through styles; canvas test timeout for cold import
+- Assembly joints are drawn in the 3D view (revolute, prismatic, cylindrical, spherical, planar, fixed, free)
+- Level of detail drops the edge lines of tiny parts in large drawings; frame scheduler tests
+- Dimensions overlay measures X/Y/Z (the scene is Z-up) and only when the view or the part changed
+- Hover and pick faces and edges of exact solids; B-rep tessellation follows the body size
+- Imported meshes shade with creased normals and edges (sheets two-sided); element opacity is honoured
+- Parametric parts show their sketches (solve status, free points, constraint glyphs), failed features and bodies that cannot be united
+
+## Sidecar
+
+- Persist JSON null receipts for void AI mutations
+
+## API
+
+- Cam.job action (plan/run multi-setup jobs, fixtures, bar/mesh stock, claims and bounds) and skill cam-five-axis; specs 69/72 change log
+
+## Documentation
+
+- Change logs for 41 naming, 42 booleans, 58 timeline
+
 ## v0.1.56 (November 2026)
 
 ## Core
