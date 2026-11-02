@@ -104,7 +104,10 @@ authorization, revisions and persistence; they call the job through a typed help
 result type, and failures read through `kernelFailed` (a deadline or cancel is explained, an internal fault is not leaked). The
 job is cacheable and byte-accounted like `cad-hole`. `packages/ai/test/cad-scene-job.test.ts` checks every operation worker against
 inline (exchange headers carry the write time and are masked), data-not-exception answers, cancellation and the cache. Still
-synchronous: the parametric `validate`/`inspect` paths and project rebuilds; they stay open.
+synchronous: project rebuilds; they stay open. Two more in-process kernel actions moved to the same queue: `cam.job` (plan or
+run of a multi-setup job, `cam-job`, `packages/ai/src/cam-job.ts`) and `cam.lathe` (plan, NC and the revolved-stock replay,
+`cam-lathe`, `packages/ai/src/cam-lathe.ts`); the actions only call `runKernelJob` under the invocation signal, and the existing
+`cam-job-action` and `cam-breadth-actions` suites (46 tests with `kernel-job`) pass through the worker unchanged.
 
 ### Continuation: exports, progress evidence and host timing
 

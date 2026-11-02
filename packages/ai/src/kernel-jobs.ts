@@ -10,6 +10,8 @@ import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } fro
 import { parametricDiagnosis, parametricExact, parametricTimeline } from "./parametric-jobs.ts"
 import { editHistory } from "./parametric-edit.ts"
 import { cadScene } from "./cad-scene-job.ts"
+import { camJob } from "./cam-job.ts"
+import { camLathe } from "./cam-lathe.ts"
 import { normalizeElement } from "./element-catalog.ts"
 import { groupIntoComponents } from "./component-grouping.ts"
 
@@ -190,6 +192,10 @@ export interface KernelJobs {
   readonly "cad-assembly": { readonly input: CadAssemblyInput; readonly output: ReturnType<typeof cadAssembly> }
   /** Shell, offset, distance, motion study, exact exchange, fastening and the body-returning feature edits (`cad-scene-job.ts`). */
   readonly "cad-scene": { readonly input: Parameters<typeof cadScene>[0]; readonly output: ReturnType<typeof cadScene> }
+  /** `cam.job`: a multi-setup plan or run with claims (`cam-job.ts`); minutes on a large job, so never on the main thread. */
+  readonly "cam-job": { readonly input: Parameters<typeof camJob>[0]; readonly output: ReturnType<typeof camJob> }
+  /** `cam.lathe`: lathe plan, NC and the stock replay (`cam-lathe.ts`). */
+  readonly "cam-lathe": { readonly input: Parameters<typeof camLathe>[0]; readonly output: ReturnType<typeof camLathe> }
   readonly "cad-rebuild": { readonly input: CadRebuildInput; readonly output: ReturnType<typeof cadRebuild> }
   /** A STEP file as base bodies of a history (spec 72 step 2.2). Not cached: the input is the file. */
   readonly "cad-import-step": { readonly input: CadImportStepInput; readonly output: ReturnType<typeof cadImportStep> }
@@ -231,6 +237,8 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cad-hole": cadHole,
   "cad-assembly": cadAssembly,
   "cad-scene": cadScene,
+  "cam-job": camJob,
+  "cam-lathe": camLathe,
   "cad-rebuild": cadRebuild,
   "cad-import-step": cadImportStep,
   "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)

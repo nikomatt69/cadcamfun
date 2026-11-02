@@ -5,6 +5,7 @@
  */
 import { cam } from "@cadcamfun/core"
 import { CAM_ACTION_INPUTS } from "@cadcamfun/api"
+import { runKernelJob } from "../kernel-job.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 
 const BASIS = "Kienzle starting values (handbook order of magnitude, not a supplier's data) and a stock sampled at the declared cell: uncalibrated, not a prediction of a real machine"
@@ -22,32 +23,7 @@ const head = (text: string, lines: number): string => text.split("\n").slice(0, 
 export const CAM_BREADTH_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cam.lathe", kind: "read", parameters: CAM_ACTION_INPUTS["cam.lathe"],
-    run: (input) => {
-      const { stock: bar, contour, bore, tools, operations, material, post } = input
-      const { faceAllowance, ...stock } = bar
-      const plan = cam.turning.planLathe({
-        stock: { ...stock }, ...(faceAllowance !== undefined ? { faceAllowance } : {}),
-        ...(contour !== undefined ? { contour: contour.map((p) => ({ ...p })) } : {}), ...(bore !== undefined ? { bore: bore.map((p) => ({ ...p })) } : {}),
-        tools: tools.map((t) => ({ ...t })), operations: operations.map((o) => ({ ...o })) as never, ...(material !== undefined ? { material } : {})
-      })
-      if (plan.issues.length > 0) return { ok: false, error: plan.issues.join("; "), issues: plan.issues }
-      const dialect = post ?? "fanuc"
-      const nc = cam.turning.emitLathe(plan, { dialect })
-      const verification = cam.turning.verifyLathe(plan, nc.nc)
-      const lines = nc.nc.split("\n")
-      return {
-        ok: true, post: dialect, release: "preview",
-        operations: plan.operations.map((o) => ({ id: o.id, name: o.name, kind: o.kind, tool: o.tool.id, moves: o.moves.length, notes: [...o.notes] })),
-        warnings: [...plan.warnings], analytic: plan.analytic, cycles: [...nc.cycles], explicit: nc.explicit.map((e) => ({ ...e })),
-        lines: lines.length, preview: lines.slice(0, 80).join("\n"),
-        verification: {
-          ...verification,
-          // The verdict in words: what the replay of the NC against the revolved stock found, bounded by the raster cell.
-          verdict: verification.ok && verification.gougeVolume <= verification.volumeBound && verification.leftVolume <= verification.volumeBound ? "matches" : "differs",
-          note: "Raster of the revolved stock (cell in mm); volumes are within volumeBound. The insert body behind the nose is swept for turning and boring tools; threads are checked for lead and depth, not removed. Not qualified on a controller."
-        }
-      }
-    }
+    run: (input, context) => runKernelJob("cam-lathe", input, context.signal !== undefined ? { signal: context.signal } : {})
   }),
   defineWireAction({
     id: "cam.process", kind: "read", parameters: CAM_ACTION_INPUTS["cam.process"],
