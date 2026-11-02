@@ -89,19 +89,25 @@ export function Tooltip(props: TooltipProps): JSX.Element {
     if (showTimer !== undefined) { clearTimeout(showTimer); showTimer = undefined }
     setActive((current) => (current?.id === id ? undefined : current))
   }
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape") cancel()
+  }
   const setRef = (element: HTMLElement): void => {
     trigger = element
     element.addEventListener("mouseenter", schedule)
     element.addEventListener("mouseleave", cancel)
     element.addEventListener("focusin", schedule)
     element.addEventListener("focusout", cancel)
+    element.addEventListener("keydown", onKeyDown)
   }
   onCleanup(() => {
+    cancel()
     if (trigger === undefined) return
     trigger.removeEventListener("mouseenter", schedule)
     trigger.removeEventListener("mouseleave", cancel)
     trigger.removeEventListener("focusin", schedule)
     trigger.removeEventListener("focusout", cancel)
+    trigger.removeEventListener("keydown", onKeyDown)
   })
 
   // We forward the ref to the single child. The child must be a host element
