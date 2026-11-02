@@ -12,7 +12,7 @@ import { Show, createEffect, createSignal, createUniqueId, type JSX } from "soli
 import { Effect } from "effect"
 import type { McpServerEntry, McpServerPatch } from "@cadcamfun/api"
 import { t } from "../../../i18n/index.ts"
-import { FIELD, RAIL_LABEL } from "../../../shared/components/WorkspacePage.tsx"
+import { CANCEL_BUTTON, FIELD, RAIL_LABEL, SUBMIT_BUTTON } from "../../../shared/components/WorkspacePage.tsx"
 
 /** A server row as the legacy cards and form read it (the DB row plus form-only fields). */
 export type McpServerCard = McpServerEntry & { readonly defaultWorkingDirectory?: string | null }
@@ -202,7 +202,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
           placeholder={t("mcp.form.namePlaceholder")}
           disabled={busy()}
         />
-        <Show when={errors().name}><p id={id("name-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().name}</p></Show>
+        <Show when={errors().name}><p id={id("name-error")} class="mt-1 text-xs text-red-600 dark:text-red-400">{errors().name}</p></Show>
       </div>
 
       <div>
@@ -233,7 +233,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
             placeholder={t("mcp.form.urlPlaceholder")}
             disabled={busy()}
           />
-          <Show when={errors().url}><p id={id("url-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().url}</p></Show>
+          <Show when={errors().url}><p id={id("url-error")} class="mt-1 text-xs text-red-600 dark:text-red-400">{errors().url}</p></Show>
         </div>
       </Show>
 
@@ -252,7 +252,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
               placeholder={t("mcp.form.commandPlaceholder")}
               disabled={busy()}
             />
-            <Show when={errors().command}><p id={id("command-error")} class="mt-1 text-sm text-red-600 dark:text-red-400">{errors().command}</p></Show>
+            <Show when={errors().command}><p id={id("command-error")} class="mt-1 text-xs text-red-600 dark:text-red-400">{errors().command}</p></Show>
             <p id={id("command-help")} class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("mcp.form.commandHelp")}</p>
           </div>
 
@@ -315,10 +315,10 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
         <label for={id("enabled")} class="ml-2 block text-sm text-gray-700 dark:text-gray-300">{t("mcp.form.enabled")}</label>
       </div>
 
-      <div class="flex space-x-3 pt-2">
+      <div class="flex gap-3 pt-2">
         <button
           type="submit"
-          class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
+          class={SUBMIT_BUTTON}
           disabled={busy()}
         >
           {busy() ? t("mcp.form.saving") : initial().id !== undefined ? t("mcp.form.update") : t("mcp.settings.add")}
@@ -328,7 +328,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
           <button
             type="button"
             onClick={() => props.onCancel?.()}
-            class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400"
+            class={CANCEL_BUTTON}
             disabled={busy()}
           >
             {t("mcp.form.cancel")}

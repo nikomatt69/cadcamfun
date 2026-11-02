@@ -6,6 +6,7 @@
  */
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
+import { X } from "lucide-solid"
 import type { McpServerPatch } from "@cadcamfun/api"
 import { useApp } from "../../../shared/state/context.ts"
 import { useKeyedRead, useRead } from "../../../app/queries.ts"
@@ -13,14 +14,14 @@ import { t } from "../../../i18n/index.ts"
 import { McpLoading, McpServerForm, legacyFailure, legacyRead, serversFrom, type McpServerCard } from "../components/mcp.tsx"
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { ConnectPreview } from "../../../shared/ui/stageshow/index.ts"
-import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { CANCEL_BUTTON, SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 /** Legacy red banner with the dismiss button. */
 function McpErrorBanner(props: { readonly message: string; readonly onDismiss: () => void }): JSX.Element {
   return (
-    <div role="alert" class="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+    <div role="alert" class="mb-4 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200">
       {props.message}
-      <button type="button" class="float-right font-bold" aria-label={t("common.close")} onClick={props.onDismiss}>&times;</button>
+      <button type="button" class="float-right flex-none rounded-md p-1 hover:bg-red-200 dark:hover:bg-red-900" aria-label={t("common.close")} onClick={props.onDismiss}><X size={14} aria-hidden="true" /></button>
     </div>
   )
 }
@@ -102,7 +103,7 @@ export function McpSettingsScreen(): JSX.Element {
 
         <Show when={showAddForm()}>
           <div class="mb-8 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-            <h2 class="mb-4 text-xl font-semibold">{t("mcp.settings.addNew")}</h2>
+            <h2 class="mb-4 text-base font-semibold">{t("mcp.settings.addNew")}</h2>
             <McpServerForm
               onSubmit={addServer}
               onCancel={() => setShowAddForm(false)}
@@ -116,10 +117,10 @@ export function McpSettingsScreen(): JSX.Element {
           fallback={
             <div class="grid gap-6 md:grid-cols-1">
               <For each={servers()}>{(server) =>
-                <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                   <div class="p-4">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                      <h2 class="min-w-0 break-words text-lg font-semibold text-slate-900 dark:text-slate-100">{server.name}</h2>
+                      <h2 class="min-w-0 break-words text-base font-semibold text-slate-900 dark:text-slate-100">{server.name}</h2>
                       <div class="flex shrink-0 items-center">
                         <div aria-hidden="true" class={`mr-2 h-2 w-2 rounded-full ${server.enabled ? "bg-green-500" : "bg-gray-400"}`} />
                         <span class="text-sm text-slate-600 dark:text-slate-300">
@@ -137,7 +138,7 @@ export function McpSettingsScreen(): JSX.Element {
                       <Show when={server.type === "sse"}>
                         <div class="mb-1">
                           <span class="font-medium">{t("mcp.settings.url")}</span>{" "}
-                          <span class="break-all rounded bg-slate-100 px-1 font-mono text-xs dark:bg-slate-800">{server.url}</span>
+                          <span class="break-all rounded bg-slate-100 px-1.5 font-mono text-xs dark:bg-slate-800">{server.url}</span>
                         </div>
                       </Show>
 
@@ -145,13 +146,13 @@ export function McpSettingsScreen(): JSX.Element {
                         <>
                           <div class="mb-1">
                             <span class="font-medium">{t("mcp.settings.command")}</span>{" "}
-                            <span class="break-all rounded bg-slate-100 px-1 font-mono text-xs dark:bg-slate-800">{server.command}</span>
+                            <span class="break-all rounded bg-slate-100 px-1.5 font-mono text-xs dark:bg-slate-800">{server.command}</span>
                           </div>
 
                           <Show when={Array.isArray(server.args) && server.args.length > 0}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.args")}</span>{" "}
-                              <span class="break-all rounded bg-slate-100 px-1 font-mono text-xs dark:bg-slate-800">
+                              <span class="break-all rounded bg-slate-100 px-1.5 font-mono text-xs dark:bg-slate-800">
                                 {(server.args as string[]).join(" ")}
                               </span>
                             </div>
@@ -160,14 +161,14 @@ export function McpSettingsScreen(): JSX.Element {
                           <Show when={server.workingDirectory !== undefined && server.workingDirectory !== null && server.workingDirectory !== ""}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.workingDirectory")}</span>{" "}
-                              <span class="break-all rounded bg-slate-100 px-1 font-mono text-xs dark:bg-slate-800">{server.workingDirectory}</span>
+                              <span class="break-all rounded bg-slate-100 px-1.5 font-mono text-xs dark:bg-slate-800">{server.workingDirectory}</span>
                             </div>
                           </Show>
 
                           <Show when={server.defaultWorkingDirectory !== undefined && server.defaultWorkingDirectory !== null && server.defaultWorkingDirectory !== ""}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.defaultWorkingDirectory")}</span>{" "}
-                              <span class="break-all rounded bg-slate-100 px-1 font-mono text-xs dark:bg-slate-800">{server.defaultWorkingDirectory}</span>
+                              <span class="break-all rounded bg-slate-100 px-1.5 font-mono text-xs dark:bg-slate-800">{server.defaultWorkingDirectory}</span>
                             </div>
                           </Show>
                         </>
@@ -180,7 +181,7 @@ export function McpSettingsScreen(): JSX.Element {
                     <div class="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        class={`rounded px-3 py-1 text-sm ${server.enabled
+                        class={`rounded-md px-3 py-1.5 text-sm ${server.enabled
                           ? "bg-slate-200 text-slate-800 hover:bg-gray-300"
                           : "bg-green-100 text-green-800 hover:bg-green-200"}`}
                         onClick={() => void toggleStatus(server, !server.enabled)}
@@ -190,14 +191,14 @@ export function McpSettingsScreen(): JSX.Element {
 
                       <button
                         type="button" aria-label={`${t("mcp.settings.delete")}: ${server.name}`}
-                        class="rounded bg-red-100 px-3 py-1 text-sm text-red-800 hover:bg-red-200"
+                        class="rounded-md bg-red-100 px-3 py-1.5 text-sm text-red-800 hover:bg-red-200"
                         onClick={() => void deleteServer(server)}
                       >
                         {t("mcp.settings.delete")}
                       </button>
                     </div>
 
-                    <A href={`/settings/mcp/edit/${encodeURIComponent(server.id)}`} class="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600" aria-label={`${t("mcp.settings.edit")}: ${server.name}`}>
+                    <A href={`/settings/mcp/edit/${encodeURIComponent(server.id)}`} class="rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600" aria-label={`${t("mcp.settings.edit")}: ${server.name}`}>
                       {t("mcp.settings.edit")}
                     </A>
                   </div>
@@ -211,7 +212,7 @@ export function McpSettingsScreen(): JSX.Element {
             <p class="mb-4">{t("mcp.settings.empty")}</p>
             <Show when={!showAddForm()}>
               <button
-                class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
+                class={SUBMIT_BUTTON}
                 onClick={() => setShowAddForm(true)}
               >
                 {t("mcp.settings.addFirst")}
@@ -276,19 +277,19 @@ export function McpConfigEditorScreen(): JSX.Element {
     <WorkspaceDetail title={t("mcp.editor.title")} backHref="/settings/mcp" backLabel={t("mcp.editor.back")}>
       <div class="mx-auto w-full max-w-5xl">
       <Show when={error() !== undefined}>
-        <div role="alert" class="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error()}</div>
+        <div role="alert" class="mb-4 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200">{error()}</div>
       </Show>
 
       <Show when={success() !== undefined}>
-        <div role="status" class="mb-4 rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-200">{success()}</div>
+        <div role="status" class="mb-4 rounded-lg bg-green-100 px-4 py-3 text-green-700 dark:bg-green-950 dark:text-green-200">{success()}</div>
       </Show>
 
       <div class="mb-4">
         <p class="mb-2 text-slate-600 dark:text-slate-300">{t("mcp.editor.intro")}</p>
 
-        <div class="mb-2 flex space-x-2">
+        <div class="mb-2 flex gap-2">
           <button
-            class="rounded bg-slate-500 px-3 py-1 text-sm text-white hover:bg-gray-600"
+            class="rounded-md bg-slate-500 px-3 py-1.5 text-sm text-white hover:bg-gray-600"
             onClick={formatJson}
           >
             {t("mcp.editor.format")}
@@ -384,7 +385,7 @@ export function McpEditServerScreen(): JSX.Element {
                 {error() ?? read.error() ?? t("mcp.edit.notFound")}
               </div>
               <div class="mt-4">
-                <A href="/settings/mcp" class="inline-block rounded bg-gray-300 px-4 py-2 font-bold text-slate-800 hover:bg-gray-400">
+                <A href="/settings/mcp" class={CANCEL_BUTTON}>
                   {t("mcp.edit.backToSettings")}
                 </A>
               </div>

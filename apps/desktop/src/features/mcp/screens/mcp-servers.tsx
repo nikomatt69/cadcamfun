@@ -23,12 +23,11 @@ import { McpLoading, legacyFailure, legacyRead, serversFrom, type McpServerCard 
 const EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1]
 /** The card spring (stiffness 300, damping 30) approximated with Motion One's tween. */
 const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-const HOVER_SHADOW = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
 
 const PAGE_BG = "min-h-full"
 const CARD = "ui-card ui-card-heavy"
 
-/** The status dot that pulses while the server is active. */
+/** The status dot: green while the server is active. */
 function McpStatusDot(props: { readonly enabled: boolean; readonly size: "sm" | "md" }): JSX.Element {
   const dot = () => (props.size === "md" ? "mr-2 h-2 w-2 rounded-full" : "mr-3 h-3 w-3 rounded-full")
   return (
@@ -36,11 +35,7 @@ function McpStatusDot(props: { readonly enabled: boolean; readonly size: "sm" | 
       when={props.enabled}
       fallback={<div class={`${dot()} bg-gray-400`} />}
     >
-      <Motion.div
-        class={`${dot()} bg-green-500`}
-        animate={{ scale: [1, 1.2, 1] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      />
+      <div class={`${dot()} bg-green-500`} />
     </Show>
   )
 }
@@ -132,16 +127,16 @@ export function McpDirectoryScreen(): JSX.Element {
                   <CardBanner icon={<Server size={28} aria-hidden="true" />} badge={server.type === "sse" ? t("mcp.type.sseShort") : t("mcp.type.stdioShort")} leftBadge={server.enabled ? t("mcp.directory.active") : undefined} />
                   <div class="flex flex-1 flex-col gap-2 p-4">
                     <h2 class="flex items-center text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300"><McpStatusDot enabled={server.enabled} size="md" />{server.name}</h2>
-                    <p class="truncate rounded bg-gray-100/60 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-gray-900/50 dark:text-gray-300">{server.type === "sse" ? server.url : server.command}</p>
+                    <p class="truncate rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">{server.type === "sse" ? server.url : server.command}</p>
                     <Show when={entry() !== undefined} fallback={<p class="text-xs italic text-gray-500 dark:text-gray-400">{server.enabled ? t("mcp.directory.infoMissing") : t("mcp.directory.disabledInfo")}</p>}>
                       <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <div class="flex justify-between"><span>{entry()?.name}</span><Show when={entry()?.version !== undefined}><span>v{entry()?.version}</span></Show></div>
-                        <div class="flex justify-between"><span class="inline-flex items-center gap-1"><Database size={12} aria-hidden="true" />{(entry()?.resources?.length ?? 0) === 1 ? t("mcp.directory.resourceOne", { count: 1 }) : t("mcp.directory.resourceMany", { count: entry()?.resources?.length ?? 0 })}</span></div>
-                        <div class="flex justify-between"><span class="inline-flex items-center gap-1"><Zap size={12} aria-hidden="true" />{(entry()?.tools?.length ?? 0) === 1 ? t("mcp.directory.toolOne", { count: 1 }) : t("mcp.directory.toolMany", { count: entry()?.tools?.length ?? 0 })}</span></div>
+                        <div class="flex justify-between gap-3"><span>{entry()?.name}</span><Show when={entry()?.version !== undefined}><span>v{entry()?.version}</span></Show></div>
+                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-1"><Database size={12} aria-hidden="true" />{(entry()?.resources?.length ?? 0) === 1 ? t("mcp.directory.resourceOne", { count: 1 }) : t("mcp.directory.resourceMany", { count: entry()?.resources?.length ?? 0 })}</span></div>
+                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-1"><Zap size={12} aria-hidden="true" />{(entry()?.tools?.length ?? 0) === 1 ? t("mcp.directory.toolOne", { count: 1 }) : t("mcp.directory.toolMany", { count: entry()?.tools?.length ?? 0 })}</span></div>
                       </div>
                     </Show>
                   </div>
-                  <div class="flex items-center justify-between gap-2 border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30" onClick={(event) => event.stopPropagation()}>
+                  <div class="flex items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-4 py-2.5 dark:border-gray-600 dark:bg-gray-700" onClick={(event) => event.stopPropagation()}>
                     <button type="button" class={TOOLBAR_BUTTON} onClick={() => void toggleServer(server, !server.enabled)}>{server.enabled ? t("mcp.settings.disable") : t("mcp.settings.enable")}</button>
                     <button type="button" class={TOOLBAR_PRIMARY} onClick={view}>{t("mcp.directory.view")}</button>
                   </div>
@@ -202,9 +197,7 @@ export function McpServerDetailsScreen(): JSX.Element {
   const backToDirectory = (): JSX.Element => (
     <A href="/mcp/directory">
       <Motion.button
-        class="inline-flex items-center rounded-xl border border-gray-200/50 bg-white/70 px-4 py-2 text-gray-600 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-white/90 hover:text-gray-800 dark:border-gray-700/50 dark:bg-gray-800/70 dark:text-gray-400 dark:hover:bg-gray-800/90 dark:hover:text-gray-200"
-        hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }}
-        press={{ scale: 0.95 }}
+        class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-white hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
       >
         <ArrowLeft size={16} class="mr-2" />
         {t("mcp.detail.back")}
@@ -216,13 +209,13 @@ export function McpServerDetailsScreen(): JSX.Element {
     <Motion.div class={PAGE_BG} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, easing: EASE }}>
       <div class="mx-auto max-w-7xl p-4 md:p-6">
         <Motion.div
-          class="rounded-2xl border border-red-200/50 bg-red-50/80 p-8 text-center shadow-xl backdrop-blur-md dark:border-red-800/30 dark:bg-red-900/20"
+          class="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-900"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, easing: CARD_EASE }}
         >
           <div class="mb-4 text-lg text-red-700 dark:text-red-300">{error() ?? t("mcp.detail.notFound")}</div>
-          <Motion.div hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }} press={{ scale: 0.95 }}>
+          <Motion.div>
             <A href="/mcp/directory">
               <button class="inline-flex items-center rounded-lg bg-gray-600 px-4 py-2.5 text-white hover:bg-gray-700">
                 <ArrowLeft size={16} class="mr-2" />
@@ -250,7 +243,7 @@ export function McpServerDetailsScreen(): JSX.Element {
 
             <Show when={error() !== undefined}>
               <Motion.div
-                class="mb-6 rounded-2xl border border-red-200/50 bg-red-50/80 px-6 py-4 shadow-xl backdrop-blur-md dark:border-red-800/30 dark:bg-red-900/20"
+                class="mb-6 rounded-lg border border-red-200 bg-red-50 px-6 py-4 dark:border-red-800 dark:bg-red-900"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, easing: EASE }}
@@ -263,27 +256,27 @@ export function McpServerDetailsScreen(): JSX.Element {
             </Show>
 
             <Motion.div
-              class={`mb-8 overflow-hidden rounded-2xl ${CARD}`}
+              class={`mb-8 overflow-hidden rounded-lg ${CARD}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, easing: CARD_EASE }}
             >
-              <div class="border-b border-gray-100/50 p-6 dark:border-gray-700/50">
+              <div class="border-b border-gray-100 p-6 dark:border-gray-700">
                 <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div class="flex items-center">
                     <Motion.div
-                      class="mr-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600"
+                      class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600"
                     >
                       <Server size={24} class="text-white" />
                     </Motion.div>
                     <div>
-                      <h2 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
+                      <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-50">
                         {server()?.name}
                       </h2>
                       <span
                         class={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${server()?.enabled
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-300"}`}
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"}`}
                       >
                         <McpStatusDot enabled={server()?.enabled === true} size="md" />
                         {server()?.enabled ? t("mcp.directory.active") : t("mcp.directory.inactive")}
@@ -293,18 +286,16 @@ export function McpServerDetailsScreen(): JSX.Element {
 
                   <div class="flex flex-wrap gap-3">
                     <Motion.button
-                      class={`inline-flex items-center rounded-xl px-4 py-2.5 font-medium text-white shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server()?.enabled
+                      class={`inline-flex items-center rounded-lg px-4 py-2.5 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server()?.enabled
                         ? "bg-red-600 hover:bg-red-700"
                         : "bg-green-600 hover:bg-green-700"}`}
                       onClick={() => void toggleStatus()}
-                      hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }}
-                      press={{ scale: 0.95 }}
                     >
                       <Activity size={16} class="mr-2" />
                       {server()?.enabled ? t("mcp.detail.disableServer") : t("mcp.detail.enableServer")}
                     </Motion.button>
 
-                    <Motion.div hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }} press={{ scale: 0.95 }}>
+                    <Motion.div>
                       <A href={`/settings/mcp/edit/${encodeURIComponent(server()?.id ?? "")}`}>
                         <button class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700">
                           <Pencil size={16} class="mr-2" />
@@ -316,7 +307,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                 </div>
 
                 <div class="mb-4 flex items-center gap-4">
-                  <span class="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                  <span class="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                     {server()?.type === "sse" ? t("mcp.type.sse") : t("mcp.type.stdio")}
                   </span>
                 </div>
@@ -326,13 +317,13 @@ export function McpServerDetailsScreen(): JSX.Element {
                     when={server()?.type === "sse"}
                     fallback={
                       <>
-                        <div class="rounded-xl bg-gray-50/50 p-3 dark:bg-gray-800/50">
+                        <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                           <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.command")}</span>
                           <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.command}</div>
                         </div>
 
                         <Show when={argsPresent(server()?.args)}>
-                          <div class="rounded-xl bg-gray-50/50 p-3 dark:bg-gray-800/50">
+                          <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.args")}</span>
                             <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">
                               {Array.isArray(server()?.args)
@@ -343,7 +334,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                         </Show>
 
                         <Show when={server()?.workingDirectory !== undefined && server()?.workingDirectory !== null && server()?.workingDirectory !== ""}>
-                          <div class="rounded-xl bg-gray-50/50 p-3 dark:bg-gray-800/50">
+                          <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.workingDirectory")}</span>
                             <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.workingDirectory}</div>
                           </div>
@@ -351,7 +342,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                       </>
                     }
                   >
-                    <div class="rounded-xl bg-gray-50/50 p-3 dark:bg-gray-800/50">
+                    <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.detail.endpoint")}</span>
                       <div class="mt-1 break-all font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.url}</div>
                     </div>
@@ -364,28 +355,28 @@ export function McpServerDetailsScreen(): JSX.Element {
                   <div class="mb-6">
                     <div class="mb-2 flex items-center gap-3">
                       <Layers size={20} class="text-gray-600 dark:text-gray-400" />
-                      <span class="text-lg font-medium text-gray-900 dark:text-white">{t("mcp.detail.infoTitle")}</span>
+                      <span class="text-base font-medium text-gray-900 dark:text-white">{t("mcp.detail.infoTitle")}</span>
                     </div>
 
-                    <div class="rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
+                    <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900">
                       <div class="flex items-center justify-between">
-                        <span class="text-lg font-medium text-gray-900 dark:text-white">{details()?.name}</span>
+                        <span class="text-base font-medium text-gray-900 dark:text-white">{details()?.name}</span>
                         <Show when={details()?.version !== undefined}>
-                          <span class="rounded-full bg-white/50 px-3 py-1 text-sm text-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
+                          <span class="rounded-full bg-white px-3 py-1 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                             v{details()?.version}
                           </span>
                         </Show>
                       </div>
 
                       <Show when={details()?.instructions !== undefined}>
-                        <div class="mt-3 rounded-lg bg-white/50 p-3 text-sm text-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
+                        <div class="mt-3 rounded-lg bg-white p-3 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           {details()?.instructions}
                         </div>
                       </Show>
                     </div>
                   </div>
 
-                  <div class="mb-6 border-b border-gray-200/50 dark:border-gray-700/50">
+                  <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex space-x-8">
                       <button
                         class={`flex items-center border-b-2 px-1 py-3 text-sm font-medium focus:outline-none ${selectedTab() === "resources"
@@ -428,7 +419,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                           <div class="grid gap-4">
                             <For each={details()?.tools ?? []}>{(tool) =>
                               <Motion.div
-                                class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
+                                class="rounded-lg border border-gray-200 bg-white p-4 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-800"
                                 initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
                                 animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                                 transition={{ duration: 0.4, easing: EASE }}
@@ -481,13 +472,13 @@ export function McpServerDetailsScreen(): JSX.Element {
                         <div class="grid gap-4">
                           <For each={details()?.resources ?? []}>{(resource) =>
                             <Motion.div
-                              class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
+                              class="rounded-lg border border-gray-200 bg-white p-4 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-800"
                               initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
                               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                               transition={{ duration: 0.4, easing: EASE }}
                             >
                               <div class="mb-2 font-medium text-gray-900 dark:text-white">{resource.name}</div>
-                              <div class="mb-2 rounded bg-gray-100/50 px-2 py-1 font-mono text-sm text-gray-600 dark:bg-gray-900/50 dark:text-gray-400">
+                              <div class="mb-2 rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">
                                 {resource.uriTemplate}
                               </div>
                               <Show when={resource.description !== undefined}>
@@ -500,7 +491,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                                   <div class="grid grid-cols-2 gap-2 text-sm">
                                     <For each={resource.arguments ?? []}>{(argument) =>
                                       <div class="flex items-center">
-                                        <span class="rounded bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                                        <span class="rounded bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                                           {argument.name}
                                         </span>
                                         <Show when={argument.required === true}>
