@@ -45,6 +45,8 @@ const formatDate = (dateString: string): string => {
   return Number.isNaN(parsed) ? "" : new Date(parsed).toLocaleDateString()
 }
 
+/** The role as a word, not the enum constant. */
+const roleLabel = (role: "ADMIN" | "MANAGER" | "MEMBER"): string => `${role.charAt(0)}${role.slice(1).toLowerCase()}`
 const roleBadge = (role: "ADMIN" | "MANAGER" | "MEMBER"): string =>
   role === "ADMIN" ? `${BADGE} workspace-badge--warn` : role === "MANAGER" ? `${BADGE} workspace-badge--accent` : BADGE
 
@@ -299,7 +301,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                               <p class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{member.name ?? t("org.members.unnamed")}</p>
                               <p class="truncate text-xs text-slate-500 dark:text-slate-400">{member.email}</p>
                             </div>
-                            <span class={`${roleBadge(member.role)} shrink-0`}>{member.role}</span>
+                            <span class={`${roleBadge(member.role)} shrink-0`}>{roleLabel(member.role)}</span>
                           </li>
                         )}</For>
                       </ul>
@@ -343,7 +345,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                                 </div>
                               </div>
                             </td>
-                            <td class="whitespace-nowrap"><span class={roleBadge(member.role)}>{member.role}</span></td>
+                            <td class="whitespace-nowrap"><span class={roleBadge(member.role)}>{roleLabel(member.role)}</span></td>
                             <td class="whitespace-nowrap text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{formatDate(member.joinedAt)}</td>
                             <Show when={canManageMembers()}>
                               <td class="whitespace-nowrap !text-right">

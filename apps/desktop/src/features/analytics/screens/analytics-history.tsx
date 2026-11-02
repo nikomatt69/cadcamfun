@@ -87,7 +87,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
                 class={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium ${selectedFilter() === option.key ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "text-slate-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-gray-700/60"}`}
               >
                 <span class="flex items-center gap-2"><option.Icon size={14} aria-hidden="true" />{option.label}</span>
-                <Show when={option.count > 0}><span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700 dark:bg-gray-600 dark:text-gray-200">{option.count}</span></Show>
+                <Show when={option.count > 0}><span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 dark:bg-gray-600 dark:text-gray-200">{option.count}</span></Show>
               </button>
             )}
           </For>

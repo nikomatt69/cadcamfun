@@ -121,7 +121,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
               </div>
 
               <div class="flex items-center space-x-2">
-                <div class="flex items-center space-x-1">
+                <div class="flex items-center space-x-2">
                   <Calendar class="h-4 w-4 text-gray-500" />
                   <input
                     type="date"
@@ -132,7 +132,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                   />
                 </div>
                 <span class="text-sm text-gray-500">{t("admin.analytics.to")}</span>
-                <div class="flex items-center space-x-1">
+                <div class="flex items-center space-x-2">
                   <Calendar class="h-4 w-4 text-gray-500" />
                   <input
                     type="date"
@@ -145,11 +145,11 @@ export function AdminAnalyticsScreen(): JSX.Element {
               </div>
 
               <div class="flex items-center space-x-2">
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
                   onClick={() => setDateRangePreset("7days")}>7d</button>
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
                   onClick={() => setDateRangePreset("30days")}>30d</button>
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
                   onClick={() => setDateRangePreset("90days")}>90d</button>
               </div>
             </div>
@@ -174,7 +174,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                       class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                       onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}
                     >
-                      <BarChart2 class="mr-1 h-4 w-4" />
+                      <BarChart2 class="mr-2 h-4 w-4" />
                       {chartType() === "line" ? t("admin.analytics.showBar") : t("admin.analytics.showLine")}
                     </button>
                   </div>

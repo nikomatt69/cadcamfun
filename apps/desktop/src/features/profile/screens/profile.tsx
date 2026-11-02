@@ -114,7 +114,7 @@ export function ProfileScreen(): JSX.Element {
       <Show when={!isLoading()} fallback={<StageLoading label={t("common.loading")} />}>
         <Show when={!profile.error()} fallback={<StageError message={`${t("common.error")}: ${profile.error()}`} />}>
         <Show when={profile.data()} fallback={
-          <StageEmpty icon={<User size={22} aria-hidden="true" />} title={t("profile.notFoundTitle")} hint={t("profile.notFoundBody")}>
+          <StageEmpty icon={<User size={22} aria-hidden="true" />} preview="lost" title={t("profile.notFoundTitle")} hint={t("profile.notFoundBody")}>
             <A href="/" class={TOOLBAR_BUTTON}>{t("profile.returnHome")}</A>
           </StageEmpty>
         }>
