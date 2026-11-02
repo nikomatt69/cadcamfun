@@ -9,7 +9,7 @@
  * `POST`ing the conversation has no v6 counterpart, so the submit button keeps its
  * legacy disabled rule (`no selection`) and performs no request.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createSignal, createUniqueId, type JSX } from "solid-js"
 import { ArrowLeft, Check, Search, User, X } from "lucide-solid"
 import { useRead } from "../../../app/queries.ts"
 import { t } from "../../../i18n/index.ts"
@@ -30,6 +30,7 @@ export interface NewConversationProps {
 }
 
 export function NewConversation(props: NewConversationProps): JSX.Element {
+  const fieldId = createUniqueId()
   const organization = useRead((c) => c.organizations.get({ params: { id: props.organizationId } }))
   const [selected, setSelected] = createSignal<ReadonlyArray<ChatMember>>([])
   const [searchQuery, setSearchQuery] = createSignal("")
@@ -47,7 +48,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
   }
 
   const selectMember = (member: ChatMember): void => {
-    setSelected([...selected(), member])
+    setSelected(props.isGroupChat === true ? [...selected(), member] : [member])
     setSearchQuery("")
   }
   const removeMember = (memberId: string): void => {
@@ -58,7 +59,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
   const createConversation = (): void => undefined
 
   const memberButton =
-    "flex w-full items-center gap-3 rounded-[5px] p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:hover:bg-slate-800"
 
   return (
     <div class="flex h-full flex-col overflow-hidden">
@@ -77,12 +78,12 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
       <div class="flex-1 overflow-y-auto p-3">
         <Show when={props.isGroupChat === true}>
           <div class="mb-4">
-            <label for="groupName" class={LABEL}>
+            <label for={`${fieldId}-group`} class={LABEL}>
               {t("chat.groupName")}
             </label>
             <input
               type="text"
-              id="groupName"
+              id={`${fieldId}-group`}
               value={groupName()}
               onInput={(event) => setGroupName(event.currentTarget.value)}
               placeholder={t("chat.groupNamePlaceholder")}
@@ -92,13 +93,14 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
         </Show>
 
         <div class="mb-4">
-          <label class={LABEL}>
+          <label for={`${fieldId}-members`} class={LABEL}>
             {props.isGroupChat === true ? t("chat.addMembers") : t("chat.selectMember")}
           </label>
 
           <div class="relative">
             <input
               type="text"
+              id={`${fieldId}-members`}
               value={searchQuery()}
               onInput={(event) => setSearchQuery(event.currentTarget.value)}
               placeholder={t("chat.memberSearch")}
@@ -110,9 +112,9 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
 
         <Show when={selected().length > 0}>
           <div class="mb-4">
-            <label class={LABEL}>
+            <p class={LABEL}>
               {props.isGroupChat === true ? t("chat.selectedMembers") : t("chat.recipient")}
-            </label>
+            </p>
 
             <div class="flex flex-wrap gap-2">
               <For each={selected()}>
@@ -123,7 +125,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
                       type="button"
                       onClick={() => removeMember(member.id)}
                       class="rounded-[4px] p-0.5 text-blue-600 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-800/60"
-                      aria-label={t("common.close")}
+                      aria-label={`${t("common.close")}: ${member.name ?? member.email ?? member.id}`}
                     >
                       <X size={12} aria-hidden="true" />
                     </button>
