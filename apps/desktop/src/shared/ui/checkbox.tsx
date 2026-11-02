@@ -8,7 +8,7 @@
  * - Indeterminate is rendered with a horizontal bar (Apple pattern).
  * - Reduced motion: static check, no animation.
  */
-import { type JSX, Show, createUniqueId } from "solid-js"
+import { type JSX, Show, createEffect, createUniqueId } from "solid-js"
 
 export type CheckboxState = boolean | "indeterminate"
 
@@ -22,17 +22,16 @@ export interface CheckboxProps {
 }
 
 export function Checkbox(props: CheckboxProps): JSX.Element {
-  const inputId = (): string => props.id ?? createUniqueId()
+  const generatedId = createUniqueId()
+  let input!: HTMLInputElement
   const checked = (): boolean | "indeterminate" => props.checked
   const isChecked = (): boolean => checked() === true
-  const onClick = (): void => {
-    if (props.disabled === true) return
-    props.onChange(!isChecked())
-  }
+  createEffect(() => { input.indeterminate = checked() === "indeterminate" })
   return (
     <label class="ui-checkbox" classList={{ "ui-checkbox-disabled": props.disabled === true, "ui-checkbox-checked": isChecked() }}>
       <input
-        id={inputId()}
+        ref={input}
+        id={props.id ?? generatedId}
         type="checkbox"
         class="ui-checkbox-input"
         checked={isChecked()}
@@ -53,7 +52,7 @@ export function Checkbox(props: CheckboxProps): JSX.Element {
         </Show>
       </span>
       <Show when={props.label !== undefined}>
-        <span class="ui-checkbox-label" onClick={onClick}>{props.label}</span>
+        <span class="ui-checkbox-label">{props.label}</span>
       </Show>
     </label>
   )
