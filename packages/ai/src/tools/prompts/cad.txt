@@ -1,4 +1,4 @@
-Inspect the CAD drawing (elements, solids, assemblies, DFM); compute sketches, mates, sheets, meshes; read-only.
+Read-only: inspect the drawing (elements, solids, assemblies, DFM); compute sketches, mates, sheets.
 
 Actions and Parameters (lengths mm; history and joint angles degrees)
 - describe: counts, bounds, layers; none; start here.

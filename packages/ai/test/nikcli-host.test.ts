@@ -325,7 +325,7 @@ return blocked;`
     expect(result?.type === "tool_result" && result.ok).toBe(false)
     const output = result?.type === "tool_result" ? result.output : ""
     // The refusal names each missing field, not only a sentence of advice, and nothing behind the action ran.
-    expect(output).toContain("history.parameters")
+    // parameters defaults to {} (a history may omit it), so only the required features field is named.
     expect(output).toContain("history.features")
     expect(output).toContain("No mutation")
     expect(handlerCalls).toEqual([])

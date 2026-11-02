@@ -24,7 +24,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Tool | Effect | Actions | Holders (primaries and specialists) | Prompt chars |
 | --- | --- | --- | --- | --- |
-| `cad` | read | 35 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4351 |
+| `cad` | read | 35 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4339 |
 | `cad_edit` | destructive | 22 | primary:build, editor, modeler | 4499 |
 | `cam` | read | 19 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3904 |
 | `cam_edit` | write | 8 | primary:build, machinist, optimizer | 2839 |
@@ -273,7 +273,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2740 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1540 | ai-specialists.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4351 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4339 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 4499 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3904 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2839 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
