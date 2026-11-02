@@ -226,3 +226,5 @@ Phone side (`apps/mobile`):
 ## Account identity integration (2026-10-16)
 
 Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.
+
+- 2026-11-02 integration verification: the phone endpoint test distinguishes the two explicitly hosted cloud delivery calls from desktop companion calls and checks that delivery stays excluded from the companion allow-list. No gateway permissions change.
