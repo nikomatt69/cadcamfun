@@ -3,6 +3,41 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.56 (November 2026)
+
+## Core
+
+- Skip features that lack a body because an earlier feature failed; undo test; spec 58 log
+- Parametric panel edits every parameter, dimension, sketch constraint and configuration
+- Expression language, validated parameters, configurations, sketch constraint report, safe feature removal
+
+## Desktop
+
+- Section view fills the cut of closed solids (back-face caps) instead of showing hollow shells
+- An element that cannot be drawn becomes a red marker with the reason and a banner, not a blank canvas
+- Draw the text, extrude, grid, tube and lathe elements the toolbar creates (they were invisible)
+- Display modes in the canvas (shaded, edges, hidden line, wireframe, x-ray, ghost)
+
+## Sidecar
+
+- Cad_edit.parametric_edit edits a stored part (parameters, any dimension, features) and the history schema keeps hole thread/tolerance/fit
+
+## API
+
+- Cad.workflow assembly reaches sub-assemblies, configurations, design tables and per-occurrence parameter overrides
+
+## AI
+
+- Bring four stale ai tests in line (cad tool first line within 100 chars, parameters defaults to {}, forward reference vs real cycle, compressed system prompt wording)
+- Raise the skill description budget to 3 300 (23 skills cost 3 199)
+- Align the per-tool description budget in corpus.ts with tool-prompts.test.ts (4 550 after PMI and parametric_edit)
+- Parametric_edit refuses circular parameter definitions
+- Skills and prompts teach parametric_edit; fix stale 'not available' claims for variable fillets and path patterns
+
+## Documentation
+
+- Spec 72 change log for the STEP import wiring
+
 ## v0.1.55 (November 2026)
 
 ## Core
