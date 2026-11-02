@@ -101,9 +101,9 @@ export default function StatusBar(): JSX.Element {
       }
       right={
         <>
-          <span class="flex items-center gap-2 font-mono" title={t("cad.status.cursor")}>
+          <span class="flex items-center gap-2 font-mono tabular-nums" title={t("cad.status.cursor")}>
             <span class="text-blue-400">{t("cad.field.x")}</span><span class="text-blue-200">{mm(elements.mousePosition?.x)}</span>
-            <span class="text-fuchsia-400">{t("cad.field.y")}</span><span class="text-fuchsia-200">{mm(elements.mousePosition?.y)}</span>
+            <span class="text-amber-400">{t("cad.field.y")}</span><span class="text-amber-200">{mm(elements.mousePosition?.y)}</span>
             <Show when={!is2D()}><span class="text-emerald-400">Z</span><span class="text-emerald-200">{mm(elements.mousePosition?.z)}</span></Show>
           </span>
           <span class="hidden text-gray-500 2xl:inline">{hint()}</span>

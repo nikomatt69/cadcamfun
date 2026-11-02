@@ -19,7 +19,7 @@ const SWEEP = ["steel-s235", "steel-c45", "stainless-304", "aluminium-6061-t6", 
 const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 const f = (v: number, d = 2): string => (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toPrecision(d + 1))
 const BTN = "px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 disabled:opacity-50"
-const BTN_PRIMARY = "px-3 py-1.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50"
+const BTN_PRIMARY = "px-3 py-1.5 rounded-lg text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
 
 const fieldKey = (name: FieldName) => `sim.f.${name}` as const
 const analysisKey = (a: FemForm["analysis"]) => `sim.an.${a}` as const

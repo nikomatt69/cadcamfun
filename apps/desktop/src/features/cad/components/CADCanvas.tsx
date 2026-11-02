@@ -1670,7 +1670,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </div>
       <div class="absolute bottom-4 left-4">
-        <button onClick={() => app.keys.setHelpOpen(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-all duration-200" title={shortcutsTitle()}>
+        <button onClick={() => app.keys.setHelpOpen(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-colors motion-reduce:transition-none duration-200" title={shortcutsTitle()}>
           <HelpCircle size={18} />
         </button>
       </div>

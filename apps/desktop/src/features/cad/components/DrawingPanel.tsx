@@ -2,6 +2,7 @@ import { INPUT, PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import { drawing, type History } from "@cadcamfun/core"
 import { DrawingSheetScene } from "../../../shared/ui/stageshow/scenes-cad.tsx"
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -85,7 +86,7 @@ export default function DrawingPanel(): JSX.Element {
         </div></Show>
         <button type="button" class={`${BUTTON} panel-btn--primary panel-btn--block`} onClick={() => void generate()}>{t("cad.drawing.generate")}</button>
       </fieldset>
-      <Show when={busy()}><p role="status" class="text-xs">{t("cad.drawing.working")}</p></Show>
+      <Show when={busy()}><LoadingState label={t("cad.drawing.working")} rows={2} /></Show>
       <Show when={error()}><p role="alert" class="text-xs text-red-600">{error()}</p></Show>
       <Show when={sheet()}>{(current) => <div class="space-y-3">
         <button type="button" class="w-full border border-gray-300 bg-white" aria-label={t("cad.drawing.enlarge")} onClick={() => dialog?.showModal()}><img src={preview()} alt={t("cad.drawing.preview")} class="w-full" /></button>
