@@ -289,6 +289,68 @@
   .ss-stage * { transition: none !important; animation: none !important; }
 }
 
+/* ── Library: a new tile joins the grid ────────────────────────────────── */
+.ss-stage .lib-grid { position: absolute; inset: 14px 12px 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 48px; gap: 8px; }
+.ss-stage .lib-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  color: var(--ss-text-faint);
+}
+.ss-stage .lib-tile--slot, .ss-stage .lib-tile--fresh { grid-area: 1 / 1; }
+.ss-stage .lib-tile--slot { justify-content: center; border-style: dashed; background: transparent; transition: opacity 0.25s ease; }
+.ss-stage .lib-tile--slot[data-gone="true"] { opacity: 0; }
+.ss-stage .lib-tile--fresh { opacity: 0; transform: scale(0.92); border-color: var(--ss-accent); color: var(--ss-accent); transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.ss-stage .lib-tile--fresh[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .lib-tile__name { font-family: var(--ss-mono); font-size: 10.5px; color: var(--ss-text); white-space: nowrap; }
+.ss-stage .lib-tile--fresh .prj-dot { margin-left: auto; }
+
+/* ── Connect: a link between two nodes ──────────────────────────────────── */
+.ss-stage .conn-node {
+  position: absolute;
+  top: 40px;
+  width: 116px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--ss-line-strong);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  color: var(--ss-text-faint);
+  transition: border-color 0.3s ease, color 0.3s ease;
+}
+.ss-stage .conn-node[data-active="true"] { border-color: var(--ss-accent); color: var(--ss-accent); }
+.ss-stage .conn-node__tile { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--ss-accent-soft); flex: none; }
+.ss-stage .conn-node__live { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity 0.3s ease 0.9s; }
+.ss-stage .conn-node__live[data-on="true"] { opacity: 1; }
+.ss-stage .conn-link { fill: none; stroke: var(--ss-accent); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ss-stage .conn-link[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ── Assistant: a prompt becomes a part ─────────────────────────────────── */
+.ss-stage .ai-chat { position: absolute; left: 12px; top: 14px; width: 164px; display: flex; flex-direction: column; gap: 9px; }
+.ss-stage .ai-bubble {
+  align-self: flex-start;
+  padding: 7px 10px;
+  border-radius: 10px 10px 10px 3px;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-line);
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+.ss-stage .ai-bubble__text { display: block; clip-path: inset(0 100% 0 0); transition: clip-path 1.2s steps(26, end); }
+.ss-stage .ai-bubble__text[data-typed="true"] { clip-path: inset(0 0 0 0); }
+.ss-stage .ai-part { opacity: 0; transform: translateY(6px); transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.ss-stage .ai-part[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .ai-hole { transition: opacity 0.3s ease; }
+
 /* ── Screen furniture that uses the stage (screen-parts.tsx) ───────────── */
 .empty-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 24px auto; }
 .empty-state__preview {

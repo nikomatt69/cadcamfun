@@ -7,7 +7,7 @@
 import { For, Show, type JSX } from "solid-js"
 import LoaderCircle from "lucide-solid/icons/loader-circle"
 import Triangle from "lucide-solid/icons/triangle"
-import { ModulePreview } from "../ui/stageshow/index.ts"
+import { ModulePreview, type PreviewKind } from "../ui/stageshow/index.ts"
 import { t } from "../../i18n/index.ts"
 
 export interface ScreenHeaderProps {
@@ -74,7 +74,7 @@ export function LoadingState(props: { readonly label: string; readonly rows?: nu
  */
 export function EmptyState(props: {
   readonly label: string
-  readonly preview?: "cad" | "cam" | "projects"
+  readonly preview?: PreviewKind
   readonly action?: JSX.Element
 }): JSX.Element {
   return (

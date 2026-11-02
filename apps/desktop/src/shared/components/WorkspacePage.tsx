@@ -13,7 +13,7 @@ import { ArrowLeft, SlidersHorizontal } from "lucide-solid"
 import { t } from "../../i18n/index.ts"
 import { Motion } from "solid-motionone"
 import { prefersReducedMotion } from "../ui/animated-section.tsx"
-import { ModulePreview } from "../ui/stageshow/index.ts"
+import { ModulePreview, type PreviewKind } from "../ui/stageshow/index.ts"
 import { LoadingState } from "./screen-parts.tsx"
 import "../../styles/workstation.css"
 import "../../styles/workspace-page.css"
@@ -179,7 +179,7 @@ export function StageEmpty(props: {
   readonly title: string
   readonly hint: string
   /** A Stageshow illustration of what will fill this screen, shown instead of the icon tile. */
-  readonly preview?: "cad" | "cam" | "projects"
+  readonly preview?: PreviewKind
   readonly children?: JSX.Element
 }): JSX.Element {
   return (

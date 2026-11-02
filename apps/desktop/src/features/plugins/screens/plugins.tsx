@@ -147,7 +147,7 @@ export function PluginsScreen(): JSX.Element {
     <Show when={!plugins.loading() || plugins.data()}>
       <Show
         when={filtered().length > 0}
-        fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} title={t("plugins.none")} hint={hasFilters() ? t("plugins.noneMatch") : t("plugins.empty")}>
+        fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} preview={hasFilters() ? undefined : "connect"} title={t("plugins.none")} hint={hasFilters() ? t("plugins.noneMatch") : t("plugins.empty")}>
           <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}>{t("plugins.install")}</button>}><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("manuals.clear")}</button></Show>
         </StageEmpty>}
       >

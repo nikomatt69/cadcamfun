@@ -8,17 +8,17 @@
  * readable: the cursor position and press state are looked up per phase, never computed.
  */
 import { For, Show, type JSX } from "solid-js"
-import { Box, File, Plus, Route, Square } from "lucide-solid"
+import { Box, File, Layers, Plug, Plus, Route, Server, Square, Wrench } from "lucide-solid"
 import { Cursor, Stage } from "./stage.tsx"
 import { t } from "../../../i18n/index.ts"
 
-const W = 360
-const H = 128
+export const W = 360
+export const H = 128
 
-interface Pose { readonly x: number; readonly y: number; readonly pressed?: boolean; readonly glide?: number }
+export interface Pose { readonly x: number; readonly y: number; readonly pressed?: boolean; readonly glide?: number }
 
 /** The cursor for the current phase; the reset beat hides it, the opening beat snaps it home. */
-function Pointer(props: { readonly phase: number; readonly poses: ReadonlyArray<Pose> }): JSX.Element {
+export function Pointer(props: { readonly phase: number; readonly poses: ReadonlyArray<Pose> }): JSX.Element {
   const pose = (): Pose => props.poses[Math.min(props.phase, props.poses.length - 1)] ?? { x: 0, y: 0 }
   const last = (): boolean => props.phase >= props.poses.length
   return <Cursor x={pose().x} y={pose().y} pressed={pose().pressed} glide={pose().glide} hidden={last()} />
@@ -225,13 +225,132 @@ export function LostPreview(props: { readonly code?: string }): JSX.Element {
   )
 }
 
-/** The three module illustrations by dashboard module id. */
-export function ModulePreview(props: { readonly module: "cad" | "cam" | "projects" }): JSX.Element {
+// ── Library: a new tile joins the grid ──────────────────────────────────────
+// 0 idle · 1 cursor to the empty slot · 2 click · 3 the new item takes the slot · 4 reset
+const LIB_POSES: ReadonlyArray<Pose> = [
+  { x: 262, y: 112, glide: 0 },
+  { x: 70, y: 40, glide: 800 },
+  { x: 70, y: 40, pressed: true, glide: 150 },
+  { x: 190, y: 118, glide: 900 }
+]
+
+/** The sample tool the new tile shows: illustration content, not UI text. */
+const SAMPLE_TOOL = "Ø 10 mm" // i18n-ok
+const LIB_ICONS = [Layers, Box, Wrench, Layers, Box] as const
+
+export function LibraryPreview(): JSX.Element {
+  return (
+    <Stage class="ss-lib" width={W} height={H} steps={[600, 800, 180, 3400, 500]} poster={3}>
+      {(phase) => (
+        <div class="ss-scene" data-reset={phase() === 4}>
+          <div class="lib-grid">
+            <div class="lib-tile lib-tile--slot" data-gone={phase() >= 3}><Plus size={14} stroke-width={2.5} /></div>
+            <div class="lib-tile lib-tile--fresh" data-on={phase() >= 3}>
+              <Wrench size={14} fill="currentColor" />
+              <span class="lib-tile__name">{SAMPLE_TOOL}</span>
+              <span class="prj-dot" />
+            </div>
+            <For each={LIB_ICONS}>
+              {(Icon, i) => (
+                <div class="lib-tile">
+                  <Icon size={14} fill="currentColor" />
+                  <span class="ss-bar" style={{ width: `${[48, 38, 54, 42, 34][i()]}px` }} />
+                </div>
+              )}
+            </For>
+          </div>
+          <Pointer phase={phase()} poses={LIB_POSES} />
+        </div>
+      )}
+    </Stage>
+  )
+}
+
+// ── Connect: a link is made between two things (plugins, MCP servers) ──────
+// 0 idle · 1 cursor to the source · 2 click · 3 the link draws, the far end comes alive · 4 reset
+const CONN_POSES: ReadonlyArray<Pose> = [
+  { x: 250, y: 108, glide: 0 },
+  { x: 100, y: 70, glide: 800 },
+  { x: 100, y: 70, pressed: true, glide: 150 },
+  { x: 180, y: 108, glide: 900 }
+]
+
+export function ConnectPreview(): JSX.Element {
+  return (
+    <Stage class="ss-conn" width={W} height={H} steps={[600, 800, 180, 3400, 500]} poster={3}>
+      {(phase) => (
+        <div class="ss-scene" data-reset={phase() === 4}>
+          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", inset: "0" }}>
+            <path class="conn-link" data-on={phase() >= 3} pathLength="1" d="M160 64 H200" />
+          </svg>
+          <div class="conn-node" style={{ left: "44px" }} data-active={phase() >= 2}>
+            <span class="conn-node__tile"><Plug size={14} fill="currentColor" /></span>
+            <span class="ss-bar" style={{ width: "52px" }} />
+          </div>
+          <div class="conn-node" style={{ left: "200px" }} data-active={phase() >= 3}>
+            <span class="conn-node__tile"><Server size={14} fill="currentColor" /></span>
+            <span class="ss-bar" style={{ width: "44px" }} />
+            <span class="prj-dot conn-node__live" data-on={phase() >= 3} />
+          </div>
+          <Pointer phase={phase()} poses={CONN_POSES} />
+        </div>
+      )}
+    </Stage>
+  )
+}
+
+// ── Assistant: a prompt becomes a part ──────────────────────────────────────
+// No cursor — the story is the model working. 0 idle · 1 the prompt is typed · 2 sent, the plate appears
+// · 3 the holes arrive one by one · 4 hold · 5 reset
+/** The sample prompt: illustration content, not UI text. */
+const SAMPLE_PROMPT = "Plate 60 × 40, 4 × M5" // i18n-ok
+
+export function AssistantPreview(): JSX.Element {
+  return (
+    <Stage class="ss-ai" width={W} height={H} steps={[500, 1500, 900, 1400, 2800, 500]} poster={4}>
+      {(phase) => (
+        <div class="ss-scene" data-reset={phase() === 5}>
+          <svg class="cad-grid" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+            <defs>
+              <pattern id="ss-ai-grid" width="16" height="16" patternUnits="userSpaceOnUse">
+                <path d="M16 0H0V16" fill="none" stroke="var(--ss-line)" stroke-width="1" opacity="0.7" />
+              </pattern>
+            </defs>
+            <rect width={W} height={H} fill="url(#ss-ai-grid)" />
+            <g class="ai-part" data-on={phase() >= 2}>
+              <polygon class="cad-top" points="196,52 214,38 330,38 312,52" />
+              <polygon class="cad-side" points="312,52 330,38 330,82 312,96" />
+              <rect class="cad-front" data-on="true" x="196" y="52" width="116" height="44" />
+              <For each={[[216, 66], [292, 66], [216, 84], [292, 84]]}>
+                {([x, y], i) => <circle class="cad-hole ai-hole" data-on={phase() >= 3} style={{ "transition-delay": `${i() * 0.28}s` }} cx={x} cy={y} r="5" />}
+              </For>
+            </g>
+          </svg>
+          <div class="ai-chat">
+            <div class="ai-bubble" data-sent={phase() >= 2}>
+              <span class="ai-bubble__text" data-typed={phase() >= 1}>{SAMPLE_PROMPT}</span>
+            </div>
+            <span class="ss-bar" style={{ width: "70px", opacity: phase() >= 2 ? 0.55 : 0 }} />
+            <span class="ss-bar" style={{ width: "46px", opacity: phase() >= 3 ? 0.55 : 0 }} />
+          </div>
+        </div>
+      )}
+    </Stage>
+  )
+}
+
+export type PreviewKind = "cad" | "cam" | "projects" | "library" | "connect" | "assistant"
+
+/** The illustration for a module or an empty state, by kind. */
+export function ModulePreview(props: { readonly module: PreviewKind }): JSX.Element {
   return (
     <div class="dash-mod-preview">
       <Show when={props.module === "cad"}><CadPreview /></Show>
       <Show when={props.module === "cam"}><CamPreview /></Show>
       <Show when={props.module === "projects"}><ProjectsPreview /></Show>
+      <Show when={props.module === "library"}><LibraryPreview /></Show>
+      <Show when={props.module === "connect"}><ConnectPreview /></Show>
+      <Show when={props.module === "assistant"}><AssistantPreview /></Show>
     </div>
   )
 }

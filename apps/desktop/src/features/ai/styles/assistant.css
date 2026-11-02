@@ -1296,6 +1296,15 @@
   color: var(--assistant-muted);
 }
 
+/* The Stageshow scene at the head of the empty thread: a prompt becomes a part. */
+.assistant-empty-preview {
+  width: min(100%, 360px);
+  margin-bottom: 20px;
+  overflow: hidden;
+  border: 1px solid var(--assistant-line);
+  border-radius: 10px;
+}
+
 .assistant-emblem {
   display: flex;
   align-items: center;

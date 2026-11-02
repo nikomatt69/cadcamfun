@@ -116,7 +116,7 @@ export function McpDirectoryScreen(): JSX.Element {
         <Show
           when={visible().length > 0}
           fallback={
-            <StageEmpty icon={<Database size={24} aria-hidden="true" />} title={servers().length === 0 ? t("mcp.directory.emptyTitle") : "No servers found"} hint={servers().length === 0 ? t("mcp.directory.emptyBody") : "No servers match your search criteria."}>
+            <StageEmpty icon={<Database size={24} aria-hidden="true" />} preview={servers().length === 0 ? "connect" : undefined} title={servers().length === 0 ? t("mcp.directory.emptyTitle") : "No servers found"} hint={servers().length === 0 ? t("mcp.directory.emptyBody") : "No servers match your search criteria."}>
               <Show when={servers().length === 0} fallback={<button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>}>
                 <A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Plus size={16} aria-hidden="true" />{t("mcp.settings.add")}</A>
               </Show>
