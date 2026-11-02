@@ -289,14 +289,14 @@ export function McpConfigEditorScreen(): JSX.Element {
 
         <div class="mb-2 flex gap-2">
           <button
-            class="rounded-md bg-slate-500 px-3 py-1.5 text-sm text-white hover:bg-gray-600"
+            class="rounded-md bg-slate-500 px-3 py-1.5 text-sm text-white hover:bg-slate-600"
             onClick={formatJson}
           >
             {t("mcp.editor.format")}
           </button>
 
           <button
-            class={`rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600 ${file.loading() || saving() ? "cursor-not-allowed opacity-50" : ""}`}
+            class={`rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 ${file.loading() || saving() ? "cursor-not-allowed opacity-50" : ""}`}
             disabled={file.loading() || saving()}
             onClick={() => void saveConfig()}
           >
@@ -381,7 +381,7 @@ export function McpEditServerScreen(): JSX.Element {
           when={read.data() !== undefined}
           fallback={
             <>
-              <div class="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700">
+              <div class="mb-4 rounded-lg bg-red-100 px-4 py-3 text-red-700 dark:bg-red-950 dark:text-red-200">
                 {error() ?? read.error() ?? t("mcp.edit.notFound")}
               </div>
               <div class="mt-4">

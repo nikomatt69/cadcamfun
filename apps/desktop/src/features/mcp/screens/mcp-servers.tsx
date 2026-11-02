@@ -249,7 +249,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                 transition={{ duration: 0.3, easing: EASE }}
               >
                 <div class="flex items-center text-red-700 dark:text-red-300">
-                  <Activity size={20} class="mr-2" />
+                  <Activity size={16} class="mr-2" />
                   {error()}
                 </div>
               </Motion.div>
@@ -354,7 +354,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                 <div class="p-6">
                   <div class="mb-6">
                     <div class="mb-2 flex items-center gap-3">
-                      <Layers size={20} class="text-gray-600 dark:text-gray-400" />
+                      <Layers size={16} class="text-gray-600 dark:text-gray-400" />
                       <span class="text-base font-medium text-gray-900 dark:text-white">{t("mcp.detail.infoTitle")}</span>
                     </div>
 

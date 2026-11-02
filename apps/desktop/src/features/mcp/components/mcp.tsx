@@ -1,5 +1,5 @@
 /**
- * Shared MCP pieces for the five legacy MCP pages: the bouncing-icon loader, the server
+ * Shared MCP pieces for the five legacy MCP pages: the loading skeleton, the server
  * form used by the settings and edit screens, and the helpers that carry the legacy
  * `{ error }` bodies to the screen.
  *
@@ -95,7 +95,6 @@ export const legacyFailure = async (cause: unknown, fallback: string): Promise<s
   return fieldOf(cause) ?? fallback
 }
 
-/** Legacy `components/ui/Loading.tsx`, class for class. */
 /** The skeleton shown while the MCP config loads: rows at the geometry of the server list. */
 export function McpLoading(): JSX.Element {
   return <LoadingState label={t("common.loading")} rows={4} />
