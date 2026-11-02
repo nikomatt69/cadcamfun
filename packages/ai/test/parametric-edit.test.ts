@@ -92,6 +92,12 @@ describe("editHistory", () => {
     }
   })
 
+  test("a circular parameter definition is refused, naming the cycle", () => {
+    const out = editHistory(plate(), edits({ op: "set_parameter", name: "a", value: "b + 1" }, { op: "set_parameter", name: "b", value: "a + 1" }, { op: "set_dimension", feature: "plate", path: "depth", value: "a" }))
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.problems!.join(" ")).toContain("circular")
+  })
+
   test("an unknown feature is refused with the feature ids", () => {
     const out = editHistory(plate(), edits({ op: "set_dimension", feature: "ghost", path: "depth", value: 3 }))
     expect(out.ok).toBe(false)
