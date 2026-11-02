@@ -13,6 +13,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { startSession } from "../../../shared/state/session.ts"
 import { Button, Field, Notice, TextField } from "../../../shared/components/enterprise.tsx"
 import { describe } from "./auth.tsx"
+import { SignInPreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 type LoadingType = "email" | "google" | "passkey" | "magic-link"
 
@@ -80,6 +81,7 @@ export function SignInScreen(): JSX.Element {
   return (
     <div class="reference-standalone-container">
       <div class="ent-card" style={{ "max-width": "26rem" }}>
+        <div class="acc-preview" aria-hidden="true"><SignInPreview label={t("signin.title")} /></div>
         <div class="ent-card__head" style={{ "text-align": "center" }}>
           <img src="/logo.png" alt={t("shell.brand")} style={{ height: "40px", width: "auto", "margin-inline": "auto", display: "block", "margin-bottom": "10px" }} />
           <h1 class="ent-header__title" style={{ "font-size": "17px", "text-align": "center" }}>{t("signin.title")}</h1>

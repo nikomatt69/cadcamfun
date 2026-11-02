@@ -11,6 +11,7 @@ import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { startSession } from "../../../shared/state/session.ts"
 import { Button, Field, Notice, TextField } from "../../../shared/components/enterprise.tsx"
+import { CodePreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 /** Auth failures carry `{ error, details }`; show both, else `fallback`. */
 export const describe = (cause: unknown, fallback: string = String(cause)): string => {
@@ -40,9 +41,10 @@ function useAction() {
 }
 
 /** The centred document card the single-step auth pages share. */
-const AuthCard = (props: { readonly title: string; readonly subtitle?: string; readonly children: JSX.Element }): JSX.Element => (
+const AuthCard = (props: { readonly title: string; readonly subtitle?: string; readonly code?: boolean; readonly children: JSX.Element }): JSX.Element => (
   <div class="reference-standalone-container">
     <div class="ent-card" style={{ "max-width": "24rem" }}>
+      <Show when={props.code === true}><div class="acc-preview" aria-hidden="true"><CodePreview /></div></Show>
       <div class="ent-card__head">
         <h1 class="ent-header__title ent-header--document">{props.title}</h1>
         <Show when={props.subtitle !== undefined}>
@@ -121,7 +123,7 @@ export function VerifyEmailScreen(): JSX.Element {
     await app.runtime.run(app.client.auth.verifyEmail({ payload: { token: search.token } }))
     return { message: t("auth.verify.done") }
   }) })
-  return <AuthCard title={t("auth.verify.title")}>
+  return <AuthCard title={t("auth.verify.title")} code>
     <div class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
       <Show when={!search.token}><Notice tone="bad">{t("auth.verify.missingToken")}</Notice></Show>
       <Show when={a.pending()}><Notice>{t("auth.verify.working")}</Notice></Show>

@@ -8,13 +8,14 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { Check, Clock, Sparkles } from "lucide-solid"
+import { Check, Clock } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
 import { openExternal } from "../../../app/external.ts"
 import { PLAN_FEATURES, PLAN_ORDER, type PlanId } from "../lib/plans.ts"
 import { WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { PricingPreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 const daysLeft = (iso: string | undefined): number =>
   iso === undefined ? 0 : Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000))
@@ -57,7 +58,7 @@ export function PricingScreen(): JSX.Element {
 
   return <WorkspacePage title={t("pricing.title")}><section class="mx-auto w-full max-w-6xl">
     <div class="reference-pricing-hero">
-      <div class="reference-pricing-icon"><Sparkles size={32} aria-hidden="true" /></div>
+      <div class="acc-pricing-preview" aria-hidden="true"><PricingPreview trialLabel={t("pricing.cta.startTrial")} /></div>
       <h2 class="reference-pricing-title">{t("pricing.title")}</h2>
       <p class="reference-pricing-intro">{t("pricing.subtitle")}</p>
       <Show when={onTrial()}>

@@ -3,6 +3,7 @@ import { Show, createSignal, type JSX } from "solid-js"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { Button, Field, Notice, TextField } from "../../../shared/components/enterprise.tsx"
+import { WaitlistPreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 export function WaitlistScreen(): JSX.Element {
   const app = useApp()
@@ -23,6 +24,7 @@ export function WaitlistScreen(): JSX.Element {
   }
   return <div class="reference-standalone-container">
     <div class="ent-card" style={{ "max-width": "24rem" }}>
+      <div class="acc-preview" aria-hidden="true"><WaitlistPreview label={t("waitlist.submit")} /></div>
       <div class="ent-card__head">
         <h1 class="ent-header__title ent-header--document">{t("waitlist.title")}</h1>
         <p class="ent-header__description">{t("waitlist.subtitle")}</p>

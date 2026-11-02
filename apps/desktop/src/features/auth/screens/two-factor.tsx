@@ -13,6 +13,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { t } from "../../../i18n/index.ts"
 import { Button, Field, Notice, TextField } from "../../../shared/components/enterprise.tsx"
+import { CodePreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 type Tab = "setup" | "verify" | "manage"
 
@@ -69,6 +70,7 @@ export function TwoFactorScreen(): JSX.Element {
   return (
     <div class="reference-standalone-container">
       <div class="ent-card" style={{ "max-width": "34rem" }}>
+        <div class="acc-preview" aria-hidden="true"><CodePreview /></div>
         <div class="ent-card__head">
           <h1 class="ent-header__title ent-header--document">{t("twofactor.title")}</h1>
           <p class="ent-header__description">{t("twofactor.subtitle")}</p>

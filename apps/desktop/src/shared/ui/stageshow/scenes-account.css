@@ -1,0 +1,100 @@
+/* Account and marketing scenes (scenes-account.tsx). Scoped under `.ss-stage`; tokens are the `--ss-*` set from stage.css. */
+
+/* ── Shared: a field with typed text, a button ─────────────────────────── */
+.ss-stage .acc-field {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ss-line-strong);
+  border-radius: 6px;
+  background: var(--ss-surface);
+  overflow: hidden;
+}
+.ss-stage .acc-type {
+  display: block;
+  font-family: var(--ss-mono);
+  font-size: 10.5px;
+  color: var(--ss-text);
+  white-space: nowrap;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.8s steps(var(--ss-steps, 12), end);
+}
+.ss-stage .acc-type[data-on="true"] { clip-path: inset(0 0 0 0); }
+.ss-stage .acc-dots { letter-spacing: 1px; }
+
+.ss-stage .acc-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--ss-action);
+  color: var(--ss-action-text);
+  font-size: 10.5px;
+  font-weight: 500;
+  transition: background-color 0.3s ease, filter 0.15s ease;
+}
+.ss-stage .acc-btn[data-pressed="true"] { filter: brightness(0.9); }
+.ss-stage .acc-btn > span { grid-area: 1 / 1; transition: opacity 0.25s ease, transform 0.25s ease; }
+.ss-stage .acc-btn__check { opacity: 0; transform: scale(0.6); }
+.ss-stage .acc-btn[data-done="true"] { background: var(--ss-ok); }
+.ss-stage .acc-btn[data-done="true"] .acc-btn__label { opacity: 0; transform: scale(0.9); }
+.ss-stage .acc-btn[data-done="true"] .acc-btn__check { opacity: 1; transform: none; }
+
+/* ── Sign in: form on the left, the workspace on the right ─────────────── */
+.ss-stage .acc-form { position: absolute; top: 16px; left: 16px; width: 156px; display: flex; flex-direction: column; gap: 10px; z-index: 1; }
+.ss-stage .acc-view { position: absolute; top: 0; right: 0; border-left: 1px solid var(--ss-line); }
+.ss-stage .acc-part { opacity: 0; transform: translateY(6px); transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.ss-stage .acc-part[data-on="true"] { opacity: 1; transform: none; }
+
+/* ── One-time code ──────────────────────────────────────────────────────── */
+.ss-stage .acc-code { position: absolute; top: 38px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+.ss-stage .acc-code__box {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 44px;
+  border: 1px solid var(--ss-line-strong);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.ss-stage .acc-code__digit { font-family: var(--ss-mono); font-size: 17px; font-weight: 500; opacity: 0; transform: translateY(4px); transition: opacity 0.2s ease, transform 0.2s ease; transition-delay: inherit; }
+.ss-stage .acc-code__box[data-on="true"] .acc-code__digit { opacity: 1; transform: none; }
+.ss-stage .acc-code[data-ok="true"] .acc-code__box { border-color: var(--ss-ok); }
+.ss-stage .acc-chip--ok { padding: 4px 8px; color: var(--ss-ok); }
+
+/* ── Waitlist ───────────────────────────────────────────────────────────── */
+.ss-stage .acc-wait { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); width: 240px; display: flex; flex-direction: column; gap: 12px; }
+.ss-stage .acc-field--wide, .ss-stage .acc-btn--wide { height: 30px; }
+.ss-stage .acc-field--wide .acc-type { font-size: 11px; }
+
+/* ── Pricing ────────────────────────────────────────────────────────────── */
+.ss-stage .acc-plans { position: absolute; top: 18px; left: 14px; right: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ss-stage .acc-plan {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  height: 70px;
+  padding: 9px 10px;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.ss-stage .acc-plan__name { font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.ss-stage .acc-plan__price { font-family: var(--ss-mono); font-size: 10.5px; color: var(--ss-text-muted); }
+.ss-stage .acc-plan[data-pick="true"] { transform: translateY(-5px); border-color: var(--ss-accent); background: var(--ss-accent-soft); box-shadow: 0 4px 10px rgb(0 0 0 / 0.1); }
+
+/* ── Where the scenes sit in the screens ───────────────────────────────── */
+.acc-preview { overflow: hidden; border-bottom: 1px solid var(--ent-line); }
+.ent-card > .acc-preview { border-radius: 7px 7px 0 0; }
+.acc-pricing-preview {
+  max-width: 360px;
+  margin: 0 auto 14px;
+  overflow: hidden;
+  border: 1px solid var(--shell-border);
+  border-radius: 5px;
+}
