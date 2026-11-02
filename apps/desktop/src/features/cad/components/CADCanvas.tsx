@@ -37,6 +37,7 @@ import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { applySketchVisibility } from "../lib/history-view.ts"
+import { applyDetailLevel } from "../lib/detail-level.ts"
 import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
@@ -179,6 +180,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let reducedMotion: MediaQueryList | undefined
   let dirty = true
   let cubeStale = true
+  /** The level of detail (edges of parts that are tiny on screen) is re-evaluated at most five times a second, after the camera moved or the parts changed. */
+  let lodPending = true
+  let lodAt = 0
   const invalidate = (): void => { dirty = true; frames?.invalidate() }
   const pivot = new THREE.Object3D()
   const raycaster = new THREE.Raycaster()
@@ -381,6 +385,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const rigAnimating = rig?.beforeUpdate(performance.now()) === true
       const moved = (orbit?.update() === true) || rigAnimating
       if (rig?.afterUpdate(moved) === true) dirty = true
+      if (moved) lodPending = true
+      if (lodPending && camera && container) {
+        const now = performance.now()
+        if (now - lodAt > 200 || !moved) {
+          lodAt = now; lodPending = false
+          if (applyDetailLevel(cadObjects(), camera, container.clientHeight)) dirty = true
+        }
+      }
       if (cubeApi !== undefined && camera && (moved || cubeStale)) { camera.updateMatrixWorld(); cubeApi.setBasis(camera.matrixWorld.elements); cubeStale = false }
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
@@ -704,6 +716,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // The raycast list is a view of the map, refreshed here instead of being rebuilt on every hover query.
     visibleObjects = drawn
+    lodPending = true
     const broken = drawn.filter((object) => object.userData.isInvalidMarker === true)
     if (broken.length > 0 || invalidItems().length > 0) {
       setInvalidItems(broken.map((object) => {
