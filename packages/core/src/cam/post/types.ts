@@ -182,6 +182,14 @@ export interface TcpCodes {
   readonly end?: (tool: number) => string
 }
 
+/** The control's words for cutter radius compensation (IR `Compensation`, G41 / G42 / G40). */
+export interface CutterCompCodes {
+  /** The block that switches compensation on for a side and D register, written with the lead-in move. */
+  readonly on: (side: "left" | "right", register: number) => string
+  /** The block that cancels it (G40), written with the lead-out move or alone before a retract. */
+  readonly off: string
+}
+
 /** The control's words for spindle orientation (IR `SpindleOrient`, `spindle-orient.ts`). */
 export interface SpindleOrientCodes {
   /** Whether the control takes an angle in the block; `false`: it stops at its own fixed mark, so any other angle is refused. */
@@ -276,6 +284,11 @@ export interface Dialect {
   }
   /** The control's spindle-orientation words; absent (GRBL): a program with a `SpindleOrient` move is refused, never written without it. */
   readonly spindleOrient?: SpindleOrientCodes
+  /**
+   * The control's cutter radius compensation words (G41 / G42 D, G40). Absent on a control without them (GRBL, Heidenhain
+   * Klartext): a program whose moves carry `Compensation` is refused, never written uncompensated (the wall would be cut oversize).
+   */
+  readonly cutterComp?: CutterCompCodes
   /** The control's tilted-plane words; absent: a program with `workPlanes` is refused. */
   readonly tiltedPlane?: TiltedPlaneCodes
   /** Inverse-time feed mode (`PostOptions.inverseTimeFeed`): the words that switch it on and back to feed per minute. */

@@ -13,6 +13,7 @@ import { arcSegmentCount } from "../../cad/arc-math.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import {
   type ArcMove,
+  type Compensation,
   type CycleMove,
   type Move,
   type OrientMove,
@@ -147,6 +148,8 @@ class Writer {
   plane: TiltedPlane | undefined
   /** Inverse-time feed (`G93`) switched on. */
   private inverse = false
+  /** Cutter radius compensation in force (G41 / G42) and its D register. */
+  private comp: { readonly mode: "left" | "right"; readonly register: number } | undefined
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
   /**
    * Incremental output (`G91`) for the body of a subprogram: the axis words are the change of the rounded position, which
@@ -290,8 +293,45 @@ class Writer {
     this.feed = undefined
   }
 
-  rapid(to: Vec3, rotary?: Rotary, expr?: WordExpr): void {
+  /**
+   * The cutter-compensation word a move asks for, or `undefined` when the mode and register are already in force. Throws
+   * when the control has no G41 / G42 / G40 or the move cannot name a positive D register: the program is refused rather
+   * than written uncompensated on the contour.
+   */
+  private compensation(comp: Compensation | undefined): string | undefined {
+    if (comp === undefined) return undefined
+    if (comp.mode === "off") {
+      if (this.comp === undefined) return undefined
+      const off = this.dialect.cutterComp?.off
+      if (off === undefined) throw new RangeError(`${this.dialect.id}: this control has no cutter compensation to cancel (G40)`)
+      this.comp = undefined
+      return off
+    }
+    const codes = this.dialect.cutterComp
+    if (codes === undefined) {
+      throw new RangeError(`${this.dialect.id}: this control has no cutter radius compensation (G41 / G42 D): a compensated path would be written on the contour and cut oversize, so the program is refused`)
+    }
+    const register = comp.register ?? this.tool
+    if (!Number.isInteger(register) || register <= 0) {
+      throw new RangeError(`${this.dialect.id}: cutter compensation needs a positive D register; the move names none and no tool is in the spindle (write D<n> or select the tool first)`)
+    }
+    if (this.comp?.mode === comp.mode && this.comp.register === register) return undefined
+    this.comp = { mode: comp.mode, register }
+    return codes.on(comp.mode, register)
+  }
+
+  /** Cancels cutter compensation before a retract, a tool change or the end of the program; a no-op when it is off. */
+  closeComp(): void {
+    if (this.comp === undefined) return
+    const off = this.dialect.cutterComp?.off
+    if (off === undefined) throw new RangeError(`${this.dialect.id}: this control has no cutter compensation to cancel (G40)`)
+    this.block(off)
+    this.comp = undefined
+  }
+
+  rapid(to: Vec3, rotary?: Rotary, expr?: WordExpr, comp?: Compensation): void {
     this.endCycle()
+    const compWord = this.compensation(comp)
     const a = this.axes(to)
     this.withExpr(a, expr)
     // Tip control first: switching it on checks the rotary axes where they stand, before this move turns them.
@@ -302,28 +342,31 @@ class Writer {
       const feed = this.options.tcpRapidFeed ?? 5000
       if (!(Number.isFinite(feed) && feed > 0)) throw new RangeError(`tcpRapidFeed must be a positive feed, not ${feed}`)
       this.leaveInverse()
-      this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
+      this.block(compWord, this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
       this.motion = "G1"
       this.commit(to, a.x, a.y, a.z)
       return
     }
     if (a.words.length === 0 && r.length === 0) {
+      if (compWord !== undefined) this.block(compWord)
       this.ir = { ...to }
       return
     }
-    this.block(this.motion === "G0" ? undefined : "G0", ...a.words, ...r)
+    this.block(compWord, this.motion === "G0" ? undefined : "G0", ...a.words, ...r)
     this.motion = "G0"
     this.commit(to, a.x, a.y, a.z)
   }
 
-  linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr, source?: Move): void {
+  linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr, source?: Move, comp?: Compensation): void {
     this.endCycle()
     this.restartSpindle()
+    const compWord = this.compensation(comp)
     const a = this.axes(to)
     this.withExpr(a, expr)
     this.ensureTcp(rotary !== undefined)
     const r = this.rotaryWords(rotary)
     if (a.words.length === 0 && r.length === 0) {
+      if (compWord !== undefined) this.block(compWord)
       this.ir = { ...to }
       return
     }
@@ -331,7 +374,7 @@ class Writer {
     const minutes = this.options.inverseTimeFeed === true && source !== undefined ? tipMinutesOf(source) : undefined
     if (minutes !== undefined && minutes > 0) {
       if (!this.inverse) { this.block(this.dialect.inverseTime!.on); this.inverse = true }
-      this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, `F${formatFeedPerMinute(1 / minutes)}`)
+      this.block(compWord, this.motion === "G1" ? undefined : "G1", ...a.words, ...r, `F${formatFeedPerMinute(1 / minutes)}`)
       this.motion = "G1"
       this.feed = undefined
       this.commit(to, a.x, a.y, a.z)
@@ -345,7 +388,7 @@ class Writer {
       feedWord = `F${w.text}`
       this.feed = undefined
     }
-    this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, feedWord)
+    this.block(compWord, this.motion === "G1" ? undefined : "G1", ...a.words, ...r, feedWord)
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
   }
@@ -391,6 +434,7 @@ class Writer {
     const codes = this.dialect.tiltedPlane
     if (codes === undefined) throw new RangeError(`${this.dialect.id}: this control has no tilted-plane words`)
     this.endCycle()
+    this.closeComp()
     this.closeTcp()
     this.leaveInverse()
     const call = this.planeCall(plane)
@@ -408,6 +452,7 @@ class Writer {
     const plane = this.plane
     if (plane === undefined) return
     this.endCycle()
+    this.closeComp()
     this.closeTcp()
     this.leaveInverse()
     const call = this.planeCall(plane)
@@ -533,8 +578,10 @@ class Writer {
       const a0 = Math.atan2(from.y - move.center.y, from.x - move.center.x)
       const dir = move.clockwise ? -1 : 1
       for (let i = 1; i <= n; i++) {
+        // The compensation word rides on the first written block of the arc (the writer keeps it modal after that).
+        const comp = i === 1 ? move.comp : undefined
         if (i === n) {
-          this.linear(move.to, move.feed)
+          this.linear(move.to, move.feed, undefined, undefined, undefined, comp)
         } else {
           const a = a0 + (dir * sweep * i) / n
           this.linear(
@@ -543,12 +590,17 @@ class Writer {
               y: move.center.y + radius * Math.sin(a),
               z: from.z + ((move.to.z - from.z) * i) / n
             },
-            move.feed
+            move.feed,
+            undefined,
+            undefined,
+            undefined,
+            comp
           )
         }
       }
       return
     }
+    const compWord = this.compensation(move.comp)
     if (full && (this.arcMode === "radius" || this.dialect.arcLimits?.fullCircle === false)) {
       // A full circle has no unique R form: two half circles.
       const mid: Vec3 = {
@@ -556,28 +608,28 @@ class Writer {
         y: 2 * move.center.y - from.y,
         z: (from.z + move.to.z) / 2
       }
-      this.emitArc({ ...move, to: mid }, from, Math.PI)
+      this.emitArc({ ...move, to: mid }, from, Math.PI, compWord)
       this.emitArc(move, mid, Math.PI)
       return
     }
-    this.emitArc(move, from, sweep)
+    this.emitArc(move, from, sweep, compWord)
   }
 
-  private emitArc(move: ArcMove, from: Vec3, sweep: number): void {
+  private emitArc(move: ArcMove, from: Vec3, sweep: number, compWord?: string): void {
     const a = this.axes(move.to, true)
     const code = move.clockwise ? "G2" : "G3"
     const motionWord = this.motion === code ? undefined : code
     if (this.arcMode === "radius") {
       const r = Math.hypot(from.x - move.center.x, from.y - move.center.y)
       const signed = sweep > Math.PI + 1e-9 ? -r : r
-      this.block(motionWord, ...a.words, `R${this.num(signed)}`, this.feedWord(move.feed))
+      this.block(compWord, motionWord, ...a.words, `R${this.num(signed)}`, this.feedWord(move.feed))
     } else {
       // I/J are relative to the start point *as the control knows it* (the rounded one).
       const sx = this.px ?? from.x * this.scale
       const sy = this.py ?? from.y * this.scale
       const i = formatNumber(move.center.x * this.scale - sx, this.options.decimals)
       const j = formatNumber(move.center.y * this.scale - sy, this.options.decimals)
-      this.block(motionWord, ...a.words, `I${i}`, `J${j}`, this.feedWord(move.feed))
+      this.block(compWord, motionWord, ...a.words, `I${i}`, `J${j}`, this.feedWord(move.feed))
     }
     this.motion = code
     this.commit(move.to, a.x, a.y, a.z)
@@ -724,10 +776,10 @@ class Writer {
     if (this.skipping) return
     switch (move._tag) {
       case "Rapid":
-        this.rapid(move.to, move.rotary, move.expr)
+        this.rapid(move.to, move.rotary, move.expr, move.comp)
         break
       case "Linear":
-        this.linear(move.to, move.feed, move.rotary, move.expr, move)
+        this.linear(move.to, move.feed, move.rotary, move.expr, move, move.comp)
         break
       case "Arc":
         this.arc(move)
@@ -960,6 +1012,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     w.comment(`OPERATION: ${tp.name}`)
     const n = numbers.get(tp.toolId) ?? 1
     if (n !== w.tool) {
+      w.closeComp()
       w.finishMotion()
       w.smoothing(false)
       // The tool-length word of the new tool replaces the tip-control word (G43.4 -> G43): say so before the changer, not after.
@@ -1025,9 +1078,12 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       const last = [...tp.moves].reverse().map(moveTarget).find((p) => p !== undefined)
       w.call(spec!.call(plan!.groups[call.group]!.number), exit, last)
     }
+    // A compensated toolpath ends with its lead-out (G40); a program that does not is cancelled here, before anything else moves.
+    w.closeComp()
     w.finishMotion()
   }
 
+  w.closeComp()
   w.finishMotion()
   if (w.ir !== undefined && Number.isFinite(zMax)) w.rapid({ x: w.ir.x, y: w.ir.y, z: Math.max(zMax, w.ir.z) })
   // Leave the control with tool length compensation, never with tool-centre-point control still on
