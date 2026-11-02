@@ -175,8 +175,6 @@ html.dark .workspace-page {
   color: var(--wp-text-muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .workspace-page__rail-card > label > span {
@@ -527,11 +525,9 @@ html.dark .workspace-page select { color-scheme: dark; }
 .workspace-table th {
   padding: 7px 10px;
   color: var(--wp-text-faint);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   text-align: left;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 

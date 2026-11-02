@@ -88,11 +88,9 @@
 .reference-shell .ent-header__eyebrow {
   margin: 0 0 3px;
   color: var(--ent-text-faint);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
   line-height: 14px;
-  text-transform: uppercase;
 }
 
 .reference-shell .ent-header__title {
@@ -151,7 +149,6 @@
   color: var(--ent-text-faint);
   font-family: var(--ent-mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
   line-height: 16px;
 }
 
@@ -161,9 +158,7 @@
   color: var(--ent-text-muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   line-height: 16px;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -224,9 +219,7 @@
   color: var(--ent-text-muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.05em;
   line-height: 15px;
-  text-transform: uppercase;
 }
 
 .ent-stat__meta {
@@ -271,12 +264,10 @@
 .ent-table th {
   padding: 7px 10px;
   color: var(--ent-text-faint);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   line-height: 14px;
   text-align: left;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
