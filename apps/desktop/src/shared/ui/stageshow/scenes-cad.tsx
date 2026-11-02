@@ -56,16 +56,16 @@ export function ExplorerScene(): JSX.Element {
             </svg>
             <div class="cadx-tree">
               <div class="cadx-row cadx-row--root" data-on="true">
-                <ChevronDown size={11} />
-                <Folder size={13} fill="currentColor" />
+                <ChevronDown size={12} />
+                <Folder size={12} fill="currentColor" />
                 <span class="cadx-row__name">{SAMPLE_PART}</span>
               </div>
               <div class="cadx-row cadx-row--child" data-on={phase() >= 1 && phase() <= 3}>
-                <Square size={13} fill="currentColor" />
+                <Square size={12} fill="currentColor" />
                 <span class="cadx-row__name">{SAMPLE_SKETCH}</span>
               </div>
               <div class="cadx-row cadx-row--child" data-on={phase() >= 2 && phase() <= 3} data-selected={phase() >= 3}>
-                <Box size={13} fill="currentColor" />
+                <Box size={12} fill="currentColor" />
                 <span class="cadx-row__name">{SAMPLE_EXTRUDE}</span>
               </div>
             </div>
