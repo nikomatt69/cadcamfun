@@ -279,8 +279,15 @@ export const ParametricParameters = namedRecord(dimension, /^[A-Za-z_][A-Za-z0-9
 
 /** The order rules no field-level check can see: references point backwards, ids are unique, sketches resolve. */
 /** The timeline fields must name what exists: the rollback marker a feature, a feature's group a declared group, groups once. */
-const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }>; readonly bases?: ReadonlyArray<{ readonly id: string; readonly brep: unknown }> }): Array<Schema.FilterIssue> => {
+const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }>; readonly bases?: ReadonlyArray<{ readonly id: string; readonly brep: unknown }>; readonly configurations?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly suppressed: ReadonlyArray<string> }>; readonly configuration?: string }): Array<Schema.FilterIssue> => {
   const issues: Array<Schema.FilterIssue> = []
+  const configurations = new Set<string>()
+  for (const [index, c] of (history.configurations ?? []).entries()) {
+    if (configurations.has(c.id)) issues.push({ path: ["configurations", index, "id"], issue: `Duplicate configuration id '${c.id}'` })
+    configurations.add(c.id)
+    for (const feature of c.suppressed) if (!history.features.some((f) => f.id === feature)) issues.push({ path: ["configurations", index, "suppressed"], issue: `Configuration '${c.id}' suppresses '${feature}', which is not a feature id` })
+  }
+  if (history.configuration !== undefined && !configurations.has(history.configuration)) issues.push({ path: ["configuration"], issue: `The active configuration '${history.configuration}' is not in configurations` })
   if (history.features.length === 0 && (history.bases ?? []).length === 0) issues.push({ path: ["features"], issue: "A history needs at least one feature or one imported body" })
   if (history.rollback !== undefined && !history.features.some((f) => f.id === history.rollback)) issues.push({ path: ["rollback"], issue: `The rollback marker '${history.rollback}' is not a feature id` })
   const groups = new Set<string>()
@@ -396,9 +403,12 @@ export const ParametricHistory = described(
     parameters: withDefault(ParametricParameters, {}), features: between(Schema.Array(feature), 0, 80),
     rollback: optional(id), groups: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), collapsed: optional(Schema.Boolean) })), 0, 40)),
     bases: optional(between(Schema.Array(ParametricBase), 0, exactBrep.MAX_BASES)),
-    version: optional(Schema.Literal(2))
+    version: optional(Schema.Literal(2)),
+    notes: optional(namedRecord(Schema.Struct({ comment: optional(text(300)), kind: optional(Schema.Literals(["length", "angle", "scalar"])), favorite: optional(Schema.Boolean) }), /^[A-Za-z_][A-Za-z0-9_]{0,79}$/, "a parameter name", 80)),
+    configurations: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), values: ParametricParameters, suppressed: Schema.Array(id).check(Schema.isMaxLength(80)) })), 0, 24)),
+    configuration: optional(id)
   }),
-  "JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far. Timeline: a feature with suppressed:true is left out with what needs it (nothing is deleted); rollback names the last built feature; name and group (an id of groups) are display only."
+  "JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far. Timeline: a feature with suppressed:true is left out with what needs it (nothing is deleted); rollback names the last built feature; name and group (an id of groups) are display only. configurations are named variants (parameter values plus the suppressed feature ids); configuration is the one shown, whose values are already in parameters and suppressed flags."
 ).check(Schema.makeFilter((history) => [...historyIssues(history.features), ...timelineIssues(history)]))
 export type ParametricHistory = typeof ParametricHistory.Type
 
