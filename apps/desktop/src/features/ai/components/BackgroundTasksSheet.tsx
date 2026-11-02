@@ -12,6 +12,7 @@ import Clock from "lucide-solid/icons/clock"
 import Layers from "lucide-solid/icons/layers"
 import LoaderCircle from "lucide-solid/icons/loader-circle"
 import X from "lucide-solid/icons/x"
+import { TasksPreview } from "../../../shared/ui/stageshow/scenes-system.tsx"
 import { t } from "../../../i18n/index.ts"
 import { formatElapsed } from "../lib/task-card.ts"
 import { renderAssistantMarkdown } from "../lib/markdown.ts"
@@ -100,7 +101,7 @@ export function BackgroundTasksSheet(): JSX.Element {
                 <X size={12} aria-hidden="true" />
               </button>
             </div>
-            <Show when={ai.tasks().length > 0} fallback={<p class="assistant-bg-sheet-empty">{t("ai.tasks.sheetEmpty")}</p>}>
+            <Show when={ai.tasks().length > 0} fallback={<><div class="assistant-bg-sheet-preview" aria-hidden="true"><TasksPreview /></div><p class="assistant-bg-sheet-empty">{t("ai.tasks.sheetEmpty")}</p></>}>
               <ul class="assistant-bg-sheet-list">
                 <For each={ai.tasks()}>
                   {(task) => (

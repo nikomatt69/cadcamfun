@@ -2,6 +2,7 @@ import { Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../shared/state/context.ts"
 import { Modal } from "../shared/ui/modal.tsx"
+import { UpdatePreview } from "../shared/ui/stageshow/scenes-system.tsx"
 import { toast } from "../shared/ui/toast.tsx"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import {
@@ -118,6 +119,7 @@ export function UpdatePrompt(): JSX.Element {
       case "available": return <AvailableBody update={current} />
       case "downloading": return (
         <div class="space-y-2" data-testid="update-progress">
+          <div class="update-preview" aria-hidden="true"><UpdatePreview /></div>
           <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.downloading")}</p>
           <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(current) ?? undefined} aria-label={t("update.downloading")}>
             <div class={`h-full bg-blue-600 transition-[width] ${percent(current) === undefined ? "w-1/3 animate-pulse" : ""}`} style={percent(current) === undefined ? undefined : { width: `${percent(current)}%` }} />
@@ -151,6 +153,7 @@ function AvailableBody(props: { readonly update: AvailableUpdate }): JSX.Element
   const notes = (): string => releaseNotesOf(props.update.notes)
   return (
     <div class="space-y-3">
+      <div class="update-preview" aria-hidden="true"><UpdatePreview /></div>
       <p class="text-sm text-gray-800 dark:text-gray-100">
         {props.update.current === undefined ? t("update.available", { version: props.update.version }) : t("update.availableFrom", { version: props.update.version, current: props.update.current })}
       </p>

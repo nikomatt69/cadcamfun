@@ -11,6 +11,7 @@ import qrcode from "qrcode-generator"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
+import { PairPreview } from "../../../shared/ui/stageshow/scenes-system.tsx"
 import { t } from "../../../i18n/index.ts"
 import { WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
@@ -77,6 +78,8 @@ export function CompanionPanel(): JSX.Element {
         {(s) => (
           <>
             <section class={CARD}>
+              {/* What pairing does, shown: a phone scans the code and joins the list. */}
+              <div class="companion-preview" aria-hidden="true"><PairPreview /></div>
               <div class="flex items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                   <span class={`inline-block h-2.5 w-2.5 rounded-full ${s().enabled ? "bg-green-500" : "bg-gray-400"}`} />
