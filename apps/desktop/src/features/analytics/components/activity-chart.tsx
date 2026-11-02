@@ -6,10 +6,11 @@
  * integer y ticks, rounded bars) and the same colours/metric labels. Data is the same
  * `GET /api/analytics/user-metrics` → `chartData` series.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createMemo, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
-import { AlertCircle, Loader } from "lucide-solid"
+import { AlertCircle } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 
@@ -98,12 +99,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
       when={!reply.loading()}
       fallback={
         <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-          <Motion.div class="flex flex-col items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Motion.span animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, easing: "linear" }} class="inline-flex">
-              <Loader class="h-8 w-8 text-blue-500" />
-            </Motion.span>
-            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{t("admin.chart.loading")}</p>
-          </Motion.div>
+          <div class="w-full max-w-sm"><LoadingState label={t("admin.chart.loading")} rows={3} /></div>
         </div>
       }
     >

@@ -12,10 +12,11 @@
  * "No AI Usage Data" card, "Generate Test Data" button included (here it re-runs the read;
  * v6 has no `userAnalyticsService` to write test rows with).
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
 import { Motion } from "solid-motionone"
-import { Activity, AlertCircle, BarChart2, Cpu, DollarSign, RefreshCw, TrendingDown, TrendingUp, Users } from "lucide-solid"
+import { Activity, AlertCircle, BarChart2, Cpu, DollarSign, TrendingDown, TrendingUp, Users } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useKeyedRead, useRead } from "../../../app/queries.ts"
 
@@ -412,10 +413,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
       <Show
         when={!loadingPersonal() && !loadingSystem()}
         fallback={
-          <Motion.div class="flex h-64 items-center justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <RefreshCw class="mr-2 h-6 w-6 animate-spin text-blue-500" />
-            <span class="text-gray-600 dark:text-gray-400">{t("cost.loading")}</span>
-          </Motion.div>
+          <LoadingState label={t("cost.loading")} rows={4} />
         }
       >
         <Show
