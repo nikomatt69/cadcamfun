@@ -7,7 +7,7 @@
  * - Reduced motion: fade only, no height animation.
  * - Header is a real <button> for native a11y.
  */
-import { type JSX, Show, createContext, createSignal, createUniqueId, useContext } from "solid-js"
+import { type JSX, createContext, createSignal, createUniqueId, useContext } from "solid-js"
 
 interface AccordionContextValue {
   readonly openItems: () => ReadonlySet<string>
@@ -60,76 +60,58 @@ export interface AccordionItemProps {
   readonly children: JSX.Element
 }
 
+interface AccordionItemContextValue {
+  readonly open: () => boolean
+  readonly disabled: () => boolean
+  readonly toggle: () => void
+  readonly triggerId: string
+  readonly panelId: string
+}
+
+const AccordionItemContext = createContext<AccordionItemContextValue>()
+
 export function AccordionItem(props: AccordionItemProps): JSX.Element {
   const ctx = useContext(AccordionContext)
   if (ctx === undefined) throw new Error("AccordionItem must be used inside Accordion")
   const open = (): boolean => ctx.openItems().has(props.value)
   const triggerId = `${ctx.baseId}-trigger-${props.value}`
   const panelId = `${ctx.baseId}-panel-${props.value}`
+  const item: AccordionItemContextValue = {
+    open,
+    disabled: () => props.disabled === true,
+    toggle: () => { if (props.disabled !== true) ctx.toggle(props.value) },
+    triggerId,
+    panelId
+  }
   return (
+    <AccordionItemContext.Provider value={item}>
     <div
       class="ui-accordion-item"
       classList={{ "ui-accordion-item-open": open() }}
       data-state={open() ? "open" : "closed"}
     >
-      <Show when={props.disabled === true}>
-        <div class="ui-accordion-disabled" />
-      </Show>
-      <Slot
-        triggerId={triggerId}
-        panelId={panelId}
-        onClick={() => props.disabled !== true && ctx.toggle(props.value)}
-      >
-        {props.children}
-      </Slot>
+      {props.children}
     </div>
+    </AccordionItemContext.Provider>
   )
-}
-
-/** Slot — renders the children with the trigger/panel pair of the item. */
-function Slot(props: { readonly triggerId: string; readonly panelId: string; readonly onClick: () => void; readonly children: JSX.Element }): JSX.Element {
-  const ctx = useContext(AccordionContext)
-  // Children are expected to be AccordionTrigger followed by AccordionContent.
-  return (
-    <>
-      <button
-        id={props.triggerId}
-        type="button"
-        class="ui-accordion-trigger"
-        aria-controls={props.panelId}
-        onClick={props.onClick}
-      >
-        {/* Forwarded children handled below */}
-        <AccordionHeader>{props.children}</AccordionHeader>
-      </button>
-      <div
-        id={props.panelId}
-        role="region"
-        aria-labelledby={props.triggerId}
-        class="ui-accordion-panel"
-      >
-        <div class="ui-accordion-panel-inner">{props.children}</div>
-      </div>
-      {ctx !== undefined && void 0}
-    </>
-  )
-}
-
-/** AccordionHeader — extracts the leading non-panel child to render as label. */
-function AccordionHeader(props: { readonly children: JSX.Element }): JSX.Element {
-  return <span class="ui-accordion-header">{props.children}</span>
 }
 
 export interface AccordionTriggerProps { readonly children: JSX.Element }
-/** Trigger — kept as alias so callers can compose <Item><Trigger/><Content/></Item>. */
 export function AccordionTrigger(props: AccordionTriggerProps): JSX.Element {
-  return <>{props.children}</>
+  const item = useContext(AccordionItemContext)
+  if (item === undefined) throw new Error("AccordionTrigger must be used inside AccordionItem")
+  return <button id={item.triggerId} type="button" class="ui-accordion-trigger" aria-controls={item.panelId} aria-expanded={item.open()} disabled={item.disabled()} onClick={item.toggle}>
+    <span class="ui-accordion-header">{props.children}</span>
+  </button>
 }
 
 export interface AccordionContentProps { readonly children: JSX.Element }
-/** Content — renders the body of an item. */
 export function AccordionContent(props: AccordionContentProps): JSX.Element {
-  return <div class="ui-accordion-content">{props.children}</div>
+  const item = useContext(AccordionItemContext)
+  if (item === undefined) throw new Error("AccordionContent must be used inside AccordionItem")
+  return <div id={item.panelId} role="region" aria-labelledby={item.triggerId} class="ui-accordion-panel" hidden={!item.open()}>
+    <div class="ui-accordion-panel-inner"><div class="ui-accordion-content">{props.children}</div></div>
+  </div>
 }
 
 // Re-export createUniqueId for symmetry with other primitives.
