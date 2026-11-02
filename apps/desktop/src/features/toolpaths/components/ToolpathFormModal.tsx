@@ -58,7 +58,7 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
 
   const submit = (event: Event): void => {
     event.preventDefault()
-    if (projectId() === "") return
+    if (props.busy || projectId() === "" || name().trim() === "") return
     void props.onSubmit({
       name: name().trim(),
       description: description() === "" ? null : description(),
@@ -71,7 +71,7 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
   }
 
   return (
-    <Modal open={props.open} title={props.row ? t("pages.edit.toolpath") : t("pages.create.new.toolpath")} onClose={props.onClose}>
+    <Modal open={props.open} title={props.row ? t("pages.edit.toolpath") : t("pages.create.new.toolpath")} onClose={() => { if (!props.busy) props.onClose() }}>
       <form onSubmit={submit} class="space-y-4">
         <div>
           <label for="toolpath-name" class={LABEL}>{t("pages.toolpath.name")}</label>
@@ -81,18 +81,20 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
           <label for="toolpath-description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
           <textarea id="toolpath-description" name="description" rows={3} class={INPUT} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
         </div>
-        <div>
-          <label for="toolpath-type" class={LABEL}>{t("pages.machine.type")}</label>
-          <select id="toolpath-type" name="type" class={INPUT} value={type()} onChange={(e) => setType(e.currentTarget.value)}>
-            <For each={Object.keys(TYPE_LABEL)}>{(value) => <option value={value}>{TYPE_LABEL[value]}</option>}</For>
-          </select>
-        </div>
-        <div>
-          <label for="toolpath-operation" class={LABEL}>{t("pages.operation.type")}</label>
-          <select id="toolpath-operation" name="operationType" class={INPUT} value={operationType()} onChange={(e) => setOperationType(e.currentTarget.value)}>
-            <Show when={props.row?.operationType === "multi-operation" || props.row?.operationType === "kernel"}><option value={props.row!.operationType!}>{OPERATION_LABEL[props.row!.operationType!]}</option></Show>
-            <For each={OPERATIONS_BY_TYPE[type()] ?? []}>{(value) => <option value={value}>{OPERATION_LABEL[value]}</option>}</For>
-          </select>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="toolpath-type" class={LABEL}>{t("pages.machine.type")}</label>
+            <select id="toolpath-type" name="type" class={INPUT} value={type()} onChange={(e) => setType(e.currentTarget.value)}>
+              <For each={Object.keys(TYPE_LABEL)}>{(value) => <option value={value}>{TYPE_LABEL[value]}</option>}</For>
+            </select>
+          </div>
+          <div>
+            <label for="toolpath-operation" class={LABEL}>{t("pages.operation.type")}</label>
+            <select id="toolpath-operation" name="operationType" class={INPUT} value={operationType()} onChange={(e) => setOperationType(e.currentTarget.value)}>
+              <Show when={props.row?.operationType === "multi-operation" || props.row?.operationType === "kernel"}><option value={props.row!.operationType!}>{OPERATION_LABEL[props.row!.operationType!]}</option></Show>
+              <For each={OPERATIONS_BY_TYPE[type()] ?? []}>{(value) => <option value={value}>{OPERATION_LABEL[value]}</option>}</For>
+            </select>
+          </div>
         </div>
         <div>
           <label for="toolpath-project" class={LABEL}>{t("cam.save.project")}</label>
@@ -109,9 +111,9 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
           <p class="text-xs text-gray-500 dark:text-gray-400">{t("pages.the.g.code.is.generated.in.the.cam.page.and.saved.to.the.toolpath.from.there")}</p>
         </Show>
         <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
-          <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" onClick={() => props.onClose()}>{t("common.cancel")}</button>
+          <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" disabled={props.busy} onClick={() => props.onClose()}>{t("common.cancel")}</button>
           <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={props.busy || projectId() === ""}>
-            {props.busy ? t("mcp.form.saving") : props.row ? "Update" : t("keys.group.create")}
+            {props.busy ? t("mcp.form.saving") : props.row ? t("common.save") : t("keys.group.create")}
           </button>
         </div>
       </form>

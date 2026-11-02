@@ -1,7 +1,7 @@
 /**
  * The toolpaths list (legacy `pages/toolpaths/index.tsx`), laid out in the CAM workspace style.
  *
- * Same workspace chrome as `/cam`: a glass toolbar capsule (`workstation-toolbar`) with the page actions, a
+ * Same workspace chrome as `/cam`: a compact toolbar with the page actions, a
  * left filter rail (`cam-workspace__sidebar`) with search, type, operation and project filters, and a central
  * stage (`cam-workspace__stage`) showing the toolpaths as a grid or a table. Create/edit and the predefined
  * "Standard Library" open as modals; "Use in CAM" hands the program to `/cam` through local storage, the same
@@ -66,8 +66,11 @@ export function ToolpathsScreen(): JSX.Element {
   const [deleting, setDeleting] = createSignal<ToolpathRow>()
 
   const run = app.runtime.run as <A>(effect: unknown) => Promise<A>
+  let loadSequence = 0
+  let mounted = true
 
   const load = async (): Promise<void> => {
+    const sequence = ++loadSequence
     setLoading(true)
     setError(undefined)
     try {
@@ -80,11 +83,11 @@ export function ToolpathsScreen(): JSX.Element {
           projectId: current.projectId || undefined
         }
       }))
-      setRows(list)
+      if (mounted && sequence === loadSequence) setRows(list)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      if (mounted && sequence === loadSequence) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
-      setLoading(false)
+      if (mounted && sequence === loadSequence) setLoading(false)
     }
   }
 
@@ -107,15 +110,14 @@ export function ToolpathsScreen(): JSX.Element {
     clearTimeout(debounce)
     debounce = setTimeout(() => void load(), 250)
   }, { defer: true }))
-  onCleanup(() => clearTimeout(debounce))
+  onCleanup(() => { mounted = false; loadSequence += 1; clearTimeout(debounce) })
 
   const update = (patch: Partial<ToolpathFilters>): void => {
     const next: ToolpathFilters = { ...filters(), ...patch }
     setFilters(next)
   }
   const clearFilters = (): void => {
-    const current = filters()
-    setFilters({ search: "", type: "", operationType: "", projectId: current.projectId })
+    setFilters({ search: "", type: "", operationType: "", projectId: "" })
   }
   const hasFilters = createMemo(() => filters().search !== "" || filters().type !== "" || filters().operationType !== "" || filters().projectId !== "")
 
@@ -209,7 +211,7 @@ export function ToolpathsScreen(): JSX.Element {
           <div class="relative">
             <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              type="text"
+              type="search"
               name="search"
               class={`${FIELD} pl-8`}
               placeholder={t("pages.search.toolpaths")}
@@ -248,14 +250,14 @@ export function ToolpathsScreen(): JSX.Element {
             <X size={13} aria-hidden="true" />{t("pages.clear.filters")}
           </button>
           <div class="workspace-view-toggle" role="group" aria-label={t("cam.multi.view")}>
-            <button type="button" class="workspace-view-toggle__btn" title={t("pages.grid.view")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
-            <button type="button" class="workspace-view-toggle__btn" title={t("pages.list.view")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.grid.view")} aria-label={t("pages.grid.view")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.list.view")} aria-label={t("pages.list.view")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
           </div>
         </div>
       </>}
     >
             <Show when={!loading()} fallback={<StageLoading label={t("pages.loading.toolpaths")} />}>
-              <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} />}>
+              <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} onRetry={() => void load()} />}>
                 <Show
                   when={rows().length > 0}
                   fallback={
@@ -286,7 +288,6 @@ export function ToolpathsScreen(): JSX.Element {
                               <th scope="col">{t("pages.type.operation")}</th>
                               <th scope="col">{t("cam.save.project")}</th>
                               <th scope="col">{t("org.overview.updated")}</th>
-                              <th scope="col">ID</th>
                               <th scope="col"><span class="sr-only">{t("vcs.tab.actions")}</span></th>
                             </tr>
                           </thead>
@@ -297,7 +298,7 @@ export function ToolpathsScreen(): JSX.Element {
                                   <div class="flex items-center gap-2">
                                     <div class="flex h-7 w-7 items-center justify-center rounded-[5px] border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"><Code size={15} class="text-slate-400" aria-hidden="true" /></div>
                                     <div>
-                                      <div class="text-xs font-medium text-slate-900 dark:text-white">{row.name}</div>
+                                      <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-slate-900 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-white dark:hover:text-blue-300" onClick={(event) => event.stopPropagation()}>{row.name}</A>
                                       <Show when={row.description}><div class="max-w-xs truncate text-[11px] text-slate-500 dark:text-slate-400">{row.description}</div></Show>
                                     </div>
                                   </div>
@@ -308,13 +309,12 @@ export function ToolpathsScreen(): JSX.Element {
                                 </td>
                                 <td class="text-slate-500 dark:text-slate-400">{projectName(row.projectId)}</td>
                                 <td class="text-slate-500 dark:text-slate-400">{formatDate(row.updatedAt)}</td>
-                                <td class="font-mono text-[11px] text-slate-500 dark:text-slate-400">{row.id.substring(0, 8)}...</td>
                                 <td onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
-                                    <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("cam.multi.downloadGcode")} onClick={() => navigate(`/toolpaths/${row.id}?download=true`)}><Download size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cam.multi.downloadGcode")} aria-label={`${t("cam.multi.downloadGcode")}: ${row.name}`} onClick={() => navigate(`/toolpaths/${encodeURIComponent(row.id)}?download=true`)}><Download size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
                                   </div>
                                 </td>
                               </tr>
@@ -326,7 +326,8 @@ export function ToolpathsScreen(): JSX.Element {
                   >
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       <For each={rows()}>{(row) => (
-                        <div class={CARD} onClick={() => openDetail(row)} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") openDetail(row) }}>
+                        <div class={CARD}>
+                          <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500">
                           <CardBanner
                             icon={<Wrench size={18} aria-hidden="true" />}
                             badge={TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}
@@ -337,15 +338,16 @@ export function ToolpathsScreen(): JSX.Element {
                             <Show when={row.description}><p class="line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
                             <div class="mt-auto space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
                               <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>
-                              <div class="flex items-center justify-between gap-2"><span>ID</span><code class="font-mono text-[10px] text-slate-400 dark:text-slate-500">{row.id.substring(0, 8)}...</code></div>
+                              <div class="flex items-center justify-between gap-2"><span>{t("cam.save.project")}</span><span class="max-w-[60%] truncate text-right">{projectName(row.projectId)}</span></div>
                             </div>
                           </div>
+                          </A>
                           <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 dark:border-slate-700/70">
                             <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(row.updatedAt)}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                              <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} onClick={() => openDetail(row)}><Edit size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title={t("common.delete")} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
                             </div>
                           </div>
                         </div>

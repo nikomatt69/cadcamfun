@@ -37,7 +37,12 @@ export function CostsScreen(): JSX.Element {
     setPending(true); setError(undefined); setNotice(undefined)
     try { await work() } catch (cause) { setError(describe(cause)) } finally { setPending(false) }
   }
-  const onCalculate = () => run(async () => { if (toolpathId()) setResult(await calculate(toolpathId())) })
+  const onCalculate = () => run(async () => {
+    const id = toolpathId()
+    if (!id) return
+    const estimate = await calculate(id)
+    if (toolpathId() === id) setResult(estimate)
+  })
   const onSave = () => run(async () => {
     const r = result(); if (!r) return
     await app.runtime.run(app.client["production-costs"].createEstimate({ payload: {
@@ -59,7 +64,7 @@ export function CostsScreen(): JSX.Element {
     rail={<form class="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void onCalculate() }}>
       <p class="text-xs text-slate-500 dark:text-slate-400">{t("costs.subtitle")}</p>
       <label class="block"><span class={RAIL_LABEL}>{t("costs.toolpath")}</span>
-        <select class={FIELD} value={toolpathId()} onChange={(e) => { setToolpathId(e.currentTarget.value); setResult(undefined) }}>
+        <select class={FIELD} value={toolpathId()} disabled={pending()} onChange={(e) => { setToolpathId(e.currentTarget.value); setResult(undefined) }}>
           <option value={NONE}>{t("costs.toolpathPlaceholder")}</option>
           <For each={toolpaths.data() ?? []}>{(row) => <option value={row.id}>{row.name}</option>}</For>
         </select>
@@ -86,6 +91,7 @@ export function CostsScreen(): JSX.Element {
       <section>
         <h2 class="mb-2 font-semibold text-slate-900 dark:text-white">{t("costs.recent")}</h2>
         <Show when={saved.loading() && !saved.data()}><StageLoading label={t("common.loading")} /></Show>
+        <Show when={saved.error()}><StageError message={`${t("costs.error")}: ${describe(saved.error())}`} /></Show>
         <Show when={saved.data()?.length === 0}><p class="text-sm text-slate-500 dark:text-slate-400">{t("costs.recentEmpty")}</p></Show>
         <ul class="grid gap-2 text-sm">
           <For each={saved.data() ?? []}>{(row) =>

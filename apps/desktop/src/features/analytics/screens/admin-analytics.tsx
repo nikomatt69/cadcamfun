@@ -6,18 +6,14 @@
  * question from `GET /api/analytics` (`isAdmin`), which the sidecar derives from
  * `ADMIN_EMAIL` / the local profile. The user dropdown reads `GET /api/analytics/user-usage`
  * (`.users`) for the same reason — legacy's `/api/admin/users` does not exist either.
- *
- * The "Most Active Users" table still renders the five hard-coded sample rows the legacy page
- * shipped with, random numbers included.
  */
-import { LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { ErrorState, LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { BarChart2, Calendar, Users } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 import { AnalyticsOverview } from "../components/analytics-overview.tsx"
 import { ActivityChart } from "../components/activity-chart.tsx"
-import { UserHistory } from "../components/user-history.tsx"
 
 interface DateRange {
   readonly startDate?: Date
@@ -31,17 +27,6 @@ interface UserRow {
 }
 
 const DAY = 86_400_000
-const ACTIONS = ["viewed", "created", "updated", "exported"] as const
-
-/** Legacy `<th>` labels, verbatim and in order. */
-const TABLE_HEADERS = [
-  "admin.analytics.user",
-  "admin.analytics.totalActivity",
-  "admin.analytics.lastActive",
-  "admin.analytics.commonAction",
-  "admin.analytics.actions"
-] as const
-
 const dayInput = (value: Date | undefined): string =>
   value === undefined ? "" : value.toISOString().split("T")[0] ?? ""
 
@@ -102,6 +87,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
         <LoadingState label={t("common.loading")} rows={4} />
       }
     >
+      <Show when={!index.error()} fallback={<ErrorState label={t("common.error")} detail={index.error()} />}>
       <Show
         when={isAdmin()}
         fallback={
@@ -122,6 +108,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
               <div class="relative flex w-full items-center sm:w-auto">
                 <Users class="absolute left-3 h-4 w-4 text-gray-500" />
                 <select
+                  aria-label={t("admin.analytics.user")}
                   value={selectedUser()}
                   onChange={(event) => setSelectedUser(event.currentTarget.value)}
                   class="w-full rounded-md border border-gray-300 py-2 pl-10 pr-8 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:w-auto"
@@ -138,6 +125,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                   <Calendar class="h-4 w-4 text-gray-500" />
                   <input
                     type="date"
+                    aria-label={t("history.from")}
                     class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
                     value={dayInput(dateRange().startDate)}
                     onInput={(event) => handleDateChange("start", event.currentTarget.value)}
@@ -148,6 +136,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                   <Calendar class="h-4 w-4 text-gray-500" />
                   <input
                     type="date"
+                    aria-label={t("history.to")}
                     class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
                     value={dayInput(dateRange().endDate)}
                     onInput={(event) => handleDateChange("end", event.currentTarget.value)}
@@ -165,6 +154,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
               </div>
             </div>
           </div>
+          <Show when={usage.error()}><ErrorState label={t("common.error")} detail={usage.error()} /></Show>
 
           <Show when={rangeKey()} keyed>
             {(key) => (
@@ -199,73 +189,8 @@ export function AdminAnalyticsScreen(): JSX.Element {
             )}
           </Show>
 
-          <div class="mt-6 rounded-lg bg-[#F8FBFF] p-4 shadow dark:bg-gray-800 dark:text-white">
-            <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-white">{t("admin.analytics.mostActive")}</h2>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                <thead class="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <For each={TABLE_HEADERS}>
-                      {(label) => (
-                        <th class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
-                          {t(label)}
-                        </th>
-                      )}
-                    </For>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 bg-[#F8FBFF] dark:divide-gray-600 dark:bg-gray-800 dark:text-white">
-                  {[1, 2, 3, 4, 5].map((_, index) => (
-                    <tr>
-                      <td class="whitespace-nowrap px-6 py-4">
-                        <div class="flex items-center">
-                          <div class="h-10 w-10 flex-shrink-0">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
-                              {String.fromCharCode(65 + index)}
-                            </div>
-                          </div>
-                          <div class="ml-4">
-                            <div class="text-sm font-medium text-gray-900 dark:text-white">{t("profile.userFallback")} {index + 1}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-300">user{index + 1}@example.com</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="whitespace-nowrap px-6 py-4">
-                        <div class="text-sm text-gray-900 dark:text-white">{Math.floor(Math.random() * 200) + 50}</div>
-                      </td>
-                      <td class="whitespace-nowrap px-6 py-4">
-                        <div class="text-sm text-gray-500 dark:text-gray-300">
-                          {new Date(Date.now() - Math.random() * DAY * 10).toLocaleString()}
-                        </div>
-                      </td>
-                      <td class="whitespace-nowrap px-6 py-4">
-                        <span class="inline-flex whitespace-nowrap rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800 dark:bg-green-700 dark:text-green-100">
-                          {ACTIONS[Math.floor(Math.random() * ACTIONS.length)]}
-                        </span>
-                      </td>
-                      <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
-                        <button
-                          type="button"
-                          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                          onClick={() => setSelectedUser(`user${index + 1}`)}
-                        >
-                          {t("admin.analytics.viewDetails")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <Show when={selectedUser()}>
-            <div class="mt-6">
-              <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-white">{t("admin.analytics.userHistory")}</h2>
-              <UserHistory limit={20} />
-            </div>
-          </Show>
         </section>
+      </Show>
       </Show>
     </Show>
   )

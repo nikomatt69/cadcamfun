@@ -7,7 +7,10 @@ import { StatGrid, type StatItem } from "../../library/components/ResourceStats.
 import { buildPlayback, playbackSegments } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
 
-const minutes = (seconds: number): string => (seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min ${Math.round(seconds % 60)} s`)
+const minutes = (seconds: number): string => {
+  const rounded = Math.round(seconds)
+  return rounded < 60 ? `${rounded} s` : `${Math.floor(rounded / 60)} min ${rounded % 60} s`
+}
 
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const decode = <A,>(schema: Schema.Codec<A>, value: unknown): A | undefined => {

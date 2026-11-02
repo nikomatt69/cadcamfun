@@ -277,24 +277,19 @@ export function ToolpathDetailScreen(): JSX.Element {
                   <WorkspaceTabs class="mb-3" tabs={TABS} value={tab()} onChange={setTab} label={t("pages.toolpath.sections")} />
 
                   <Show when={tab() === "details"}>
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                      <div class={`${PANEL} md:col-span-2 !p-3`}>
+                    <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,19rem)]">
+                      <div class={`${PANEL} min-w-0`}>
                         <Show when={editing() && draft()} fallback={
-                          <div class="space-y-3">
-                            <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{current().name}</h2>
-                            <Show when={current().description} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">{t("pages.no.description.provided")}</p>}>
-                              <p class="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{current().description}</p>
+                          <div class="space-y-4">
+                            <Show when={current().description}>
+                              <p class="whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{current().description}</p>
                             </Show>
-                            <div class="grid grid-cols-2 gap-2">
-                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("pages.machine.type")}</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{typeLabel(current().type)}</p></div>
-                              <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40"><h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("pages.operation.type")}</h3><p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{operationLabel(current().operationType)}</p></div>
-                            </div>
                             <ToolpathProgramDetails row={current()} drawing={drawing()} />
                             <Show when={current().data && Object.keys(current().data as object).length > 0}>
-                              <div>
-                                <h3 class="mb-1.5 text-xs font-semibold text-slate-900 dark:text-white">{t("pages.toolpath.settings")}</h3>
-                                <div class="max-h-80 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900"><pre class="font-mono text-[11px] text-slate-800 dark:text-slate-200">{JSON.stringify(current().data, null, 2)}</pre></div>
-                              </div>
+                              <details class="border-t border-slate-200 pt-3 dark:border-slate-700">
+                                <summary class="cursor-pointer text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-slate-200">{t("pages.toolpath.settings")}</summary>
+                                <div class="mt-2 max-h-80 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900"><pre class="font-mono text-[11px] text-slate-800 dark:text-slate-200">{JSON.stringify(current().data, null, 2)}</pre></div>
+                              </details>
                             </Show>
                           </div>
                         }>
@@ -308,7 +303,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                                 <label for="detail-description" class={LABEL}>{t("save.description")}</label>
                                 <textarea id="detail-description" name="description" rows={4} class={INPUT} value={value().description} onInput={(e) => patch({ description: e.currentTarget.value })} />
                               </div>
-                              <div class="grid grid-cols-2 gap-3">
+                              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div>
                                   <label for="detail-type" class={LABEL}>{t("pages.machine.type")}</label>
                                   <select id="detail-type" name="type" class={INPUT} value={value().type} onChange={(e) => patch({ type: e.currentTarget.value })}>
@@ -340,7 +335,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                         </Show>
                       </div>
 
-                      <aside class={`${PANEL} !p-3`}>
+                      <aside class={`${PANEL} min-w-0`}>
                         <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.toolpath.information")}</h3>
                         <dl class="panel-kv">
                           <dt>{t("org.overview.created")}</dt><dd>{formatDate(current().createdAt) || "-"}</dd>
@@ -371,7 +366,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                           </Show>
                         </div>
                       }>
-                        <textarea class={`${INPUT} h-[60vh] font-mono`} placeholder={t("pages..enter.g.code.here")} value={draft()?.gcode ?? ""} onInput={(e) => patch({ gcode: e.currentTarget.value })} />
+                        <textarea class={`${INPUT} h-[60vh] font-mono`} aria-label={t("ai.controls.mode.gcode")} placeholder={t("pages..enter.g.code.here")} value={draft()?.gcode ?? ""} onInput={(e) => patch({ gcode: e.currentTarget.value })} />
                       </Show>
                     </div>
                   </Show>
@@ -404,7 +399,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                     <div class={`${PANEL} !p-3`}>
                       <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("settings.notif.comments")}</h3>
                       <form class="mb-3" onSubmit={(event) => void addComment(event)}>
-                        <textarea class={INPUT} rows={3} placeholder={t("pages.add.a.comment")} required value={commentText()} onInput={(e) => setCommentText(e.currentTarget.value)} />
+                        <textarea class={INPUT} rows={3} aria-label={t("pages.add.a.comment")} placeholder={t("pages.add.a.comment")} required value={commentText()} onInput={(e) => setCommentText(e.currentTarget.value)} />
                         <div class="mt-2 flex justify-end">
                           <button type="submit" class={SUBMIT_BUTTON} disabled={commentText().trim() === ""}>{t("pages.post.comment")}</button>
                         </div>
@@ -427,7 +422,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                                 </div>
                               </div>
                               <Show when={me.data()?.id === comment.userId}>
-                                <button type="button" class="rounded p-1.5 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title={t("pages.delete.comment")} onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
+                                <button type="button" class="rounded p-1.5 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title={t("pages.delete.comment")} aria-label={t("pages.delete.comment")} onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
                               </Show>
                             </div>
                           )}</For>
