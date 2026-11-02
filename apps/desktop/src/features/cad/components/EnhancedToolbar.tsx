@@ -3,7 +3,7 @@ import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, History, RotateCcw, RotateCw, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
+import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, History, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -13,6 +13,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { prefersDark } from "../../../shared/state/settings.ts"
 import SimulationPanel from "./SimulationPanel.tsx"
 import ComponentCreationModal from "./ComponentCreationModal.tsx"
+import { PmiPanel } from "../../pmi/index.ts"
 
 export interface EnhancedToolbarProps {
   readonly sidebarOpen: boolean
@@ -42,7 +43,7 @@ const TOGGLE_OFF = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-7
 const hover = { scale: 1.05, backgroundColor: "rgba(59, 130, 246, 0.1)" }
 const press = { scale: 0.95 }
 
-/** The editor's top bar: menu, save/import/library, undo/redo, view toggles, CAM link, selection summary, FEA dialog. */
+/** The editor's top bar: menu, save/import/library, undo/redo, view toggles, CAM link, selection summary, FEA and PMI dialogs. */
 export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Element {
   const [showComponentModal, setShowComponentModal] = createSignal(false)
   const elements = useElementsStore()
@@ -51,6 +52,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
   const [showElementsPopup, setShowElementsPopup] = createSignal(false)
   const app = useApp()
   const [simulationPosition, setSimulationPosition] = createSignal<{ x: number; y: number } | null>(null)
+  const [pmiPosition, setPmiPosition] = createSignal<{ x: number; y: number } | null>(null)
   let popup: HTMLDivElement | undefined
 
   const isDarkMode = (): boolean => {
@@ -66,7 +68,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
 
   onMount(() => {
     const outside = (event: MouseEvent) => { if (popup && !popup.contains(event.target as Node)) setShowElementsPopup(false) }
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") { setSimulationPosition(null); setShowElementsPopup(false) } }
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") { setSimulationPosition(null); setPmiPosition(null); setShowElementsPopup(false) } }
     document.addEventListener("mousedown", outside)
     document.addEventListener("keydown", key)
     onCleanup(() => { document.removeEventListener("mousedown", outside); document.removeEventListener("keydown", key) })
@@ -85,20 +87,31 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
     setShowComponentModal(true)
   }
 
-  /** Positions the FEA dialog next to the cursor, keeping it inside the window (like the tool forms). */
-  const openSimulation = (event: MouseEvent) => {
-    if (simulationPosition()) { setSimulationPosition(null); return }
-    const width = Math.min(1200, window.innerWidth * 0.95)
-    const height = Math.min(800, window.innerHeight * 0.9)
+  /** Positions a toolbar dialog next to the cursor, keeping it inside the window (like the tool forms). */
+  const dialogPosition = (event: MouseEvent, width: number, height: number): { x: number; y: number } => {
     const margin = 20
     let x = event.clientX + 15
     let y = event.clientY + 15
     if (x + width + margin > window.innerWidth) { x = event.clientX - width - 15; if (x < margin) x = window.innerWidth - width - margin }
     if (y + height + margin > window.innerHeight) { y = event.clientY - height - 15; if (y < margin) y = window.innerHeight - height - margin }
-    setSimulationPosition({
+    return {
       x: Math.max(margin, Math.min(Math.max(x, margin), window.innerWidth - width - margin)),
       y: Math.max(margin, Math.min(Math.max(y, margin), window.innerHeight - height - margin))
-    })
+    }
+  }
+
+  /** Opens the FEA dialog (or closes it); the PMI dialog closes with it, one toolbar dialog at a time. */
+  const openSimulation = (event: MouseEvent) => {
+    if (simulationPosition()) { setSimulationPosition(null); return }
+    setPmiPosition(null)
+    setSimulationPosition(dialogPosition(event, Math.min(1200, window.innerWidth * 0.95), Math.min(800, window.innerHeight * 0.9)))
+  }
+
+  /** Opens the PMI dialog like the FEA one; the FEA dialog closes with it, one toolbar dialog at a time. */
+  const openPmi = (event: MouseEvent) => {
+    if (pmiPosition()) { setPmiPosition(null); return }
+    setSimulationPosition(null)
+    setPmiPosition(dialogPosition(event, Math.min(640, window.innerWidth * 0.95), Math.min(800, window.innerHeight * 0.9)))
   }
 
   return (
@@ -169,6 +182,15 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             title={t("cad.tb.openFea")}
           >
             <Activity size={16} />
+          </button>
+          <button
+            onClick={openPmi}
+            class={`p-1.5 border shadow-sm rounded-md flex items-center ${pmiPosition() ? TOGGLE_ON : TOGGLE_OFF}`}
+            title={t("cad.pmi.title")}
+            data-testid="cad-pmi-toolbar-button"
+            aria-expanded={pmiPosition() !== null}
+          >
+            <Ruler size={16} />
           </button>
           <A href="/cam" class="p-1.5 flex items-center bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 text-white hover:from-green-600 hover:via-emerald-600 hover:to-green-600 border-0 shadow-md rounded-md" title={t("cad.switchCam")}>
             <Wrench size={16} />
@@ -308,6 +330,31 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
                 </div>
               </div>
             </div>
+          </div>
+        </Portal>}
+      </Show>
+
+      <Show when={pmiPosition()}>{(position) =>
+        <Portal>
+          <div class="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" onClick={() => setPmiPosition(null)} />
+          <div
+            class="panel fixed z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+            style={{ top: `${position().y}px`, left: `${position().x}px`, width: `${Math.min(640, window.innerWidth * 0.95)}px`, height: `${Math.min(800, window.innerHeight * 0.9)}px`, "background": "var(--panel-bg)", "color": "var(--panel-text)" }}
+            data-testid="cad-pmi-dialog"
+            role="dialog"
+            aria-label={t("cad.pmi.title")}
+          >
+            <div class="flex items-center justify-between p-4" style={{ "border-bottom": "1px solid var(--panel-border)", "background": "var(--panel-bg-subtle)" }}>
+              <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style={{ "background": "var(--panel-accent)" }}><Ruler size={18} class="text-white" /></div>
+                <div>
+                  <h2 class="text-lg font-semibold" style={{ "color": "var(--panel-text)" }}>{t("cad.pmi.title")}</h2>
+                  <p class="text-sm" style={{ "color": "var(--panel-text-muted)" }}>{t("cad.pmi.description")}</p>
+                </div>
+              </div>
+              <button onClick={() => setPmiPosition(null)} class="p-2 rounded-lg transition-colors" style={{ "color": "var(--panel-text-muted)" }} aria-label={t("cad.drawing.close")}><X size={20} /></button>
+            </div>
+            <div class="h-[calc(100%-4rem)] overflow-y-auto p-4"><PmiPanel embedded /></div>
           </div>
         </Portal>}
       </Show>

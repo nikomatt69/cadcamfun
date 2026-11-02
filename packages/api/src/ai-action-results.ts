@@ -127,6 +127,19 @@ const titleBlock = Schema.Struct({
   issues: Schema.Array(Schema.Struct({ key: str, message: str })),
   ...drawingRef
 })
+const pmiResult = Schema.Struct({
+  ok: Schema.Literal(true),
+  pmi: record,
+  fingerprint: str,
+  issues: Schema.Array(Schema.Struct({ code: str, message: str, annotationId: Schema.optionalKey(str) })),
+  ...drawingRef
+})
+const pmiValidateResult = Schema.Struct({
+  ok: Schema.Literal(true),
+  valid: Schema.Boolean,
+  fingerprint: str,
+  issues: Schema.Array(Schema.Struct({ code: str, message: str, annotationId: Schema.optionalKey(str) }))
+})
 const setups = Schema.Struct({
   ok: Schema.Literal(true),
   parts: Schema.Array(Schema.Struct({ id: str, name: str, plan: record })), partsTotal: int,
@@ -317,6 +330,8 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.simulate": read(simulated),
   "cad.assembly": read(assembly),
   "cad.title_block": read(titleBlock),
+  "cad.pmi_list": read(pmiResult),
+  "cad.pmi_validate": read(pmiValidateResult),
   "cad.setups": read(setups),
   "cad.shell": read(shell),
   "cad.surface": read(Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["surface", "solid"]), valid: Schema.Boolean, faces: int, boundaryEdges: int })),
@@ -342,6 +357,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.offset": write(["drawing"], added),
   "cad_edit.hole": write(["drawing"], added),
   "cad_edit.title_block_set": write(["drawing"], titleBlock),
+  "cad_edit.pmi_set": write(["drawing"], pmiResult),
   "cad_edit.add": write(["drawing"], added, "skipped"),
   "cad_edit.add_entities": write(["drawing"], added),
   "cad_edit.modify": write(["drawing"], modified),

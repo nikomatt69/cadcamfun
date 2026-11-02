@@ -401,6 +401,10 @@ import type {
   DrawingsListForProjectOutput,
   DrawingsCreateForProjectInput,
   DrawingsCreateForProjectOutput,
+  PmiGetInput,
+  PmiGetOutput,
+  PmiUpdateInput,
+  PmiUpdateOutput,
   ComponentsGetInput,
   ComponentsGetOutput,
   ComponentsUpdateInput,
@@ -3584,6 +3588,31 @@ export function make(options: ClientOptions) {
             },
             successStatus: 201,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    pmi: {
+      get: (input: PmiGetInput, requestOptions?: RequestOptions) =>
+        request<PmiGetOutput>(
+          {
+            method: "GET",
+            path: `/api/drawings/${encodeURIComponent(input.id)}/pmi`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: PmiUpdateInput, requestOptions?: RequestOptions) =>
+        request<PmiUpdateOutput>(
+          {
+            method: "PUT",
+            path: `/api/drawings/${encodeURIComponent(input.id)}/pmi`,
+            body: { pmi: input["pmi"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,
           },
           requestOptions,

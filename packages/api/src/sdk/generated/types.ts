@@ -1110,6 +1110,8 @@ export type DrawingsCreateForProjectPayload = {
   readonly mergeData?: boolean | undefined
 }
 
+export type PmiUpdatePayload = { readonly pmi: unknown; readonly baseUpdatedAt?: string | undefined }
+
 export type ComponentsUpdatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -6411,6 +6413,28 @@ export type DrawingsCreateForProjectOutput = {
   createdAt: string
   updatedAt: string
   projectId: string
+}
+
+export type PmiGetInput = { readonly id: { readonly id: string }["id"] }
+
+export type PmiGetOutput = {
+  drawingId: string
+  pmi: unknown
+  fingerprint: string
+  issues: Array<{ annotationId?: string | undefined; code: string; message: string }>
+}
+
+export type PmiUpdateInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly pmi: PmiUpdatePayload["pmi"]
+  readonly baseUpdatedAt?: PmiUpdatePayload["baseUpdatedAt"]
+}
+
+export type PmiUpdateOutput = {
+  drawingId: string
+  pmi: unknown
+  fingerprint: string
+  issues: Array<{ annotationId?: string | undefined; code: string; message: string }>
 }
 
 export type ComponentsGetInput = { readonly id: { readonly id: string }["id"] }

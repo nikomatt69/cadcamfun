@@ -17,6 +17,7 @@ import StatusBar from "../components/StatusBar.tsx"
 import FloatingToolbar from "../components/FloatingToolbar.tsx"
 import EnhancedToolbar from "../components/EnhancedToolbar.tsx"
 import DrawingPanel from "../components/DrawingPanel.tsx"
+import { PmiViewportOverlay } from "../../pmi/index.ts"
 import CadRibbon from "../components/CadRibbon.tsx"
 import SurfacingPanel, { type SurfacingOp } from "../components/SurfacingPanel.tsx"
 import { t } from "../../../i18n/index.ts"
@@ -249,6 +250,7 @@ export default function CadPage(): JSX.Element {
               footerDock={<TitleBlockOverlay mode={cad.viewMode} />}
             />
             <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
+            <Show when={canvas()}>{(api) => <PmiViewportOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
               <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} ai={() => <button class="cad-ribbon-action" onClick={() => app.setPanelOpen(true)}>{t("ai.title")}</button>} />
             </Show>

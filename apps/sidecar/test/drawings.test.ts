@@ -128,6 +128,39 @@ describe("the title block stored with a drawing", () => {
   })
 })
 
+describe("the PMI set stored with a drawing", () => {
+  test("PMI endpoints round-trip a valid set; an invalid one is a 400 that writes nothing, via the endpoint and via a drawing save", async () => {
+    const ref = { body: "part", kind: "face", key: "plate.top" }
+    const pmiSet = {
+      version: 1,
+      captures: [{ id: "c1", name: "Front", annotationIds: ["d1", "s1"] }],
+      annotations: [
+        { id: "d1", captureId: "c1", refs: [ref], kind: "datum", letter: "A" },
+        { id: "s1", captureId: "c1", refs: [ref], kind: "dimensional-size", nominal: 10, upper: 0.1, lower: -0.1 }
+      ]
+    }
+    const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "PMI", data: { elements: [] } } })
+    const empty = await app.call(`/api/drawings/${d.id}/pmi`)
+    expect(empty.status).toBe(200)
+    expect(empty.body.pmi).toEqual({ version: 1, annotations: [], captures: [] })
+    const put = await app.call(`/api/drawings/${d.id}/pmi`, { method: "PUT", json: { pmi: pmiSet } })
+    expect(put.status).toBe(200)
+    expect(put.body.fingerprint).toBeString()
+    expect(put.body.issues).toEqual([])
+    expect((await app.call(`/api/drawings/${d.id}/pmi`)).body.pmi).toEqual(pmiSet)
+    expect((await app.call(`/api/drawings/${d.id}`)).body.data.pmi).toEqual(pmiSet)
+
+    const invalid = { ...pmiSet, annotations: [...pmiSet.annotations, { id: "d2", captureId: "c1", refs: [ref], kind: "datum", letter: "A" }] }
+    const bad = await app.call(`/api/drawings/${d.id}/pmi`, { method: "PUT", json: { pmi: invalid } })
+    expect(bad.status).toBe(400)
+    expect(bad.body.message).toContain("Invalid PMI:")
+    expect((await app.call(`/api/drawings/${d.id}/pmi`)).body.pmi).toEqual(pmiSet)
+    const badSave = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: [], pmi: invalid } } })
+    expect(badSave.status).toBe(400)
+    expect((await app.call(`/api/drawings/${d.id}`)).body.data.pmi).toEqual(pmiSet)
+  })
+})
+
 describe("restore point retention", () => {
   test("the interval and the number kept follow the configured policy (CADCAMFUN_VERSION_*): every save is kept when the interval is 0, only the newest N survive", async () => {
     const tuned = await makeApp({ versionIntervalMs: 0, versionLimit: 3 })

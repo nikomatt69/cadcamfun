@@ -4,6 +4,7 @@ import { MaterialsGroup, MaterialsStorageGroup } from "./groups/materials.ts"
 import { ToolsGroup, ToolsStorageGroup } from "./groups/tools.ts"
 import { MachineConfigsGroup, MachineConfigsStorageGroup } from "./groups/machine-configs.ts"
 import { DrawingsGroup } from "./groups/drawings.ts"
+import { PmiGroup } from "./groups/pmi.ts"
 import { ComponentsGroup } from "./groups/components.ts"
 import { ProjectToolpathsGroup, ToolpathExtrasGroup, ToolpathsGroup } from "./groups/toolpaths.ts"
 import { ToolpathGeneratorGroup } from "./groups/toolpath-generator.ts"
@@ -73,6 +74,7 @@ export * from "./groups/cloud.ts"
 export * from "./groups/materials.ts"
 export * from "./groups/tools.ts"
 export * from "./groups/drawings.ts"
+export * from "./groups/pmi.ts"
 export * from "./groups/components.ts"
 export * from "./groups/toolpaths.ts"
 export * from "./groups/toolpath-generator.ts"
@@ -109,6 +111,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(MachineConfigsGroup.middleware(Authorization))
   .add(MachineConfigsStorageGroup.middleware(Authorization))
   .add(DrawingsGroup.middleware(Authorization))
+  .add(PmiGroup.middleware(Authorization))
   .add(ComponentsGroup.middleware(Authorization))
   .add(ToolpathsGroup.middleware(Authorization))
   .add(ToolpathExtrasGroup.middleware(Authorization))

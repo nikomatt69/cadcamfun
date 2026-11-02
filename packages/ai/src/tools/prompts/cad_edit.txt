@@ -18,6 +18,7 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - parametric_convert: elementId, depth? (flat shapes), name?. Store a parametric twin preserving shape, placement and properties; original remains.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]. Store a checked exact copy. Preview cad.shell; names cad.exact.
 - title_block_set: titleBlock {title?, number?, revision?, status?, ...}; only given fields change.
+- pmi_set: pmi {version:1, annotations, captures}; replaces the whole PMI set after validation (compare-and-swap).
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?. Stores a checked copy. Preview cad.hole.
 - offset: id, distance (outward). Store a checked exact copy; source remains. Preview cad.offset.
 - surface: operation patch|stitch|thicken, patches (data, trim?), thickness?, direction?, tolerance?, name?; as cad.surface, with the same thicken limits. Open surface bodies are excluded from solid analysis and CAM.

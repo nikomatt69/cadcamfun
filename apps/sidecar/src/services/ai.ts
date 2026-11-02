@@ -7,7 +7,7 @@ import {
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type HostToolContext, type ProviderId, type ToolHandlersShape,
   modToolContributions, modSpecs, isolatedPaths, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
-import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, type History } from "@cadcamfun/core"
+import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, pmi, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { Database, schema } from "@cadcamfun/db"
@@ -666,6 +666,17 @@ const toolHandlers = Effect.gen(function*() {
       await save(loaded, { ...loaded.data, titleBlock: { ...complete } }, loaded.elements)
       await audit(loaded.projectId, "ai.cad.title_block_set", { drawingId: loaded.id, fields: Object.keys(input.titleBlock) })
       return reply(complete)
+    },
+    cadPmi: async (projectId, input) => {
+      { const denied = await refused(projectId); if (denied) return denied }
+      const loaded = await load(projectId, input.action === "set")
+      const reply = (set: pmi.PmiSet) => ({ ok: true as const, pmi: set, fingerprint: pmi.pmiFingerprint(set), issues: pmi.validatePmiSet(set), ...where(loaded) })
+      if (input.action === "list") return reply(pmi.pmiSetOf(loaded.data))
+      const issues = pmi.validatePmiSet(input.pmi)
+      if (issues.length > 0) return { ok: false, error: `Invalid PMI: ${issues.map((i) => i.message).join("; ")}` }
+      await save(loaded, { ...loaded.data, pmi: input.pmi }, loaded.elements)
+      await audit(loaded.projectId, "ai.cad.pmi_set", { drawingId: loaded.id, annotations: input.pmi.annotations.length })
+      return reply(input.pmi)
     },
     cadSetups: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }

@@ -21,6 +21,8 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - assembly: washers?; clashes, gaps, BOM, joints, missing fasteners.
 - setups: ids?, fixture?, allowed?; orientations per solid.
 - title_block: none; the completed title block and what it lacks.
+- pmi_list: none; stored PMI, fingerprint, issues.
+- pmi_validate: pmi; validate, store nothing.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming); resolve gives exact|split|merged|deleted|ambiguous.
 - workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.

@@ -52,6 +52,9 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.setups": { accept: [{}, { ids: ["a"], fixture: "none", allowed: ["+Z", "-X"] }], refuse: [{ ids: [] }, { fixture: "top" }, { allowed: [] }, { allowed: ["+W"] }] },
   "cad.assembly": { accept: [{}, { washers: false }], refuse: [{ washers: 1 }] },
   "cad.title_block": { accept: [{}], refuse: [[]] },
+  "cad.pmi_list": { accept: [{}], refuse: [[]] },
+  "cad.pmi_validate": { accept: [{ pmi: { version: 1, annotations: [], captures: [] } }], refuse: [{}] },
+  "cad_edit.pmi_set": { accept: [{ pmi: { version: 1, annotations: [], captures: [] } }], refuse: [{}] },
   "cad_edit.title_block_set": { accept: [{ titleBlock: { title: "Plate" } }, { titleBlock: { status: "released", scale: "1:2", mass: 0.4 } }], refuse: [{}, { titleBlock: {} }, { titleBlock: { status: "shipped" } }, { titleBlock: { date: "tomorrow" } }, { titleBlock: { mass: -1 } }] },
   "cad.shell": { accept: [{ id: "a", thickness: 2 }, { id: "a", thickness: 1.5, open: ["plate.top"] }], refuse: [{ id: "a" }, { id: "", thickness: 2 }, { id: "a", thickness: 0 }, { id: "a", thickness: 2, open: [""] }] },
   "cad.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "patch", patches: [] }] },
@@ -132,7 +135,7 @@ describe("Effect-owned CAD and parametric inputs", () => {
       // The derived schema may let through what only the decode sees (trimming, history order); the decode never does.
       for (const input of refuse) expect([id, input, await decodes(schema, input)]).toEqual([id, input, false])
       // A misspelt optional field is refused at both, not silently dropped. An action without parameters takes any object.
-      if (id === "cad.describe" || id === "cad.check" || id === "cad.title_block") return
+      if (id === "cad.describe" || id === "cad.check" || id === "cad.title_block" || id === "cad.pmi_list") return
       const misspelt = { ...(accept[0] as object), layerr: "L1" }
       expect([id, wire.safeParse(misspelt).success, await decodes(schema, misspelt)]).toEqual([id, false, false])
     })

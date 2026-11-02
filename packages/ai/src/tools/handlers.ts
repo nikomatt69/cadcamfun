@@ -17,6 +17,9 @@ export type CamStockInput = { action: "inspect" } | { action: "set"; stock: type
 /** What the title block handler is asked: the drawing's block as it reads now, or the fields to set (the others keep their value). */
 export type CadTitleBlockInput = { action: "inspect" } | { action: "set"; titleBlock: drawing.TitleBlock }
 
+/** What the PMI handler is asked: list the stored set, or replace it (validated, compare-and-swap in the host). */
+export type CadPmiInput = { action: "list" } | { action: "set"; pmi: import("@cadcamfun/core").pmi.PmiSet }
+
 /** What `cam_verify_toolpath` adds to the operation's own settings and stock; validated before the handler runs. */
 export interface VerifyToolOptions {
   readonly tool?: Partial<cam.verify.VerifyTool>
@@ -52,6 +55,8 @@ export interface ToolHandlersShape {
   cadSetups?(projectId: string, input: CadSetupsInput): Promise<unknown>
   /** The title block of the open drawing (ISO 7200 fields), completed from what the drawing knows; or the fields to set in it. */
   cadTitleBlock?(projectId: string, input: CadTitleBlockInput): Promise<unknown>
+  /** The PMI set of the open drawing (spec 49 P1), stored in `data.pmi`; `set` replaces it after validation. */
+  cadPmi?(projectId: string, input: CadPmiInput): Promise<unknown>
   /** Exact interference, bill of materials, joints and the fasteners still missing of the open drawing. */
   cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */

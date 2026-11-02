@@ -70,6 +70,12 @@ export const CadTitleBlockSetInput = Schema.Struct({
 })
 export type CadTitleBlockSetInput = typeof CadTitleBlockSetInput.Type
 
+/** A PMI set (spec 49 P1) as stored in `Drawing.data.pmi`; validated by `@cadcamfun/core` `pmi.validatePmiSet`. */
+export const CadPmiInput = Schema.Struct({
+  pmi: Schema.Unknown.annotate({ description: "The PMI set: { version: 1, annotations: [...], captures: [...] }. Annotations are dimensional-size, dimensional-location, geometric-tolerance (GdtSpec), datum, datum-target, surface-texture or note, each with id, captureId and topological refs {body, kind, key}." })
+})
+export type CadPmiInput = typeof CadPmiInput.Type
+
 /** What hollowing a solid would give, on paper: nothing in the drawing changes. */
 export const CadShellInput = Schema.Struct({
   id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)).annotate({ description: "Id of the solid to hollow." }),
@@ -211,6 +217,8 @@ export const CAD_ACTION_INPUTS = {
   "cad.simulate": CadSimulateInput,
   "cad.assembly": CadAssemblyInput,
   "cad.title_block": empty,
+  "cad.pmi_list": empty,
+  "cad.pmi_validate": CadPmiInput,
   "cad.setups": CadSetupsInput,
   "cad.shell": CadShellInput,
   "cad.offset": CadOffsetInput,
@@ -223,6 +231,7 @@ export const CAD_ACTION_INPUTS = {
   "cad_edit.offset": CadOffsetInput,
   "cad_edit.hole": CadHoleInput,
   "cad_edit.title_block_set": CadTitleBlockSetInput,
+  "cad_edit.pmi_set": CadPmiInput,
   "cad.distance": CadDistanceInput,
   "cad.kernel": CadKernelInput,
   "cad.workflow": CadWorkflowInput,

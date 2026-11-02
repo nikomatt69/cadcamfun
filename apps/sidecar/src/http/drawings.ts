@@ -1,5 +1,5 @@
 import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
-import { drawing as sheet } from "@cadcamfun/core"
+import { drawing as sheet, pmi } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -13,6 +13,13 @@ const titleBlockOf = (data: unknown) => {
   const block = typeof data === "object" && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>)["titleBlock"] : undefined
   const errors = sheet.titleBlockErrors(block)
   return errors.length === 0 ? Effect.void : Effect.fail(new BadRequest({ message: `Invalid title block: ${errors.map((e) => e.message).join("; ")}` }))
+}
+
+/** A stored PMI set must be valid like the title block: nothing is written when it is damaged. */
+const pmiOf = (data: unknown) => {
+  const raw = typeof data === "object" && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>)["pmi"] : undefined
+  const errors = pmi.pmiErrors(raw)
+  return errors.length === 0 ? Effect.void : Effect.fail(new BadRequest({ message: `Invalid PMI: ${errors.join("; ")}` }))
 }
 
 export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(function*(handlers) {
@@ -42,6 +49,7 @@ export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(
       Effect.gen(function*() {
         yield* load(params.id)
         yield* titleBlockOf(payload.data)
+        yield* pmiOf(payload.data)
         const { baseUpdatedAt, mergeData, ...fields } = payload
         const saved = yield* drawings.save(params.id, fields, baseUpdatedAt, mergeData === true)
         if (!saved.ok) return yield* new Conflict({ message: `The drawing was saved elsewhere since it was read (${saved.currentUpdatedAt}). Nothing was overwritten.` })
@@ -74,6 +82,7 @@ export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(
         yield* projectAccess(params.id)
         if (!payload.name) return yield* new BadRequest({ message: "Drawing name is required" })
         yield* titleBlockOf(payload.data)
+        yield* pmiOf(payload.data)
         return yield* drawings.create(params.id, { ...payload, name: payload.name })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create drawing"))))
 }))
