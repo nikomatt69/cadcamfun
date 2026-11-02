@@ -10,6 +10,7 @@ import { GRID_COLORS } from "../../../viewport/adaptive-grid.ts"
 import { createThreeObject } from "./createThreeObject.ts"
 import { createInvalidMarker, invalidReason } from "./invalid-marker.ts"
 import { initializeElementTransform, premultiplyObject, rotationOf, type ElementTransformFields } from "./element-transform.ts"
+import { releaseGeometries, releasePooledInstance } from "./shared-geometry.ts"
 
 export const HOVER_COLOR = 0x4a90e2
 export const SELECTED_COLOR = 0xff3366
@@ -164,9 +165,11 @@ export function disposeObject(root: THREE.Object3D): void {
     }
   }
   for (const texture of textures) texture.dispose()
-  for (const geometry of geometries) geometry.dispose()
+  // A geometry shared with other parts (identical copies of one shape, `shared-geometry.ts`) is kept until its last holder is freed.
+  releaseGeometries(geometries)
   for (const material of materials) material.dispose()
   root.removeFromParent()
+  releasePooledInstance(root)
 }
 
 export interface DragStart {

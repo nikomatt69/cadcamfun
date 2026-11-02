@@ -29,8 +29,8 @@ const defaultStorage = (): Storage | undefined => {
 }
 
 /** The stored preferences of a scope: only the fields that are present and valid (none for a missing, damaged or blocked entry). */
-export const readViewPrefs = (scope: string, storage: Pick<Storage, "getItem"> | undefined = defaultStorage()): Partial<ViewPrefs> => {
-  if (storage === undefined) return {}
+export const readViewPrefs = (scope: string, storage: Pick<Storage, "getItem"> | null | undefined = defaultStorage() ?? null): Partial<ViewPrefs> => {
+  if (storage === undefined || storage === null) return {}
   try {
     const raw = storage.getItem(viewPrefsKey(scope))
     if (raw === null) return {}
@@ -47,8 +47,8 @@ export const readViewPrefs = (scope: string, storage: Pick<Storage, "getItem"> |
 }
 
 /** Stores the preferences of a scope. Returns false when the storage refused; the choice then lasts until the app is closed. */
-export const writeViewPrefs = (scope: string, prefs: ViewPrefs, storage: Pick<Storage, "setItem"> | undefined = defaultStorage()): boolean => {
-  if (storage === undefined) return false
+export const writeViewPrefs = (scope: string, prefs: ViewPrefs, storage: Pick<Storage, "setItem"> | null | undefined = defaultStorage() ?? null): boolean => {
+  if (storage === undefined || storage === null) return false
   try {
     storage.setItem(viewPrefsKey(scope), JSON.stringify({ displayMode: prefs.displayMode, showSketches: prefs.showSketches, showFlatPattern: prefs.showFlatPattern }))
     return true
@@ -72,7 +72,7 @@ const same = (a: ViewPrefs, b: ViewPrefs): boolean => a.displayMode === b.displa
  * project's (a project without any inherits what is on screen, which becomes its own); from then on every change is written to the
  * current project and to the last-used slot. Returns the function that stops it.
  */
-export const bindViewPrefs = (cad: WatchableStore<ViewPrefs>, document: WatchableStore<{ readonly projectId: string | null }>, storage: Pick<Storage, "getItem" | "setItem"> | undefined = defaultStorage()): (() => void) => {
+export const bindViewPrefs = (cad: WatchableStore<ViewPrefs>, document: WatchableStore<{ readonly projectId: string | null }>, storage: Pick<Storage, "getItem" | "setItem"> | null | undefined = defaultStorage() ?? null): (() => void) => {
   let scope = scopeOf(document.getState().projectId)
   const restore = (from: string): boolean => {
     const stored = readViewPrefs(from, storage)

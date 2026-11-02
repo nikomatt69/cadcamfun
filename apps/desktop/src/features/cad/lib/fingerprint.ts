@@ -47,8 +47,11 @@ const MAX_DEPTH = 12
 const numberBits = new Float64Array(1)
 const numberWords = new Uint32Array(numberBits.buffer)
 
+/** Folded into every step; 0 for the plain fingerprint, another constant for the second hash of `shapeKey`. */
+let seed = 0
+
 const mix = (hash: number, value: number): number => {
-  let next = (hash ^ (value | 0)) >>> 0
+  let next = (hash ^ (value | 0) ^ seed) >>> 0
   next = Math.imul(next, 16777619) >>> 0
   return next
 }
@@ -124,3 +127,18 @@ const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: Readon
 
 /** The shape fingerprint of an element: same number = same geometry, move it as much as you like. */
 export const shapeFingerprint = (element: unknown): number => hash(element, new WeakSet<object>(), 0, PLACEMENT_KEYS)
+
+/**
+ * A key that tells the shapes of *different* elements apart: two independent 32-bit hashes (64 bits) and the element's type. The plain
+ * fingerprint is only ever compared between two versions of one element; sharing a built shape between elements (`shared-geometry.ts`)
+ * must not trust 32 bits, because a collision would draw one part with another part's geometry.
+ */
+export const shapeKey = (element: unknown): string => {
+  const first = shapeFingerprint(element)
+  seed = 0x9e3779b1
+  try {
+    const second = hash(element, new WeakSet<object>(), 0, PLACEMENT_KEYS)
+    const type = (element as { type?: unknown } | null)?.type
+    return `${typeof type === "string" ? type : ""}:${first.toString(36)}:${second.toString(36)}`
+  } finally { seed = 0 }
+}

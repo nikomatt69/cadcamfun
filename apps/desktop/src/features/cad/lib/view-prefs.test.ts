@@ -46,8 +46,8 @@ describe("the stored look of the canvas", () => {
     const hostile = { getItem: () => { throw new Error("blocked") }, setItem: () => { throw new Error("quota") } }
     expect(readViewPrefs("s", hostile)).toEqual({})
     expect(writeViewPrefs("s", prefs(), hostile)).toBe(false)
-    expect(readViewPrefs("s", undefined)).toEqual({})
-    expect(writeViewPrefs("s", prefs(), undefined)).toBe(false)
+    expect(readViewPrefs("s", null)).toEqual({})
+    expect(writeViewPrefs("s", prefs(), null)).toBe(false)
     const cad = store(prefs())
     const document = store({ projectId: null as string | null })
     const stop = bindViewPrefs(cad, document, hostile)

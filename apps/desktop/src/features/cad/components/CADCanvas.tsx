@@ -42,7 +42,8 @@ import { applyDetailLevel } from "../lib/detail-level.ts"
 import { applyJointSelection, createJointMarkers, describeJoint, pickJointMarker, type JointPick } from "../lib/joint-markers.ts"
 import { useAssemblyStore } from "../store/assemblyStore.ts"
 import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, pixelRadiusAt, sameSubEntity, type SubEntityPick, type SubHighlightKind, type VertexPicking } from "../lib/sub-entity.ts"
-import { shapeFingerprint } from "../lib/fingerprint.ts"
+import { shapeFingerprint, shapeKey } from "../lib/fingerprint.ts"
+import { ShapePool } from "../lib/shared-geometry.ts"
 import { flatPatternSource } from "../lib/flat-pattern.ts"
 import FlatPatternOverlay from "./FlatPatternOverlay.tsx"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
@@ -205,6 +206,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let pointerDown: { x: number; y: number; additive: boolean } | undefined
   /** One Three object per drawn element, with the shape it was built for. The canvas owns this map. */
   const objectsById = new Map<string, { object: THREE.Object3D; shape: number }>()
+  /** The built shapes identical parts share (one master per shape, a copy per part). */
+  const shapes = new ShapePool()
   /** The drawn objects that pass the layer visibility test: the raycast candidate list, kept in step with the map. */
   let visibleObjects: THREE.Object3D[] = []
 
@@ -522,6 +525,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       rig = undefined
       orbit?.dispose()
       look.dispose()
+      // Each part gives its share of the geometry back first, then the pool frees its masters, then the scene's own helpers go.
+      for (const entry of objectsById.values()) disposeObject(entry.object)
+      shapes.clear()
       // Dispose the entire owned scene once, including helper textures.
       if (scene) disposeObject(scene)
       objectsById.clear()
@@ -714,7 +720,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         }
       }
       if (!object) {
-        const built = buildElementObject(element, invalidate)
+        // Identical parts (a pattern, a row of fasteners) are built once and share their geometry; see `lib/shared-geometry.ts`.
+        const built = shapes.acquire(
+          `${shapeKey(element)}|${cad.tolerance}|${currentLookTier()}`, element,
+          () => buildElementObject(element, invalidate),
+          (copy) => applyElementTransform(copy, element as ElementTransformFields, originOffset())
+        )
         if (!built) continue
         objectsById.set(element.id, { object: built, shape })
         scene.add(built)
