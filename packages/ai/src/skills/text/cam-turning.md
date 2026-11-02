@@ -21,5 +21,5 @@
 - Warnings and `explicit[]` (an operation written as moves although a cycle exists, with the reason) must reach the user.
 
 ## Do not
-- Do not promise tool life, chip control or surface finish: none is modelled. Do not claim live tooling, C-axis, sub-spindle transfer or mill-turn: not built (spec 52 T7, M1-M4).
+- Do not promise tool life, chip control or surface finish: none is modelled. This planner writes turning only: no live-tooling milling, C-axis contouring or sub-spindle transfer operations, and the milling kernel refuses a turning centre. A mill-turn centre (B head, Y, positioned C: `cam` action `materials` lists them with their `turning` block) can be shown and a program for it replayed with `cam` action `machine`, but do not promise a planned or verified mill-turn program.
 - Do not store the NC as verified: `cam_edit turn` saves the point-tool preview only.

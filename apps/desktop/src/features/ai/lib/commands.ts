@@ -88,6 +88,23 @@ const reject = (reason: string): CommandOutcome => ({ kind: "rejected", reason }
 /** Renders a command with no argument as a fixed prompt. */
 const prompt = (text: string) => (): CommandOutcome => ({ kind: "prompt", prompt: text })
 
+/** One language-neutral line for the toast: `done/total`, the step under way after a play sign, and the steps still waiting after a circle. */
+export const planSummary = (plan: ReadonlyArray<{ readonly content: string; readonly status: string }>): string | undefined => {
+  if (plan.length === 0) return undefined
+  const done = plan.filter((step) => step.status === "completed").length
+  const current = plan.find((step) => step.status === "in_progress")
+  const waiting = plan.filter((step) => step.status === "pending").length
+  return `${done}/${plan.length}${current === undefined ? "" : ` · ▶ ${current.content}`}${waiting === 0 ? "" : ` · ○${waiting}`}`
+}
+
+/** `/plan` and `/build`: pick the primary agent; text after the command is sent to it as the next message. */
+const switchPrimary = (id: "plan" | "build", args: string, host: CommandHost): CommandOutcome => {
+  if (!host.ai.agents().some((agent) => agent.id === id)) return reject("ai.cmd.agent.unknown")
+  host.ai.setAgent(id)
+  const task = args.trim()
+  return task === "" ? done : { kind: "prompt", prompt: task }
+}
+
 const PERMISSIONS = ["auto", "ask", "approve"] as const
 
 /** `mm` tolerance on the argument so `/mode CAD` and `/mode cad` both work. */
@@ -150,7 +167,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
   },
   {
     name: "sessions",
-    aliases: ["history"],
+    aliases: ["history", "resume"],
     group: "session",
     title: "ai.cmd.sessions",
     description: "ai.cmd.sessions.desc",
@@ -234,6 +251,21 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     keywords: ["halt", "interrupt", "esc"],
     run: ({ host }) => { host.ai.abort(); return done }
   },
+  {
+    // Claude Code's `/todos`: the agent's own plan for this conversation (its todowrite list), read from the store, never sent to the model.
+    name: "todos",
+    aliases: ["todo", "plan-list"],
+    group: "session",
+    title: "ai.cmd.todos",
+    description: "ai.cmd.todos.desc",
+    keywords: ["plan", "steps", "progress", "tasks", "checklist"],
+    run: ({ host }) => {
+      const summary = planSummary(host.ai.plan())
+      if (summary === undefined) return reject("ai.cmd.todos.empty")
+      host.notify(summary)
+      return done
+    }
+  },
 
   // ── Model and behaviour ───────────────────────────────────────────────────
   {
@@ -270,6 +302,28 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
       host.ai.setAgent(match.id)
       return done
     }
+  },
+  {
+    // Claude Code's `/plan`: the Plan agent reads and plans, it never writes. With text after the command it starts planning that task at once.
+    name: "plan",
+    aliases: ["planning"],
+    group: "model",
+    title: "ai.cmd.plan",
+    description: "ai.cmd.plan.desc",
+    args: "[task]",
+    keywords: ["read-only", "propose", "think first", "preview"],
+    run: ({ args, host }) => switchPrimary("plan", args, host)
+  },
+  {
+    // The way back from `/plan`: the Build agent edits the drawing and the CAM program under the permission mode in force.
+    name: "build",
+    aliases: ["execute"],
+    group: "model",
+    title: "ai.cmd.build",
+    description: "ai.cmd.build.desc",
+    args: "[task]",
+    keywords: ["edit", "write", "act", "leave plan"],
+    run: ({ args, host }) => switchPrimary("build", args, host)
   },
   {
     name: "permissions",
@@ -350,6 +404,16 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     run: ({ host }) => { void host.ai.consolidateMemory(); return done }
   },
   {
+    // Claude Code's `/init` writes CLAUDE.md; the CAD/CAM counterpart is the project's standing context (`memory_edit` action `context_update`).
+    name: "init",
+    aliases: ["project-rules"],
+    group: "context",
+    title: "ai.cmd.init",
+    description: "ai.cmd.init.desc",
+    keywords: ["standing context", "rules", "claude.md", "units", "origin", "conventions"],
+    run: prompt("Set up the standing context of this project. Read what is stored with memory action context_read, then read the facts from the project: cad action describe (units, bounds, layers), cam action stock, library action lookup_machine_config and the project defaults. Draft short sections for the rules that hold for every conversation here: units and origin, material and stock, machine and post, layer naming, tolerance standard, verification expectations. Show me the draft and what you could not establish. Write a section with memory_edit action context_update only after I confirm it, one heading at a time, and never store secrets, revisions or guesses.")
+  },
+  {
     name: "stats",
     aliases: ["tokens", "usage"],
     group: "context",
@@ -396,7 +460,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
   },
   {
     name: "check",
-    aliases: ["review", "validate"],
+    aliases: ["validate"],
     group: "design",
     title: "ai.cmd.check",
     description: "ai.cmd.check.desc",
@@ -466,7 +530,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     title: "ai.cmd.estimate",
     description: "ai.cmd.estimate.desc",
     keywords: ["cost", "quote", "time", "price", "money"],
-    run: prompt("Estimate the production cost of the current toolpath — machine time, tooling and setup — and explain the breakdown so I can sanity-check it.")
+    run: prompt("Estimate the production time and cost of the current program. Take the cutting time and tool changes from cam action setup_sheet (a saved kernel program) or from the analysis of the stored NC. The rates are not readable by you: use the machine and operator hourly rates, setup time and material price I give, or ask me for them, and never invent one. Show the arithmetic line by line (machine time, tooling wear, setup, material with waste) so I can sanity-check it, and say what is not included.")
   },
 
   // ── Library ──────────────────────────────────────────────────────────────
@@ -490,6 +554,26 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
   },
 
   // ── Version control ──────────────────────────────────────────────────────
+  {
+    // Claude Code's `/review`: read the change before it is merged. Read-only; the evidence comes from the version control and the CAM review.
+    name: "review",
+    aliases: ["code-review", "audit"],
+    group: "version",
+    title: "ai.cmd.review",
+    description: "ai.cmd.review.desc",
+    keywords: ["diff", "changes", "before merge", "findings", "pull request"],
+    run: prompt("Review the work on the checked-out branch before it is merged, changing nothing. Read vcs action status and vcs action diff against main, run cad action check on the changed solids and read cam action review for the saved CAM programs. Report findings by severity with the element or operation ids, say which evidence is stale or missing, and list what the checks do not prove.")
+  },
+  {
+    // Claude Code's `/rewind`: go back to an earlier saved state. The agent lists the checkpoints and waits for the person to name one.
+    name: "rewind",
+    aliases: ["checkpoints", "undo-to"],
+    group: "version",
+    title: "ai.cmd.rewind",
+    description: "ai.cmd.rewind.desc",
+    keywords: ["restore", "checkpoint", "go back", "revert", "earlier state"],
+    run: prompt("I want to go back to an earlier state of this project. List the checkpoints with vcs action checkpoints and, for the ones I may mean, show what changed since each with vcs action diff. Restore nothing yet: ask me which checkpoint, and only after I name it restore it with vcs_edit action restore_checkpoint using the current project revision.")
+  },
   {
     name: "status",
     aliases: ["vcs", "diff"],
@@ -591,7 +675,7 @@ const commandScore = (command: SlashCommand, query: string): number => {
  * order (grouped by the caller); a typed query ranks by name, then alias, then
  * keyword. Grouping never reorders the user's own ranking.
  */
-export const searchCommands = (query: string, limit = 40): ReadonlyArray<SlashCommand> => {
+export const searchCommands = (query: string, limit = 80): ReadonlyArray<SlashCommand> => {
   const trimmed = query.trim()
   if (trimmed === "") return COMMANDS.slice(0, limit)
   return COMMANDS

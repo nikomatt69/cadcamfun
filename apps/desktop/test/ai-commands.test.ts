@@ -15,6 +15,7 @@ import {
   findCommand,
   isCommandDraft,
   parseCommand,
+  planSummary,
   runCommand,
   searchCommands,
   type CommandHost,
@@ -410,6 +411,105 @@ describe("the commands that act on the conversation itself", () => {
         const owner = seen.get(name)
         expect(owner === undefined || owner === command.name, `${name} answers to two commands`).toBe(true)
         seen.set(name, command.name)
+      }
+    }
+  })
+})
+
+describe("Claude Code style commands that map to real capabilities", () => {
+  const withPrimaries = (calls: string[], plan: ReadonlyArray<{ content: string; status: string }> = []) => stubAi({
+    agents: () => [
+      { id: "build", title: "Build", description: "", tools: [], edits: true },
+      { id: "plan", title: "Plan", description: "", tools: [], edits: false }
+    ],
+    setAgent: (id: string) => { calls.push(id) },
+    plan: () => plan
+  })
+
+  test("/plan switches to the Plan agent and /build switches back", async () => {
+    const calls: string[] = []
+    const rec = recorder(withPrimaries(calls))
+    expect(await run("/plan", rec)).toEqual({ kind: "done" })
+    expect(await run("/build", rec)).toEqual({ kind: "done" })
+    expect(calls).toEqual(["plan", "build"])
+  })
+
+  test("text after /plan is planned at once, by the Plan agent", async () => {
+    const calls: string[] = []
+    const outcome = await run("/plan a bracket with four M6 holes", recorder(withPrimaries(calls)))
+    expect(calls).toEqual(["plan"])
+    expect(outcome).toEqual({ kind: "prompt", prompt: "a bracket with four M6 holes" })
+  })
+
+  test("/plan is refused, and the agent kept, when the host lists no such agent", async () => {
+    const calls: string[] = []
+    const rec = recorder(stubAi({ setAgent: (id: string) => { calls.push(id) } }))
+    expect(await run("/plan", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.agent.unknown" })
+    expect(calls).toEqual([])
+  })
+
+  test("/todos shows the agent's plan on one line and refuses an empty one", async () => {
+    const empty = recorder(withPrimaries([]))
+    expect(await run("/todos", empty)).toEqual({ kind: "rejected", reason: "ai.cmd.todos.empty" })
+    const rec = recorder(withPrimaries([], [
+      { content: "Model the base", status: "completed" },
+      { content: "Drill the holes", status: "in_progress" },
+      { content: "Verify the toolpath", status: "pending" },
+      { content: "Export NC", status: "pending" }
+    ]))
+    expect(await run("/todo", rec)).toEqual({ kind: "done" })
+    expect(rec.notices).toEqual([{ message: "1/4 · ▶ Drill the holes · ○2", tone: undefined }])
+    expect(planSummary([])).toBeUndefined()
+  })
+
+  test("/review reads the change without writing and no longer hides behind /check", async () => {
+    expect(findCommand("review")?.name).toBe("review")
+    expect(findCommand("check")?.name).toBe("check")
+    const outcome = await run("/review")
+    expect(outcome?.kind).toBe("prompt")
+    if (outcome?.kind !== "prompt") return
+    for (const wanted of ["vcs action status", "vcs action diff", "cad action check", "cam action review", "changing nothing"]) expect(outcome.prompt).toContain(wanted)
+    expect(outcome.prompt).not.toContain("vcs_edit")
+  })
+
+  test("/rewind lists checkpoints first and restores only on the person's word", async () => {
+    const outcome = await run("/rewind")
+    expect(outcome?.kind).toBe("prompt")
+    if (outcome?.kind !== "prompt") return
+    expect(outcome.prompt).toContain("vcs action checkpoints")
+    expect(outcome.prompt).toContain("Restore nothing yet")
+    expect(outcome.prompt).toContain("vcs_edit action restore_checkpoint")
+    expect(findCommand("checkpoints")?.name).toBe("rewind")
+  })
+
+  test("/init drafts the project's standing context and writes only after confirmation", async () => {
+    const outcome = await run("/init")
+    expect(outcome?.kind).toBe("prompt")
+    if (outcome?.kind !== "prompt") return
+    expect(outcome.prompt).toContain("memory action context_read")
+    expect(outcome.prompt).toContain("memory_edit action context_update")
+    expect(outcome.prompt).toContain("only after I confirm")
+  })
+
+  test("/resume opens the conversations and /estimate no longer invents rates", async () => {
+    const rec = recorder()
+    expect(findCommand("resume")?.name).toBe("sessions")
+    await run("/resume", rec)
+    expect(rec.panels).toEqual(["sessions"])
+    const estimate = await run("/estimate")
+    expect(estimate?.kind === "prompt" && estimate.prompt).toContain("never invent one")
+  })
+
+  test("every prompt command names only actions the harness really has", async () => {
+    const { ACTION_CATALOGUE } = await import("../../../packages/ai/src/actions/catalogue.ts")
+    const known = new Set(ACTION_CATALOGUE.map((spec) => spec.id))
+    for (const command of COMMANDS) {
+      // Commands that act on the store get a store that answers nothing; only the briefs they hand back matter here.
+      const quiet = new Proxy({}, { get: () => () => [] }) as unknown as CommandHost["ai"]
+      const outcome = await Promise.resolve(command.run({ args: "", host: recorder(quiet).host })).catch(() => undefined)
+      if (outcome?.kind !== "prompt") continue
+      for (const m of outcome.prompt.matchAll(/\b(cad_edit|cam_edit|library_edit|memory_edit|vcs_edit|cad|cam|library|memory|vcs) action ([a-z_]+)/g)) {
+        expect(known.has(`${m[1]}.${m[2]}`), `${command.name}: ${m[0]}`).toBe(true)
       }
     }
   })

@@ -50,4 +50,4 @@ from the model, so views and dimensions follow. `format: "svg"` returns the SVG.
 
 ## Limits to say out loud
 Sketches are 2D with point-based entities; NURBS splines, 3D sketches and sketch blocks are not in this call. Mates solve rigid
-occurrences from their present pose (one solution, not all assembly modes). Sheet metal unfolding and weldment cut lists are not here.
+occurrences from their present pose (one solution, not all assembly modes). Sheet metal flat patterns come from a parametric `sheet` feature (skill fusion-360-modelling), not from this call; no action returns a weldment cut list.

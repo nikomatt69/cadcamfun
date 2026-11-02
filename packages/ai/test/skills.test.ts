@@ -2,6 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { CAM_ACTION_INPUTS } from "@cadcamfun/api"
+import { drawing, pmi } from "@cadcamfun/core"
 import { ELEMENT_SPECS } from "../src/element-catalog.ts"
 import { buildHostConfig } from "../src/nikcli/config.ts"
 import { CADCAM_SKILLS, installSkills, skillMarkdown } from "../src/skills/index.ts"
@@ -101,5 +103,44 @@ describe("cadcam skills", () => {
       expect(permission["**"], name).toBe("deny")
       for (const blocked of ["bash", "edit", "write", "webfetch"]) expect(permission[blocked], `${name} ${blocked}`).toBeUndefined()
     }
+  })
+  test("the PMI skill names every annotation kind, every tolerance kind and the replace-the-whole-set rule", () => {
+    const body = CADCAM_SKILLS.find((skill) => skill.name === "pmi-and-drawing-annotation")?.body ?? ""
+    for (const kind of ["dimensional-size", "dimensional-location", "geometric-tolerance", "datum", "datum-target", "surface-texture", "note"]) expect(body, kind).toContain(`\`${kind}\``)
+    for (const kind of Object.keys(drawing.GDT_NEEDS_DATUM)) expect(body, kind).toContain(kind)
+    expect(body).toContain("REPLACES the whole set")
+    // The examples it gives are valid: a datum, a size with its deviations and a position frame that cites the datum.
+    const set: pmi.PmiSet = {
+      version: 1,
+      captures: [{ id: "c1", name: "Front", annotationIds: ["d1", "s1", "g1"] }],
+      annotations: [
+        { id: "d1", captureId: "c1", kind: "datum", letter: "A", refs: [{ body: "plate", kind: "face", key: "plate.top" }] },
+        { id: "s1", captureId: "c1", kind: "dimensional-size", nominal: 10, upper: 0.015, lower: 0, refs: [{ body: "plate", kind: "face", key: "hole.wall" }] },
+        { id: "g1", captureId: "c1", kind: "geometric-tolerance", gdt: { kind: "position", value: 0.1, diameter: true, datums: ["A"] }, refs: [{ body: "plate", kind: "face", key: "hole.wall" }] }
+      ]
+    }
+    expect(pmi.validatePmiSet(set)).toEqual([])
+    expect(pmi.validatePmiSet({ ...set, annotations: set.annotations.slice(1) }).map((issue) => issue.code)).toContain("unknown-datum")
+  })
+
+  test("the cutting-data and library skills quote the real enumerations", () => {
+    const body = (name: string) => CADCAM_SKILLS.find((skill) => skill.name === name)?.body ?? ""
+    const input = CAM_ACTION_INPUTS["cam.cutting_data"].fields as unknown as { cut: { literals: ReadonlyArray<string> }; tool: { fields: { kind: { literals: ReadonlyArray<string> } } } }
+    expect(input.cut.literals.length).toBeGreaterThan(5)
+    for (const cut of input.cut.literals) expect(body("cutting-parameters"), cut).toContain(cut)
+    for (const kind of input.tool.fields.kind.literals) expect(body("cutting-parameters"), kind).toContain(kind)
+    expect(body("cutting-parameters")).toContain("cutter that is geometrically impossible")
+    for (const post of ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"]) expect(body("library-setup"), post).toContain(post)
+    // The honest limit: costs are written, never read back, so no price is quoted from them.
+    expect(body("library-setup")).toContain("no action reads them back")
+  })
+
+  test("skills that were once stale say what the kernel now does", () => {
+    const body = (name: string) => CADCAM_SKILLS.find((skill) => skill.name === name)?.body ?? ""
+    expect(body("cam-turning")).not.toContain("not built")
+    expect(body("cam-turning")).toContain("cam` action `machine`")
+    expect(body("cad-workflow")).not.toContain("Sheet metal unfolding")
+    expect(body("cam-operation-workflow")).toContain("compare_setups")
+    expect(body("cam-operation-workflow")).toContain("chain_status")
   })
 })
