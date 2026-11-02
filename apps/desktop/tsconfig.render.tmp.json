@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "incremental": true, "tsBuildInfoFile": "/tmp/cadcanvas-render.tsbuildinfo" },
+  "include": ["src/features/cad/components/CADCanvas.tsx", "src/features/cad/lib/*.ts", "src/features/cad/components/StatusBar.tsx", "src/features/cad/components/DimensionsOverlay.tsx"],
+  "exclude": []
+}

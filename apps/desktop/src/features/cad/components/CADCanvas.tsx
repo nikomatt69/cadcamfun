@@ -410,7 +410,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       renderer, scene, camera,
       render: () => renderer?.render(scene!, camera!),
       quality: currentLookTier,
-      busy: () => dirty || fourViewOn,
+      // The occlusion shades the depth buffer: with faces that are not drawn (hidden line, wireframe) or see-through (x-ray, ghost) it would smudge the background.
+      busy: () => dirty || fourViewOn || (cad.displayMode !== "shaded-edges" && cad.displayMode !== "shaded"),
       exclude: (object) => object === gizmo?.getHelper() || object.userData.isControlPoint === true,
       radius: () => {
         const box = new THREE.Box3()

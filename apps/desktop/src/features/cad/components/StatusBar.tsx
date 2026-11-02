@@ -71,6 +71,9 @@ export default function StatusBar(): JSX.Element {
           <Show when={elements.selectedElement}>
             {(selected) => <Seg label={t("cad.status.selected")} value={`${selected().type} ${selected().id.substring(0, 6)}`} tone="blue" hideBelow="lg" title={selected().id} />}
           </Show>
+          <Show when={cad.pickedEntity}>
+            {(entity) => <Seg value={t(entity().kind === "face" ? "cad.sub.face" : "cad.sub.edge", { index: entity().index })} tone="amber" hideBelow="lg" testId="status-entity" />}
+          </Show>
           <Show when={bounds()}>
             {(box) => <Seg label={t("cad.status.size")} value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} tone="cyan" hideBelow="xl" title={t("cad.status.sizeTitle")} />}
           </Show>
