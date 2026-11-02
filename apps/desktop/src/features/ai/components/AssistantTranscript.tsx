@@ -199,7 +199,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                           onClick={() => props.onUseSuggestion(suggestion.prompt)}
                           title={suggestion.description}
                         >
-                          <span class="assistant-suggestion-toast-icon"><Lightbulb size={13} aria-hidden="true" /></span>
+                          <span class="assistant-suggestion-toast-icon"><Lightbulb size={14} aria-hidden="true" /></span>
                           <span class="assistant-suggestion-toast-copy">
                             <strong>{suggestion.title}</strong>
                             <small>{suggestion.description}</small>
@@ -211,7 +211,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                           aria-label={t("ai.suggestions.dismiss")}
                           onClick={() => ai.dismissSuggestion(suggestion.id)}
                         >
-                          <X size={11} aria-hidden="true" />
+                          <X size={12} aria-hidden="true" />
                         </button>
                       </li>
                     )}
@@ -222,7 +222,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
           }
         >
           <div class="assistant-thread-meta">
-            <span>{t("ai.composer.thisComputer")} · {props.headerMeta} · </span>
+            <span>{t("ai.composer.thisComputer")} · {props.headerMeta}</span>
             <button
               type="button"
               class="assistant-thread-meta-link"
@@ -271,14 +271,9 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
               <div class="ui-dots" aria-label={t("ai.thinking")}>
                 <span /><span /><span />
               </div>
-              <div class="flex flex-col">
-                <span class="assistant-thinking-title">
-                  {t("ai.thinking.processing")}
-                </span>
-                <span class="assistant-thinking-subtitle">
-                  {t("ai.runtime.streaming")}
-                </span>
-              </div>
+              <span class="assistant-thinking-title">
+                {t("ai.thinking.processing")}
+              </span>
             </div>
           </Show>
           <Show when={planAwaitingApproval(ai.agent(), ai.status(), ai.messages())}>

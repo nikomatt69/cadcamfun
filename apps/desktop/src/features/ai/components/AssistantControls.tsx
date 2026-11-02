@@ -90,7 +90,7 @@ function ControlMenu(props: {
         <Show when={props.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot(), margin: 0 }} aria-hidden="true" />}</Show>
         <Show when={props.showValue}>
           <span class="assistant-control-label">{selected()?.label ?? props.value}</span>
-          <ChevronDown size={11} class="assistant-control-chevron" aria-hidden="true" />
+          <ChevronDown size={12} class="assistant-control-chevron" aria-hidden="true" />
         </Show>
         <Show when={!props.showValue}>
           <span class="assistant-control-dot" aria-hidden="true" />
@@ -119,7 +119,7 @@ function ControlMenu(props: {
                     trigger?.focus()
                   }}
                 >
-                  <span class="assistant-control-option-check">{active() ? <Check size={13} aria-hidden="true" /> : null}</span>
+                  <span class="assistant-control-option-check">{active() ? <Check size={14} aria-hidden="true" /> : null}</span>
                   <span>
                     <Show when={option.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot() }} aria-hidden="true" />}</Show>
                     <strong>{option.label}</strong>

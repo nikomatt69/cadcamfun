@@ -31,7 +31,7 @@ export function SessionsPanel(): JSX.Element {
       <div class="assistant-panel-header">
         <p class="assistant-section-label mb-0">{t("ai.sessions.title")} ({ai.sessions().length})</p>
         <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => ai.newSession()} data-testid="ai-session-new">
-          <Plus size={11} aria-hidden="true" />
+          <Plus size={12} aria-hidden="true" />
           {t("ai.sessions.new")}
         </button>
       </div>

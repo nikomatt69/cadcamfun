@@ -75,11 +75,11 @@ export function TaskCard(props: TaskCardProps): JSX.Element {
     >
       <div class="assistant-task-card-head">
         <span aria-hidden="true" class="assistant-task-card-icon">
-          <Show when={status() === "running" || status() === "starting"}><LoaderCircle size={13} class="animate-spin assistant-status-active" /></Show>
-          <Show when={status() === "queued"}><Clock size={13} class="assistant-status-active" /></Show>
-          <Show when={status() === "completed"}><Check size={13} class="assistant-status-ok" /></Show>
-          <Show when={status() === "error" || status() === "failed"}><X size={13} class="assistant-status-error" /></Show>
-          <Show when={status() === "cancelled"}><X size={13} class="assistant-status-muted" /></Show>
+          <Show when={status() === "running" || status() === "starting"}><LoaderCircle size={14} class="animate-spin assistant-status-active" /></Show>
+          <Show when={status() === "queued"}><Clock size={14} class="assistant-status-active" /></Show>
+          <Show when={status() === "completed"}><Check size={14} class="assistant-status-ok" /></Show>
+          <Show when={status() === "error" || status() === "failed"}><X size={14} class="assistant-status-error" /></Show>
+          <Show when={status() === "cancelled"}><X size={14} class="assistant-status-muted" /></Show>
         </span>
         <span class="assistant-agent-pill" data-testid="ai-task-agent">{agentLabel(agent())}</span>
         <span class="assistant-task-card-title" title={title()}>{title()}</span>
@@ -120,7 +120,7 @@ export function TaskCard(props: TaskCardProps): JSX.Element {
                 aria-label={t("ai.tasks.copyReport")}
                 onClick={(event) => { event.preventDefault(); event.stopPropagation(); void copy(report()) }}
               >
-                {copied() ? <Check size={10} aria-hidden="true" /> : <Copy size={10} aria-hidden="true" />}
+                {copied() ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
                 {copied() ? t("ai.tasks.copied") : t("ai.tasks.copyReport")}
               </button>
             </summary>

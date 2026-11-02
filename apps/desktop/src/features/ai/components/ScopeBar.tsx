@@ -102,7 +102,7 @@ export function ScopeBar(): JSX.Element {
               classList={{ "is-active": drawingValue() === "" }}
               onClick={() => setScopeOpen(false)}
             >
-              <span class="assistant-scope-check">{drawingValue() === "" ? <Check size={13} aria-hidden="true" /> : null}</span>
+              <span class="assistant-scope-check">{drawingValue() === "" ? <Check size={14} aria-hidden="true" /> : null}</span>
               <span>{document.name ?? t("ai.composer.unsavedDrawing", { name: app.drawing().name })}</span>
             </button>
             <For each={projects()}>
@@ -129,7 +129,7 @@ export function ScopeBar(): JSX.Element {
                           classList={{ "is-active": active() }}
                           onClick={() => { selectDrawing(`drawing:${drawing.id}`); setScopeOpen(false) }}
                         >
-                          <span class="assistant-scope-check">{active() ? <Check size={13} aria-hidden="true" /> : null}</span>
+                          <span class="assistant-scope-check">{active() ? <Check size={14} aria-hidden="true" /> : null}</span>
                           <span>{t("ai.composer.drawingInProject", { drawing: drawing.name, project: project.name })}</span>
                         </button>
                       )
@@ -156,7 +156,7 @@ export function ScopeBar(): JSX.Element {
           <div class="assistant-device-row is-active">
             <Monitor size={14} aria-hidden="true" />
             <span><strong>{t("ai.composer.thisComputer")}</strong><small>{t("ai.composer.executionHost")}</small></span>
-            <Check size={13} aria-hidden="true" />
+            <Check size={14} aria-hidden="true" />
           </div>
           <For each={devices()?.devices ?? []}>
             {(device) => (
@@ -170,7 +170,7 @@ export function ScopeBar(): JSX.Element {
             )}
           </For>
           <button type="button" class="assistant-device-manage" onClick={() => navigate("/settings/companion")}>
-            <Settings2 size={13} aria-hidden="true" />
+            <Settings2 size={14} aria-hidden="true" />
             {t("ai.composer.manageDevices")}
           </button>
         </div>

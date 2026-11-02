@@ -50,7 +50,7 @@ export function CommandPalette(props: Props): JSX.Element {
       data-testid="ai-command-palette"
     >
       <p class="assistant-palette-head">
-        <Search size={11} aria-hidden="true" />
+        <Search size={12} aria-hidden="true" />
         <span>{t("ai.palette.title")}</span>
         <Show when={queryOf(props.draft).trim() !== ""}>
           <span class="assistant-palette-query" data-testid="ai-command-query">{queryOf(props.draft).trim()}</span>

@@ -48,7 +48,7 @@ export function ModelPicker(): JSX.Element {
         <Show when={effortLabel()}>
           {(effort) => <span class="assistant-chip-effort">{effort()}</span>}
         </Show>
-        <ChevronDown size={11} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
+        <ChevronDown size={12} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
       </button>
       <Show when={open()}>
         <ModelMenu onSelect={() => setOpen(false)} />
@@ -104,7 +104,7 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
                     </div>
                   </span>
                   <Show when={!model.configured}>
-                    <span class="assistant-status-warn text-[10px]">{t("ai.model.unconfigured")}</span>
+                    <span class="assistant-status-warn text-[11px]">{t("ai.model.unconfigured")}</span>
                   </Show>
                 </button>
               </li>

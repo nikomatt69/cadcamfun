@@ -310,7 +310,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     {
       id: "new",
       label: t("ai.sessions.newConversation"),
-      icon: <Plus size={15} aria-hidden="true" />,
+      icon: <Plus size={14} aria-hidden="true" />,
       primary: true,
       disabled: busy(),
       run: () => ai.newSession()
@@ -318,7 +318,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     {
       id: "sessions",
       label: t("ai.sessions.title"),
-      icon: <History size={15} aria-hidden="true" />,
+      icon: <History size={14} aria-hidden="true" />,
       count: sessionsCount(),
       active: panel() === "sessions",
       run: () => setPanel((current) => nextPanel(current, "sessions"))
@@ -326,18 +326,18 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     {
       id: "context",
       label: t("ai.context.title"),
-      icon: <Layers size={15} aria-hidden="true" />,
+      icon: <Layers size={14} aria-hidden="true" />,
       active: panel() === "context",
       run: () => setPanel((current) => nextPanel(current, "context"))
     }
   ])
 
   const headerItems = createMemo((): ReadonlyArray<HeaderItem> => [
-    { id: "extensions", label: t("ai.extensions.title"), icon: <Plug size={15} aria-hidden="true" />, active: panel() === "extensions", run: () => setPanel((current) => nextPanel(current, "extensions")) },
+    { id: "extensions", label: t("ai.extensions.title"), icon: <Plug size={14} aria-hidden="true" />, active: panel() === "extensions", run: () => setPanel((current) => nextPanel(current, "extensions")) },
     {
       id: "tools",
       label: t("ai.tool.tools"),
-      icon: <Wrench size={15} aria-hidden="true" />,
+      icon: <Wrench size={14} aria-hidden="true" />,
       count: registeredTools().length,
       active: panel() === "tools",
       run: () => setPanel((current) => nextPanel(current, "tools"))
@@ -345,28 +345,28 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     {
       id: "catalog",
       label: t("ai.catalog.title"),
-      icon: <ScrollText size={15} aria-hidden="true" />,
+      icon: <ScrollText size={14} aria-hidden="true" />,
       active: panel() === "catalog",
       run: () => setPanel((current) => nextPanel(current, "catalog"))
     },
     {
       id: "skills",
       label: t("ai.skills.title"),
-      icon: <BookOpen size={15} aria-hidden="true" />,
+      icon: <BookOpen size={14} aria-hidden="true" />,
       active: panel() === "skills",
       run: () => setPanel((current) => nextPanel(current, "skills"))
     },
     {
       id: "stats",
       label: t("ai.toolbar.statistics"),
-      icon: <BarChart3 size={15} aria-hidden="true" />,
+      icon: <BarChart3 size={14} aria-hidden="true" />,
       active: panel() === "stats",
       run: () => setPanel((current) => nextPanel(current, "stats"))
     },
     {
       id: "providers",
       label: t("ai.providers.title"),
-      icon: <KeyRound size={15} aria-hidden="true" />,
+      icon: <KeyRound size={14} aria-hidden="true" />,
       active: panel() === "providers",
       disabled: busy(),
       run: () => setPanel((current) => nextPanel(current, "providers"))
@@ -374,14 +374,14 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     {
       id: "refresh",
       label: t("ai.toolbar.refresh"),
-      icon: <RefreshCw size={15} aria-hidden="true" />,
+      icon: <RefreshCw size={14} aria-hidden="true" />,
       disabled: busy(),
       run: () => ai.refresh()
     },
     {
       id: "clear",
       label: t("ai.clear"),
-      icon: <Trash2 size={15} aria-hidden="true" />,
+      icon: <Trash2 size={14} aria-hidden="true" />,
       danger: true,
       disabled: busy() || ai.messages().length === 0,
       run: () => batch(() => { ai.clear(); setDraft("") })
@@ -421,7 +421,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       <Show when={ai.messages().length > 0 && ai.suggestions().length > 0 && !running()}>
         <section class="assistant-suggestions" data-testid="proactive-suggestions">
-          <p class="assistant-section-label"><Lightbulb size={10} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
+          <p class="assistant-section-label"><Lightbulb size={12} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
           <ul>
             <For each={ai.suggestions().slice(0, 3)}>
               {(suggestion) => (
@@ -444,7 +444,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                     aria-label={t("ai.suggestions.dismiss")}
                     onClick={() => ai.dismissSuggestion(suggestion.id)}
                   >
-                    <X size={10} aria-hidden="true" />
+                    <X size={12} aria-hidden="true" />
                   </button>
                 </li>
               )}

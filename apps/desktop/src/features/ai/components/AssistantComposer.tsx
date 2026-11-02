@@ -114,10 +114,10 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
           <ul class="assistant-attachments-row" data-testid="ai-attachments">
             <For each={props.files}>{(file) => (
               <li class="assistant-attachment inline-flex items-center gap-1.5">
-                <Paperclip size={11} aria-hidden="true" />
+                <Paperclip size={12} aria-hidden="true" />
                 <span class="truncate" title={file.name}>{file.name}</span>
                 <button type="button" aria-label={t("ai.attach.remove", { name: file.name })} onClick={() => props.onRemoveFile(file)}>
-                  <X size={10} aria-hidden="true" />
+                  <X size={12} aria-hidden="true" />
                 </button>
               </li>
             )}</For>
@@ -177,7 +177,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
               data-enabled={ai.includeContext()}
               title={t("ai.toolbar.context")}
             >
-              <Layers size={13} aria-hidden="true" />
+              <Layers size={14} aria-hidden="true" />
               <span class="sr-only">{t("ai.toolbar.context")}</span>
               <Show when={ai.includeContext()}><span class="assistant-context-dot" aria-hidden="true" /></Show>
             </button>
@@ -193,7 +193,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
                 title={t("ai.stop")}
                 aria-label={t("ai.stop")}
               >
-                <Square size={11} aria-hidden="true" />
+                <Square size={12} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -214,7 +214,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
               title={running() ? t("ai.queue") : t("ai.send")}
               aria-label={running() ? t("ai.queue") : t("ai.send")}
             >
-              <ArrowUp size={15} aria-hidden="true" />
+              <ArrowUp size={14} aria-hidden="true" />
             </button>
           </div>
         </div>

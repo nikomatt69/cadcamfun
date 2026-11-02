@@ -10,11 +10,47 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import LoaderCircle from "lucide-solid/icons/loader-circle"
+import Activity from "lucide-solid/icons/activity"
+import ArrowLeftRight from "lucide-solid/icons/arrow-left-right"
+import BookOpen from "lucide-solid/icons/book-open"
+import Box from "lucide-solid/icons/box"
+import Boxes from "lucide-solid/icons/boxes"
+import Braces from "lucide-solid/icons/braces"
+import Check from "lucide-solid/icons/check"
+import Crosshair from "lucide-solid/icons/crosshair"
+import Download from "lucide-solid/icons/download"
+import FileCode from "lucide-solid/icons/file-code"
+import Gauge from "lucide-solid/icons/gauge"
+import GitBranch from "lucide-solid/icons/git-branch"
+import Layers from "lucide-solid/icons/layers"
+import List from "lucide-solid/icons/list"
+import Nut from "lucide-solid/icons/nut"
+import Pencil from "lucide-solid/icons/pencil"
+import PencilRuler from "lucide-solid/icons/pencil-ruler"
+import Play from "lucide-solid/icons/play"
+import Ruler from "lucide-solid/icons/ruler"
+import Search from "lucide-solid/icons/search"
+import Settings from "lucide-solid/icons/settings"
+import Square from "lucide-solid/icons/square"
+import Target from "lucide-solid/icons/target"
+import Wrench from "lucide-solid/icons/wrench"
+import X from "lucide-solid/icons/x"
 import { t } from "../../../i18n/index.ts"
 import type { AiToolCall } from "../lib/types.ts"
 import { isVcsTool, toolFacts } from "../lib/tool-facts.ts"
 import { actionOf } from "../lib/tool-schemas.ts"
 import { canonicalTool, toolTitle } from "../lib/tools.ts"
+
+/** The row's glyph, from the app's icon set: every view names its mark with a short code and one size and stroke draw them all. */
+const GLYPHS: Record<string, (props: { size: number; "aria-hidden": "true" }) => JSX.Element> = {
+  "{}": Braces, "↔": ArrowLeftRight, "⇩": Download, "≈": Gauge, "⌕": Search, "⌖": Crosshair, "⌗": Nut, "⌘": FileCode, "⎇": GitBranch,
+  "■": Square, "▣": Boxes, "▤": Ruler, "▦": Layers, "▶": Play, "▷": Play, "◆": Box, "◇": PencilRuler, "◉": Activity, "◎": Target,
+  "☆": BookOpen, "☰": List, "⚒": Wrench, "⚙": Settings, "✎": Pencil, "✓": Check, "✕": X
+}
+const Glyph = (props: { readonly code: string }): JSX.Element => {
+  const Icon = GLYPHS[props.code]
+  return Icon === undefined ? <span>{props.code}</span> : <Icon size={14} aria-hidden="true" />
+}
 
 const SPECIALISTS = ["researcher", "editor", "modeler", "machinist", "reviewer", "planner", "diagnostician", "verifier", "optimizer"] as const
 /** The specialist's name in the user's language (an agent this version does not know keeps its own name). */
@@ -100,7 +136,7 @@ const Issues = (props: { readonly issues: ReadonlyArray<Rec> }): JSX.Element => 
       return (
         <li class="assistant-tool-issue">
           <span class="assistant-issue-badge" data-severity={severity}>{severity}</span>
-          <span class="break-words"><Show when={str(issue["code"])}>{(code) => <code class="mr-1 text-[10px]">{code()}</code>}</Show>{str(issue["message"])}<Show when={num(issue["line"])}>{(line) => <span class="assistant-meta-text"> · line {line()}</span>}</Show></span>
+          <span class="break-words"><Show when={str(issue["code"])}>{(code) => <code class="mr-1">{code()}</code>}</Show>{str(issue["message"])}<Show when={num(issue["line"])}>{(line) => <span class="assistant-meta-text"> · line {line()}</span>}</Show></span>
         </li>
       )
     }}</For>
@@ -386,8 +422,8 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
       <Show when={agent()}>
         {(name) => <span class="assistant-agent-pill" data-testid="tool-agent">{agentLabel(name())}</span>}
       </Show>
-      <Show when={done()} fallback={<><LoaderCircle size={11} aria-hidden="true" class="animate-spin assistant-status-active" /><span class="assistant-meta-text">~ {pendingText()}</span></>}>
-        <span aria-hidden="true" class="assistant-tool-glyph" data-tone={tone()}>{tone() === "error" ? "✕" : view().icon}</span>
+      <Show when={done()} fallback={<><LoaderCircle size={14} aria-hidden="true" class="animate-spin assistant-status-active" /><span class="assistant-meta-text">{pendingText()}</span></>}>
+        <span aria-hidden="true" class="assistant-tool-glyph" data-tone={tone()}><Glyph code={tone() === "error" ? "✕" : view().icon} /></span>
         <span class="assistant-tool-title" data-tone={tone()}>{view().title}</span>
       </Show>
       <code class="assistant-tool-id" title={toolTitle(props.tool, actionOf(props.call?.input))}>{props.tool}</code>

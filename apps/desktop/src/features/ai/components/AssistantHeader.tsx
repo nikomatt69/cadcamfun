@@ -84,7 +84,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
           >
             <span class="assistant-bar-title-line">
               <h2 class="assistant-bar-title">{activeSession()?.title ?? t("ai.title")}</h2>
-              <ChevronDown size={13} class="assistant-bar-title-chevron" aria-hidden="true" />
+              <ChevronDown size={14} class="assistant-bar-title-chevron" aria-hidden="true" />
               <span class="assistant-orb" data-status={status()} aria-hidden="true">
                 <span class="assistant-orb-core" />
               </span>
@@ -143,7 +143,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
               data-testid="ai-more-toggle"
               onClick={() => setMenuOpen(!menuOpen())}
             >
-              <Ellipsis size={15} aria-hidden="true" />
+              <Ellipsis size={14} aria-hidden="true" />
             </button>
             <Show when={menuOpen()}>
               <div class="assistant-menu" role="menu" aria-label={t("ai.header.more")} data-testid="ai-more-menu">
@@ -183,7 +183,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
               title={t("ai.close")}
               onClick={() => props.onClose?.()}
             >
-              <X size={15} aria-hidden="true" />
+              <X size={14} aria-hidden="true" />
             </button>
           </Show>
         </div>

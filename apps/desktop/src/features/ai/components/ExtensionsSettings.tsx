@@ -89,7 +89,7 @@ export function ExtensionsSettings(): JSX.Element {
       <section class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-sm font-medium">{t("ai.extensions.mcp")}</h3>
-          <button type="button" class="assistant-icon-action" disabled={busy() || servers.loading || !ai.projectId()} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await refreshServers() })}><RefreshCw size={13} aria-hidden="true" /></button>
+          <button type="button" class="assistant-icon-action" disabled={busy() || servers.loading || !ai.projectId()} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await refreshServers() })}><RefreshCw size={14} aria-hidden="true" /></button>
         </div>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.mcpHint")}</p>
         <Show when={ai.projectId()} fallback={<p class="text-xs assistant-meta-text">{t("ai.extensions.projectRequired")}</p>}>
@@ -100,8 +100,8 @@ export function ExtensionsSettings(): JSX.Element {
                 <button type="button" class="min-w-0 flex-1 text-left" title={server.name} onClick={() => { setName(server.name); setConfig(JSON.stringify(server.config, null, 2)) }}>
                   <strong class="block truncate">{server.name}</strong><span class="text-xs assistant-meta-text">{server.config.type} · {server.status}</span>
                 </button>
-                <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(server.config.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: server.name })} aria-pressed={server.config.enabled} onClick={() => void save(server.name, { ...server.config, enabled: !server.config.enabled })}><Power size={13} aria-hidden="true" /></button>
-                <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: server.name })} onClick={() => { const projectId = ai.projectId(); if (projectId) void mutate(async () => { await run(app.client.ai.deleteMcpServer({ params: { name: server.name }, query: { projectId } })); await refreshServers() }) }}><Trash2 size={13} aria-hidden="true" /></button>
+                <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(server.config.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: server.name })} aria-pressed={server.config.enabled} onClick={() => void save(server.name, { ...server.config, enabled: !server.config.enabled })}><Power size={14} aria-hidden="true" /></button>
+                <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: server.name })} onClick={() => { const projectId = ai.projectId(); if (projectId) void mutate(async () => { await run(app.client.ai.deleteMcpServer({ params: { name: server.name }, query: { projectId } })); await refreshServers() }) }}><Trash2 size={14} aria-hidden="true" /></button>
               </li>
             )}</For>
           </ul>
@@ -127,8 +127,8 @@ export function ExtensionsSettings(): JSX.Element {
         <Show when={plugins.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
         <ul class="space-y-1"><For each={plugins()?.plugins}>{(plugin) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{plugin.name}</strong><span class="text-xs assistant-meta-text">{plugin.version} · {t("ai.extensions.toolCount", { count: plugin.tools })}{plugin.mods > 0 ? ` · ${t("ai.extensions.modCount", { count: plugin.mods })}` : ""}{plugin.modes > 0 ? ` · ${t("ai.extensions.modeCount", { count: plugin.modes })}` : ""}</span></div>
-          <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Power size={13} aria-hidden="true" /></button>
-          <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: plugin.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionPlugin({ params: { id: plugin.id } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Trash2 size={13} aria-hidden="true" /></button>
+          <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Power size={14} aria-hidden="true" /></button>
+          <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: plugin.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionPlugin({ params: { id: plugin.id } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Trash2 size={14} aria-hidden="true" /></button>
         </li>}</For></ul>
         <details class="space-y-2">
           <summary class="cursor-pointer text-xs">{t("ai.extensions.install")}</summary>
@@ -145,15 +145,15 @@ export function ExtensionsSettings(): JSX.Element {
       <section class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-sm font-medium">{t("ai.extensions.mods")}</h3>
-          <button type="button" class="assistant-icon-action" disabled={busy() || mods.loading} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await modActions.refetch() })}><RefreshCw size={13} aria-hidden="true" /></button>
+          <button type="button" class="assistant-icon-action" disabled={busy() || mods.loading} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await modActions.refetch() })}><RefreshCw size={14} aria-hidden="true" /></button>
         </div>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.modsHint")}</p>
         <Show when={mods.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
         <ul class="space-y-1"><For each={mods()?.mods}>{(mod) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{mod.name}</strong><span class="text-xs assistant-meta-text">{mod.description} · {mod.origin === "plugin" ? t("ai.extensions.modFromPlugin", { name: mod.pluginId ?? "" }) : t("ai.extensions.modWrittenBy", { origin: mod.origin })}</span></div>
           <Show when={mod.origin !== "plugin"}>
-            <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(mod.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: mod.name })} aria-pressed={mod.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionMod({ params: { id: mod.id }, payload: { enabled: !mod.enabled } })); await modActions.refetch() })}><Power size={13} aria-hidden="true" /></button>
-            <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: mod.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionMod({ params: { id: mod.id } })); await modActions.refetch() })}><Trash2 size={13} aria-hidden="true" /></button>
+            <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(mod.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: mod.name })} aria-pressed={mod.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionMod({ params: { id: mod.id }, payload: { enabled: !mod.enabled } })); await modActions.refetch() })}><Power size={14} aria-hidden="true" /></button>
+            <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: mod.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionMod({ params: { id: mod.id } })); await modActions.refetch() })}><Trash2 size={14} aria-hidden="true" /></button>
           </Show>
         </li>}</For></ul>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.modsAssistant")}</p>

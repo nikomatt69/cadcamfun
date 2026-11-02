@@ -9,7 +9,6 @@
  * the assistant's main file.
  */
 import { For, Index, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
-import Bot from "lucide-solid/icons/bot"
 import Check from "lucide-solid/icons/check"
 import CircleGauge from "lucide-solid/icons/circle-gauge"
 import Copy from "lucide-solid/icons/copy"
@@ -63,6 +62,16 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
     const ms = Date.parse(end) - Date.parse(props.message.createdAt)
     return Number.isFinite(ms) && ms >= 0 ? (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`) : undefined
   }
+  /** The footer says what the header does not: the model, how long it took, what it cost. */
+  const turnFooter = (): string[] => {
+    const parts: string[] = []
+    if (props.message.model) parts.push(props.message.model.replace(/^~/, ""))
+    const took = duration()
+    if (took !== undefined) parts.push(took)
+    if (props.message.usage) parts.push(`${compactTokens(props.message.usage.outputTokens)} tok`)
+    if (props.message.interrupted) parts.push(t("ai.interrupted"))
+    return parts
+  }
   const isUser = (): boolean => props.message.role === "user"
   const rating = (): "up" | "down" | undefined => ai.feedback()[props.message.id]
 
@@ -112,7 +121,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
               }
               if (kind === "retry") {
                 const current = () => segment() as Extract<GroupedSegment, { kind: "retry" }>
-                return <p class="assistant-retry-row" data-testid="ai-retry-row">↻ {t("ai.agent.retry", { n: current().attempt })} · {current().message}</p>
+                return <p class="assistant-retry-row" data-testid="ai-retry-row"><RefreshCw size={12} aria-hidden="true" />{t("ai.agent.retry", { n: current().attempt })} · {current().message}</p>
               }
               if (kind === "diagnostic") {
                 const current = () => segment() as Extract<GroupedSegment, { kind: "diagnostic" }>
@@ -156,7 +165,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
         </Index>
         <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
           <p class="assistant-turn-footer" data-testid="ai-turn-footer">
-            <Bot size={10} aria-hidden="true" />{t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model?.replace(/^~/, "")}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {compactTokens(usage().outputTokens)} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
+            {turnFooter().join(" · ")}
           </p>
         </Show>
         <Show when={props.message.status === "streaming" && segments().length === 0}>
@@ -164,13 +173,13 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
         </Show>
         <Show when={(props.message.attachments?.length ?? 0) > 0}>
           <p class="assistant-message-attachments" data-testid="message-attachments">
-            <For each={props.message.attachments}>{(name) => <span class="assistant-attachment-pill"><Paperclip size={10} aria-hidden="true" />{name}</span>}</For>
+            <For each={props.message.attachments}>{(name) => <span class="assistant-attachment-pill"><Paperclip size={12} aria-hidden="true" />{name}</span>}</For>
           </p>
         </Show>
         <Show when={props.message.status === "error" && props.message.error && props.message.error !== props.message.text}>
           <div class="assistant-enterprise-card mt-2" role="alert">
             <div class="assistant-enterprise-card-head">
-              <CircleGauge size={15} class="assistant-coral-icon" aria-hidden="true" />
+              <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
               <span class="assistant-enterprise-card-title">{t("ai.runtime.error")}</span>
             </div>
             <div class="assistant-enterprise-card-body">
@@ -198,7 +207,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
           title={t("ai.message.copyTitle")}
           onClick={() => props.onCopy(props.message.text, props.message.id)}
         >
-          {props.copiedId === props.message.id ? <Check size={10} aria-hidden="true" /> : <Copy size={10} aria-hidden="true" />}
+          {props.copiedId === props.message.id ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
           {props.copiedId === props.message.id ? t("ai.message.copied") : t("ai.message.copy")}
         </button>
         <Show when={!isUser() && props.message.status !== "streaming"}>
@@ -210,7 +219,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             data-testid="ai-regenerate"
             onClick={() => props.onRegenerate()}
           >
-            <RefreshCw size={10} aria-hidden="true" />
+            <RefreshCw size={12} aria-hidden="true" />
             {t("ai.message.regenerate")}
           </button>
         </Show>
@@ -248,7 +257,7 @@ function FeedbackButtons(props: { readonly messageId: string; readonly rating: "
         data-testid="ai-feedback-up"
         onClick={() => rate("up")}
       >
-        <ThumbsUp size={10} aria-hidden="true" />
+        <ThumbsUp size={12} aria-hidden="true" />
         {t("ai.feedback.up")}
       </button>
       <button
@@ -260,7 +269,7 @@ function FeedbackButtons(props: { readonly messageId: string; readonly rating: "
         data-testid="ai-feedback-down"
         onClick={() => { rate("down"); setCommenting(true) }}
       >
-        <ThumbsDown size={10} aria-hidden="true" />
+        <ThumbsDown size={12} aria-hidden="true" />
         {t("ai.feedback.down")}
       </button>
       <Show when={commenting()}>

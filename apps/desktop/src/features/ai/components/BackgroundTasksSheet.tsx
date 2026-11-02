@@ -22,10 +22,10 @@ import { isActiveTask } from "../store/tasks.ts"
 import { agentLabel } from "./ToolRow.tsx"
 
 const taskIcon = (task: AiTask): JSX.Element =>
-  task.status === "completed" ? <Check size={13} aria-hidden="true" class="assistant-status-ok" />
-    : task.status === "running" ? <LoaderCircle size={13} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" />
-      : task.status === "queued" ? <Clock size={13} aria-hidden="true" class="assistant-status-active" />
-        : <X size={13} aria-hidden="true" class={task.status === "error" ? "assistant-status-error" : "assistant-status-muted"} />
+  task.status === "completed" ? <Check size={14} aria-hidden="true" class="assistant-status-ok" />
+    : task.status === "running" ? <LoaderCircle size={14} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" />
+      : task.status === "queued" ? <Clock size={14} aria-hidden="true" class="assistant-status-active" />
+        : <X size={14} aria-hidden="true" class={task.status === "error" ? "assistant-status-error" : "assistant-status-muted"} />
 
 /** Keep keyboard navigation inside the sheet while it is presented as a modal. */
 export function handleTaskSheetKeys(event: KeyboardEvent, panel: HTMLElement, close: () => void): void {
@@ -92,7 +92,7 @@ export function BackgroundTasksSheet(): JSX.Element {
           <Layers size={12} aria-hidden="true" />
           <span>{t("ai.tasks.openSheet")}</span>
           <span class="assistant-pill" data-testid="ai-bg-active-count">{active().length}/{ai.tasks().length}</span>
-          <Show when={active().length > 0}><LoaderCircle size={11} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" /></Show>
+          <Show when={active().length > 0}><LoaderCircle size={12} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" /></Show>
         </button>
       </Show>
       <Show when={open()}>
