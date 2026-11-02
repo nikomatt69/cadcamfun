@@ -18,6 +18,7 @@ import { TOLERANCE_PRESETS, isTolerance } from "@cadcamfun/core"
 import { setDisplayUnits, setDocumentTolerance } from "../../../../shared/state/document-settings.ts"
 import { useApp } from "../../../../shared/state/context.ts"
 import { DISPLAY_UNITS, UNIT_TABLE, formatLength, fromDisplay, isDisplayUnits, toDisplay } from "../../../../viewport/units.ts"
+import { ExplorerScene } from "../../../../shared/ui/stageshow/scenes-cad.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
 import type { Browser } from "./browserState.ts"
 
@@ -144,7 +145,7 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
     return items.length > 0 && items.every((element) => flag === "visible" ? element?.visible !== false : element?.locked === true)
   }
   return (
-    <Show when={props.roots.length > 0 || b.mode() === "layer"} fallback={<p class="p-4 text-xs text-center text-gray-500 dark:text-gray-400">{props.emptyText ?? t("browser.empty")}</p>}>
+    <Show when={props.roots.length > 0 || b.mode() === "layer"} fallback={<div class="p-3"><ExplorerScene /><p class="px-1 pb-1 text-xs text-center text-gray-500 dark:text-gray-400">{props.emptyText ?? t("browser.empty")}</p></div>}>
       <For each={sections()}>
         {(section) => {
           const layer = () => layerOf(section.id)

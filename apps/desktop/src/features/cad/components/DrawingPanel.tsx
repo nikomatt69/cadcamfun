@@ -1,6 +1,7 @@
 import { INPUT, PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import { drawing, type History } from "@cadcamfun/core"
+import { DrawingSheetScene } from "../../../shared/ui/stageshow/scenes-cad.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -65,7 +66,7 @@ export default function DrawingPanel(): JSX.Element {
     <label class="block text-xs"><span class="mb-1 block text-gray-500">{label}</span><input class={INPUT} type={numeric ? "number" : "text"} step={numeric ? "any" : undefined} required={numeric} value={value()} onInput={(e) => set(e.currentTarget.value)} /></label>
   return <PanelCard title={t("cad.drawing.title")} testId="drawing-panel">
     <p class="text-xs text-gray-500">{t("cad.drawing.description")}</p>
-    <Show when={parts().length > 0} fallback={<p>{t("cad.drawing.empty")}</p>}>
+    <Show when={parts().length > 0} fallback={<><DrawingSheetScene /><p>{t("cad.drawing.empty")}</p></>}>
       <fieldset disabled={busy()} class="space-y-3">
         <label class="block text-xs">{t("cad.drawing.part")}<select class={INPUT} value={part()?.id} onChange={(e) => setChosen(e.currentTarget.value)}>
           <For each={parts()}>{(p) => <option value={p.id}>{p.name ?? p.id}</option>}</For>

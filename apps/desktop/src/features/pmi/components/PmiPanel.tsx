@@ -11,6 +11,8 @@ import { For, Show, createEffect, createMemo, createSignal, type JSX } from "sol
 import { pmi } from "@cadcamfun/core"
 import { Badge, INPUT, Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { toast } from "../../../shared/ui/toast.tsx"
+import { PmiScene } from "../../../shared/ui/stageshow/scenes-cad.tsx"
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
@@ -94,7 +96,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
 
       {/* Annotations grouped by capture */}
       <div class="mt-3 space-y-3" data-testid="pmi-annotation-list">
-        <Show when={store.set.annotations.length === 0}><p style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.empty")}</p></Show>
+        <Show when={store.set.annotations.length === 0}><PmiScene /><p style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.empty")}</p></Show>
         <For each={groups()}>{(group) => (
           <div>
             <h4 class="panel-group__title">{group.capture.name}</h4>
@@ -142,7 +144,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
       </div>
       <Show when={store.status === "conflict"}><div class="mt-2"><Note kind="bad" role="alert">{t("cad.pmi.conflict")}{store.error !== undefined ? ` ${store.error}` : ""}</Note></div></Show>
       <Show when={store.status === "error" && store.error !== undefined}><p role="alert" class="mt-2" style={{ ...BAD, "font-size": "12px" }}>{store.error}</p></Show>
-      <Show when={store.status === "loading"}><p role="status" class="mt-2" style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.loading")}</p></Show>
+      <Show when={store.status === "loading"}><LoadingState label={t("cad.pmi.loading")} rows={2} /></Show>
 
       {/* Drawing derivation: same rows the sheet consumes */}
       <div class="mt-3 border-t pt-3" style={DIVIDER} data-testid="pmi-drawing-section">

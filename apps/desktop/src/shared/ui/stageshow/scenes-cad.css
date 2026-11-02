@@ -1,0 +1,55 @@
+/* CAD workspace scenes (scenes-cad.tsx). Scoped under `.ss-stage`; tokens are the stage's `--ss-*`. */
+
+.cadx-frame {
+  width: 100%;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ent-line, rgb(128 128 128 / 0.25));
+  border-radius: 8px;
+}
+
+/* Explorer: the feature tree */
+.ss-stage .cadx-tree {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 132px;
+  padding-top: 8px;
+  background: var(--ss-surface);
+  border-right: 1px solid var(--ss-line);
+}
+.ss-stage .cadx-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--ss-text-faint);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.35s var(--ss-ease), transform 0.35s var(--ss-ease), background-color 0.3s ease, color 0.3s ease;
+}
+.ss-stage .cadx-row[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .cadx-row--root { color: var(--ss-text-muted); }
+.ss-stage .cadx-row--child { padding-left: 24px; }
+.ss-stage .cadx-row[data-selected="true"] { background: var(--ss-accent-soft); color: var(--ss-accent); }
+.ss-stage .cadx-row__name { font-size: 11px; font-weight: 500; color: var(--ss-text); white-space: nowrap; }
+.ss-stage .cadx-row[data-selected="true"] .cadx-row__name { color: var(--ss-accent); }
+.ss-stage .cadx-ext { opacity: 0; transform: translate(var(--dx, -16px), var(--dy, 10px)); transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease; }
+.ss-stage .cadx-ext[data-on="true"] { opacity: 1; transform: none; }
+
+/* Drawing sheet: paper, a frame, a front view, a dimension */
+.ss-stage .cadx-paper { background: var(--ss-surface); }
+.ss-stage .cadx-border { fill: none; stroke: var(--ss-line-strong); stroke-width: 1.2; }
+.ss-stage .cadx-view { fill: none; stroke: var(--ss-text-muted); stroke-width: 1.3; }
+.ss-stage .cadx-axis { fill: none; stroke: var(--ss-line-strong); stroke-width: 0.9; stroke-dasharray: 8 3 2 3; }
+.ss-stage .cadx-titleblock { fill: none; stroke: var(--ss-line-strong); stroke-width: 1; }
+.ss-stage .cadx-dim path { fill: none; stroke: var(--ss-accent); stroke-width: 1.3; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ss-stage .cadx-dim[data-on="true"] path { stroke-dashoffset: 0; transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* PMI: the hole gets picked, the flag lands on the end of its leader */
+.ss-stage .cadx-hole { fill: var(--ss-surface-inset); stroke: var(--ss-line-strong); stroke-width: 1.2; transition: stroke 0.25s ease, fill 0.25s ease; }
+.ss-stage .cadx-hole[data-picked="true"] { stroke: var(--ss-accent); fill: var(--ss-accent-soft); }
+.ss-stage .cadx-leader { fill: none; stroke: var(--ss-accent); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ss-stage .cadx-leader[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.ss-stage .cadx-flag { transition-delay: 0.5s; }
+.ss-stage .cadx-flag[data-show="true"] { color: var(--ss-accent); border-color: var(--ss-accent); }
