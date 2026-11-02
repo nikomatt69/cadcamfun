@@ -23,7 +23,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - title_block: none; the completed title block and what it lacks.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming); resolve gives exact|split|merged|deleted|ambiguous.
-- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.
+- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences (overrides?), subAssemblies?, configurations?|designTable?, configuration?, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview; names from exact.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.
 - offset: id, distance; outward offset preview, rounded convex corners; unsupported says why.

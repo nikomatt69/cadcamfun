@@ -91,8 +91,55 @@ describe("op sketch", () => {
   })
 })
 
+describe("op assembly: configurations, sub-assemblies and per-occurrence parameters", () => {
+  const plate = { id: "plate", shape: { kind: "history", history: bracket(40) }, density: 1 }
+  const volume = async (extra: Record<string, unknown>) => (await call({ op: "assembly", definitions: [plate], checks: ["mass"], ...extra }))["mass"]?.volumeMm3 as number | undefined
+  const two = [{ id: "p1", definition: "plate", grounded: true }, { id: "p2", definition: "plate", grounded: true, at: { x: 100, y: 0, z: 0 }, overrides: { w: 60 } }]
+
+  test("an occurrence override rebuilds its own copy of a parametric part; the other copy keeps the definition's value", async () => {
+    expect(await volume({ occurrences: two })).toBeCloseTo((40 + 60) * 250, 1)
+  })
+
+  test("a configuration sets a definition's parameters for every occurrence, the occurrence override still wins", async () => {
+    const configurations = [{ name: "wide", parameters: { plate: { w: 80 } } }]
+    expect(await volume({ occurrences: two, configurations, configuration: "wide" })).toBeCloseTo((80 + 60) * 250, 1)
+    expect(await volume({ occurrences: two, configurations })).toBeCloseTo((40 + 60) * 250, 1)
+  })
+
+  test("a design table becomes configurations: parameter columns and suppress columns", async () => {
+    const designTable = { columns: ["name", "plate.w", "suppress:p2"], rows: [["small", 30, 0], ["single", 30, "yes"]] }
+    expect(await volume({ occurrences: two, designTable, configuration: "small" })).toBeCloseTo((30 + 60) * 250, 1)
+    const single = await call({ op: "assembly", definitions: [plate], occurrences: two, designTable, configuration: "single", checks: ["mass", "bom"] })
+    expect(single["mass"].volumeMm3).toBeCloseTo(30 * 250, 1)
+    expect(single["leaves"]).toEqual(["p1"])
+    expect(single["configurations"]).toEqual(["small", "single"])
+  })
+
+  test("a sub-assembly places its occurrences by path; mates and checks name the path", async () => {
+    const subAssemblies = [{ id: "pair", occurrences: [{ id: "l", definition: "plate" }, { id: "r", definition: "plate", at: { x: 80, y: 0, z: 0 } }] }]
+    const occurrences = [{ id: "g", definition: "pair", grounded: true }]
+    const r = await call({ op: "assembly", definitions: [plate], subAssemblies, occurrences, checks: ["mass", "bom"] })
+    expect(r["leaves"]).toEqual(["g/l", "g/r"])
+    expect(r["mass"].volumeMm3).toBeCloseTo(2 * 40 * 250, 1)
+    expect(r["bom"][0].quantity).toBe(2)
+    // A mate may name a nested occurrence by its path: slide the right plate against the left one (face 5 is +x, face 4 is -x); grounding the sub-assembly would ground every part in it, so the left part is grounded instead.
+    const mated = await call({
+      op: "assembly", definitions: [{ id: "blk", shape: { kind: "box", x: 40, y: 25, z: 10 } }], subAssemblies: [{ id: "pair", occurrences: [{ id: "l", definition: "blk", grounded: true }, { id: "r", definition: "blk", at: { x: 90, y: 0, z: 0 } }] }], occurrences: [{ id: "g", definition: "pair" }],
+      mates: [{ kind: "coincident", a: { occurrence: "g/l", face: 5 }, b: { occurrence: "g/r", face: 4 } }]
+    })
+    expect(mated["residual"]).toBeLessThan(1e-9)
+    expect(mated["placements"]["g/r"].t[0]).toBeCloseTo(40, 4)
+  })
+
+  test("a wrong configuration name, a sub-assembly that shadows a part and an unknown nested path are refused with what exists", async () => {
+    expect(await call({ op: "assembly", definitions: [plate], occurrences: two, configurations: [{ name: "a" }], configuration: "b" })).toMatchObject({ ok: false, error: expect.stringContaining("defined: a") })
+    expect(await call({ op: "assembly", definitions: [plate], occurrences: two, subAssemblies: [{ id: "plate", occurrences: [{ id: "x", definition: "plate" }] }] })).toMatchObject({ ok: false, error: expect.stringContaining("own id") })
+    expect(await call({ op: "assembly", definitions: [plate], occurrences: two, mates: [{ kind: "lock", a: "p1", b: "nope" }] })).toMatchObject({ ok: false })
+  })
+})
+
 describe("op assembly", () => {
-  const defs = [{ id: "base", shape: { kind: "box", x: 40, y: 40, z: 10 }, density: 7.85 }, { id: "pin", shape: { kind: "cylinder", radius: 4, height: 20 }, density: 7.85 }]
+  const defs =[{ id: "base", shape: { kind: "box", x: 40, y: 40, z: 10 }, density: 7.85 }, { id: "pin", shape: { kind: "cylinder", radius: 4, height: 20 }, density: 7.85 }]
 
   test("a pin in a hole: concentric plus seated shoulder leaves exactly one rotation; the numbers are analytic", async () => {
     const r = await call({

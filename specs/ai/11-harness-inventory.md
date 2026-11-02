@@ -24,7 +24,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Tool | Effect | Actions | Holders (primaries and specialists) | Prompt chars |
 | --- | --- | --- | --- | --- |
-| `cad` | read | 33 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4179 |
+| `cad` | read | 33 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4254 |
 | `cad_edit` | destructive | 21 | primary:build, editor, modeler | 4384 |
 | `cam` | read | 19 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3904 |
 | `cam_edit` | write | 8 | primary:build, machinist, optimizer | 2839 |
@@ -73,7 +73,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad.surface` | read | — | operation*, patches*, thickness, direction, tolerance, name | local (core cad.brep.buildSurfaceOperation, core cad.brep.edgeUses, core cad.brep.validateBrep) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.exchange` | read | — | format*, ids | handler `cadExchange` → `apps/sidecar/src/services/ai.ts:705` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.kernel` | read | — | op*, elementId, history, body, kinds, limit, refs, parameters, after, madeAfter | handler `parametric` → `apps/sidecar/src/services/ai.ts:896` | yes | declared | action-inputs-cad.test.ts, cad-kernel-naming.test.ts |
-| `cad.workflow` | read | — | op*, entities, constraints, drag, definitions, occurrences, mates, drive, checks, elementId, history, options, format, attachment, data, unit, repair, requireSolid | handler `parametric` → `apps/sidecar/src/services/ai.ts:896` | yes | declared | action-inputs-cad.test.ts, cad-workflow.test.ts |
+| `cad.workflow` | read | — | op*, entities, constraints, drag, definitions, occurrences, subAssemblies, configurations, designTable, configuration, mates, drive, checks, elementId, history, options, format, attachment, data, unit, repair, requireSolid | handler `parametric` → `apps/sidecar/src/services/ai.ts:896` | yes | declared | action-inputs-cad.test.ts, cad-workflow.test.ts |
 | `cad.simulate` | read | — | op*, analysis, id, history, body, material, overrides, size, maxElements, supports, loads, thermal, referenceTemperature, uniformTemperature, initialTemperature, transient, modes, criterion, freeExpansion, metric, levels, factor, tolerance, candidates, targetSafety, probes | handler `cadExportBodies` → `apps/sidecar/src/services/ai.ts:734` | yes | declared | action-inputs-cad.test.ts, ai-simulate.test.ts |
 | `cad.distance` | read | — | firstId*, secondId* | handler `cadDistance` → `apps/sidecar/src/services/ai.ts:833` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.parametric_fastener` (was `cad_parametric`) | read | — | size, fit, shaftDiameter | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
@@ -270,7 +270,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2740 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1540 | ai-specialists.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4179 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4254 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 4384 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3904 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2839 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
@@ -332,7 +332,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
 | `cad-naming` | cad | 2763 | cad, cad_edit, parts |
-| `cad-workflow` | cad | 5271 | cad, cad_edit, parts |
+| `cad-workflow` | cad | 6127 | cad, cad_edit, parts |
 | `parametric-design` | cad | 8513 | cad, cad_edit, parts, vcs_edit |
 | `fusion-360-modelling` | cad | 15261 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 7046 | cad, cam, cam_edit, library, parts |

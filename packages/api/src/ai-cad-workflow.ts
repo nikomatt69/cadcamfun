@@ -67,7 +67,26 @@ const occurrence = Schema.Struct({
   /** Rotation applied before the translation. */
   rotate: optional(Schema.Struct({ axis: xyz, degrees: Schema.Finite })),
   grounded: optional(Schema.Boolean),
-  suppressed: optional(Schema.Boolean)
+  suppressed: optional(Schema.Boolean),
+  /** Parameter values of a history definition for this occurrence only (over the configuration's): a longer bolt, a wider plate. */
+  overrides: optional(Schema.Record(Schema.String, Schema.Finite))
+})
+
+/** A reusable group of occurrences; an occurrence whose `definition` is the sub-assembly's id places the whole group. */
+const subAssembly = Schema.Struct({ id, name: optional(id), occurrences: Schema.Array(occurrence).check(Schema.isMinLength(1), Schema.isMaxLength(200)) })
+
+/** A named variant: parameter values by definition id, occurrence paths (`gearbox/bolt2`) suppressed or hidden. */
+const configuration = Schema.Struct({
+  name: id,
+  parameters: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Finite))),
+  suppressed: optional(Schema.Array(id).check(Schema.isMaxLength(500))),
+  hidden: optional(Schema.Array(id).check(Schema.isMaxLength(500)))
+})
+
+/** Configurations from a table: first column `name`, then `definition.parameter` (numbers) or `suppress:<occurrence path>` (0/1 or yes/no). */
+const designTable = Schema.Struct({
+  columns: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120))).check(Schema.isMinLength(2), Schema.isMaxLength(40)),
+  rows: Schema.Array(Schema.Array(Schema.Union([Schema.String, Schema.Finite])).check(Schema.isMaxLength(40))).check(Schema.isMinLength(1), Schema.isMaxLength(50))
 })
 
 /** A mate: `kind` plus its operands `a`, `b` ({occurrence, feature | face}) and values (see the skill cad-workflow). */
@@ -83,6 +102,11 @@ export const CadWorkflowInput = Schema.Struct({
   // assembly
   definitions: optional(Schema.Array(definition).check(Schema.isMinLength(1), Schema.isMaxLength(100))),
   occurrences: optional(Schema.Array(occurrence).check(Schema.isMinLength(1), Schema.isMaxLength(500))),
+  subAssemblies: optional(Schema.Array(subAssembly).check(Schema.isMaxLength(40))),
+  configurations: optional(Schema.Array(configuration).check(Schema.isMaxLength(50))),
+  designTable: optional(designTable),
+  /** The configuration to solve and check (mass, bom, interference, clearance follow it); default none. */
+  configuration: optional(id),
   mates: optional(Schema.Array(WorkflowMate).check(Schema.isMaxLength(1000))),
   /** Sweep the revolute or slider mate `joint` from `from` to `to` in `steps` solves. */
   drive: optional(Schema.Struct({ joint: id, from: Schema.Finite, to: Schema.Finite, steps: Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 361 })) })),
