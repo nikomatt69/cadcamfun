@@ -482,7 +482,7 @@ export interface SsiPolyline {
  * Undefined means unsupported (including tangency); an empty array means disjoint surfaces.
  * These are untrimmed rings: the caller must establish that the whole ring belongs to both faces.
  */
-export const coaxialSphereCylinderRings = (sa: Surface, sb: Surface): SsiPoint[][] | undefined => {
+export const coaxialSphereCylinderRings = (sa: Surface, sb: Surface, near = 0): SsiPoint[][] | undefined => {
   const sphere = sa.kind === "sphere" ? sa : sb.kind === "sphere" ? sb : undefined
   const cylinder = sa.kind === "cylinder" ? sa : sb.kind === "cylinder" ? sb : undefined
   if (sphere === undefined || cylinder === undefined) return undefined
@@ -492,7 +492,10 @@ export const coaxialSphereCylinderRings = (sa: Surface, sb: Surface): SsiPoint[]
   const roundoff = 64 * Number.EPSILON * Math.max(1, length3(offset), sphere.radius, cylinder.radius)
   if (length3(cross3(offset, cylinder.frame.z)) > roundoff) return undefined
   const delta = (sphere.radius - cylinder.radius) * (sphere.radius + cylinder.radius)
-  if (delta < 0) return []
+  // A sphere that misses the cylinder by less than `near` still lies within the classification tolerance of it over a band, so the
+  // fragment's probe can read "on": it is not an empty answer, the pair stays on the general path (whose checks and recoveries
+  // know it), exactly as `coaxialCircles` does.
+  if (delta < 0) return Math.abs(sphere.radius - cylinder.radius) < near ? undefined : []
   if (delta === 0) return undefined
   const dz = Math.sqrt(delta)
   return [-dz, dz].map((z) => Array.from({ length: 128 }, (_, i) => {

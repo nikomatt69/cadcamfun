@@ -566,7 +566,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
           return f.surface.kind === "cylinder" && e.curve.kind === "circle" && Math.abs(dot3(e.curve.frame.z, f.surface.frame.z)) > 1 - 1e-14 && Math.abs(e.t1 - e.t0 - 2 * Math.PI) < 1e-12
         })
       }
-      const rings = completeRevolutionFace(S[0], fa) && completeRevolutionFace(S[1], fbF) ? coaxialSphereCylinderRings(fa.surface, fbF.surface) : undefined
+      const rings = completeRevolutionFace(S[0], fa) && completeRevolutionFace(S[1], fbF) ? coaxialSphereCylinderRings(fa.surface, fbF.surface, fitTol * 20) : undefined
       if (rings !== undefined && rings.every((ring) => ring.every((q) => S[0].loc.insideFace(ia, q.ua, q.va) && S[1].loc.insideFace(ib, q.ub, q.vb)))) {
         for (const pts of rings) {
           const cylinder = fa.surface.kind === "cylinder" ? fa.surface : fbF.surface
