@@ -16,9 +16,15 @@ test("Settings Profile edits the persisted Git identity and reloads it when reop
     email.dispatchEvent(new window.Event("input", { bubbles: true }))
     const form = name.closest("form")
     expect(form).not.toBeNull()
-    expect(form?.querySelector('button[type="submit"]')).not.toBeNull()
+    const submit = () => form?.querySelector<HTMLButtonElement>('button[type="submit"]')
+    // The button is always rendered (stable layout) and enabled only while the draft differs from the saved identity.
+    expect(submit()).not.toBeNull()
+    expect(submit()?.disabled).toBe(false)
     form?.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }))
-    await app.wait(() => !form?.querySelector('button[type="submit"]'))
+    // While saving the whole fieldset is disabled; once saved the form is editable again and nothing is left to save.
+    const fieldset = form?.querySelector("fieldset")
+    expect(fieldset?.disabled).toBe(true)
+    await app.wait(() => fieldset?.disabled === false && submit()?.disabled === true)
     expect((await app.sidecar.call("/api/user/git-profile")).body).toEqual({ name: "Workshop Engineer", email: "engineer@workshop.test" })
     expect((await app.sidecar.call("/api/user/profile")).body.name).toBe(accountBefore.name)
     page.dispose()
