@@ -1,15 +1,15 @@
 /**
  * Organizations screens — `/organizations`, `/organizations/create`, `/organizations/:id`.
  *
- * Ports of `.reference/src/pages/organizations/{index,create,[id]}.tsx`: the gradient
- * page with the create modal, the plain create form, and the tabbed detail page
+ * Ports of `.reference/src/pages/organizations/{index,create,[id]}.tsx`: the list
+ * page with the create modal, the create form, and the tabbed detail page
  * (Overview / Chat / Members / Projects / Settings) with the invite modal.
  *
  * Three legacy calls have no v6 counterpart, so they keep their legacy *outcome*
  * instead of inventing data:
  *  - `GET …/organizations/:id/members` — the detail reply already carries `members`;
- *  - `GET …/organizations/:id/projects` — the Projects tab always renders the legacy
- *    empty state ("No projects");
+ *  - `GET …/organizations/:id/projects` — the Projects tab uses the detail's count
+ *    and links to the project list instead of inventing a list of projects;
  *  - `POST …/organizations/:id/invite` and the Danger-Zone delete button — no request
  *    is made, exactly like the legacy buttons that never registered a handler.
  *
@@ -92,17 +92,20 @@ export function OrganizationsScreen(): JSX.Element {
   return (
     <WorkspacePage
       title={t("org.title")}
+      description={t("org.subtitle")}
       actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("org.new")}</button>}
       rail={<>
         <label class="block">
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("org.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+            <input type="search" name="search" class={`${FIELD} pl-8`} placeholder={t("org.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
         <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
-        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} {t("shell.organizations")}</p>
+        <Show when={orgs.data() !== undefined}>
+          <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400" role="status">{filtered().length} / {orgs.data()?.length ?? 0} {t("shell.organizations")}</p>
+        </Show>
       </>}
       overlays={
         <Modal open={showModal()} title={t("org.modal.title")} onClose={() => { if (!isSubmitting()) setShowModal(false) }}>
@@ -176,10 +179,10 @@ export function CreateOrganizationScreen(): JSX.Element {
 
   return (
     <WorkspaceDetail title={t("org.modal.title")} subtitle={t("org.create.details")} backHref="/organizations" backLabel={t("common.back")}>
-      <div class="mx-auto w-full max-w-3xl">
+      <div class="mx-auto w-full max-w-2xl">
         <div class={PANEL}>
-          <div class="mb-6 flex items-center gap-4">
-            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-[5px] bg-blue-50 dark:bg-blue-900/30"><Users size={16} aria-hidden="true" class="text-blue-600 dark:text-blue-400" /></div>
+          <div class="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
+            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-blue-50 dark:bg-blue-900/30"><Users size={16} aria-hidden="true" class="text-blue-600 dark:text-blue-400" /></div>
             <div>
               <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.create.details")}</h2>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("org.create.lead")}</p>
@@ -262,20 +265,16 @@ export function OrganizationDetailScreen(): JSX.Element {
             }
 
             return <>
-              <Show when={(org().description ?? "").length > 0}>
-                <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{org().description}</p>
-              </Show>
-
               <WorkspaceTabs class="mb-3" tabs={tabs()} value={activeTab()} onChange={selectTab} label={t("org.tab.overview")} />
 
               <Show when={activeTab() === "overview"}>
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <section class={`${PANEL} !p-3`}>
-                    <h2 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.overview.about")}</h2>
-                    <p class="text-xs leading-5 text-slate-600 dark:text-slate-400">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(15rem,1fr)]">
+                  <section class={`${PANEL} min-w-0`}>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{t("org.overview.about")}</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                       <Show when={(org().description ?? "").length > 0} fallback={t("org.overview.noDescription")}>{org().description}</Show>
                     </p>
-                    <h3 class="mb-1.5 mt-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("org.overview.details")}</h3>
+                    <h3 class="mb-2 mt-5 border-t border-slate-200 pt-4 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">{t("org.overview.details")}</h3>
                     <KeyValueList rows={[
                       { label: t("org.overview.created"), value: formatDate(org().createdAt) },
                       { label: t("org.overview.updated"), value: formatDate(org().updatedAt) },
@@ -284,12 +283,27 @@ export function OrganizationDetailScreen(): JSX.Element {
                     ]} />
                   </section>
 
-                  <section class={`${PANEL} !p-3`}>
-                    <h2 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.overview.activity")}</h2>
-                    <div class="workspace-empty !mt-0 !max-w-none !py-6">
-                      <div class="workspace-empty__icon"><Users size={20} aria-hidden="true" /></div>
-                      <p class="text-xs text-slate-500 dark:text-slate-400">{t("org.overview.noActivity")}</p>
+                  <section class={`${PANEL} min-w-0`}>
+                    <div class="flex items-center justify-between gap-3">
+                      <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{t("org.members.title")}</h2>
+                      <button type="button" class={TOOLBAR_BUTTON} onClick={() => setActiveTab("members")}>{t("org.tab.members")}</button>
                     </div>
+                    <Show when={org().members.length > 0} fallback={<p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{t("common.none")}</p>}>
+                      <ul class="mt-3 divide-y divide-slate-200 dark:divide-slate-700">
+                        <For each={org().members.slice(0, 4)}>{(member) => (
+                          <li class="flex min-w-0 items-center gap-3 py-2.5">
+                            <Show when={member.image} fallback={<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"><User size={16} aria-hidden="true" /></span>}>
+                              {(image) => <img class="h-8 w-8 shrink-0 rounded-md object-cover" src={image()} alt="" />}
+                            </Show>
+                            <div class="min-w-0 flex-1">
+                              <p class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{member.name ?? t("org.members.unnamed")}</p>
+                              <p class="truncate text-xs text-slate-500 dark:text-slate-400">{member.email}</p>
+                            </div>
+                            <span class={`${roleBadge(member.role)} shrink-0`}>{member.role}</span>
+                          </li>
+                        )}</For>
+                      </ul>
+                    </Show>
                   </section>
                 </div>
               </Show>
@@ -352,10 +366,19 @@ export function OrganizationDetailScreen(): JSX.Element {
                     <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.projects.title")}</h2>
                     <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(newProjectHref())}><Plus size={14} aria-hidden="true" />{t("org.detail.newProject")}</button>
                   </div>
-                  {/* No organization-projects endpoint: the legacy empty state, always. */}
-                  <StageEmpty icon={<FolderOpen size={22} aria-hidden="true" />} preview="projects" title={t("org.projects.empty")} hint={t("org.projects.emptyBody")}>
-                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}>{t("org.projects.create")}</button>
-                  </StageEmpty>
+                  <Show when={org().projectCount > 0} fallback={
+                    <StageEmpty icon={<FolderOpen size={22} aria-hidden="true" />} preview="projects" title={t("org.projects.empty")} hint={t("org.projects.emptyBody")}>
+                      <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}>{t("org.projects.create")}</button>
+                    </StageEmpty>
+                  }>
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+                      <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><FolderOpen size={19} aria-hidden="true" /></span>
+                        <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{t("org.detail.projectCount", { count: org().projectCount })}</p>
+                      </div>
+                      <A href="/projects" class={TOOLBAR_BUTTON}>{t("org.tab.projects")}</A>
+                    </div>
+                  </Show>
                 </section>
               </Show>
 

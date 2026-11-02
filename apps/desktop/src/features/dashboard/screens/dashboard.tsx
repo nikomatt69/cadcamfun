@@ -26,7 +26,6 @@ import {
   ArrowUpRight
 } from "lucide-solid"
 import {
-  BADGE,
   CARD,
   StageLoading,
   TOOLBAR_BUTTON,
@@ -105,7 +104,9 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       label: t("dashboard.metric.materials"),
       value: props.data.materialsCount,
       meta:
-        props.data.materialsLowStock !== undefined && props.data.materialsLowStock > 0
+        props.data.materialsLowStock === undefined
+          ? t("dashboard.metric.unavailable")
+          : props.data.materialsLowStock > 0
           ? `${props.data.materialsLowStock} ${t("dashboard.metric.lowStockSuffix")}`
           : t("dashboard.metric.stockOk"),
       metaAlert: props.data.materialsLowStock !== undefined && props.data.materialsLowStock > 0,
@@ -167,10 +168,6 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       eyebrow={t("dashboard.hero.eyebrow")}
       description={t("dashboard.hero.tagline")}
       actions={<>
-        <span class={`${BADGE} workspace-badge--ok`}>
-          <span class="dash-dot" aria-hidden="true" />
-          {t("dashboard.status.nominal")}
-        </span>
         <A href="/projects" class={TOOLBAR_BUTTON}>
           <FolderOpen size={14} aria-hidden="true" />
           {t("dashboard.hero.cta.browse")}
@@ -182,9 +179,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       </>}
     >
       <div class="dash" aria-busy={props.loading}>
-        <Show when={props.loading}>
-          <StageLoading label={t("dashboard.loading")} />
-        </Show>
+        <Show when={!props.loading} fallback={<StageLoading label={t("dashboard.loading")} />}>
 
         <Show when={!props.loading && props.data.projectsCount === 0}>
           <FirstRun />
@@ -211,6 +206,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
             <QuickCard />
           </div>
         </section>
+        </Show>
       </div>
     </WorkspacePage>
   )
@@ -279,17 +275,14 @@ function ModuleCard(props: ModuleData): JSX.Element {
 
 function SystemCard(props: { readonly data: DashboardData }): JSX.Element {
   const rows = (): ReadonlyArray<{ readonly label: string; readonly value: string }> => [
-    { label: t("dashboard.system.latency"), value: "14 ms" },
-    { label: t("dashboard.system.cache"), value: "97%" },
-    { label: t("dashboard.system.errors"), value: "0.1%" },
     { label: t("dashboard.system.activeProjects"), value: String(props.data.activeProjects ?? "—") },
-    { label: t("dashboard.system.recentComponents"), value: String(props.data.recentComponents ?? "—") }
+    { label: t("dashboard.system.recentComponents"), value: String(props.data.recentComponents ?? "—") },
+    { label: t("dashboard.quick.drawings"), value: String(props.data.drawingsCount ?? "—") }
   ]
   return (
     <section class="dash-panel" aria-label={t("dashboard.system.title")}>
       <div class="dash-panel-head">
         <h2 class="ent-section__title">{t("dashboard.system.title")}</h2>
-        <span class={BADGE}>{t("dashboard.status.nominal")}</span>
       </div>
       <KeyValueList rows={rows().map((row) => ({ label: row.label, value: row.value }))} />
     </section>

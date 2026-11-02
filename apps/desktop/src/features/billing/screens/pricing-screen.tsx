@@ -15,6 +15,7 @@ import { useRead } from "../../../app/queries.ts"
 import { openExternal } from "../../../app/external.ts"
 import { PLAN_FEATURES, PLAN_ORDER, type PlanId } from "../lib/plans.ts"
 import { WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { ErrorState, LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { PricingPreview } from "../../../shared/ui/stageshow/scenes-account.tsx"
 
 const daysLeft = (iso: string | undefined): number =>
@@ -27,12 +28,12 @@ export function PricingScreen(): JSX.Element {
   const [pending, setPending] = createSignal<PlanId>()
   const [error, setError] = createSignal<string>()
 
-  const plan = (): string => subscription.data()?.plan ?? "FREE"
+  const plan = (): string | undefined => subscription.data()?.plan
   const onTrial = (): boolean => subscription.data()?.isOnTrial === true
   const isCurrent = (id: PlanId): boolean => plan() === id
 
   const choose = async (id: PlanId): Promise<void> => {
-    if (pending() !== undefined) return
+    if (pending() !== undefined || subscription.data() === undefined || subscription.error() !== undefined) return
     setPending(id)
     setError(undefined)
     try {
@@ -68,6 +69,8 @@ export function PricingScreen(): JSX.Element {
     <Show when={error() !== undefined}>
       <p role="alert" class="mx-auto mb-4 max-w-3xl text-center text-sm text-red-600 dark:text-red-400">{error()}</p>
     </Show>
+    <Show when={subscription.loading()}><LoadingState label={t("subscription.card.title")} /></Show>
+    <Show when={subscription.error()}><ErrorState label={t("common.error")} detail={subscription.error()} /></Show>
     <div class="reference-pricing-grid">
       <For each={PLAN_ORDER}>{(id) => {
         const info = PLAN_FEATURES[id]!
@@ -81,7 +84,7 @@ export function PricingScreen(): JSX.Element {
             type="button"
             class="reference-button-primary"
             data-plan={id}
-            disabled={isCurrent(id) || id === "FREE" || subscription.loading() || pending() !== undefined}
+            disabled={subscription.data() === undefined || subscription.error() !== undefined || isCurrent(id) || id === "FREE" || subscription.loading() || pending() !== undefined}
             onClick={() => void choose(id)}
           >
             {pending() === id ? t("common.loading") : label(id)}

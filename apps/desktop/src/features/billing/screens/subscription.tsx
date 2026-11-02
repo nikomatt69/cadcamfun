@@ -53,6 +53,7 @@ function SubscriptionCard(): JSX.Element {
   const [billingPending, setBillingPending] = createSignal(false)
   const [billingError, setBillingError] = createSignal<string>()
   const openPortal = async (): Promise<void> => {
+    if (billingPending() || info() === undefined) return
     setBillingPending(true)
     setBillingError(undefined)
     try {
@@ -76,6 +77,7 @@ function SubscriptionCard(): JSX.Element {
         <Show when={subscription.loading()}><LoadingState label={t("subscription.card.title")} /></Show>
         <Show when={subscription.error()}><ErrorState label={t("common.error")} detail={subscription.error()} /></Show>
 
+        <Show when={info() !== undefined}>
         <Show when={isOnTrial() && trialDaysLeft() !== null && (trialDaysLeft() ?? 99) <= 3}>
           <div class="mb-4 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
             <div class="flex items-center gap-2">
@@ -170,6 +172,7 @@ function SubscriptionCard(): JSX.Element {
         </div>
         <Show when={billingError() !== undefined}>
           <p role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">{billingError()}</p>
+        </Show>
         </Show>
       </div>
     </div>

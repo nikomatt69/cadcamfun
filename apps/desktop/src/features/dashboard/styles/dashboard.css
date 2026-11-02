@@ -13,6 +13,7 @@
   width: 100%;
   max-width: 1120px;
   margin-inline: auto;
+  container-type: inline-size;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -30,22 +31,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.dash-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--ent-ok);
-  flex-shrink: 0;
-}
-
 /* Module cards reuse CARD; only the inner rhythm is dashboard-specific. */
 .dash-mod-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 4px;
+  gap: 12px;
 }
-@media (min-width: 1024px) { .dash-mod-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (min-width: 780px) { .dash-mod-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* The Stageshow illustration runs edge to edge at the head of the card (the card clips it). */
 .dash-mod-preview { border-bottom: 1px solid var(--ent-line); }
@@ -72,6 +64,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 8px 6px 12px;
   border-top: 1px solid var(--ent-line);
@@ -92,10 +85,13 @@
   font-weight: 500;
   color: var(--ent-accent);
   text-decoration: none;
-  white-space: nowrap;
 }
 @media (hover: hover) and (pointer: fine) {
-  .dash-open-link:hover { background: var(--ent-accent-soft); }
+  .dash-open-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
+.dash-open-link:focus-visible, .dash-row:focus-visible {
+  outline: 2px solid var(--ent-accent);
+  outline-offset: 2px;
 }
 .dash-stat {
   font-family: var(--ent-mono);
@@ -107,9 +103,9 @@
 .dash-split {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 4px;
+  gap: 12px;
 }
-@media (min-width: 1024px) { .dash-split { grid-template-columns: 1.2fr 1fr; align-items: start; } }
+@container (min-width: 650px) { .dash-split { grid-template-columns: 1.2fr 1fr; align-items: start; } }
 
 .dash-panel {
   border: 1px solid var(--ent-line);
@@ -149,5 +145,5 @@
 
 /* First run: the CAD scene over one line of copy and the primary action. */
 .dash-first { max-width: 480px; margin-inline: auto; width: 100%; }
-.dash-first__body { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.dash-first__body { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; }
 .dash-first__text { margin: 0; flex: 1; min-width: 0; font-size: 12px; color: var(--ent-text-muted); }
