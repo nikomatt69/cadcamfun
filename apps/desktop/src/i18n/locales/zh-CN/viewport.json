@@ -28,5 +28,12 @@
   "cad.depth": "深度",
   "cad.snapSettings": "捕捉设置",
   "cad.enableSnapping": "启用捕捉",
-  "viewport.editor2d": "二维图纸编辑器"
+  "viewport.editor2d": "二维图纸编辑器",
+  "viewport.capture.screenshot": "截图",
+  "viewport.capture.record": "录制视频",
+  "viewport.capture.stop": "停止录制 ({time})",
+  "viewport.capture.saved": "已保存 {name}",
+  "viewport.capture.failed": "捕获失败：{reason}",
+  "viewport.capture.unavailable": "请先打开 3D 视图。",
+  "viewport.capture.unsupported": "此 WebView 不支持视频录制。"
 }

@@ -51456,6 +51456,27 @@
                                                     "feed": {}
                                                   },
                                                   "additionalProperties": false
+                                                },
+                                                "comp": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "mode": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "left",
+                                                        "right",
+                                                        "off"
+                                                      ]
+                                                    },
+                                                    "register": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "mode"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
                                               },
                                               "required": [
@@ -51521,6 +51542,27 @@
                                                     "feed": {}
                                                   },
                                                   "additionalProperties": false
+                                                },
+                                                "comp": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "mode": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "left",
+                                                        "right",
+                                                        "off"
+                                                      ]
+                                                    },
+                                                    "register": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "mode"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
                                               },
                                               "required": [
@@ -51581,6 +51623,27 @@
                                                 "feed": {
                                                   "type": "number",
                                                   "exclusiveMinimum": 0
+                                                },
+                                                "comp": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "mode": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "left",
+                                                        "right",
+                                                        "off"
+                                                      ]
+                                                    },
+                                                    "register": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "mode"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
                                               },
                                               "required": [
@@ -51742,6 +51805,34 @@
                                               },
                                               "required": [
                                                 "_tag"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "CutterComp"
+                                                  ]
+                                                },
+                                                "side": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "left",
+                                                    "right",
+                                                    "off"
+                                                  ]
+                                                },
+                                                "register": {
+                                                  "type": "integer",
+                                                  "minimum": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "side"
                                               ],
                                               "additionalProperties": false
                                             },
@@ -53689,6 +53780,13 @@
                             "leadRadius": {
                               "type": "number",
                               "exclusiveMinimum": 0
+                            },
+                            "compensation": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "controller"
+                              ]
                             }
                           },
                           "required": [
@@ -55399,6 +55497,27 @@
                                             "feed": {}
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -55464,6 +55583,27 @@
                                             "feed": {}
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -55524,6 +55664,27 @@
                                         "feed": {
                                           "type": "number",
                                           "exclusiveMinimum": 0
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -55685,6 +55846,34 @@
                                       },
                                       "required": [
                                         "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CutterComp"
+                                          ]
+                                        },
+                                        "side": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "minimum": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side"
                                       ],
                                       "additionalProperties": false
                                     },
@@ -58481,6 +58670,27 @@
                                             "feed": {}
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -58546,6 +58756,27 @@
                                             "feed": {}
                                           },
                                           "additionalProperties": false
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -58606,6 +58837,27 @@
                                         "feed": {
                                           "type": "number",
                                           "exclusiveMinimum": 0
+                                        },
+                                        "comp": {
+                                          "type": "object",
+                                          "properties": {
+                                            "mode": {
+                                              "type": "string",
+                                              "enum": [
+                                                "left",
+                                                "right",
+                                                "off"
+                                              ]
+                                            },
+                                            "register": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "mode"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -58767,6 +59019,34 @@
                                       },
                                       "required": [
                                         "_tag"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "CutterComp"
+                                          ]
+                                        },
+                                        "side": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "minimum": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side"
                                       ],
                                       "additionalProperties": false
                                     },
@@ -59762,6 +60042,27 @@
                                           "feed": {}
                                         },
                                         "additionalProperties": false
+                                      },
+                                      "comp": {
+                                        "type": "object",
+                                        "properties": {
+                                          "mode": {
+                                            "type": "string",
+                                            "enum": [
+                                              "left",
+                                              "right",
+                                              "off"
+                                            ]
+                                          },
+                                          "register": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "mode"
+                                        ],
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -59827,6 +60128,27 @@
                                           "feed": {}
                                         },
                                         "additionalProperties": false
+                                      },
+                                      "comp": {
+                                        "type": "object",
+                                        "properties": {
+                                          "mode": {
+                                            "type": "string",
+                                            "enum": [
+                                              "left",
+                                              "right",
+                                              "off"
+                                            ]
+                                          },
+                                          "register": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "mode"
+                                        ],
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -59887,6 +60209,27 @@
                                       "feed": {
                                         "type": "number",
                                         "exclusiveMinimum": 0
+                                      },
+                                      "comp": {
+                                        "type": "object",
+                                        "properties": {
+                                          "mode": {
+                                            "type": "string",
+                                            "enum": [
+                                              "left",
+                                              "right",
+                                              "off"
+                                            ]
+                                          },
+                                          "register": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "mode"
+                                        ],
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -60048,6 +60391,34 @@
                                     },
                                     "required": [
                                       "_tag"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "CutterComp"
+                                        ]
+                                      },
+                                      "side": {
+                                        "type": "string",
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off"
+                                        ]
+                                      },
+                                      "register": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "side"
                                     ],
                                     "additionalProperties": false
                                   },
@@ -66334,6 +66705,27 @@
                                                   "feed": {}
                                                 },
                                                 "additionalProperties": false
+                                              },
+                                              "comp": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "mode": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "left",
+                                                      "right",
+                                                      "off"
+                                                    ]
+                                                  },
+                                                  "register": {
+                                                    "type": "integer",
+                                                    "exclusiveMinimum": 0
+                                                  }
+                                                },
+                                                "required": [
+                                                  "mode"
+                                                ],
+                                                "additionalProperties": false
                                               }
                                             },
                                             "required": [
@@ -66399,6 +66791,27 @@
                                                   "feed": {}
                                                 },
                                                 "additionalProperties": false
+                                              },
+                                              "comp": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "mode": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "left",
+                                                      "right",
+                                                      "off"
+                                                    ]
+                                                  },
+                                                  "register": {
+                                                    "type": "integer",
+                                                    "exclusiveMinimum": 0
+                                                  }
+                                                },
+                                                "required": [
+                                                  "mode"
+                                                ],
+                                                "additionalProperties": false
                                               }
                                             },
                                             "required": [
@@ -66459,6 +66872,27 @@
                                               "feed": {
                                                 "type": "number",
                                                 "exclusiveMinimum": 0
+                                              },
+                                              "comp": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "mode": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "left",
+                                                      "right",
+                                                      "off"
+                                                    ]
+                                                  },
+                                                  "register": {
+                                                    "type": "integer",
+                                                    "exclusiveMinimum": 0
+                                                  }
+                                                },
+                                                "required": [
+                                                  "mode"
+                                                ],
+                                                "additionalProperties": false
                                               }
                                             },
                                             "required": [
@@ -66620,6 +67054,34 @@
                                             },
                                             "required": [
                                               "_tag"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "CutterComp"
+                                                ]
+                                              },
+                                              "side": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "left",
+                                                  "right",
+                                                  "off"
+                                                ]
+                                              },
+                                              "register": {
+                                                "type": "integer",
+                                                "minimum": 1
+                                              }
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "side"
                                             ],
                                             "additionalProperties": false
                                           },

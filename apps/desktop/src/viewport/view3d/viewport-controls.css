@@ -27,3 +27,5 @@
 @media (max-width: 900px) { .vp3-footer--player > span { display: none; } }
 @media (prefers-reduced-transparency: reduce) { .vp3-controls, .vp3-cube, .vp3-transform { backdrop-filter: none; background: #f8fbff; } .dark .vp3-controls, .dark .vp3-cube, .dark .vp3-transform { background: #1e1e1e; } }
 @media (prefers-contrast: more) { .vp3-controls, .vp3-cube, .vp3-transform { border: 2px solid currentColor; } }
+.vp3-capture-btn { display: inline-flex; align-items: center; justify-content: center; }
+.vp3-root button.vp3-capture-btn[aria-pressed=true] { background: #b91c1c; color: #fff; }

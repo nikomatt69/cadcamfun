@@ -32,6 +32,7 @@ import projectAutoMemory from "./text/project-auto-memory.md" with { type: "text
 import stockAndFixtures from "./text/stock-and-fixtures.md" with { type: "text" }
 import camTurning from "./text/cam-turning.md" with { type: "text" }
 import camPost from "./text/cam-post.md" with { type: "text" }
+import camFiveAxis from "./text/cam-five-axis.md" with { type: "text" }
 
 /** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
 export const USER_MARKER = ".user-skill"
@@ -101,7 +102,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cutting-parameters", description: "Speeds, feeds, stepdown and stepover starting points by material, and the formulas behind them.", category: "cam", tags: ["cam", "feeds", "speeds"], body: skillText(cuttingParameters) },
   { name: "drilling-and-holes", description: "Drilling operations: cycles, peck rules, through-hole depth, large holes.", category: "cam", tags: ["cam", "drilling"], body: skillText(drillingAndHoles) },
   { name: "precision-and-tolerances", description: "Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.", category: "cam", tags: ["precision", "tolerance", "iso286"], body: skillText(precisionAndTolerances) },
-  { name: "industrial-standards", description: "Mechanical and industrial rules for professional parts: ISO 2768 general tolerances, ISO 286 fits, surface finish, ISO 273 / ISO 4762 fastener holes, tap drills, DIN 6885 keys, ISO 54 gears, preferred numbers, design rules per process (milling, turning, sheet metal, casting, printing) and material densities.", category: "cad", tags: ["iso", "din", "tolerance", "fits", "dfm", "standards"], body: skillText(industrialStandards) },
+  { name: "industrial-standards", description: "ISO 2768 general tolerances, ISO 286 fits, surface finish, ISO 273 / ISO 4762 fastener holes, tap drills, DIN 6885 keys, ISO 54 gears, preferred numbers, design rules per process and material densities.", category: "cad", tags: ["iso", "din", "tolerance", "fits", "dfm", "standards"], body: skillText(industrialStandards) },
   { name: "machines-and-axes", description: "Mill, lathe and 3D printer: what turns, the sense of every axis, zeros and work offsets, touch probes and tool setters, and how to check a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: skillText(machinesAndAxes) },
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: skillText(drawingsAndImages) },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: skillText(pluginAuthoring) },
@@ -117,7 +118,8 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: skillText(stockAndFixtures) },
   { name: "fea-simulation", description: "Finite-element studies on a solid: static stress, thermal, thermal stress, modal and buckling; the run, converge and material loop that improves a study, stress criteria and limits.", category: "cad", tags: ["fea", "simulation", "stress", "thermal", "modal"], body: skillText(feaSimulation) },
   { name: "cam-turning", description: "Plan a turned part with real inserts: roughing, finishing, grooving, threading, parting, nose-radius path and the stock-removal replay (cam lathe).", category: "cam", tags: ["cam", "turning", "lathe"], body: skillText(camTurning) },
-  { name: "cam-post", description: "Test a post by replaying its text, diff against expected NC, and optimise feeds from measured engagement (cam post_test, cam process).", category: "cam", tags: ["cam", "post", "feeds"], body: skillText(camPost) }
+  { name: "cam-post", description: "Test a post by replaying its text, diff against expected NC, and optimise feeds from measured engagement (cam post_test, cam process).", category: "cam", tags: ["cam", "post", "feeds"], body: skillText(camPost) },
+  { name: "cam-five-axis", description: "Multi-setup and five-axis jobs: setups, stock, fixtures, multiaxis; read claims, bounds, failure reasons.", category: "cam", tags: ["cam", "five-axis", "setups", "fixtures", "verification"], body: skillText(camFiveAxis) }
 ]
 
 /** The `SKILL.md` text nikcli reads: front matter then the playbook. */

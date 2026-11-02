@@ -28,5 +28,12 @@
   "cad.depth": "العمق",
   "cad.snapSettings": "إعدادات الالتقاط",
   "cad.enableSnapping": "تفعيل الالتقاط",
-  "viewport.editor2d": "محرر الرسم ثنائي الأبعاد"
+  "viewport.editor2d": "محرر الرسم ثنائي الأبعاد",
+  "viewport.capture.screenshot": "لقطة شاشة",
+  "viewport.capture.record": "تسجيل فيديو",
+  "viewport.capture.stop": "إيقاف التسجيل ({time})",
+  "viewport.capture.saved": "تم حفظ {name}",
+  "viewport.capture.failed": "فشل الالتقاط: {reason}",
+  "viewport.capture.unavailable": "افتح عرض ثلاثي الأبعاد أولاً.",
+  "viewport.capture.unsupported": "تسجيل الفيديو غير متاح في هذا العرض."
 }

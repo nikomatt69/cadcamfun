@@ -53,7 +53,7 @@ export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate =
   let angles: RotaryAngles = {}
   program.toolpaths.forEach((path, p) => {
     expandMoves(path.moves, from).forEach((move, index) => {
-      if (move._tag === "Comment" || move._tag === "Cycle" || isControlNode(move)) return
+      if (move._tag === "Comment" || move._tag === "Cycle" || move._tag === "CutterComp" || isControlNode(move)) return
       const state = stateAt(used, p, index)
       const anglesFrom = angles
       angles = anglesAfter(move, angles)

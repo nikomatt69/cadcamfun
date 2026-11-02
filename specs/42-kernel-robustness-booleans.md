@@ -165,3 +165,11 @@ fix is an analytic seed for coaxial surfaces of revolution (circles), clipped to
   chord 0.05 to 0.5 mm (seed 133 union, face 1) still gets no triangles for that face (`tessellate.ts` warns "constrained segments cross").
   The fix belongs in the tessellator (edge polylines are shared between faces, so a per-face retry breaks the weld).
 - 500 seeds were not run (240 aligned, 140 generic new, 60 generic earlier).
+
+### 6.3 CAD-A round 2026-10-31
+
+- R0 counters built: `booleanCounters()` / `resetBooleanCounters()` (calls, exact, recoveredByDisplacement, strictFailure, failed, emptyResult,
+  poleContact, byStage); the assistant reads them through `cad.kernel` op `health`. The seeded JSON report script is not written.
+- A designed-coincidence probe (60+ cases) was written and is red in places the other session's R3 may already cover: identical spheres and a
+  tangent boss rim still recover by displacement, a cross bore through a rod hits "intersection curve could not be refined", and slots open to
+  a side wall disagree with the expected volumes (the expectation may be at fault). Not committed; re-derive the expectations before using.

@@ -195,6 +195,29 @@ const stripLine = (raw: string): string =>
 /** What a block does to the flow of the program. */
 type Flow = "next" | "return" | "end"
 
+/**
+ * Heidenhain legacy cycle 19 WORKING PLANE, read as the `PLANE SPATIAL` words it predates (spec 72 P4-6). `CYCL DEF 19.1 A.. B.. C..`
+ * takes the same spatial angles as SPA / SPB / SPC (rotations about the fixed X, Y, Z axes in that order), so the frame it defines is
+ * the same one; a cycle with all three angles at 0 is the control's cancel and is read as `PLANE RESET`. The two cycle rows are replaced
+ * one for one, so every line number (and every finding) still names its Klartext block. The exact legacy syntax is not qualified on a
+ * real control: the decoder is the reference, not the vendor's manual.
+ */
+const legacyWorkingPlane = (text: string): string =>
+  text.split(/\r?\n/).map((raw) => {
+    const code = raw.replace(/^\s*\d+\s+/, "").replace(/;.*$/, "").trim().toUpperCase()
+    if (/^CYCL DEF 19\.0\b/.test(code)) return `; ${code}`
+    if (!/^CYCL DEF 19\.1\b/.test(code)) return raw
+    const words = code.slice(code.indexOf("19.1") + 4)
+    const angle = (letter: string): number => {
+      const m = new RegExp(`(?:^|\\s)${letter}([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))`).exec(words)
+      return m === null ? 0 : Number(m[1])
+    }
+    const a = angle("A"), b = angle("B"), c = angle("C")
+    if (a === 0 && b === 0 && c === 0) return "PLANE RESET"
+    const signed = (v: number): string => (v >= 0 ? `+${v}` : String(v))
+    return `PLANE SPATIAL SPA${signed(a)} SPB${signed(b)} SPC${signed(c)}`
+  }).join("\n")
+
 export const interpretGcode = (text: string, options: InterpretOptions = {}): InterpretResult => {
   const segments: GSegment[] = []
   const errors: string[] = []
@@ -211,6 +234,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     }
   }
   if (/\bBEGIN PGM\b/i.test(text)) {
+    text = legacyWorkingPlane(text)
     const decoded = decodeKlartext(text, (tool) => options.toolRadius?.(undefined, tool))
     // A fixed cycle that moves in a path is several lines: findings still name the Klartext line (and the source line behind it).
     lineMap = decoded.lines.map((l) => lineMap?.[l - 1] ?? l)

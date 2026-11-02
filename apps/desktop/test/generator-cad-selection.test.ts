@@ -27,13 +27,21 @@ const mount = async (machine: cam.MachineKind = "mill") => {
   installDom()
   const { render } = await import("solid-js/web")
   const { OperationSection } = await import("../src/features/cam/components/generator/OperationSection.tsx")
+  const { KernelSession } = await import("../src/features/cam/components/generator/KernelSection.tsx")
+  const { createAppState, AppProvider } = await import("../src/shared/state/context.ts")
+  const { createFakeApi } = await import("../src/testing/fake-api.ts")
+  const { runtimeForClient } = await import("../src/app/client.ts")
+  const { createComponent } = await import("solid-js")
+  const client = createFakeApi()
+  const app = createAppState({ client, runtime: runtimeForClient(client), sidecar: "fake" })
   useGeneratorStore.getState().updateSettings("machineType", machine)
   useGeneratorStore.getState().setGeometryType("selected")
   useGeneratorStore.setState((state) => ({ expanded: { ...state.expanded, operation: true } }))
   const root = document.createElement("div")
   document.body.replaceChildren(root)
   let job!: JobView
-  const dispose = render(() => { job = useJob(); return OperationSection() }, root)
+  // The operation section reads the kernel controls, which live in KernelSession inside the app context, as in the generator panel.
+  const dispose = render(() => AppProvider({ state: app, get children() { return createComponent(KernelSession, { onGCodeGenerated: () => {}, get children() { job = useJob(); return OperationSection() } }) } }), root)
   const picker = () => root.querySelector<HTMLSelectElement>('[data-testid="generator-cad-picker"] select')!
   const choose = (id: string) => {
     picker().value = id

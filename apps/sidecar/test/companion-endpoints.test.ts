@@ -7,7 +7,7 @@ import { OpenApi } from "effect/unstable/httpapi"
 import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
 import { CompanionClient } from "../../mobile/lib/client.ts"
 import { parsePairingLink } from "../../mobile/lib/pairing.ts"
-import { isCompanionRoute } from "../src/services/companion-gateway.ts"
+import { isCompanionRoute, isCloudRoute } from "../src/services/companion-gateway.ts"
 
 /**
  * The phone's endpoint contract: every call `apps/mobile/lib/client.ts` makes must be a route the API defines and the
@@ -69,8 +69,16 @@ describe("phone endpoint contract", () => {
     expect(missing).toEqual([])
   })
 
-  test("every phone call passes the companion gateway's allow-list", () => {
-    expect(calls.filter((call) => !isCompanionRoute(call.method, call.path))).toEqual([])
+  test("phone calls use the companion allow-list except explicitly hosted delivery routes", () => {
+    const hosted = new Set(["GET /api/projects/P/cloud/status", "POST /api/projects/P/cloud/send"])
+    expect(calls.filter((call) => !hosted.has(`${call.method} ${call.path}`) && !isCompanionRoute(call.method, call.path))).toEqual([])
+    for (const key of hosted) {
+      const call = calls.find((call) => `${call.method} ${call.path}` === key)
+      expect(call).toBeDefined()
+      if (!call) throw new Error(`Missing hosted phone route: ${key}`)
+      expect(isCompanionRoute(call.method, call.path)).toBe(false)
+      expect(isCloudRoute(call.method, call.path)).toBe(true)
+    }
   })
 
   test("all 21 production-cost endpoints reach the phone with their exact HTTP methods", () => {

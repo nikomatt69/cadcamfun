@@ -90,6 +90,16 @@ export const frameIsRigid = (frame: WorkFrame): boolean =>
 const signedNumber = (text: string): string => (text.startsWith("-") || text.startsWith("+") ? text : `+${text}`)
 
 /**
+ * A plane asked for with Heidenhain's legacy cycle 19 on a control that has no such word. The plane is refused, never written with
+ * another control's word: the program would cut in a frame the post did not mean.
+ */
+const refuseLegacy = (control: string, call: PlaneCall): void => {
+  if (call.plane.legacy === true) {
+    throw new RangeError(`${control}: legacy cycle 19 WORKING PLANE is a Heidenhain word; this control has no such cycle, so the tilted plane is refused instead of being written as another word`)
+  }
+}
+
+/**
  * Fanuc 30i/31i/32i-B tilted working plane indexing:
  *  - `G68.2 X Y Z I J K`  defines the feature coordinate system (P omitted = P0, Euler angles in the order Z, X', Z''; the origin is
  *    in the active work coordinate system). It rotates the programmed coordinates only.
@@ -101,6 +111,7 @@ const signedNumber = (text: string): string => (text.startsWith("-") || text.sta
  */
 export const fanucTiltedPlane: TiltedPlaneCodes = {
   set: (c) => {
+    refuseLegacy("Fanuc", c)
     const e = eulerZXZ(c.matrix)
     return [
       "G91 G28 Z0", "G90",
@@ -108,7 +119,10 @@ export const fanucTiltedPlane: TiltedPlaneCodes = {
       "G53.1"
     ]
   },
-  reset: (c) => ["G91 G28 Z0", "G90", "G69", ...(c.rotaryAxes.length > 0 ? [`G0 ${c.rotaryAxes.map((a) => `${a}${c.number(0)}`).join(" ")}`] : [])]
+  reset: (c) => {
+    refuseLegacy("Fanuc", c)
+    return ["G91 G28 Z0", "G90", "G69", ...(c.rotaryAxes.length > 0 ? [`G0 ${c.rotaryAxes.map((a) => `${a}${c.number(0)}`).join(" ")}`] : [])]
+  }
 }
 
 // ------------------------------------------------------------------------------------------------- Siemens
@@ -133,12 +147,14 @@ export const fanucTiltedPlane: TiltedPlaneCodes = {
  */
 export const siemensTiltedPlane: TiltedPlaneCodes = {
   set: (c) => {
+    refuseLegacy("Siemens", c)
     const s = c.swivel
     if (s === undefined || s.dataRecord.length === 0) throw new RangeError("Siemens tilted plane: set options.swivel.dataRecord (the machine's swivel data record, CYCLE800 _TC)")
     const e = eulerXYZ(c.matrix)
     return [cycle800(c, s, [c.origin.x, c.origin.y, c.origin.z], [c.angle(e.a), c.angle(e.b), c.angle(e.c)])]
   },
   reset: (c) => {
+    refuseLegacy("Siemens", c)
     const s = c.swivel
     if (s === undefined || s.dataRecord.length === 0) throw new RangeError("Siemens tilted plane: set options.swivel.dataRecord (the machine's swivel data record, CYCLE800 _TC)")
     const zero = c.number(0)
@@ -162,17 +178,42 @@ const cycle800 = (c: PlaneCall, s: NonNullable<PlaneCall["swivel"]>, at: readonl
  *  - SEQ+/SEQ-    which of the two rotary solutions.
  * `PLANE RESET TURN MB MAX FMAX` cancels the plane and turns the axes back; the datum is then moved back to the preset (cycle 7 with
  * zeros). Lines carry the Klartext prefix: the Klartext writer passes them through unchanged.
+ *
+ * Legacy cycle 19 (`TiltedPlane.legacy`): `CYCL DEF 19.0 WORKING PLANE` / `CYCL DEF 19.1 A.. B.. C..`, the iTNC 530-era cycle that
+ * `PLANE SPATIAL` replaced. A, B and C are the same spatial angles as SPA, SPB and SPC: rotations about the fixed X, Y and Z axes in
+ * that order, `M = Rz(C) Ry(B) Rx(A)`. The cycle rotates the axes about the active datum, so the plane's origin is still written with
+ * cycle 7 first. Cancelling is the same cycle with all three angles at 0, then the datum back at the preset. The exact legacy syntax is
+ * **not qualified on a real control**: the TNC 640 / TNC7 manuals document `PLANE`, and a shop running cycle 19 must check its own
+ * control's wording (some iTNC versions wrote `CYCL DEF 19.1` without the A/B/C letters). A control without cycle 19 refuses the plane
+ * (`refuseLegacy`), never writes another control's word.
  */
 export const klartextTiltedPlane: TiltedPlaneCodes = {
   set: (c) => {
     const a = spatialAngles(c.matrix)
+    if (c.plane.legacy === true) {
+      return [
+        ...datum(c.origin.x, c.origin.y, c.origin.z),
+        `${KLARTEXT_PREFIX}CYCL DEF 19.0 WORKING PLANE`,
+        `${KLARTEXT_PREFIX}CYCL DEF 19.1 A${signedNumber(c.angle(a.spa))} B${signedNumber(c.angle(a.spb))} C${signedNumber(c.angle(a.spc))}`
+      ]
+    }
     const seq = c.plane.solution === undefined ? "" : c.plane.solution > 0 ? " SEQ+" : " SEQ-"
     return [
       ...datum(c.origin.x, c.origin.y, c.origin.z),
       `${KLARTEXT_PREFIX}PLANE SPATIAL SPA${signedNumber(c.angle(a.spa))} SPB${signedNumber(c.angle(a.spb))} SPC${signedNumber(c.angle(a.spc))} TURN MB MAX FMAX${seq}`
     ]
   },
-  reset: (c) => [`${KLARTEXT_PREFIX}PLANE RESET TURN MB MAX FMAX`, ...datum(c.number(0), c.number(0), c.number(0))]
+  reset: (c) => {
+    if (c.plane.legacy === true) {
+      const zero = c.angle(0)
+      return [
+        `${KLARTEXT_PREFIX}CYCL DEF 19.0 WORKING PLANE`,
+        `${KLARTEXT_PREFIX}CYCL DEF 19.1 A${signedNumber(zero)} B${signedNumber(zero)} C${signedNumber(zero)}`,
+        ...datum(c.number(0), c.number(0), c.number(0))
+      ]
+    }
+    return [`${KLARTEXT_PREFIX}PLANE RESET TURN MB MAX FMAX`, ...datum(c.number(0), c.number(0), c.number(0))]
+  }
 }
 
 /** Cycle 7 DATUM SHIFT, one block per row as the TNC writes it. */

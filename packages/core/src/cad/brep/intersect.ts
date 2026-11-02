@@ -9,7 +9,7 @@
  *   on (u_a, v_a, u_b, v_b) with a plane constraint across the curve, then resampled until the chords are within the
  *   fit tolerance.
  */
-import { cross3, dist3, dot3, length3, normalize3, solve2, solveDense, sub3, unwrapNear as unwrapNearCheck, type Vec2, type Vec3 } from "./math.ts"
+import { cross3, dist3, dot3, fromFrame, length3, normalize3, solve2, solveDense, sub3, unwrapNear as unwrapNearCheck, type Vec2, type Vec3 } from "./math.ts"
 import { curveDerivs, curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface, type SurfaceParam } from "./geom.ts"
 import type { Edge } from "./topology.ts"
 import type { FaceMesh } from "./tessellate.ts"
@@ -156,6 +156,32 @@ export const refineCurveSurface = (c: Curve3, s: Surface, t0: number, uv0: Surfa
   return { t, u, v, point: P }
 }
 
+/** Parameters t of the points origin + t dir (dir unit) on a sphere, cylinder or cone (no roots for other surfaces). */
+const lineQuadricRoots = (origin: Vec3, dir: Vec3, s: Surface): number[] => {
+  let a: number, b: number, c: number
+  if (s.kind === "sphere") {
+    const w = sub3(origin, s.frame.origin)
+    a = 1; b = 2 * dot3(w, dir); c = dot3(w, w) - s.radius * s.radius
+  } else if (s.kind === "cylinder" || s.kind === "cone") {
+    const z = s.frame.z
+    const w = sub3(origin, s.frame.origin)
+    const wz = dot3(w, z), dz = dot3(dir, z)
+    const wp = sub3(w, { x: z.x * wz, y: z.y * wz, z: z.z * wz }), dp = sub3(dir, { x: z.x * dz, y: z.y * dz, z: z.z * dz })
+    const T = s.kind === "cone" ? Math.tan(s.semiAngle) : 0
+    const rho0 = s.radius + T * wz
+    a = dot3(dp, dp) - T * T * dz * dz
+    b = 2 * (dot3(wp, dp) - T * dz * rho0)
+    c = dot3(wp, wp) - rho0 * rho0
+  } else return []
+  if (Math.abs(a) < 1e-14) return Math.abs(b) < 1e-14 ? [] : [-c / b]
+  const disc = b * b - 4 * a * c
+  if (disc < 0) return []
+  const root = Math.sqrt(disc)
+  const q = -0.5 * (b + (b < 0 ? -root : root))
+  const t1 = q / a, t2 = q === 0 ? t1 : c / q
+  return Math.abs(t1 - t2) < 1e-12 ? [t1] : [t1, t2]
+}
+
 /**
  * Transversal hits of edge `e` (sampled at `params`, 3D `points`) with the triangulated face `mesh` of `s`.
  * Parameters within [t0, t1] (ends included); hits closer than `tol` are merged.
@@ -170,9 +196,26 @@ export const edgeSurfaceHits = (
   tol: number
 ): CurveSurfaceHit[] => {
   const hits: CurveSurfaceHit[] = []
+  // A straight edge meets a sphere, cylinder or cone in the roots of a quadratic: exact, and independent of the mesh. The mesh
+  // lies inside a convex surface by its chord tolerance, so an edge that crosses the surface by less than that (the seam of a
+  // cylinder against a sphere 1e-5 mm larger) never meets a triangle.
+  if (e.curve.kind === "line") {
+    const span = e.t1 - e.t0
+    for (const t of lineQuadricRoots(e.curve.origin, e.curve.dir, s)) {
+      if (t < e.t0 - 1e-9 * span || t > e.t1 + 1e-9 * span) continue
+      const tt = Math.min(e.t1, Math.max(e.t0, t))
+      const P = curvePoint(e.curve, tt)
+      const q = surfaceProject(s, P)
+      const h = refineCurveSurface(e.curve, s, tt, q, tol)
+      if (h === undefined) continue
+      const t2 = Math.min(e.t1, Math.max(e.t0, h.t))
+      if (hits.some((x) => dist3(x.point, h.point) < tol)) continue
+      hits.push({ ...h, t: t2, point: curvePoint(e.curve, t2) })
+    }
+  }
   for (let i = 0; i + 1 < points.length; i++) {
     const p = points[i]!, q = points[i + 1]!
-    const lo = { x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), z: Math.min(p.z, q.z) }
+    const lo ={ x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), z: Math.min(p.z, q.z) }
     const hi = { x: Math.max(p.x, q.x), y: Math.max(p.y, q.y), z: Math.max(p.z, q.z) }
     for (const ti of bvh.query(lo, hi)) {
       const [ia, ib, ic] = mesh.tris[ti]!
@@ -435,6 +478,55 @@ export interface SsiPolyline {
   readonly closed: boolean
 }
 
+/** Exact closed intersection rings for a sphere centred on a cylinder axis.
+ * Undefined means unsupported (including tangency); an empty array means disjoint surfaces.
+ * These are untrimmed rings: the caller must establish that the whole ring belongs to both faces.
+ */
+export const coaxialSphereCylinderRings = (sa: Surface, sb: Surface): SsiPoint[][] | undefined => {
+  const sphere = sa.kind === "sphere" ? sa : sb.kind === "sphere" ? sb : undefined
+  const cylinder = sa.kind === "cylinder" ? sa : sb.kind === "cylinder" ? sb : undefined
+  if (sphere === undefined || cylinder === undefined) return undefined
+  const offset = sub3(sphere.frame.origin, cylinder.frame.origin)
+  const height = dot3(offset, cylinder.frame.z)
+  // Do not turn a merely near-coaxial pair into a coaxial one using a modelling tolerance.
+  const roundoff = 64 * Number.EPSILON * Math.max(1, length3(offset), sphere.radius, cylinder.radius)
+  if (length3(cross3(offset, cylinder.frame.z)) > roundoff) return undefined
+  const delta = (sphere.radius - cylinder.radius) * (sphere.radius + cylinder.radius)
+  if (delta < 0) return []
+  if (delta === 0) return undefined
+  const dz = Math.sqrt(delta)
+  return [-dz, dz].map((z) => Array.from({ length: 128 }, (_, i) => {
+    const angle = i * Math.PI / 64
+    const p = fromFrame(cylinder.frame, cylinder.radius * Math.cos(angle), cylinder.radius * Math.sin(angle), height + z)
+    const a = surfaceProject(sa, p), b = surfaceProject(sb, p)
+    return { p, ua: a.u, va: a.v, ub: b.u, vb: b.v }
+  }))
+}
+
+/** Exact intersections of a line/circle edge with a plane; undefined for a coplanar or unsupported edge. */
+export const edgePlaneParameters = (edge: Edge, origin: Vec3, normal: Vec3): number[] | undefined => {
+  const c = edge.curve
+  let roots: number[]
+  if (c.kind === "line") {
+    const denominator = dot3(c.dir, normal)
+    if (Math.abs(denominator) < 1e-14) return undefined
+    roots = [dot3(sub3(origin, c.origin), normal) / denominator]
+  } else if (c.kind === "circle") {
+    const a = c.radius * dot3(c.frame.x, normal), b = c.radius * dot3(c.frame.y, normal)
+    const d = dot3(sub3(origin, c.frame.origin), normal), radius = Math.hypot(a, b)
+    if (radius < 1e-14) return undefined
+    if (Math.abs(d) > radius) return []
+    const phase = Math.atan2(b, a), angle = Math.acos(d / radius)
+    roots = []
+    for (const root of [phase - angle, phase + angle]) {
+      const start = Math.ceil((edge.t0 - root) / (2 * Math.PI))
+      const end = Math.floor((edge.t1 - root) / (2 * Math.PI))
+      for (let k = start; k <= end; k++) roots.push(root + k * 2 * Math.PI)
+    }
+  } else return undefined
+  return roots.filter((t) => t >= edge.t0 && t <= edge.t1)
+}
+
 /**
  * Intersection polylines of two triangulated faces (approximate, from the meshes); coplanar triangle pairs are
  * skipped. Endpoints are chained by mesh topology: a point is identified by the mesh edge it lies on and the
@@ -660,6 +752,55 @@ export const unwrapSsi = (sa: Surface, sb: Surface, pts: SsiPoint[]): SsiPoint[]
       ub: pb.u === undefined ? q.ub : unwrapNearCheck(q.ub, prev.ub, pb.u),
       vb: pb.v === undefined ? q.vb : unwrapNearCheck(q.vb, prev.vb, pb.v)
     })
+  }
+  return out
+}
+
+// ================================================================ coaxial surfaces of revolution
+
+/** A circle of intersection of two coaxial surfaces of revolution: centre, radius and the plane's axes. */
+export interface IntersectionCircle {
+  readonly centre: Vec3
+  readonly radius: number
+  readonly x: Vec3
+  readonly y: Vec3
+}
+
+/**
+ * Exact intersection circles of a sphere with a cylinder or cone about the same axis (the sphere's centre on the axis), or
+ * undefined when the pair is not of that kind or the circles are too close to resolve (a tangent pair, left to the general
+ * path). The mesh seeds cannot separate two circles a few hundredths of a millimetre apart (a sphere 1e-5 mm larger than a
+ * cylinder it is centred on meets it in two circles 0.015 mm apart at a grazing angle); here they are solved in closed form:
+ * the profile of the cone, rho = R + v tan(a), meets the profile of the sphere, rho^2 + (v - zs)^2 = r^2, in a quadratic in v.
+ */
+export const coaxialCircles = (sa: Surface, sb: Surface, tol: number, near: number): IntersectionCircle[] | undefined => {
+  const sphere = sa.kind === "sphere" ? sa : sb.kind === "sphere" ? sb : undefined
+  const cone = sa.kind === "cylinder" || sa.kind === "cone" ? sa : sb.kind === "cylinder" || sb.kind === "cone" ? sb : undefined
+  if (sphere === undefined || cone === undefined) return undefined
+  const f = cone.frame
+  const rel = sub3(sphere.frame.origin, f.origin)
+  const zs = dot3(rel, f.z)
+  const off = length3({ x: rel.x - f.z.x * zs, y: rel.y - f.z.y * zs, z: rel.z - f.z.z * zs })
+  if (off > tol * 10) return undefined
+  const t = cone.kind === "cone" ? Math.tan(cone.semiAngle) : 0
+  const R = cone.radius, r = sphere.radius
+  const a = 1 + t * t, b = 2 * (R * t - zs), c = R * R + zs * zs - r * r
+  const disc = b * b - 4 * a * c
+  if (disc < 0) {
+    // No circle. A sphere that misses the cylinder by less than `near` (twenty fit tolerances) still lies within the classification
+    // tolerance of it over a band (the fragment's sample can fall there and read "on"): that pair stays on the general path,
+    // whose checks and recoveries know it. A clear gap is an empty answer.
+    const gap = Math.abs(Math.abs(R + t * zs) / Math.sqrt(a) - r)
+    return gap < near ? undefined : []
+  }
+  const root = Math.sqrt(disc)
+  const roots = [(-b - root) / (2 * a), (-b + root) / (2 * a)]
+  if (Math.abs(roots[1]! - roots[0]!) < tol * 100) return undefined
+  const out: IntersectionCircle[] = []
+  for (const v of roots) {
+    const rho = R + t * v
+    if (!(rho > tol * 10)) continue
+    out.push({ centre: { x: f.origin.x + f.z.x * v, y: f.origin.y + f.z.y * v, z: f.origin.z + f.z.z * v }, radius: rho, x: f.x, y: f.y })
   }
   return out
 }

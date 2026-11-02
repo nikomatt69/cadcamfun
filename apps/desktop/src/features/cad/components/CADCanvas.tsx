@@ -10,6 +10,7 @@ import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
 import { formatGridStep } from "../../../viewport/grid-lod.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
+import { CaptureButtons } from "../../../viewport/CaptureButtons.tsx"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -36,6 +37,11 @@ import { booleanFormed } from "../lib/createThreeObject.ts"
 import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
+import { applySketchVisibility } from "../lib/history-view.ts"
+import { applyDetailLevel } from "../lib/detail-level.ts"
+import { createJointMarkers } from "../lib/joint-markers.ts"
+import { useAssemblyStore } from "../store/assemblyStore.ts"
+import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
@@ -110,6 +116,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const layers = useLayerStore()
   const selection = useSelectionStore()
   const transformStore = useTransformControlsStore()
+  const assembly = useAssemblyStore()
   const snap = createSnap()
   const transformControls = createTransformControls({ enableKeyboardShortcuts: props.keyboard !== false })
 
@@ -177,6 +184,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let reducedMotion: MediaQueryList | undefined
   let dirty = true
   let cubeStale = true
+  /** The level of detail (edges of parts that are tiny on screen) is re-evaluated at most five times a second, after the camera moved or the parts changed. */
+  let lodPending = true
+  let lodAt = 0
   const invalidate = (): void => { dirty = true; frames?.invalidate() }
   const pivot = new THREE.Object3D()
   const raycaster = new THREE.Raycaster()
@@ -200,6 +210,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [webglFailed, setWebglFailed] = createSignal(false)
   const [rebuilds, setRebuilds] = createSignal(0)
   const [hoveredId, setHoveredId] = createSignal<string | null>(null)
+  /** The face or edge of an exact solid under the cursor, and the one last clicked. */
+  const [hoveredSub, setHoveredSub] = createSignal<SubEntityPick | undefined>(undefined)
+  const [pickedSub, setPickedSub] = createSignal<SubEntityPick | undefined>(undefined)
   const [isSelectionMode, setSelectionMode] = createSignal(false)
   const [isMultiSelectMode, setMultiSelectMode] = createSignal(false)
   const [isFullscreen, setFullscreen] = createSignal(false)
@@ -220,6 +233,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [memory, setMemory] = createSignal({ used: 0, total: 0, geometries: 0, textures: 0 })
   const [frame, setFrame] = createSignal(0)
   /** The elements that have no geometry to draw: each is a red marker in the scene and a line in the banner. */
+  /** Features of a drawn history that failed: the part is drawn without them, and the person is told which and why. */
+  const [issueItems, setIssueItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly feature: string; readonly message: string }>>([])
   const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
@@ -247,10 +262,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     return raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1)), hit)
   }
 
+  /** The hits of the last `elementIdAt` ray, nearest first: the face or edge under the cursor is read from them. */
+  let lastHits: THREE.Intersection[] = []
+  const ownerOf = (object: THREE.Object3D): string | undefined => {
+    for (let current: THREE.Object3D | null = object; current; current = current.parent) {
+      const id = current.userData.elementId as string | undefined
+      if (id) return id
+    }
+    return undefined
+  }
   const elementIdAt = (): string | null => {
+    lastHits = []
     if (visibleObjects.length === 0) return null
     // `visibleObjects` is already filtered by layer visibility, and the first hit is the one that counts.
     const hits = raycaster.intersectObjects(visibleObjects, true)
+    lastHits = hits
     for (const hit of hits) {
       for (let current: THREE.Object3D | null = hit.object; current; current = current.parent) {
         const id = current.userData.elementId as string | undefined
@@ -363,6 +389,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const rigAnimating = rig?.beforeUpdate(performance.now()) === true
       const moved = (orbit?.update() === true) || rigAnimating
       if (rig?.afterUpdate(moved) === true) dirty = true
+      if (moved) lodPending = true
+      if (lodPending && camera && container) {
+        const now = performance.now()
+        if (now - lodAt > 200 || !moved) {
+          lodAt = now; lodPending = false
+          if (applyDetailLevel(cadObjects(), camera, container.clientHeight)) dirty = true
+        }
+      }
       if (cubeApi !== undefined && camera && (moved || cubeStale)) { camera.updateMatrixWorld(); cubeApi.setBasis(camera.matrixWorld.elements); cubeStale = false }
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
@@ -377,7 +411,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       renderer, scene, camera,
       render: () => renderer?.render(scene!, camera!),
       quality: currentLookTier,
-      busy: () => dirty || fourViewOn,
+      // The occlusion shades the depth buffer: with faces that are not drawn (hidden line, wireframe) or see-through (x-ray, ghost) it would smudge the background.
+      busy: () => dirty || fourViewOn || (cad.displayMode !== "shaded-edges" && cad.displayMode !== "shaded"),
       exclude: (object) => object === gizmo?.getHelper() || object.userData.isControlPoint === true,
       radius: () => {
         const box = new THREE.Box3()
@@ -686,12 +721,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // The raycast list is a view of the map, refreshed here instead of being rebuilt on every hover query.
     visibleObjects = drawn
+    lodPending = true
     const broken = drawn.filter((object) => object.userData.isInvalidMarker === true)
     if (broken.length > 0 || invalidItems().length > 0) {
       setInvalidItems(broken.map((object) => {
         const id = String(object.userData.elementId)
         const element = all.find((candidate) => candidate.id === id) as { name?: string; type?: string } | undefined
         return { id, name: element?.name || element?.type || id, reason: String(object.userData.invalidReason ?? "") }
+      }))
+    }
+    const failing = drawn.filter((object) => Array.isArray(object.userData.historyIssues))
+    if (failing.length > 0 || issueItems().length > 0) {
+      setIssueItems(failing.flatMap((object) => {
+        const id = String(object.userData.elementId)
+        const element = all.find((candidate) => candidate.id === id) as { name?: string; type?: string } | undefined
+        return (object.userData.historyIssues as ReadonlyArray<{ feature: string; message: string }>).map((issue) => ({ id, name: element?.name || element?.type || id, feature: issue.feature, message: issue.message }))
       }))
     }
     setRebuilds((count) => count + 1)
@@ -725,6 +769,47 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     for (const [id, entry] of objectsById) {
       if (applyDisplayMode(entry.object, mode, mode === "ghost" && selected.size > 0 && !selected.has(id))) changed = true
     }
+    if (changed) invalidate()
+  })
+
+  // Face and edge highlights of exact solids: translucent copy of the face / thick copy of the edge, added to the scene while hovered
+  // or picked. A rebuild makes them stale (the parts are new objects), so they are dropped then.
+  const subOverlays: Partial<Record<SubHighlightKind, THREE.Object3D>> = {}
+  const showSub = (kind: SubHighlightKind, pick: SubEntityPick | undefined) => {
+    disposeSubHighlight(subOverlays[kind]); delete subOverlays[kind]
+    if (pick !== undefined && scene && pick.object.parent !== null) { subOverlays[kind] = createSubHighlight(pick, kind); scene.add(subOverlays[kind]!) }
+    invalidate()
+  }
+  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null) }, { defer: true }))
+  createEffect(() => { const pick = hoveredSub(); const picked = pickedSub(); showSub("hover", pick !== undefined && sameSubEntity(pick, picked) ? undefined : pick) })
+  createEffect(() => showSub("picked", pickedSub()))
+  createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
+  onCleanup(() => { for (const kind of Object.keys(subOverlays) as SubHighlightKind[]) disposeSubHighlight(subOverlays[kind]) })
+
+  // The joints of the assembly (revolute, prismatic, ...) as glyphs at their origin, when the assembly panel shows them.
+  let jointMarkers: THREE.Object3D | undefined
+  createEffect(() => {
+    rebuilds()
+    const joints = Object.values(assembly.assemblyState.joints ?? {})
+    const show = assembly.showJoints
+    const offset = originOffset()
+    if (!ready() || !scene) return
+    if (jointMarkers) { disposeObject(jointMarkers); jointMarkers = undefined }
+    if (show && joints.length > 0) {
+      const box = modelBox()
+      jointMarkers = createJointMarkers(joints, box.isEmpty() ? 100 : box.getBoundingSphere(new THREE.Sphere()).radius, offset)
+      scene.add(jointMarkers)
+    }
+    invalidate()
+  })
+
+  // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
+  createEffect(() => {
+    rebuilds()
+    const show = cad.showSketches
+    if (!ready()) return
+    let changed = false
+    for (const entry of objectsById.values()) if (applySketchVisibility(entry.object, show)) changed = true
     if (changed) invalidate()
   })
 
@@ -1019,6 +1104,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         setHoveredId(id)
         container.style.cursor = id ? "pointer" : "default"
       }
+      // The face or edge of an exact solid under the cursor.
+      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id)) : undefined
+      if (!sameSubEntity(sub, hoveredSub())) setHoveredSub(sub)
       const hit = planePoint()
       if (hit) publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
     })
@@ -1098,8 +1186,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click
     setPointer(event)
     const id = elementIdAt()
-    if (id && !isLocked(id)) selection.selectElement(id, down.additive)
-    else if (!id && !down.additive) selection.clearSelection()
+    if (id && !isLocked(id)) {
+      selection.selectElement(id, down.additive)
+      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id))
+      cad.setPickedEntity(sub === undefined ? null : { elementId: sub.elementId, kind: sub.kind, index: sub.index })
+      setPickedSub(sub)
+    } else if (!id && !down.additive) { selection.clearSelection(); cad.setPickedEntity(null); setPickedSub(undefined) }
   }
 
   // ---------------------------------------------------------------------------------------------------- drawing tools
@@ -1341,6 +1433,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
+      <Show when={pickedSub()}>
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }) })}</div>}
+      </Show>
+
+      <Show when={issueItems().length > 0}>
+        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-amber-900/90 px-3 py-2 text-xs text-white shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
+          <p class="font-semibold">{t("cad.issues.title", { count: issueItems().length })}</p>
+          <ul class="mt-1 space-y-0.5">
+            <For each={issueItems().slice(0, 4)}>{(item) => (
+              <li><button type="button" class="text-left underline decoration-dotted" onClick={() => selection.selectElement(item.id)}>{item.name}</button> · {item.feature}: {item.message}</li>
+            )}</For>
+          </ul>
+        </div>
+      </Show>
+
       <div class="panel cad-viewport-top">
         <div class="cad-viewport-selection">
           <SelectionControls
@@ -1479,6 +1586,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
           <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
         </select>
+        <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "#0288d1" : "rgba(0,0,0,0.7)" }}
+          aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
       </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button
@@ -1510,6 +1619,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </div>
         <div class="cad-viewport-footer__actions">
           {props.footerActions}
+          <CaptureButtons mode="cad" />
           <button type="button" onClick={toggleFullscreen} class="panel-icon-btn" title={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"} aria-label={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"}>
             <Show when={isFullscreen()} fallback={<Maximize2 size={18} />}><Minimize2 size={18} /></Show>
           </button>

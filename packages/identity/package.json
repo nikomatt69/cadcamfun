@@ -1,6 +1,6 @@
 {
   "name": "@cadcamfun/identity",
-  "version": "0.1.55",
+  "version": "0.1.59",
   "private": true,
   "type": "module",
   "exports": {

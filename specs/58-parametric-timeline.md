@@ -136,3 +136,16 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
   the remaining bodies still build; the exact replay skips the same. Panel: "not built: X failed" and the remedy under the issue; the
   assistant report lists skipped features with their cause. Remedies for shell, Boolean and thread failures are not built yet (their
   errors keep today's text).
+- 2026-11-02: parametric kernel and panel round (branch worktree-agent-a44456accb88fc2bf). Expressions: AST evaluator with lazy `if()`, comparisons and logic, spaced units (`2 in`, um/ft/thou), clamp/mod/trunc/cbrt, dimensional check (`inferKind`, warnings only), Tarjan `parameterCycles`, a dimension that names a failed parameter says which. `setParameter` refuses loops, unknown names and bad syntax (`parameterProblem`); `renameParameter` no longer drops rollback/groups/bases and carries notes and configurations. `removeFeature` repairs the rollback marker, groups and configurations; `removalImpact` lists declared and lineage dependents; `dependents: declared|all|none`. `addFeature` inserts at the rollback marker. `history-config.ts`: configurations (parameter values + suppressed set, design table, activate/sync/compare; spec 46 A5 primitive). `history-sketch.ts`: `sketchReport` (per-constraint ok/redundant/conflict/driven, DOF, freedom) and add/remove/driven edits that refuse a contradiction naming the clash. A feature that only lacks a body because an earlier feature failed is now `skipped`, not `failed`. API `ParametricHistory` accepts `notes`, `configurations`, `configuration`. Panel: `DimensionField`, parameter table, sketch constraint list, configurations/design table, delete impact. Still open: T4 for the mesh replay (only the exact replay resumes), T6 group-aware panel, features still select faces by position/name string (spec 41 N7/N8), `fingerprint.ts` still includes `group`.
+
+
+## Change log (CAD-A round 2026-10-31)
+
+- **T4 built for the exact replay** (`exactReplay(..., { cache })` / `rebuildExact(h, result, { cache })`, `ExactStageCache`, `newExactStageCache`):
+  the replay state is checkpointed at every feature boundary under a fingerprint chain (feature JSON, the parameters its text reads, the
+  mesh verdict, suppression state, imported bases); the next replay resumes from the longest boundary whose chain still matches.
+  Tests `cad/history-incremental.test.ts`: resumed == full (volume, face names, key sets) for last-feature, middle, parameter, suppress/release,
+  first-feature edits; a foreign cache is never used. Bench (`history.exact-50-features-full` / `-resumed`: 36 sketches + base extrude +
+  12 holes, edit of the last hole, load 0.77 per CPU, 7 runs): **349 ms full, 52.6 ms resumed (6.6x)**; budgets 1000 / 250 ms.
+  Not done: the **mesh** replay (`rebuild()`) still runs in full and is now the dominant cost of an edit (it needs the `ReplayState`
+  refactor of the T4 row); a per-part cache is not yet held by the sidecar (adapter work).

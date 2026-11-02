@@ -67,6 +67,8 @@ import {
   liftTo
 } from "./common.ts"
 
+import { emitCompensatedLaps } from "./profile-compensated.ts"
+
 export const ProfileSideSchema = Schema.Literals(["outside", "inside", "onLine"])
 export type ProfileSide = typeof ProfileSideSchema.Type
 
@@ -98,6 +100,12 @@ export class ProfileParams extends Schema.Class<ProfileParams>("cam/ProfileParam
     /** Maximum ramp angle from horizontal, degrees. */
     rampAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0.1, maximum: 45 })), 3),
     tabs: withDefault(Schema.Array(TabSchema), [] as ReadonlyArray<Tab>),
+    /**
+     * `controller`: the program is the contour itself with `G41` / `G42` on (the control keeps the tool centre a radius off it, the radius
+     * in the tool's register), so a worn tool is corrected at the machine. Closed contours and circles, no tabs, a straight approach and
+     * exit; `none`: the tool-centre path is written (the offset is in the program).
+     */
+    compensation: withDefault(Schema.Literals(["none", "controller"]), "none" as const),
     /** Replace circular runs of a polyline by arcs (circles and arcs always stay arcs). */
     arcFit: withDefault(Schema.Boolean, false),
     /** Tessellation / arc-fit tolerance, mm. */
@@ -450,6 +458,16 @@ export const generateProfile = (
   b.comment(`Profile ${params.side}: ${params.name}`)
   const d = toolRadius(tool) + params.allowance
   for (const source of sourcesOf(geometry, params.tolerance)) {
+    if (params.compensation === "controller") {
+      if (params.side === "onLine") throw new RangeError("Controller compensation needs a side: an onLine profile is the programmed contour already")
+      if (params.tabs.length > 0) throw new RangeError("Controller compensation does not combine with tabs: the tab lifts are written on the tool-centre path")
+      if (source.kind === "arc" || (source.kind === "contour" && !source.contour.closed)) throw new RangeError("Controller compensation takes closed contours and circles: an open contour has no inside to put the approach in")
+      // The contour itself (shifted by the allowance): the same plan made with a tool of no radius.
+      for (const plan of planSource(source, params, { ...tool, diameter: 1e-6 })) {
+        emitCompensatedLaps(b, { path: plan.path, outside: params.side === "outside", ccw: wantCcw(params.side, params.climb), radius: toolRadius(tool) }, levels, params.feed, params.plungeFeed)
+      }
+      continue
+    }
     for (const plan of planSource(source, params, tool)) emitPlan(b, within === undefined ? plan : keepWithin(plan, within, d), params, tool, levels)
   }
   if (!b.started) b.comment("nothing to cut: the offset contour collapsed")

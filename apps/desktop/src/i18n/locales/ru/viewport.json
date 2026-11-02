@@ -28,5 +28,12 @@
   "cad.depth": "Глубина",
   "cad.snapSettings": "Настройки привязки",
   "cad.enableSnapping": "Включить привязку",
-  "viewport.editor2d": "Редактор 2D-чертежа"
+  "viewport.editor2d": "Редактор 2D-чертежа",
+  "viewport.capture.screenshot": "Снимок экрана",
+  "viewport.capture.record": "Записать видео",
+  "viewport.capture.stop": "Остановить запись ({time})",
+  "viewport.capture.saved": "Сохранено: {name}",
+  "viewport.capture.failed": "Не удалось выполнить захват: {reason}",
+  "viewport.capture.unavailable": "Сначала откройте 3D-вид.",
+  "viewport.capture.unsupported": "Запись видео недоступна в этом webview."
 }

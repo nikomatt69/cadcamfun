@@ -28,5 +28,12 @@
   "cad.depth": "Depth",
   "cad.snapSettings": "Snap Settings",
   "cad.enableSnapping": "Enable Snapping",
-  "viewport.editor2d": "2D drawing editor"
+  "viewport.editor2d": "2D drawing editor",
+  "viewport.capture.screenshot": "Screenshot",
+  "viewport.capture.record": "Record video",
+  "viewport.capture.stop": "Stop recording ({time})",
+  "viewport.capture.saved": "Saved {name}",
+  "viewport.capture.failed": "Capture failed: {reason}",
+  "viewport.capture.unavailable": "Open the 3D view first.",
+  "viewport.capture.unsupported": "Video recording is not available in this webview."
 }

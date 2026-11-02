@@ -52,8 +52,8 @@ export default function SelectionControls(props: SelectionControlsProps): JSX.El
       <Show when={hasSelection()}>
         <div class="mb-2 text-sm text-gray-700 dark:text-gray-300">
           <div class="flex justify-between items-center">
-            <span>{count()} selected</span>
-            <Show when={props.bounds}>{(b) => <span class="text-xs text-gray-500">{Math.round(b().width)}×{Math.round(b().height)}</span>}</Show>
+            <span>{t("cad.selected", { count: count() })}</span>
+            <Show when={props.bounds}>{(b) => <span class="text-xs text-gray-500">{Math.round(b().width)}×{Math.round(b().height)}×{Math.round(b().depth)}</span>}</Show>
           </div>
         </div>
       </Show>

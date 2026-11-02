@@ -411,7 +411,7 @@ export const dimensionValue = (dimension: Dimension, values: Readonly<Record<str
   } catch (error) {
     if (failed !== undefined && error instanceof ExpressionError) {
       const culprit = referencesIn(dimension).find((r) => failed[r.name] !== undefined)
-      if (culprit !== undefined) throw new ExpressionError(`Parameter '${culprit.name}' failed: ${failed[culprit.name]}`, culprit.at, dimension)
+      if (culprit !== undefined) throw new Error(`Parameter '${culprit.name}' failed: ${failed[culprit.name]}`)
     }
     throw error
   }

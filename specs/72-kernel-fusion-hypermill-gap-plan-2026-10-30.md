@@ -375,3 +375,26 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   already closed; fold splitting not built (no failing case). Open and listed in spec 42 §6.2: analytic seeds for coaxial surfaces of revolution,
   equal-radius corner fillets (4 of 32 Booleans of a rounded box still use the displacement), NURBS x NURBS marching, coarse-chord tessellation
   of seed 133's cap face. No API/AI/desktop follow-up is needed for these core-only changes (`BooleanCounters` gained `verified` / `verifyRejected`).
+
+- 2026-10-31 (wiring G, STEP import into the history): a history may now hold only imported bodies (`features` minimum 0, refused with the
+  field named when there is neither a feature nor a body; `decodeStartHistory` lets the import route and the `cad-import-step` job start from an
+  empty timeline); `removeImported` / `importedUses` in core (a body a feature names is not removed, the refusal lists the features); the
+  Parametric part panel has an "Import STEP" chooser (same `importStepToHistory` as the route, all or nothing, report shown, body stored in its
+  JSON form), a row per imported body and a remove button (`importStepIntoHistory` in `features/cad/lib/importStep.ts`). The i18n literal
+  baseline was refreshed: the Mitsubishi and Brother manual titles (round 3) had pushed `manuals/lib/catalogue.ts` 2 above it. Still open: no AI
+  action for the import (the STEP text would have to cross the model, and the tool-prompt budget has 9 characters left; the file route and the
+  panel cover it); 33 new locale strings are machine-translated.
+- 2026-11-01 (CAM-A): **step 0.5 built for the kernel.** Fixture bodies are in the job model (`ManufacturingJob.fixtures`, `setups[].fixtures`), checked against the tool assembly over the whole NC (also with the table turned) and deciding `setup-workholding` (passed / failed with the NC line / refused when a body cuts into the part); `stockModel` (bar, closed mesh) lets a roughed shape be the stock, and the roughed swarf cone (`kernel/stock-model.test.ts`, milestone M1 fixture) reaches `verified-program` with every claim passed (declared error 0.25 mm) while a wide holder low on the tool does not; the raw-box dome stays a truthful failure. Multi-setup jobs (`runSetups`) give each fixing its work offset and a job-level `part-coverage`. Still open for 0.5: a seeded-collision multi-orientation job reaching `blocked` is tested for one setup only; the stock is not carried between setups (C4).
+- 2026-11-01 (build, step 3.3 first half, P2-3): kernel cutter radius compensation. IR move `CutterComp {side left|right|off, register?}` (pass-through in
+  length/time/viewer/playback); dialect flag `cutterComp` (generic, Fanuc family, Haas, Okuma, Siemens, LinuxCNC, Mazak, Mitsubishi/Brother by inheritance;
+  GRBL and Heidenhain refuse with a reason, Klartext RL/RR not written); `ProfileParams.compensation: "controller"` and `OperationSpec` profile
+  `compensation` (schema, API, generated clients): the program is the contour itself with `G42 D<tool>` (climb) or `G41` (conventional), straight 45 degree
+  approach and exit of 2-6 tool radii on free ground, one lap per depth, `G40` in the exit. Refused with reasons: tabs, open contours, arcs, onLine, no
+  room for the approach. Gate: `test/cam/cutter-comp.test.ts` (the interpreter's offset path lies one radius from the contour, a 2.9 mm register radius
+  cuts 0.1 mm smaller) and `kernel/cutter-comp-job.test.ts` (same removed volume as the tool-centre path, no-gouge / material-removed / nc-replay pass).
+  The `nc-replay` extent check is widened by the tool radius in X and Y for compensated tools and says so; it bounds the offset, the exact proof is the
+  interpreter test. Open: the planner never chooses it (opt-in per operation), pocket / surface finishes, spring passes, wear register (D separate from T),
+  `convertNc` does not turn G41/G42 back into `CutterComp`, Klartext RL/RR, desktop control.
+
+
+- 2026-11-02 (branch integration): both compensation IR forms share the dialect cutter-compensation codes and emitter state; unsupported controls still refuse compensation.

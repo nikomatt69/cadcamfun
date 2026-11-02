@@ -201,7 +201,7 @@ export type OperationSpec =
    * `tabs` hold a through-cut part: material left standing at `position` (0..1 along the tool-centre path), `width` mm long
    * and `height` mm above `bottom`. `leadIn` is how the cutter enters and leaves the wall (default `arc`, `leadRadius` mm).
    */
-  | (OperationBase & { readonly strategy: "profile"; readonly loop: ReadonlyArray<Vec2>; readonly side: "outside" | "inside"; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean; readonly within?: RegionSpec; readonly tabs?: ReadonlyArray<ProfileTab>; readonly leadIn?: ProfileLeadIn; readonly leadRadius?: number })
+  | (OperationBase & { readonly strategy: "profile"; readonly loop: ReadonlyArray<Vec2>; readonly side: "outside" | "inside"; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean; readonly within?: RegionSpec; readonly tabs?: ReadonlyArray<ProfileTab>; readonly leadIn?: ProfileLeadIn; readonly leadRadius?: number; /** `controller`: the program is the contour with G41/G42 and the radius is corrected at the machine (spec 72 P2-3); closed contours, no tabs. */ readonly compensation?: "none" | "controller" })
   | (OperationBase & { readonly strategy: "bore"; readonly center: Vec2; readonly diameter: number; readonly top: number; readonly bottom: number; readonly allowance?: number })
   /**
    * Holes at points: drilled (peck / chip break from the cutting data), spotted, rigid-tapped with a `tap` cutter (the feed is its

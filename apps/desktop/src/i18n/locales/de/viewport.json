@@ -28,5 +28,12 @@
   "cad.depth": "Tiefe",
   "cad.snapSettings": "Fangeinstellungen",
   "cad.enableSnapping": "Objektfang aktivieren",
-  "viewport.editor2d": "2D-Zeichnungseditor"
+  "viewport.editor2d": "2D-Zeichnungseditor",
+  "viewport.capture.screenshot": "Screenshot",
+  "viewport.capture.record": "Video aufnehmen",
+  "viewport.capture.stop": "Aufnahme beenden ({time})",
+  "viewport.capture.saved": "{name} gespeichert",
+  "viewport.capture.failed": "Aufnahme fehlgeschlagen: {reason}",
+  "viewport.capture.unavailable": "Öffne zuerst die 3D-Ansicht.",
+  "viewport.capture.unsupported": "Videoaufnahme ist in dieser Webview nicht verfügbar."
 }

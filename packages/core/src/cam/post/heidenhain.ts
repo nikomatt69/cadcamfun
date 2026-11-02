@@ -10,7 +10,8 @@ import { klartextTiltedPlane } from "./workplane.ts"
  * Native Klartext (TNC 640 / TNC7 conversational): `L` lines, circles as a centre `CC` and a `C` block, tool calls, dwell
  * (cycle 9), smoothing (cycle 32), expanded drilling. A simultaneous five-axis section is bracketed by `M128` (tool tip
  * positioning kept by the control) and `M129`. A tilted work plane (`PostOptions.workPlanes`) is cycle 7 (datum at the plane's
- * origin) plus `PLANE SPATIAL ... TURN MB MAX FMAX`, cancelled with `PLANE RESET` (`workplane.ts`). Repeated toolpaths become label subprograms (`CALL LBL n`,
+ * origin) plus `PLANE SPATIAL ... TURN MB MAX FMAX`, cancelled with `PLANE RESET` (`workplane.ts`); with `legacy: true` the same plane
+ * is written as cycle 19 `WORKING PLANE` (unqualified on a real control, see `workplane.ts`). Repeated toolpaths become label subprograms (`CALL LBL n`,
  * `LBL n` … `LBL 0` after `M30`), their bodies in incremental `IX IY IZ`.
  *
  * Klartext has no block of its own for a miscellaneous function: an M function rides on a positioning block. One that acts at
@@ -27,7 +28,7 @@ import { klartextTiltedPlane } from "./workplane.ts"
  * TIME` / `9.1 DWELL`, `CYCL DEF 32.0 TOLERANCE` / `32.1 T`, `CYCL DEF 247 PRESETTING` / `Q339=n ;PRESET NUMBER`).
  */
 export const heidenhainDialect: Dialect = {
-  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
+  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, cutterComp: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
   commentStyle: "semicolon", tcp: { on: () => "M128", off: () => "M129" },
   // Klartext feeds are tip feeds under M128; there is no inverse-time word.
   inverseTime: undefined,
@@ -130,7 +131,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     if (line.startsWith(KLARTEXT_PREFIX)) {
       const text = line.slice(KLARTEXT_PREFIX.length)
       // A cycle parameter row ("  Q200=+2 ;..") is a continuation of its `CYCL DEF`, with no block number of its own.
-      if (/^PLANE (?:SPATIAL|RESET)\b/.test(text)) { frameChanged = true; z = undefined; lastMove = -1 }
+      // A plane word (PLANE SPATIAL / RESET, or the legacy cycle 19 set / cancel) puts the last height in another frame.
+      if (/^PLANE (?:SPATIAL|RESET)\b/.test(text) || /^CYCL DEF 19\.[01]\b/.test(text)) { frameChanged = true; z = undefined; lastMove = -1 }
       if (text.startsWith(";") || text.startsWith("  ")) lines.push(text)
       else if (/\bM99$/.test(text)) move(text)
       else block(text)

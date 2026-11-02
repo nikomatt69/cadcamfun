@@ -11,9 +11,10 @@ import * as THREE from "three"
 import { useCADStore } from "../store/cadStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 
-interface ScreenDimension {
+export interface ScreenDimension {
   readonly id: string
-  readonly type: "width" | "height"
+  /** `width` is the size along X, `depth` along Y, `height` along Z (the scene is Z-up). */
+  readonly type: "width" | "depth" | "height"
   readonly startX: number
   readonly startY: number
   readonly endX: number
@@ -27,6 +28,8 @@ export interface DimensionsOverlayProps {
   readonly scene: () => THREE.Scene | undefined
   readonly camera: () => THREE.Camera | undefined
 }
+
+const formatSize = (value: number): string => value.toFixed(2)
 
 /** One scene object per selected element: the first (outermost) object carrying the element's id. */
 const selectedObjects = (scene: THREE.Scene, ids: ReadonlyArray<string>): THREE.Object3D[] => {
@@ -60,18 +63,37 @@ export const measureDimensions = (
     if (box.isEmpty()) return
     const size = new THREE.Vector3()
     box.getSize(size)
-    const p1 = project(new THREE.Vector3(box.min.x, box.min.y, box.min.z))
-    const p2 = project(new THREE.Vector3(box.max.x, box.min.y, box.min.z)) // width
-    const p3 = project(new THREE.Vector3(box.min.x, box.max.y, box.min.z)) // height
+    const origin = project(new THREE.Vector3(box.min.x, box.min.y, box.min.z))
+    const alongX = project(new THREE.Vector3(box.max.x, box.min.y, box.min.z))
+    const alongY = project(new THREE.Vector3(box.min.x, box.max.y, box.min.z))
+    const alongZ = project(new THREE.Vector3(box.min.x, box.min.y, box.max.z))
     const elementId = object.name || (object.userData.elementId as string | undefined) || `dim-${index}`
-    if (p1 && p2) {
-      dimensions.push({ id: `${elementId}-width`, type: "width", startX: p1.x, startY: p1.y, endX: p2.x, endY: p2.y, textX: (p1.x + p2.x) / 2, textY: p1.y - 15, value: size.x.toFixed(2) })
+    const add = (type: ScreenDimension["type"], end: { x: number; y: number } | null, value: number, textOffset: { x: number; y: number }) => {
+      if (!origin || !end) return
+      dimensions.push({ id: `${elementId}-${type}`, type, startX: origin.x, startY: origin.y, endX: end.x, endY: end.y, textX: (origin.x + end.x) / 2 + textOffset.x, textY: (origin.y + end.y) / 2 + textOffset.y, value: formatSize(value) })
     }
-    if (p1 && p3) {
-      dimensions.push({ id: `${elementId}-height`, type: "height", startX: p1.x, startY: p1.y, endX: p3.x, endY: p3.y, textX: p1.x - 30, textY: (p1.y + p3.y) / 2, value: size.y.toFixed(2) })
-    }
+    add("width", alongX, size.x, { x: 0, y: 15 })
+    add("depth", alongY, size.y, { x: -15, y: 10 })
+    add("height", alongZ, size.z, { x: -25, y: 0 })
   })
   return dimensions
+}
+
+/**
+ * A cheap fingerprint of everything the dimensions depend on: the camera (matrix and projection), the overlay size and the world
+ * matrix of each selected object. Equal fingerprints mean the lines would be the same, so the measure can be skipped.
+ */
+export const viewSignature = (scene: THREE.Scene, camera: THREE.Camera, ids: ReadonlyArray<string>, width: number, height: number): string => {
+  camera.updateMatrixWorld()
+  const parts: number[] = [width, height, ...camera.matrixWorld.elements, ...camera.projectionMatrix.elements]
+  for (const object of selectedObjects(scene, ids)) {
+    object.updateWorldMatrix(true, false)
+    parts.push(...object.matrixWorld.elements)
+    // The geometry can change under the same matrix (a rebuilt part is a new object, an edited one a new bounding sphere).
+    const geometry = (object as THREE.Mesh).geometry
+    parts.push(geometry?.boundingSphere?.radius ?? geometry?.getAttribute?.("position")?.count ?? 0, object.children.length)
+  }
+  return parts.join(",")
 }
 
 export default function DimensionsOverlay(props: DimensionsOverlayProps): JSX.Element {
@@ -85,13 +107,19 @@ export default function DimensionsOverlay(props: DimensionsOverlayProps): JSX.El
     const ids = [...selection.selectedElementIds]
     let frame = 0
     let last = ""
+    let lastView = ""
     const tick = () => {
       const scene = props.scene()
       const camera = props.camera()
       if (scene && camera) {
-        const next = measureDimensions(scene, camera, ids, root?.clientWidth || window.innerWidth, root?.clientHeight || window.innerHeight)
-        const key = JSON.stringify(next)
-        if (key !== last) { last = key; setDimensions(next) }
+        // The measure walks the scene and projects the corners: it runs only when the view or the parts changed, not on every idle frame.
+        const view = viewSignature(scene, camera, ids, root?.clientWidth || window.innerWidth, root?.clientHeight || window.innerHeight)
+        if (view !== lastView) {
+          lastView = view
+          const next = measureDimensions(scene, camera, ids, root?.clientWidth || window.innerWidth, root?.clientHeight || window.innerHeight)
+          const key = JSON.stringify(next)
+          if (key !== last) { last = key; setDimensions(next) }
+        }
       }
       frame = requestAnimationFrame(tick)
     }

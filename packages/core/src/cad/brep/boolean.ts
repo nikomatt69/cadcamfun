@@ -25,14 +25,18 @@ import { massProperties } from "./mass.ts"
 import { Cdt } from "./cdt.ts"
 import { checkBudget } from "./budget.ts"
 import {
+  coaxialSphereCylinderRings,
+  edgePlaneParameters,
   edgeEdgeHits,
   edgeOnSurface,
+  coaxialCircles,
   edgeSurfaceHits,
   meshIntersectionPolylines,
   refineSsiPolyline,
   refineSurfaceSurface,
   TriBvh,
   triSetOfFace,
+  type IntersectionCircle,
   type SsiPoint,
   type TriSet
 } from "./intersect.ts"
@@ -251,7 +255,7 @@ const boxOf = (pts: Iterable<Vec3>): { lo: Vec3; hi: Vec3 } => {
 
 // ================================================================ curve fitting
 
-interface FittedCurve {
+export interface FittedCurve {
   readonly curve: Curve3
   readonly t0: number
   readonly t1: number
@@ -277,7 +281,7 @@ const conicOf = (sa: Surface, sb: Surface): { readonly frame: Frame; readonly a:
 }
 
 /** Line, circle, the surfaces' exact conic, or an interpolating cubic B-spline through exact points of a curve. */
-const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?: { readonly frame: Frame; readonly a: number; readonly b: number }): FittedCurve => {
+export const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?: { readonly frame: Frame; readonly a: number; readonly b: number }): FittedCurve => {
   const n = pts.length
   const P0 = pts[0]!, Pn = closed ? pts[0]! : pts[n - 1]!
   // Line.
@@ -497,6 +501,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     readonly fb: number
     pts: SsiPoint[]
     readonly closed: boolean
+    readonly ringPlane?: { readonly origin: Vec3; readonly normal: Vec3 }
   }
   const ssis: Ssi[] = []
   const onEdgeOf = (sd: SolidData, fi: number, pts: ReadonlyArray<SsiPoint>): boolean => {
@@ -506,14 +511,85 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     }
     return false
   }
+  /**
+   * Seeds for the intersection of two coaxial surfaces of revolution (a sphere centred on a cylinder's or cone's axis): the
+   * exact circles, sampled every two seed chords and cut to the runs that lie inside both faces. The ends of a run are within a
+   * step of the face boundary and snap to the boundary vertices like a mesh seed's ends.
+   */
+  type Seed = { readonly p: Vec3; readonly uva: Vec2; readonly uvb: Vec2 }
+  const circleSeeds = (circles: ReadonlyArray<IntersectionCircle>, ia: number, ib: number, sa: Surface, sb: Surface): Array<{ readonly pts: Seed[]; readonly closed: boolean }> => {
+    const out: Array<{ pts: Seed[]; closed: boolean }> = []
+    const pa = surfacePeriods(sa), pb = surfacePeriods(sb)
+    for (const c of circles) {
+      const n = Math.min(4096, Math.max(32, Math.ceil((TAU * c.radius) / (seedChord * 2))))
+      const samples: Array<Seed & { readonly ok: boolean }> = []
+      for (let k = 0; k < n; k++) {
+        const th = (TAU * k) / n
+        const p = add3(c.centre, add3(scale3(c.x, c.radius * Math.cos(th)), scale3(c.y, c.radius * Math.sin(th))))
+        const qa = surfaceProject(sa, p), qb = surfaceProject(sb, p)
+        const prev = samples[k - 1]
+        const ua = prev !== undefined && pa.u !== undefined ? unwrapNear(qa.u, prev.uva.x, pa.u) : qa.u
+        const va = prev !== undefined && pa.v !== undefined ? unwrapNear(qa.v, prev.uva.y, pa.v) : qa.v
+        const ub = prev !== undefined && pb.u !== undefined ? unwrapNear(qb.u, prev.uvb.x, pb.u) : qb.u
+        const vb = prev !== undefined && pb.v !== undefined ? unwrapNear(qb.v, prev.uvb.y, pb.v) : qb.v
+        samples.push({ p, uva: { x: ua, y: va }, uvb: { x: ub, y: vb }, ok: S[0].loc.insideFace(ia, qa.u, qa.v) && S[1].loc.insideFace(ib, qb.u, qb.v) })
+      }
+      const strip = (s: Seed & { readonly ok: boolean }): Seed => ({ p: s.p, uva: s.uva, uvb: s.uvb })
+      if (samples.every((s) => s.ok)) { out.push({ pts: samples.map(strip), closed: true }); continue }
+      const first = samples.findIndex((s) => !s.ok)
+      if (first < 0) continue
+      let run: Seed[] = []
+      for (let j = 1; j <= n; j++) {
+        const s = samples[(first + j) % n]!
+        if (s.ok) run.push(strip(s))
+        else {
+          if (run.length >= 2) out.push({ pts: run, closed: false })
+          run = []
+        }
+      }
+      if (run.length >= 2) out.push({ pts: run, closed: false })
+    }
+    return out
+  }
   A.faces.forEach((fa, ia) => {
     B.faces.forEach((fbF, ib) => {
       if (!boxOverlap(S[0].faceBox[ia]!, S[1].faceBox[ib]!, 0)) return
       checkBudget()
       if (coincidentSurfaces(fa.surface, fbF.surface, S[1], ib)) return
+      const completeRevolutionFace = (sd: SolidData, f: Face): boolean => {
+        if (f.loops.length !== 1) return false
+        const coedges = f.loops[0]!.coedges
+        return coedges.every((ce) => {
+          const e = sd.brep.edges[ce.edge]!
+          if (e.curve.kind !== "line" && e.curve.kind !== "circle") return false
+          if (coedges.filter((c) => c.edge === ce.edge).length === 2) return true
+          return f.surface.kind === "cylinder" && e.curve.kind === "circle" && Math.abs(dot3(e.curve.frame.z, f.surface.frame.z)) > 1 - 1e-14 && Math.abs(e.t1 - e.t0 - 2 * Math.PI) < 1e-12
+        })
+      }
+      const rings = completeRevolutionFace(S[0], fa) && completeRevolutionFace(S[1], fbF) ? coaxialSphereCylinderRings(fa.surface, fbF.surface) : undefined
+      if (rings !== undefined && rings.every((ring) => ring.every((q) => S[0].loc.insideFace(ia, q.ua, q.va) && S[1].loc.insideFace(ib, q.ub, q.vb)))) {
+        for (const pts of rings) {
+          const cylinder = fa.surface.kind === "cylinder" ? fa.surface : fbF.surface
+          if (cylinder.kind !== "cylinder") continue
+          // Analytic rings have an even, uniformly spaced sample count: opposite samples determine their plane's origin.
+          const center = scale3(add3(pts[0]!.p, pts[pts.length / 2]!.p), 0.5)
+          for (const [sd, face] of [[S[0], fa], [S[1], fbF]] as const) {
+            for (const ei of new Set(face.loops.flatMap((l) => l.coedges.map((c) => c.edge)))) {
+              const edge = sd.brep.edges[ei]!
+              for (const t of edgePlaneParameters(edge, center, cylinder.frame.z) ?? []) {
+                const p = curvePoint(edge.curve, t)
+                if (Math.abs(dist3(p, center) - cylinder.radius) <= tol) sd.splits[ei]!.push({ t, vid: reg.add(p) })
+              }
+            }
+          }
+          ssis.push({ fa: ia, fb: ib, pts, closed: true, ringPlane: { origin: center, normal: cylinder.frame.z } })
+        }
+        return
+      }
       const ta = S[0].tri[ia], tb = S[1].tri[ib], bvb = S[1].bvh[ib]
       if (ta === undefined || tb === undefined || bvb === undefined) return
-      for (const pl of meshIntersectionPolylines(ta, tb, bvb, fa.surface, fbF.surface)) {
+      const circles = coaxialCircles(fa.surface, fbF.surface, tol, fitTol * 20)
+      for (const pl of circles !== undefined ? circleSeeds(circles, ia, ib, fa.surface, fbF.surface) : meshIntersectionPolylines(ta, tb, bvb, fa.surface, fbF.surface)) {
         const refined = refineSsiPolyline(fa.surface, fbF.surface, pl.pts, pl.closed, tol, fitTol)
         if (refined === undefined) { warnings.push(`face ${ia}×${ib}: intersection curve could not be refined`); continue }
         if (onEdgeOf(S[0], ia, refined) || onEdgeOf(S[1], ib, refined)) continue
@@ -531,12 +607,57 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const b = surfaceProject(sb, p, { u: q.ub, v: q.vb })
     return { p, ua: a.u, va: a.v, ub: b.u, vb: b.v }
   }
+  /**
+   * An open intersection curve that stops short of a boundary vertex it points at (a mesh seed ends where a thin sliver of one
+   * face, such as the wedge between a wall and an arc that touches it, is narrower than the mesh can resolve) is marched on to
+   * that vertex. Only a vertex that lies on both surfaces, straight ahead of the end (within 14 degrees) and within a few seed
+   * chords counts, and every step is a Newton solution on both surfaces that stays on the straight way to it; otherwise the curve
+   * is left as it was (and is refused later as before). An end already at a vertex is not touched.
+   */
+  const extendToVertex = (curve: SsiPoint[], atEnd: boolean, sa: Surface, sb: Surface): SsiPoint[] => {
+    const end = atEnd ? curve[curve.length - 1]! : curve[0]!
+    const prev = atEnd ? curve[curve.length - 2]! : curve[1]!
+    if (reg.pts.some((P) => dist3(P, end.p) <= snapR)) return curve
+    const chordDir = normalize3(sub3(end.p, prev.p))
+    if (length3(chordDir) === 0) return curve
+    let target: Vec3 | undefined, best = Infinity
+    for (const P of reg.pts) {
+      const d = dist3(P, end.p)
+      if (d > seedChord * 16 || d >= best || dot3(sub3(P, end.p), chordDir) < 0.97 * d) continue
+      const qa = surfaceProject(sa, P), qb = surfaceProject(sb, P)
+      if (dist3(surfacePoint(sa, qa.u, qa.v), P) > tol * 10 || dist3(surfacePoint(sb, qb.u, qb.v), P) > tol * 10) continue
+      best = d
+      target = P
+    }
+    if (target === undefined) return curve
+    const way = sub3(target, end.p)
+    const steps = Math.max(1, Math.ceil(best / (seedChord * 2)))
+    const added: SsiPoint[] = []
+    let last = end
+    for (let k = 1; k <= steps; k++) {
+      const seed = add3(end.p, scale3(way, k / steps))
+      const q = k === steps
+        ? projectToSsi(last, target, sa, sb)
+        : refineSurfaceSurface(sa, sb, seed, { u: last.ua, v: last.va }, { u: last.ub, v: last.vb }, normalize3(way), tol)
+      // Off the straight way (more than a twentieth of the run) is another branch or a curve that bends away: give up.
+      if (q === undefined || dist3(q.p, seed) > 0.05 * best + tol * 10) return curve
+      added.push(q)
+      last = q
+    }
+    return atEnd ? [...curve, ...added] : [...added.reverse(), ...curve]
+  }
   ssis.forEach((c, ci) => {
     const sa = A.faces[c.fa]!.surface, sb = B.faces[c.fb]!.surface
     let pts = c.pts
+    if (!c.closed && pts.length >= 2) {
+      pts = extendToVertex(pts, true, sa, sb)
+      pts = extendToVertex(pts, false, sa, sb)
+    }
     // Vertices on this curve: registry points that lie on both surfaces and near the polyline.
-    const onCurve: Array<{ readonly vid: number; readonly seg: number; readonly f: number }> = []
+    const onCurve: Array<{ readonly vid: number; readonly seg: number; readonly f: number; readonly d: number }> = []
     reg.pts.forEach((P, vid) => {
+      // Both nearby coaxial rings lie on both surfaces. The surface-distance test alone cannot tell their vertices apart.
+      if (c.ringPlane !== undefined && Math.abs(dot3(sub3(P, c.ringPlane.origin), c.ringPlane.normal)) > tol * 10) return
       let best = -1, bestD = Infinity, bestF = 0
       const nseg = c.closed ? pts.length : pts.length - 1
       for (let i = 0; i < nseg; i++) {
@@ -550,8 +671,13 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
       if (best < 0 || bestD > snapR) return
       const qa = surfaceProject(sa, P), qb = surfaceProject(sb, P)
       if (dist3(surfacePoint(sa, qa.u, qa.v), P) > tol * 10 || dist3(surfacePoint(sb, qb.u, qb.v), P) > tol * 10) return
-      onCurve.push({ vid, seg: best, f: bestF })
+      onCurve.push({ vid, seg: best, f: bestF, d: bestD })
     })
+    // An interior vertex is on the curve when it is within the fit of the polyline; the wider snap radius is for the ends only. Two
+    // curves a few hundredths of a millimetre apart (a sphere 1e-5 mm larger than the cylinder it is centred on) have each
+    // other's vertices within the snap radius, and a curve routed through the other's vertex jumps across the gap.
+    const onTol = Math.max(fitTol * 5, tol * 100)
+    const endVids = new Set<number>()
     if (!c.closed) {
       // Ends must be vertices.
       const endVid = (end: SsiPoint): number | undefined => {
@@ -564,10 +690,12 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
         warnings.push(`intersection curve of faces ${c.fa}×${c.fb} ends away from any boundary point`)
         return
       }
+      endVids.add(v0).add(v1)
       pts = [projectToSsi(pts[0]!, reg.pts[v0]!, sa, sb), ...pts.slice(1, -1), projectToSsi(pts[pts.length - 1]!, reg.pts[v1]!, sa, sb)]
     }
     // Ordered vertices along the curve (by segment, then position).
     const along = onCurve
+      .filter((o) => o.d <= onTol || endVids.has(o.vid))
       .map((o) => ({ ...o, pos: o.seg + o.f }))
       .sort((x, y) => x.pos - y.pos)
       .filter((o, i, arr) => i === 0 || o.vid !== arr[i - 1]!.vid)

@@ -45,7 +45,7 @@ export const savePmi = async (app: AppState, drawingId: string, set: pmi.PmiSet,
     const server = reply as { fingerprint?: unknown; issues?: unknown }
     return { outcome: "saved", result: { set: base.set, fingerprint: typeof server.fingerprint === "string" ? server.fingerprint : base.fingerprint, issues: Array.isArray(server.issues) ? (server.issues as pmi.PmiIssue[]) : base.issues } }
   } catch (cause) {
-    if (isSaveConflict(cause)) return { outcome: "conflict", message: cause instanceof Error ? cause.message : "The drawing was saved elsewhere since it was read. Nothing was overwritten." }
+    if (isSaveConflict(cause)) return { outcome: "conflict", message: cause instanceof Error ? cause.message : String(cause) }
     throw cause
   }
 }

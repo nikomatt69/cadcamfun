@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import { isoSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post } from "./types.ts"
@@ -12,6 +13,7 @@ export const genericDialect: Dialect = {
   uppercaseComments: false,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: isoCutterComp,
   inverseTime: { on: "G93", off: "G94" },
   begin: () => [],
   setup: ["G90", "G17", "G94"],

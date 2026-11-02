@@ -59,7 +59,7 @@ const countSegments = (program: cam.Program, tolerance: number, start: Vec3): nu
       angles = after
       if (move._tag === "Orient") { count += samples; continue }
       if (move._tag === "Dwell" || move._tag === "SpindleOrient") { count++; continue }
-      if (cam.isControlNode(move)) continue
+      if (cam.isControlNode(move) || move._tag === "CutterComp") continue
       if (move._tag === "Arc") { count += arcChordCount(from, move, tolerance); from = move.to; continue }
       count += samples
       from = move.to
@@ -124,6 +124,8 @@ export const buildPlayback = (
       if (entry._tag === "Dwell") { write(from, from, false, entry.seconds, path, move, tool); continue }
       // Spindle orientation: the tool stands still for the beat the clock gives it.
       if (entry._tag === "SpindleOrient") { write(from, from, false, duration, path, move, tool); continue }
+      // A compensation word moves nothing and takes no time.
+      if (entry._tag === "CutterComp") continue
       if (entry._tag !== "Arc") {
         const origin = from
         for (let i = 1; i <= samples; i++) {

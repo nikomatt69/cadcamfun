@@ -92,10 +92,13 @@ describe("editHistory", () => {
     }
   })
 
-  test("a circular parameter definition is refused, naming the cycle", () => {
-    const out = editHistory(plate(), edits({ op: "set_parameter", name: "a", value: "b + 1" }, { op: "set_parameter", name: "b", value: "a + 1" }, { op: "set_dimension", feature: "plate", path: "depth", value: "a" }))
-    expect(out.ok).toBe(false)
-    if (!out.ok) expect(out.problems!.join(" ")).toContain("circular")
+  test("a forward reference is refused naming the unknown parameter, and a real cycle is refused naming the cycle", () => {
+    const forward = editHistory(plate(), edits({ op: "set_parameter", name: "a", value: "b + 1" }))
+    expect(forward.ok).toBe(false)
+    if (!forward.ok) expect(forward.error).toContain("unknown parameter 'b'")
+    const cycle = editHistory(plate(), edits({ op: "set_parameter", name: "a", value: 4 }, { op: "set_parameter", name: "b", value: "a + 1" }, { op: "set_parameter", name: "a", value: "b + 1" }))
+    expect(cycle.ok).toBe(false)
+    if (!cycle.ok) expect(cycle.error).toContain("circular definition: a -> b -> a")
   })
 
   test("an unknown feature is refused with the feature ids", () => {

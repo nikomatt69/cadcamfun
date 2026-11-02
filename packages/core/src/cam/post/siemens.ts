@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import type { Program } from "../ir.ts"
 import { siemensSpindleOrient } from "./spindle-orient.ts"
@@ -33,6 +34,7 @@ export const siemensDialect: Dialect = {
   unitCodes: { mm: "G71", inch: "G70" },
   rotary: true,
   spindleOrient: siemensSpindleOrient,
+  cutterComp: isoCutterComp,
   tcp: { on: (_tool, transformation) => (transformation === undefined ? "TRAORI" : `TRAORI(${transformation})`), off: () => "TRAFOOF" },
   // CYCLE800 swivel plane with its full parameter list (workplane.ts); G93 inverse-time feed, G94 back to mm/min.
   tiltedPlane: siemensTiltedPlane,

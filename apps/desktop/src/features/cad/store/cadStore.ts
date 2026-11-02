@@ -113,6 +113,12 @@ interface CADState {
   /** How the canvas draws solids: shaded, with edges, hidden line, wireframe, x-ray or ghost (`lib/display-mode.ts`). */
   displayMode: DisplayMode;
   setDisplayMode: (mode: DisplayMode) => void;
+  /** Show the sketches a feature already uses (a sketch nothing uses is always shown). */
+  showSketches: boolean;
+  setShowSketches: (show: boolean) => void;
+  /** The face or edge of an exact solid the person clicked in the canvas (null: none). Cleared when the selection moves on. */
+  pickedEntity: { readonly elementId: string; readonly kind: "face" | "edge"; readonly index: number } | null;
+  setPickedEntity: (entity: CADState["pickedEntity"]) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -122,6 +128,10 @@ export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
   displayMode: DEFAULT_DISPLAY_MODE,
   setDisplayMode: (mode) => set((state) => (isDisplayMode(mode) ? { displayMode: mode } : state)),
+  showSketches: false,
+  setShowSketches: (show) => set({ showSketches: show === true }),
+  pickedEntity: null,
+  setPickedEntity: (entity) => set({ pickedEntity: entity }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

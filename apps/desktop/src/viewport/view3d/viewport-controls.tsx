@@ -1,6 +1,7 @@
 import { For, Show, type JSX } from "solid-js"
 import type { RenderMode, TransformMode, ViewPreset } from "./view3d.tsx"
 import "./viewport-controls.css"
+import { CaptureButtons } from "../CaptureButtons.tsx"
 
 // Kept within WP7 ownership until the screen agent moves these keys into en.cad.json.
 export const viewportLabels = {
@@ -28,6 +29,8 @@ interface ControlsProps {
   readonly onFullscreen: () => void
   readonly onTransform: (mode: TransformMode) => void
   readonly footer?: JSX.Element
+  /** Mode of the screenshot/video buttons; omitted, the viewport has none. */
+  readonly capture?: "cad" | "cam"
   /** The orientation cube; when the host provides it, it takes the place of the row of view buttons. */
   readonly cube?: JSX.Element
 }
@@ -61,7 +64,7 @@ export function ViewportControls(props: ControlsProps): JSX.Element {
     </Show>
     <div class="vp3-footer" classList={{ "vp3-footer--player": !!props.footer }}>
       <span>{viewportLabels.shortcuts}</span>
-      <div class="vp3-footer-actions">{props.footer}<button type="button" disabled={!props.enabled} onClick={props.onFullscreen}>{viewportLabels.fullscreen}</button></div>
+      <div class="vp3-footer-actions">{props.footer}<Show when={props.capture}>{mode => <CaptureButtons mode={mode()} class="vp3-capture-btn" iconSize={14} />}</Show><button type="button" disabled={!props.enabled} onClick={props.onFullscreen}>{viewportLabels.fullscreen}</button></div>
     </div>
   </>
 }
