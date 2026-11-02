@@ -23,9 +23,35 @@ import { agentLabel } from "./ToolRow.tsx"
 
 const taskIcon = (task: AiTask): JSX.Element =>
   task.status === "completed" ? <Check size={13} aria-hidden="true" class="assistant-status-ok" />
-    : task.status === "running" ? <LoaderCircle size={13} aria-hidden="true" class="animate-spin assistant-status-active" />
+    : task.status === "running" ? <LoaderCircle size={13} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" />
       : task.status === "queued" ? <Clock size={13} aria-hidden="true" class="assistant-status-active" />
         : <X size={13} aria-hidden="true" class={task.status === "error" ? "assistant-status-error" : "assistant-status-muted"} />
+
+/** Keep keyboard navigation inside the sheet while it is presented as a modal. */
+export function handleTaskSheetKeys(event: KeyboardEvent, panel: HTMLElement, close: () => void): void {
+  if (event.key === "Escape") {
+    event.preventDefault()
+    event.stopPropagation()
+    close()
+    return
+  }
+  if (event.key !== "Tab") return
+  const controls = Array.from(panel.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]'
+  )).filter((element) => !element.hidden && (!element.closest("details:not([open])") || element.tagName === "SUMMARY"))
+  const first = controls[0]
+  const last = controls.at(-1)
+  if (first === undefined || last === undefined) {
+    event.preventDefault()
+    panel.focus()
+  } else if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 export function BackgroundTasksSheet(): JSX.Element {
   const ai = useAiStore()
@@ -48,7 +74,7 @@ export function BackgroundTasksSheet(): JSX.Element {
   createEffect(() => {
     if (!open()) return
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
-    queueMicrotask(() => panel?.focus())
+    queueMicrotask(() => { if (open()) panel?.focus() })
     onCleanup(() => { if (previous !== undefined && previous.isConnected) previous.focus() })
   })
 
@@ -66,7 +92,7 @@ export function BackgroundTasksSheet(): JSX.Element {
           <Layers size={12} aria-hidden="true" />
           <span>{t("ai.tasks.openSheet")}</span>
           <span class="assistant-pill" data-testid="ai-bg-active-count">{active().length}/{ai.tasks().length}</span>
-          <Show when={active().length > 0}><LoaderCircle size={11} aria-hidden="true" class="animate-spin assistant-status-active" /></Show>
+          <Show when={active().length > 0}><LoaderCircle size={11} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" /></Show>
         </button>
       </Show>
       <Show when={open()}>
@@ -76,7 +102,7 @@ export function BackgroundTasksSheet(): JSX.Element {
             tabindex="-1"
             class="assistant-bg-sheet"
             data-testid="ai-bg-sheet"
-            onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false) } }}
+            onKeyDown={(event) => handleTaskSheetKeys(event, event.currentTarget, () => setOpen(false))}
             role="dialog"
             aria-modal="true"
             aria-label={t("ai.tasks.sheetTitle")}
@@ -97,7 +123,7 @@ export function BackgroundTasksSheet(): JSX.Element {
                   {t("ai.tasks.stopAll")}
                 </button>
               </Show>
-              <button type="button" class="assistant-btn-xs" data-testid="ai-bg-close" aria-label={t("ai.tasks.sheetTitle")} onClick={() => setOpen(false)}>
+              <button type="button" class="assistant-btn-xs" data-testid="ai-bg-close" aria-label={t("ai.close")} onClick={() => setOpen(false)}>
                 <X size={12} aria-hidden="true" />
               </button>
             </div>

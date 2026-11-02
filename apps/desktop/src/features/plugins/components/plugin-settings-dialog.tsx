@@ -6,14 +6,14 @@
  * under the plugin's stored config, saved through `PUT /api/plugins/:id/config`
  * (`plugins.updateConfig`).
  *
- * The legacy `Dialog` primitive is replaced by a fixed overlay with the same
- * `role="dialog"` contract the plugin list's dialogs already use.
+ * The shared modal supplies consistent focus, dismissal and reduced-motion behavior.
  */
 import { For, Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js"
-import { AlertCircle, Info, Loader, Save, X } from "lucide-solid"
+import { AlertCircle, Info, Loader, Save } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { Effect } from "effect"
+import { Modal } from "../../../shared/ui/modal.tsx"
 
 export interface ConfigProperty {
   readonly type: string
@@ -62,6 +62,8 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
 
   createEffect(() => {
     if (!props.open) {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = undefined
       setLoading(true)
       setSaved(false)
       setError(undefined)
@@ -172,39 +174,18 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
   }
 
   return (
-    <Show when={props.open}>
-      <div
-        class="fixed inset-0 z-[1060] flex items-center justify-center bg-black/50 p-4"
-        onClick={(event) => { if (event.target === event.currentTarget && !saving()) props.onClose() }}
-      >
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("plugins.settings.title", { name: props.pluginName ?? props.pluginId })}
-          class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800"
-        >
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
-              {t("plugins.settings.title", { name: props.pluginName ?? props.pluginId })}
-            </h2>
-            <button type="button" aria-label={t("common.close")} disabled={saving()} onClick={props.onClose}>
-              <X size={20} />
-            </button>
-          </div>
-
+    <Modal open={props.open} title={t("plugins.settings.title", { name: props.pluginName ?? props.pluginId })} size="lg" closable={!saving()} onClose={() => { if (!saving()) props.onClose() }}>
           <Show
             when={!loading()}
             fallback={
               <div class="flex items-center justify-center py-12">
-                <Loader class="mr-2 animate-spin text-blue-500" />
+                <Loader class="mr-2 motion-safe:animate-spin text-blue-500" />
                 <span class="text-gray-600 dark:text-gray-300">{t("plugins.settings.loading")}</span>
               </div>
             }
           >
-            <Show
-              when={error() === undefined || saving()}
-              fallback={
-                <div class="rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+            <Show when={error() !== undefined}>
+                <div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
                   <div class="flex items-start">
                     <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-red-500" />
                     <div>
@@ -213,8 +194,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                     </div>
                   </div>
                 </div>
-              }
-            >
+            </Show>
               <Show
                 when={hasSettings()}
                 fallback={
@@ -240,21 +220,14 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                     )}
                   </For>
 
-                  <Show when={error() !== undefined && saving()}>
-                    <div class="flex items-start rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800/30 dark:bg-red-900/20">
-                      <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-red-500" size={16} />
-                      <span class="text-sm text-red-600 dark:text-red-400">{t("plugins.settings.saveFailed", { error: error() ?? "" })}</span>
-                    </div>
-                  </Show>
                   <Show when={saved()}>
-                    <div class="flex items-start rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800/30 dark:bg-green-900/20">
+                    <div role="status" class="flex items-start rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800/30 dark:bg-green-900/20">
                       <Save class="mr-2 mt-0.5 flex-shrink-0 text-green-500" size={16} />
                       <span class="text-sm text-green-600 dark:text-green-400">{t("plugins.settings.saved")}</span>
                     </div>
                   </Show>
                 </div>
               </Show>
-            </Show>
 
             <Show when={hasSettings()}>
               <div class="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-5 dark:border-gray-700">
@@ -276,7 +249,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                     when={!saving()}
                     fallback={
                       <>
-                        <Loader class="mr-2 animate-spin" size={16} />
+                        <Loader class="mr-2 motion-safe:animate-spin" size={16} />
                         {t("plugins.settings.saving")}
                       </>
                     }
@@ -297,8 +270,6 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
               </div>
             </Show>
           </Show>
-        </div>
-      </div>
-    </Show>
+    </Modal>
   )
 }
