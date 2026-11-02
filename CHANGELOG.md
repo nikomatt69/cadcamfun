@@ -3,6 +3,13 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.62 (November 2026)
+
+## Core
+
+- Exact view of a report is a deterministic work budget under a 30 s clock cap, not 1.5 s of wall clock; oversize blend reaches the assistant with the kernel's limit and remedy (sidecar + ai tests)
+- Refuse a fillet, variable fillet or chamfer whose strips collide on a shared face (R30 on a 40 mm plate side built a 56.55 mm part); mesh, exact blend and replay, message names the limit
+
 ## v0.1.61 (November 2026)
 
 ## Core
