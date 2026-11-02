@@ -1,5 +1,6 @@
 import type { AiSessionMessages, AiSessionSummary, AiStatus, SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
+import type { DashboardData, RecentActivityItem, UserHistoryReply, UserMetricsReply } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
 import type { CalculateEstimateBody, CalculatedEstimate, EstimateCreate, EstimateDetails, EstimateResponse, EstimateUpdate, MaterialCostCreate, MaterialCostDetails, MaterialCostResponse, MaterialCostUpdate, OperationCostCreate, OperationCostDetails, OperationCostUpdate, ToolWearCreate, ToolWearDetails, ToolWearResponse, ToolWearUpdate } from "@cadcamfun/api"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
@@ -284,6 +285,14 @@ export class CompanionClient {
     this.request<unknown>("PUT", `/api/machine-configs/${encodeURIComponent(id)}`, { name: input.name, description: input.description ?? null, isPublic: input.isPublic ?? false, type: input.type, config: config ?? { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: input.controller } }).then(resourceRow)
   cloneMachine = (id: string) => this.request<unknown>("POST", `/api/machine-configs/${encodeURIComponent(id)}/clone`, {})
   deleteResource = (resource: ResourceKind, id: string) => this.request<unknown>("DELETE", `/api/${resource}/${encodeURIComponent(id)}`)
+
+  // ── Analytics (the signed-in user's own numbers; the admin views stay on the desktop) ─────────
+
+  analyticsDashboard = (signal?: AbortSignal) => this.request<typeof DashboardData.Type>("GET", "/api/analytics/dashboard-data", undefined, signal)
+  analyticsMetrics = (range: { startDate: Date; endDate: Date }, metric: string, groupBy: "day" | "week" | "month", signal?: AbortSignal) =>
+    this.request<typeof UserMetricsReply.Type>("GET", `/api/analytics/user-metrics?startDate=${encodeURIComponent(range.startDate.toISOString())}&endDate=${encodeURIComponent(range.endDate.toISOString())}&groupBy=${groupBy}&metric=${encodeURIComponent(metric)}`, undefined, signal)
+  recentActivity = (limit = 20, signal?: AbortSignal) => this.request<readonly (typeof RecentActivityItem.Type)[]>("GET", `/api/analytics/recent-activity?limit=${limit}`, undefined, signal)
+  analyticsHistory = (limit = 50, offset = 0, signal?: AbortSignal) => this.request<typeof UserHistoryReply.Type>("GET", `/api/analytics/user-history?limit=${limit}&offset=${offset}`, undefined, signal)
 
   // ── Organizations (same contract and role rules as the desktop) ─────────
 

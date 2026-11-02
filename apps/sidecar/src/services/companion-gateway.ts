@@ -146,6 +146,9 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET", "POST"], path: /^\/api\/production-costs\/(estimates|material-costs|operation-costs|tool-wear)$/ },
   { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/production-costs\/(estimates|material-costs|operation-costs|tool-wear)\/(?!calculate$)[^/]+$/ },
   { methods: ["POST"], path: /^\/api\/production-costs\/estimates\/calculate$/ },
+  // The user's own analytics (dashboard counters, trends, recent activity). The admin views (`/api/analytics`,
+  // `system-metrics`, `user-usage`) and everything that writes (`track`, `log-view`) stay on the desktop.
+  { methods: ["GET"], path: /^\/api\/analytics\/(dashboard-data|recent-activity|user-metrics|user-history)$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },

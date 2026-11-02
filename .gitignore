@@ -123,3 +123,6 @@ release-local/
 /.astro/
 /.claude/
 /nikcli.json
+
+# Installed agent skills (npx skills add)
+.agents/
