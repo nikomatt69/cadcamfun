@@ -18,6 +18,7 @@ export function LanguageSelector(): JSX.Element {
   return (
     <div class="relative">
       <select
+        aria-label={t("settings.lang.title")}
         value={locale()}
         onChange={(event) => app.settings.update({ locale: event.currentTarget.value as Locale })}
         class="block w-full rounded-md border border-slate-200/70 bg-white/80 py-2 pl-10 pr-4 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
@@ -28,7 +29,7 @@ export function LanguageSelector(): JSX.Element {
         <Globe class="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
       </div>
       <Show when={isLoading()}>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("settings.lang.loading")}</p>
+        <p role="status" class="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("settings.lang.loading")}</p>
       </Show>
     </div>
   )

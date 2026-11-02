@@ -71,11 +71,13 @@ export function KeybindingsSettings(): JSX.Element {
     // Keys are consumed by the recorder, never by the command they happen to be bound to.
     const resume = keys.suspend()
     const onKey = (event: KeyboardEvent): void => {
+      // Unmodified Tab remains navigation; modified Tab can still be recorded.
+      if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) return
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); finish(); return }
       // The manual field below the recorder is for typing: its keys are text, not a chord to record.
       if (event.target instanceof HTMLInputElement && event.target.type === "text") return
       event.preventDefault()
       event.stopPropagation()
-      if (event.key === "Escape") { finish(); return }
       const chord = chordFromEvent(event, keys.platform)
       if (chord === undefined) return
       finish()
@@ -119,9 +121,9 @@ export function KeybindingsSettings(): JSX.Element {
         </div>
         <div class="flex items-center gap-2 text-sm">
           <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-600" onClick={() => void exportMap()}>{t("keys.export")}</button>
-          <label class="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-600">
+          <label class="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500 dark:border-slate-600">
             {t("keys.import")}
-            <input type="file" accept="application/json,.json" class="hidden" onChange={(event) => { void importMap(event.currentTarget.files?.[0]); event.currentTarget.value = "" }} />
+            <input type="file" accept="application/json,.json" class="sr-only" onChange={(event) => { void importMap(event.currentTarget.files?.[0]); event.currentTarget.value = "" }} />
           </label>
           <button type="button" class="rounded-md border border-red-200 px-3 py-1.5 text-red-700 dark:border-red-800 dark:text-red-300" onClick={() => { keys.resetAll(); setPending(undefined); toast.success(t("keys.resetDone")) }}>{t("keys.resetAll")}</button>
         </div>
@@ -130,14 +132,14 @@ export function KeybindingsSettings(): JSX.Element {
       <Show when={issues() > 0}><p role="status" class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">{t("keys.issues", { count: issues() })}</p></Show>
 
       <div class="flex flex-wrap items-center gap-2">
-        <div role="tablist" class="flex gap-1">
+        <div role="group" aria-label={t("keys.title")} class="flex flex-wrap gap-1">
           <For each={SCOPES}>{(tab) =>
-            <button type="button" role="tab" aria-selected={scope() === tab} onClick={() => setScope(tab)} class="rounded-md px-3 py-1 text-sm"
+            <button type="button" aria-pressed={scope() === tab} onClick={() => { finish(); setPending(undefined); setScope(tab) }} class="rounded-md px-3 py-1 text-sm"
               classList={{ "bg-blue-600 text-white": scope() === tab, "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200": scope() !== tab }}>{t(`keys.scope.${tab}` as Key)}</button>}
           </For>
         </div>
         <input type="search" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} placeholder={t("keys.search")} aria-label={t("keys.search")}
-          class="ml-auto min-w-[14rem] rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800" />
+          class="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm sm:ml-auto sm:w-auto sm:min-w-[14rem] dark:border-slate-600 dark:bg-slate-800" />
       </div>
 
       <For each={rows()}>{(section) =>

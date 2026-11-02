@@ -62,7 +62,7 @@ export default function UnifiedLibrary<T extends LibraryItem>(props: UnifiedLibr
             <input type="search" data-library-search aria-label={t("library.searchKind", { type: props.entityType })} placeholder={t("library.searchKind", { type: props.entityType })} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
             <Show when={search()}><button type="button" class="library-icon-button" aria-label={t("library.clear")} onClick={() => setSearch("")}><X size={14} /></button></Show>
           </div>
-          <button type="button" class="library-control-button" aria-expanded={showFilters()} aria-controls={`${id}-filters`} data-active={showFilters() || hasFilters()} onClick={() => setShowFilters(!showFilters())}><Filter size={15} />{t("library.filters")}<Show when={hasFilters()}><span class="library-filter-dot" /></Show></button>
+          <button type="button" class="library-control-button" aria-expanded={showFilters()} aria-controls={showFilters() ? `${id}-filters` : undefined} data-active={showFilters() || hasFilters()} onClick={() => setShowFilters(!showFilters())}><Filter size={15} aria-hidden="true" />{t("library.filters")}<Show when={hasFilters()}><span class="library-filter-dot" /></Show></button>
           <div class="library-view-switch" role="group" aria-label={t("library.view")}>
             <button type="button" class="library-icon-button" aria-label={t("library.grid")} title={t("library.grid")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} /></button>
             <button type="button" class="library-icon-button" aria-label={t("library.list")} title={t("library.list")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} /></button>
@@ -73,7 +73,7 @@ export default function UnifiedLibrary<T extends LibraryItem>(props: UnifiedLibr
           <div class="library-sources" role="group" aria-label={t("library.sources")}>
             <For each={SOURCES}>{(source) => <button type="button" data-source={source.id} aria-pressed={activeSource() === source.id} onClick={() => { clear(); setActiveSource(source.id) }}><source.icon size={14} aria-hidden="true" /><span>{t(source.label)}</span><span class="library-count">{sourceStats()[source.id]}</span></button>}</For>
           </div>
-          <span class="library-result-count" role="status">{isLoading() ? t("library.loading") : t("library.items", { count: filtered().length })}</span>
+          <span class="library-result-count" role="status">{isLoading() ? t("library.loading") : error() ? t("library.loadError") : t("library.items", { count: filtered().length })}</span>
         </div>
         <Show when={showFilters()}>
           <div id={`${id}-filters`} class="library-filters">
@@ -93,7 +93,7 @@ export default function UnifiedLibrary<T extends LibraryItem>(props: UnifiedLibr
                   <article class="library-item">
                     <div class="library-item-preview"><Show when={props.entityType === "materials"} fallback={<Icon size={28} aria-hidden="true" />}><span class="library-material-swatch" style={{ "background-color": (item as unknown as MaterialLibraryItem).color || "#a1a1aa" }} /></Show></div>
                     <div class="library-item-body"><h4 title={item.name}>{item.name}</h4><Show when={facts(item)}><p class="library-item-facts">{facts(item)}</p></Show><Show when={item.description}><p class="library-item-description">{item.description}</p></Show><Show when={item.tags?.length}><div class="library-item-tags"><For each={item.tags?.slice(0, 3)}>{(tag) => <span>{tag}</span>}</For></div></Show></div>
-                    <div class="library-item-actions"><button type="button" class="library-select-button" onClick={() => props.onSelectItem?.(item)}>{t("library.useItem")}</button><Show when={activeSource() !== "local" && props.onSaveItem}><button type="button" class="library-icon-button" aria-label={t("library.saveLocal")} title={t("library.saveLocal")} onClick={() => props.onSaveItem?.(item)}><Star size={16} /></button></Show></div>
+                    <div class="library-item-actions"><Show when={props.onSelectItem}><button type="button" class="library-select-button" aria-label={`${t("library.useItem")}: ${item.name}`} onClick={() => props.onSelectItem?.(item)}>{t("library.useItem")}</button></Show><Show when={activeSource() !== "local" && props.onSaveItem}><button type="button" class="library-icon-button" aria-label={`${t("library.saveLocal")}: ${item.name}`} title={t("library.saveLocal")} onClick={() => props.onSaveItem?.(item)}><Star size={16} aria-hidden="true" /></button></Show></div>
                   </article>
                 )}</For>
               </div>

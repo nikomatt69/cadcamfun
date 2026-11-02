@@ -55,10 +55,10 @@ export function GitProfileSettings(): JSX.Element {
     }
   }
 
-  const field = "w-full rounded-md border border-slate-200/70 bg-white/80 px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
+  const field = "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 
   return (
-    <div class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
+    <div class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
       <h3 class="mb-1 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
         <GitBranch class="mr-2 h-4 w-4" />
         {t("vcs.profile.title")}
@@ -86,20 +86,18 @@ export function GitProfileSettings(): JSX.Element {
           <input id="git-profile-email" type="email" required maxlength={254} autocomplete="email" value={email()} onInput={(event) => setEmail(event.currentTarget.value)} class={field} />
         </div>
       </div>
-      <Show when={changed()}>
         <div class="mt-4 flex justify-end">
           <button
             type="submit"
-            disabled={saving()}
+            disabled={saving() || !changed()}
             class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             <Show when={saving()}>
-              <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <div aria-hidden="true" class="h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-white border-t-transparent" />
             </Show>
             {t("vcs.profile.save")}
           </button>
         </div>
-      </Show>
       </fieldset>
       </form>
       </Show>

@@ -19,15 +19,19 @@ export function StatGrid(props: { readonly items: ReadonlyArray<StatItem>; reado
 
 /** A value against a reference range, as a bar (a property compared with the strongest common stock). */
 export function PropertyBar(props: { readonly label: string; readonly value: number; readonly max: number; readonly unit: string }): JSX.Element {
-  const ratio = (): number => (props.max > 0 ? Math.min(1, Math.max(0, props.value / props.max)) : 0)
+  const hasRange = (): boolean => Number.isFinite(props.max) && props.max > 0 && Number.isFinite(props.value)
+  const value = (): number => Math.min(props.max, Math.max(0, props.value))
+  const ratio = (): number => (hasRange() ? value() / props.max : 0)
   return <div>
     <div class="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
       <span class="text-slate-600 dark:text-slate-300">{props.label}</span>
       <span class="font-medium text-slate-900 dark:text-white">{props.value > 0 ? `${props.value} ${props.unit}` : "-"}</span>
     </div>
-    <div class="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" role="meter" aria-label={props.label} aria-valuemin={0} aria-valuemax={props.max} aria-valuenow={Math.min(props.value, props.max)}>
-      <Show when={props.value > 0}><div class="h-full rounded-full bg-blue-600 dark:bg-blue-400" style={{ width: `${(ratio() * 100).toFixed(1)}%` }} /></Show>
-    </div>
+    <Show when={hasRange()}>
+      <div class="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" role="meter" aria-label={props.label} aria-valuemin={0} aria-valuemax={props.max} aria-valuenow={value()} aria-valuetext={`${props.value} ${props.unit}`}>
+        <Show when={props.value > 0}><div class="h-full rounded-full bg-blue-600 dark:bg-blue-400" style={{ width: `${(ratio() * 100).toFixed(1)}%` }} /></Show>
+      </div>
+    </Show>
   </div>
 }
 

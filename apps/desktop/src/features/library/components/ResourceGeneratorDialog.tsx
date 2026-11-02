@@ -6,8 +6,8 @@
  * fill. Submitting opens the docked assistant panel and sends the brief, so the user watches the real tool calls
  * and approves the real writes.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
-import { Sparkles } from "lucide-solid"
+import { For, Show, createSignal, createUniqueId, type JSX } from "solid-js"
+import { MessageSquareText } from "lucide-solid"
 import { useApp } from "../../../shared/state/context.ts"
 import { useAiStore } from "../../ai/index.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
@@ -43,6 +43,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
   const app = useApp()
   const ai = maybeAi()
   const spec = RESOURCE_GENERATION[props.kind]
+  const parametersId = createUniqueId()
   const [request, setRequest] = createSignal("")
   const [quantity, setQuantity] = createSignal(MIN_GENERATION_COUNT)
   const [makePublic, setMakePublic] = createSignal(false)
@@ -142,12 +143,12 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
       </div>
 
       <div class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
-        <button type="button" class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-700 dark:text-slate-200" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()}>
+        <button type="button" class="flex w-full items-center justify-between gap-3 rounded text-left text-sm font-medium text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()} aria-controls={showParameters() ? parametersId : undefined}>
           <span>{t("library.generate.parameters", { count: spec.parameters.length })}</span>
           <span class="text-slate-400">{showParameters() ? t("update.hide") : t("cad.createComponent.show")}</span>
         </button>
         <Show when={showParameters()}>
-          <ul class="mt-2 space-y-1">
+          <ul id={parametersId} class="mt-2 space-y-1">
             <For each={spec.parameters}>{(parameter) => (
               <li class="flex gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <code class="font-mono text-blue-600 dark:text-blue-400">{parameter.name}</code>
@@ -160,7 +161,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
 
       <p class="text-xs text-slate-500 dark:text-slate-400">{t(`library.generate.note.${props.kind}` as Key)}</p>
 
-      <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
         <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={props.onClose}>{t("common.cancel")}</button>
         <button
           type="button"
@@ -169,7 +170,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
           disabled={request().trim() === ""}
           onClick={submit}
         >
-          <Sparkles size={16} aria-hidden="true" />{t("library.detail.generateAi")}
+          <MessageSquareText size={16} aria-hidden="true" />{t("library.detail.generateAi")}
         </button>
       </div>
     </Modal>
