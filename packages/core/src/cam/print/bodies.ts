@@ -71,6 +71,24 @@ const overlap = (a: Mesh64, b: Mesh64): boolean => {
   return p.min[0] <= q.max[0] + eps && p.max[0] >= q.min[0] - eps && p.min[1] <= q.max[1] + eps && p.max[1] >= q.min[1] - eps && p.min[2] <= q.max[2] + eps && p.max[2] >= q.min[2] - eps
 }
 
+/**
+ * Solids whose boxes overlap or touch are united into one closed body (Boolean union); solids apart are left as they are.
+ * A union that fails or is not a closed solid is an error: no partial print is produced.
+ */
+export const unitePrintMeshes = (meshes: ReadonlyArray<Mesh64>): { readonly meshes: ReadonlyArray<Mesh64>; readonly errors: ReadonlyArray<string> } => {
+  const touching = meshes.some((a, i) => meshes.some((b, j) => j > i && overlap(a, b)))
+  if (!touching || meshes.length < 2) return { meshes, errors: [] }
+  try {
+    const result = wide(booleanAll(meshes.map((m) => ({ positions: Float32Array.from(m.positions), indices: m.indices })), "union"))
+    const problem = printSolidIssue(result)
+    if (problem !== undefined) return { meshes: [], errors: [`United print bodies: ${problem}`] }
+    return { meshes: [result], errors: [] }
+  } catch (cause) {
+    return { meshes: [], errors: [`Overlapping solids could not be united (${cause instanceof Error ? cause.message : String(cause)}); no partial print was produced`] }
+  }
+}
+
+
 export const printBodies = (selected: ReadonlyArray<CadElement>): PrintBodies => {
   const sourceErrors = selected.flatMap((e) => { const problem = sourceIssue(e); return problem === undefined ? [] : [problem] })
   if (sourceErrors.length > 0) return { meshes: [], skipped: [], warnings: [], errors: sourceErrors }
@@ -112,18 +130,9 @@ export const printBodies = (selected: ReadonlyArray<CadElement>): PrintBodies =>
     }
   }
   if (errors.length > 0) return { meshes: [], skipped, warnings, errors }
-  // Solids that cross each other are one body: their union is what gets printed, not two shells through each other.
-  const touching = meshes.some((a, i) => meshes.some((b, j) => j > i && overlap(a, b)))
-  if (touching && meshes.length > 1) {
-    try {
-      const united = booleanAll(meshes.map((m) => ({ positions: Float32Array.from(m.positions), indices: m.indices })), "union")
-      const result = wide(united)
-      const problem = printSolidIssue(result)
-      if (problem !== undefined) return { meshes: [], skipped, warnings, errors: [`United print bodies: ${problem}`] }
-      return { meshes: [result], skipped, warnings, errors }
-    } catch (cause) {
-      return { meshes: [], skipped, warnings, errors: [`Overlapping solids could not be united (${cause instanceof Error ? cause.message : String(cause)}); no partial print was produced`] }
-    }
-  }
-  return { meshes, skipped, warnings, errors }
+  // Solids that cross or touch each other are one body: their union is what gets printed, not two shells through each other.
+  const united = unitePrintMeshes(meshes)
+  if (united.errors.length > 0) return { meshes: [], skipped, warnings, errors: united.errors }
+  return { meshes: united.meshes, skipped, warnings, errors }
 }
+
