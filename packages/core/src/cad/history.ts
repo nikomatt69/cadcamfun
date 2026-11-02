@@ -549,6 +549,24 @@ export type Feature = (SketchFeature | ExtrudeFeature | RevolveFeature | HoleFea
 /** A named fold of the timeline (display only: a group never changes a replay). */
 export interface TimelineGroup { readonly id: string; readonly name: string; readonly collapsed?: boolean }
 
+/** What a parameter measures, for the unit check and the table: a length (mm), an angle (the table keeps radians; write `90deg`) or a bare number. */
+export type ParameterKind = "length" | "angle" | "scalar"
+
+/** Display data of a parameter (spec 58): a comment, the kind of quantity, a favourite flag. Never changes a replay. */
+export interface ParameterNote { readonly comment?: string; readonly kind?: ParameterKind; readonly favorite?: boolean }
+
+/**
+ * A named variant of the part (a design-table row, spec 46 A5): values for some parameters and the exact set of suppressed features.
+ * Parameters a configuration does not name keep their current value. Activating one writes its values into the history
+ * (`history-config.ts`), so every reader of `parameters` and `suppressed` sees the variant with no extra step.
+ */
+export interface Configuration {
+  readonly id: string
+  readonly name: string
+  readonly values: Readonly<Record<string, number | string>>
+  readonly suppressed: ReadonlyArray<string>
+}
+
 /**
  * The parametric history. The timeline fields are a read-compatible superset (spec 58, decision D8 default): a history without
  * them replays exactly as before, and nothing migrates.
@@ -563,6 +581,11 @@ export interface History {
   readonly bases?: ReadonlyArray<ImportedBase>
   /** 2 when the history was written with the timeline fields. */
   readonly version?: 2
+  /** Comments and kinds of parameters, by name. */
+  readonly notes?: Readonly<Record<string, ParameterNote>>
+  /** The named variants of the part and the id of the one the history currently shows. */
+  readonly configurations?: ReadonlyArray<Configuration>
+  readonly configuration?: string
 }
 
 /**
@@ -892,7 +915,7 @@ export const rebuild = (history: History): RebuildResult => {
   const { values, errors } = resolveParameters(history.parameters)
   for (const [name, message] of Object.entries(errors)) issues.push({ feature: `parameter ${name}`, severity: "error", message })
   const dim = (d: Dimension, feature: string): number | undefined => {
-    try { return dimensionValue(d, values) } catch (error) {
+    try { return dimensionValue(d, values, errors) } catch (error) {
       issues.push({ feature, severity: "error", message: error instanceof Error ? error.message : String(error) })
       return undefined
     }

@@ -6,7 +6,7 @@
  * A dimension is addressed by a path inside its feature: `depth`, `at.0`, `sketch.constraints.3.value`. The panel and the assistant use the
  * same paths.
  */
-import { namesIn, type Dimension } from "./expr.ts"
+import { evaluate, namesIn, parameterCycles, referencesIn, type Dimension } from "./expr.ts"
 import { rebuild, type DimConstraint, type Feature, type History, type RebuildResult } from "./history.ts"
 import { bodyCreator, bodyRefs, declaredNeeds } from "./history-timeline.ts"
 
@@ -179,45 +179,141 @@ export const renameParameter = (history: History, from: string, to: string): His
   if (!(from in history.parameters)) throw new RangeError(`No parameter '${from}'`)
   if (!NAME.test(to)) throw new RangeError(`'${to}' is not a valid name (letters, digits and _, not starting with a digit)`)
   if (to !== from && to in history.parameters) throw new RangeError(`There is already a parameter '${to}'`)
-  const parameters: Record<string, number | string> = {}
-  for (const [name, def] of Object.entries(history.parameters)) parameters[name === from ? to : name] = typeof def === "string" ? (renameIn(def, from, to) as string) : def
-  return { parameters, features: history.features.map((f) => mapDimensions(f, (d) => renameIn(d, from, to))) }
+  const rewrite = (table: Readonly<Record<string, number | string>>): Record<string, number | string> => {
+    const out: Record<string, number | string> = {}
+    for (const [name, def] of Object.entries(table)) out[name === from ? to : name] = typeof def === "string" ? (renameIn(def, from, to) as string) : def
+    return out
+  }
+  const { notes, configurations, ...rest } = history
+  return {
+    ...rest,
+    parameters: rewrite(history.parameters),
+    features: history.features.map((f) => mapDimensions(f, (d) => renameIn(d, from, to))),
+    ...(notes === undefined ? {} : { notes: Object.fromEntries(Object.entries(notes).map(([name, note]) => [name === from ? to : name, note])) }),
+    ...(configurations === undefined ? {} : { configurations: configurations.map((c) => ({ ...c, values: rewrite(c.values) })) })
+  }
 }
 
-/** The names of the parameters and features that refer to `name`. */
-export const usesOf = (history: History, name: string): { readonly parameters: ReadonlyArray<string>; readonly features: ReadonlyArray<string> } => ({
-  parameters: Object.entries(history.parameters).filter(([k, d]) => k !== name && typeof d === "string" && namesIn(d).includes(name)).map(([k]) => k),
-  features: history.features.filter((f) => dimensionsOf(f).some((d) => typeof d.value === "string" && namesIn(d.value).includes(name))).map((f) => f.id)
-})
+/** The names of the parameters, features and configurations that refer to `name` in a formula. */
+export const usesOf = (history: History, name: string): { readonly parameters: ReadonlyArray<string>; readonly features: ReadonlyArray<string>; readonly configurations?: ReadonlyArray<string> } => {
+  const configurations = (history.configurations ?? []).filter((c) => Object.values(c.values).some((d) => typeof d === "string" && namesIn(d).includes(name))).map((c) => c.id)
+  return {
+    parameters: Object.entries(history.parameters).filter(([k, d]) => k !== name && typeof d === "string" && namesIn(d).includes(name)).map(([k]) => k),
+    features: history.features.filter((f) => dimensionsOf(f).some((d) => typeof d.value === "string" && namesIn(d.value).includes(name))).map((f) => f.id),
+    ...(configurations.length > 0 ? { configurations } : {})
+  }
+}
 
-/** A parameter added or replaced (a number or an expression). */
+/**
+ * Why a parameter could not be given this value, or `undefined` when it can: a bad name, an expression that does not parse, a name
+ * that is not a parameter, or a definition that would make a loop (`a -> b -> a`). The text is what the field shows.
+ */
+export const parameterProblem = (history: History, name: string, value: number | string): string | undefined => {
+  if (!NAME.test(name)) return `'${name}' is not a valid name (letters, digits and _, not starting with a digit)`
+  if (typeof value === "number") return Number.isFinite(value) ? undefined : "the value is not a finite number"
+  if (value.trim() === "") return "a parameter needs a value or a formula"
+  const table = { ...history.parameters, [name]: value }
+  const known = (n: string) => Object.hasOwn(table, n)
+  for (const ref of referencesIn(value, known)) if (!known(ref.name)) return `unknown parameter '${ref.name}' (at ${ref.at} in "${value}")`
+  const loop = parameterCycles(table).find((cycle) => cycle.includes(name))
+  if (loop !== undefined) return `circular definition: ${loop.join(" -> ")}`
+  try {
+    evaluate(value, (n) => { const d = table[n]; return typeof d === "number" ? d : 1 })
+  } catch (error) {
+    // Only syntax matters here: a division by a parameter that is 0 right now is a value problem, shown by the replay.
+    const text = error instanceof Error ? error.message : String(error)
+    if (!/Division by zero|finite/.test(text)) return text
+  }
+  return undefined
+}
+
+/**
+ * A parameter added or replaced (a number or an expression). Throws on a bad name, an expression that does not parse, an unknown
+ * parameter in it, or a definition that would close a loop; the message names the loop.
+ */
 export const setParameter = (history: History, name: string, value: number | string): History => {
-  if (!NAME.test(name)) throw new RangeError(`'${name}' is not a valid name (letters, digits and _, not starting with a digit)`)
+  const problem = parameterProblem(history, name, value)
+  if (problem !== undefined) throw new RangeError(problem)
   return { ...history, parameters: { ...history.parameters, [name]: value } }
 }
 
 /** A parameter removed; refuses while something still uses it (the lists say what). */
 export const removeParameter = (history: History, name: string): History => {
   const used = usesOf(history, name)
-  if (used.parameters.length + used.features.length > 0) {
-    throw new RangeError(`'${name}' is still used by ${[...used.parameters.map((p) => `parameter ${p}`), ...used.features.map((f) => `feature ${f}`)].join(", ")}`)
+  if (used.parameters.length + used.features.length + (used.configurations?.length ?? 0) > 0) {
+    throw new RangeError(`'${name}' is still used by ${[...used.parameters.map((p) => `parameter ${p}`), ...used.features.map((f) => `feature ${f}`), ...(used.configurations ?? []).map((c) => `configuration ${c}`)].join(", ")}`)
   }
   const { [name]: _gone, ...parameters } = history.parameters
-  return { ...history, parameters }
+  const { notes, configurations, ...rest } = history
+  const keep = notes === undefined ? undefined : Object.fromEntries(Object.entries(notes).filter(([k]) => k !== name))
+  return {
+    ...rest,
+    parameters,
+    ...(keep === undefined || Object.keys(keep).length === 0 ? {} : { notes: keep }),
+    ...(configurations === undefined ? {} : { configurations: configurations.map((c) => ({ ...c, values: Object.fromEntries(Object.entries(c.values).filter(([k]) => k !== name)) })) })
+  }
 }
 
 /** Ids of the features that need `id` to exist: a sketch used by an extrude, revolve, rib or sheet, an extrude / revolve / hole copied by a pattern or a mirror, a sketch used by a sweep or loft, an extrusion hollowed by a shell. */
 export const dependentsOf = (history: History, id: string): ReadonlyArray<string> =>
   history.features.filter((f) => ((f.type === "extrude" || f.type === "revolve" || f.type === "rib" || f.type === "sheet") && f.sketch === id) || (f.type === "plane" && f.from.kind !== "points" && f.from.kind !== "face" && f.from.base === id) || (f.type === "sketch" && f.plane === id) || ((f.type === "hole" || f.type === "text") && f.plane === id) || ((f.type === "pattern" || f.type === "mirror" || f.type === "shell") && f.feature === id) || (f.type === "sweep" && (f.profile === id || f.path === id)) || (f.type === "loft" && f.sections.includes(id))).map((f) => f.id)
 
-/** A feature removed together with everything that cannot exist without it (the extrusions of a sketch, the patterns of those, ...). */
-export const removeFeature = (history: History, id: string): History => {
-  const gone = new Set<string>([id])
-  const queue = [id]
-  while (queue.length > 0) {
-    for (const dependent of dependentsOf(history, queue.pop()!)) if (!gone.has(dependent)) { gone.add(dependent); queue.push(dependent) }
+/**
+ * What deleting `id` takes with it. `declared` are the features that cannot exist without it by reference (the extrusions of a
+ * sketch, the patterns of those, ...); `lineage` are features that only act on the bodies it built (a hole cutting an extrusion
+ * names neither) and would fail once it is gone. Both in timeline order.
+ */
+export const removalImpact = (history: History, id: string): { readonly declared: ReadonlyArray<string>; readonly lineage: ReadonlyArray<string> } => {
+  if (!history.features.some((f) => f.id === id)) return { declared: [], lineage: [] }
+  const closure = (reaches: (from: string) => ReadonlyArray<string>): Set<string> => {
+    const gone = new Set<string>([id])
+    const queue = [id]
+    while (queue.length > 0) for (const dependent of reaches(queue.pop()!)) if (!gone.has(dependent)) { gone.add(dependent); queue.push(dependent) }
+    gone.delete(id)
+    return gone
   }
-  return { ...history, features: history.features.filter((f) => !gone.has(f.id)) }
+  const declared = closure((x) => dependentsOf(history, x))
+  const graph = dependencyGraph(history)
+  const all = closure((x) => history.features.filter((f) => graph.get(f.id)?.has(x) === true).map((f) => f.id))
+  const order = (ids: Set<string>) => history.features.filter((f) => ids.has(f.id)).map((f) => f.id)
+  return { declared: order(declared), lineage: order(new Set([...all].filter((x) => !declared.has(x)))) }
+}
+
+/**
+ * The timeline fields that named removed features, made valid again: a rollback marker on a removed feature moves to the last
+ * remaining feature before it, groups left without members disappear, and configurations stop listing the removed ids.
+ */
+const repairAfterRemoval = (before: History, features: ReadonlyArray<Feature>): History => {
+  const gone = new Set(before.features.filter((f) => !features.some((g) => g.id === f.id)).map((f) => f.id))
+  let { rollback, groups, configurations, ...rest } = before
+  if (rollback !== undefined && gone.has(rollback)) {
+    const at = before.features.findIndex((f) => f.id === rollback)
+    rollback = before.features.slice(0, at).reverse().find((f) => !gone.has(f.id))?.id
+  }
+  if (groups !== undefined) {
+    const used = new Set(features.map((f) => f.group))
+    groups = groups.filter((g) => used.has(g.id))
+  }
+  if (configurations !== undefined) configurations = configurations.map((c) => (c.suppressed.some((x) => gone.has(x)) ? { ...c, suppressed: c.suppressed.filter((x) => !gone.has(x)) } : c))
+  return {
+    ...rest, features,
+    ...(rollback === undefined ? {} : { rollback }),
+    ...(groups === undefined || groups.length === 0 ? {} : { groups }),
+    ...(configurations === undefined ? {} : { configurations })
+  }
+}
+
+/**
+ * A feature removed together with everything that cannot exist without it. `dependents` chooses how far: `declared` (default) the
+ * features that reference it, `all` also those that only act on its bodies (see `removalImpact`), `none` just the feature, leaving
+ * what depended on it to fail visibly in the replay (state `failed` / `skipped`, never silent). The rollback marker, groups and
+ * configurations are repaired.
+ */
+export const removeFeature = (history: History, id: string, options: { readonly dependents?: "declared" | "all" | "none" } = {}): History => {
+  const mode = options.dependents ?? "declared"
+  const impact = mode === "none" ? { declared: [], lineage: [] } : removalImpact(history, id)
+  const gone = new Set<string>([id, ...impact.declared, ...(mode === "all" ? impact.lineage : [])])
+  return repairAfterRemoval(history, history.features.filter((f) => !gone.has(f.id)))
 }
 
 /** Why one feature must stay after another: it names it, it names a body it made, or the replay saw it change that feature's body. */
@@ -301,6 +397,20 @@ export const insertFeature = (history: History, feature: Feature, after: string 
   const features = [...history.features]
   features.splice(at, 0, feature)
   return { history: { ...history, features } }
+}
+
+/**
+ * A new feature added the way a timeline does: at the end, or, while the model is rolled back, right after the rollback marker
+ * (which then moves onto the new feature, so the edit stays where the person is working and the features after it are kept).
+ * Same refusals as `insertFeature`.
+ */
+export const addFeature = (history: History, feature: Feature): TimelineEdit => {
+  if (history.rollback === undefined) {
+    const last = history.features[history.features.length - 1]
+    return insertFeature(history, feature, last?.id)
+  }
+  const inserted = insertFeature(history, feature, history.rollback)
+  return inserted.refusal !== undefined ? inserted : { history: { ...inserted.history, rollback: feature.id } }
 }
 
 /** A feature's display name, or back to its id with `undefined` / an empty name (display only: the replay never reads it). */
