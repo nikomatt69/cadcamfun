@@ -2,14 +2,14 @@
 .manuals-screen { color: var(--shell-text); --manual-muted: var(--shell-muted); --manual-line: var(--page-border); --manual-accent: var(--page-accent); }
 .manuals-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: var(--manual-muted); }
 .manuals-stats small { font-size: 11px; }
-.manuals-access-note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; padding: 10px 12px; background: var(--page-tab); border: 1px solid var(--manual-line); border-radius: var(--page-radius); font-size: 12px; }
+.manuals-access-note { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px; background: var(--page-tab); border: 1px solid var(--manual-line); border-radius: var(--page-radius); font-size: 12px; }
 .manuals-access-note > svg { flex: none; margin-top: 2px; color: var(--manual-accent); }
 .manuals-access-note strong { font-weight: 600; }
 .manuals-access-note p { margin: 0; line-height: 1.5; color: var(--manual-muted); }
 .manuals-manufacturers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .manuals-manufacturers button[aria-pressed="true"] { background: var(--page-tab); color: var(--page-accent); border-color: var(--page-accent); }
 .manuals-filters nav { display: grid; gap: 3px; margin-bottom: 20px; }
-.manuals-filters nav button { display: flex; justify-content: space-between; gap: 8px; padding: 9px 8px; border-radius: var(--ui-radius-sm); color: var(--shell-text); text-align: left; font-size: 12px; }
+.manuals-filters nav button { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: var(--ui-radius-sm); color: var(--shell-text); text-align: left; font-size: 12px; }
 .manuals-filters nav button:hover { background: var(--page-tab); }
 .manuals-filters nav button[aria-pressed="true"] { background: var(--page-tab); color: var(--page-accent); font-weight: 600; }
 .manuals-filters nav button:focus-visible, .manuals-search button:focus-visible, .manual-open:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
@@ -20,14 +20,14 @@
 .manuals-search > svg { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); color: var(--manual-muted); pointer-events: none; }
 .manuals-search input { padding-left: 34px; padding-right: 30px; }
 .manuals-search input::-webkit-search-cancel-button { display: none; }
-.manuals-search button { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); padding: 2px; color: var(--manual-muted); }
+.manuals-search button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 4px; color: var(--manual-muted); }
 .manuals-result-count { margin: 12px 0; color: var(--manual-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .manuals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .manual-card { display: flex; flex-direction: column; min-width: 0; }
 .manual-card:focus-within { border-color: var(--manual-accent); }
 .manual-card-top { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
-.manual-kind { color: var(--manual-muted); border: 1px solid var(--manual-line); border-radius: var(--ui-radius-sm); padding: 2px 6px; font-size: 10px; font-weight: 500; }
-.manual-account { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--manual-muted); }
+.manual-kind { color: var(--manual-muted); border: 1px solid var(--manual-line); border-radius: var(--ui-radius-sm); padding: 2px 8px; font-size: 11px; font-weight: 500; }
+.manual-account { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--manual-muted); }
 .manual-publisher { margin: 0 0 5px; color: var(--manual-accent); font-size: 11px; font-weight: 600; }
 .manual-card h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.015em; line-height: 1.5; overflow-wrap: anywhere; }
 .manual-card h2 a { display: inline; text-decoration: none; color: inherit; font-size: inherit; font-weight: inherit; }

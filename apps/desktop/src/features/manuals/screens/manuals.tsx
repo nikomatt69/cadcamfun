@@ -25,7 +25,7 @@ function ManualCard(props: { readonly entry: ManualEntry }): JSX.Element {
   return <article class={`${PANEL} manual-card`} data-manual-id={entry().id}>
     <div class="manual-card-top"><span class="manual-kind">{t(`manuals.kind.${entry().kind}`)}</span><Show when={entry().access === "account"}><span class="manual-account"><UserRound size={12} aria-hidden="true" />{t("manuals.account")}</span></Show></div>
     <p class="manual-publisher">{entry().publisher}</p>
-    <h2><a class="manual-open" href={entry().url} target="_blank" rel="noopener noreferrer" onClick={open} aria-label={t("manuals.openTitle", { title: entry().title })}>{entry().title}<ExternalLink size={13} aria-hidden="true" /></a></h2>
+    <h2><a class="manual-open" href={entry().url} target="_blank" rel="noopener noreferrer" onClick={open} aria-label={t("manuals.openTitle", { title: entry().title })}>{entry().title}<ExternalLink size={14} aria-hidden="true" /></a></h2>
     <p class="manual-collection">{entry().collection}</p>
     <div class="manual-card-bottom">
       <span class="manual-language"><Globe size={12} aria-hidden="true" />{t(entry().language === "en" ? "manuals.english" : "manuals.multipleLanguages")}</span>
@@ -62,7 +62,7 @@ export default function ManualsScreen(): JSX.Element {
       <div class="manuals-content">
         <div class="manuals-search-row"><div class="manuals-search"><Search size={16} aria-hidden="true" /><input class={FIELD} type="search" aria-label={t("manuals.search")} placeholder={t("manuals.searchPlaceholder")} value={query()} onInput={(event) => filter({ q: event.currentTarget.value })} /><Show when={query()}><button type="button" aria-label={t("manuals.clear")} onClick={() => filter({ q: "" })}><X size={15} /></button></Show></div><Show when={filtered()}><button type="button" class={TOOLBAR_BUTTON} onClick={clear}>{t("manuals.clear")}</button></Show></div>
         <nav class="manuals-manufacturers" aria-label={t("manuals.featured")}><For each={manufacturers}>{(name) => <button type="button" class={TOOLBAR_BUTTON} aria-pressed={publisher() === name} onClick={() => filter({ publisher: publisher() === name ? "" : name, category: "", q: "" })}>{name}</button>}</For></nav>
-        <aside class="manuals-access-note"><Globe size={15} aria-hidden="true" /><p><strong>{t("manuals.onDemand")}</strong> {t("manuals.onDemandHint")}</p></aside>
+        <aside class="manuals-access-note"><Globe size={16} aria-hidden="true" /><p><strong>{t("manuals.onDemand")}</strong> {t("manuals.onDemandHint")}</p></aside>
         <p class="manuals-result-count" role="status" aria-live="polite">{t("manuals.results", { count: results().length })}</p>
         <Show when={results().length > 0} fallback={<StageEmpty icon={<BookOpen size={30} aria-hidden="true" />} preview="lost" title={t("manuals.empty")} hint={t("manuals.emptyHint")}><button type="button" class={TOOLBAR_BUTTON} onClick={clear}>{t("manuals.clear")}</button></StageEmpty>}>
           <div class="manuals-grid"><For each={visible()}>{(entry) => <ManualCard entry={entry} />}</For></div>
