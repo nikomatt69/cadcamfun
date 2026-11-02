@@ -9,7 +9,7 @@
  *   on (u_a, v_a, u_b, v_b) with a plane constraint across the curve, then resampled until the chords are within the
  *   fit tolerance.
  */
-import { cross3, dist3, dot3, length3, normalize3, solve2, solveDense, sub3, unwrapNear as unwrapNearCheck, type Vec2, type Vec3 } from "./math.ts"
+import { cross3, dist3, dot3, fromFrame, length3, normalize3, solve2, solveDense, sub3, unwrapNear as unwrapNearCheck, type Vec2, type Vec3 } from "./math.ts"
 import { curveDerivs, curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface, type SurfaceParam } from "./geom.ts"
 import type { Edge } from "./topology.ts"
 import type { FaceMesh } from "./tessellate.ts"
@@ -433,6 +433,55 @@ export const ssiTangent = (sa: Surface, sb: Surface, q: SsiPoint): Vec3 => {
 export interface SsiPolyline {
   readonly points: SsiPoint[]
   readonly closed: boolean
+}
+
+/** Exact closed intersection rings for a sphere centred on a cylinder axis.
+ * Undefined means unsupported (including tangency); an empty array means disjoint surfaces.
+ * These are untrimmed rings: the caller must establish that the whole ring belongs to both faces.
+ */
+export const coaxialSphereCylinderRings = (sa: Surface, sb: Surface): SsiPoint[][] | undefined => {
+  const sphere = sa.kind === "sphere" ? sa : sb.kind === "sphere" ? sb : undefined
+  const cylinder = sa.kind === "cylinder" ? sa : sb.kind === "cylinder" ? sb : undefined
+  if (sphere === undefined || cylinder === undefined) return undefined
+  const offset = sub3(sphere.frame.origin, cylinder.frame.origin)
+  const height = dot3(offset, cylinder.frame.z)
+  // Do not turn a merely near-coaxial pair into a coaxial one using a modelling tolerance.
+  const roundoff = 64 * Number.EPSILON * Math.max(1, length3(offset), sphere.radius, cylinder.radius)
+  if (length3(cross3(offset, cylinder.frame.z)) > roundoff) return undefined
+  const delta = (sphere.radius - cylinder.radius) * (sphere.radius + cylinder.radius)
+  if (delta < 0) return []
+  if (delta === 0) return undefined
+  const dz = Math.sqrt(delta)
+  return [-dz, dz].map((z) => Array.from({ length: 128 }, (_, i) => {
+    const angle = i * Math.PI / 64
+    const p = fromFrame(cylinder.frame, cylinder.radius * Math.cos(angle), cylinder.radius * Math.sin(angle), height + z)
+    const a = surfaceProject(sa, p), b = surfaceProject(sb, p)
+    return { p, ua: a.u, va: a.v, ub: b.u, vb: b.v }
+  }))
+}
+
+/** Exact intersections of a line/circle edge with a plane; undefined for a coplanar or unsupported edge. */
+export const edgePlaneParameters = (edge: Edge, origin: Vec3, normal: Vec3): number[] | undefined => {
+  const c = edge.curve
+  let roots: number[]
+  if (c.kind === "line") {
+    const denominator = dot3(c.dir, normal)
+    if (Math.abs(denominator) < 1e-14) return undefined
+    roots = [dot3(sub3(origin, c.origin), normal) / denominator]
+  } else if (c.kind === "circle") {
+    const a = c.radius * dot3(c.frame.x, normal), b = c.radius * dot3(c.frame.y, normal)
+    const d = dot3(sub3(origin, c.frame.origin), normal), radius = Math.hypot(a, b)
+    if (radius < 1e-14) return undefined
+    if (Math.abs(d) > radius) return []
+    const phase = Math.atan2(b, a), angle = Math.acos(d / radius)
+    roots = []
+    for (const root of [phase - angle, phase + angle]) {
+      const start = Math.ceil((edge.t0 - root) / (2 * Math.PI))
+      const end = Math.floor((edge.t1 - root) / (2 * Math.PI))
+      for (let k = start; k <= end; k++) roots.push(root + k * 2 * Math.PI)
+    }
+  } else return undefined
+  return roots.filter((t) => t >= edge.t0 && t <= edge.t1)
 }
 
 /**
