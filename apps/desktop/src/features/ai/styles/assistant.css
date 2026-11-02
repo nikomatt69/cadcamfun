@@ -244,14 +244,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  height: 22px;
+  gap: 6px;
+  height: 24px;
   padding: 0 8px;
   border-radius: 6px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-raised);
   color: var(--assistant-ink);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -301,13 +301,13 @@
 .assistant-pill {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 6px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: 999px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-raised);
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -342,15 +342,14 @@
 .assistant-agent-pill {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 6px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: 5px;
   background: var(--assistant-raised);
   border: 1px solid var(--assistant-line);
   color: var(--assistant-ink);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.01em;
 }
 
 .assistant-field {
@@ -383,7 +382,7 @@
   background: var(--assistant-bg);
   padding: 8px 10px;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--assistant-ink);
 }
@@ -597,7 +596,7 @@
   padding: 0 7px;
   margin-right: 4px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   color: var(--assistant-ink);
@@ -702,7 +701,7 @@
   border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -712,7 +711,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--assistant-subtle);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* Header Overflow Menu */
@@ -768,7 +767,7 @@
 .assistant-menu-count {
   flex: 0 0 auto;
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -820,10 +819,8 @@
   gap: 5px;
   margin-bottom: 8px;
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
 }
 
 .assistant-stats-grid {
@@ -849,7 +846,7 @@
 
 .assistant-stat-label {
   margin-top: 2px;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--assistant-muted);
 }
 
@@ -870,7 +867,7 @@
 
 .assistant-tool-catalogue li > span {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--assistant-ink);
 }
@@ -878,13 +875,13 @@
 .assistant-tool-catalogue li > code {
   display: inline-block;
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--assistant-muted);
 }
 
 .assistant-tool-catalogue li > p {
   margin-top: 4px;
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 .assistant-context-facts {
@@ -904,7 +901,7 @@
 
 .assistant-context-facts dt {
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: capitalize;
 }
 
@@ -978,7 +975,7 @@
 .assistant-session-meta {
   display: block;
   margin-top: 1px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--assistant-muted);
 }
 
@@ -1036,7 +1033,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--assistant-ink);
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -1129,7 +1126,7 @@
   padding: 9px 14px;
   border-bottom: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
-  font-size: 11.5px;
+  font-size: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1144,10 +1141,8 @@
 }
 
 .assistant-goal-label {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--assistant-muted);
 }
 
@@ -1174,7 +1169,7 @@
   cursor: pointer;
   font-weight: 600;
   color: var(--assistant-ink);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .assistant-plan-list,
@@ -1267,8 +1262,11 @@
 }
 
 .assistant-thread-meta {
-  margin-bottom: 18px;
-  font-size: 11.5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 20px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--assistant-muted);
 }
@@ -1415,8 +1413,7 @@
   align-items: center;
   min-width: 0;
   min-height: 58px;
-  padding: 7px 6px 7px 9px;
-  border: 1px solid var(--assistant-line);
+  padding: 8px 8px 8px 12px;
   border-radius: 12px;
   color: var(--assistant-ink);
   background: var(--assistant-surface);
@@ -1431,7 +1428,6 @@
   flex: 0 0 auto;
   border-radius: 7px;
   color: var(--assistant-ink);
-  background: var(--assistant-raised);
 }
 
 .assistant-suggestion-toast-copy {
@@ -1443,7 +1439,7 @@
 
 .assistant-suggestion-toast-copy strong {
   overflow: hidden;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -1454,7 +1450,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1465,9 +1461,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 14px 0 0;
-  padding: 11px 14px;
-  border: 1px solid var(--assistant-line);
+  margin: 16px 0 0;
+  padding: 12px;
   border-radius: 12px;
   background: var(--assistant-surface);
 }
@@ -1476,11 +1471,6 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--assistant-ink);
-}
-
-.assistant-thinking-subtitle {
-  font-size: 11px;
-  color: var(--assistant-muted);
 }
 
 /* Message Bubbles */
@@ -1536,7 +1526,7 @@
 }
 
 .assistant-pending-bubble {
-  padding: 8px 13px;
+  padding: 8px 12px;
   border-radius: 12px;
   border: 1px dashed var(--assistant-line-strong);
   background: var(--assistant-surface);
@@ -1545,20 +1535,17 @@
 
 .assistant-pending-badge {
   margin-bottom: 2px;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--assistant-muted);
 }
 
 /* Reasoning & Tool Groups inside Messages */
 .assistant-reasoning {
-  border-radius: 9px;
-  border: 1px solid var(--assistant-line);
+  border-radius: 10px;
   background: var(--assistant-surface);
-  padding: 6px 10px;
-  font-size: 11.5px;
+  padding: 8px 12px;
+  font-size: 12px;
   color: var(--assistant-muted);
 }
 
@@ -1579,17 +1566,23 @@
 }
 
 .assistant-retry-row {
-  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--assistant-warn);
-  padding: 2px 4px;
+  padding: 4px 12px;
 }
+.assistant-retry-row > svg { flex: none; }
 
 .assistant-diagnostic-card {
   border-radius: 9px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
-  padding: 8px 11px;
+  padding: 8px 12px;
   font-size: 12px;
+  line-height: 1.4;
 }
 
 .assistant-diagnostic-card[data-severity="error"] {
@@ -1604,9 +1597,9 @@
 
 .assistant-tool-group {
   border-radius: 10px;
-  border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
-  padding: 7px 11px;
+  padding: 8px 12px;
+  line-height: 1.4;
   font-size: 12px;
   color: var(--assistant-muted);
 }
@@ -1633,10 +1626,11 @@
 /* Tool Call Rows & Blocks */
 .assistant-tool-call {
   border-radius: 10px;
-  border: 1px solid var(--assistant-line);
+  border: 1px solid transparent;
   background: var(--assistant-surface);
-  padding: 8px 11px;
+  padding: 8px 12px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--assistant-ink);
   list-style: none;
 }
@@ -1650,12 +1644,13 @@
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .assistant-tool-glyph {
-  font-size: 11px;
-  color: var(--assistant-ok);
+  display: inline-flex;
+  flex: none;
+  color: var(--assistant-muted);
 }
 
 .assistant-tool-glyph[data-tone="warn"] { color: var(--assistant-warn); }
@@ -1673,7 +1668,7 @@
 .assistant-tool-id {
   margin-left: auto;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--assistant-subtle);
 }
 
@@ -1683,7 +1678,7 @@
 
 .assistant-tool-figure figcaption {
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--assistant-muted);
 }
 
@@ -1691,7 +1686,7 @@
   margin-top: 6px;
   word-break: break-word;
   color: var(--assistant-coral);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .assistant-tool-detail {
@@ -1701,7 +1696,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .assistant-tool-chips {
@@ -1711,12 +1706,13 @@
 }
 
 .assistant-tool-chip {
-  padding: 2px 7px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
   border-radius: 6px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-raised);
   color: var(--assistant-ink);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 .assistant-tool-lines,
@@ -1734,11 +1730,10 @@
 
 .assistant-issue-badge {
   flex-shrink: 0;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   background: var(--assistant-raised);
   color: var(--assistant-muted);
 }
@@ -1773,7 +1768,7 @@
 
 .assistant-tool-raw-summary {
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--assistant-subtle);
 }
 
@@ -1785,17 +1780,15 @@
 }
 
 .assistant-raw-label {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--assistant-muted);
 }
 
 /* Delegated Task Card (.assistant-task-card) */
 .assistant-task-card {
   border-radius: 11px;
-  border: 1px solid var(--assistant-line);
+  line-height: 1.4;
   background: var(--assistant-surface);
   font-size: 12px;
   overflow: hidden;
@@ -1805,8 +1798,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
-  padding: 8px 11px;
+  gap: 8px;
+  padding: 8px 12px;
   background: color-mix(in srgb, var(--assistant-ink) 2.5%, transparent);
 }
 
@@ -1827,23 +1820,23 @@
 }
 
 .assistant-task-card-hint {
-  padding: 0 11px 8px;
+  padding: 0 12px 8px;
   font-size: 11px;
   color: var(--assistant-muted);
 }
 
 .assistant-task-card-error {
-  padding: 8px 11px;
+  padding: 8px 12px;
   border-top: 1px solid var(--assistant-line);
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--assistant-coral);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .assistant-task-card-details {
   border-top: 1px solid var(--assistant-line);
-  padding: 8px 11px;
+  padding: 8px 12px;
 }
 
 .assistant-task-card-summary {
@@ -1872,11 +1865,9 @@
 
 /* Turn Footer, Attachments & Permission Card */
 .assistant-turn-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--assistant-subtle);
   font-variant-numeric: tabular-nums;
 }
@@ -1984,13 +1975,13 @@
 .assistant-copy-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  gap: 6px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--assistant-subtle);
-  font-size: 10.5px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -2019,7 +2010,7 @@
 .assistant-control-error-body {
   margin: 0;
   color: var(--assistant-muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .assistant-agent-dot {
@@ -2041,7 +2032,7 @@
   border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
   color: var(--assistant-ink);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -2294,7 +2285,7 @@ html.dark .assistant-surface .assistant-field:focus {
 
 .assistant-character-count {
   color: var(--assistant-subtle);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   padding: 0 2px;
@@ -2405,7 +2396,7 @@ html.dark .assistant-surface .assistant-field:focus {
   border-radius: 6px;
   color: var(--assistant-muted);
   background: transparent;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -2474,10 +2465,8 @@ html.dark .assistant-surface .assistant-field:focus {
   min-height: 26px;
   padding: 0 8px 4px;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .assistant-control-popover-head span:last-child {
@@ -2524,7 +2513,7 @@ html.dark .assistant-surface .assistant-field:focus {
 
 .assistant-control-option strong {
   overflow: hidden;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2533,7 +2522,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-control-option small {
   overflow: hidden;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2558,7 +2547,7 @@ html.dark .assistant-surface .assistant-field:focus {
   padding: 0 7px;
   border-radius: 6px;
   color: var(--assistant-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -2611,10 +2600,8 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-scope-group > p {
   padding: 4px 8px 3px 28px;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
 }
 
 .assistant-scope-option {
@@ -2629,7 +2616,7 @@ html.dark .assistant-surface .assistant-field:focus {
   border-radius: 8px;
   color: var(--assistant-muted);
   background: transparent;
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
 }
 
@@ -2684,7 +2671,7 @@ html.dark .assistant-surface .assistant-field:focus {
   border-radius: 999px;
   color: var(--assistant-ink);
   background: var(--assistant-raised);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -2706,10 +2693,8 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-device-menu-title {
   padding: 4px 7px 6px;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .assistant-device-row {
@@ -2746,7 +2731,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-device-row small {
   overflow: hidden;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2785,7 +2770,7 @@ html.dark .assistant-surface .assistant-field:focus {
   border-radius: 6px;
   background: transparent;
   color: var(--assistant-ink);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   transition: background-color 140ms ease, color 140ms ease;
@@ -2868,7 +2853,7 @@ html.dark .assistant-surface .assistant-field:focus {
   background: transparent;
   color: var(--assistant-coral);
   font: inherit;
-  font-size: 10.5px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2943,8 +2928,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 12px;
   padding: 15px 14px 13px 18px;
   border-bottom: 1px solid var(--assistant-line);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--assistant-ink) 3%, transparent), transparent);
-}
+  }
 
 .assistant-context-dialog-title {
   flex: 1 1 auto;
@@ -2963,7 +2947,7 @@ html.dark .assistant-surface .assistant-field:focus {
   max-width: 56ch;
   margin: 4px 0 0;
   color: var(--assistant-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -3099,7 +3083,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-context-category-label {
   overflow: hidden;
   color: var(--assistant-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   text-overflow: ellipsis;
   text-transform: capitalize;
   white-space: nowrap;
@@ -3165,7 +3149,7 @@ html.dark .assistant-surface .assistant-field:focus {
   background: transparent;
   color: var(--assistant-muted);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
@@ -3242,7 +3226,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 7px;
   flex: 0 0 auto;
   color: var(--assistant-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .assistant-palette-head {
@@ -3250,8 +3234,6 @@ html.dark .assistant-surface .assistant-field:focus {
   padding: 0 12px;
   border-bottom: 1px solid var(--assistant-line);
   font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
 .assistant-palette-query {
@@ -3278,10 +3260,8 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-cmd-help-group {
   padding: 4px 8px 3px;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .assistant-palette-item {
@@ -3317,7 +3297,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-palette-args {
   margin-left: 5px;
   color: var(--assistant-muted);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 450;
 }
 
@@ -3333,7 +3313,7 @@ html.dark .assistant-surface .assistant-field:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--assistant-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -3344,7 +3324,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-palette-empty {
   padding: 20px 14px;
   color: var(--assistant-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -3407,7 +3387,7 @@ html.dark .assistant-surface .assistant-field:focus {
 .assistant-cmd-help-list dd {
   margin-top: 3px;
   color: var(--assistant-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -3690,7 +3670,7 @@ html.dark .assistant-surface .assistant-field:focus {
   align-items: center;
   gap: 6px;
   width: min(520px, 100%);
-  padding: 4px 9px;
+  padding: 6px 12px;
   border: 1px solid var(--assistant-line);
   border-radius: 999px;
   background: var(--assistant-surface);
@@ -3704,18 +3684,18 @@ html.dark .assistant-surface .assistant-field:focus {
   outline: none;
   background: transparent;
   color: var(--assistant-ink);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* Older messages: the conversation is longer than the screen. */
 .assistant-older-button {
   align-self: center;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border: 1px solid var(--assistant-line);
   border-radius: 999px;
   background: var(--assistant-raised);
   color: var(--assistant-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -3766,7 +3746,7 @@ html.dark .assistant-surface .assistant-field:focus {
   width: 190px;
   height: 22px;
   padding: 0 7px;
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 /* The action catalogue: what the agent may call, and what it changes. */
@@ -3806,7 +3786,7 @@ html.dark .assistant-surface .assistant-field:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -3825,7 +3805,7 @@ html.dark .assistant-surface .assistant-field:focus {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--assistant-muted);
 }
 
