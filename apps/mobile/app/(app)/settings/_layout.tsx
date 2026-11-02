@@ -9,6 +9,7 @@ export default function Layout() {
   return (
     <TabStack title="Settings" largeTitle={false} hideHeader>
       <Stack.Screen name="costs" options={{ title: "Production costs", headerShown: false }} />
+      <Stack.Screen name="profile" options={{ title: "Profile", headerShown: false }} />
       <Stack.Screen name="analytics" options={{ title: "Analytics", headerShown: false }} />
       <Stack.Screen name="organizations" options={{ title: "Organizations", headerShown: false }} />
       <Stack.Screen name="organization" options={{ title: "Organization", headerShown: false }} />

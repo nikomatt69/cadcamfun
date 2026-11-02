@@ -3,7 +3,7 @@ import { Alert, Platform, Text, View } from "react-native"
 import Constants from "expo-constants"
 import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { Accessibility, AppWindow, Ban, BarChart3, BellRing, Building2, Calculator, ClipboardCopy, EyeOff, Fingerprint, Inbox, Layers3, ListChecks, Lock, MonitorSmartphone, MousePointerClick, Network, Palette, ShieldCheck, Sparkles, Timer, Unplug, Vibrate, type LucideIcon } from "lucide-react-native"
+import { Accessibility, AppWindow, Ban, BarChart3, BellRing, Building2, Calculator, ClipboardCopy, EyeOff, Fingerprint, Inbox, UserRound, Layers3, ListChecks, Lock, MonitorSmartphone, MousePointerClick, Network, Palette, ShieldCheck, Sparkles, Timer, Unplug, Vibrate, type LucideIcon } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -137,6 +137,7 @@ export default function SettingsScreen() {
 
         <SettingsSection title="Workspace">
           <NavRow icon={Calculator} title="Production costs" description="Estimates, material costs, tool wear and operation rates" onPress={() => router.push("/settings/costs")} />
+          <NavRow icon={UserRound} title="Profile" description="Your account, counters, projects, components and toolpaths" onPress={() => router.push("/settings/profile")} />
           <NavRow icon={BarChart3} title="Analytics" description="Your activity, counters and trends — the same numbers as the desktop" onPress={() => router.push("/settings/analytics")} />
           <NavRow icon={Building2} title="Organizations" description="Your organizations, members and roles — synced with the desktop" onPress={() => router.push("/settings/organizations")} />
           <NavRow icon={Layers3} title="Materials, tools & machines" description="Search, create and edit your resources — synced with the desktop" onPress={() => router.push("/settings/resources")} />

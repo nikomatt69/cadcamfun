@@ -1,7 +1,8 @@
 import type { AiSessionMessages, AiSessionSummary, AiStatus, SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
-import type { DashboardData, RecentActivityItem, UserHistoryReply, UserMetricsReply } from "@cadcamfun/api"
+import type { DashboardData, RecentActivityItem, UserHistoryReply, UserMetricsReply, UserProfile, UserStats } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
+import type { ProfileListItem, ProfileListKind, ProfileRow } from "./profile"
 import type { CalculateEstimateBody, CalculatedEstimate, EstimateCreate, EstimateDetails, EstimateResponse, EstimateUpdate, MaterialCostCreate, MaterialCostDetails, MaterialCostResponse, MaterialCostUpdate, OperationCostCreate, OperationCostDetails, OperationCostUpdate, ToolWearCreate, ToolWearDetails, ToolWearResponse, ToolWearUpdate } from "@cadcamfun/api"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
 import type { ChatEvent } from "./sse"
@@ -293,6 +294,24 @@ export class CompanionClient {
     this.request<typeof UserMetricsReply.Type>("GET", `/api/analytics/user-metrics?startDate=${encodeURIComponent(range.startDate.toISOString())}&endDate=${encodeURIComponent(range.endDate.toISOString())}&groupBy=${groupBy}&metric=${encodeURIComponent(metric)}`, undefined, signal)
   recentActivity = (limit = 20, signal?: AbortSignal) => this.request<readonly (typeof RecentActivityItem.Type)[]>("GET", `/api/analytics/recent-activity?limit=${limit}`, undefined, signal)
   analyticsHistory = (limit = 50, offset = 0, signal?: AbortSignal) => this.request<typeof UserHistoryReply.Type>("GET", `/api/analytics/user-history?limit=${limit}&offset=${offset}`, undefined, signal)
+
+  // ── Profile (read-only; editing, keys and tokens stay on the desktop) ─────────
+
+  profile = (signal?: AbortSignal) => this.request<typeof UserProfile.Type>("GET", "/api/user/profile", undefined, signal)
+  profileStats = (signal?: AbortSignal) => this.request<typeof UserStats.Type>("GET", "/api/user/stats", undefined, signal)
+  userProjects = (signal?: AbortSignal) => this.request<readonly ProfileListItem<"projects">[]>("GET", "/api/user/projects", undefined, signal)
+  userComponents = (signal?: AbortSignal) => this.request<readonly ProfileListItem<"components">[]>("GET", "/api/user/components", undefined, signal)
+  userToolpaths = (signal?: AbortSignal) => this.request<readonly ProfileListItem<"toolpaths">[]>("GET", "/api/user/toolpaths", undefined, signal)
+  userOrganizations = (signal?: AbortSignal) => this.request<readonly ProfileListItem<"organizations">[]>("GET", "/api/user/organizations", undefined, signal)
+  /** One of the four lists by kind (a literal path per list, so the allow-list contract test can read each one). */
+  userItems = (kind: ProfileListKind, signal?: AbortSignal): Promise<readonly ProfileRow[]> => {
+    switch (kind) {
+      case "projects": return this.userProjects(signal)
+      case "components": return this.userComponents(signal)
+      case "toolpaths": return this.userToolpaths(signal)
+      case "organizations": return this.userOrganizations(signal)
+    }
+  }
 
   // ── Organizations (same contract and role rules as the desktop) ─────────
 

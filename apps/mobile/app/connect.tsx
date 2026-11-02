@@ -15,6 +15,7 @@ import { TextField } from "@/components/ui/TextField"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { AccountCard } from "@/components/layout/AccountCard"
 import { BrandMark } from "@/components/layout/BrandMark"
+import { PairingStory } from "@/components/layout/PairingStory"
 import { CapsuleButton } from "@/components/layout/CapsuleButton"
 import { EntryScreen } from "@/components/layout/EntryScreen"
 import { PairingScanner } from "@/components/pairing/PairingScanner"
@@ -139,8 +140,9 @@ export default function ConnectScreen() {
         </>
       )}
     >
-      <View style={{ alignItems: "center", paddingTop: 8 }}>
-        <BrandMark size={64} />
+      <View style={{ alignItems: "center", paddingTop: 8, gap: 16 }}>
+        <BrandMark size={44} />
+        <PairingStory />
       </View>
       <View style={{ gap: 10 }}>
         <Text style={{ color: palette.accent, textAlign: "center", ...caps(12, { weight: "700" }) }}>Your work. With you.</Text>

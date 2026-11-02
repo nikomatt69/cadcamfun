@@ -149,6 +149,9 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   // The user's own analytics (dashboard counters, trends, recent activity). The admin views (`/api/analytics`,
   // `system-metrics`, `user-usage`) and everything that writes (`track`, `log-view`) stay on the desktop.
   { methods: ["GET"], path: /^\/api\/analytics\/(dashboard-data|recent-activity|user-metrics|user-history)$/ },
+  // The user's own profile card, counters and item lists. Editing the profile (multipart), API keys, tokens, the
+  // password and account deletion stay on the desktop.
+  { methods: ["GET"], path: /^\/api\/user\/(profile|stats|projects|components|toolpaths|organizations)$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },
