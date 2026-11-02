@@ -136,22 +136,22 @@ export function MaterialSection(): JSX.Element {
           <div class="p-3 bg-blue-50 rounded-md">
             <h4 class="text-xs font-medium text-blue-800 mb-2">{MATERIAL_NAMES[gen.settings.material] ?? t("cam.gen.mat.other")} {t("cam.properties")}</h4>
             <div class="grid gap-x-4 gap-y-2 text-xs">
-              <div class="flex justify-between"><span class="text-gray-600">{t("cam.gen.mat.density")}</span><span class="font-medium text-blue-700">{property().density}</span></div>
-              <div class="flex justify-between"><span class="text-gray-600">{t("cam.explorer.hardness")}</span><span class="font-medium text-blue-700">{property().hardness}</span></div>
-              <div class="flex justify-between"><span class="text-gray-600">{t("cam.gen.mat.thermal")}</span><span class="font-medium text-blue-700">{property().thermalBehavior}</span></div>
-              <div class="flex justify-between"><span class="text-gray-600">{t("cam.gen.mat.chipType")}</span><span class="font-medium text-blue-700">{property().chipType}</span></div>
-              <div class="flex justify-between"><span class="text-gray-600">{t("cam.gen.mat.coolant")}</span><span class="font-medium text-blue-700">{property().coolant}</span></div>
+              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.density")}</span><span class="font-medium text-blue-700">{property().density}</span></div>
+              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.explorer.hardness")}</span><span class="font-medium text-blue-700">{property().hardness}</span></div>
+              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.thermal")}</span><span class="font-medium text-blue-700">{property().thermalBehavior}</span></div>
+              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.chipType")}</span><span class="font-medium text-blue-700">{property().chipType}</span></div>
+              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.coolant")}</span><span class="font-medium text-blue-700">{property().coolant}</span></div>
               <Show when={property().recommendedToolCoating}>
-                <div class="flex justify-between"><span class="text-gray-600">{t("cam.gen.mat.toolCoating")}</span><span class="font-medium text-blue-700">{property().recommendedToolCoating}</span></div>
+                <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.toolCoating")}</span><span class="font-medium text-blue-700">{property().recommendedToolCoating}</span></div>
               </Show>
             </div>
-            <button type="button" class="mt-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" onClick={applyRecommended}>{t("cam.gen.mat.applyRecommended")}</button>
+            <button type="button" class="mt-3 text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-200" onClick={applyRecommended}>{t("cam.gen.mat.applyRecommended")}</button>
           </div>
         )}
       </Show>
 
       <div class="mt-2 p-3 bg-blue-50 rounded-md">
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center gap-3">
           <span class="text-sm font-medium text-blue-800">{t("cam.gen.mat.workpieceInfo")}</span>
           <button type="button" class="text-xs text-blue-600 hover:text-blue-800" onClick={() => gen.flash("Workpiece thickness is determined by the geometry selected in the Operations section", 4000)}>{t("cam.gen.mat.info")}</button>
         </div>

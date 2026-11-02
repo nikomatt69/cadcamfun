@@ -138,10 +138,10 @@ function SelectedElementPanel(): JSX.Element {
                   <div class="grid grid-cols-2 gap-2 text-sm">
                     <For each={rows().slice(0, -1)}>
                       {([label, value]) => (
-                        <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>
+                        <div class="flex justify-between gap-3"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>
                       )}
                     </For>
-                    <div class="flex justify-between col-span-2 mt-2 border-t border-green-200 pt-2">
+                    <div class="flex justify-between gap-3 col-span-2 mt-2 border-t border-green-200 pt-2">
                       <span class="text-gray-600 font-medium">{t("cam.gen.op.machiningDepthColon")}</span>
                       <span class="font-medium text-blue-600">{gen.settings.depth} {t("cad.millimeters")}</span>
                     </div>
@@ -152,7 +152,7 @@ function SelectedElementPanel(): JSX.Element {
                 <div class="mt-2 border-t border-green-200 pt-2" data-testid="part-size">
                   <p class="text-sm font-medium text-gray-700 mb-1">{t("cam.gen.op.partSize")}</p>
                   <div class="grid grid-cols-2 gap-2 text-sm">
-                    <For each={part()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
+                    <For each={part()}>{([label, value]) => <div class="flex justify-between gap-3"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
                   </div>
                 </div>
               </Show>
@@ -163,7 +163,7 @@ function SelectedElementPanel(): JSX.Element {
                   {t("cam.gen.op.stockFollows")}
                 </label>
                 <div class="grid grid-cols-2 gap-2 text-sm">
-                  <For each={stock()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
+                  <For each={stock()}>{([label, value]) => <div class="flex justify-between gap-3"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
                 </div>
               </div>
               <DepthBox />
@@ -447,7 +447,7 @@ export function OperationSection(): JSX.Element {
               <Show when={gen.settings.useAI && !gen.isAIProcessing}>
                 <button
                   type="button"
-                  class="absolute top-2 right-2 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                  class="absolute top-2 right-2 p-1.5 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
                   title={t("cam.generateAi")}
                   onClick={() => {
                     const s = gen.settings

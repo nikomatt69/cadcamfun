@@ -439,7 +439,7 @@ export default function CamPage(): JSX.Element {
           />
 
           <div
-            class="cam-workspace__stage flex-1 min-w-0 relative overflow-hidden rounded-2xl mx-2"
+            class="cam-workspace__stage flex-1 min-w-0 relative overflow-hidden rounded-lg mx-2"
           >
             <Show when={camStore.activeTab === "editor"}>
               <div class="h-full">
@@ -447,7 +447,7 @@ export default function CamPage(): JSX.Element {
               </div>
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
-              <div class="h-full rounded-xl">
+              <div class="h-full rounded-lg">
                 <ToolpathVisualizer
                   stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece}
                   playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1}

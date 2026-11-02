@@ -141,10 +141,10 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             title={t(gen.showFullscreen ? "cam.exitFullscreen" : "cam.fullscreen")}
             aria-label={t(gen.showFullscreen ? "cam.exitFullscreen" : "cam.fullscreen")}
           >
-            <Show when={gen.showFullscreen} fallback={<Maximize2 size={15} />}><Minimize2 size={15} /></Show>
+            <Show when={gen.showFullscreen} fallback={<Maximize2 size={14} />}><Minimize2 size={14} /></Show>
           </button>
           <button type="button" class="panel-icon-btn" title={t("cam.generator.helpTitle")} aria-label={t("cam.generator.helpTitle")} onClick={() => toast(t("cam.generator.help"))}>
-            <CircleHelp size={15} />
+            <CircleHelp size={14} />
           </button>
         </div>
       </header>
@@ -185,7 +185,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             </Show>
           </button>
           <Show when={running()}>
-            <p class="text-[10px] text-gray-500 text-center" data-testid="generate-progress" aria-live="polite">{progressLabel()}</p>
+            <p class="text-[11px] text-gray-500 text-center tabular-nums" data-testid="generate-progress" aria-live="polite">{progressLabel()}</p>
           </Show>
           <button type="button" onClick={saveAsToolpath} class="panel-btn panel-btn--block">
             <Save size={14} />{t("cam.generator.saveAsToolpath")}

@@ -61,7 +61,7 @@ export default function KernelSetups(props: {
               <p class="font-medium">{part.name}</p>
               <ol class="space-y-1">
                 <For each={plan().setups}>{(setup, index) => (
-                  <li class="flex items-start justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-1" data-testid="kernel-setups-item" data-orientation={setup.orientation}>
+                  <li class="flex items-start justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-2" data-testid="kernel-setups-item" data-orientation={setup.orientation}>
                     <span>
                       <strong>{index() + 1}. {setup.orientation}</strong>{" "}
                       {t("cam.setups.share", { percent: percent(setup.share) })}

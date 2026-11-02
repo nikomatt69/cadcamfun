@@ -220,7 +220,7 @@ export function PrintProfileSection(): JSX.Element {
           <CheckRow id="print-relative-e" checked={p().relativeExtrusion} onChange={(checked) => gen.setPrinter({ relativeExtrusion: checked })}>{t("cam.gen.pp.relativeE")}</CheckRow>
           <details>
             <summary class="panel-hint" style={{ cursor: "pointer" }}>{t("cam.gen.pp.startEnd")}</summary>
-            <div class="panel-group" style={{ "margin-top": "6px" }}>
+            <div class="panel-group" style={{ "margin-top": "8px" }}>
               <Field label={t("cad.field.start")} hint="Replaces the built-in block. {nozzle} {bed} {layer} are filled in.">
                 <textarea class={INPUT} rows="4" spellcheck={false} value={p().startGcode ?? ""} onChange={(event) => gen.setPrinter({ startGcode: event.currentTarget.value.trim() === "" ? undefined : event.currentTarget.value } as Partial<PrinterExtras>)} />
               </Field>

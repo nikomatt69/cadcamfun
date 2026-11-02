@@ -187,7 +187,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
   return (
     <div
       ref={container}
-      class="h-full w-full flex flex-col overflow-y-auto scrollbar-thin rounded-xl scrollbar-thumb-gray-300 scrollbar-track-transparent"
+      class="h-full w-full flex flex-col overflow-y-auto scrollbar-thin rounded-lg scrollbar-thumb-gray-300 scrollbar-track-transparent"
       style={{ "max-height": props.height || "800px" }}
     >
       <div class="relative flex-1" style={{ width: props.width, "min-height": "400px" }}>
@@ -257,7 +257,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
                 {stats().maxY.toFixed(2)}, Z: {stats().minZ.toFixed(2)} -{" "}
                 {stats().maxZ.toFixed(2)}
               </div>
-              <div class="flex space-x-4">
+              <div class="flex gap-4">
                 <div><span class="font-medium">{t("cam.gen.viewer.rapidsColon")}</span> {path().rapidMoves}</div>
                 <div><span class="font-medium">{t("cam.gen.viewer.linearColon")}</span> {path().linearMoves}</div>
                 <div><span class="font-medium">{t("cam.gen.viewer.circularColon")}</span> {path().circularMoves}</div>
@@ -278,20 +278,20 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
           <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">{t("cam.gen.viewer.analysis")}</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="p-3 bg-gray-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.totalPoints")}</p>
-              <p class="text-xl font-bold text-blue-600">{toolPath().length}</p>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("cam.gen.viewer.totalPoints")}</p>
+              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">{toolPath().length}</p>
             </div>
-            <div class="p-3 bg-blue-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.rapids")}</p>
-              <p class="text-xl font-bold text-blue-600">{path().rapidMoves}</p>
+            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("cam.gen.viewer.rapids")}</p>
+              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">{path().rapidMoves}</p>
             </div>
-            <div class="p-3 bg-green-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.linear")}</p>
-              <p class="text-xl font-bold text-green-600">{path().linearMoves}</p>
+            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("cam.gen.viewer.linear")}</p>
+              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">{path().linearMoves}</p>
             </div>
-            <div class="p-3 bg-purple-50 rounded-md">
-              <p class="text-sm font-medium text-gray-700">{t("cam.gen.viewer.circular")}</p>
-              <p class="text-xl font-bold text-purple-600">{path().circularMoves}</p>
+            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("cam.gen.viewer.circular")}</p>
+              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">{path().circularMoves}</p>
             </div>
           </div>
 

@@ -419,22 +419,22 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             </span>
           )}</Show>
           <Show when={(props.motion?.unsupported.length ?? 0) > 0}>
-            <span data-testid="partial-preview" role="status" class="px-2 py-1 rounded-lg bg-orange-600/80 text-white text-xs" title={props.motion!.unsupported.slice(0, 20).map((u) => `line ${u.line}: ${u.word}`).join("\n")}>
+            <span data-testid="partial-preview" role="status" class="px-2 py-1 rounded-lg bg-orange-600 text-white text-xs" title={props.motion!.unsupported.slice(0, 20).map((u) => `line ${u.line}: ${u.word}`).join("\n")}>
               {t("cam.visualizer.partialPreview", { count: props.motion!.unsupported.length })}
             </span>
           </Show>
         <button
           type="button"
-          class={`ml-auto rounded p-2 text-white ${settingsOpen() ? "bg-blue-600" : "bg-black/50 hover:bg-black/70"}`}
+          class={`ml-auto flex-none rounded-lg p-2 text-white ${settingsOpen() ? "bg-blue-600" : "bg-neutral-900 hover:bg-neutral-800"}`}
           aria-label={t("cam.visualizer.settings")}
           aria-expanded={settingsOpen()}
           onClick={() => { setOperationsOpen(false); setSettingsOpen((value) => !value) }}
         >
-          <Settings size={18} />
+          <Settings size={16} />
         </button>
         </div>
         <Show when={showStats()}>
-          <div class="toolpath-visualizer__stats rounded-lg bg-black/80 px-3 py-2 text-[11px] leading-5 text-slate-200" tabIndex={0} aria-label={t("cam.visualizer.showStats")} data-collapsed={statsCollapsed() ? "true" : "false"}>
+          <div class="toolpath-visualizer__stats rounded-lg bg-neutral-900 px-3 py-2 text-[11px] leading-5 text-slate-200" tabIndex={0} aria-label={t("cam.visualizer.showStats")} data-collapsed={statsCollapsed() ? "true" : "false"}>
             <button type="button" class="toolpath-visualizer__stats-head" aria-expanded={!statsCollapsed()} onClick={() => setStatsCollapsed(!statsCollapsed())}>
               <span>{t("cam.visualizer.showStats")}</span>{statsCollapsed() ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
             </button>

@@ -93,9 +93,9 @@ export function ToolSection(): JSX.Element {
       </div>
 
       <div class="p-3 bg-gray-50 rounded-md">
-        <div class="flex justify-between items-start">
+        <div class="flex justify-between items-start gap-3">
           <h4 class="text-sm font-medium text-gray-700 mb-2">{toolTitle(machine(), gen.settings.toolType)}</h4>
-          <div class="text-xs text-gray-500">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
+          <div class="flex-none text-xs text-gray-500">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
         </div>
         <div class="flex items-center">
           <div class="w-20 h-20 mr-4 flex-none bg-white rounded-md border border-gray-200 flex items-center justify-center">

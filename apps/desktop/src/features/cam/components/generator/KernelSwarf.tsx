@@ -63,7 +63,7 @@ export default function KernelSwarf(props: {
         <Show when={asked() && walls().length === 0}><p class="text-xs text-gray-500" data-testid="kernel-swarf-none">{t("cam.swarf.none")}</p></Show>
         <ul class="space-y-1">
           <For each={walls()}>{({ part, wall }) => (
-            <li class="flex items-center justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-1 text-xs" data-testid="kernel-swarf-wall" data-kind={wall.kind} data-face={wall.face}>
+            <li class="flex items-center justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-2 text-xs" data-testid="kernel-swarf-wall" data-kind={wall.kind} data-face={wall.face}>
               <span>{part}: {t(`cam.swarf.kind.${wall.kind}`)}, {wall.height.toFixed(1)} mm, {t("cam.swarf.lean", { degrees: wall.lean.toFixed(1) })}{wall.concaveRadius !== undefined ? ` · ${t("cam.swarf.concave", { radius: wall.concaveRadius.toFixed(1) })}` : ""}</span>
               <button type="button" class="ui-btn ui-btn-secondary" disabled={hint() !== undefined} onClick={() => add(wall)} data-testid="kernel-swarf-add">{t("cam.swarf.add")}</button>
             </li>

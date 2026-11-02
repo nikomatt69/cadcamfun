@@ -404,9 +404,9 @@ export function KernelOperationControls(): JSX.Element {
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
-                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={12} /></button>
-                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={12} /></button>
-                      <button type="button" class="rounded px-2 py-1 text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={12} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={14} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={14} /></button>
+                      <button type="button" class="rounded px-2 py-1 text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={14} /></button>
                     </span>
                   </div>
                   <div class="flex items-center gap-1">
@@ -471,7 +471,7 @@ export function KernelRunControls(): JSX.Element {
       <Show when={kernel.result()?.status === "failed" ? kernel.result() : undefined}>{(value) => <ul class="text-xs text-red-600" role="alert"><For each={value().status === "failed" ? (value() as Extract<CamKernelResult, { status: "failed" }>).issues : []}>{(issue) => <li>{issue.message}</li>}</For></ul>}</Show>
       <Show when={kernel.artifact()}>{(value) => (
         <div class="space-y-2 text-xs" data-testid="kernel-evidence">
-          <div class="flex justify-between font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
+          <div class="flex justify-between gap-3 font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
           <Show when={kernel.stale()}><p role="status" class="text-amber-600" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
           <p>{t("cam.kernel.summary", { operations: value().operations.length, tools: value().tools.length, seconds: value().cycleTimeSeconds.toFixed(1) })}</p>
           <button type="button" class="ui-btn ui-btn-secondary" data-testid="kernel-setup-sheet" onClick={() => {

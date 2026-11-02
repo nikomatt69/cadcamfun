@@ -5,7 +5,7 @@ import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorS
 import { Badge, CheckRow, Field, INPUT, NumberField, Section } from "./ui.tsx"
 import { t } from "../../../../i18n/index.ts"
 
-const BLUE = "#4B83F0"
+const BLUE = "var(--panel-accent)"
 
 /** "Cutting Parameters": pass depth, feeds, stepover, tool offset and direction (with their sketches) and live statistics. */
 export function CuttingSection(): JSX.Element {
@@ -82,13 +82,13 @@ export function CuttingSection(): JSX.Element {
           <div class="w-48 h-32 max-w-full relative">
             <svg width="100%" height="100%" viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
               <text x="120" y="30" text-anchor="middle" font-size="16" fill={BLUE}>{s().direction === "climb" ? "Concordant" : "Discordant"}</text>
-              <circle cx="80" cy="80" r="40" fill="none" stroke="#aaa" stroke-width="1" />
+              <circle cx="80" cy="80" r="40" fill="none" stroke="var(--panel-border-strong)" stroke-width="1" />
               <circle cx="80" cy="80" r={s().direction === "climb" ? "14" : "8"} fill={BLUE} />
               <Show when={s().direction === "climb"}>
                 <path d="M 80,80 Q 100,95 120,80" stroke={BLUE} stroke-width="2" fill="none" stroke-dasharray="4,3" />
                 <path d="M 115,77 L 120,80 L 115,83" fill="none" stroke={BLUE} stroke-width="2" />
               </Show>
-              <circle cx="160" cy="80" r="40" fill="none" stroke="#aaa" stroke-width="1" />
+              <circle cx="160" cy="80" r="40" fill="none" stroke="var(--panel-border-strong)" stroke-width="1" />
               <circle cx="160" cy="80" r={s().direction === "conventional" ? "14" : "8"} fill={BLUE} />
               <Show when={s().direction === "conventional"}>
                 <path d="M 160,80 Q 140,65 120,80" stroke={BLUE} stroke-width="2" fill="none" stroke-dasharray="4,3" />
