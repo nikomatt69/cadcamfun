@@ -629,5 +629,14 @@
   "costs.report.length": "طول مسار الأداة: {value}",
   "costs.report.wear": "تآكل الأداة: {value}",
   "costs.report.feed": "معدل التغذية: {value} مم/د",
-  "costs.report.end": "--- نهاية التقرير ---"
+  "costs.report.end": "--- نهاية التقرير ---",
+  "cad.display": "النمط المرئي",
+  "cad.display.shaded": "مظلل",
+  "cad.display.shaded-edges": "مظلل مع الحواف",
+  "cad.display.hidden-line": "الخطوط المخفية",
+  "cad.display.wireframe": "إطار سلكي",
+  "cad.display.xray": "أشعة سينية",
+  "cad.display.ghost": "شبحي",
+  "cad.invalid.title": "عناصر لا يمكن رسمها: {count}",
+  "cad.invalid.more": "و{count} أخرى"
 }

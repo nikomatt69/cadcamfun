@@ -629,5 +629,14 @@
   "costs.report.length": "Длина траектории: {value}",
   "costs.report.wear": "Износ инструмента: {value}",
   "costs.report.feed": "Подача: {value} мм/мин",
-  "costs.report.end": "--- Конец отчёта ---"
+  "costs.report.end": "--- Конец отчёта ---",
+  "cad.display": "Визуальный стиль",
+  "cad.display.shaded": "С закраской",
+  "cad.display.shaded-edges": "С закраской и рёбрами",
+  "cad.display.hidden-line": "Скрытые линии",
+  "cad.display.wireframe": "Каркас",
+  "cad.display.xray": "Рентген",
+  "cad.display.ghost": "Призрак",
+  "cad.invalid.title": "Элементы, которые нельзя отобразить: {count}",
+  "cad.invalid.more": "и ещё {count}"
 }

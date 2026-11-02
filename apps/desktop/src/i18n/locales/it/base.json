@@ -629,5 +629,14 @@
   "costs.report.length": "Lunghezza percorso: {value}",
   "costs.report.wear": "Usura utensile: {value}",
   "costs.report.feed": "Avanzamento: {value} mm/min",
-  "costs.report.end": "--- Fine report ---"
+  "costs.report.end": "--- Fine report ---",
+  "cad.display": "Stile visivo",
+  "cad.display.shaded": "Ombreggiato",
+  "cad.display.shaded-edges": "Ombreggiato con spigoli",
+  "cad.display.hidden-line": "Linee nascoste",
+  "cad.display.wireframe": "Wireframe",
+  "cad.display.xray": "Raggi X",
+  "cad.display.ghost": "Fantasma",
+  "cad.invalid.title": "Elementi che non si possono disegnare: {count}",
+  "cad.invalid.more": "e altri {count}"
 }

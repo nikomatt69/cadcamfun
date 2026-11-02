@@ -629,5 +629,14 @@
   "costs.report.length": "टूलपाथ लंबाई: {value}",
   "costs.report.wear": "उपकरण घिसाव: {value}",
   "costs.report.feed": "फ़ीड दर: {value} mm/min",
-  "costs.report.end": "--- रिपोर्ट समाप्त ---"
+  "costs.report.end": "--- रिपोर्ट समाप्त ---",
+  "cad.display": "विज़ुअल शैली",
+  "cad.display.shaded": "शेडेड",
+  "cad.display.shaded-edges": "किनारों के साथ शेडेड",
+  "cad.display.hidden-line": "छिपी रेखाएँ",
+  "cad.display.wireframe": "वायरफ़्रेम",
+  "cad.display.xray": "एक्स-रे",
+  "cad.display.ghost": "घोस्ट",
+  "cad.invalid.title": "जो तत्व नहीं बनाए जा सकते: {count}",
+  "cad.invalid.more": "और {count} अन्य"
 }

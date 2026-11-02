@@ -4,6 +4,7 @@ import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
 import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
 import { DEFAULT_EXPLODED_VIEW, type ExplodedViewState } from "../lib/exploded-view.ts";
+import { DEFAULT_DISPLAY_MODE, isDisplayMode, type DisplayMode } from "../lib/display-mode.ts";
 
 type ViewMode = "2d" | "3d";
 type OriginPreset =
@@ -109,6 +110,9 @@ interface CADState {
   /** The section view: a plane that cuts the model open at one point along an axis. */
   section: SectionState;
   setSection: (patch: Partial<SectionState>) => void;
+  /** How the canvas draws solids: shaded, with edges, hidden line, wireframe, x-ray or ghost (`lib/display-mode.ts`). */
+  displayMode: DisplayMode;
+  setDisplayMode: (mode: DisplayMode) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -116,6 +120,8 @@ interface CADState {
 
 export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
+  displayMode: DEFAULT_DISPLAY_MODE,
+  setDisplayMode: (mode) => set((state) => (isDisplayMode(mode) ? { displayMode: mode } : state)),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

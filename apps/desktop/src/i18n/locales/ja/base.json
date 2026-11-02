@@ -629,5 +629,14 @@
   "costs.report.length": "ツールパス長さ: {value}",
   "costs.report.wear": "工具摩耗: {value}",
   "costs.report.feed": "送り速度: {value} mm/min",
-  "costs.report.end": "--- レポート終わり ---"
+  "costs.report.end": "--- レポート終わり ---",
+  "cad.display": "表示スタイル",
+  "cad.display.shaded": "シェーディング",
+  "cad.display.shaded-edges": "エッジ付きシェーディング",
+  "cad.display.hidden-line": "隠線処理",
+  "cad.display.wireframe": "ワイヤーフレーム",
+  "cad.display.xray": "X線",
+  "cad.display.ghost": "ゴースト",
+  "cad.invalid.title": "描画できない要素: {count}",
+  "cad.invalid.more": "ほか {count} 件"
 }

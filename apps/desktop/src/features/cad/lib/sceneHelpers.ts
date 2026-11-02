@@ -8,6 +8,7 @@ import { useCADStore } from "../store/cadStore.ts"
 import { HISTORY_LIMIT, useElementsStore, type Element } from "../store/elementsStore.ts"
 import { GRID_COLORS } from "../../../viewport/adaptive-grid.ts"
 import { createThreeObject } from "./createThreeObject.ts"
+import { createInvalidMarker, invalidReason } from "./invalid-marker.ts"
 import { initializeElementTransform, premultiplyObject, rotationOf, type ElementTransformFields } from "./element-transform.ts"
 
 export const HOVER_COLOR = 0x4a90e2
@@ -112,10 +113,16 @@ export function applyHighlight(root: THREE.Object3D, state: HighlightState): voi
 
 export { applyElementTransform, type ElementTransformFields } from "./element-transform.ts"
 
-/** Builds the Three object of an element; `userData.pivot` is its centre in world space. */
+/**
+ * Builds the Three object of an element; `userData.pivot` is its centre in world space. An element that cannot be drawn (no
+ * geometry, a builder that throws) is never dropped silently: it becomes a red marker that carries the reason
+ * (`userData.isInvalidMarker`, `userData.invalidReason`), so a broken body is visible and selectable instead of a blank canvas.
+ */
 export function buildElementObject(element: Element, onEdgesReady?: () => void): THREE.Object3D | null {
-  const object = createThreeObject(element, undefined, onEdgesReady)
-  if (!object) return null
+  let failure: string | undefined
+  let drawn: THREE.Object3D | null = null
+  try { drawn = createThreeObject(element, undefined, onEdgesReady) } catch (error) { failure = error instanceof Error ? error.message : String(error) }
+  const object = drawn ?? createInvalidMarker(element as unknown as Record<string, unknown>, useCADStore.getState().originOffset, failure ?? invalidReason(element as unknown as Record<string, unknown>))
   initializeElementTransform(object, element as ElementTransformFields, useCADStore.getState().originOffset)
   object.userData.isCADElement = true
   object.userData.elementId = element.id

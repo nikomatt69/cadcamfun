@@ -35,9 +35,10 @@ import {
 import { booleanFormed } from "../lib/createThreeObject.ts"
 import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
+import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
-import { createSectionHelper } from "../lib/sectionHelper.ts"
+import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
 import DragDropIndicator from "./DragDropIndicator.tsx"
 import SelectionControls from "./SelectionControls.tsx"
@@ -218,6 +219,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [dropScreen, setDropScreen] = createSignal<{ x: number; y: number }>()
   const [memory, setMemory] = createSignal({ used: 0, total: 0, geometries: 0, textures: 0 })
   const [frame, setFrame] = createSignal(0)
+  /** The elements that have no geometry to draw: each is a red marker in the scene and a line in the banner. */
+  const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
   /** Every drawn object, in insertion order. */
@@ -579,6 +582,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     scene.add(createSectionHelper(section.axis, section.position, section.inverted, modelBox()))
     invalidate()
   })
+  // A closed solid cut open shows the inside of its far walls: the cut is filled flat, as in a section drawing. The caps depend on
+  // whether a section is on and on the parts, not on where the plane is, so dragging the slider does not rebuild them.
+  createEffect(() => {
+    rebuilds()
+    const on = cad.section.enabled
+    if (!ready() || !scene) return
+    const roots = cadObjects()
+    if (on) addSectionCaps(roots); else removeSectionCaps(roots)
+    // The caps are meshes under the parts: the visual style dresses them again.
+    for (const root of roots) root.userData.displayKey = undefined
+    invalidate()
+  })
   /** The extent of the model along the section axis: the slider's range. */
   const sectionRange = createMemo((): { min: number; max: number } => {
     rebuilds(); elements.elements
@@ -671,6 +686,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // The raycast list is a view of the map, refreshed here instead of being rebuilt on every hover query.
     visibleObjects = drawn
+    const broken = drawn.filter((object) => object.userData.isInvalidMarker === true)
+    if (broken.length > 0 || invalidItems().length > 0) {
+      setInvalidItems(broken.map((object) => {
+        const id = String(object.userData.elementId)
+        const element = all.find((candidate) => candidate.id === id) as { name?: string; type?: string } | undefined
+        return { id, name: element?.name || element?.type || id, reason: String(object.userData.invalidReason ?? "") }
+      }))
+    }
     setRebuilds((count) => count + 1)
     invalidate()
     props.onElementsChange?.(all)
@@ -688,6 +711,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     exploded.setTarget(enabled ? state.amount : 0, reducedMotion?.matches === true || cad.viewMode === "2d")
     setExplosionActive(exploded.active)
     invalidate()
+  })
+
+  // Visual style (shaded, edges, hidden line, wireframe, x-ray, ghost): presentation only, applied to the objects after every
+  // reconcile and when the mode, or in `ghost` the selection, changes. An object already in the asked look costs nothing.
+  createEffect(() => {
+    rebuilds()
+    const mode = cad.displayMode
+    cad.section.enabled
+    const selected = new Set(selectedIds())
+    if (!ready()) return
+    let changed = false
+    for (const [id, entry] of objectsById) {
+      if (applyDisplayMode(entry.object, mode, mode === "ghost" && selected.size > 0 && !selected.has(id))) changed = true
+    }
+    if (changed) invalidate()
   })
 
   // Hover / selection tint, applied to the delta only: moving the cursor between two parts must not
@@ -1291,6 +1329,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       {props.children}
 
+      <Show when={invalidItems().length > 0}>
+        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-red-900/90 px-3 py-2 text-xs text-white shadow-lg" role="alert" data-testid="invalid-elements">
+          <p class="font-semibold">{t("cad.invalid.title", { count: invalidItems().length })}</p>
+          <ul class="mt-1 space-y-0.5">
+            <For each={invalidItems().slice(0, 4)}>{(item) => (
+              <li><button type="button" class="text-left underline decoration-dotted" onClick={() => selection.selectElement(item.id)}>{item.name}</button>: {item.reason}</li>
+            )}</For>
+          </ul>
+          <Show when={invalidItems().length > 4}><p class="mt-1 opacity-80">{t("cad.invalid.more", { count: invalidItems().length - 4 })}</p></Show>
+        </div>
+      </Show>
+
       <div class="panel cad-viewport-top">
         <div class="cad-viewport-selection">
           <SelectionControls
@@ -1424,6 +1474,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
       {props.footerDock}
+      <div class="cad-viewport-footer__section" data-testid="display-mode-control">
+        <select class="rounded-md bg-gray-800 px-1.5 py-1 text-[11px] text-white" aria-label={t("cad.display")} title={t("cad.display")} value={cad.displayMode}
+          onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
+          <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
+        </select>
+      </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button
           type="button"
