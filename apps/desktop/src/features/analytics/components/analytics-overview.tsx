@@ -86,7 +86,7 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
       case "project": return <FileText class={`${iconClass} text-blue-500`} />
       case "component": return <Database class={`${iconClass} text-green-500`} />
       case "tool": return <Wrench class={`${iconClass} text-orange-500`} />
-      case "page_view": return <Eye class={`${iconClass} text-purple-500`} />
+      case "page_view": return <Eye class={`${iconClass} text-gray-500`} />
       default: return <Activity class={`${iconClass} text-gray-500`} />
     }
   }
@@ -107,27 +107,27 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
 
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             <StatCard title={t("admin.analytics.totalActivity")} value={totalActivityCount()}
-              icon={<Activity class={`${bigIcon} text-blue-500`} />} />
+              icon={<Activity class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.activeUsers")} value={0}
-              icon={<Users class={`${bigIcon} text-green-500`} />} />
+              icon={<Users class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <Show when={props.isAdmin}>
               <StatCard title={t("admin.analytics.totalUsers")} value={0}
-                icon={<Users class={`${bigIcon} text-purple-500`} />} />
+                icon={<Users class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             </Show>
             <StatCard title={t("admin.analytics.pageViews")} value={byType().get("page_view") ?? 0}
-              icon={<Eye class={`${bigIcon} text-indigo-500`} />} />
+              icon={<Eye class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.aiRequests")} value={summary()?.totalAiRequests ?? "N/A"}
-              icon={<Zap class={`${bigIcon} text-yellow-500`} />} />
+              icon={<Zap class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.cadDrawings")} value={summary()?.totalCadDrawings ?? "N/A"}
-              icon={<FileText class={`${bigIcon} text-cyan-500`} />} />
+              icon={<FileText class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.storage")} value={summary()?.totalStorageUsage ?? "N/A"}
-              icon={<HardDrive class={`${bigIcon} text-red-500`} />} />
+              icon={<HardDrive class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.projects")} value={summary()?.totalProjects ?? "N/A"}
-              icon={<Folder class={`${bigIcon} text-blue-600`} />} />
+              icon={<Folder class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.components")} value={summary()?.totalComponents ?? "N/A"}
-              icon={<Grid class={`${bigIcon} text-green-600`} />} />
+              icon={<Grid class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
             <StatCard title={t("admin.analytics.toolpaths")} value={summary()?.totalToolpaths ?? "N/A"}
-              icon={<GitMerge class={`${bigIcon} text-purple-600`} />} />
+              icon={<GitMerge class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
           </div>
 
           <Show when={byType().size > 0}>

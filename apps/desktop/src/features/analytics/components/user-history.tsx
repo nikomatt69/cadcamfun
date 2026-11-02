@@ -5,9 +5,10 @@
  * The legacy hook keeps `limit`/`offset` inside the same filter object, so changing a
  * filter after paging keeps the offset; that is preserved here on purpose.
  */
+import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
-import { Activity, Calendar, ChevronDown, Filter } from "lucide-solid"
+import { Calendar, ChevronDown, Filter } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useKeyedRead } from "../../../app/queries.ts"
 
@@ -216,7 +217,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
           fallback={
             <Show when={loading() && logs().length === 0} fallback={
               <div class="p-6 text-center">
-                <Activity class="mx-auto mb-2 h-12 w-12 text-gray-400" />
+                <div class="mx-auto mb-3 max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TrendPreview /></div>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white">{t("history.empty")}</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-300">
                   {filters().itemTypes.length > 0 || filters().actions.length > 0 || filters().startDate || filters().endDate

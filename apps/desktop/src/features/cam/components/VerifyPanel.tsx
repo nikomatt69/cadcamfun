@@ -6,6 +6,7 @@
  * the holder the user fills in, and draws the verdict: errors first, the numbers, and the remaining stock
  * as a height map with gouges in red. Nothing is checked that was not modelled, and the panel says so.
  */
+import { VerifyPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createEffect, type JSX } from "solid-js"
 import { AlertTriangle, Check, Sparkles } from "lucide-solid"
 import { cam as camCore } from "@cadcamfun/core"
@@ -103,7 +104,10 @@ export default function VerifyPanel(): JSX.Element {
       >
         {verify.running ? t("cam.verify.running") : t("cam.verify.run")}
       </button>
-      <Show when={cam.gcode.trim().length === 0}><p class="text-xs text-gray-500">{t("cam.verify.empty")}</p></Show>
+      <Show when={cam.gcode.trim().length === 0}>
+        <div class="overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><VerifyPreview /></div>
+        <p class="text-xs text-gray-500">{t("cam.verify.empty")}</p>
+      </Show>
 
       <Show when={verify.error}>
         <div class="p-3 bg-red-50 rounded-md flex items-start" role="alert">

@@ -27,9 +27,15 @@ import {
   Save,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Upload,
-  Wand2,
+  Route,
+  Frame,
+  Spline,
+  Waves,
+  Orbit,
+  Rotate3d,
+  Cylinder,
+  Drill,
   Wrench // i18n-ok icon import
 } from "lucide-solid"
 import { useGeneratorStore } from "../store/generatorStore.ts"
@@ -154,7 +160,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             titleKey: "cam.ribbon.group.workbench",
             actions: [
               { id: "editor", labelKey: "cam.ribbon.editor", icon: (s, k) => <Cog size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("editor") },
-              { id: "toolpath", labelKey: "cam.ribbon.toolpath", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("toolpath") }
+              { id: "toolpath", labelKey: "cam.ribbon.toolpath", icon: (s, k) => <Route size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("toolpath") }
             ]
           }
         ]
@@ -184,7 +190,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
               { id: "print-support", labelKey: "cam.strategy.printSupport", icon: (s, k) => <Cog size={s} class={k} />, accent: "red", onClick: () => pickOperation("support") },
               { id: "print-solid", labelKey: "cam.strategy.printInfill", icon: (s, k) => <Library size={s} class={k} />, accent: "red", onClick: () => pickOperation("infill") },
               { id: "print-raft", labelKey: "cam.strategy.printRaft", icon: (s, k) => <Layers size={s} class={k} />, accent: "red", onClick: () => pickOperation("raft") },
-              { id: "print-brim", labelKey: "cam.strategy.printBrim", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "red", onClick: () => pickOperation("brim") }
+              { id: "print-brim", labelKey: "cam.strategy.printBrim", icon: (s, k) => <Frame size={s} class={k} />, accent: "red", onClick: () => pickOperation("brim") }
             ]
           }]
         }
@@ -192,11 +198,11 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {
             titleKey: "cam.ribbon.group.profiling",
             actions: [
-              { id: "strategy-contour", labelKey: "cam.strategy.contour", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "blue", onClick: () => pickOperation("contour") },
+              { id: "strategy-contour", labelKey: "cam.strategy.contour", icon: (s, k) => <Spline size={s} class={k} />, accent: "blue", onClick: () => pickOperation("contour") },
               { id: "strategy-pocket", labelKey: "cam.strategy.pocket", icon: (s, k) => <Box size={s} class={k} />, accent: "blue", onClick: () => pickOperation("pocket") },
               { id: "strategy-face", labelKey: "cam.strategy.face", icon: (s, k) => <Library size={s} class={k} />, accent: "blue", onClick: () => pickOperation("face") },
-              { id: "strategy-drill", labelKey: "cam.strategy.drill", icon: (s, k) => <Cog size={s} class={k} />, accent: "cyan", onClick: () => pickOperation("drill") },
-              { id: "strategy-thread", labelKey: "cam.strategy.threadMilling", icon: (s, k) => <Sparkles size={s} class={k} />, accent: "blue", onClick: () => pickOperation("thread-milling") }
+              { id: "strategy-drill", labelKey: "cam.strategy.drill", icon: (s, k) => <Drill size={s} class={k} />, accent: "cyan", onClick: () => pickOperation("drill") },
+              { id: "strategy-thread", labelKey: "cam.strategy.threadMilling", icon: (s, k) => <Cog size={s} class={k} />, accent: "blue", onClick: () => pickOperation("thread-milling") }
             ]
           },
           {
@@ -204,7 +210,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             actions: [
               { id: "strategy-zlevel", labelKey: "cam.strategy.zLevelRough", icon: (s, k) => <Layers size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface") },
               { id: "strategy-parallel", labelKey: "cam.strategy.parallel", icon: (s, k) => <Library size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface_parallel") },
-              { id: "strategy-waterline", labelKey: "cam.strategy.waterline", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface_waterline") },
+              { id: "strategy-waterline", labelKey: "cam.strategy.waterline", icon: (s, k) => <Waves size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface_waterline") },
               { id: "strategy-adaptive", labelKey: "cam.strategy.adaptive", icon: (s, k) => <Cog size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface_adaptive") },
               { id: "strategy-rest", labelKey: "cam.strategy.rest", icon: (s, k) => <Cog size={s} class={k} />, accent: "purple", onClick: () => pickOperation("3d_surface_rest") }
             ]
@@ -214,17 +220,17 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             actions: [
               { id: "strategy-32", labelKey: "cam.strategy.index32", icon: (s, k) => <Box size={s} class={k} />, accent: "amber", onClick: () => pickOperation("index_3_2") },
               { id: "strategy-4", labelKey: "cam.strategy.axis4", icon: (s, k) => <Layers size={s} class={k} />, accent: "amber", onClick: () => pickOperation("axis_4") },
-              { id: "strategy-5swarf", labelKey: "cam.strategy.axis5Swarf", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "amber", onClick: () => pickOperation("axis_5_swarf") },
-              { id: "strategy-5sim", labelKey: "cam.strategy.axis5Sim", icon: (s, k) => <Sparkles size={s} class={k} />, accent: "amber", onClick: () => pickOperation("axis_5_sim") }
+              { id: "strategy-5swarf", labelKey: "cam.strategy.axis5Swarf", icon: (s, k) => <Orbit size={s} class={k} />, accent: "amber", onClick: () => pickOperation("axis_5_swarf") },
+              { id: "strategy-5sim", labelKey: "cam.strategy.axis5Sim", icon: (s, k) => <Rotate3d size={s} class={k} />, accent: "amber", onClick: () => pickOperation("axis_5_sim") }
             ]
           },
           {
             titleKey: "cam.ribbon.group.lathe",
             actions: [
               { id: "strategy-facing", labelKey: "cam.strategy.facing", icon: (s, k) => <Box size={s} class={k} />, accent: "orange", onClick: () => pickOperation("facing") },
-              { id: "strategy-turning", labelKey: "cam.strategy.turningOD", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "orange", onClick: () => pickOperation("turning") },
+              { id: "strategy-turning", labelKey: "cam.strategy.turningOD", icon: (s, k) => <Cylinder size={s} class={k} />, accent: "orange", onClick: () => pickOperation("turning") },
               { id: "strategy-boring", labelKey: "cam.strategy.turningID", icon: (s, k) => <Cog size={s} class={k} />, accent: "orange", onClick: () => pickOperation("boring") },
-              { id: "strategy-threading", labelKey: "cam.strategy.threadingOD", icon: (s, k) => <Sparkles size={s} class={k} />, accent: "orange", onClick: () => pickOperation("threading") },
+              { id: "strategy-threading", labelKey: "cam.strategy.threadingOD", icon: (s, k) => <Cog size={s} class={k} />, accent: "orange", onClick: () => pickOperation("threading") },
               { id: "strategy-parting", labelKey: "cam.strategy.parting", icon: (s, k) => <Layers size={s} class={k} />, accent: "orange", onClick: () => pickOperation("parting") }
             ]
           }

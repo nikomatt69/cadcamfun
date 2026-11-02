@@ -192,7 +192,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
             <button
               onClick={downloadCombinedGCode}
               disabled={stats().generatedToolpaths === 0}
-              class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Download size={16} />
               {t("cam.multi.downloadGcode")}

@@ -1,0 +1,58 @@
+/* CAM-side scenes (scenes-cam.tsx). Scoped under `.ss-stage`; tokens come from stage.css. */
+
+/* ── Verify ─────────────────────────────────────────────────────────────── */
+.ss-stage .vf-cut {
+  fill: var(--ss-surface-inset);
+  stroke: var(--ss-line);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+.ss-stage .vf-cut[data-on="true"] { transform: scaleX(1); transition: transform 2.4s linear; }
+.ss-stage .vf-cut[data-on="false"] { transition: none; }
+.ss-stage .vf-tool {
+  position: absolute;
+  left: 42px;
+  top: 68px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ss-accent);
+  box-shadow: 0 0 0 3px var(--ss-accent-soft), 0 1px 3px rgb(0 0 0 / 0.25);
+  opacity: 0;
+}
+.ss-stage .vf-tool[data-on="true"] { opacity: 1; transform: translateX(264px); transition: transform 2.4s linear, opacity 0.2s ease; }
+.ss-stage .vf-tool[data-on="false"] { transition: none; }
+
+/* ── Cost ───────────────────────────────────────────────────────────────── */
+.ss-stage .cost-btn { position: absolute; margin: 0; }
+.ss-stage .cost-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ss-stage .cost-bar[data-on="true"] { transform: scaleY(1); }
+.ss-stage .cost-bar[data-tone="a"] { fill: var(--ss-accent); }
+.ss-stage .cost-bar[data-tone="b"] { fill: var(--ss-text-faint); }
+.ss-stage .cost-bar[data-tone="c"] { fill: var(--ss-line-strong); }
+
+/* ── Trend ──────────────────────────────────────────────────────────────── */
+.ss-stage .trend-line {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.ss-stage .trend-line[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.ss-stage .trend-line[data-on="false"] { transition: none; }
+.ss-stage .trend-area { fill: var(--ss-accent-soft); opacity: 0; transition: opacity 0.6s ease 1s; }
+.ss-stage .trend-area[data-on="true"] { opacity: 0.7; }
+.ss-stage .trend-hair { stroke: var(--ss-line-strong); stroke-width: 1; opacity: 0; transition: opacity 0.25s ease; }
+.ss-stage .trend-hair[data-on="true"] { opacity: 1; }
+.ss-stage .trend-dot { fill: var(--ss-accent); stroke: var(--ss-surface); stroke-width: 2; opacity: 0; transition: opacity 0.25s ease; }
+.ss-stage .trend-dot[data-on="true"] { opacity: 1; }

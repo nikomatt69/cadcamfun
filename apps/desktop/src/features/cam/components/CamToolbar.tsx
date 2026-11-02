@@ -112,7 +112,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <A
             href="/cad"
-            class="btn btn-sm flex items-center bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 border-0 shadow-md"
+            class="btn btn-sm flex items-center bg-blue-600 text-white hover:bg-blue-700 border-0"
             title={t("cam.switchCad")}
           >
             <Grid3x3 size={16} class="mr-1" />

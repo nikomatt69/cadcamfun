@@ -201,3 +201,8 @@
     font-size: 12px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-animation, .fade-in, .slide-in-right { animation: none; }
+  .ai-agent-panel { transition: none; }
+}

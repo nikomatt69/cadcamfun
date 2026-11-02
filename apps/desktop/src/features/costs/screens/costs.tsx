@@ -2,12 +2,12 @@
  * Costs screen (`/costs`): pick a toolpath, calculate the estimate on the sidecar, show
  * the breakdown and optionally save it.
  */
+import { CostPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
-import { DollarSign } from "lucide-solid"
-import { FIELD, PANEL, RAIL_LABEL, StageEmpty, StageError, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { FIELD, PANEL, RAIL_LABEL, StageError, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 import { Toast, formatDate } from "../../../shared/components/screen-parts.tsx"
 
 // Passed as an expression on purpose: the compiler would otherwise emit a bare `value` attribute that test DOMs mis-parse.
@@ -71,7 +71,7 @@ export function CostsScreen(): JSX.Element {
     <div class="grid content-start gap-4">
       <Toast message={notice()} />
       <Show when={error()}><StageError message={`${t("costs.error")}: ${error()}`} /></Show>
-      <Show when={result()} fallback={<StageEmpty icon={<DollarSign size={24} aria-hidden="true" />} title={t("costs.result")} hint={t("costs.empty")} />}>{(r) =>
+      <Show when={result()} fallback={<div class="workspace-empty"><div class="workspace-empty__preview"><CostPreview /></div><h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h3><p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("costs.empty")}</p></div>}>{(r) =>
         <article class={PANEL} aria-label={t("costs.result")}>
           <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h2>
           <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">

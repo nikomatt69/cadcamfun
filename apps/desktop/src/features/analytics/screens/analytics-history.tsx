@@ -50,11 +50,11 @@ export function AnalyticsHistoryScreen(): JSX.Element {
   const statCards = (): readonly StatCard[] => {
     const fields = legacy()
     return [
-      { key: "total", label: t("history.total"), caption: t("history.allTime"), accent: "text-blue-500", Icon: Activity,
+      { key: "total", label: t("history.total"), caption: t("history.allTime"), accent: "text-slate-500 dark:text-slate-400", Icon: Activity,
         value: (fields.totalActivities ?? 0).toLocaleString() },
-      { key: "week", label: t("history.week"), caption: t("history.last7"), accent: "text-green-500", Icon: Calendar,
+      { key: "week", label: t("history.week"), caption: t("history.last7"), accent: "text-slate-500 dark:text-slate-400", Icon: Calendar,
         value: (fields.thisWeekActivities ?? 0).toLocaleString() },
-      { key: "daily", label: t("history.average"), caption: t("history.perDay"), accent: "text-purple-500", Icon: TrendingUp,
+      { key: "daily", label: t("history.average"), caption: t("history.perDay"), accent: "text-slate-500 dark:text-slate-400", Icon: TrendingUp,
         value: String(Math.round(fields.avgDailyActivities ?? 0)) }
     ]
   }
@@ -112,7 +112,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
 
         <div class={`${PANEL} !p-0 overflow-hidden`}>
           <div class="border-b border-slate-200/50 p-5 dark:border-slate-700/50">
-            <h3 class="flex items-center gap-2 text-lg font-medium text-slate-800 dark:text-gray-200"><Activity size={18} class="text-indigo-500" aria-hidden="true" />{t("history.timeline")}</h3>
+            <h3 class="flex items-center gap-2 text-lg font-medium text-slate-800 dark:text-gray-200"><Activity size={18} class="text-slate-500 dark:text-slate-400" aria-hidden="true" />{t("history.timeline")}</h3>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {selectedFilter() === "all" ? t("history.allActivities") : t("history.filteredBy", { key: selectedFilter().toUpperCase() })}
             </p>

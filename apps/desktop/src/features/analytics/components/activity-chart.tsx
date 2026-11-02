@@ -6,6 +6,7 @@
  * integer y ticks, rounded bars) and the same colours/metric labels. Data is the same
  * `GET /api/analytics/user-metrics` → `chartData` series.
  */
+import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createMemo, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { AlertCircle, Loader } from "lucide-solid"
@@ -122,7 +123,8 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
         <Show
           when={data().length > 0}
           fallback={
-            <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+            <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+              <div class="w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TrendPreview /></div>
               <p class="text-sm text-gray-500 dark:text-gray-400">{t("admin.chart.empty")}</p>
             </div>
           }
