@@ -39,7 +39,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 ## Parameters
 
 - Fusion's Change Parameters is `parameters`: numbers or expressions (`"half": "width / 2"`, `"pitch": "wire * 2.5"`, units mm cm m in deg rad, functions sin cos sqrt min max ...). Name them for what they mean, not "d1".
-- Change a size later with `cad_edit` `parametric_update`; try variants first with `cad` `parametric_test` (nothing is written). A shape's measures are also reachable one by one (width, diameter, radius, length, angle).
+- Change a size later with `cad_edit` `parametric_update` (existing parameters). To parameterise a part that has literal numbers, or to add a parameter or a feature to a stored part, use `parametric_edit`: `cad` `parametric_inspect` lists each feature's dimension paths, then `set_parameter` + `set_dimension` bind a dimension to a name or an expression (`"value": "plate_t / 2"`), `insert_feature` / `replace_feature` / `remove_feature` change the timeline, and one failing edit refuses the whole list. Try variants first with `cad` `parametric_test` (nothing is written). A shape's measures are also reachable one by one (width, diameter, radius, length, angle).
 
 ## What is not there
 

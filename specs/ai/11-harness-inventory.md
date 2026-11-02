@@ -259,7 +259,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/nikcli/prompts/basics.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3048 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/compaction.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2565 | nikcli-host.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/diagnostician.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3021 | prompt-corpus.test.ts |
-| `packages/ai/src/nikcli/prompts/editor.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1896 | ai-specialists.test.ts, auto-mode.test.ts, prompt-corpus.test.ts, specialists-host.test.ts, tool-definitions.test.ts |
+| `packages/ai/src/nikcli/prompts/editor.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2014 | ai-specialists.test.ts, auto-mode.test.ts, prompt-corpus.test.ts, specialists-host.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/nikcli/prompts/machinist.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 5986 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/memory.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 631 | prompt-corpus.test.ts |
 | `packages/ai/src/nikcli/prompts/modeler.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 6130 | fusion-modelling.test.ts, prompt-corpus.test.ts |
@@ -333,8 +333,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `plugin-authoring` | dev | 1659 | — |
 | `cad-naming` | cad | 2763 | cad, cad_edit, parts |
 | `cad-workflow` | cad | 5271 | cad, cad_edit, parts |
-| `parametric-design` | cad | 7693 | cad, cad_edit, parts, vcs_edit |
-| `fusion-360-modelling` | cad | 14816 | cad, cad_edit, cam, parts |
+| `parametric-design` | cad | 8513 | cad, cad_edit, parts, vcs_edit |
+| `fusion-360-modelling` | cad | 15261 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 7046 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |

@@ -45,10 +45,10 @@ export const PROMPT_BUDGETS = {
   system: 13_000,
   /** One mode, one family style or one specialist prompt. */
   staticEntry: 10_000,
-  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. */
-  descriptions: 35_000,
-  /** One tool description. */
-  description: 4_000,
+  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. Raised to 35 600 when cad_edit parametric_edit (structural edits of a stored part) joined. */
+  descriptions: 35_600,
+  /** One tool description (4 400, in step with tool-prompts.test.ts: cad and cad_edit carry the whole parametric surface). */
+  description: 4_400,
   /** One skill body. */
   skill: 17_000,
   /** All skill descriptions together (the `skill` tool lists them on every request). */
