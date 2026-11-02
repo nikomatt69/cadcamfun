@@ -79,6 +79,27 @@ describe("dimension fields", () => {
     dispose()
   }, 60_000)
 
+  test("undo and redo restore the history and the field follows the stored value", async () => {
+    const { id, dispose } = mountPanel(plateTemplate())
+    await tick()
+    await change("plate depth", "9")
+    expect(stored(id).features.find((f) => f.id === "plate")).toMatchObject({ depth: 9 })
+    await change("Parameter thick", "12")
+    expect(stored(id).parameters["thick"]).toBe(12)
+    useElementsStore.getState().undo()
+    await tick()
+    expect(stored(id).parameters["thick"]).toBe(8)
+    expect(field("Parameter thick").value).toBe("8")
+    useElementsStore.getState().undo()
+    await tick()
+    expect(stored(id).features.find((f) => f.id === "plate")).toMatchObject({ depth: "thick" })
+    expect(field("plate depth").value).toBe("thick")
+    useElementsStore.getState().redo()
+    await tick()
+    expect(field("plate depth").value).toBe("9")
+    dispose()
+  }, 60_000)
+
   test("an angle field in degrees reads 45° as 45, not as radians", async () => {
     const h: History = { ...plateTemplate(), features: plateTemplate().features.map((f) => (f.id === "plate" && f.type === "extrude" ? { ...f, taper: 0 } : f)) }
     const { id, dispose } = mountPanel(h)

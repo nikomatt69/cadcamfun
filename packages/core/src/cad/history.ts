@@ -909,6 +909,9 @@ export const cornersOf = (line: ReadonlyArray<Vec2>): Vec2[] => {
   })
 }
 
+/** The message of a feature that found no body to act on. */
+const NO_BODY = "There is no body for this operation to act on"
+
 /** Replays the history from the top. Never throws: what cannot be built is in `issues`. */
 export const rebuild = (history: History): RebuildResult => {
   const issues: Issue[] = []
@@ -967,7 +970,7 @@ export const rebuild = (history: History): RebuildResult => {
   const apply = (feature: string, tool: Mesh, operation: Operation, targets: ReadonlyArray<string> | undefined, label: string): void => {
     if (operation === "new") { bodies.push({ id: label, mesh: tool, feature }); return }
     const chosen = bodies.filter((b) => targets === undefined || targets.includes(b.id))
-    if (chosen.length === 0) { issues.push({ feature, severity: "error", message: "There is no body for this operation to act on" }); return }
+    if (chosen.length === 0) { issues.push({ feature, severity: "error", message: NO_BODY }); return }
     if (operation === "union") {
       const merged = chosen.reduce((acc, b) => booleanMesh(b.mesh, acc, "union"), tool)
       const first = bodies.indexOf(chosen[0]!)
@@ -1298,7 +1301,7 @@ export const rebuild = (history: History): RebuildResult => {
             ...(within !== undefined ? { within: { min: within.min as [number, number, number], max: within.max as [number, number, number] } } : {})
           }
           const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
-          if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body for this operation to act on" }); break }
+          if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: NO_BODY }); break }
           let blended = 0
           let nativeAttempts = 0
           // A fillet that does not fit every selected edge fails as a whole (spec 58 T5): the bodies are put back as they were.
@@ -1986,6 +1989,16 @@ export const rebuild = (history: History): RebuildResult => {
               : `'${f.id}' removes no material: its tool does not overlap the bodies it cuts. Check its position and the bodies it targets.`
           })
         }
+      }
+      // A feature that only fails because the body it acts on was never built (an earlier feature failed) is skipped, not failed: it names no
+      // body, so the declared needs above could not see it, but the cause is that earlier failure and the person should fix that one.
+      const own = issues.slice(issuesBefore).filter((i) => i.severity === "error")
+      const root = broken.values().next().value
+      if (failed && root !== undefined && own.length > 0 && own.every((i) => i.message === NO_BODY)) {
+        issues.splice(issuesBefore, issues.length - issuesBefore, { feature: f.id, severity: "error", message: `Not built: there is no body for it to act on because '${root}' failed` })
+        states[f.id] = { state: "skipped", by: root }
+        broken.set(f.id, root)
+        continue
       }
       states[f.id] = { state: failed ? "failed" : "ok" }
       if (failed) broken.set(f.id, f.id)

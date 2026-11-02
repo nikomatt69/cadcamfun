@@ -8,7 +8,7 @@ import { historyVolume, rebuild, type Feature, type History } from "./history.ts
 import {
   activateConfiguration, addConfiguration, compareConfigurations, configurationHistory, designTable, removeConfiguration, renameConfiguration, setConfigurationSuppressed, setConfigurationValue, syncConfiguration
 } from "./history-config.ts"
-import { parameterProblem, removeFeature, removalImpact, removeParameter, renameParameter, setParameter, plateTemplate } from "./history-edit.ts"
+import { parameterProblem, removeFeature, setDimension, removalImpact, removeParameter, renameParameter, setParameter, plateTemplate } from "./history-edit.ts"
 import { groupFeatures } from "./history-edit.ts"
 import { withRollback, withSuppressed } from "./history-timeline.ts"
 import { parameterTable, setParameterNote } from "./parameter-table.ts"
@@ -319,6 +319,28 @@ describe("configurations", () => {
   })
 })
 
+describe("failure reporting", () => {
+  test("a feature that acts on a body that was never built is skipped by the failure, not failed itself", () => {
+    const h = setDimension(plateTemplate(), "plate", "depth", "thick / 0")
+    const built = rebuild(h)
+    expect(built.states["plate"]).toEqual({ state: "failed" })
+    expect(built.states["hole1"]).toEqual({ state: "skipped", by: "plate" })
+    expect(built.issues.find((i) => i.feature === "hole1")?.message).toContain("because 'plate' failed")
+    // Without an earlier failure the same message stays a failure of that feature.
+    const orphan = rebuild({ ...plateTemplate(), features: [plateTemplate().features[2]!] })
+    expect(orphan.states["hole1"]).toEqual({ state: "failed" })
+  })
+
+  test("a dimension that uses a failed parameter says which one and why, once", () => {
+    const h = { ...plateTemplate(), parameters: { ...plateTemplate().parameters, hole: "nope + 1" } }
+    const built = rebuild(h)
+    const message = built.issues.find((i) => i.feature === "hole1")?.message ?? ""
+    expect(message).toContain("Parameter 'hole' failed: Unknown parameter 'nope'")
+    expect(message.match(/\(at /g)?.length).toBe(1)
+    expect(built.states["plate"]).toEqual({ state: "ok" })
+  })
+})
+
 describe("parameter table", () => {
   test("rows carry value, kind, dependencies, users, comments and unit warnings", () => {
     let h = plateTemplate()
@@ -329,7 +351,7 @@ describe("parameter table", () => {
     h = setParameterNote(h, "width", { comment: "overall X", kind: "length", favorite: true })
     const rows = Object.fromEntries(parameterTable(h).map((r) => [r.name, r]))
     expect(rows["width"]).toMatchObject({ value: 60, kind: "length", declared: true, comment: "overall X", favorite: true })
-    expect(rows["width"]!.usedBy.parameters.sort()).toEqual(["bad", "half", "ratio"])
+    expect([...rows["width"]!.usedBy.parameters].sort()).toEqual(["bad", "half", "ratio"])
     expect(rows["width"]!.usedBy.features).toContain("sketch1")
     expect(rows["half"]).toMatchObject({ value: 30, kind: "length", dependsOn: ["width"] })
     expect(rows["tilt"]).toMatchObject({ kind: "angle" })
