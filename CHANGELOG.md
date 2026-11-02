@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.59 (November 2026)
+
+## Desktop
+
+- Screenshot and video buttons in the CAD canvas and the CAM preview
+
 ## v0.1.58 (November 2026)
 
 - No notable changes
