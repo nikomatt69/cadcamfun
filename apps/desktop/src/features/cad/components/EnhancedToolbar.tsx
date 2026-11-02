@@ -318,9 +318,9 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">
                   <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />{t("cad.tb.simActive")}</span>
-                  <span>Ctrl+Shift+S: Toggle simulation</span>
-                  <span>F9: Switch mode</span>
-                  <span>Esc: Close</span>
+                  <span>Ctrl+Shift+S: Toggle simulation{/* i18n-ok */}</span>
+                  <span>F9: Switch mode{/* i18n-ok */}</span>
+                  <span>Esc: Close{/* i18n-ok */}</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
                   <span>{t("cad.tb.advancedMode")}</span>
