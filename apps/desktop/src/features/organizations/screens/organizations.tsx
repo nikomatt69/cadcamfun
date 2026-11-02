@@ -240,7 +240,7 @@ export function OrganizationDetailScreen(): JSX.Element {
     >
       <Show when={detail.data() !== undefined || !detail.loading()} fallback={<StageLoading label={t("common.loading")} />}>
         <Show when={detail.data()} fallback={
-          <StageEmpty icon={<Building size={22} aria-hidden="true" />} title={t("org.notFound.title")} hint={t("org.notFound.body")}>
+          <StageEmpty icon={<Building size={22} aria-hidden="true" />} preview="lost" title={t("org.notFound.title")} hint={t("org.notFound.body")}>
             <A href="/profile" class={TOOLBAR_BUTTON}>{t("org.notFound.back")}</A>
           </StageEmpty>
         }>

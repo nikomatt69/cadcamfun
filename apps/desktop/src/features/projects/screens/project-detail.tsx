@@ -205,7 +205,7 @@ export function ProjectDetailScreen(): JSX.Element {
 
         <Show when={!loading()} fallback={<StageLoading label={t("pages.loading.project.details")} />}>
           <Show when={project()} fallback={
-            <StageEmpty icon={<File size={22} />} title={t("pages.project.not.found")} hint={t("pages.the.project.you.are.looking.for.doesn.t.exist.or.you.don.t.have.access.to.it")}>
+            <StageEmpty icon={<File size={22} />} preview="lost" title={t("pages.project.not.found")} hint={t("pages.the.project.you.are.looking.for.doesn.t.exist.or.you.don.t.have.access.to.it")}>
               <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate("/projects")}>{t("pages.back.to.projects")}</button>
             </StageEmpty>
           }>

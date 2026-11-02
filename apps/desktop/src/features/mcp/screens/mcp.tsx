@@ -14,6 +14,7 @@ import { useKeyedRead, useRead } from "../../../app/queries.ts"
 import { t } from "../../../i18n/index.ts"
 import { McpLoading, McpServerForm, legacyFailure, legacyRead, serversFrom, type McpServerCard } from "../components/mcp.tsx"
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { ConnectPreview } from "../../../shared/ui/stageshow/index.ts"
 import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 /** Legacy red banner with the dismiss button. */
@@ -208,6 +209,7 @@ export function McpSettingsScreen(): JSX.Element {
           }
         >
           <div class="rounded bg-slate-100 p-8 text-center">
+            <div class="mx-auto mb-4 w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><ConnectPreview /></div>
             <p class="mb-4">{t("mcp.settings.empty")}</p>
             <Show when={!showAddForm()}>
               <button
