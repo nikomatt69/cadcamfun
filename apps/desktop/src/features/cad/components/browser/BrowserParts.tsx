@@ -5,7 +5,7 @@
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  ChevronDown, ChevronRight, Copy, Crosshair, Eye, EyeOff, FolderPlus, Grid3x3, Layers, Lock, Maximize, Ruler, Scan, Sparkles, Trash2, Unlock, Ungroup, Plus
+  ChevronDown, ChevronRight, Copy, Crosshair, Eye, EyeOff, FolderPlus, Grid3x3, Layers, Lock, Maximize, Ruler, Scan, MessageSquare, Trash2, Unlock, Ungroup, Plus
 } from "lucide-solid"
 import { useCADStore } from "../../store/cadStore.ts"
 import { useElementsStore } from "../../store/elementsStore.ts"
@@ -60,7 +60,7 @@ export function BrowserToolbar(props: { readonly browser: Browser }): JSX.Elemen
         <button class={ICON} title={t("browser.isolate")} aria-label={t("browser.isolate")} disabled={count() === 0} onClick={b.isolateSelection}><Scan size={14} /></button>
         <button class={ICON} title={t("browser.lockToggle")} aria-label={t("browser.lockSelection")} disabled={count() === 0} onClick={b.lockSelection}><Lock size={14} /></button>
         <button class={ICON} title={t("browser.groupSelection")} aria-label={t("browser.groupSelection")} disabled={count() < 2} onClick={b.groupSelection}><FolderPlus size={14} /></button>
-        <button class={ICON} title={t("browser.askAiTitle")} aria-label={t("browser.askAi")} disabled={count() === 0} onClick={() => ask(selectionPrompt(selected()))}><Sparkles size={14} /></button>
+        <button class={ICON} title={t("browser.askAiTitle")} aria-label={t("browser.askAi")} disabled={count() === 0} onClick={() => ask(selectionPrompt(selected()))}><MessageSquare size={14} /></button>
         <button class={ICON} title={t("browser.ungroup")} aria-label={t("browser.ungroup")} disabled={b.selectedGroups().length === 0} onClick={b.ungroupSelection}><Ungroup size={14} /></button>
         <select
           class="text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-40"

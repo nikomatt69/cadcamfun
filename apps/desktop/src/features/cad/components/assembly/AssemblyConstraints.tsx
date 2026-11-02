@@ -1,4 +1,4 @@
-import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
+import { NumberField, PanelCard } from "../../../../shared/components/panel/ui.tsx"
 /**
  * Constraints between assembly nodes (legacy `components/cad/assembly/AssemblyConstraints.tsx`).
  *
@@ -95,14 +95,14 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
           <Show when={constraintType() === "distance"}>
             <label class="block">
               <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.distance")}</span>
-              <input type="number" min="0" step="0.1" class="panel-input" value={distance()} onInput={(event) => setDistance(Number.parseFloat(event.currentTarget.value) || 0)} />
+              <NumberField class="panel-input" value={distance()} step="0.1" accept={(value) => value >= 0} onValue={setDistance} />
             </label>
           </Show>
 
           <Show when={constraintType() === "angle"}>
             <label class="block">
               <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.angleDegrees")}</span>
-              <input type="number" min="0" max="360" step="1" class="panel-input" value={angle()} onInput={(event) => setAngle(Number.parseFloat(event.currentTarget.value) || 0)} />
+              <NumberField class="panel-input" value={angle()} step="1" accept={(value) => value >= 0 && value <= 360} onValue={setAngle} />
             </label>
           </Show>
 

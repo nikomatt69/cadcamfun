@@ -2,7 +2,7 @@ import { Box } from "lucide-solid"
 import { A } from "@solidjs/router"
 import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
-import { INPUT as FIELD, LABEL } from "../../../shared/components/panel/ui.tsx"
+import { INPUT as FIELD, LABEL, NumberField } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../store/cadStore.ts"
@@ -109,9 +109,9 @@ export default function WorkpieceSetup(): JSX.Element {
   const number = (name: "width" | "height" | "depth" | "positionX" | "positionY" | "positionZ", label: string, wrap = false) => (
     <div>
       <label class={LABEL}>{label}</label>
-      <Show when={wrap} fallback={<input type="number" name={name} value={form()[name]} onInput={(e) => set(name, e.currentTarget.value)} class={`mt-1 ${FIELD}`} />}>
+      <Show when={wrap} fallback={<NumberField class={`mt-1 ${FIELD}`} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />}>
         <div class="mt-1 relative rounded-md shadow-sm">
-          <input type="number" name={name} value={form()[name]} onInput={(e) => set(name, e.currentTarget.value)} class={FIELD} />
+          <NumberField class={FIELD} value={Number(form()[name])} accept={(value) => name.startsWith("position") || value > 0} onValue={(value) => set(name, String(value))} />
           <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none" />
         </div>
       </Show>

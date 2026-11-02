@@ -1,5 +1,5 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { LoaderCircle, Sparkles } from "lucide-solid"
+import { Boxes, LoaderCircle } from "lucide-solid"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
 import { useCustomElementsStore } from "../../store/customElementsStore.ts"
@@ -56,7 +56,7 @@ export default function CustomElementAssistant(props: {
   return (
     <section class="flex h-full flex-col gap-4 p-5">
       <div class="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-900 dark:bg-blue-950/30">
-        <span class="rounded-lg bg-blue-600 p-2 text-white"><Sparkles size={17} /></span>
+        <span class="rounded-lg bg-blue-600 p-2 text-white"><Boxes size={17} /></span>
         <div><h3 class="text-sm font-semibold text-slate-900 dark:text-white">{t("cad.customElements.assistantHeading")}</h3><p class="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{t("cad.customElements.assistantDescription")}</p></div>
       </div>
       <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="custom-element-assistant-prompt">{t("cad.customElements.assistantPromptLabel")}</label>
@@ -70,7 +70,7 @@ export default function CustomElementAssistant(props: {
       <div class="mt-auto flex items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
         <p class="text-xs text-slate-500 dark:text-slate-400">{t("cad.customElements.assistantReviewHint")}</p>
         <button type="button" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={!brief().trim() || busy()} onClick={() => void generate()}>
-          <Show when={busy()} fallback={<Sparkles size={16} />}><LoaderCircle size={16} class="animate-spin" /></Show>{busy() ? t("cad.customElements.assistantGenerating") : t("cad.customElements.assistantGenerate")}
+          <Show when={busy()} fallback={<Boxes size={16} />}><LoaderCircle size={16} class="animate-spin" /></Show>{busy() ? t("cad.customElements.assistantGenerating") : t("cad.customElements.assistantGenerate")}
         </button>
       </div>
     </section>

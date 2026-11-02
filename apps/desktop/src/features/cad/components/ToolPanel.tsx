@@ -1,4 +1,5 @@
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 /**
  * The "create" tool panel of the CAD editor: every element tool grouped by category, and the "Add element" form that
  * opens next to the clicked tool. Port of the legacy `ToolPanel`.
@@ -106,7 +107,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
   const numberInput = (name: string, label: string) => (
     <div>
       <label class="block text-xs text-gray-500">{labelOr(label, label)}</label>
-      <input type="number" name={name} value={data()[name] ?? 0} onInput={(e) => change(name, "number", e.currentTarget)} class={INPUT} />
+      <NumberField class={INPUT} value={Number(data()[name] ?? 0)} accept={() => true} onValue={(value) => setData({ ...data(), [name]: value })} />
     </div>
   )
   const positionFields = () => (
@@ -171,7 +172,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
         <Show when={props.type === "line" || props.type === "circle" || props.type === "rectangle"}>
           <div class="mt-2">
             <label class="block text-xs text-gray-500">{t("cad.toolpanel.lineWidth")}</label>
-            <input type="number" name="linewidth" value={data()["linewidth"] ?? 1} min={1} max={10} onInput={(e) => change("linewidth", "number", e.currentTarget)} class={INPUT} />
+            <NumberField class={INPUT} value={Number(data()["linewidth"] ?? 1)} int accept={(value) => value >= 1 && value <= 10} onValue={(value) => setData({ ...data(), linewidth: value })} />
           </div>
         </Show>
         <div class="mt-4 flex justify-end space-x-2">

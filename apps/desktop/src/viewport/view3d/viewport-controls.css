@@ -4,6 +4,7 @@
 .vp3-controls, .vp3-cube, .vp3-transform { position: absolute; z-index: 2; padding: .25rem; display: flex; gap: .25rem; background: var(--vp-surface); color: var(--vp-text); border: 1px solid var(--vp-border); border-radius: .5rem; box-shadow: 0 2px 10px #0002; backdrop-filter: blur(8px); }
 .vp3-controls { top: 1rem; left: 1rem; right: 8rem; flex-wrap: wrap; width: max-content; max-width: calc(100% - 9rem); }
 .vp3-root button, .vp3-root select { color: var(--vp-text); background: transparent; border: 1px solid transparent; border-radius: .25rem; padding: .375rem .5rem; font-size: .75rem; line-height: 1.2; cursor: pointer; }
+.vp3-root button { transition: background-color .12s ease, transform .12s ease; }
 .vp3-root button:active { transform: scale(.97); }
 .vp3-root button:focus-visible, .vp3-root select:focus-visible { outline: 2px solid #3584e4; outline-offset: 2px; }
 .vp3-root button[aria-pressed=true] { background: #b3d4fc; color: #163f70; }
@@ -12,7 +13,7 @@
 .vp3-cube { top: 1rem; right: 1rem; display: grid; grid-template-columns: repeat(2,1fr); width: 6.5rem; }
 .vp3-cube button:first-child, .vp3-cube button:last-child { grid-column: span 2; }
 .vp3-transform { bottom: 3rem; left: 1rem; }
-.vp3-footer { position: absolute; bottom: 1rem; left: 1rem; right: 1rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #ddd; font-size: .625rem; pointer-events: none; }
+.vp3-footer { font-variant-numeric: tabular-nums; position: absolute; bottom: 1rem; left: 1rem; right: 1rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #ddd; font-size: .625rem; pointer-events: none; }
 .vp3-footer button { pointer-events: auto; background: var(--vp-surface); box-shadow: 0 2px 10px #0002; }
 .vp3-footer--player { z-index: 30; }
 .vp3-footer-actions { display: flex; align-items: center; gap: .5rem; min-width: 0; margin-left: auto; }
@@ -29,3 +30,4 @@
 @media (prefers-contrast: more) { .vp3-controls, .vp3-cube, .vp3-transform { border: 2px solid currentColor; } }
 .vp3-capture-btn { display: inline-flex; align-items: center; justify-content: center; }
 .vp3-root button.vp3-capture-btn[aria-pressed=true] { background: #b91c1c; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .vp3-root button { transition: none; } .vp3-root button:active { transform: none; } }

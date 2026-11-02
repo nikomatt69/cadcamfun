@@ -1,4 +1,4 @@
-import { Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
+import { Note, NumberField, PanelCard } from "../../../shared/components/panel/ui.tsx"
 /**
  * Solid surfacing panel — Fusion/Hypermill-style CAD ops on closed solids.
  *
@@ -12,7 +12,7 @@ import { Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
  * Falls back to a friendly empty state when no closed solid is selected.
  */
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
-import { Box, Layers, Plus, Wand2, Wrench } from "lucide-solid"
+import { Box, Layers, Plus, Slice, Wrench } from "lucide-solid"
 import { cad as core } from "@cadcamfun/core"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -236,7 +236,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
                     title={t(cell.title)}
                   >
                     <span class="strategy-cell__icon">
-                      {cell.id === "chamferBox" || cell.id === "chamferCylinderTop" ? <Wand2 size={18} /> :
+                      {cell.id === "chamferBox" || cell.id === "chamferCylinderTop" ? <Slice size={18} /> :
                        cell.id === "shell" ? <Layers size={18} /> :
                        cell.id === "sweep" ? <Wrench size={18} /> : <Plus size={18} />}
                     </span>
@@ -253,14 +253,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
         <div class="space-y-2">
           <label class="block">
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.distance")}</span>
-            <input
-              type="number"
-              min="0.01"
-              step="0.1"
-              class="panel-input font-mono"
-              value={distance()}
-              onChange={(event) => setDistance(Math.max(0.01, Number(event.currentTarget.value)))}
-            />
+            <NumberField class="panel-input font-mono" value={distance()} step="0.1" accept={(value) => value >= 0.01} onValue={setDistance} />
           </label>
         </div>
       </Show>
@@ -269,14 +262,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
         <div class="space-y-2">
           <label class="block">
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.thickness")}</span>
-            <input
-              type="number"
-              min="0.01"
-              step="0.05"
-              class="panel-input font-mono"
-              value={thickness()}
-              onChange={(event) => setThickness(Math.max(0.01, Number(event.currentTarget.value)))}
-            />
+            <NumberField class="panel-input font-mono" value={thickness()} step="0.05" accept={(value) => value >= 0.01} onValue={setThickness} />
           </label>
           <label class="block">
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.openFaces")}</span>
