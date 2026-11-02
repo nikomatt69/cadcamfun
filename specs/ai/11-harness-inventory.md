@@ -12,13 +12,13 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 ## Totals
 
-- Actions: **125** in **15** tools (read 71, write 48, destructive 6).
-- Actions with an identified execution path: **125/125**.
-- Actions named in their tool prompt: **125/125**.
-- Actions mentioned by at least one test file: **124/125**.
-- Actions with a declared result schema: **125/125**.
+- Actions: **126** in **15** tools (read 72, write 48, destructive 6).
+- Actions with an identified execution path: **126/126**.
+- Actions named in their tool prompt: **126/126**.
+- Actions mentioned by at least one test file: **125/126**.
+- Actions with a declared result schema: **126/126**.
 - Prompt files: **63** (base layers 8, modes 5); one-shot workflows: **5**.
-- Built-in skills: **23** (plus user skills from the store); composer commands: **36**.
+- Built-in skills: **24** (plus user skills from the store); composer commands: **36**.
 
 ## Tools
 
@@ -26,7 +26,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- |
 | `cad` | read | 35 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4339 |
 | `cad_edit` | destructive | 22 | primary:build, editor, modeler | 4499 |
-| `cam` | read | 19 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3904 |
+| `cam` | read | 20 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4222 |
 | `cam_edit` | write | 8 | primary:build, machinist, optimizer | 2839 |
 | `library` | read | 5 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1311 |
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1361 |
@@ -128,6 +128,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cam.cutting_data` | read | — | material*, cut*, tool*, machine, depth, ae, ap, scallop | handler `machine` → `apps/sidecar/src/http/workspace.ts:79` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
 | `cam.turn` | read | — | profile*, stock*, stepdown, allowance, feedMmRev, rpm, machine, machineConfig | local (core cam.kernel.findMachine, core cam.kernel.kernelMachineOfConfig, core cam.kernel.planTurning) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
 | `cam.manufacture` | read | — | setupOrientation, workOffset, material*, machine, machineConfig, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, breadth, tabs, subprograms, nativeCycles, tcp, smoothing, postDefinition, postDefinitionId, print | handler `manufacture` → `apps/sidecar/src/services/ai.ts:376` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, ai-cam-chain.test.ts, cam-subprograms.test.ts |
+| `cam.job` | read | — | op*, material*, machine, part*, tools, quality, setups*, nc | local (core cam.kernel.coverageOf, core cam.kernel.findMachine, core cam.kernel.planOnly, core cam.kernel.runSetups, core cam.model.partMeshes) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-job-action.test.ts |
 | `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:1550` | yes | declared | ai-cam-chain.test.ts |
 | `cam.lathe` | read | — | stock*, contour, bore, tools*, operations*, material, post | local (core cam.turning.emitLathe, core cam.turning.planLathe, core cam.turning.verifyLathe) — `packages/ai/src/actions/cam-breadth-process.ts` | yes | declared | cam-breadth-actions.test.ts |
 | `cam.process` | read | — | gcode, operationId, tool*, material*, machine, stock*, rpm, mode*, post | handler `machine` → `apps/sidecar/src/http/workspace.ts:79`<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1172` | yes | declared | cam-breadth-actions.test.ts |
@@ -275,7 +276,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1540 | ai-specialists.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4339 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 4499 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3904 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 4222 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2839 | auto-mode.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1478 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1311 | prompt-corpus.test.ts |
@@ -347,6 +348,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `fea-simulation` | cad | 4364 | cad, cad_edit, library, memory |
 | `cam-turning` | cam | 3480 | cam, cam_edit |
 | `cam-post` | cam | 2933 | cam |
+| `cam-five-axis` | cam | 4475 | cam, cam_edit |
 
 ## Composer commands (`apps/desktop/src/features/ai/lib/commands.ts`)
 

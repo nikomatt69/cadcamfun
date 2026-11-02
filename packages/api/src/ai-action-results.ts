@@ -217,6 +217,11 @@ const cuttingData = Schema.Struct({ ok: Schema.Literal(true), material: Schema.S
 const turning = Schema.Struct({ ok: Schema.Literal(true), ...CamTurningPlan.fields })
 /** A read-only kernel run (or plan): nothing is stored. A blocked or failed run is a refusal carrying its issues. */
 const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), ...drawingRef })
+/**
+ * A multi-setup job planned or run in process (`cam.job`): nothing is stored. A run states each setup's release, every claim with its
+ * detail, the tolerance budget (the declared bounds) and the job's coverage; a failed claim carries the reason in its detail.
+ */
+const jobResult = Schema.Struct({ ok: Schema.Boolean, op: Schema.Literals(["plan", "run"]), release: Schema.optionalKey(str), setups: Schema.optionalKey(Schema.Array(record)), claims: Schema.optionalKey(Schema.Array(record)), failed: Schema.optionalKey(Schema.Array(record)), coverage: Schema.optionalKey(record), notes: Schema.optionalKey(strings), issues: Schema.optionalKey(Schema.Array(record)), error: Schema.optionalKey(str) })
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
 
 // ---------------------------------------------------------------- `cam_edit` (writes)
@@ -406,6 +411,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam.process": read(CamProcessResult),
   "cam.post_test": read(CamPostTestResult),
   "cam.manufacture": read(manufactured),
+  "cam.job": read(jobResult),
   "cam.chain_status": read(chainStatus),
 
   "cam_edit.manufacture": write(["operation", "program"], programStored),

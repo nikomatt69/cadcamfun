@@ -9,6 +9,7 @@ import { cam } from "@cadcamfun/core"
 import { CAM_ACTION_INPUTS, VisionInput as CAM_VISION_INPUT, CamSetupCandidate, CamMachiningPlan, CamManufactureInput } from "@cadcamfun/api"
 import { analyzeGcode } from "../gcode-analysis.ts"
 import { machineRun } from "../machine-run.ts"
+import { runCamJob } from "./cam-kernel-job.ts"
 import { vision } from "./cad.ts"
 import { defineAction, defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 
@@ -219,6 +220,10 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cam.manufacture", kind: "read", parameters: CAM_ACTION_INPUTS["cam.manufacture"],
     run: (input, { handlers, projectId, signal }) => handlers.manufacture?.(projectId, input, signal) ?? Promise.resolve({ ok: false, error: "The CAM kernel is unavailable in this host." })
+  }),
+  defineWireAction({
+    id: "cam.job", kind: "read", parameters: CAM_ACTION_INPUTS["cam.job"],
+    run: (input, context) => runCamJob(input, context)
   }),
   defineWireAction({
     id: "cam.chain_status", kind: "read", replaces: "cam_chain_status",
