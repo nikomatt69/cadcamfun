@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.64 (November 2026)
+
+## Desktop
+
+- Improve AI loop progress, worker responsiveness, and session recovery
+
 ## v0.1.63 (November 2026)
 
 ## Desktop
