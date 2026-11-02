@@ -47,12 +47,13 @@ describe("stageshow mounted", () => {
       ModulePreview({ module: "cad" }),
       ModulePreview({ module: "cam" }),
       ModulePreview({ module: "projects" }),
+      ModulePreview({ module: "lost" }),
       LostPreview({ code: "404" }),
       StageEmpty({ icon: null, title: "Empty", hint: "Nothing yet", preview: "cam" }),
       StageLoading({ label: "Loading things" })
     ], root)
     try {
-      expect(root.querySelectorAll(".ss-stage").length).toBe(5)
+      expect(root.querySelectorAll(".ss-stage").length).toBe(6)
       expect([...root.querySelectorAll(".ss-stage")].every((el) => el.getAttribute("aria-hidden") === "true")).toBe(true)
       expect(root.querySelector(".workspace-empty__preview .ss-stage")).not.toBeNull()
       expect(root.querySelector(".workspace-empty__icon")).toBeNull()

@@ -339,7 +339,7 @@ export function AssistantPreview(): JSX.Element {
   )
 }
 
-export type PreviewKind = "cad" | "cam" | "projects" | "library" | "connect" | "assistant"
+export type PreviewKind = "cad" | "cam" | "projects" | "library" | "connect" | "assistant" | "lost"
 
 /** The illustration for a module or an empty state, by kind. */
 export function ModulePreview(props: { readonly module: PreviewKind }): JSX.Element {
@@ -351,6 +351,7 @@ export function ModulePreview(props: { readonly module: PreviewKind }): JSX.Elem
       <Show when={props.module === "library"}><LibraryPreview /></Show>
       <Show when={props.module === "connect"}><ConnectPreview /></Show>
       <Show when={props.module === "assistant"}><AssistantPreview /></Show>
+      <Show when={props.module === "lost"}><LostPreview /></Show>
     </div>
   )
 }
