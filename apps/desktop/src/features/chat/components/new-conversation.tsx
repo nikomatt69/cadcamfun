@@ -119,7 +119,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
             <div class="flex flex-wrap gap-2">
               <For each={selected()}>
                 {(member) => (
-                  <div class="inline-flex items-center gap-1 rounded-[5px] bg-blue-50 py-1 pl-2 pr-1 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                  <div class="inline-flex items-center gap-2 rounded-[5px] bg-blue-50 py-1 pl-2 pr-1 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                     <span class="text-xs font-medium">{member.name ?? member.email ?? ""}</span>
                     <button
                       type="button"
@@ -148,11 +148,11 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
             <For each={filteredMembers()}>
               {(member) => (
                 <button type="button" class={memberButton} onClick={() => selectMember(member)}>
-                  <div class="flex-shrink-0">
+                  <div class="flex-none">
                     <Show
                       when={member.image !== null && member.image.length > 0}
                       fallback={
-                        <div class="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-100 dark:bg-slate-800">
+                        <div class="flex h-7 w-7 flex-none items-center justify-center rounded-[4px] bg-slate-100 dark:bg-slate-800">
                           <User size={14} class="text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         </div>
                       }
@@ -169,8 +169,8 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
                     <p class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
                       {member.name ?? t("chat.unnamedUser")}
                     </p>
-                    <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                      {member.email ?? t("chat.noEmail")} • {member.role}
+                    <p class="truncate text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                      {member.email ?? t("chat.noEmail")} · {member.role.charAt(0) + member.role.slice(1).toLowerCase()}
                     </p>
                   </div>
                 </button>
