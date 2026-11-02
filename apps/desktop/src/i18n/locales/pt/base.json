@@ -641,5 +641,7 @@
   "cad.invalid.more": "e mais {count}",
   "cad.sketches": "Esboços",
   "cad.sketches.toggle": "Mostrar os esboços que as operações já usam",
-  "cad.issues.title": "Operações com erros: {count}"
+  "cad.issues.title": "Operações com erros: {count}",
+  "cad.sub.face": "Face {index}",
+  "cad.sub.edge": "Aresta {index}"
 }

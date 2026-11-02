@@ -641,5 +641,7 @@
   "cad.invalid.more": "e altri {count}",
   "cad.sketches": "Schizzi",
   "cad.sketches.toggle": "Mostra gli schizzi già usati dalle feature",
-  "cad.issues.title": "Feature con errori: {count}"
+  "cad.issues.title": "Feature con errori: {count}",
+  "cad.sub.face": "Faccia {index}",
+  "cad.sub.edge": "Spigolo {index}"
 }

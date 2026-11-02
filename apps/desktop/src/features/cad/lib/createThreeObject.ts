@@ -59,7 +59,9 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
   if (!cached) {
     const placed = cadElementBrep(withoutGizmo(element));
     if (!placed.brep) return null;
-    cached = { model: placed.brep, tessellation: brep.bodyTessellation(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 }) };
+    // The chord tolerance follows the size of the body (the kernel's default: 1/2000 of its diagonal, between 1 and 50 micrometres): a
+    // fixed 0.01 mm left a small screw faceted and spent millions of triangles on a metre-long frame. The element can still ask for its own.
+    cached = { model: placed.brep, tessellation: brep.bodyTessellation(placed.brep, typeof element.tolerance === "number" && element.tolerance > 0 ? { chordTol: element.tolerance } : {}) };
     brepGeometryCache.set(element, cached);
   }
   const t = cached.tessellation;

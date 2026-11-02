@@ -37,6 +37,7 @@ import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { applySketchVisibility } from "../lib/history-view.ts"
+import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
@@ -201,6 +202,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [webglFailed, setWebglFailed] = createSignal(false)
   const [rebuilds, setRebuilds] = createSignal(0)
   const [hoveredId, setHoveredId] = createSignal<string | null>(null)
+  /** The face or edge of an exact solid under the cursor, and the one last clicked. */
+  const [hoveredSub, setHoveredSub] = createSignal<SubEntityPick | undefined>(undefined)
+  const [pickedSub, setPickedSub] = createSignal<SubEntityPick | undefined>(undefined)
   const [isSelectionMode, setSelectionMode] = createSignal(false)
   const [isMultiSelectMode, setMultiSelectMode] = createSignal(false)
   const [isFullscreen, setFullscreen] = createSignal(false)
@@ -250,10 +254,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     return raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1)), hit)
   }
 
+  /** The hits of the last `elementIdAt` ray, nearest first: the face or edge under the cursor is read from them. */
+  let lastHits: THREE.Intersection[] = []
+  const ownerOf = (object: THREE.Object3D): string | undefined => {
+    for (let current: THREE.Object3D | null = object; current; current = current.parent) {
+      const id = current.userData.elementId as string | undefined
+      if (id) return id
+    }
+    return undefined
+  }
   const elementIdAt = (): string | null => {
+    lastHits = []
     if (visibleObjects.length === 0) return null
     // `visibleObjects` is already filtered by layer visibility, and the first hit is the one that counts.
     const hits = raycaster.intersectObjects(visibleObjects, true)
+    lastHits = hits
     for (const hit of hits) {
       for (let current: THREE.Object3D | null = hit.object; current; current = current.parent) {
         const id = current.userData.elementId as string | undefined
@@ -739,6 +754,20 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (changed) invalidate()
   })
 
+  // Face and edge highlights of exact solids: translucent copy of the face / thick copy of the edge, added to the scene while hovered
+  // or picked. A rebuild makes them stale (the parts are new objects), so they are dropped then.
+  const subOverlays: Partial<Record<SubHighlightKind, THREE.Object3D>> = {}
+  const showSub = (kind: SubHighlightKind, pick: SubEntityPick | undefined) => {
+    disposeSubHighlight(subOverlays[kind]); delete subOverlays[kind]
+    if (pick !== undefined && scene && pick.object.parent !== null) { subOverlays[kind] = createSubHighlight(pick, kind); scene.add(subOverlays[kind]!) }
+    invalidate()
+  }
+  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null) }, { defer: true }))
+  createEffect(() => { const pick = hoveredSub(); const picked = pickedSub(); showSub("hover", pick !== undefined && sameSubEntity(pick, picked) ? undefined : pick) })
+  createEffect(() => showSub("picked", pickedSub()))
+  createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
+  onCleanup(() => { for (const kind of Object.keys(subOverlays) as SubHighlightKind[]) disposeSubHighlight(subOverlays[kind]) })
+
   // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
   createEffect(() => {
     rebuilds()
@@ -1040,6 +1069,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         setHoveredId(id)
         container.style.cursor = id ? "pointer" : "default"
       }
+      // The face or edge of an exact solid under the cursor.
+      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id)) : undefined
+      if (!sameSubEntity(sub, hoveredSub())) setHoveredSub(sub)
       const hit = planePoint()
       if (hit) publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
     })
@@ -1119,8 +1151,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click
     setPointer(event)
     const id = elementIdAt()
-    if (id && !isLocked(id)) selection.selectElement(id, down.additive)
-    else if (!id && !down.additive) selection.clearSelection()
+    if (id && !isLocked(id)) {
+      selection.selectElement(id, down.additive)
+      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id))
+      cad.setPickedEntity(sub === undefined ? null : { elementId: sub.elementId, kind: sub.kind, index: sub.index })
+      setPickedSub(sub)
+    } else if (!id && !down.additive) { selection.clearSelection(); cad.setPickedEntity(null); setPickedSub(undefined) }
   }
 
   // ---------------------------------------------------------------------------------------------------- drawing tools
@@ -1360,6 +1396,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           </ul>
           <Show when={invalidItems().length > 4}><p class="mt-1 opacity-80">{t("cad.invalid.more", { count: invalidItems().length - 4 })}</p></Show>
         </div>
+      </Show>
+
+      <Show when={pickedSub()}>
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }) })}</div>}
       </Show>
 
       <Show when={issueItems().length > 0}>

@@ -641,5 +641,7 @@
   "cad.invalid.more": "et {count} de plus",
   "cad.sketches": "Esquisses",
   "cad.sketches.toggle": "Afficher les esquisses déjà utilisées par des fonctions",
-  "cad.issues.title": "Fonctions en erreur : {count}"
+  "cad.issues.title": "Fonctions en erreur : {count}",
+  "cad.sub.face": "Face {index}",
+  "cad.sub.edge": "Arête {index}"
 }

@@ -641,5 +641,7 @@
   "cad.invalid.more": "und {count} weitere",
   "cad.sketches": "Skizzen",
   "cad.sketches.toggle": "Skizzen anzeigen, die Features bereits verwenden",
-  "cad.issues.title": "Features mit Fehlern: {count}"
+  "cad.issues.title": "Features mit Fehlern: {count}",
+  "cad.sub.face": "Fläche {index}",
+  "cad.sub.edge": "Kante {index}"
 }

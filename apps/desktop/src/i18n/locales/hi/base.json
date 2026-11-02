@@ -641,5 +641,7 @@
   "cad.invalid.more": "और {count} अन्य",
   "cad.sketches": "स्केच",
   "cad.sketches.toggle": "फ़ीचर द्वारा उपयोग हो चुके स्केच दिखाएँ",
-  "cad.issues.title": "त्रुटि वाले फ़ीचर: {count}"
+  "cad.issues.title": "त्रुटि वाले फ़ीचर: {count}",
+  "cad.sub.face": "फलक {index}",
+  "cad.sub.edge": "किनारा {index}"
 }

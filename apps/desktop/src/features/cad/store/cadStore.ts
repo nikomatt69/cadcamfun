@@ -116,6 +116,9 @@ interface CADState {
   /** Show the sketches a feature already uses (a sketch nothing uses is always shown). */
   showSketches: boolean;
   setShowSketches: (show: boolean) => void;
+  /** The face or edge of an exact solid the person clicked in the canvas (null: none). Cleared when the selection moves on. */
+  pickedEntity: { readonly elementId: string; readonly kind: "face" | "edge"; readonly index: number } | null;
+  setPickedEntity: (entity: CADState["pickedEntity"]) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -127,6 +130,8 @@ export const useCADStore = create<CADState>((set, get) => ({
   setDisplayMode: (mode) => set((state) => (isDisplayMode(mode) ? { displayMode: mode } : state)),
   showSketches: false,
   setShowSketches: (show) => set({ showSketches: show === true }),
+  pickedEntity: null,
+  setPickedEntity: (entity) => set({ pickedEntity: entity }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

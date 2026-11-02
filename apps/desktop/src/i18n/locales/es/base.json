@@ -641,5 +641,7 @@
   "cad.invalid.more": "y {count} más",
   "cad.sketches": "Bocetos",
   "cad.sketches.toggle": "Mostrar los bocetos que ya usan las operaciones",
-  "cad.issues.title": "Operaciones con errores: {count}"
+  "cad.issues.title": "Operaciones con errores: {count}",
+  "cad.sub.face": "Cara {index}",
+  "cad.sub.edge": "Arista {index}"
 }

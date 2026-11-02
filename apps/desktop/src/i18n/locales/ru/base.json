@@ -641,5 +641,7 @@
   "cad.invalid.more": "и ещё {count}",
   "cad.sketches": "Эскизы",
   "cad.sketches.toggle": "Показывать эскизы, уже использованные операциями",
-  "cad.issues.title": "Операции с ошибками: {count}"
+  "cad.issues.title": "Операции с ошибками: {count}",
+  "cad.sub.face": "Грань {index}",
+  "cad.sub.edge": "Ребро {index}"
 }

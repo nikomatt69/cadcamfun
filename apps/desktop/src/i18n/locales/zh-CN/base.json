@@ -641,5 +641,7 @@
   "cad.invalid.more": "以及另外 {count} 个",
   "cad.sketches": "草图",
   "cad.sketches.toggle": "显示已被特征使用的草图",
-  "cad.issues.title": "出错的特征：{count}"
+  "cad.issues.title": "出错的特征：{count}",
+  "cad.sub.face": "面 {index}",
+  "cad.sub.edge": "边 {index}"
 }
