@@ -21,6 +21,7 @@
  */
 import { digestOf } from "../cam/kernel/identity.ts"
 import { timelinePlan } from "./history-timeline.ts"
+import { lookupEdgeRefs, lookupRef, planarPickOf, shellOpenFromRefs, type RefBody } from "./history-refs.ts"
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
 import { catmullRomCurves, ellipseCurves } from "./sketch-curves.ts"
@@ -851,6 +852,12 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
     tools.set(f.id, { exact: [no(reason)], operation: op, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
     apply(f.id, no(reason), op, f.targets, f.id)
   }
+  /** The bodies as the references of a feature see them (the state just before it), and the states before it. */
+  const refBodies = (): RefBody[] => bodies.map((b) => ({ id: b.id, brep: b.exact.brep }))
+  /** The reason every candidate body loses its exact model when a reference of the feature cannot be resolved (the mesh replay already failed the feature). */
+  const refFailed = (candidates: ReadonlyArray<(typeof bodies)[number]>, reason: string): void => {
+    for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(reason) }
+  }
   const sketchOf = (id: string) => {
     const sk = result.sketches[id]
     return sk === undefined || sk.solve.status === "conflicting" || sk.solve.status === "failed" ? undefined : sk
@@ -1234,9 +1241,23 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
             const radiusEnd = f.radiusEnd === undefined ? undefined : dim(f.radiusEnd)
             if (f.radiusEnd !== undefined && radiusEnd === undefined) break
             if (radiusEnd !== undefined && style !== "fillet") { unsupported(f, "a variable radius belongs to a fillet, not a chamfer"); break }
-            for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) {
+            // Edges stored as persistent references are the selection (spec 41), whatever their kind.
+            let refEdges: ReturnType<typeof lookupEdgeRefs> | undefined
+            if (sel?.refs !== undefined) {
+              refEdges = lookupEdgeRefs(sel.refs, refBodies(), timeline)
+              if (!refEdges.ok) { unsupported(f, refEdges.error); break }
+              if (refEdges.byBody.size === 0) { unsupported(f, "the fillet has no edge references"); break }
+            }
+            const refByBody = refEdges !== undefined && refEdges.ok ? refEdges.byBody : undefined
+            for (const b of bodies.filter((x) => (f.targets === undefined || f.targets.includes(x.id)) && (refByBody === undefined || refByBody.has(x.id)))) {
               if (b.exact.brep === undefined) continue
-              const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
+              const own = refByBody?.get(b.id)
+              const all = blendCandidates(b.exact.brep, 25)
+              const picked = own === undefined ? selectBlendEdges(all, selector) : all.filter((c) => own.edges.has(c.edge))
+              if (own !== undefined && picked.length < own.edges.size) {
+                bodies[bodies.indexOf(b)] = { ...b, exact: no(`${own.edges.size - picked.length} of the ${own.edges.size} referenced edges are not edges the exact ${style} can blend (a straight edge between two planes, or a rim of a surface of revolution)`) }
+                continue
+              }
               if (picked.length === 0) continue
               if (radiusEnd === undefined) {
                 const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
@@ -1284,7 +1305,12 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
             // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
             const ex = extrusions.get(f.feature)
             const t = dim(f.thickness)
-            const open = f.open ?? "none"
+            let open = f.open ?? "none"
+            if (f.openFaces !== undefined) {
+              const fromRefs = shellOpenFromRefs(f.feature, f.openFaces, refBodies(), timeline)
+              if (!fromRefs.ok) { unsupported({ ...f, operation: "subtract" }, fromRefs.error); break }
+              open = fromRefs.open
+            }
             const rev = revolutions.get(f.feature)
             const sw = sweeps.get(f.feature)
             if (ex === undefined && sw !== undefined) {
@@ -1354,7 +1380,15 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
             const raw = f.pull === undefined ? { x: 0, y: 0, z: 1 } : { x: dim(f.pull[0]), y: dim(f.pull[1]), z: dim(f.pull[2]) }
             const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
             let pool = candidates
-            if (f.name !== undefined) {
+            if (f.ref !== undefined) {
+              const hit = lookupRef(f.ref, refBodies(), timeline, "face")
+              if (!hit.ok || hit.indices.length !== 1) { refFailed(candidates, hit.ok ? `the reference '${f.ref}' names ${hit.indices.length} faces; a single face is needed` : hit.error); break }
+              const body = bodies.find((b) => b.id === hit.body)!
+              near = faceCentre(hit.brep, hit.indices[0]!)
+              const pick = planarPickOf(hit.brep, hit.indices[0]!)
+              hint = typeof pick === "string" ? undefined : pick.normal
+              pool = [body]
+            } else if (f.name !== undefined) {
               let named: { body: (typeof bodies)[number]; face: number } | undefined
               for (const b of candidates) {
                 if (b.exact.brep === undefined) continue
@@ -1426,7 +1460,17 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
               const u = normalize3(e1), n = normalize3(nn)
               made = { u, v: cross3(n, u), n, origin: p1 }
             } else {
-              // A face of a body: the nearest planar face to `near` (`normal` tells which side), square to it.
+              // A face of a body: the nearest planar face to `near` (`normal` tells which side), square to it. A reference is the face itself.
+              if (d.ref !== undefined) {
+                const hit = lookupRef(d.ref, refBodies(), timeline, "face")
+                if (!hit.ok || hit.indices.length !== 1) { warnings.push(`${f.id}: ${hit.ok ? `the reference '${d.ref}' names ${hit.indices.length} faces` : hit.error}`); break }
+                const pick = planarPickOf(hit.brep, hit.indices[0]!)
+                const found = typeof pick === "string" ? pick : planarFaceFrame(hit.brep, pick)
+                const lift = d.offset === undefined ? 0 : dim(d.offset)
+                if (typeof found === "string" || lift === undefined) { warnings.push(`${f.id}: the reference '${d.ref}' is not a planar face${typeof found === "string" ? `: ${found}` : ""}`); break }
+                planes.set(f.id, { u: found.u, v: found.v, n: found.normal, origin: add3(found.centroid, scale3(found.normal, lift)) })
+                break
+              }
               const nx = dim(d.near[0]), ny = dim(d.near[1]), nz = dim(d.near[2])
               const hx = d.normal === undefined ? undefined : dim(d.normal[0])
               const hy = d.normal === undefined ? undefined : dim(d.normal[1])
@@ -1694,6 +1738,14 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
             const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
             const query = { near, ...(hint !== undefined ? { normal: hint } : {}) }
             const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+            if (f.ref !== undefined) {
+              const hit = lookupRef(f.ref, refBodies(), timeline, "face")
+              if (!hit.ok || hit.indices.length !== 1) { refFailed(candidates, hit.ok ? `the reference '${f.ref}' names ${hit.indices.length} faces; a single face is needed` : hit.error); break }
+              const body = bodies.find((b) => b.id === hit.body)!
+              const pushed = pushPullFace(body.exact.brep!, { ...query, distance, face: hit.indices[0]! })
+              bodies[bodies.indexOf(body)] = { ...body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+              break
+            }
             // A named face is the one that is moved: the point it was authored with may be stale after an edit, and a name
             // that no longer exists is reported rather than replaced by a nearby face.
             if (f.name !== undefined) {
