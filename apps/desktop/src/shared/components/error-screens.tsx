@@ -4,7 +4,8 @@
  */
 import { Show, type JSX } from "solid-js"
 import { A, useLocation, useNavigate } from "@solidjs/router"
-import { AlertTriangle, ArrowLeft } from "lucide-solid"
+import { ArrowLeft } from "lucide-solid"
+import { LostPreview } from "../ui/stageshow/index.ts"
 import { t } from "../../i18n/index.ts"
 
 const ErrorPanel = (props: { readonly code: string; readonly title: string; readonly description: string; readonly variant: "notFound" | "server" | "offline" }): JSX.Element => {
@@ -13,10 +14,8 @@ const ErrorPanel = (props: { readonly code: string; readonly title: string; read
   const reload = () => { if (typeof window !== "undefined") window.location.reload() }
   return <div class="reference-standalone-container">
     <div class="reference-error-card">
-      <div class="reference-error-badge" classList={{ "reference-error-badge-offline": props.variant === "offline" }}>
-        <Show when={props.variant === "offline"} fallback={<span aria-hidden="true">{props.code}</span>}>
-          <AlertTriangle size={32} aria-hidden="true" />
-        </Show>
+      <div class="reference-error-preview">
+        <LostPreview code={props.code === "" ? undefined : props.code} />
       </div>
       <h1 class="reference-error-title">{props.title}</h1>
       <p class="reference-error-detail">{props.description}</p>

@@ -3,8 +3,10 @@
  * every other list page: `WorkspacePage` frame, `CARD` surfaces,
  * `TOOLBAR_*` actions, dense 12px type, tabular numerals.
  *
- * No hero card, no animations, no gradients — the toolbar already carries
- * the title and the primary actions.
+ * No hero card and no gradients — the toolbar already carries the title and the
+ * primary actions. The one moving thing is the small Stageshow illustration at the
+ * head of each module card (`ModulePreview`): decorative, paused off-screen, still
+ * for reduced motion.
  *
  * The section headings, the KPI tiles and the spec lists are the shared
  * enterprise vocabulary (`SectionHeader`, `StatTile`, `KeyValueList`), not
@@ -32,6 +34,7 @@ import {
   WorkspacePage
 } from "../../../shared/components/WorkspacePage.tsx"
 import { KeyValueList, SectionHeader, StatGrid, StatTile } from "../../../shared/components/enterprise.tsx"
+import { ModulePreview } from "../../../shared/ui/stageshow/index.ts"
 import { t } from "../../../i18n/index.ts"
 
 interface DashboardData {
@@ -62,6 +65,7 @@ interface ModuleData {
   readonly href: string
   readonly cta: string
   readonly icon: typeof Grid3X3
+  readonly preview: "cad" | "cam" | "projects"
   readonly specs: ReadonlyArray<{ readonly k: string; readonly v: string }>
   readonly stat: string
 }
@@ -117,6 +121,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       href: "/cad",
       cta: t("dashboard.module.cad.cta"),
       icon: Grid3X3,
+      preview: "cad",
       specs: [
         { k: t("dashboard.spec.kernel"), v: t("dashboard.spec.cadKernel") },
         { k: t("dashboard.spec.units"), v: t("dashboard.spec.unitsValue") },
@@ -131,6 +136,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       href: "/cam",
       cta: t("dashboard.module.cam.cta"),
       icon: Wrench,
+      preview: "cam",
       specs: [
         { k: t("dashboard.spec.strategy"), v: t("dashboard.spec.camStrategy") },
         { k: t("dashboard.spec.post"), v: t("dashboard.spec.camPost") },
@@ -145,6 +151,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
       href: "/projects",
       cta: t("dashboard.module.projects.cta"),
       icon: File,
+      preview: "projects",
       specs: [
         { k: t("dashboard.system.activeProjects"), v: String(props.data.activeProjects ?? "—") },
         { k: t("dashboard.metric.projects"), v: String(props.data.projectsCount ?? "—") },
@@ -224,6 +231,7 @@ function ModuleCard(props: ModuleData): JSX.Element {
   const Icon = props.icon
   return (
     <div class={CARD}>
+      <ModulePreview module={props.preview} />
       <div class="dash-mod-body">
         <div class="dash-mod-head">
           <Icon size={15} aria-hidden="true" class="dash-mod-icon" />

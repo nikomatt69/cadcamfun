@@ -188,7 +188,7 @@ export function ProfileScreen(): JSX.Element {
             <WorkspaceTabs class="mb-3" tabs={tabs()} value={activeTab()} onChange={setActiveTab} label={t("profile.role")} />
 
             <Show when={activeTab() === "projects"}>
-              <Show when={(projects.data() ?? []).length > 0} fallback={<StageEmpty icon={<Folder size={22} aria-hidden="true" />} title={t("profile.emptyProjects")} hint={t("profile.emptyProjectsBody")} />}>
+              <Show when={(projects.data() ?? []).length > 0} fallback={<StageEmpty icon={<Folder size={22} aria-hidden="true" />} preview="projects" title={t("profile.emptyProjects")} hint={t("profile.emptyProjectsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={projects.data() ?? []}>{(project) => itemCard(project, `/projects/${project.id}`, Folder, false)}</For>
                 </div>
@@ -196,7 +196,7 @@ export function ProfileScreen(): JSX.Element {
             </Show>
 
             <Show when={activeTab() === "components"}>
-              <Show when={(components.data() ?? []).length > 0} fallback={<StageEmpty icon={<Box size={22} aria-hidden="true" />} title={t("profile.emptyComponents")} hint={t("profile.emptyComponentsBody")} />}>
+              <Show when={(components.data() ?? []).length > 0} fallback={<StageEmpty icon={<Box size={22} aria-hidden="true" />} preview="cad" title={t("profile.emptyComponents")} hint={t("profile.emptyComponentsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={components.data() ?? []}>{(component) => itemCard(component, `/components/${component.id}`, Box, true)}</For>
                 </div>
@@ -204,7 +204,7 @@ export function ProfileScreen(): JSX.Element {
             </Show>
 
             <Show when={activeTab() === "toolpaths"}>
-              <Show when={(toolpaths.data() ?? []).length > 0} fallback={<StageEmpty icon={<Wrench size={22} aria-hidden="true" />} title={t("profile.emptyToolpaths")} hint={t("profile.emptyToolpathsBody")} />}>
+              <Show when={(toolpaths.data() ?? []).length > 0} fallback={<StageEmpty icon={<Wrench size={22} aria-hidden="true" />} preview="cam" title={t("profile.emptyToolpaths")} hint={t("profile.emptyToolpathsBody")} />}>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={toolpaths.data() ?? []}>{(toolpath) => itemCard(toolpath, `/toolpaths/${toolpath.id}`, Wrench, false)}</For>
                 </div>

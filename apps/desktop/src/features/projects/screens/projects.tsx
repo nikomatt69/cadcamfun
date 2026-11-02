@@ -215,7 +215,7 @@ export function ProjectsScreen(): JSX.Element {
         <Show
           when={filtered().length > 0}
           fallback={
-            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} title={t("profile.emptyProjects")} hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
+            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} preview={search() === "" ? "projects" : undefined} title={t("profile.emptyProjects")} hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
               <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("projects.create")}</button>}>
                 <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
               </Show>

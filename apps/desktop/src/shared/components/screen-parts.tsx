@@ -4,9 +4,10 @@
  * Every screen renders these instead of hand-writing the same markup, which is also why
  * there is a single place where `role="alert"` and `aria-busy` are decided.
  */
-import { Show, type JSX } from "solid-js"
+import { For, Show, type JSX } from "solid-js"
 import LoaderCircle from "lucide-solid/icons/loader-circle"
 import Triangle from "lucide-solid/icons/triangle"
+import { ModulePreview } from "../ui/stageshow/index.ts"
 import { t } from "../../i18n/index.ts"
 
 export interface ScreenHeaderProps {
@@ -43,22 +44,47 @@ export function ScreenHeader(props: ScreenHeaderProps): JSX.Element {
   )
 }
 
-/** Centred spinner with an accessible label. */
-export function LoadingState(props: { readonly label: string }): JSX.Element {
+/**
+ * Loading — a skeleton at the geometry of the rows that will arrive, so the page does not
+ * jump when the data lands. The label stays for assistive tech and is shown small.
+ */
+export function LoadingState(props: { readonly label: string; readonly rows?: number }): JSX.Element {
   return (
-    <div class="flex items-center gap-2 px-6 py-8 text-sm text-gray-600 dark:text-gray-300" aria-busy="true">
-      <LoaderCircle size={18} aria-hidden="true" class="animate-spin" />
-      <span>{props.label}</span>
+    <div class="loading-state" aria-busy="true" role="status">
+      <div class="loading-state__rows" aria-hidden="true">
+        <For each={Array.from({ length: props.rows ?? 4 }, (_, i) => i)}>
+          {(i) => (
+            <div class="loading-state__row" style={{ "animation-delay": `${i * 90}ms` }}>
+              <span class="loading-state__icon" />
+              <span class="loading-state__bar" style={{ width: `${[38, 52, 30, 46][i % 4]}%` }} />
+              <span class="loading-state__bar loading-state__bar--meta" />
+            </div>
+          )}
+        </For>
+      </div>
+      <span class="loading-state__label"><LoaderCircle size={13} aria-hidden="true" class="animate-spin" />{props.label}</span>
     </div>
   )
 }
 
-/** Nothing here yet — says so in the same voice as the heading, never a bare word. */
-export function EmptyState(props: { readonly label: string }): JSX.Element {
+/**
+ * Nothing here yet — says so in the same voice as the heading, never a bare word.
+ * With `preview` it shows the Stageshow illustration of what will fill the screen
+ * (a new project arriving, a toolpath drawing itself); `action` is the one next step.
+ */
+export function EmptyState(props: {
+  readonly label: string
+  readonly preview?: "cad" | "cam" | "projects"
+  readonly action?: JSX.Element
+}): JSX.Element {
   return (
-    <p class="px-6 py-10 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-      {props.label}
-    </p>
+    <div class="empty-state">
+      <Show when={props.preview !== undefined}>
+        <div class="empty-state__preview"><ModulePreview module={props.preview!} /></div>
+      </Show>
+      <p class="px-6 py-6 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">{props.label}</p>
+      <Show when={props.action !== undefined}><div class="empty-state__action">{props.action}</div></Show>
+    </div>
   )
 }
 

@@ -1,0 +1,311 @@
+/* Stageshow illustrations (shared/ui/stageshow). Everything is scoped under `.ss-stage`;
+   colours are the app's `--ent-*` tokens, so the same drawing serves light and dark.
+   `@keyframes` live outside the scope, prefixed `ss-`. */
+
+/* Tokens: the app's `--ent-*` when the surface is inside the shell, else these fallbacks
+   (the boot splash renders before the shell exists), light and dark. */
+.ss-stage {
+  --ss-surface: var(--ent-surface, #ffffff);
+  --ss-surface-subtle: var(--ent-surface-subtle, #f6f7f9);
+  --ss-surface-inset: var(--ent-surface-inset, #eef0f3);
+  --ss-line: var(--ent-line, #dde1e7);
+  --ss-line-strong: var(--ent-line-strong, #c3c9d2);
+  --ss-text: var(--ent-text, #1b2230);
+  --ss-text-muted: var(--ent-text-muted, #5b6575);
+  --ss-text-faint: var(--ent-text-faint, #8a93a1);
+  --ss-accent: var(--ent-accent, #2557d6);
+  --ss-accent-soft: var(--ent-accent-soft, #e8eefc);
+  --ss-action: var(--ent-action, #2557d6);
+  --ss-action-text: var(--ent-action-text, #ffffff);
+  --ss-ok: var(--ent-ok, #15803d);
+}
+.ss-stage { --ss-radius: var(--ent-radius, 8px); --ss-mono: var(--ent-mono, ui-monospace, SFMono-Regular, Menlo, monospace); --ss-ease: var(--ent-ease, cubic-bezier(0.2, 0, 0, 1)); }
+:where(.dark) .ss-stage {
+  --ss-surface: var(--ent-surface, #171b22);
+  --ss-surface-subtle: var(--ent-surface-subtle, #1c212a);
+  --ss-surface-inset: var(--ent-surface-inset, #12161c);
+  --ss-line: var(--ent-line, #2b323d);
+  --ss-line-strong: var(--ent-line-strong, #3a4352);
+  --ss-text: var(--ent-text, #e6e9ef);
+  --ss-text-muted: var(--ent-text-muted, #9aa4b2);
+  --ss-text-faint: var(--ent-text-faint, #6f7886);
+  --ss-accent: var(--ent-accent, #6b95f2);
+  --ss-accent-soft: var(--ent-accent-soft, #1c2a47);
+  --ss-action: var(--ent-action, #6b95f2);
+  --ss-action-text: var(--ent-action-text, #0b1220);
+  --ss-ok: var(--ent-ok, #4cc07a);
+}
+
+.ss-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ss-surface-inset);
+  user-select: none;
+  pointer-events: none;
+  contain: layout paint style;
+}
+
+.ss-stage .ss-stage__canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: 0 0;
+  font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ss-text);
+  /* The loop's reset beat: the whole scene eases out and back in. */
+}
+
+.ss-stage .ss-scene {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.45s var(--ss-ease);
+}
+.ss-stage .ss-scene[data-reset="true"] { opacity: 0; }
+
+/* ── Cursor ─────────────────────────────────────────────────────────────── */
+.ss-stage .ss-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  transition-property: transform, opacity;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease;
+  will-change: transform;
+}
+.ss-stage .ss-cursor[data-hidden="true"] { opacity: 0; }
+.ss-stage .ss-cursor__arrow {
+  display: block;
+  margin: -3px 0 0 -4px; /* the tip is the hotspot */
+  fill: var(--ss-text);
+  stroke: var(--ss-surface);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.28));
+  transform-origin: 4px 3px;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ss-stage .ss-cursor[data-pressed="true"] .ss-cursor__arrow {
+  transform: scale(0.88);
+  transition-duration: 0.08s;
+}
+
+/* ── Shared parts ───────────────────────────────────────────────────────── */
+.ss-stage .ss-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ss-line-strong);
+  opacity: 0.55;
+}
+
+.ss-stage .ss-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  background: var(--ss-surface);
+  border-right: 1px solid var(--ss-line);
+}
+.ss-stage .ss-rail__tool {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--ss-text-faint);
+  transition: background-color 0.25s var(--ss-ease), color 0.25s var(--ss-ease);
+}
+.ss-stage .ss-rail__tool[data-active="true"] {
+  background: var(--ss-accent-soft);
+  color: var(--ss-accent);
+}
+
+.ss-stage .ss-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-line);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.35s var(--ss-ease), transform 0.35s var(--ss-ease);
+}
+.ss-stage .ss-chip[data-show="true"] { opacity: 1; transform: none; }
+.ss-stage .ss-chip--mono { font-family: var(--ss-mono); font-variant-numeric: tabular-nums; }
+
+/* ── CAD: sketch → extrude ─────────────────────────────────────────────── */
+.ss-stage .cad-grid { position: absolute; inset: 0; }
+.ss-stage .cad-sketch {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.ss-stage .cad-sketch[data-on="true"] { stroke-dashoffset: 0; }
+.ss-stage .cad-sketch[data-done="true"] { opacity: 0; }
+.ss-stage .cad-front { fill: var(--ss-surface); stroke: var(--ss-line-strong); stroke-width: 1.2; stroke-linejoin: round; transition: opacity 0.3s ease; opacity: 0; }
+.ss-stage .cad-front[data-on="true"] { opacity: 1; }
+.ss-stage .cad-extrusion { transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease; opacity: 0; transform: translate(-22px, 16px); }
+.ss-stage .cad-extrusion[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .cad-top { fill: var(--ss-surface-subtle); stroke: var(--ss-line-strong); stroke-width: 1.2; stroke-linejoin: round; }
+.ss-stage .cad-side { fill: var(--ss-line); stroke: var(--ss-line-strong); stroke-width: 1.2; stroke-linejoin: round; }
+.ss-stage .cad-hole { fill: var(--ss-surface-inset); stroke: var(--ss-line-strong); stroke-width: 1.2; opacity: 0; transition: opacity 0.4s ease; }
+.ss-stage .cad-hole[data-on="true"] { opacity: 1; }
+
+/* ── CAM: a toolpath that draws itself, G-code that follows ────────────── */
+.ss-stage .cam-stock { fill: var(--ss-surface); stroke: var(--ss-line-strong); stroke-width: 1.2; }
+.ss-stage .cam-pocket { fill: var(--ss-surface-inset); stroke: var(--ss-line); stroke-width: 1; }
+.ss-stage .cam-path {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.9;
+}
+.ss-stage .cam-path[data-on="true"] { stroke-dashoffset: 0; transition: stroke-dashoffset 2.6s linear; }
+.ss-stage .cam-path[data-on="false"] { transition: none; }
+.ss-stage .cam-tool {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ss-accent);
+  box-shadow: 0 0 0 3px var(--ss-accent-soft), 0 1px 3px rgb(0 0 0 / 0.25);
+  offset-path: path("M96 52 H198 V86 H96 V62 H188 V76 H106 V69 H178");
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+}
+.ss-stage .cam-tool[data-on="true"] { offset-distance: 100%; transition: offset-distance 2.6s linear; }
+.ss-stage .cam-tool[data-on="false"] { transition: none; opacity: 0; }
+.ss-stage .cam-code {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 128px;
+  padding: 12px 12px 0;
+  background: var(--ss-surface);
+  border-left: 1px solid var(--ss-line);
+  font-family: var(--ss-mono);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--ss-text-muted);
+}
+.ss-stage .cam-code__line {
+  display: block;
+  padding: 2px 0;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.3s ease, transform 0.3s var(--ss-ease);
+}
+.ss-stage .cam-code__line[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .cam-code__line[data-now="true"] { color: var(--ss-text); }
+
+/* ── Projects: a new row carries the rest down ─────────────────────────── */
+.ss-stage .prj-head {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-line);
+  z-index: 2;
+}
+.ss-stage .prj-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--ss-action);
+  color: var(--ss-action-text);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+.ss-stage .prj-btn[data-pressed="true"] { filter: brightness(0.9); }
+.ss-stage .prj-list { position: absolute; inset: 34px 0 0 0; background: var(--ss-surface); overflow: hidden; }
+.ss-stage .prj-rows {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ss-stage .prj-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  flex: none;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ss-line);
+}
+.ss-stage .prj-row__icon { color: var(--ss-text-faint); flex: none; display: grid; }
+.ss-stage .prj-row__name { width: 76px; flex: none; font-size: 11px; font-weight: 500; }
+.ss-stage .prj-row__meta { margin-left: auto; width: 54px; }
+.ss-stage .prj-row[data-fresh="true"] { background: var(--ss-accent-soft); }
+.ss-stage .prj-rows { transform: translateY(-32px); } /* the new row waits above the list */
+.ss-stage .prj-rows[data-carry="true"] { transform: none; }
+.ss-stage .prj-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ss-ok); flex: none; }
+
+/* ── Lost: an outline with nothing in it ──────────────────────────────── */
+.ss-stage .lost-outline {
+  fill: none;
+  stroke: var(--ss-line-strong);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 4;
+  transition: stroke 0.4s ease;
+}
+.ss-stage .lost-outline[data-found="true"] { stroke: var(--ss-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-stage * { transition: none !important; animation: none !important; }
+}
+
+/* ── Screen furniture that uses the stage (screen-parts.tsx) ───────────── */
+.empty-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 24px auto; }
+.empty-state__preview {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ss-line);
+  border-radius: var(--ss-radius);
+}
+.empty-state__action { padding-bottom: 20px; }
+
+.loading-state { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
+.loading-state__rows { border: 1px solid var(--ss-line); border-radius: var(--ss-radius); overflow: hidden; background: var(--ss-surface); }
+.loading-state__row { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px; border-bottom: 1px solid var(--ss-line); animation: ss-pulse 1.4s ease-in-out infinite; }
+.loading-state__row:last-child { border-bottom: 0; }
+.loading-state__icon { width: 13px; height: 13px; border-radius: 3px; background: var(--ss-line-strong); opacity: 0.55; flex: none; }
+.loading-state__bar { height: 6px; border-radius: 3px; background: var(--ss-line-strong); opacity: 0.55; }
+.loading-state__bar--meta { margin-left: auto; width: 54px; }
+.loading-state__label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ss-text-muted); }
+@keyframes ss-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .loading-state__row { animation: none; } }

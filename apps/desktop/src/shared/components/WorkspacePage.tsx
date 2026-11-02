@@ -13,6 +13,8 @@ import { ArrowLeft, SlidersHorizontal } from "lucide-solid"
 import { t } from "../../i18n/index.ts"
 import { Motion } from "solid-motionone"
 import { prefersReducedMotion } from "../ui/animated-section.tsx"
+import { ModulePreview } from "../ui/stageshow/index.ts"
+import { LoadingState } from "./screen-parts.tsx"
 import "../../styles/workstation.css"
 import "../../styles/workspace-page.css"
 
@@ -156,7 +158,7 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
 
 /** The stage's loading line. */
 export function StageLoading(props: { readonly label: string }): JSX.Element {
-  return <p class="py-8 text-center text-xs text-slate-500 dark:text-slate-400" role="status">{props.label}</p>
+  return <LoadingState label={props.label} rows={3} />
 }
 
 /** The stage's error box, with an optional retry. */
@@ -172,10 +174,19 @@ export function StageError(props: { readonly message: string; readonly onRetry?:
 }
 
 /** The stage's empty card: an icon, a heading, a hint and optional actions. */
-export function StageEmpty(props: { readonly icon: JSX.Element; readonly title: string; readonly hint: string; readonly children?: JSX.Element }): JSX.Element {
+export function StageEmpty(props: {
+  readonly icon: JSX.Element
+  readonly title: string
+  readonly hint: string
+  /** A Stageshow illustration of what will fill this screen, shown instead of the icon tile. */
+  readonly preview?: "cad" | "cam" | "projects"
+  readonly children?: JSX.Element
+}): JSX.Element {
   return (
     <div class="workspace-empty">
-      <div class="workspace-empty__icon" aria-hidden="true">{props.icon}</div>
+      <Show when={props.preview !== undefined} fallback={<div class="workspace-empty__icon" aria-hidden="true">{props.icon}</div>}>
+        <div class="workspace-empty__preview"><ModulePreview module={props.preview!} /></div>
+      </Show>
       <h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{props.title}</h3>
       <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{props.hint}</p>
       <Show when={props.children !== undefined}><div class="workspace-empty__actions">{props.children}</div></Show>

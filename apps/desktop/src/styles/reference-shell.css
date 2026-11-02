@@ -209,6 +209,7 @@
 /* Standalone error / legal / offline screens (no navbar). */
 .reference-standalone-container { display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; min-height: 100%; }
 .reference-error-card { max-width: 28rem; width: 100%; text-align: center; padding: 24px; border-radius: 5px; border: 1px solid var(--shell-border); background: var(--shell-chrome); box-shadow: none; }
+.reference-error-preview { margin: -24px -24px 18px; overflow: hidden; border-radius: 4px 4px 0 0; border-bottom: 1px solid var(--shell-border); }
 .reference-error-badge { margin: 0 auto 12px; width: 40px; height: 40px; border-radius: 5px; background: var(--shell-active); color: var(--shell-active-text); border: 1px solid var(--shell-active-border); font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; }
 .reference-error-badge.reference-error-badge-offline { background: #fbf1df; border-color: #ecd8ae; color: #a15c07; }
 .dark .reference-error-badge.reference-error-badge-offline { background: #2e2413; border-color: #4a3a1e; color: #e0a24a; }

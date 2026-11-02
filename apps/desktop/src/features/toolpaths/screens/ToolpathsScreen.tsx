@@ -261,6 +261,7 @@ export function ToolpathsScreen(): JSX.Element {
                   fallback={
                     <StageEmpty
                       icon={<Code size={20} aria-hidden="true" />}
+                      preview={hasFilters() ? undefined : "cam"}
                       title={t("profile.emptyToolpaths")}
                       hint={hasFilters() ? t("pages.no.toolpaths.match.your.search.criteria") : t("pages.create.your.first.toolpath.to.get.started.or.choose.from.our.standard.library")}
                     >

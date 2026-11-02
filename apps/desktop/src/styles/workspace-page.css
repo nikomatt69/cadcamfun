@@ -596,6 +596,10 @@ html.dark .workspace-page select { color-scheme: dark; }
   text-align: center;
 }
 
+.workspace-empty:has(.workspace-empty__preview) { padding-top: 0; overflow: hidden; }
+/* The illustration runs edge to edge across the head of the card. */
+.workspace-empty__preview { margin: 0 -28px 22px; border-bottom: 1px solid var(--wp-border); }
+
 .workspace-empty__icon {
   display: flex;
   align-items: center;

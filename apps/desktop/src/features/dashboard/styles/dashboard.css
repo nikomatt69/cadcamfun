@@ -1,6 +1,6 @@
 /* Dashboard — workstation language: same panel, border, radius and density
    as the projects/toolpaths lists. Flat surfaces, tabular numerals,
-   8px radius, 12px base. No shadows, no gradients, no animation.
+   8px radius, 12px base. No shadows, no gradients; the only motion is the module illustrations.
 
    The section headings, stat tiles and key/value lists are the shared
    enterprise vocabulary (`ent-section`, `ent-stat`, `ent-kv`); this file only
@@ -46,6 +46,9 @@
   gap: 4px;
 }
 @media (min-width: 1024px) { .dash-mod-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* The Stageshow illustration runs edge to edge at the head of the card (the card clips it). */
+.dash-mod-preview { border-bottom: 1px solid var(--ent-line); }
 
 .dash-mod-body {
   display: flex;
