@@ -629,5 +629,12 @@
   "costs.report.length": "Comprimento do percurso: {value}",
   "costs.report.wear": "Desgaste da ferramenta: {value}",
   "costs.report.feed": "Avanço: {value} mm/min",
-  "costs.report.end": "--- Fim do relatório ---"
+  "costs.report.end": "--- Fim do relatório ---",
+  "cad.display": "Estilo visual",
+  "cad.display.shaded": "Sombreado",
+  "cad.display.shaded-edges": "Sombreado com arestas",
+  "cad.display.hidden-line": "Linhas ocultas",
+  "cad.display.wireframe": "Estrutura de arame",
+  "cad.display.xray": "Raios X",
+  "cad.display.ghost": "Fantasma"
 }

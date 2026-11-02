@@ -629,5 +629,12 @@
   "costs.report.length": "刀路长度：{value}",
   "costs.report.wear": "刀具磨损：{value}",
   "costs.report.feed": "进给：{value} mm/min",
-  "costs.report.end": "--- 报告结束 ---"
+  "costs.report.end": "--- 报告结束 ---",
+  "cad.display": "视觉样式",
+  "cad.display.shaded": "着色",
+  "cad.display.shaded-edges": "着色带边",
+  "cad.display.hidden-line": "消隐线",
+  "cad.display.wireframe": "线框",
+  "cad.display.xray": "X光",
+  "cad.display.ghost": "幽灵"
 }

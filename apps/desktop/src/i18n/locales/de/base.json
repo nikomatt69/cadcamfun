@@ -629,5 +629,12 @@
   "costs.report.length": "Werkzeugbahnlänge: {value}",
   "costs.report.wear": "Werkzeugverschleiß: {value}",
   "costs.report.feed": "Vorschub: {value} mm/min",
-  "costs.report.end": "--- Ende des Berichts ---"
+  "costs.report.end": "--- Ende des Berichts ---",
+  "cad.display": "Darstellungsstil",
+  "cad.display.shaded": "Schattiert",
+  "cad.display.shaded-edges": "Schattiert mit Kanten",
+  "cad.display.hidden-line": "Verdeckte Kanten",
+  "cad.display.wireframe": "Drahtmodell",
+  "cad.display.xray": "Röntgen",
+  "cad.display.ghost": "Geist"
 }

@@ -629,5 +629,12 @@
   "costs.report.length": "Longitud de trayectoria: {value}",
   "costs.report.wear": "Desgaste de herramienta: {value}",
   "costs.report.feed": "Avance: {value} mm/min",
-  "costs.report.end": "--- Fin del informe ---"
+  "costs.report.end": "--- Fin del informe ---",
+  "cad.display": "Estilo visual",
+  "cad.display.shaded": "Sombreado",
+  "cad.display.shaded-edges": "Sombreado con aristas",
+  "cad.display.hidden-line": "Líneas ocultas",
+  "cad.display.wireframe": "Estructura alámbrica",
+  "cad.display.xray": "Rayos X",
+  "cad.display.ghost": "Fantasma"
 }

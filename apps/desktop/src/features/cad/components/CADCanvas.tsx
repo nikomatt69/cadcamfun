@@ -35,6 +35,7 @@ import {
 import { booleanFormed } from "../lib/createThreeObject.ts"
 import { FrameScheduler } from "../lib/frame-scheduler.ts"
 import { ExplodedView } from "../lib/exploded-view.ts"
+import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { createSectionHelper } from "../lib/sectionHelper.ts"
@@ -688,6 +689,20 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     exploded.setTarget(enabled ? state.amount : 0, reducedMotion?.matches === true || cad.viewMode === "2d")
     setExplosionActive(exploded.active)
     invalidate()
+  })
+
+  // Visual style (shaded, edges, hidden line, wireframe, x-ray, ghost): presentation only, applied to the objects after every
+  // reconcile and when the mode, or in `ghost` the selection, changes. An object already in the asked look costs nothing.
+  createEffect(() => {
+    rebuilds()
+    const mode = cad.displayMode
+    const selected = new Set(selectedIds())
+    if (!ready()) return
+    let changed = false
+    for (const [id, entry] of objectsById) {
+      if (applyDisplayMode(entry.object, mode, mode === "ghost" && selected.size > 0 && !selected.has(id))) changed = true
+    }
+    if (changed) invalidate()
   })
 
   // Hover / selection tint, applied to the delta only: moving the cursor between two parts must not
@@ -1424,6 +1439,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
       {props.footerDock}
+      <div class="cad-viewport-footer__section" data-testid="display-mode-control">
+        <select class="rounded-md bg-gray-800 px-1.5 py-1 text-[11px] text-white" aria-label={t("cad.display")} title={t("cad.display")} value={cad.displayMode}
+          onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
+          <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
+        </select>
+      </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button
           type="button"

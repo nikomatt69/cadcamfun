@@ -629,5 +629,12 @@
   "costs.report.length": "Longueur de trajectoire : {value}",
   "costs.report.wear": "Usure d'outil : {value}",
   "costs.report.feed": "Avance : {value} mm/min",
-  "costs.report.end": "--- Fin du rapport ---"
+  "costs.report.end": "--- Fin du rapport ---",
+  "cad.display": "Style visuel",
+  "cad.display.shaded": "Ombré",
+  "cad.display.shaded-edges": "Ombré avec arêtes",
+  "cad.display.hidden-line": "Lignes cachées",
+  "cad.display.wireframe": "Fil de fer",
+  "cad.display.xray": "Rayons X",
+  "cad.display.ghost": "Fantôme"
 }

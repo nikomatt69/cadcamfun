@@ -629,5 +629,12 @@
   "costs.report.length": "Toolpath Length: {value}",
   "costs.report.wear": "Tool Wear: {value}",
   "costs.report.feed": "Feed Rate: {value} mm/min",
-  "costs.report.end": "--- End of Report ---"
+  "costs.report.end": "--- End of Report ---",
+  "cad.display": "Visual style",
+  "cad.display.shaded": "Shaded",
+  "cad.display.shaded-edges": "Shaded with edges",
+  "cad.display.hidden-line": "Hidden line",
+  "cad.display.wireframe": "Wireframe",
+  "cad.display.xray": "X-ray",
+  "cad.display.ghost": "Ghost"
 }
