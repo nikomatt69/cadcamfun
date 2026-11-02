@@ -272,7 +272,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                 <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div class="flex items-center">
                     <Motion.div
-                      class="mr-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600"
+                      class="mr-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600"
                     >
                       <Server size={24} class="text-white" />
                     </Motion.div>
@@ -316,7 +316,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                 </div>
 
                 <div class="mb-4 flex items-center gap-4">
-                  <span class="rounded-full bg-gradient-to-r from-blue-100 to-purple-100 px-3 py-1 text-xs text-blue-800 dark:from-blue-900/50 dark:to-purple-900/50 dark:text-blue-300">
+                  <span class="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
                     {server()?.type === "sse" ? t("mcp.type.sse") : t("mcp.type.stdio")}
                   </span>
                 </div>
@@ -367,7 +367,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                       <span class="text-lg font-medium text-gray-900 dark:text-white">{t("mcp.detail.infoTitle")}</span>
                     </div>
 
-                    <div class="rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 p-4 dark:from-blue-900/20 dark:to-purple-900/20">
+                    <div class="rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
                       <div class="flex items-center justify-between">
                         <span class="text-lg font-medium text-gray-900 dark:text-white">{details()?.name}</span>
                         <Show when={details()?.version !== undefined}>
@@ -444,7 +444,7 @@ export function McpServerDetailsScreen(): JSX.Element {
                                       <For each={Object.entries(parametersOf(tool.parameters))}>{([key, value]) =>
                                         <div class="flex items-start space-x-3">
                                           <div class="flex items-center">
-                                            <span class="rounded bg-purple-100 px-2 py-1 font-mono text-xs text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">{key}</span>
+                                            <span class="rounded bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">{key}</span>
                                             <Show when={requiredOf(tool.parameters).includes(key)}>
                                               <span class="ml-1 text-xs text-red-500">*</span>
                                             </Show>

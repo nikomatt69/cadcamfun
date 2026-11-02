@@ -535,7 +535,7 @@ export function AISettingsPanel(): JSX.Element {
       </div>
 
       <Show when={settings().mcpEnabled}>
-        <div class="p-3 mt-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300 text-xs rounded-lg flex items-start">
+        <div class="p-3 mt-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-xs rounded-lg flex items-start">
           <Shield size={14} class="mr-2 flex-shrink-0 mt-0.5" />
           <p>
             The MCP (Model-Completions-Protocol) is active. AI requests will be optimized through semantic caching,

@@ -7,6 +7,7 @@
  * non-2xx body; the typed client fails before decoding, so `legacyRead`/`legacyFailure`
  * read that same body back and fail with the legacy message instead of an Effect one.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
 import type { McpServerEntry, McpServerPatch } from "@cadcamfun/api"
@@ -94,14 +95,9 @@ export const legacyFailure = async (cause: unknown, fallback: string): Promise<s
 }
 
 /** Legacy `components/ui/Loading.tsx`, class for class. */
+/** The skeleton shown while the MCP config loads: rows at the geometry of the server list. */
 export function McpLoading(): JSX.Element {
-  return (
-    <div class="grid h-screen place-items-center">
-      <div class="animate-bounce">
-        <img src="/icon.png" draggable={false} class="h-12 w-12 md:h-16 md:w-16" alt="lensshare" />
-      </div>
-    </div>
-  )
+  return <LoadingState label={t("common.loading")} rows={4} />
 }
 
 export interface McpServerFormProps {

@@ -46,7 +46,7 @@ export function ProgressBar(props: ProgressBarProps): JSX.Element {
   const pct = () => Math.max(0, Math.min(100, (props.value / max()) * 100))
   const tone = () => props.tone ?? "blue"
   return (
-    <div class={["ui-progress", `ui-progress-${tone()}`].join(" ")} role="progressbar" aria-valuenow={props.value} aria-valuemax={max()}>
+    <div class={["ui-progress", `ui-progress-${tone()}`].join(" ")} role="progressbar" aria-valuemin={0} aria-valuenow={props.value} aria-valuemax={max()}>
       <div class="ui-progress-fill" style={{ width: `${pct()}%` }} />
     </div>
   )

@@ -9,6 +9,7 @@ import { type JSX, Show, For, createSignal } from "solid-js"
 import { Portal } from "solid-js/web"
 import Check from "lucide-solid/icons/check"
 import TriangleAlert from "lucide-solid/icons/triangle-alert"
+import CircleAlert from "lucide-solid/icons/circle-alert"
 import X from "lucide-solid/icons/x"
 import Info from "lucide-solid/icons/info"
 import { prefersReducedMotion } from "./animated-section.tsx"
@@ -61,7 +62,7 @@ const toneIcon = (tone: ToastTone): JSX.Element => {
   switch (tone) {
     case "success": return <Check size={18} aria-hidden="true" />
     case "warning": return <TriangleAlert size={18} aria-hidden="true" />
-    case "error": return <X size={18} aria-hidden="true" />
+    case "error": return <CircleAlert size={18} aria-hidden="true" />
     default: return <Info size={18} aria-hidden="true" />
   }
 }
@@ -73,9 +74,9 @@ export function ToastViewport(): JSX.Element {
         <For each={items()}>{(item) => (
           <Motion.div
             class={toneClass(item.tone)}
-            initial={reduced() ? { opacity: 0 } : { opacity: 0, x: 24, scale: 0.95 }}
-            animate={reduced() ? { opacity: 1 } : { opacity: 1, x: 0, scale: 1 }}
-            exit={reduced() ? { opacity: 0 } : { opacity: 0, x: 24, scale: 0.95 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, x: 24 }}
+            animate={reduced() ? { opacity: 1 } : { opacity: 1, x: 0 }}
+            exit={reduced() ? { opacity: 0 } : { opacity: 0, x: 24 }}
             transition={{ duration: 0.35, easing: [0.22, 1, 0.36, 1] }}
           >
             <span class="ui-toast-icon">{toneIcon(item.tone)}</span>

@@ -13,6 +13,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { useKeyedRead, useRead } from "../../../app/queries.ts"
 import { t } from "../../../i18n/index.ts"
 import { McpLoading, McpServerForm, legacyFailure, legacyRead, serversFrom, type McpServerCard } from "../components/mcp.tsx"
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 /** Legacy red banner with the dismiss button. */
@@ -93,7 +94,7 @@ export function McpSettingsScreen(): JSX.Element {
         </Show>
       </>}
     >
-    <Show when={!config.loading()} fallback={<div class="p-8 text-center"><McpLoading /></div>}>
+    <Show when={!config.loading()} fallback={<McpLoading />}>
       <div class="mx-auto max-w-5xl">
 
         <Show when={error() !== undefined}>
@@ -316,7 +317,7 @@ export function McpConfigEditorScreen(): JSX.Element {
           </div>
         }
       >
-        <div class="p-8 text-center">{t("mcp.editor.loading")}</div>
+        <LoadingState label={t("mcp.editor.loading")} rows={5} />
       </Show>
 
       <div class="mt-4 text-sm text-slate-600">

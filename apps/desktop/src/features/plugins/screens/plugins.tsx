@@ -345,7 +345,7 @@ export function PluginDetailScreen(): JSX.Element {
 
   return <WorkspaceDetail title={plugin.data()?.manifest.name || t("plugins.title")} subtitle="Plugin" backHref="/plugins" backLabel={t("plugins.detail.backToPlugins")}>
     <Show when={plugin.data() !== undefined || !plugin.loading()} fallback={
-      <div class="mx-auto p-8 text-center">{t("plugins.detail.loading")}</div>
+      <LoadingState label={t("plugins.detail.loading")} rows={3} />
     }>
       <Show when={!plugin.error()} fallback={
         <div class="mx-auto max-w-4xl p-4 md:p-8">
@@ -460,7 +460,7 @@ export function PluginDetailScreen(): JSX.Element {
               type="button"
               disabled={pending() || generating()}
               onClick={() => void generateReadme()}
-              class="flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm text-white shadow-sm transition-colors duration-150 ease-out hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText size={16} class="mr-2" />
               {t(generating() ? "plugins.detail.generating" : "plugins.detail.generateReadme")}

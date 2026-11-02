@@ -26,7 +26,7 @@ import Plus from "lucide-solid/icons/plus"
 import Plug from "lucide-solid/icons/plug"
 import RefreshCw from "lucide-solid/icons/refresh-cw"
 import ScrollText from "lucide-solid/icons/scroll-text"
-import Sparkles from "lucide-solid/icons/sparkles"
+import Lightbulb from "lucide-solid/icons/lightbulb"
 import Trash2 from "lucide-solid/icons/trash-2"
 import Wrench from "lucide-solid/icons/wrench"
 import X from "lucide-solid/icons/x"
@@ -421,7 +421,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       <Show when={ai.messages().length > 0 && ai.suggestions().length > 0 && !running()}>
         <section class="assistant-suggestions" data-testid="proactive-suggestions">
-          <p class="assistant-section-label"><Sparkles size={10} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
+          <p class="assistant-section-label"><Lightbulb size={10} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
           <ul>
             <For each={ai.suggestions().slice(0, 3)}>
               {(suggestion) => (
@@ -432,7 +432,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                     onClick={() => setDraft(suggestion.prompt)}
                     title={suggestion.description}
                   >
-                    <span class="assistant-suggestion-toast-icon"><Sparkles size={12} aria-hidden="true" /></span>
+                    <span class="assistant-suggestion-toast-icon"><Lightbulb size={12} aria-hidden="true" /></span>
                     <span class="assistant-suggestion-toast-copy">
                       <strong>{suggestion.title}</strong>
                       <small>{suggestion.description}</small>

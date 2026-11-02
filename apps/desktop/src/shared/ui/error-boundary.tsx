@@ -45,7 +45,7 @@ function ErrorFallback(props: ErrorFallbackProps): JSX.Element {
   return (
     <div role="alert" class="ui-error-fallback">
       <div class="ui-error-fallback-icon" aria-hidden="true">
-        <AlertTriangle size={18} />
+        <AlertTriangle size={18} aria-hidden="true" />
       </div>
       <div class="ui-error-fallback-body">
         <h4 class="ui-error-fallback-title">{t("common.error")}</h4>

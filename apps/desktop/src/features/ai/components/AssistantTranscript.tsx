@@ -12,7 +12,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down"
 import CircleGauge from "lucide-solid/icons/circle-gauge"
 import Hammer from "lucide-solid/icons/hammer"
 import Search from "lucide-solid/icons/search"
-import Sparkles from "lucide-solid/icons/sparkles"
+import Lightbulb from "lucide-solid/icons/lightbulb"
 import X from "lucide-solid/icons/x"
 import { t } from "../../../i18n/index.ts"
 import { AssistantPreview } from "../../../shared/ui/stageshow/index.ts"
@@ -181,7 +181,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                           onClick={() => props.onUseSuggestion(suggestion.prompt)}
                           title={suggestion.description}
                         >
-                          <span class="assistant-suggestion-toast-icon"><Sparkles size={13} aria-hidden="true" /></span>
+                          <span class="assistant-suggestion-toast-icon"><Lightbulb size={13} aria-hidden="true" /></span>
                           <span class="assistant-suggestion-toast-copy">
                             <strong>{suggestion.title}</strong>
                             <small>{suggestion.description}</small>
