@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import { linuxcncSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post } from "./types.ts"
@@ -27,6 +28,7 @@ export const linuxcncDialect: Dialect = {
   uppercaseComments: false,
   rotary: true,
   spindleOrient: linuxcncSpindleOrient,
+  cutterComp: isoCutterComp,
   inverseTime: { on: "G93", off: "G94" },
   smoothing: { on: (tol) => [`G64 P${tol}`], off: ["G61"] },
   begin: () => ["%"],

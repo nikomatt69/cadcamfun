@@ -70,7 +70,8 @@ export const OperationSpecSchema = Schema.Union([
   Schema.Struct({
     ...overrides, strategy: Schema.Literal("profile"), loop: ring, side: Schema.Literals(["outside", "inside"]), top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean),
     tabs: Schema.optionalKey(Schema.Array(Schema.Struct({ position: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 })), width: positive, height: positive })).check(Schema.isMaxLength(64))),
-    leadIn: Schema.optionalKey(Schema.Literals(PROFILE_LEAD_INS)), leadRadius: Schema.optionalKey(positive)
+    leadIn: Schema.optionalKey(Schema.Literals(PROFILE_LEAD_INS)), leadRadius: Schema.optionalKey(positive),
+    compensation: Schema.optionalKey(Schema.Literals(["none", "controller"]))
   }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("bore"), center: point, diameter: positive, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot", "tap", "ream"])), cycle: Schema.optionalKey(HoleCycleSchema) }),

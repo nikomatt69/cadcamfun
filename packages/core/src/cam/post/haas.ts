@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import { fanucProgramNumber, fanucSubprograms } from "./fanuc.ts"
 import { haasSpindleOrient } from "./spindle-orient.ts"
@@ -32,6 +33,7 @@ export const haasDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   spindleOrient: haasSpindleOrient,
+  cutterComp: isoCutterComp,
   tcp: "G234",
   inverseTime: { on: "G93", off: "G94" },
   // Haas G234 page: "The rotary axes must be at 0 before commanding G234"; "Do not program rapid moves while TCPC is active".

@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import { isoSpindleOrient } from "./spindle-orient.ts"
 import type { Dialect, Post } from "./types.ts"
@@ -27,6 +28,7 @@ export const okumaDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: isoCutterComp,
   workOffset: (offset) => `G15 H${Number(offset.slice(1)) - 53}`,
   begin: () => [],
   setup: ["G90", "G17", "G94", "G40", "G80"],

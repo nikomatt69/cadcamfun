@@ -20138,6 +20138,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "properties": {
                                               "_tag": {
                                                 "enum": [
+                                                  "CutterComp",
+                                                ],
+                                                "type": "string",
+                                              },
+                                              "register": {
+                                                "minimum": 1,
+                                                "type": "integer",
+                                              },
+                                              "side": {
+                                                "enum": [
+                                                  "left",
+                                                  "right",
+                                                  "off",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "side",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "_tag": {
+                                                "enum": [
                                                   "Assign",
                                                 ],
                                                 "type": "string",
@@ -64974,6 +65002,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "properties": {
                                         "_tag": {
                                           "enum": [
+                                            "CutterComp",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "register": {
+                                          "minimum": 1,
+                                          "type": "integer",
+                                        },
+                                        "side": {
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
                                             "Assign",
                                           ],
                                           "type": "string",
@@ -66220,6 +66276,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             },
                             "bottom": {
                               "type": "number",
+                            },
+                            "compensation": {
+                              "enum": [
+                                "none",
+                                "controller",
+                              ],
+                              "type": "string",
                             },
                             "coolant": {
                               "enum": [
@@ -69084,6 +69147,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               "properties": {
                                                 "_tag": {
                                                   "enum": [
+                                                    "CutterComp",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "register": {
+                                                  "minimum": 1,
+                                                  "type": "integer",
+                                                },
+                                                "side": {
+                                                  "enum": [
+                                                    "left",
+                                                    "right",
+                                                    "off",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "side",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
                                                     "Assign",
                                                   ],
                                                   "type": "string",
@@ -70563,6 +70654,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                       "required": [
                                         "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "CutterComp",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "register": {
+                                          "minimum": 1,
+                                          "type": "integer",
+                                        },
+                                        "side": {
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "side",
                                       ],
                                       "type": "object",
                                     },
@@ -72474,6 +72593,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     },
                                     "required": [
                                       "_tag",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "CutterComp",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "register": {
+                                        "minimum": 1,
+                                        "type": "integer",
+                                      },
+                                      "side": {
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "side",
                                     ],
                                     "type": "object",
                                   },

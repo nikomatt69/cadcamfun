@@ -670,7 +670,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         }
         case "profile": {
           const params = decode(ProfileParams, {
-            ...common, side: op.side, allowance: allowance ?? 0, leadIn: op.leadIn ?? "arc", leadRadius: op.leadRadius ?? Math.max(0.5, Math.min(radius, 5)),
+            ...common, side: op.side, compensation: op.compensation ?? "none", allowance: allowance ?? 0, leadIn: op.leadIn ?? "arc", leadRadius: op.leadRadius ?? Math.max(0.5, Math.min(radius, 5)),
             helixPitch: data.helixPitch, rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), arcFit: true, tolerance: prepared.tolerance,
             // A tab is material left standing: the cutter, which has its own width, is lifted over a window one diameter longer.
             ...(op.tabs !== undefined ? { tabs: op.tabs.map((t) => ({ ...t, width: t.width + tool.diameter })) } : {})
@@ -1234,7 +1234,12 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const rounding = 2 * Math.pow(10, -decimals) + 1e-9 + tcpTerm
   const plannedExtent = extent(planned.segments)
   const replayedExtent = interpreted === undefined ? [] : extent(interpreted.segments.filter((s): s is Exclude<GSegment, { kind: "dwell" }> => s.kind !== "dwell" && carry?.interior.has(s) !== true).map((s) => ({ rapid: s.kind === "rapid", to: s.to })))
-  const extentAgrees = replayedExtent.length === plannedExtent.length && plannedExtent.every((v, i) => Math.abs(v - replayedExtent[i]!) <= rounding)
+  // Cutter radius compensation (`G41` / `G42`): the program is the contour and the control's offset moves the tool centre by up to the tool radius
+  // in X and Y, so the replayed extent may differ from the planned one by that much there (Z is not offset). The exact offset is proven by the
+  // interpreter's own compensation tests; here the claim says it is only bounded.
+  const compensatedTools = new Set(toolpaths.filter((t) => t.moves.some((m) => m._tag === "CutterComp")).map((t) => t.toolId))
+  const compSlack = compensatedTools.size === 0 ? 0 : Math.max(...[...compensatedTools].map((id) => toolOf(id).diameter / 2))
+  const extentAgrees = replayedExtent.length === plannedExtent.length && plannedExtent.every((v, i) => Math.abs(v - replayedExtent[i]!) <= rounding + (i < 4 ? compSlack : 0))
   if (interpreted !== undefined && interpreted.errors.length > 0) issues.push(issue("ReplayMismatch", "replay", `The NC interpreter could not model: ${interpreted.errors.slice(0, 3).join("; ")}`))
   if (interpreted !== undefined && !extentAgrees) issues.push(issue("ReplayMismatch", "replay", `The replayed NC reaches [${replayedExtent.map((v) => v.toFixed(3)).join(", ")}], the planned motion [${plannedExtent.map((v) => v.toFixed(3)).join(", ")}]`))
 
@@ -1361,7 +1366,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     },
     {
       id: "nc-replay", status: interpreted === undefined ? "unresolved" : interpreted.errors.length > 0 || noTool > 0 || !extentAgrees ? "failed" : "passed",
-      detail: interpreted === undefined ? "No NC was emitted" : `Interpreted ${interpreted.segments.length} NC motions independently of the post; extents agree within ${rounding.toExponential(1)} mm${carry !== undefined ? `; ${carry.carried} motions ran under tool-centre-point control and were carried to machine coordinates through the table pivot (${carry.pieces} pieces within ${job.post?.options?.tolerance ?? 0.01} mm of the tip path)` : ""}`
+      detail: interpreted === undefined ? "No NC was emitted" : `Interpreted ${interpreted.segments.length} NC motions independently of the post; extents agree within ${rounding.toExponential(1)} mm${compSlack > 0 ? ` (X and Y within ${compSlack} mm: the control compensates the cutter radius, so the replay is the offset path of the programmed contour)` : ""}${carry !== undefined ? `; ${carry.carried} motions ran under tool-centre-point control and were carried to machine coordinates through the table pivot (${carry.pieces} pieces within ${job.post?.options?.tolerance ?? 0.01} mm of the tip path)` : ""}`
     },
     { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" },
     {

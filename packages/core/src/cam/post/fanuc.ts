@@ -1,3 +1,4 @@
+import { isoCutterComp } from "./cutter-comp.ts"
 import { emitProgram } from "./emitter.ts"
 import type { Program } from "../ir.ts"
 import { isoSpindleOrient } from "./spindle-orient.ts"
@@ -40,6 +41,7 @@ export const fanucDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   spindleOrient: isoSpindleOrient,
+  cutterComp: isoCutterComp,
   tcp: "G43.4",
   // Tilted working plane indexing (G68.2 + G53.1, workplane.ts) and inverse-time feed (G93, back with G94).
   tiltedPlane: fanucTiltedPlane,

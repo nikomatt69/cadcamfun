@@ -28,7 +28,7 @@ import { klartextTiltedPlane } from "./workplane.ts"
  * TIME` / `9.1 DWELL`, `CYCL DEF 32.0 TOLERANCE` / `32.1 T`, `CYCL DEF 247 PRESETTING` / `Q339=n ;PRESET NUMBER`).
  */
 export const heidenhainDialect: Dialect = {
-  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
+  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, cutterComp: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
   commentStyle: "semicolon", tcp: { on: () => "M128", off: () => "M129" },
   // Klartext feeds are tip feeds under M128; there is no inverse-time word.
   inverseTime: undefined,

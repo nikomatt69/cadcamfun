@@ -20,6 +20,7 @@ import {
   type Program,
   type Rotary,
   type SpindleOrientMove,
+  type CutterCompMove,
   type Toolpath,
   arcSweepBetween,
   expandCycle,
@@ -537,6 +538,14 @@ class Writer {
     }
   }
 
+  /** Cutter radius compensation: `G41 D<n>` (tool left of the path), `G42 D<n>` (right), `G40` (off). D is the tool number unless the move names a register. */
+  cutterComp(move: CutterCompMove): void {
+    this.endCycle()
+    cutterCompRefusal(this.dialect)
+    const word = this.compensation({ mode: move.side, ...(move.register === undefined ? {} : { register: move.register }) })
+    if (word !== undefined) this.block(word)
+  }
+
   /** Writes the spindle start that follows an orientation, before the first feed move after it. */
   private restartSpindle(): void {
     if (this.restartRpm === undefined) return
@@ -799,6 +808,9 @@ class Writer {
       case "SpindleOrient":
         this.spindleOrient(move)
         break
+      case "CutterComp":
+        this.cutterComp(move)
+        break
       case "Assign":
       case "MacroCall":
       case "If":
@@ -900,6 +912,13 @@ const feedRange = (toolpath: Toolpath): string => {
   return lo === hi ? `${Math.round(lo)}` : `${Math.round(lo)}-${Math.round(hi)}`
 }
 
+/** Refuses (with the reason) a compensation word the control does not have: the offset program would cut a radius too much or too little. */
+const cutterCompRefusal = (dialect: Dialect): void => {
+  if (dialect.cutterComp === undefined) {
+    throw new RangeError(`${dialect.id}: this post writes no cutter radius compensation (G41 / G42 / G40); the program is refused instead of written as the programmed contour, which would cut a tool radius off the part. Generate the tool-centre path instead (compensation: none)`)
+  }
+}
+
 /** Refuses (with the reason) an orientation the control has no word for, or one it can only do at its fixed mark. */
 const spindleOrientRefusal = (dialect: Dialect, angle: number): void => {
   const spec = dialect.spindleOrient
@@ -928,6 +947,7 @@ const rejectUnwritable = (program: Program, dialect: Dialect): void => {
       throw new RangeError(`Toolpath "${toolpath.name}" mixes positioned rotary axes (3+2) with simultaneous rotary motion: split it into two operations`)
     }
     for (const m of toolpath.moves) if (m._tag === "SpindleOrient") spindleOrientRefusal(dialect, m.angle ?? 0)
+    if (toolpath.moves.some((m) => m._tag === "CutterComp")) cutterCompRefusal(dialect)
     if (simultaneous && !dialect.rotary) {
       throw new RangeError(`Toolpath "${toolpath.name}" drives rotary axes, which the ${dialect.id} post cannot write: use a 5-axis post (haas) or a 3-axis operation`)
     }
