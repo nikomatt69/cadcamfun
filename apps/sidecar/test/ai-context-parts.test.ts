@@ -43,6 +43,8 @@ describe("assembleParts", () => {
     const scoped = makeAiContext({ kv: kv as never, projects: projects as never, host: Option.none(), drawings: {
       find: (actorId: string, id: string) => {
         reads.push(`${actorId}:${id}`)
+        // d-1 was last saved before its snapshot was written, d-2 has no snapshot at all.
+        if (id === "d-1") return Effect.succeed({ project: { id: "p1" }, id, name: "Bracket", updatedAt: "2026-10-28T09:00:00Z", data: {} })
         return Effect.succeed({ project: { id: "p1" }, id, name: "Other drawing", updatedAt: "2026-11-02T10:00:00Z", data: { elements: [{ id: "other-body", type: "cube", name: "Other body", width: 20, height: 30, depth: 40 }] } })
       }
     } as never })
@@ -54,7 +56,7 @@ describe("assembleParts", () => {
     expect(second.observation.text).not.toContain("element-0")
     expect(second.manifest.included.some((source) => source.id === "stored-drawing")).toBe(true)
     expect(second.observation.text).toContain("live selection unavailable")
-    expect(reads).toEqual(["u:d-2"])
+    expect(reads).toEqual(["u:d-1", "u:d-2"])
     expect(first.stable.text).toBe(second.stable.text)
   })
 
@@ -78,5 +80,42 @@ describe("assembleParts", () => {
     const parts = await Effect.runPromise(scoped.assembleParts({ ...request, sessionId: "s", drawingId: "d-2", includeContext: false, explicit: "Only this turn" }))
     expect(parts.observation.text).toBe("Only this turn")
     expect(calls).toEqual([])
+  })
+
+  describe("a snapshot older than the saved drawing", () => {
+    const savedAfter = (updatedAt: string, project = "p1") => makeAiContext({ kv: kv as never, projects: projects as never, host: Option.none(), drawings: {
+      find: () => Effect.succeed({ project: { id: project }, id: "d-1", name: "Bracket", updatedAt, data: {} })
+    } as never })
+
+    test("is delivered with a note that the saved drawing is newer, inside the observation budget", async () => {
+      const parts = await Effect.runPromise(savedAfter("2026-10-28T10:05:00Z").assembleParts({ ...request, drawingId: "d-1" }))
+      expect(parts.observation.text).toContain('drawing "Bracket"')
+      expect(parts.observation.text).toContain("Stale snapshot")
+      expect(parts.observation.text).toContain("2026-10-28T10:05:00.000Z")
+      expect(parts.observation.text).toContain("cad action describe")
+      expect(parts.observation.text.length).toBeLessThanOrEqual(OBSERVATION_BUDGET)
+      expect(parts.observation.manifest.omitted.filter((entry) => entry.reason === "budget")).toEqual([])
+      // The editor snapshot time stays the observation time; the later save does not pose as it.
+      expect(parts.observationAt).toBe(Date.parse("2026-10-28T10:00:00Z"))
+    })
+
+    test("a snapshot written after the last save, or an equal time, carries no note and keeps its whole budget", async () => {
+      for (const updatedAt of ["2026-10-28T10:00:00Z", "2026-10-28T09:59:59Z"]) {
+        const parts = await Effect.runPromise(savedAfter(updatedAt).assembleParts({ ...request, drawingId: "d-1" }))
+        expect(parts.observation.text).not.toContain("Stale snapshot")
+      }
+      const plain = await Effect.runPromise(context.assembleParts({ ...request, drawingId: "d-1" }))
+      const checked = await Effect.runPromise(savedAfter("2026-10-28T09:00:00Z").assembleParts({ ...request, drawingId: "d-1" }))
+      expect(checked.observation.text).toBe(plain.observation.text)
+    })
+
+    test("a drawing of another project, or one that cannot be read, adds nothing", async () => {
+      const foreign = await Effect.runPromise(savedAfter("2026-11-01T00:00:00Z", "foreign").assembleParts({ ...request, drawingId: "d-1" }))
+      expect(foreign.observation.text).not.toContain("Stale snapshot")
+      const broken = makeAiContext({ kv: kv as never, projects: projects as never, host: Option.none(), drawings: { find: () => Effect.fail(new Error("db down")) } as never })
+      const parts = await Effect.runPromise(broken.assembleParts({ ...request, drawingId: "d-1" }))
+      expect(parts.observation.text).toContain('drawing "Bracket"')
+      expect(parts.observation.text).not.toContain("Stale snapshot")
+    })
   })
 })

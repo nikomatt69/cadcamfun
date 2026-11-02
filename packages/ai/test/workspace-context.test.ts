@@ -78,6 +78,18 @@ describe("workspace context", () => {
     expect(renderNotes([])).toBe("")
   })
 
+  test("a note cut to the line limit says so and names the action that returns it whole", () => {
+    const long = `G55 fixture plate. ${"Vise jaw offset recorded from the probe cycle; ".repeat(20)}LAST-FACT`
+    const cut = renderNotes([{ key: "setup", value: long }, { key: "short", value: "mm only" }])
+    expect(cut).toContain("- setup: G55 fixture plate.")
+    expect(cut).not.toContain("LAST-FACT")
+    expect(cut).toContain("[cut; memory action recall reads the whole note]")
+    // A note that fits, and a short one beside the cut one, carry no marker.
+    expect(cut).toContain("\n- short: mm only")
+    expect(cut.match(/\[cut;/g)?.length).toBe(1)
+    expect(renderNotes([{ key: "k", value: "x".repeat(300) }])).not.toContain("[cut;")
+  })
+
   test("the system prompt carries the workflow, attachments and when to ask", () => {
     const prompt = systemPrompt("ctx")
     expect(prompt).toMatch(/execute a useful bounded step.*read its result/i)

@@ -220,7 +220,10 @@ export const renderNotes = (notes: ReadonlyArray<{ readonly key: string; readonl
     let value: string
     try { value = typeof note.value === "string" ? note.value : JSON.stringify(note.value) ?? "unknown" }
     catch { value = "unserializable value" }
-    const line = `- ${label(note.key)}: ${str(value)?.slice(0, 300) ?? "unknown"}`
+    // A note may hold 2 000 characters; the context shows 300. A cut says so and names the action that returns the whole note.
+    const whole = untrustedLine(value, 100_000)
+    const shown = str(value)?.slice(0, 300) ?? "unknown"
+    const line = `- ${label(note.key)}: ${shown}${whole.length > 300 ? ` [cut; memory action recall reads the whole note]` : ""}`
     const candidate = [...rows, line]
     if (header(notes.length - candidate.length).length + candidate.join("\n").length > budget) break
     rows.push(line)

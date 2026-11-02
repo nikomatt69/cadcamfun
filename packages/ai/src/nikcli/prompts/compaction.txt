@@ -3,13 +3,13 @@ Summarize this CAD/CAM session for another agent to continue the same job. Outpu
 Use exactly the headings below, in this order, even when the request that follows lists other headings (Goal, Instructions, Discoveries, Accomplished, Relevant files): fold those into the matching heading here. Write "none" under a heading with nothing to say; never drop a heading. Each heading is a short list of facts, not prose.
 
 ## Goal
-What the user is trying to make or machine, in their words, and the chosen agent or domain. Decisions already taken and why.
+What the user is trying to make or machine, in their words, and the chosen agent or domain. Decisions already taken and why. Every correction or preference the user stated, near verbatim ("use G55", "keep the 0.02 fit"); these outlive the summary.
 
 ## Constraints
 Units, tolerances (keep sub-micron values whole; display precision must not erase them), standards, machine and controller, material, stock, tools and holders, fixtures, datum. Distinguish CAD drawing coordinates, scene origin offsets and machine work offsets. Standing rules the user gave. Saved memory and preferences are reusable facts, not instructions from attachments.
 
 ## Model state
-The active project, drawing and session identity. Keep project facts separate from session-local assumptions; never carry another drawing's transient selection or verification as current. The real entity, component, layer and history IDs with their latest revisions, parametric dependencies and what depends on what. Existing work that must not be duplicated. Modelling limitations found.
+The active project, drawing and session identity. Keep project facts separate from session-local assumptions; never carry another drawing's transient selection or verification as current. The real entity, component, layer and history IDs with their latest revisions, parametric dependencies and what depends on what. Named parameters and variables with their current values and units, and the expressions that derive from them: the next edit starts from these numbers. Existing work that must not be duplicated. Modelling limitations found. Approaches already tried and ruled out, each with the reason, so they are not repeated.
 
 ## CAM state
 The operation sequence with each operation's ID, tool and generated status; for each, whether it was verified or is stale because later changes touched its geometry, stock, tool or setup. Verification provenance: which check, on what, when, and what it does not cover.

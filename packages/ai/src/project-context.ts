@@ -27,7 +27,11 @@ export const projectContextKey = (projectId: string): string => `ai.projectconte
 export const MAX_PROJECT_CONTEXT_CHARS = 8_000
 
 export const PROJECT_CONTEXT_BUDGET = 2_000
-export const PROJECT_MEMORY_BUDGET = 1_500
+/**
+ * What earlier sessions established is the new session's only recall of machine, stock, work offsets and decisions, and the
+ * assistant has no tool that reads the Brain file. 1 500 characters held about ten facts; 3 000 hold a project's standing setup.
+ */
+export const PROJECT_MEMORY_BUDGET = 3_000
 export const USER_HABITS_BUDGET = 1_500
 
 /** Notes older than this and not referenced by the project context are pruned when a session settles. */
@@ -193,7 +197,7 @@ export const renderProjectMemory = (document: string | undefined, budget: number
     ],
     text,
     Math.max(0, Math.floor(num(budget) ?? PROJECT_MEMORY_BUDGET)),
-    "\n[Project memory truncated; the full file is on disk.]"
+    `\n[Project memory truncated: only the start of ${(document ?? "").length} characters is shown. A fact that is missing here may exist; confirm with the user or the drawing instead of assuming it is absent.]`
   )
 }
 

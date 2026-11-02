@@ -21,6 +21,9 @@ import type { DrawingRepo } from "../repos/drawing-repo.ts"
 
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
+/** Characters of the observation budget kept free for the note that says the snapshot is behind the saved drawing. */
+const SNAPSHOT_STALE_RESERVE = 500
+
 export class ContextAccessDenied extends Error {
   constructor() {
     super("Project not found or inaccessible")
@@ -53,10 +56,23 @@ export const makeAiContext = ({ kv, projects, host, drawings }: AiContextDeps) =
         ? snapshot.value as Record<string, unknown> : undefined
       const matchingProject = saved?.["projectId"] === undefined || saved["projectId"] === projectId
       const matchingDrawing = request.drawingId === undefined || saved?.["drawingId"] === request.drawingId
-      if (snapshot && matchingProject && matchingDrawing) out.push({
-        id: "workspace-snapshot", kind: "ui-snapshot", label: "saved editor snapshot", at: Date.parse(snapshot.updatedAt),
-        text: typeof snapshot.value === "string" ? snapshot.value : renderWorkspaceContext(snapshot.value, { projectId, ...(snapshotBudget !== undefined ? { budget: snapshotBudget } : {}) })
-      })
+      if (snapshot && matchingProject && matchingDrawing) {
+        // The snapshot is written by the editor that sent a turn. A turn from another window or the phone, or an assistant edit
+        // saved since, leaves it behind the stored drawing: the element list and selection would be read as current.
+        const stored = request.drawingId !== undefined && drawings !== undefined
+          ? yield* read("the session's saved drawing", drawings.find(request.actorId, request.drawingId), undefined) : undefined
+        const savedAt = stored === undefined ? NaN : Date.parse(stored.updatedAt), snapshotAt = Date.parse(snapshot.updatedAt)
+        const stale = stored !== undefined && stored.project.id === projectId && Number.isFinite(savedAt) && Number.isFinite(snapshotAt) && savedAt > snapshotAt
+        const room = snapshotBudget === undefined ? undefined : Math.max(0, snapshotBudget - (stale ? SNAPSHOT_STALE_RESERVE : 0))
+        out.push({
+          id: "workspace-snapshot", kind: "ui-snapshot", label: "saved editor snapshot", at: snapshotAt,
+          text: typeof snapshot.value === "string" ? snapshot.value : renderWorkspaceContext(snapshot.value, { projectId, ...(room !== undefined ? { budget: room } : {}) })
+        })
+        if (stale) out.push({
+          id: "snapshot-stale", kind: "ui-snapshot", label: "saved editor snapshot is behind the saved drawing",
+          text: `Stale snapshot: drawing ${JSON.stringify(stored.name.slice(0, 80))} was saved at ${new Date(savedAt).toISOString()}, after the editor snapshot above (${new Date(snapshotAt).toISOString()}). Its elements, counts and selection may be outdated; call cad action describe before using ids or positions from it.`
+        })
+      }
       else if (request.drawingId !== undefined && drawings !== undefined) {
         const drawing = yield* read("the session's saved drawing", drawings.find(request.actorId, request.drawingId), undefined)
         if (drawing?.project.id === projectId) {
