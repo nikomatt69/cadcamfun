@@ -915,7 +915,7 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
   }
 
   .table th {
-    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500;
   }
 
   .table tbody {
@@ -1376,10 +1376,14 @@ input:checked + .toggle-slider:before {
 
 .toolGroupTitle {
   font-size: 12px;
-  color: #888;
+  line-height: 16px;
+  font-weight: 500;
+  color: #6b7280;
   margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+}
+
+.dark .toolGroupTitle {
+  color: #9ca3af;
 }
 
 /* Animation for active operations */
@@ -1420,10 +1424,15 @@ input:checked + .toggle-slider:before {
 }
 
 .toolOptionTitle {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #777;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: #6b7280;
   margin-bottom: 8px;
+}
+
+.dark .toolOptionTitle {
+  color: #9ca3af;
 }
 
 /* Adjust default border colors in dark mode */
