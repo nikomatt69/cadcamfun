@@ -38,6 +38,8 @@ import { ExplodedView } from "../lib/exploded-view.ts"
 import { DISPLAY_MODES, applyDisplayMode, isDisplayMode } from "../lib/display-mode.ts"
 import { applySketchVisibility } from "../lib/history-view.ts"
 import { applyDetailLevel } from "../lib/detail-level.ts"
+import { createJointMarkers } from "../lib/joint-markers.ts"
+import { useAssemblyStore } from "../store/assemblyStore.ts"
 import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
@@ -113,6 +115,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const layers = useLayerStore()
   const selection = useSelectionStore()
   const transformStore = useTransformControlsStore()
+  const assembly = useAssemblyStore()
   const snap = createSnap()
   const transformControls = createTransformControls({ enableKeyboardShortcuts: props.keyboard !== false })
 
@@ -780,6 +783,23 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   createEffect(() => showSub("picked", pickedSub()))
   createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
   onCleanup(() => { for (const kind of Object.keys(subOverlays) as SubHighlightKind[]) disposeSubHighlight(subOverlays[kind]) })
+
+  // The joints of the assembly (revolute, prismatic, ...) as glyphs at their origin, when the assembly panel shows them.
+  let jointMarkers: THREE.Object3D | undefined
+  createEffect(() => {
+    rebuilds()
+    const joints = Object.values(assembly.assemblyState.joints ?? {})
+    const show = assembly.showJoints
+    const offset = originOffset()
+    if (!ready() || !scene) return
+    if (jointMarkers) { disposeObject(jointMarkers); jointMarkers = undefined }
+    if (show && joints.length > 0) {
+      const box = modelBox()
+      jointMarkers = createJointMarkers(joints, box.isEmpty() ? 100 : box.getBoundingSphere(new THREE.Sphere()).radius, offset)
+      scene.add(jointMarkers)
+    }
+    invalidate()
+  })
 
   // Sketches of a history: the ones a feature uses show only when the person asks, the others always.
   createEffect(() => {
