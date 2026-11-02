@@ -25,6 +25,8 @@ import { massProperties } from "./mass.ts"
 import { Cdt } from "./cdt.ts"
 import { checkBudget } from "./budget.ts"
 import {
+  coaxialSphereCylinderRings,
+  edgePlaneParameters,
   edgeEdgeHits,
   edgeOnSurface,
   edgeSurfaceHits,
@@ -497,6 +499,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     readonly fb: number
     pts: SsiPoint[]
     readonly closed: boolean
+    readonly ringPlane?: { readonly origin: Vec3; readonly normal: Vec3 }
   }
   const ssis: Ssi[] = []
   const onEdgeOf = (sd: SolidData, fi: number, pts: ReadonlyArray<SsiPoint>): boolean => {
@@ -511,6 +514,36 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
       if (!boxOverlap(S[0].faceBox[ia]!, S[1].faceBox[ib]!, 0)) return
       checkBudget()
       if (coincidentSurfaces(fa.surface, fbF.surface, S[1], ib)) return
+      const completeRevolutionFace = (sd: SolidData, f: Face): boolean => {
+        if (f.loops.length !== 1) return false
+        const coedges = f.loops[0]!.coedges
+        return coedges.every((ce) => {
+          const e = sd.brep.edges[ce.edge]!
+          if (e.curve.kind !== "line" && e.curve.kind !== "circle") return false
+          if (coedges.filter((c) => c.edge === ce.edge).length === 2) return true
+          return f.surface.kind === "cylinder" && e.curve.kind === "circle" && Math.abs(dot3(e.curve.frame.z, f.surface.frame.z)) > 1 - 1e-14 && Math.abs(e.t1 - e.t0 - 2 * Math.PI) < 1e-12
+        })
+      }
+      const rings = completeRevolutionFace(S[0], fa) && completeRevolutionFace(S[1], fbF) ? coaxialSphereCylinderRings(fa.surface, fbF.surface) : undefined
+      if (rings !== undefined && rings.every((ring) => ring.every((q) => S[0].loc.insideFace(ia, q.ua, q.va) && S[1].loc.insideFace(ib, q.ub, q.vb)))) {
+        for (const pts of rings) {
+          const cylinder = fa.surface.kind === "cylinder" ? fa.surface : fbF.surface
+          if (cylinder.kind !== "cylinder") continue
+          // Analytic rings have an even, uniformly spaced sample count: opposite samples determine their plane's origin.
+          const center = scale3(add3(pts[0]!.p, pts[pts.length / 2]!.p), 0.5)
+          for (const [sd, face] of [[S[0], fa], [S[1], fbF]] as const) {
+            for (const ei of new Set(face.loops.flatMap((l) => l.coedges.map((c) => c.edge)))) {
+              const edge = sd.brep.edges[ei]!
+              for (const t of edgePlaneParameters(edge, center, cylinder.frame.z) ?? []) {
+                const p = curvePoint(edge.curve, t)
+                if (Math.abs(dist3(p, center) - cylinder.radius) <= tol) sd.splits[ei]!.push({ t, vid: reg.add(p) })
+              }
+            }
+          }
+          ssis.push({ fa: ia, fb: ib, pts, closed: true, ringPlane: { origin: center, normal: cylinder.frame.z } })
+        }
+        return
+      }
       const ta = S[0].tri[ia], tb = S[1].tri[ib], bvb = S[1].bvh[ib]
       if (ta === undefined || tb === undefined || bvb === undefined) return
       for (const pl of meshIntersectionPolylines(ta, tb, bvb, fa.surface, fbF.surface)) {
@@ -537,6 +570,8 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     // Vertices on this curve: registry points that lie on both surfaces and near the polyline.
     const onCurve: Array<{ readonly vid: number; readonly seg: number; readonly f: number }> = []
     reg.pts.forEach((P, vid) => {
+      // Both nearby coaxial rings lie on both surfaces. The surface-distance test alone cannot tell their vertices apart.
+      if (c.ringPlane !== undefined && Math.abs(dot3(sub3(P, c.ringPlane.origin), c.ringPlane.normal)) > tol * 10) return
       let best = -1, bestD = Infinity, bestF = 0
       const nseg = c.closed ? pts.length : pts.length - 1
       for (let i = 0; i < nseg; i++) {
