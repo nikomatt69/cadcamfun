@@ -3,6 +3,15 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.70 (November 2026)
+
+## Desktop
+
+- Refine CAD explorer and layer controls
+- Improve CAM operation controls
+- Stageshow scenes for MCP, manuals and not-found empties
+- Add lost kind to stageshow module previews
+
 ## v0.1.69 (November 2026)
 
 ## Desktop
