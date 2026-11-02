@@ -269,17 +269,17 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
             <WorkspaceTabs class="mb-3" tabs={tabs()} value={tab()} onChange={setTab} label={t("library.detail.sections", { title: meta.title })} />
 
             <Show when={tab() === "overview"}>
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div class={`${PANEL} md:col-span-2 !p-3`}>
+              <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,19rem)]">
+                <div class={`${PANEL} min-w-0`}>
                   <div class="mb-3 flex items-start gap-2">
                     <span class="flex h-8 w-8 flex-none items-center justify-center rounded-[5px] border border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"><Icon size={16} aria-hidden="true" /></span>
                     <div class="min-w-0">
-                      <h2 class="truncate text-[13px] font-semibold text-slate-900 dark:text-white">{name()}</h2>
-                      <p class="text-[11px] text-slate-500 dark:text-slate-400">{meta.title}</p>
+                      <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{meta.title}</h2>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">{name()}</p>
                     </div>
                   </div>
                   <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">{t("pages.no.description.provided")}</p>}>
-                    <p class="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{str(current()["description"] ?? current()["notes"])}</p>
+                    <p class="whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{str(current()["description"] ?? current()["notes"])}</p>
                   </Show>
                   <Show when={props.kind === "components"}><div class="mt-3"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
                   <Show when={props.kind === "tools"}><div class="mt-3"><ToolPreview3D tool={current()} /></div></Show>
@@ -288,7 +288,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   <div class="mt-3"><StatGrid items={summaryFields(props.kind, current())} /></div>
                   <Show when={props.kind === "materials"}><div class="mt-3"><MaterialBars properties={asRecord(current()["properties"])} /></div></Show>
                 </div>
-                <aside class={`${PANEL} !p-3`}>
+                <aside class={`${PANEL} min-w-0`}>
                   <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("library.detail.information")}</h3>
                   <dl class="panel-kv">
                     <dt>{t("org.overview.created")}</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
@@ -421,13 +421,18 @@ function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined
 /** Strength / stiffness / conductivity against the strongest common stock, so two materials compare at a glance. */
 function MaterialBars(props: { readonly properties: Row }): JSX.Element {
   const value = (key: string): number => num(props.properties[key])
-  return <div class="grid grid-cols-1 gap-2.5 rounded-[5px] border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
-    <PropertyBar label={t("library.material.density")} value={densityKgM3(value("density"))} max={9000} unit="kg/m³" />
-    <PropertyBar label={t("library.detail.yield")} value={value("yieldStrength")} max={1800} unit="MPa" />
-    <PropertyBar label={t("library.detail.ultimate")} value={value("ultimateStrength")} max={2000} unit="MPa" />
-    <PropertyBar label={t("library.detail.elastic")} value={value("elasticModulus")} max={400} unit="GPa" />
-    <PropertyBar label={t("library.detail.thermal")} value={value("thermalConductivity")} max={400} unit="W/(m·K)" />
-  </div>
+  const properties = createMemo(() => [
+    { label: t("library.material.density"), value: densityKgM3(value("density")), max: 9000, unit: "kg/m³" },
+    { label: t("library.detail.yield"), value: value("yieldStrength"), max: 1800, unit: "MPa" },
+    { label: t("library.detail.ultimate"), value: value("ultimateStrength"), max: 2000, unit: "MPa" },
+    { label: t("library.detail.elastic"), value: value("elasticModulus"), max: 400, unit: "GPa" },
+    { label: t("library.detail.thermal"), value: value("thermalConductivity"), max: 400, unit: "W/(m·K)" }
+  ].filter((property) => property.value > 0))
+  return <Show when={properties().length > 0}>
+    <div class="grid grid-cols-1 gap-3 rounded-md border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
+      <For each={properties()}>{(property) => <PropertyBar {...property} />}</For>
+    </div>
+  </Show>
 }
 
 function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly onPatch: (key: string, value: unknown) => void; readonly onPatchConfig: (key: string, value: unknown) => void }): JSX.Element {
