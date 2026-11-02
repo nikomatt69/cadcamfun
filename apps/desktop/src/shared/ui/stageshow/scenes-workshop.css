@@ -26,7 +26,7 @@
   height: 11px;
   border-radius: 50%;
   background: var(--ss-accent);
-  box-shadow: 0 0 0 3px var(--ss-accent-soft), 0 1px 3px rgb(0 0 0 / 0.25);
+  box-shadow: 0 0 0 3px var(--ss-accent-soft);
   offset-path: path("M40 26 H196 V62 H40 V34 H182 V54 H54 V44 H168");
   offset-distance: 0%;
   offset-rotate: 0deg;
@@ -45,7 +45,7 @@
   background: var(--ss-surface);
   border-left: 1px solid var(--ss-line);
   font-family: var(--ss-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.35;
   color: var(--ss-text-muted);
 }
@@ -71,12 +71,12 @@
   top: 12px;
   bottom: 12px;
   width: 196px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--ss-line);
   border-radius: 8px;
   background: var(--ss-surface);
   font-family: var(--ss-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--ss-text-muted);
   overflow: hidden;
@@ -92,7 +92,7 @@
   color: var(--ss-text-faint);
 }
 
-.ss-stage .wk-program__name { color: var(--ss-text); font-size: 10.5px; }
+.ss-stage .wk-program__name { color: var(--ss-text); font-size: 11px; }
 .ss-stage .wk-program__line { display: block; white-space: nowrap; }
 .ss-stage .wk-program__line[data-checked="true"] { color: var(--ss-text); }
 
@@ -146,7 +146,7 @@
 .ss-stage .wk-op {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   height: 34px;
   flex: none;
   padding: 0 12px;
@@ -168,7 +168,7 @@
   align-items: center;
   gap: 8px;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--ss-line);
   border-radius: 8px;
   background: var(--ss-surface);
@@ -185,7 +185,7 @@
   right: 16px;
   top: 14px;
   width: 150px;
-  padding: 9px 11px;
+  padding: 10px 12px;
   border: 1px solid var(--ss-line-strong);
   border-radius: 8px;
   background: var(--ss-surface);
@@ -198,7 +198,7 @@
 .ss-stage .wk-spec[data-in="true"] { opacity: 1; transform: none; }
 .ss-stage .wk-spec__title { display: block; font-size: 11.5px; font-weight: 600; color: var(--ss-text); margin-bottom: 6px; }
 .ss-stage .wk-spec .ss-bar { margin-bottom: 5px; }
-.ss-stage .wk-spec__chip { display: inline-flex; margin-top: 2px; padding: 2px 7px; border-radius: 999px; background: var(--ss-surface-inset); font-size: 10px; color: var(--ss-text-muted); white-space: nowrap; }
+.ss-stage .wk-spec__chip { display: inline-flex; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: var(--ss-surface-inset); font-size: 11px; color: var(--ss-text-muted); white-space: nowrap; }
 
 /* ── Tool: the cutter that is assigned to an operation ───────────────────── */
 .ss-stage .wk-cutter {
@@ -221,7 +221,7 @@
   top: 56px;
   width: 168px;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--ss-line);
   border-radius: 8px;
   background: var(--ss-surface);
