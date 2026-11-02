@@ -18,7 +18,6 @@ import { TOLERANCE_PRESETS, isTolerance } from "@cadcamfun/core"
 import { setDisplayUnits, setDocumentTolerance } from "../../../../shared/state/document-settings.ts"
 import { useApp } from "../../../../shared/state/context.ts"
 import { DISPLAY_UNITS, UNIT_TABLE, formatLength, fromDisplay, isDisplayUnits, toDisplay } from "../../../../viewport/units.ts"
-import { NumberField } from "../property-inputs/NumberField.tsx"
 import { ExplorerScene } from "../../../../shared/ui/stageshow/scenes-cad.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
 import type { Browser } from "./browserState.ts"
@@ -203,6 +202,7 @@ export function OriginBlock(): JSX.Element {
   const cad = useCADStore()
   const settings = () => app.settings.settings()
   const [custom, setCustom] = createSignal(false)
+  const [problem, setProblem] = createSignal<string | undefined>()
   const presets = createMemo(() => (TOLERANCE_PRESETS.includes(settings().tolerance) ? TOLERANCE_PRESETS : [...TOLERANCE_PRESETS, settings().tolerance].sort((a, b) => b - a)))
   const decimals = () => settings().decimals
   const length = (mm: number): string => formatLength(mm, settings().units, decimals())
@@ -216,11 +216,14 @@ export function OriginBlock(): JSX.Element {
   const onTolerance = (value: string): void => {
     if (value === "custom") { setCustom(true); return }
     setCustom(false)
+    setProblem(undefined)
     setDocumentTolerance(app, Number(value))
   }
   const onCustom = (typed: number): void => {
     const mm = fromDisplay(typed, settings().units)
-    if (isTolerance(mm)) setDocumentTolerance(app, mm)
+    if (!isTolerance(mm)) { setProblem(`${length(0.0001)} to ${length(10)}`); return }
+    setProblem(undefined)
+    setDocumentTolerance(app, mm)
   }
   return (
     <details class="sidebar-browser-origin border-b border-[color:var(--ent-line)]" data-testid="browser-origin" open>
@@ -241,16 +244,13 @@ export function OriginBlock(): JSX.Element {
         </label>
         <Show when={custom()}>
           <div class="px-3 pb-2">
-            <NumberField
-              label={t("browser.customTolerance")}
-              class={`${SELECT} w-full`}
+            <input
+              type="number" step="any" aria-label={t("browser.customTolerance")} data-testid="browser-custom-tolerance"
+              class={`${SELECT} w-full`} placeholder={t("browser.toleranceIn", { unit: UNIT_TABLE[settings().units].label })}
               value={toDisplay(settings().tolerance, settings().units)}
-              min={toDisplay(0.0001, settings().units)}
-              max={toDisplay(10, settings().units)}
-              step={toDisplay(0.001, settings().units)}
-              onChange={onCustom}
+              onChange={(event) => onCustom(event.currentTarget.valueAsNumber)}
             />
-            <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{t("browser.toleranceIn", { unit: UNIT_TABLE[settings().units].label })}</p>
+            <Show when={problem()}><p class="mt-1 text-xs text-red-600" role="alert">{t("browser.allowed", { range: problem() ?? "" })}</p></Show>
           </div>
         </Show>
         <div class={TOGGLE_ROW}><span class="mr-2 text-[color:var(--ent-text-muted)]"><Maximize size={14} /></span><span class="flex-1">{t("browser.workpiece")}</span><span class="font-mono tabular-nums">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
