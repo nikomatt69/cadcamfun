@@ -398,3 +398,10 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
 
 
 - 2026-11-02 (branch integration): both compensation IR forms share the dialect cutter-compensation codes and emitter state; unsupported controls still refuse compensation.
+- 2026-11-02 (CAD round 4, verified jointly, spec 42 §6.4): equal-radius corner Booleans of a fully rounded box are solved in place (0 displaced of 32, were 4);
+  a sphere centred on a cylinder or cone axis meets it in closed-form circles (spheres 1e-6 to 1e-3 mm off the wall are solved in place, both orders); `ssi.ts`
+  intersects two surface patches on their own and `ssi-gate.ts` is the R5 gate: **189 of 200 seeded pairs pass (94.5 %)**, worst curve error 8.4e-7 mm, 11 failures
+  (8 missed branches, 4 spurious curves). The Boolean does not use `intersectPatches` yet. The joint run of the two parallel branches found and fixed two
+  regressions (a sphere 1e-6 mm inside a coaxial cylinder read as disjoint: empty intersection, whole-cylinder subtraction, no warning; the circle-seed vertex
+  filter applied to mesh-seeded curves: aligned seed 78 fell back to the displacement). Sweeps: aligned 1-240 and generic 61-200, 0 refused, 0 failed, 0 displaced
+  after the fix. Open: the 11 gate failures, NURBS x NURBS marching inside the Boolean, singular-point tracing.

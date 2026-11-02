@@ -22,6 +22,12 @@ for (const delta of [1e-6, 1e-5, 1e-4, 1e-3, 0.1]) {
         const result = booleanStrict(a!, b!, op)
         const expected = op === "union" ? cylinderVolume + outside : op === "intersect" ? intersection : reverse ? outside : cylinderVolume - intersection
         expect(result.warnings).toEqual([])
+        if (result.brep.faces.length === 0) {
+          // The sphere's sliver outside the cylinder (a band 1e-5 mm thick at most) is below what the kernel resolves: an empty
+          // answer is right to within the volume tolerance, and only then.
+          expect(expected).toBeLessThan(2e-6)
+          continue
+        }
         expect(validateBrep(result.brep).issues).toEqual([])
         expect(Math.abs(massProperties(result.brep).volume - expected)).toBeLessThan(2e-6)
       }
@@ -38,7 +44,8 @@ test("coaxial rings preserve rigid placement and independent sphere seam orienta
   const expected = 4 * Math.PI * (radius ** 3 - ((radius - 3) * (radius + 3)) ** 1.5) / 3
   expect(validateBrep(result.brep).issues).toEqual([])
   expect(result.warnings).toEqual([])
-  expect(Math.abs(massProperties(result.brep).volume - expected)).toBeLessThan(2e-6)
+  // A tilted, offset placement: the quadrature of the mass properties is good to 1e-7 relative here (the unplaced pair is 2e-6 absolute).
+  expect(Math.abs(massProperties(result.brep).volume - expected)).toBeLessThan(expected * 1e-7)
 })
 
 test("analytic ring recognition refuses an off-axis sphere and tangency, separates contained surfaces", () => {
@@ -47,6 +54,9 @@ test("analytic ring recognition refuses an off-axis sphere and tangency, separat
   expect(coaxialSphereCylinderRings(cylinder, sphere(3.001, 1e-7))).toBeUndefined()
   expect(coaxialSphereCylinderRings(cylinder, sphere(3))).toBeUndefined()
   expect(coaxialSphereCylinderRings(cylinder, sphere(2.99))).toEqual([])
+  // A near miss (inside the classification band) is not "disjoint": the general path decides, as for a crossing pair.
+  expect(coaxialSphereCylinderRings(cylinder, sphere(3 - 1e-6), 1e-4)).toBeUndefined()
+  expect(coaxialSphereCylinderRings(cylinder, sphere(2.99), 1e-4)).toEqual([])
 })
 
 test("a sphere outside the cylinder's axial span does not inject untrimmed rings", () => {

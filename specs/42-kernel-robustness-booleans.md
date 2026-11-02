@@ -173,3 +173,28 @@ fix is an analytic seed for coaxial surfaces of revolution (circles), clipped to
 - A designed-coincidence probe (60+ cases) was written and is red in places the other session's R3 may already cover: identical spheres and a
   tangent boss rim still recover by displacement, a cross bore through a rod hits "intersection curve could not be refined", and slots open to
   a side wall disagree with the expected volumes (the expectation may be at fault). Not committed; re-derive the expectations before using.
+
+### 6.4 CAD round 4 2026-11-02 (equal-radius corners, coaxial surfaces, the R5 gate)
+
+Verified on main at the end of the round (the two parallel branches that built it were merged without a joint run; this section records what
+the joint run found).
+
+| Item | Result | Gate |
+|---|---|---|
+| Equal-radius corner Booleans (cylinder x cylinder, cylinder/sphere x sphere at a rounded-box corner) | **Solved in place.** An open intersection curve that stops short of a boundary vertex it points at (a mesh seed ends where a sliver of one face is narrower than the mesh resolves) is marched on to the vertex when the vertex lies on both surfaces, straight ahead within 14 degrees and within 16 seed chords (`extendToVertex`). The fully rounded box: 0 displaced of 32 Booleans (was 4), volume error 8e-11. Sweeps after the fixes below: aligned 1-240 and generic 61-200 are 0 refused, 0 failed; generic 0 displaced. | `rounded-box.test.ts` |
+| Coaxial sphere x cylinder / cone | **Closed form.** `coaxialCircles` (intersect.ts) solves the quadratic of the two profiles; the circles seed the curves (`circleSeeds`), trimmed to the runs inside both faces. A sphere 1e-6 to 1e-3 mm larger than a cylinder it is centred on meets it in two circles 0.002 to 0.07 mm apart at a grazing angle that mesh seeds cannot separate: solved in place. A second route for *complete* revolution faces (`coaxialSphereCylinderRings`: exact 128-sample rings, ring-plane vertex filter) came from a parallel branch and is kept; it runs first. Interior vertices of a circle-seeded curve must lie within the fit of it (a curve routed through the other circle's vertex jumped the gap). | `coaxial.test.ts`, `coaxial-ssi.test.ts` |
+| Patch x patch SSI (`ssi.ts`) | `intersectPatches(a, ra, b, rb)`: two parameter rectangles of two surfaces (NURBS or analytic), seeds from a BVH of the sampled grids, Newton onto both surfaces, resampled to a chord sag of 5e-7 mm. **Standalone: the Boolean does not call it** (it still seeds from the faces' tessellations). | `ssi.test.ts` |
+| R5 gate (`ssi-gate.ts`) | 200 seeded pairs (25 NURBS x plane, 25 x sphere, 25 x cylinder, 125 NURBS x NURBS), truth by a 160 x 160 dense grid of patch A. **189 of 200 pass (94.5 %)**: plane 24/25, sphere 22/25, cylinder 25/25, NURBS x NURBS 118/125. Worst curve error to both surfaces 8.4e-7 mm (limit 1e-6; no pair fails on accuracy). The 11 failures are 8 missed branches and 4 spurious curves (one pair has both). Slowest pair 19 s, total 431 s. | `bun packages/core/src/cad/brep/ssi-gate.ts 1 200` (prints the table and the failing seeds) |
+
+Joint-run findings, fixed in this section:
+- `coaxialSphereCylinderRings` answered "disjoint" (`[]`) for every sphere smaller than the cylinder, so a sphere 1e-6 mm inside the wall had an
+  empty intersection and a subtraction that kept the whole cylinder, with no warning and no dropped curve to trigger the R7 check (the R7 test
+  of 26f58343 went red). A near miss (gap below twenty fit tolerances) now stays on the general path, as `coaxialCircles` already did.
+- The interior-vertex filter written for the circle seeds applied to every curve; aligned seed 78 (cylinder x cylinder) lost a vertex and fell back
+  to the displacement (aligned 1-240 had 1 displaced). It applies only to circle-seeded curves now; `fuzz-residuals.test.ts` seed 78 pins it.
+- Test expectations: a sphere 1e-5 mm larger than the cylinder leaves a sliver of at most 2e-6 mm3 that the kernel reports as empty (right to
+  within the volume tolerance; the test accepts an empty answer only below it); the tilted-placement volume is checked at 1e-7 relative.
+
+Open: the 11 gate failures above (the harness prints the seeds); the Boolean does not use `intersectPatches`, so NURBS x NURBS faces still go
+through the mesh seeds (the R5 gate measures the kernel piece, not the Boolean); no singular-point tracer (tangency, cusps) beyond the cases
+solved by merging tangent hits; 500 seeds were not run.
