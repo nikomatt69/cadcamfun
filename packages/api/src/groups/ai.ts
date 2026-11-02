@@ -223,6 +223,8 @@ export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questio
 export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),
   action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory", "context", "acceptance", "set_acceptance"]),
   criteria: opt(Schema.Unknown),
+  /** `compact` only: what the summary should concentrate on (Claude Code's `/compact <focus>`). */
+  instructions: opt(Schema.String.check(Schema.isMaxLength(500))),
   taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
 /** nikcli's session goal (`/goal`): what the agent works toward on its own, and how far it is. */
 export const SessionGoal = Schema.Struct({

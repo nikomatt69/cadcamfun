@@ -391,8 +391,9 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     group: "context",
     title: "ai.cmd.compact",
     description: "ai.cmd.compact.desc",
+    args: "[what the summary should concentrate on]",
     keywords: ["token", "window", "shorten", "memory"],
-    run: ({ host }) => { void host.ai.compact(); return done }
+    run: ({ host, args }) => { void host.ai.compact(args.trim() === "" ? undefined : args.trim()); return done }
   },
   {
     name: "memory",

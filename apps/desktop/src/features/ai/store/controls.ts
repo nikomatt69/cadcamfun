@@ -25,6 +25,7 @@ export interface ControlFields {
   readonly taskId?: string
   readonly requestId?: string
   readonly answers?: ReadonlyArray<ReadonlyArray<string>>
+  readonly instructions?: string
 }
 
 export interface ControlsContext {
@@ -57,7 +58,7 @@ export interface Controls {
   readonly refreshModes: () => void
   readonly loadContextBreakdown: () => Promise<void>
   readonly consolidateMemory: () => Promise<void>
-  readonly compact: () => Promise<void>
+  readonly compact: (instructions?: string) => Promise<void>
   readonly cancelTask: (taskId: string) => Promise<void>
   readonly replyQuestion: (requestId: string, answers?: ReadonlyArray<ReadonlyArray<string>>) => Promise<void>
 }
@@ -100,7 +101,7 @@ export const createControls = (ctx: ControlsContext): Controls => {
     },
     loadContextBreakdown: () => control("context"),
     consolidateMemory: () => control("consolidate_memory"),
-    compact: () => control("compact"),
+    compact: (instructions) => control("compact", instructions !== undefined && instructions.trim() !== "" ? { instructions: instructions.trim() } : {}),
     cancelTask: (taskId) => control("cancel_task", { taskId }),
     replyQuestion: (requestId, answers) => control(answers ? "answer_question" : "reject_question", { requestId, ...(answers ? { answers } : {}) })
   }

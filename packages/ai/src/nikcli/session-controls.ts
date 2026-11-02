@@ -16,6 +16,8 @@ export interface SessionControlInput {
   readonly model?: { readonly provider?: string; readonly model?: string }
   /** Explicit owner-authored engineering criteria; the sidecar validates and stores them separately from model text. */
   readonly criteria?: unknown
+  /** `compact` only: what the summary should concentrate on. */
+  readonly instructions?: string
 }
 
 /** nikcli's `COMPACTION_BUFFER` (`session/overflow.ts`): the room kept below an input window before the host summarises. */

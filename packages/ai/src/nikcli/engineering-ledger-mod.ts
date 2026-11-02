@@ -5,6 +5,16 @@ import { pathToFileURL } from "node:url"
 import { renderEngineeringLedger, type EngineeringLedger } from "../engineering-state.ts"
 import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
 
+/**
+ * What the next compaction of a session should concentrate on, set by `/compact <focus>` while it runs. The hook reads it from here
+ * (same process), so it never travels through the host's configuration or the model's request.
+ */
+const focusBySession = new Map<string, string>()
+export const setCompactionFocus = (sessionId: string, focus: string | undefined): void => {
+  if (focus === undefined || focus.trim() === "") focusBySession.delete(sessionId)
+  else focusBySession.set(sessionId, focus.trim().slice(0, 500))
+}
+
 export interface EngineeringLedgerRead {
   readonly ledger: EngineeringLedger
   readonly summaryTargetTokens?: number
@@ -14,7 +24,7 @@ export interface EngineeringLedgerRead {
 export type EngineeringLedgerReader = (directory: string, sessionId: string) => Promise<EngineeringLedgerRead | undefined>
 
 const BRIDGE = Symbol.for("cadcamfun/engineering-ledger/v1")
-type Callback = (directory: string, sessionId: string) => Promise<{ readonly text: string; readonly summaryTargetTokens?: number } | undefined>
+type Callback = (directory: string, sessionId: string) => Promise<{ readonly text: string; readonly summaryTargetTokens?: number; readonly focus?: string } | undefined>
 const bridge = (): Map<string, Callback> => {
   const global = globalThis as unknown as Record<symbol, unknown>
   const existing = global[BRIDGE]
@@ -41,7 +51,8 @@ export const installEngineeringLedgerMod = (root: string, read: EngineeringLedge
     const state = await read(directory, sessionId)
     if (state === undefined) return undefined
     const text = renderEngineeringLedger(state.ledger)
-    return text === "" ? undefined : { text, ...(state.summaryTargetTokens !== undefined ? { summaryTargetTokens: state.summaryTargetTokens } : {}) }
+    const focus = focusBySession.get(sessionId)
+    return text === "" ? undefined : { text, ...(state.summaryTargetTokens !== undefined ? { summaryTargetTokens: state.summaryTargetTokens } : {}), ...(focus !== undefined ? { focus } : {}) }
   })
   const file = join(root, "native", `engineering-ledger-${key}.mjs`)
   const source = `const key = ${JSON.stringify(key)};
@@ -56,7 +67,8 @@ export const CadcamEngineeringLedger = async ({ directory }) => ({
     const state = await read(directory, sessionID);
     if (!state) return;
     const target = Number.isFinite(state.summaryTargetTokens) ? "Keep the narrative summary below " + state.summaryTargetTokens + " tokens. The authoritative ledger is supplied again after compaction." : "";
-    output.prompt = [${JSON.stringify(compactionPrompt)}, target, ...(Array.isArray(output.context) ? output.context : []), state.text].filter(Boolean).join("\\n\\n");
+    const focus = typeof state.focus === "string" ? "The person asked the summary to concentrate on: " + JSON.stringify(state.focus) + ". Keep every ledger fact and decision as well; give this topic the most detail." : "";
+    output.prompt = [${JSON.stringify(compactionPrompt)}, target, focus, ...(Array.isArray(output.context) ? output.context : []), state.text].filter(Boolean).join("\\n\\n");
   },
   "experimental.chat.messages.transform": async (_input, output) => {
     const messages = output.messages;

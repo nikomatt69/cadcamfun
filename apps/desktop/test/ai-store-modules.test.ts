@@ -237,6 +237,16 @@ describe("the commands the host's session answers", () => {
     expect(h.error()).toBeUndefined()
   })
 
+  test("compact sends the focus text only when there is one", async () => {
+    const calls: Array<{ readonly action: string; readonly payload: Record<string, unknown> }> = []
+    const h = controlsHarness(calls)
+    const controls = createControls(h.ctx as never)
+    await controls.compact("  the vise setup  ")
+    await controls.compact("   ")
+    expect(calls[0]?.payload["instructions"]).toBe("the vise setup")
+    expect("instructions" in (calls[1]?.payload ?? {})).toBe(false)
+  })
+
   test("the command that answers a question carries the answers", async () => {
     const calls: Array<{ readonly action: string; readonly payload: Record<string, unknown> }> = []
     const h = controlsHarness(calls)

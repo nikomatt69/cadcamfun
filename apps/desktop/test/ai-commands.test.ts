@@ -262,6 +262,14 @@ describe("running commands", () => {
     expect(calls).toEqual(["compact", "memory"])
   })
 
+  test("/compact carries what the summary should concentrate on, and none when typed bare", async () => {
+    const seen: Array<string | undefined> = []
+    const rec = recorder(stubAi({ compact: async (focus?: string) => { seen.push(focus) } }))
+    await run("/compact", rec)
+    await run("/compact   the bore tolerances and the vise setup ", rec)
+    expect(seen).toEqual([undefined, "the bore tolerances and the vise setup"])
+  })
+
   test("panel commands open exactly one disclosure", async () => {
     const rec = recorder()
     for (const [command, panel] of [["sessions", "sessions"], ["tools", "tools"], ["skills", "skills"], ["stats", "stats"], ["help", "help"]] as const) {

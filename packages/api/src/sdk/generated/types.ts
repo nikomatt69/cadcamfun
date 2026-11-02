@@ -394,6 +394,7 @@ export type AiSessionControlPayload = {
     | "acceptance"
     | "set_acceptance"
   readonly criteria?: unknown | undefined
+  readonly instructions?: string | undefined
   readonly taskId?: string | undefined
   readonly requestId?: string | undefined
   readonly answers?: ReadonlyArray<ReadonlyArray<string>> | undefined
@@ -3181,6 +3182,7 @@ export type AiSessionControlInput = {
   readonly projectId?: AiSessionControlPayload["projectId"]
   readonly action: AiSessionControlPayload["action"]
   readonly criteria?: AiSessionControlPayload["criteria"]
+  readonly instructions?: AiSessionControlPayload["instructions"]
   readonly taskId?: AiSessionControlPayload["taskId"]
   readonly requestId?: AiSessionControlPayload["requestId"]
   readonly answers?: AiSessionControlPayload["answers"]

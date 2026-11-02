@@ -1353,6 +1353,7 @@ export function make(options: ClientOptions) {
               projectId: input["projectId"],
               action: input["action"],
               criteria: input["criteria"],
+              instructions: input["instructions"],
               taskId: input["taskId"],
               requestId: input["requestId"],
               answers: input["answers"],

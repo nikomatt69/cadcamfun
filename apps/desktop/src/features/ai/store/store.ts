@@ -107,7 +107,7 @@ export interface AiStore {
   /** Asks the host where the context tokens go (nikcli `SessionContext.breakdown`); the answer lands in `hostContext().breakdown`. */
   readonly loadContextBreakdown: () => Promise<void>
   readonly consolidateMemory: () => Promise<void>
-  readonly compact: () => Promise<void>
+  readonly compact: (instructions?: string) => Promise<void>
   readonly cancelTask: (id: string) => Promise<void>
   readonly replyQuestion: (requestId: string, answers?: ReadonlyArray<ReadonlyArray<string>>) => Promise<void>
   /**

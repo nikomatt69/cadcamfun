@@ -37,6 +37,7 @@ import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
 import type { HostTaskInfo } from "./nikcli/chat.ts"
 import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "./nikcli/primaries.ts"
+import { setCompactionFocus } from "./nikcli/engineering-ledger-mod.ts"
 import { compactHostSession, readContextBreakdown, type ContextBreakdown, readDeliveredObservation, readHostContextPolicy } from "./nikcli/context.ts"
 import { planObservation, renderObservation, type ContextSection, type ObservationInput } from "./context-assembly.ts"
 import { contextBudget, questionsForSession, replySessionQuestion, type SessionControlInput } from "./nikcli/session-controls.ts"
@@ -495,7 +496,8 @@ export class AiService extends Context.Service<AiService, {
           if (state.busy) return yield* new AiConfigError({ message: "Wait for the current turn to finish before compacting." })
           yield* Effect.promise(() => host.value.scheduler.stopParent(owner))
           if (!providerID || !modelID || !selected) return yield* new AiConfigError({ message: "Select an available model before compacting." })
-          yield* compactHostSession(projectHost, sessionId, { providerID, modelID })
+          setCompactionFocus(sessionId, input.instructions)
+          yield* compactHostSession(projectHost, sessionId, { providerID, modelID }).pipe(Effect.ensuring(Effect.sync(() => setCompactionFocus(sessionId, undefined))))
         } else if (input.action === "consolidate_memory") {
           if (state.busy) return yield* new AiConfigError({ message: "Wait for the current turn to finish before consolidating memory." })
           yield* Effect.promise(() => host.value.scheduler.stopParent(owner))

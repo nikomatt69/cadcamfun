@@ -425,6 +425,7 @@ type Endpoint6_6Input = {
   readonly projectId?: Endpoint6_6Request["payload"]["projectId"]
   readonly action: Endpoint6_6Request["payload"]["action"]
   readonly criteria?: Endpoint6_6Request["payload"]["criteria"]
+  readonly instructions?: Endpoint6_6Request["payload"]["instructions"]
   readonly taskId?: Endpoint6_6Request["payload"]["taskId"]
   readonly requestId?: Endpoint6_6Request["payload"]["requestId"]
   readonly answers?: Endpoint6_6Request["payload"]["answers"]
@@ -438,6 +439,7 @@ const Endpoint6_6 = (raw: RawClient["ai"]) => (input: Endpoint6_6Input) =>
       projectId: input["projectId"],
       action: input["action"],
       criteria: input["criteria"],
+      instructions: input["instructions"],
       taskId: input["taskId"],
       requestId: input["requestId"],
       answers: input["answers"],

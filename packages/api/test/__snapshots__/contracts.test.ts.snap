@@ -8152,6 +8152,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                     ],
                   },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "maxLength": 500,
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "model": {
                     "anyOf": [
                       {
