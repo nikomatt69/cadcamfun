@@ -35,5 +35,5 @@ export const PREVIEW_STAGE = "relative overflow-hidden rounded-[5px] border bord
 /** A message laid over the stage (no WebGL, empty geometry, partial geometry). */
 export const stageNote = (tone: "info" | "warn"): string =>
   tone === "warn"
-    ? "pointer-events-none absolute inset-x-4 bottom-4 rounded-[5px] border border-amber-500/40 bg-slate-900/90 p-2.5 text-center text-[11px] text-amber-200"
+    ? "pointer-events-none absolute inset-x-4 bottom-4 rounded-[5px] border border-amber-700 bg-slate-900 p-3 text-center text-[11px] text-amber-200"
     : "pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-slate-300"

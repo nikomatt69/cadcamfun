@@ -94,7 +94,7 @@ export function ResourceGeometryPreview(props: {
     })
   })
   return <PreviewFrame title={t("cam.resource.preview")} testId="resource-geometry-preview" onFit={() => fit()} fitLabel={t("cam.resource.fit")} hint={t("cam.resource.orbit")}
-    actions={<Show when={props.program}><label class="flex items-center gap-1"><input type="checkbox" class="accent-blue-600" checked={pathsVisible()} onChange={(event) => setPathsVisible(event.currentTarget.checked)} />{t("save.toolpaths")}</label></Show>}>
+    actions={<Show when={props.program}><label class="flex items-center gap-2"><input type="checkbox" class="accent-blue-600" checked={pathsVisible()} onChange={(event) => setPathsVisible(event.currentTarget.checked)} />{t("save.toolpaths")}</label></Show>}>
     <div ref={host} class={`${PREVIEW_STAGE} h-80`} role="img" aria-label={t("cam.resource.preview")}>
       <Show when={unavailable()}><p role="status" class={stageNote("info")}>{t("cam.resource.noWebgl")}</p></Show>
       <Show when={!unavailable() && props.elements.length === 0}><p role="status" class={stageNote("info")}>{t("cam.resource.previewEmpty")}</p></Show>

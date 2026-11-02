@@ -13,7 +13,7 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js"
 import { A, useNavigate, useSearchParams } from "@solidjs/router"
-import { Box, Cpu, Grid3x3, Layers, List, Plus, Search, Sparkles, Trash2, Wrench, X, Edit } from "lucide-solid"
+import { Box, Cpu, Grid3x3, Layers, List, MessageSquareText, Plus, Search, Trash2, Wrench, X, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -293,7 +293,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       title={t("library.detail.libraryTitle", { name: meta.plural })}
       description={t("library.description", { type: lower })}
       actions={<>
-            <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />{t("cam.explorer.generate")}</button>
+            <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><MessageSquareText size={16} aria-hidden="true" />{t("cam.explorer.generate")}</button>
             <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />{t("ai.sessions.new")} {meta.singular}</button>
       </>}
       rail={<>
@@ -339,8 +339,8 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   <X size={14} aria-hidden="true" />{t("library.reset")}
                 </button>
                 <div class="workspace-view-toggle" role="group" aria-label={t("library.view")}>
-                  <button type="button" class="workspace-view-toggle__btn" title={t("library.grid")} aria-label={t("library.grid")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
-                  <button type="button" class="workspace-view-toggle__btn" title={t("library.list")} aria-label={t("library.list")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
+                  <button type="button" class="workspace-view-toggle__btn" title={t("library.grid")} aria-label={t("library.grid")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
+                  <button type="button" class="workspace-view-toggle__btn" title={t("library.list")} aria-label={t("library.list")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
                 </div>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{t("library.detail.countOf", { shown: filtered().length, total: rows().length, name: lower })}</p>
@@ -430,7 +430,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                     >
                         <Show when={hasFilters()} fallback={<>
                           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>{t("keys.group.create")} {meta.singular}</button>
-                          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />{t("library.detail.generateAi")}</button>
+                          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><MessageSquareText size={16} aria-hidden="true" />{t("library.detail.generateAi")}</button>
                         </>}>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("library.reset")}</button>
                         </Show>
@@ -498,12 +498,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                 <div class="workspace-resource-fact"><span>{fact.label}</span><span>{fact.value}</span></div>
                               )}</For>
                               <Show when={props.kind === "components" && str(row["projectId"]) !== ""}>
-                                <div class="flex justify-between"><span>{t("library.detail.project")}</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>
+                                <div class="flex justify-between gap-3"><span>{t("library.detail.project")}</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>
                               </Show>
                             </div>
                           </div>
                           </A>
-                          <div class="flex items-center justify-between border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30">
+                          <div class="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800">
                             <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(str(row["updatedAt"]))}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
                               <Show when={row["builtin"] !== true}>

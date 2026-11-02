@@ -308,7 +308,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                 <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("cam.resource.structure")}</h3>
                 <p class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("cam.resource.elementCount", { count: componentEntries(resourceElements(current()["data"])).length })}</p>
                 <ol class="space-y-1 text-xs text-slate-700 dark:text-slate-300"><For each={componentEntries(resourceElements(current()["data"]))}>{({ element, depth }) =>
-                  <li style={{ "padding-left": `${depth * 16}px` }}>{String(element["name"] ?? element.type)} <span class="text-[10.5px] text-slate-500 dark:text-slate-400">· {element.type}</span></li>
+                  <li style={{ "padding-left": `${depth * 16}px` }}>{String(element["name"] ?? element.type)} <span class="text-[11px] text-slate-500 dark:text-slate-400">· {element.type}</span></li>
                 }</For></ol>
               </div>
             </Show>
