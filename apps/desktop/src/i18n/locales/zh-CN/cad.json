@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "PMI 尚未有效。请先修正高亮的标注再保存。",
   "cad.pmi.drawingTitle": "图纸页上",
   "cad.pmi.drawingEmpty": "暂时没有可用于图纸页的内容。",
-  "cad.pmi.unanchored": "{count} 个标注没有锚点，仅在 PMI 面板中列出。"
+  "cad.pmi.unanchored": "{count} 个标注没有锚点，仅在 PMI 面板中列出。",
+  "cad.sub.vertex": "顶点 {index}",
+  "cad.sub.hover": "光标下"
 }

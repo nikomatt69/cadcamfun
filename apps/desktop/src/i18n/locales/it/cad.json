@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "Il PMI non è ancora valido. Correggi le annotazioni evidenziate prima di salvare.",
   "cad.pmi.drawingTitle": "Sul foglio di disegno",
   "cad.pmi.drawingEmpty": "Ancora nulla di derivabile per il foglio.",
-  "cad.pmi.unanchored": "{count} annotazione/i senza punto di ancoraggio, elencate solo nel pannello PMI."
+  "cad.pmi.unanchored": "{count} annotazione/i senza punto di ancoraggio, elencate solo nel pannello PMI.",
+  "cad.sub.vertex": "Vertice {index}",
+  "cad.sub.hover": "Sotto il cursore"
 }

@@ -18,7 +18,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
 import { Cog, HelpCircle, Layers, Maximize2, Minimize2, Move, RotateCw, Sliders } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
-import { useCADStore } from "../store/cadStore.ts"
+import { useCADStore, type PickedEntity } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -41,7 +41,7 @@ import { applySketchVisibility } from "../lib/history-view.ts"
 import { applyDetailLevel } from "../lib/detail-level.ts"
 import { createJointMarkers } from "../lib/joint-markers.ts"
 import { useAssemblyStore } from "../store/assemblyStore.ts"
-import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, sameSubEntity, type SubEntityPick, type SubHighlightKind } from "../lib/sub-entity.ts"
+import { createSubHighlight, describeSubEntity, disposeSubHighlight, pickSubEntity, pixelRadiusAt, sameSubEntity, type SubEntityPick, type SubHighlightKind, type VertexPicking } from "../lib/sub-entity.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { addSectionCaps, createSectionHelper, removeSectionCaps } from "../lib/sectionHelper.ts"
@@ -271,6 +271,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }
     return undefined
   }
+  /** The ray of the last `setPointer` and the screen tolerance for the corners of exact solids (snapping priority vertex > edge > face). */
+  const vertexPicking = (): VertexPicking | undefined =>
+    camera && container ? { ray: raycaster.ray.clone(), radiusAt: pixelRadiusAt(camera, container.clientHeight || 1) } : undefined
+  const entityOf = (sub: SubEntityPick): PickedEntity => ({ elementId: sub.elementId, kind: sub.kind, index: sub.index, ...(sub.coords !== undefined ? { coords: sub.coords } : {}) })
   const elementIdAt = (): string | null => {
     lastHits = []
     if (visibleObjects.length === 0) return null
@@ -780,7 +784,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (pick !== undefined && scene && pick.object.parent !== null) { subOverlays[kind] = createSubHighlight(pick, kind); scene.add(subOverlays[kind]!) }
     invalidate()
   }
-  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null) }, { defer: true }))
+  createEffect(on(rebuilds, () => { setHoveredSub(undefined); setPickedSub(undefined); cad.setPickedEntity(null); cad.setHoveredEntity(null) }, { defer: true }))
   createEffect(() => { const pick = hoveredSub(); const picked = pickedSub(); showSub("hover", pick !== undefined && sameSubEntity(pick, picked) ? undefined : pick) })
   createEffect(() => showSub("picked", pickedSub()))
   createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
@@ -1105,8 +1109,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         container.style.cursor = id ? "pointer" : "default"
       }
       // The face or edge of an exact solid under the cursor.
-      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id)) : undefined
-      if (!sameSubEntity(sub, hoveredSub())) setHoveredSub(sub)
+      const sub = id ? pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking()) : undefined
+      if (!sameSubEntity(sub, hoveredSub())) { setHoveredSub(sub); cad.setHoveredEntity(sub === undefined ? null : entityOf(sub)) }
       const hit = planePoint()
       if (hit) publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
     })
@@ -1188,8 +1192,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const id = elementIdAt()
     if (id && !isLocked(id)) {
       selection.selectElement(id, down.additive)
-      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id))
-      cad.setPickedEntity(sub === undefined ? null : { elementId: sub.elementId, kind: sub.kind, index: sub.index })
+      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking())
+      cad.setPickedEntity(sub === undefined ? null : entityOf(sub))
       setPickedSub(sub)
     } else if (!id && !down.additive) { selection.clearSelection(); cad.setPickedEntity(null); setPickedSub(undefined) }
   }
@@ -1434,7 +1438,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </Show>
 
       <Show when={pickedSub()}>
-        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }) })}</div>}
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600/90 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
       </Show>
 
       <Show when={issueItems().length > 0}>

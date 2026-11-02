@@ -1036,5 +1036,7 @@
   "cad.parametric.configs.varying": "{count} rows differ between configurations",
   "cad.parametric.configs.compare": "Build and compare",
   "cad.parametric.configs.volume": "{volume} cm³",
-  "cad.parametric.configs.errors": "{count} error(s)"
+  "cad.parametric.configs.errors": "{count} error(s)",
+  "cad.sub.vertex": "Vertex {index}",
+  "cad.sub.hover": "Under cursor"
 }

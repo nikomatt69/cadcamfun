@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "Le PMI n'est pas encore valide. Corrigez les annotations signalées avant d'enregistrer.",
   "cad.pmi.drawingTitle": "Sur la feuille de dessin",
   "cad.pmi.drawingEmpty": "Rien de déductible pour la feuille pour l'instant.",
-  "cad.pmi.unanchored": "{count} annotation(s) sans point d'ancrage, listée(s) uniquement dans le panneau PMI."
+  "cad.pmi.unanchored": "{count} annotation(s) sans point d'ancrage, listée(s) uniquement dans le panneau PMI.",
+  "cad.sub.vertex": "Sommet {index}",
+  "cad.sub.hover": "Sous le curseur"
 }

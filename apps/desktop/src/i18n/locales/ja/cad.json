@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "PMI はまだ有効ではありません。保存する前にハイライトされた注記を修正してください。",
   "cad.pmi.drawingTitle": "図面シート上",
   "cad.pmi.drawingEmpty": "シートに反映できるものはまだありません。",
-  "cad.pmi.unanchored": "{count} 件の注記にはアンカー点がなく、PMI パネルにのみ表示されます。"
+  "cad.pmi.unanchored": "{count} 件の注記にはアンカー点がなく、PMI パネルにのみ表示されます。",
+  "cad.sub.vertex": "頂点 {index}",
+  "cad.sub.hover": "カーソル下"
 }

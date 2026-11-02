@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "El PMI aún no es válido. Corrige las anotaciones resaltadas antes de guardar.",
   "cad.pmi.drawingTitle": "En la hoja del dibujo",
   "cad.pmi.drawingEmpty": "Todavía no hay nada derivable para la hoja.",
-  "cad.pmi.unanchored": "{count} anotación(es) no tienen punto de anclaje y solo aparecen en el panel PMI."
+  "cad.pmi.unanchored": "{count} anotación(es) no tienen punto de anclaje y solo aparecen en el panel PMI.",
+  "cad.sub.vertex": "Vértice {index}",
+  "cad.sub.hover": "Bajo el cursor"
 }

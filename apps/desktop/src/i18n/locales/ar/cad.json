@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "PMI غير صالح بعد. صحّح التعليقات المميّزة قبل الحفظ.",
   "cad.pmi.drawingTitle": "على ورقة الرسم",
   "cad.pmi.drawingEmpty": "لا شيء قابل للاشتقاق للورقة بعد.",
-  "cad.pmi.unanchored": "{count} تعليق بلا نقطة تثبيت، وتظهر في لوحة PMI فقط."
+  "cad.pmi.unanchored": "{count} تعليق بلا نقطة تثبيت، وتظهر في لوحة PMI فقط.",
+  "cad.sub.vertex": "الرأس {index}",
+  "cad.sub.hover": "تحت المؤشر"
 }

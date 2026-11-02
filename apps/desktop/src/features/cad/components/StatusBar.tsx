@@ -3,13 +3,23 @@ import { Seg, Sep, ShellSegs, Strip } from "../../../shared/components/workspace
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
-import { useCADStore } from "../store/cadStore.ts"
+import { useCADStore, type PickedEntity } from "../store/cadStore.ts"
+import { describeSubEntity } from "../lib/sub-entity.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { useTransformControlsStore } from "../store/transformControlsStore.ts"
 
 const mm = (value: number | undefined): string => (value ?? 0).toFixed(2)
+
+/** "Face 7", "Edge 12" or "Vertex 3 · X 10 Y 0 Z 25" for the chip of a picked or hovered entity. */
+export const entityChip = (entity: PickedEntity): string =>
+  describeSubEntity({ kind: entity.kind, index: entity.index, ...(entity.coords !== undefined ? { coords: entity.coords } : {}) }, {
+    face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index })
+  })
+
+const sameEntity = (a: PickedEntity | null, b: PickedEntity | null): boolean =>
+  a !== null && b !== null && a.kind === b.kind && a.index === b.index && a.elementId === b.elementId
 
 /**
  * The CAD editor's information strip: mode, transform tool, material and stock, the grid / axes / dimensions
@@ -72,7 +82,10 @@ export default function StatusBar(): JSX.Element {
             {(selected) => <Seg label={t("cad.status.selected")} value={`${selected().type} ${selected().id.substring(0, 6)}`} tone="blue" hideBelow="lg" title={selected().id} />}
           </Show>
           <Show when={cad.pickedEntity}>
-            {(entity) => <Seg value={t(entity().kind === "face" ? "cad.sub.face" : "cad.sub.edge", { index: entity().index })} tone="amber" hideBelow="lg" testId="status-entity" />}
+            {(entity) => <Seg value={entityChip(entity())} tone="amber" hideBelow="lg" testId="status-entity" />}
+          </Show>
+          <Show when={cad.hoveredEntity !== null && !sameEntity(cad.hoveredEntity, cad.pickedEntity)}>
+            <Seg label={t("cad.sub.hover")} value={entityChip(cad.hoveredEntity!)} tone="cyan" hideBelow="lg" testId="status-entity-hover" />
           </Show>
           <Show when={bounds()}>
             {(box) => <Seg label={t("cad.status.size")} value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} tone="cyan" hideBelow="xl" title={t("cad.status.sizeTitle")} />}

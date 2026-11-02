@@ -65,6 +65,14 @@ interface OriginOffset {
   z: number;
 }
 
+/** A face, edge or corner of an exact solid, as the status bar and the panels name it. `coords` is a corner's model position. */
+export interface PickedEntity {
+  readonly elementId: string;
+  readonly kind: "face" | "edge" | "vertex";
+  readonly index: number;
+  readonly coords?: { readonly x: number; readonly y: number; readonly z: number };
+}
+
 interface CADState {
   viewMode: ViewMode;
   activeTool: string;
@@ -117,8 +125,11 @@ interface CADState {
   showSketches: boolean;
   setShowSketches: (show: boolean) => void;
   /** The face or edge of an exact solid the person clicked in the canvas (null: none). Cleared when the selection moves on. */
-  pickedEntity: { readonly elementId: string; readonly kind: "face" | "edge"; readonly index: number } | null;
-  setPickedEntity: (entity: CADState["pickedEntity"]) => void;
+  pickedEntity: PickedEntity | null;
+  setPickedEntity: (entity: PickedEntity | null) => void;
+  /** The face, edge or corner under the cursor (null: none), for the status chip. */
+  hoveredEntity: PickedEntity | null;
+  setHoveredEntity: (entity: PickedEntity | null) => void;
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
@@ -132,6 +143,8 @@ export const useCADStore = create<CADState>((set, get) => ({
   setShowSketches: (show) => set({ showSketches: show === true }),
   pickedEntity: null,
   setPickedEntity: (entity) => set({ pickedEntity: entity }),
+  hoveredEntity: null,
+  setHoveredEntity: (entity) => set({ hoveredEntity: entity }),
   explodedView: DEFAULT_EXPLODED_VIEW,
   explodablePartCount: 0,
   setExplodedView: (patch) => set((state) => ({

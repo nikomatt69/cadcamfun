@@ -98,6 +98,15 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
   }
   group.userData.isBrep = true;
   group.userData.brepFaces = cached.model.faces.length;
+  // The corners of the body (scene space, vertex index = triple index): picked by the canvas, drawn only while hovered or picked.
+  const corners = new Float32Array(cached.model.vertices.length * 3);
+  cached.model.vertices.forEach((vertex, k) => {
+    corners[k * 3] = vertex.point.x + offset.x;
+    corners[k * 3 + 1] = vertex.point.y + offset.y;
+    corners[k * 3 + 2] = vertex.point.z + offset.z;
+  });
+  group.userData.brepVertices = corners;
+  group.userData.brepOffset = { x: offset.x, y: offset.y, z: offset.z };
   return group;
 };
 

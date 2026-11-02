@@ -1036,5 +1036,7 @@
   "cad.pmi.invalid": "Die PMI ist noch nicht gültig. Korrigiere die markierten Annotationen vor dem Speichern.",
   "cad.pmi.drawingTitle": "Auf dem Zeichnungsblatt",
   "cad.pmi.drawingEmpty": "Für das Blatt ist noch nichts ableitbar.",
-  "cad.pmi.unanchored": "{count} Annotation(en) haben keinen Ankerpunkt und stehen nur im PMI-Bereich."
+  "cad.pmi.unanchored": "{count} Annotation(en) haben keinen Ankerpunkt und stehen nur im PMI-Bereich.",
+  "cad.sub.vertex": "Eckpunkt {index}",
+  "cad.sub.hover": "Unter dem Cursor"
 }
