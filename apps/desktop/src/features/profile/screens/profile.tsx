@@ -13,7 +13,7 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { Box, Calendar, Folder, Globe, Layout, Mail, MapPin, Pencil, Settings, Shield, User, Wrench } from "lucide-solid"
+import { Box, Calendar, Folder, Globe, Layout, Mail, MapPin, Pencil, Share2, Shield, User, Wrench } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 import {
@@ -82,15 +82,15 @@ export function ProfileScreen(): JSX.Element {
       <div class="p-3">
         <h3 class="truncate text-xs font-semibold text-slate-900 dark:text-white">{item.name}</h3>
         <Show when={withDescription}>
-          <p class="mt-0.5 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{item.description ?? t("profile.noDescription")}</p>
+          <p class="mt-1 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{item.description ?? t("profile.noDescription")}</p>
         </Show>
-        <p class="mt-1.5 text-[10.5px] text-slate-400 dark:text-slate-500">{t("profile.updated", { date: shortDate(item.updatedAt) })}</p>
+        <p class="mt-1.5 text-[10.5px] tabular-nums text-slate-500 dark:text-slate-400">{t("profile.updated", { date: shortDate(item.updatedAt) })}</p>
       </div>
     </A>
   )
 
   const stat = (icon: JSX.Element, value: number, label: string): JSX.Element => (
-    <div class="flex items-center gap-2 rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40">
+    <div class="flex items-center gap-2 rounded-[5px] bg-slate-50 p-3 dark:bg-slate-800/40">
       <span class="flex h-7 w-7 flex-none items-center justify-center rounded-[4px] border border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">{icon}</span>
       <div class="min-w-0">
         <p class="text-[15px] font-semibold leading-5 tabular-nums text-slate-900 dark:text-white">{value}</p>
@@ -107,7 +107,7 @@ export function ProfileScreen(): JSX.Element {
           <Show when={isAdmin()}>
             <A href="/admin" class={TOOLBAR_BUTTON}><Shield size={14} aria-hidden="true" />{t("profile.adminDashboard")}</A>
           </Show>
-          <A href="/profile/settings" class={TOOLBAR_PRIMARY}><Settings size={14} aria-hidden="true" />{t("profile.editProfile")}</A>
+          <A href="/profile/settings" class={TOOLBAR_PRIMARY}><Pencil size={14} aria-hidden="true" />{t("profile.editProfile")}</A>
         </>
       }
     >
@@ -127,7 +127,6 @@ export function ProfileScreen(): JSX.Element {
                   >
                     <img src={me().image ?? ""} alt={me().name ?? t("profile.userFallback")} class="h-14 w-14 rounded-[5px] border border-slate-200 object-cover dark:border-slate-700" />
                   </Show>
-                  <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" title={t("profile.role")} />
                 </div>
 
                 <div class="min-w-0 flex-1">
@@ -141,7 +140,7 @@ export function ProfileScreen(): JSX.Element {
                       <div class="flex min-w-0 items-center gap-2">
                         <Mail size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
-                          <p class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-400 dark:text-slate-500">{t("profile.email")}</p>
+                          <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.email")}</p>
                           <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().email}</p>
                         </div>
                       </div>
@@ -150,7 +149,7 @@ export function ProfileScreen(): JSX.Element {
                       <div class="flex min-w-0 items-center gap-2">
                         <MapPin size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                         <div class="min-w-0">
-                          <p class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-400 dark:text-slate-500">{t("profile.location")}</p>
+                          <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.location")}</p>
                           <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{me().location}</p>
                         </div>
                       </div>
@@ -158,8 +157,8 @@ export function ProfileScreen(): JSX.Element {
                     <div class="flex min-w-0 items-center gap-2">
                       <Calendar size={14} class="flex-none text-slate-400 dark:text-slate-500" aria-hidden="true" />
                       <div class="min-w-0">
-                        <p class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-400 dark:text-slate-500">{t("profile.joined")}</p>
-                        <p class="truncate text-[11.5px] text-slate-700 dark:text-slate-200">{formatMonth(me().createdAt ?? "")}</p>
+                        <p class="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">{t("profile.joined")}</p>
+                        <p class="truncate text-[11.5px] tabular-nums text-slate-700 dark:text-slate-200">{formatMonth(me().createdAt ?? "")}</p>
                       </div>
                     </div>
                   </div>
@@ -173,7 +172,7 @@ export function ProfileScreen(): JSX.Element {
                   <Show when={typeof me().website === "string" && (me().website?.length ?? 0) > 0}>
                     <a href={me().website ?? ""} target="_blank" rel="noopener noreferrer" class={TOOLBAR_BUTTON}><Globe size={14} aria-hidden="true" />{t("profile.website")}</a>
                   </Show>
-                  <button type="button" class={TOOLBAR_BUTTON}><Pencil size={14} aria-hidden="true" />{t("profile.shareProfile")}</button>
+                  <button type="button" class={TOOLBAR_BUTTON}><Share2 size={14} aria-hidden="true" />{t("profile.shareProfile")}</button>
                 </div>
               </div>
 

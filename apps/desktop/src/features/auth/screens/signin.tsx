@@ -127,7 +127,7 @@ export function SignInScreen(): JSX.Element {
           <Show when={!magicLinkSent()} fallback={<Notice tone="ok">{t("auth.magicSent")}</Notice>}>
             <div style={{ display: "flex", "flex-direction": "column", gap: "8px" }}>
               <Field label={t("auth.magicLabel")} id="magic-email">
-                <TextField id="magic-email" type="email" value={magicLinkEmail()} placeholder="Enter your email" onInput={setMagicLinkEmail} />
+                <TextField id="magic-email" type="email" value={magicLinkEmail()} placeholder={t("auth.placeholder.email")} onInput={setMagicLinkEmail} />
               </Field>
               <Button block onClick={handleMagicLink} disabled={busy("magic-link")}>
                 {busy("magic-link") ? t("auth.magicSending") : t("auth.magicSend")}

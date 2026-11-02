@@ -18,13 +18,14 @@
  */
 import { Show, type JSX } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
-import { Building, MessageCircle, MessageSquare } from "lucide-solid"
-import { PANEL, StageEmpty, TOOLBAR_PRIMARY, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
+import { Building, MessageSquare } from "lucide-solid"
+import { StageEmpty, StageLoading, TOOLBAR_PRIMARY, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
 import { ConversationList } from "../components/conversation-list.tsx"
 import { ConversationDetail } from "../components/conversation-detail.tsx"
 import { NewConversation } from "../components/new-conversation.tsx"
+import { ChatEmpty } from "../components/chat-empty.tsx"
 
 /** A chat panel: the shared glass card, filling its column. */
 const CHAT_PANEL = "ui-card ui-card-default min-w-0 overflow-hidden"
@@ -45,16 +46,7 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
 
   const loadingBlock = (): JSX.Element => (
     <WorkspaceDetail title={t("chat.title")} backHref="/organizations" backLabel={t("chat.backToOrgs")}>
-      <div class="flex flex-1 items-center justify-center">
-        <div class="text-center">
-          <span class="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-500" aria-hidden="true" />
-          <Show when={isNew() || isConversation()}>
-            <p class="mt-4 font-medium text-gray-600 dark:text-gray-400" role="status">
-              {isConversation() ? t("chat.loadingConv") : isGroup() ? t("chat.preparingGroup") : t("chat.preparingDm")}
-            </p>
-          </Show>
-        </div>
-      </div>
+      <StageLoading label={isConversation() ? t("chat.loadingConv") : isGroup() ? t("chat.preparingGroup") : isNew() ? t("chat.preparingDm") : t("common.loading")} />
     </WorkspaceDetail>
   )
 
@@ -75,7 +67,7 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
 
   /** The two-column layout: the conversation list and the main panel, filling the page. */
   const columns = (main: JSX.Element): JSX.Element => (
-    <div class="flex min-h-[480px] flex-1 gap-4">
+    <div class="flex min-h-[480px] flex-1 gap-3">
       <div class={`w-1/3 ${CHAT_PANEL}`}><ConversationList organizationId={params.id} /></div>
       <div class={`w-2/3 ${CHAT_PANEL}`}>{main}</div>
     </div>
@@ -88,17 +80,7 @@ export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "gr
     if (isNew()) {
       return <NewConversation organizationId={params.id} isGroupChat={isGroup()} onBack={() => navigate(`${root()}/chat`)} />
     }
-    return (
-      <div class="flex h-full items-center justify-center p-8">
-        <div class="text-center text-gray-500 dark:text-gray-400">
-          <div class={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${PANEL} !p-0 text-[#007ACC] dark:text-blue-300`}>
-            <MessageCircle class="h-8 w-8" aria-hidden="true" />
-          </div>
-          <h2 class="mb-2 text-xl font-medium text-gray-900 dark:text-white">{t("chat.select")}</h2>
-          <p class="text-sm">{t("chat.selectHint")}</p>
-        </div>
-      </div>
-    )
+    return <ChatEmpty title={t("chat.select")} hint={t("chat.selectHint")} />
   }
 
   return (

@@ -97,7 +97,7 @@ export function OrganizationsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("org.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
@@ -131,7 +131,7 @@ export function OrganizationsScreen(): JSX.Element {
           <Show
             when={filtered().length > 0}
             fallback={
-              <StageEmpty icon={<Building size={24} aria-hidden="true" />} title={search() !== "" ? t("org.none") : t("org.empty.title")} hint={search() !== "" ? t("org.noneMatch") : t("org.empty.body")}>
+              <StageEmpty icon={<Building size={24} aria-hidden="true" />} preview={search() === "" ? "connect" : undefined} title={search() !== "" ? t("org.none") : t("org.empty.title")} hint={search() !== "" ? t("org.noneMatch") : t("org.empty.body")}>
                 <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("org.empty.cta")}</button>}>
                   <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
                 </Show>
@@ -179,10 +179,10 @@ export function CreateOrganizationScreen(): JSX.Element {
       <div class="mx-auto w-full max-w-3xl">
         <div class={PANEL}>
           <div class="mb-6 flex items-center gap-4">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30"><Users class="h-6 w-6 text-blue-600 dark:text-blue-400" /></div>
+            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-[5px] bg-blue-50 dark:bg-blue-900/30"><Users size={16} aria-hidden="true" class="text-blue-600 dark:text-blue-400" /></div>
             <div>
-              <h2 class="text-lg font-medium text-slate-900 dark:text-white">{t("org.create.details")}</h2>
-              <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.create.lead")}</p>
+              <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.create.details")}</h2>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("org.create.lead")}</p>
             </div>
           </div>
           <Show when={error()}><div class="mb-4"><StageError message={error() ?? ""} /></div></Show>
@@ -275,7 +275,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                     <p class="text-xs leading-5 text-slate-600 dark:text-slate-400">
                       <Show when={(org().description ?? "").length > 0} fallback={t("org.overview.noDescription")}>{org().description}</Show>
                     </p>
-                    <h3 class="mb-1.5 mt-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("org.overview.details")}</h3>
+                    <h3 class="mb-1.5 mt-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("org.overview.details")}</h3>
                     <KeyValueList rows={[
                       { label: t("org.overview.created"), value: formatDate(org().createdAt) },
                       { label: t("org.overview.updated"), value: formatDate(org().updatedAt) },
@@ -330,7 +330,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                               </div>
                             </td>
                             <td class="whitespace-nowrap"><span class={roleBadge(member.role)}>{member.role}</span></td>
-                            <td class="whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">{formatDate(member.joinedAt)}</td>
+                            <td class="whitespace-nowrap text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{formatDate(member.joinedAt)}</td>
                             <Show when={canManageMembers()}>
                               <td class="whitespace-nowrap !text-right">
                                 {/* Legacy renders these two buttons without handlers; v6 has no member endpoints either. */}
@@ -353,7 +353,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                     <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(newProjectHref())}><Plus size={14} aria-hidden="true" />{t("org.detail.newProject")}</button>
                   </div>
                   {/* No organization-projects endpoint: the legacy empty state, always. */}
-                  <StageEmpty icon={<FolderOpen size={22} aria-hidden="true" />} title={t("org.projects.empty")} hint={t("org.projects.emptyBody")}>
+                  <StageEmpty icon={<FolderOpen size={22} aria-hidden="true" />} preview="projects" title={t("org.projects.empty")} hint={t("org.projects.emptyBody")}>
                     <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}>{t("org.projects.create")}</button>
                   </StageEmpty>
                 </section>
@@ -363,7 +363,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                 <section class={`${PANEL} !p-3`}>
                   <div class="mb-3">
                     <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.settings.title")}</h2>
-                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t("org.settings.body")}</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("org.settings.body")}</p>
                   </div>
                   {/* Legacy submits this form to nothing (no handler): it is inert here too. */}
                   <form class="space-y-3" onSubmit={(event) => event.preventDefault()}>
@@ -380,7 +380,7 @@ export function OrganizationDetailScreen(): JSX.Element {
 
                   <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
                     <h3 class="text-xs font-semibold text-red-600 dark:text-red-400">{t("org.settings.danger")}</h3>
-                    <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t("org.settings.dangerBody")}</p>
+                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("org.settings.dangerBody")}</p>
                     {/* Inert: legacy never wired a handler to this button. */}
                     <button type="button" class={`${CANCEL_BUTTON} mt-2 !text-red-600 dark:!text-red-400`}>{t("org.settings.delete")}</button>
                   </div>

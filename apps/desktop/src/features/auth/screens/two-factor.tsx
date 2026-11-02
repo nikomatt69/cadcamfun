@@ -176,8 +176,8 @@ export function TwoFactorScreen(): JSX.Element {
                         when={backupCodes().length > 0}
                         fallback={<p class="ent-header__description">{t("twofactor.noBackup")}</p>}
                       >
-                        <div style={{ display: "grid", "grid-template-columns": "repeat(2, minmax(0, 1fr))", gap: "6px", "font-family": "var(--ent-mono)", "font-size": "11px" }}>
-                          <For each={backupCodes()}>{(code) => <div class="ent-card" style={{ padding: "6px 8px" }}>{code}</div>}</For>
+                        <div style={{ display: "grid", "grid-template-columns": "repeat(2, minmax(0, 1fr))", gap: "6px", "font-family": "var(--ent-mono)", "font-size": "11px", "font-variant-numeric": "tabular-nums" }}>
+                          <For each={backupCodes()}>{(code) => <div class="ent-card" style={{ padding: "8px 12px" }}>{code}</div>}</For>
                         </div>
                         <p class="ent-field__hint">{t("twofactor.backupHint")}</p>
                       </Show>

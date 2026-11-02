@@ -88,6 +88,25 @@
 .ss-stage .acc-plan__price { font-family: var(--ss-mono); font-size: 10.5px; color: var(--ss-text-muted); }
 .ss-stage .acc-plan[data-pick="true"] { transform: translateY(-5px); border-color: var(--ss-accent); background: var(--ss-accent-soft); box-shadow: 0 4px 10px rgb(0 0 0 / 0.1); }
 
+/* ── Chat ───────────────────────────────────────────────────────────────── */
+.ss-stage .chat-row { position: absolute; left: 16px; right: 16px; display: flex; align-items: flex-end; gap: 8px; opacity: 0; transform: translateY(8px); transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.ss-stage .chat-row[data-on="true"] { opacity: 1; transform: none; }
+.ss-stage .chat-row:not(.chat-row--me) { top: 18px; }
+.ss-stage .chat-row--me { top: 70px; justify-content: flex-end; }
+.ss-stage .chat-avatar { width: 24px; height: 24px; flex: none; border-radius: 6px; background: var(--ss-line-strong); opacity: 0.6; }
+.ss-stage .chat-bubble { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px; border-radius: 10px 10px 10px 3px; background: var(--ss-surface); border: 1px solid var(--ss-line); }
+.ss-stage .chat-bubble--me { position: relative; border-radius: 10px 10px 3px 10px; background: var(--ss-accent); border-color: var(--ss-accent); min-width: 116px; min-height: 38px; }
+.ss-stage .chat-typing, .ss-stage .chat-text { position: absolute; inset: 0; display: flex; align-items: center; transition: opacity 0.25s ease; }
+.ss-stage .chat-typing { justify-content: center; gap: 4px; opacity: 0; }
+.ss-stage .chat-typing[data-on="true"] { opacity: 1; }
+.ss-stage .chat-typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--ss-action-text); opacity: 0.8; animation: ss-dot 1s ease-in-out infinite; }
+.ss-stage .chat-typing i:nth-child(2) { animation-delay: 0.15s; }
+.ss-stage .chat-typing i:nth-child(3) { animation-delay: 0.3s; }
+.ss-stage .chat-text { flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding: 0 12px; opacity: 0; }
+.ss-stage .chat-text[data-on="true"] { opacity: 1; }
+.ss-stage .chat-line { display: block; height: 6px; border-radius: 3px; background: var(--ss-action-text); opacity: 0.85; }
+@keyframes ss-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-3px); opacity: 1; } }
+
 /* ── Where the scenes sit in the screens ───────────────────────────────── */
 .acc-preview { overflow: hidden; border-bottom: 1px solid var(--ent-line); }
 .ent-card > .acc-preview { border-radius: 7px 7px 0 0; }

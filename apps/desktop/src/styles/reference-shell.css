@@ -228,11 +228,11 @@
 
 /* Legal pages. */
 .reference-legal-card { max-width: 56rem; margin: 0 auto; padding: 24px; border-radius: 5px; border: 1px solid var(--shell-border); background: var(--shell-chrome); box-shadow: none; }
-.reference-legal-icon { width: 36px; height: 36px; border-radius: 5px; background: var(--shell-active); border: 1px solid var(--shell-active-border); color: var(--shell-active-text); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.reference-legal-icon { width: 36px; height: 36px; border-radius: 5px; background: var(--shell-active); color: var(--shell-active-text); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
 .reference-legal-card h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; }
 .reference-legal-intro { color: var(--shell-muted); margin: 0 0 16px; font-size: 12px; line-height: 1.6; }
 .reference-legal-card h2 { font-size: 13px; font-weight: 600; margin: 14px 0 4px; }
-.reference-legal-card p { color: var(--shell-text); margin: 0 0 8px; line-height: 1.6; font-size: 12px; }
+.reference-legal-card p { color: var(--shell-text); margin: 0 0 8px; line-height: 1.6; font-size: 12px; max-width: 72ch; }
 .reference-legal-footer { font-size: 12px; }
 
 /* Invitations. */
@@ -244,15 +244,14 @@
 
 /* Pricing. */
 .reference-pricing-hero { max-width: 56rem; margin: 0 auto 16px; text-align: center; padding: 20px; border-radius: 5px; border: 1px solid var(--shell-border); background: var(--shell-chrome); box-shadow: none; }
-.reference-pricing-icon { width: 36px; height: 36px; margin: 0 auto 10px; border-radius: 5px; background: var(--shell-active); border: 1px solid var(--shell-active-border); color: var(--shell-active-text); display: flex; align-items: center; justify-content: center; }
 .reference-pricing-title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; color: var(--shell-text); }
 .reference-pricing-intro { color: var(--shell-muted); margin: 0 0 12px; font-size: 12px; line-height: 1.6; }
-.reference-pricing-trial { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--shell-ok) 32%, transparent); background: color-mix(in srgb, var(--shell-ok) 12%, transparent); color: var(--shell-ok); font-weight: 600; font-size: 11px; box-shadow: none; }
+.reference-pricing-trial { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: color-mix(in srgb, var(--shell-ok) 12%, transparent); color: var(--shell-ok); font-weight: 600; font-size: 11px; box-shadow: none; }
 .reference-pricing-grid { display: grid; gap: 12px; max-width: 72rem; margin: 0 auto; padding: 0; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
 .reference-pricing-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 5px; border: 1px solid var(--shell-border); background: var(--shell-chrome); box-shadow: none; }
 .reference-pricing-card.is-featured { background: var(--shell-active); border-color: var(--shell-active-border); box-shadow: none; }
 .reference-pricing-card h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.reference-pricing-price { font-size: 18px; font-weight: 600; margin: 0; color: var(--shell-active-text); }
+.reference-pricing-price { font-size: 18px; font-weight: 600; margin: 0; color: var(--shell-active-text); font-variant-numeric: tabular-nums; }
 .reference-pricing-summary { color: var(--shell-muted); margin: 0; font-size: 11px; line-height: 1.5; min-height: 2.5rem; }
 .reference-pricing-card ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; font-size: 11px; color: var(--shell-text); flex-grow: 1; }
 .reference-pricing-card li { display: flex; align-items: flex-start; gap: 6px; }

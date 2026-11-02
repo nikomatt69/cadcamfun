@@ -159,3 +159,32 @@ export function PricingPreview(props: { readonly trialLabel: string }): JSX.Elem
     </Stage>
   )
 }
+
+// ── Chat: a message arrives, a reply is typed and sent ─────────────────────
+// 0 idle · 1 the incoming message arrives · 2 the reply is typed (dots) · 3 the reply lands, hold · 4 reset   (no cursor)
+export function ChatPreview(): JSX.Element {
+  return (
+    <Stage class="ss-acc-chat" width={W} height={H} steps={[500, 900, 1100, 3400, 500]} poster={3}>
+      {(phase) => (
+        <div class="ss-scene" data-reset={phase() === 4}>
+          <div class="chat-row" data-on={phase() >= 1}>
+            <span class="chat-avatar" />
+            <div class="chat-bubble">
+              <span class="ss-bar" style={{ width: "132px" }} />
+              <span class="ss-bar" style={{ width: "84px" }} />
+            </div>
+          </div>
+          <div class="chat-row chat-row--me" data-on={phase() >= 2}>
+            <div class="chat-bubble chat-bubble--me">
+              <span class="chat-typing" data-on={phase() === 2}><i /><i /><i /></span>
+              <span class="chat-text" data-on={phase() >= 3}>
+                <span class="chat-line" style={{ width: "96px" }} />
+                <span class="chat-line" style={{ width: "58px" }} />
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </Stage>
+  )
+}

@@ -11,8 +11,8 @@
  * so the page keeps reading like the original; nothing else is reachable.
  */
 import type { JSX } from "solid-js"
-import { MessageCircle } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
+import { ChatEmpty } from "./chat-empty.tsx"
 
 export interface ConversationDetailProps {
   readonly conversationId: string
@@ -21,11 +21,5 @@ export interface ConversationDetailProps {
 }
 
 export function ConversationDetail(_props: ConversationDetailProps): JSX.Element {
-  return (
-    <div class="flex h-full flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-      <MessageCircle class="mb-4 h-16 w-16" aria-hidden="true" />
-      <h2 class="mb-2 text-xl font-semibold">{t("chat.select")}</h2>
-      <p class="text-sm">{t("chat.selectHintDetail")}</p>
-    </div>
-  )
+  return <ChatEmpty title={t("chat.select")} hint={t("chat.selectHintDetail")} />
 }

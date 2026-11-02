@@ -13,6 +13,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { ArrowLeft, Check, Search, User, X } from "lucide-solid"
 import { useRead } from "../../../app/queries.ts"
 import { t } from "../../../i18n/index.ts"
+import { FIELD, ICON_BUTTON, LABEL, StageLoading, TOOLBAR_PRIMARY } from "../../../shared/components/WorkspacePage.tsx"
 
 interface ChatMember {
   readonly id: string
@@ -57,31 +58,26 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
   const createConversation = (): void => undefined
 
   const memberButton =
-    "flex w-full items-center rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+    "flex w-full items-center gap-3 rounded-[5px] p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
 
   return (
-    <div class="flex h-full flex-col overflow-hidden rounded-lg bg-white shadow-md dark:bg-gray-800">
+    <div class="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div class="flex items-center border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-        <button
-          type="button"
-          onClick={props.onBack}
-          class="mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          aria-label={t("common.back")}
-        >
-          <ArrowLeft class="h-5 w-5" aria-hidden="true" />
+      <div class="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700/70">
+        <button type="button" onClick={props.onBack} class={ICON_BUTTON} aria-label={t("common.back")}>
+          <ArrowLeft size={14} aria-hidden="true" />
         </button>
 
-        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+        <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">
           {props.isGroupChat === true ? t("chat.newGroup") : t("chat.newDm")}
         </h2>
       </div>
 
       {/* Content */}
-      <div class="flex-1 overflow-y-auto p-4">
+      <div class="flex-1 overflow-y-auto p-3">
         <Show when={props.isGroupChat === true}>
           <div class="mb-4">
-            <label for="groupName" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="groupName" class={LABEL}>
               {t("chat.groupName")}
             </label>
             <input
@@ -90,13 +86,13 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
               value={groupName()}
               onInput={(event) => setGroupName(event.currentTarget.value)}
               placeholder={t("chat.groupNamePlaceholder")}
-              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              class={FIELD}
             />
           </div>
         </Show>
 
         <div class="mb-4">
-          <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label class={LABEL}>
             {props.isGroupChat === true ? t("chat.addMembers") : t("chat.selectMember")}
           </label>
 
@@ -106,30 +102,30 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
               value={searchQuery()}
               onInput={(event) => setSearchQuery(event.currentTarget.value)}
               placeholder={t("chat.memberSearch")}
-              class="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-4 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              class={`${FIELD} pl-8`}
             />
-            <Search class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" aria-hidden="true" />
+            <Search size={14} class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           </div>
         </div>
 
         <Show when={selected().length > 0}>
           <div class="mb-4">
-            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label class={LABEL}>
               {props.isGroupChat === true ? t("chat.selectedMembers") : t("chat.recipient")}
             </label>
 
             <div class="flex flex-wrap gap-2">
               <For each={selected()}>
                 {(member) => (
-                  <div class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                    <span class="text-sm font-medium">{member.name ?? member.email ?? ""}</span>
+                  <div class="inline-flex items-center gap-1 rounded-[5px] bg-blue-50 py-1 pl-2 pr-1 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                    <span class="text-xs font-medium">{member.name ?? member.email ?? ""}</span>
                     <button
                       type="button"
                       onClick={() => removeMember(member.id)}
-                      class="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                      class="rounded-[4px] p-0.5 text-blue-600 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-800/60"
                       aria-label={t("common.close")}
                     >
-                      <X class="h-4 w-4" aria-hidden="true" />
+                      <X size={12} aria-hidden="true" />
                     </button>
                   </div>
                 )}
@@ -140,14 +136,10 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
 
         <Show
           when={!organization.loading()}
-          fallback={
-            <div class="flex h-32 items-center justify-center">
-              <span class="h-6 w-6 animate-spin rounded-full border-2 border-b-2 border-blue-500" aria-hidden="true" />
-            </div>
-          }
+          fallback={<StageLoading label={t("common.loading")} />}
         >
           <div class="space-y-1">
-            <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <h3 class="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
               {filteredMembers().length > 0 ? t("chat.orgMembers") : t("chat.noMembersFound")}
             </h3>
 
@@ -158,24 +150,24 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
                     <Show
                       when={member.image !== null && member.image.length > 0}
                       fallback={
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700">
-                          <User class="h-5 w-5 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                        <div class="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-100 dark:bg-slate-800">
+                          <User size={14} class="text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         </div>
                       }
                     >
                       <img
-                        class="h-10 w-10 rounded-full"
+                        class="h-7 w-7 rounded-[4px] object-cover"
                         src={member.image ?? ""}
                         alt={member.name ?? t("org.members.avatarAlt")}
                       />
                     </Show>
                   </div>
 
-                  <div class="ml-3 flex-1 text-left">
-                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <div class="min-w-0 flex-1 text-left">
+                    <p class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
                       {member.name ?? t("chat.unnamedUser")}
                     </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                    <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">
                       {member.email ?? t("chat.noEmail")} • {member.role}
                     </p>
                   </div>
@@ -187,14 +179,14 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
       </div>
 
       {/* Footer */}
-      <div class="border-t border-gray-200 p-4 dark:border-gray-700">
+      <div class="border-t border-slate-200 p-3 dark:border-slate-700/70">
         <button
           type="button"
           onClick={createConversation}
           disabled={selected().length === 0}
-          class="flex w-full items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          class={`${TOOLBAR_PRIMARY} w-full justify-center`}
         >
-          <Check class="mr-2 h-4 w-4" aria-hidden="true" />
+          <Check size={14} aria-hidden="true" />
           {props.isGroupChat === true ? t("chat.createGroup") : t("chat.startConversation")}
         </button>
       </div>
