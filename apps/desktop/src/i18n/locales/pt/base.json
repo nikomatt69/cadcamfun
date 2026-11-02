@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "Linhas ocultas",
   "cad.display.wireframe": "Estrutura de arame",
   "cad.display.xray": "Raios X",
-  "cad.display.ghost": "Fantasma"
+  "cad.display.ghost": "Fantasma",
+  "cad.invalid.title": "Elementos que não podem ser desenhados: {count}",
+  "cad.invalid.more": "e mais {count}"
 }

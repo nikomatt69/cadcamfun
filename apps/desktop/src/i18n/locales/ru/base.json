@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "Скрытые линии",
   "cad.display.wireframe": "Каркас",
   "cad.display.xray": "Рентген",
-  "cad.display.ghost": "Призрак"
+  "cad.display.ghost": "Призрак",
+  "cad.invalid.title": "Элементы, которые нельзя отобразить: {count}",
+  "cad.invalid.more": "и ещё {count}"
 }

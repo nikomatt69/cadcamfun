@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "Verdeckte Kanten",
   "cad.display.wireframe": "Drahtmodell",
   "cad.display.xray": "Röntgen",
-  "cad.display.ghost": "Geist"
+  "cad.display.ghost": "Geist",
+  "cad.invalid.title": "Elemente, die nicht gezeichnet werden können: {count}",
+  "cad.invalid.more": "und {count} weitere"
 }

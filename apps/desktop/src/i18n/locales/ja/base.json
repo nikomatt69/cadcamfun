@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "隠線処理",
   "cad.display.wireframe": "ワイヤーフレーム",
   "cad.display.xray": "X線",
-  "cad.display.ghost": "ゴースト"
+  "cad.display.ghost": "ゴースト",
+  "cad.invalid.title": "描画できない要素: {count}",
+  "cad.invalid.more": "ほか {count} 件"
 }

@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "Hidden line",
   "cad.display.wireframe": "Wireframe",
   "cad.display.xray": "X-ray",
-  "cad.display.ghost": "Ghost"
+  "cad.display.ghost": "Ghost",
+  "cad.invalid.title": "Elements that cannot be drawn: {count}",
+  "cad.invalid.more": "and {count} more"
 }

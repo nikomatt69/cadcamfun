@@ -636,5 +636,7 @@
   "cad.display.hidden-line": "消隐线",
   "cad.display.wireframe": "线框",
   "cad.display.xray": "X光",
-  "cad.display.ghost": "幽灵"
+  "cad.display.ghost": "幽灵",
+  "cad.invalid.title": "无法绘制的元素：{count}",
+  "cad.invalid.more": "以及另外 {count} 个"
 }

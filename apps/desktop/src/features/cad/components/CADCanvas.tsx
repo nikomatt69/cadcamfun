@@ -219,6 +219,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [dropScreen, setDropScreen] = createSignal<{ x: number; y: number }>()
   const [memory, setMemory] = createSignal({ used: 0, total: 0, geometries: 0, textures: 0 })
   const [frame, setFrame] = createSignal(0)
+  /** The elements that have no geometry to draw: each is a red marker in the scene and a line in the banner. */
+  const [invalidItems, setInvalidItems] = createSignal<ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>>([])
 
   const selectedIds = () => selection.selectedElementIds
   /** Every drawn object, in insertion order. */
@@ -672,6 +674,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // The raycast list is a view of the map, refreshed here instead of being rebuilt on every hover query.
     visibleObjects = drawn
+    const broken = drawn.filter((object) => object.userData.isInvalidMarker === true)
+    if (broken.length > 0 || invalidItems().length > 0) {
+      setInvalidItems(broken.map((object) => {
+        const id = String(object.userData.elementId)
+        const element = all.find((candidate) => candidate.id === id) as { name?: string; type?: string } | undefined
+        return { id, name: element?.name || element?.type || id, reason: String(object.userData.invalidReason ?? "") }
+      }))
+    }
     setRebuilds((count) => count + 1)
     invalidate()
     props.onElementsChange?.(all)
@@ -1305,6 +1315,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </Show>
 
       {props.children}
+
+      <Show when={invalidItems().length > 0}>
+        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-red-900/90 px-3 py-2 text-xs text-white shadow-lg" role="alert" data-testid="invalid-elements">
+          <p class="font-semibold">{t("cad.invalid.title", { count: invalidItems().length })}</p>
+          <ul class="mt-1 space-y-0.5">
+            <For each={invalidItems().slice(0, 4)}>{(item) => (
+              <li><button type="button" class="text-left underline decoration-dotted" onClick={() => selection.selectElement(item.id)}>{item.name}</button>: {item.reason}</li>
+            )}</For>
+          </ul>
+          <Show when={invalidItems().length > 4}><p class="mt-1 opacity-80">{t("cad.invalid.more", { count: invalidItems().length - 4 })}</p></Show>
+        </div>
+      </Show>
 
       <div class="panel cad-viewport-top">
         <div class="cad-viewport-selection">
