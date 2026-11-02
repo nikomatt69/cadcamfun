@@ -19,7 +19,7 @@ import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
-import { changeParameters, editTimeline, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
+import { changeParameters, editTimeline, historyRevision, failureMessage, inspectParametric, testParametric, verificationFor } from "./ai-parametric.ts"
 import { ActingUser, CurrentTurn, ensureTurnActive, invocationFailureText, isInvocationRefusal } from "./acting-user.ts"
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
@@ -41,7 +41,7 @@ import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
 import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
-import { KernelJobError, editHistory, featureEditOf, normalizeElement, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { KernelJobError, diagnose, editHistory, featureEditOf, normalizeElement, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -909,8 +909,12 @@ const toolHandlers = Effect.gen(function*() {
       if (input.action === "validate") return inspectParametric(input.history)
       if (input.action === "create") {
         const report = inspectParametric(input.history)
-        if (!report.ok) return { ...report, ok: false, error: "error" in report ? report.error : "The part does not rebuild into a valid solid; nothing was created." }
-        return { ...(await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }])) as Record<string, unknown>, mutation: "add" }
+        if (!report.ok) return { ...report, ok: false, error: failureMessage(report, "Nothing was created") }
+        const added = await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }]) as Record<string, unknown>
+        if (added["ok"] !== true) return added
+        // What was stored, read back: the id and revision the next update needs, and the verdict of the build (volume, size, warnings).
+        const stored = (added["elements"] as ReadonlyArray<Record<string, unknown>>)[0]
+        return { ...added, mutation: "add", elementId: stored?.["id"], revision: historyRevision(stored?.["history"]), verification: "verification" in report ? report.verification : undefined }
       }
       if (input.action === "convert") {
         const loaded = await load(projectId)
@@ -948,7 +952,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!edited.ok) return { ...edited, ...where(loaded) }
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
-        return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), report: edited.report, ...where(loaded) }
+        return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report), report: edited.report, ...where(loaded) }
       }
       if (input.action === "edit") {
         const edited = editHistory(history, input.edits)
@@ -956,16 +960,18 @@ const toolHandlers = Effect.gen(function*() {
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
         return {
-          ok: true, mutation: "edit", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), report: edited.report,
+          ok: true, mutation: "edit", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report), report: edited.report,
           applied: edited.applied, ...(edited.removed.length > 0 ? { removed: edited.removed } : {}), ...where(loaded)
         }
       }
       const changed = changeParameters(history, input.parameters)
-      if (!changed.ok) return changed
-      if (!changed.report.ok) return { ...changed.report, error: "Parameters were not changed because the variant failed validation.", ...where(loaded) }
+      if (!changed.ok) return { ...changed, ...where(loaded) }
+      if (!changed.report.ok) {
+        return { ...changed.report, verification: verificationFor(changed.history, changed.report), diagnosis: diagnose(changed.history, changed.report), error: failureMessage({ diagnosis: diagnose(changed.history, changed.report) }, "The parameters were not changed: the variant fails and the part is untouched"), ...where(loaded) }
+      }
       const updated = { ...element, history: changed.history }
       await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
-      return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), report: changed.report, ...where(loaded) }
+      return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), verification: verificationFor(changed.history, changed.report), report: changed.report, ...where(loaded) }
     },
     addEntities: async (projectId, entities) => {
       const loaded = await load(projectId, true)

@@ -1,21 +1,29 @@
 /** Project adaptation of the existing parametric kernel. Tests never persist a variant. */
 import { createHash } from "node:crypto"
 import { moveFeatureTo, rebuild, usesOf, withRollback, withSuppressed, type History } from "@cadcamfun/core"
-import { decodeHistory, KernelJobError, parametricReport, runKernelJob, type ParametricHandlerInput } from "@cadcamfun/ai"
+import { decodeHistory, diagnose, type Diagnosis, KernelJobError, parametricReport, runKernelJob, verificationOf, type ParametricHandlerInput } from "@cadcamfun/ai"
 
 export const historyRevision = (history: unknown): string => createHash("sha256").update(JSON.stringify(history)).digest("hex")
 
 export const inspectParametric = (history: unknown) => {
   const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false, error: "Stored parametric history is invalid.", problems: decoded.problems.slice(0, 8) }
-  return { ...parametricReport(decoded.data), history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) })) }
+  const report = parametricReport(decoded.data)
+  return {
+    // The verdict first (what the assistant reads), then the full rebuild report; a failure also says where it started.
+    verification: verificationOf(decoded.data, report), ...(report.ok ? {} : { diagnosis: diagnose(decoded.data, report) }),
+    ...report, history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) }))
+  }
 }
+
+/** The compact verdict to put beside a stored change (a create, update, edit or timeline step): the rebuild report is kept by the caller. */
+export const verificationFor = (history: History, report: ReturnType<typeof parametricReport>) => verificationOf(history, report)
 
 export const changeParameters = (history: unknown, parameters: Readonly<Record<string, number | string>>) => {
   const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false as const, error: "Stored parametric history is invalid." }
   const unknown = Object.keys(parameters).filter((name) => !Object.hasOwn(decoded.data.parameters, name))
-  if (unknown.length > 0) return { ok: false as const, error: `Unknown parameters: ${unknown.join(", ")}. Inspect the part first.` }
+  if (unknown.length > 0) return { ok: false as const, error: `Unknown parameters: ${unknown.join(", ")}. This part's parameters are: ${Object.keys(decoded.data.parameters).join(", ") || "(none)"}. parametric_update changes existing ones; add a new one with parametric_edit set_parameter.` }
   const next = { ...decoded.data, parameters: { ...decoded.data.parameters, ...parameters } }
   return { ok: true as const, history: next, report: parametricReport(next) }
 }
@@ -79,4 +87,13 @@ export const testParametric = async (history: unknown, input: Extract<Parametric
     return { name: c.name, passed: failures.length === 0, failures, ...(acceptance !== undefined ? { acceptance } : {}), ...report }
   }))
   return { ok: cases.every((c) => c.passed), revision: historyRevision(history), mutated: false, cases }
+}
+
+/** One sentence a person can act on: what failed first, the usual fix, and what that left behind. */
+export const failureMessage = (report: { readonly diagnosis?: Diagnosis; readonly error?: unknown }, lead: string): string => {
+  const diagnosis = report.diagnosis
+  if (diagnosis === undefined) return typeof report.error === "string" ? report.error : `${lead}: the part does not rebuild into a valid solid.`
+  const causes = diagnosis.rootCauses.slice(0, 3).map((c) => `${c.feature}: ${c.message}`)
+  const hint = diagnosis.removedLastSolid?.hint ?? diagnosis.rootCauses.find((c) => c.hint !== undefined)?.hint
+  return `${lead}. ${causes.length > 0 ? causes.join("; ") + "." : "The build leaves no solid."}${hint !== undefined ? ` ${hint}` : ""}`
 }

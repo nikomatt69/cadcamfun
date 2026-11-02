@@ -51,7 +51,7 @@ export interface SceneParts {
   readonly skipped: ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
 }
 
-const SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"])
+const SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "capsule", "washer", "nut", "bolt", "screw", "gear", "spring", "ellipsoid", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"])
 const CONTAINERS = new Set(["component", "group", "assembly"])
 
 const num = (v: unknown, fallback = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback)

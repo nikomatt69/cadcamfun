@@ -9,6 +9,7 @@
 import { PARAMETRIC_ACTION_INPUTS as INPUTS } from "@cadcamfun/api"
 import { analyzeManufacturability, brep, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, requireThread, type History } from "@cadcamfun/core"
 import { EXACT_ACTION_BUDGET_MS, decodeHistory, exactReport, parametricReport } from "../parametric.ts"
+import { diagnose, verificationOf } from "../parametric-verification.ts"
 import { KernelJobError, runKernelJob } from "../kernel-job.ts"
 import type { ActionContext } from "./action.ts"
 
@@ -62,7 +63,7 @@ const runRecipe = async (
   const parsed = decodeHistory(built.history)
   if (!parsed.success) return { ok: false, error: `The ${input.recipe} recipe produced a history the schema refuses: ${parsed.problems.slice(0, 3).join("; ")}` }
   const report = parametricReport(parsed.data)
-  const result = { ok: report.ok, recipe: built.recipe, summary: built.summary, derived: built.derived, rules: built.rules, history: parsed.data, report }
+  const result = { ok: report.ok, recipe: built.recipe, summary: built.summary, derived: built.derived, rules: built.rules, history: parsed.data, verification: verificationOf(parsed.data, report), report }
   if (!create) return result
   if (!report.ok) return { ...result, error: "The generated part did not rebuild cleanly, so it was not created." }
   if (context.handlers.parametric === undefined) return { ...result, ok: false, error: "Parametric project tools are unavailable in this host." }
@@ -74,7 +75,9 @@ const runRecipe = async (
   })
   const createdOk = asRecord(created)?.["ok"] !== false
   if (!createdOk) return { ...result, ok: false, error: typeof asRecord(created)?.["error"] === "string" ? String(asRecord(created)!["error"]) : "The part was built but could not be stored.", created }
-  return { ...result, ok: true, created }
+  // The same handles a parametric create returns, so the next call does not have to dig them out of `created`.
+  const stored = asRecord(created)
+  return { ...result, ok: true, created, ...(stored?.["ids"] !== undefined ? { ids: stored["ids"] } : {}), ...(stored?.["elementId"] !== undefined ? { elementId: stored["elementId"] } : {}), ...(stored?.["revision"] !== undefined ? { revision: stored["revision"] } : {}) }
 }
 
 /** The parametric history of an element already in the drawing (the handler reads it); `create` also stores the parametric twin. */
@@ -83,7 +86,11 @@ export const runParametricFromElement = (input: Input<"cad.parametric_from_eleme
 export const runParametricConvert = (input: Input<"cad_edit.parametric_convert">, context: ActionContext) =>
   of({ action: "convert", elementId: input.elementId, create: true, ...(input.depth !== undefined ? { depth: input.depth } : {}), ...(input.name !== undefined ? { name: input.name } : {}) }, context)
 
-export const runParametricValidate = (input: Input<"cad.parametric_validate">) => parametricReport(input.history)
+/** The rebuild report with its verdict in front, and for a history that does not build, the feature where it went wrong and the usual fix. */
+export const runParametricValidate = (input: Input<"cad.parametric_validate">) => {
+  const report = parametricReport(input.history)
+  return { verification: verificationOf(input.history, report), ...(report.ok ? {} : { diagnosis: diagnose(input.history, report) }), ...report }
+}
 export const runParametricFastener = (input: Input<"cad.parametric_fastener">) => lookupFastener(input)
 export const runParametricRecipe = (input: Input<"cad.parametric_recipe">, context: ActionContext) => runRecipe(input, context, false)
 export const runParametricRecipeCreate = (input: Input<"cad_edit.parametric_recipe_create">, context: ActionContext) => runRecipe(input, context, true)
