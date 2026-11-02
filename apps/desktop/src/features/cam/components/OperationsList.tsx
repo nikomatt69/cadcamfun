@@ -10,6 +10,7 @@ import { List, Trash2 } from "lucide-solid"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { t } from "../../../i18n/index.ts"
+import { OperationScene } from "../../../shared/ui/stageshow/scenes-workshop.tsx"
 
 export interface OperationRow {
   readonly id: string
@@ -32,7 +33,7 @@ export default function OperationsList(props: OperationsListProps): JSX.Element 
     <SidebarSection id="cam-operations" title={t("cam.operations")} icon={List} summary={String(props.toolpaths.length)}>
         <Show
           when={props.toolpaths.length > 0}
-          fallback={<p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.emptyOperations")}</p>}
+          fallback={<div class="panel-scene panel-scene--empty"><OperationScene /></div>}
         >
           <div class="space-y-2" role="list" aria-label={t("cam.operations")}>
             <For each={props.toolpaths}>

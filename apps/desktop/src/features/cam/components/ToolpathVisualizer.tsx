@@ -16,6 +16,7 @@ import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
 import { SimulationMiniPlayer } from "./SimulationMiniPlayer.tsx"
 import { SimulationTimeline } from "./SimulationTimeline.tsx"
+import { SimulationScene } from "../../../shared/ui/stageshow/scenes-workshop.tsx"
 import { RUN_THROUGH_PAUSE_MS, shouldResume } from "../lib/run-through.ts"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../lib/simulation.ts"
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
@@ -308,6 +309,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           when={hasProgram()}
           fallback={
             <div class="toolpath-visualizer__empty flex flex-col items-center justify-center text-white/70 text-sm">
+              <div class="panel-scene panel-scene--empty panel-scene--on-dark"><SimulationScene /></div>
               <p class="font-medium">{t("cam.preview.noToolpath")}</p>
               <p class="mt-1 text-xs text-white/50">{props.program.toolpaths.length === 0 ? t("cam.preview.hint") : t("cam.preview.pick")}</p>
             </div>
@@ -343,7 +345,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <div class="pointer-events-auto flex gap-2">
             <button
               onClick={resetView}
-              class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur text-white text-xs flex items-center gap-1.5"
+              class="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs flex items-center gap-1.5"
               title={t("cam.resetView")}
               aria-label={t("cam.resetView")}
             >
@@ -352,14 +354,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             <button
               onClick={() => setGridVisible(!gridVisible())}
               aria-pressed={gridVisible()}
-              class={`px-3 py-1.5 rounded-lg text-xs backdrop-blur ${gridVisible() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
+              class={`px-3 py-1.5 rounded-lg text-xs ${gridVisible() ? "bg-blue-600 text-white" : "bg-neutral-900 hover:bg-neutral-800 text-white"}`}
             >
               {t("cam.grid")}
             </button>
             <button
               onClick={() => setAxesVisible(!axesVisible())}
               aria-pressed={axesVisible()}
-              class={`px-3 py-1.5 rounded-lg text-xs backdrop-blur ${axesVisible() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
+              class={`px-3 py-1.5 rounded-lg text-xs ${axesVisible() ? "bg-blue-600 text-white" : "bg-neutral-900 hover:bg-neutral-800 text-white"}`}
             >
               {t("cam.axes")}
             </button>
@@ -367,7 +369,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <div class="pointer-events-auto">
             <button
               onClick={() => navigate(0)}
-              class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur text-white text-xs flex items-center gap-1.5"
+              class="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs flex items-center gap-1.5"
               aria-label={t("cam.rewind")}
             >
               <RotateCcw size={14} />
@@ -381,21 +383,21 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               onClick={() => { setSettingsOpen(false); setOperationsOpen(!operationsOpen()) }}
               aria-pressed={operationsOpen()}
               data-testid="operations-toggle"
-              class={`px-2 py-1 rounded-lg text-xs backdrop-blur flex items-center gap-1.5 ${operationsOpen() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
+              class={`px-2 py-1 rounded-lg text-xs flex items-center gap-1.5 ${operationsOpen() ? "bg-blue-600 text-white" : "bg-neutral-900 hover:bg-neutral-800 text-white"}`}
             >
               <ListTree size={14} /> {t("cam.operations.title")}
             </button>
             <select
               aria-label={t("cam.visualizer.colorMode")}
               data-testid="color-mode"
-              class="px-2 py-1 rounded-lg bg-black/40 text-white text-xs backdrop-blur border border-white/20"
+              class="px-2 py-1 rounded-lg bg-neutral-900 text-white text-xs border border-neutral-700"
               value={colorMode()}
               onChange={(event) => setColorMode(event.currentTarget.value as ColorMode)}
             >
               <For each={COLOR_MODES}>{(m) => <option value={m}>{t(`cam.visualizer.color.${m}`)}</option>}</For>
             </select>
             <Show when={props.machineChoice}>{(choice) => (
-            <label class="px-2 py-1 rounded-lg bg-black/40 backdrop-blur text-white text-xs flex items-center gap-1.5" title={t("cam.visualizer.machineSource", { machine: MACHINE_LABELS[choice().kind], source: SOURCE_LABELS[choice().source] })}>
+            <label class="px-2 py-1 rounded-lg bg-neutral-900 text-white text-xs flex items-center gap-1.5" title={t("cam.visualizer.machineSource", { machine: MACHINE_LABELS[choice().kind], source: SOURCE_LABELS[choice().source] })}>
               <span data-testid="machine-badge">{MACHINE_LABELS[choice().kind]}</span>
               <span class="text-white/50">· {SOURCE_LABELS[choice().source]}</span>
               <select
@@ -412,7 +414,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             </label>
           )}</Show>
           <Show when={props.machineChoice?.mismatch}>{(mismatch) => (
-            <span data-testid="machine-mismatch" role="status" class="px-2 py-1 rounded-lg bg-amber-500/80 text-black text-xs" title={mismatch().reasons.join("; ")}>
+            <span data-testid="machine-mismatch" role="status" class="px-2 py-1 rounded-lg bg-amber-500 text-black text-xs" title={mismatch().reasons.join("; ")}>
               {t("cam.visualizer.machineMismatch", { machine: MACHINE_LABELS[mismatch().inferred] })}
             </span>
           )}</Show>
@@ -516,7 +518,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
         </Show>
         <div class="toolpath-visualizer__dock flex flex-col items-end gap-2" data-testid="visualizer-dock">
             <Show when={nc().length > 0}>
-              <ol class="rounded-lg bg-black/65 px-2 py-1 font-mono text-[11px] leading-5 text-slate-300 backdrop-blur" data-testid="nc-strip" aria-label={t("cam.visualizer.ncStrip")}>
+              <ol class="rounded-lg bg-neutral-900 px-2 py-1 font-mono text-[11px] leading-5 text-slate-300" data-testid="nc-strip" aria-label={t("cam.visualizer.ncStrip")}>
                 <For each={nc()}>{(row) => (
                   <li>
                     <button type="button" class={`w-full truncate text-left ${row.current ? "rounded bg-yellow-300/20 text-yellow-200" : "hover:text-white"}`} onClick={() => seekLine(row.line)} data-current={row.current ? "true" : undefined}>
@@ -527,7 +529,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               </ol>
             </Show>
             <Show when={legend().length > 0}>
-              <ul class="rounded-lg bg-black/65 px-2 py-1 text-[11px] leading-5 text-slate-200 backdrop-blur" data-testid="path-legend">
+              <ul class="rounded-lg bg-neutral-900 px-2 py-1 text-[11px] leading-5 text-slate-200" data-testid="path-legend">
                 <For each={legend().slice(0, 12)}>{(entry) => (
                   <li class="flex items-center gap-1.5"><span class="inline-block h-2 w-3 rounded-sm" style={{ background: colorHex(entry.color) }} />{colorMode() === "move" ? moveLabel(entry.label as cam.viewer.MoveClass) : entry.label}</li>
                 )}</For>

@@ -9,13 +9,12 @@
 import { For, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { Card } from "../../../shared/ui/card.tsx"
-import { Field, TextInput } from "../../../shared/ui/field.tsx"
+import { Field } from "../../../shared/ui/field.tsx"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { t, type Key } from "../../../i18n/index.ts"
 import { useCamStore } from "../store/camStore.ts"
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-const hover = { backgroundColor: "rgba(59, 130, 246, 0.1)" }
-const press = { scale: 0.96 }
 
 export type OperationId = "profile" | "pocket" | "engrave" | "drill" | "face"
 
@@ -60,18 +59,18 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
           <div class="grid grid-cols-2 gap-2">
             <For each={OPERATIONS}>
               {(op) => (
-                <Motion.button
-                  class={`px-3 py-2 rounded-xl text-sm font-medium border transition-colors duration-150 ${
+                <button
+                  type="button"
+                  class={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors duration-150 ${
                     cam.operation === op.id
-                      ? "bg-blue-600 text-white border-blue-600 shadow"
-                      : "bg-white/60 dark:bg-gray-800/60 border-white/40 dark:border-gray-600/40 text-gray-700 dark:text-gray-200 hover:bg-white/80 dark:hover:bg-gray-700/80"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
+                  aria-pressed={cam.operation === op.id}
                   onClick={() => cam.setOperation(op.id)}
-                  hover={cam.operation === op.id ? hover : { backgroundColor: "rgba(59, 130, 246, 0.06)" }}
-                  press={press}
                 >
                   {t(op.label)}
-                </Motion.button>
+                </button>
               )}
             </For>
           </div>
@@ -80,49 +79,28 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
         <div class="mt-4 space-y-3">
           <Field label={t("cam.gen.panel.stepdown")}>
             {(ids) => (
-              <TextInput
-                id={ids.id}
-                type="number"
-                step="0.1"
-                min="0"
-                value={String(props.stepDown ?? defaults().stepDown)}
-                onInput={(event) => props.onChangeStepDown?.(Number(event.currentTarget.value))}
-              />
+              <NumberField id={ids.id} step={"0.1"} value={props.stepDown ?? defaults().stepDown} accept={(value) => value >= 0} onValue={(value) => props.onChangeStepDown?.(value)} />
             )}
           </Field>
           <Field label={t("cam.gen.panel.feed")}>
             {(ids) => (
-              <TextInput
-                id={ids.id}
-                type="number"
-                step="10"
-                min="0"
-                value={String(props.feed ?? defaults().feed)}
-                onInput={(event) => props.onChangeFeed?.(Number(event.currentTarget.value))}
-              />
+              <NumberField id={ids.id} step={"10"} value={props.feed ?? defaults().feed} accept={(value) => value >= 0} onValue={(value) => props.onChangeFeed?.(value)} />
             )}
           </Field>
           <Field label={t("cam.explorer.param.plungerate")}>
             {(ids) => (
-              <TextInput
-                id={ids.id}
-                type="number"
-                step="10"
-                min="0"
-                value={String(props.plunge ?? defaults().plunge)}
-                onInput={(event) => props.onChangePlunge?.(Number(event.currentTarget.value))}
-              />
+              <NumberField id={ids.id} step={"10"} value={props.plunge ?? defaults().plunge} accept={(value) => value >= 0} onValue={(value) => props.onChangePlunge?.(value)} />
             )}
           </Field>
         </div>
 
-        <Motion.button
+        <button
+          type="button"
           class="ui-btn ui-btn-primary w-full justify-center mt-4"
           onClick={() => props.onGenerate?.()}
-          press={{ scale: 0.97 }}
         >
           {t("cam.gen.panel.generate")}
-        </Motion.button>
+        </button>
       </Card>
     </Motion.div>
   )

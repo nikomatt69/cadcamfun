@@ -13,7 +13,6 @@
  * are under "3D Surface" — they see them under "Machining → 3D".
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import {
   Box,
   Cog,
@@ -90,36 +89,8 @@ const POST_ACCENT: Record<PostProcessorType, RibbonAction["accent"]> = {
   fanuc: "blue", haas: "blue", mazak: "blue", mitsubishi: "blue", brother: "blue", siemens: "cyan", okuma: "cyan", heidenhain: "purple", linuxcnc: "green", grbl: "amber", generic: "neutral"
 }
 
-const SVG = (path: string) => (size = 18, klass = ""): JSX.Element => (
-  <svg width={size} height={size} viewBox="0 0 24 24" class={klass} fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{path}</svg>
-)
-const ICON_HOME = SVG('<rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" />')
-const ICON_OPEN = SVG('<path d="M5 4h6l2 2h6v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />')
-const ICON_NEW = SVG('<rect x="4" y="6" width="16" height="14" rx="1.5" /><path d="M9 6V4h6v2" /><path d="M12 11v6 M9 14h6" />')
-
-const chipClass = (accent: RibbonAction["accent"]): string => {
-  switch (accent) {
-    case "blue": return "border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-    case "purple": return "border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30"
-    case "cyan": return "border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
-    case "amber": return "border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/30"
-    case "orange": return "border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-    case "green": return "border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-    case "red": return "border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30"
-    default: return "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-  }
-}
-
-const groupLabelClass: Readonly<Record<RibbonAction["accent"], string>> = {
-  blue: "text-blue-700 dark:text-blue-300",
-  purple: "text-purple-700 dark:text-purple-300",
-  cyan: "text-cyan-700 dark:text-cyan-300",
-  amber: "text-amber-700 dark:text-amber-300",
-  orange: "text-orange-700 dark:text-orange-300",
-  green: "text-emerald-700 dark:text-emerald-300",
-  red: "text-red-700 dark:text-red-300",
-  neutral: "text-gray-700 dark:text-gray-300"
-}
+/** One neutral chip for every action: the accent stays in the action data, but a rainbow of borders says nothing the labels do not. */
+const chipClass = (_accent: RibbonAction["accent"]): string => "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
 
 export default function CamRibbon(props: CamRibbonProps): JSX.Element {
   const gen = useGeneratorStore()
@@ -275,12 +246,9 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
   }
 
   return (
-    <Motion.div
+    <div
       class="cam-ribbon flex flex-col w-full"
       data-testid="cam-ribbon"
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
     >
       <div class="flex w-full items-stretch border-b border-[color:var(--workspace-border)]">
         <For each={TABS}>
@@ -306,11 +274,11 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
       <div class="flex w-full items-stretch overflow-x-auto" data-testid={`cam-ribbon-${tab()}`}>
         <For each={groups()}>
           {(group, groupIndex) => (
-            <div class={`flex flex-col px-[10px] pt-[5px] pb-[6px] ${groupIndex() < groups().length - 1 ? "border-r border-[color:var(--workspace-border)]" : ""}`}>
-              <div class={`text-[10px] leading-[12px] font-semibold uppercase tracking-[.035em] mb-1 ${groupLabelClass[group.actions[0]!.accent]}`}>
+            <div class={`flex flex-col px-3 pt-2 pb-2 ${groupIndex() < groups().length - 1 ? "border-r border-[color:var(--workspace-border)]" : ""}`}>
+              <div class="text-[11px] leading-4 font-semibold mb-1 text-gray-600 dark:text-gray-400">
                 {t(group.titleKey)}
               </div>
-              <div class="flex flex-wrap gap-1">
+              <div class="flex flex-wrap gap-2">
                 <For each={group.actions}>
                   {(action) => {
                     const active = (): boolean => action.active?.() ?? false
@@ -319,7 +287,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
                       <button
                         type="button"
                         data-ribbon-action={action.id}
-                        class={`flex items-center gap-[5px] min-h-[26px] px-[7px] py-[3px] rounded-[5px] text-[11px] leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active() ? "ring-2 ring-blue-300 dark:ring-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
+                        class={`flex flex-none items-center gap-1.5 min-h-[28px] px-2 py-1 rounded-md text-xs leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active() ? "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
                         onClick={action.onClick}
                         title={label()}
                         aria-pressed={active()}
@@ -335,6 +303,6 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           )}
         </For>
       </div>
-    </Motion.div>
+    </div>
   )
 }

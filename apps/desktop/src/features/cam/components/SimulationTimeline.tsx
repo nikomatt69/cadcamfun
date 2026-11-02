@@ -39,10 +39,10 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
     props.onSeek(Math.max(0, Math.min(1, (event.clientX - box.left) / Math.max(1, box.width))) * props.duration)
   }
   const button = (label: string, icon: JSX.Element, onClick: () => void, testId: string): JSX.Element => (
-    <button type="button" class="rounded p-1 text-white/80 hover:bg-white/10 hover:text-white" title={label} aria-label={label} data-testid={testId} onClick={onClick}>{icon}</button>
+    <button type="button" class="flex-none rounded-md p-1.5 text-white/80 transition-colors hover:bg-white/10 hover:text-white" title={label} aria-label={label} data-testid={testId} onClick={onClick}>{icon}</button>
   )
   return (
-    <div class="flex items-center gap-2 rounded-lg bg-black/60 px-2 py-1.5 backdrop-blur pointer-events-auto" data-testid="simulation-timeline" role="group" aria-label={t("cam.timeline.label")}>
+    <div class="flex items-center gap-2 rounded-lg bg-neutral-900 px-3 py-1.5 pointer-events-auto" data-testid="simulation-timeline" role="group" aria-label={t("cam.timeline.label")}>
       {button(t("cam.timeline.prevOperation"), <ChevronsLeft size={14} />, () => props.onStepOperation(-1), "timeline-prev-op")}
       {button(t("cam.timeline.prevMove"), <ChevronLeft size={14} />, () => props.onStepMove(-1), "timeline-prev-move")}
       <div
@@ -82,7 +82,7 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
         )}</For>
         <For each={props.toolChanges}>{(at) => <div class="absolute top-0 bottom-0 w-0.5 bg-white" data-testid="timeline-tool-change" title={t("cam.timeline.toolChange")} style={{ left: pct(at, props.duration) }} />}</For>
         <For each={props.markers}>{(m) => <div class={`absolute top-0 h-2 w-1.5 rounded-b ${m.severity === "error" ? "bg-red-500" : "bg-amber-400"}`} data-testid="timeline-marker" title={m.message} style={{ left: pct(m.seconds, props.duration) }} />}</For>
-        <div class="absolute top-0 bottom-0 w-0.5 bg-yellow-300 shadow" data-testid="timeline-playhead" style={{ left: pct(props.seconds, props.duration) }} />
+        <div class="absolute top-0 bottom-0 w-0.5 bg-yellow-300" data-testid="timeline-playhead" style={{ left: pct(props.seconds, props.duration) }} />
       </div>
       {button(t("cam.timeline.nextMove"), <ChevronRight size={14} />, () => props.onStepMove(1), "timeline-next-move")}
       {button(t("cam.timeline.nextOperation"), <ChevronsRight size={14} />, () => props.onStepOperation(1), "timeline-next-op")}
@@ -95,12 +95,12 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
       )}</Show>
       <label class="flex items-center gap-1 text-[11px] text-white/80">
         <span>{t("cam.timeline.speed")}</span>
-        <select aria-label={t("cam.timeline.speed")} class="rounded border border-slate-600 bg-slate-800 px-1 py-0.5 text-white" value={String(props.rate)} onChange={(event) => props.onRate(Number(event.currentTarget.value))} data-testid="timeline-speed">
+        <select aria-label={t("cam.timeline.speed")} class="rounded-md border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 text-white" value={String(props.rate)} onChange={(event) => props.onRate(Number(event.currentTarget.value))} data-testid="timeline-speed">
           <For each={RATES}>{(r) => <option value={String(r)}>{r}×</option>}</For>
         </select>
       </label>
       <Show when={props.duration > 0}>
-        <output class="min-w-[4.5rem] text-right text-[11px] tabular-nums text-white/80">{Math.floor(props.seconds / 60)}:{String(Math.floor(props.seconds % 60)).padStart(2, "0")} / {Math.floor(props.duration / 60)}:{String(Math.floor(props.duration % 60)).padStart(2, "0")}</output>
+        <output class="min-w-[4.5rem] flex-none text-right text-[11px] tabular-nums text-white/80">{Math.floor(props.seconds / 60)}:{String(Math.floor(props.seconds % 60)).padStart(2, "0")} / {Math.floor(props.duration / 60)}:{String(Math.floor(props.duration % 60)).padStart(2, "0")}</output>
       </Show>
     </div>
   )

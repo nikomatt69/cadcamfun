@@ -7,7 +7,6 @@
  */
 import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { Motion } from "solid-motionone"
 import {
   Brain, Code, DollarSign, Folder, Grid3x3, History, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, RotateCcw, RotateCw, Save, Settings, Sun, Upload, Wrench, Zap
 } from "lucide-solid"
@@ -59,26 +58,20 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
   }
 
   return (
-    <Motion.div
+    <div
       class="workstation-toolbar w-full flex items-center justify-between"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.4 }}
     >
-      <Motion.div
-        class="flex rounded-2xl w-max items-center backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 p-2 shadow-md border border-white/30 dark:border-gray-600/30"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.6 }}
+      <div
+        class="flex rounded-2xl w-max items-center bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-600"
       >
-        <Motion.button
-          class="mr-2 p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 focus:outline-none transition-colors duration-150 border border-white/40 dark:border-gray-600/40 shadow-sm"
+        <button
+          type="button"
+          class="mr-2 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors duration-150 border border-gray-200 dark:border-gray-600"
           onClick={() => cam.toggleSidebar()}
-          press={{ scale: 0.95 }}
           aria-label={t("cam.toggleSidebar")}
         >
           <Menu size={20} class="text-gray-600 dark:text-gray-400" />
-        </Motion.button>
+        </button>
 
         <div class="ml-6 flex items-center space-x-2">
           <button onClick={() => props.onSave()} class={`${OUTLINE} cursor-pointer`} title={t("cam.saveGcode")} aria-label={t("cam.saveGcode")} disabled={!props.canSave}>
@@ -127,7 +120,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <button
             onClick={() => props.onToggleAi()}
-            class={`p-1.5 border shadow-sm rounded-md flex items-center mr-2 ${props.aiEnhanced ? TOGGLE_ON : TOGGLE_OFF}`}
+            class={`p-1.5 border rounded-md flex items-center mr-2 ${props.aiEnhanced ? TOGGLE_ON : TOGGLE_OFF}`}
             aria-label={t("cam.toggleAi")}
             aria-pressed={props.aiEnhanced}
             title={t(props.aiEnhanced ? "cam.aiDisable" : "cam.aiEnable")}
@@ -138,7 +131,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <button
             onClick={toggleDarkMode}
-            class={`p-1.5 border shadow-sm rounded-md flex items-center ${dark() ? TOGGLE_ON : TOGGLE_OFF}`}
+            class={`p-1.5 border rounded-md flex items-center ${dark() ? TOGGLE_ON : TOGGLE_OFF}`}
             aria-label={t("cam.toggleTheme")}
             aria-pressed={dark()}
           >
@@ -147,40 +140,37 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             </Show>
           </button>
         </div>
-      </Motion.div>
+      </div>
 
-      <Motion.div
+      <div
         class="workstation-workspace-tabs flex space-x-3"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.8 }}
       >
         <For each={TABS}>
           {(tab) => (
-            <Motion.button
+            <button
+              type="button"
               onClick={() => cam.setActiveTab(tab.id)}
               aria-pressed={cam.activeTab === tab.id}
-              class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium backdrop-blur-sm transition-colors duration-150 ${
+              class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-150 ${
                 cam.activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white/70 dark:bg-gray-700/70 text-gray-700 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-gray-600/90 border border-white/40 dark:border-gray-600/40"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600"
               }`}
-              press={{ scale: 0.98 }}
             >
               {tab.icon(16)}
               {t(tab.label)}
-            </Motion.button>
+            </button>
           )}
         </For>
-        <Motion.button
+        <button
+          type="button"
           onClick={() => props.onToggleChat()}
           class="flex items-center px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors duration-150"
           aria-label={t(props.showChat ? "cam.chatClose" : "cam.chatOpen")}
-          press={{ scale: 0.95 }}
         >
           <Show when={props.showChat} fallback={<PanelRight size={16} />}><PanelRightClose size={16} /></Show>
-        </Motion.button>
-      </Motion.div>
-    </Motion.div>
+        </button>
+      </div>
+    </div>
   )
 }

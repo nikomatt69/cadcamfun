@@ -16,6 +16,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../../cad/store/cadStore.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { pickMachine } from "../lib/machine-pick.ts"
+import { MachineScene } from "../../../shared/ui/stageshow/scenes-workshop.tsx"
 import {
   MACHINES_PATH,
   machineControllerOf,
@@ -182,6 +183,7 @@ export default function MachineSelect(): JSX.Element {
             </div>
 
             <Show when={machines().length === 0}>
+              <div class="panel-scene panel-scene--empty"><MachineScene /></div>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {t("cam.machine.empty")}{" "}
                 <A href={MACHINES_PATH} class="text-blue-600 hover:underline dark:text-blue-400">{t("cam.machine.createInLibrary")}</A>

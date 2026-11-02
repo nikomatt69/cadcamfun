@@ -4,6 +4,7 @@ import { Code, Play } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { gcodeSummary } from "../lib/gcode-summary.ts"
 import { caretPosition, tokenizeGcodeLine } from "../lib/gcode-tokens.ts"
+import { GCodeScene } from "../../../shared/ui/stageshow/scenes-workshop.tsx"
 import "../../../styles/cam-panels.css"
 
 export interface GCodeEditorProps {
@@ -58,6 +59,8 @@ export default function GCodeEditor(props: GCodeEditorProps): JSX.Element {
         <Show when={summary().offsets.length > 0}><span>{summary().offsets.join(" ")}</span></Show>
       </p>
     </header>
+    {/* The decorative strip: the program the panel edits, checked. It says nothing a screen reader needs. */}
+    <div class="panel-scene"><GCodeScene /></div>
     <div class="cam-editor__body">
       <div class="cam-editor__gutter" aria-hidden="true">
         <div class="cam-editor__gutter-lines" style={{ transform: shiftY() }}>

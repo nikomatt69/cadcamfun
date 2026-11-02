@@ -35,7 +35,7 @@ const OVERRIDES = ["rpm", "feed", "stepdown", "stepover"] as const
 function OptionalNumber(props: { readonly value: number | undefined; readonly placeholder: string; readonly testId?: string; readonly onValue: (value: number | undefined) => void }): JSX.Element {
   return (
     <input
-      type="number" class="w-full rounded border border-gray-300 px-1 py-0.5 text-xs" placeholder={props.placeholder} value={props.value ?? ""} data-testid={props.testId}
+      type="number" class="w-full rounded border border-gray-300 px-2 py-1 text-xs" placeholder={props.placeholder} value={props.value ?? ""} data-testid={props.testId}
       onChange={(event) => { const raw = event.currentTarget.value.trim(); const v = Number(raw); props.onValue(raw === "" || !Number.isFinite(v) || v <= 0 ? undefined : v) }}
     />
   )
@@ -400,7 +400,7 @@ export function KernelOperationControls(): JSX.Element {
               const cutter = () => kernel.library().find((c) => c.id === op.tool)
               const own = op as unknown as Readonly<Record<string, number | undefined>>
               return (
-                <div class="rounded border border-gray-200 dark:border-gray-700 p-1.5 text-xs space-y-1" data-testid="kernel-plan-operation">
+                <div class="rounded border border-gray-200 dark:border-gray-700 p-2 text-xs space-y-1" data-testid="kernel-plan-operation">
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
@@ -411,13 +411,13 @@ export function KernelOperationControls(): JSX.Element {
                   </div>
                   <div class="flex items-center gap-1">
                     <Show when={cutter()}>{(c) => <ToolSilhouette cutter={c()} height={36} />}</Show>
-                    <select class="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs" value={op.tool} onChange={(event) => kernel.patchOperation(index(), { tool: event.currentTarget.value })} data-testid="kernel-plan-tool">
+                    <select class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs" value={op.tool} onChange={(event) => kernel.patchOperation(index(), { tool: event.currentTarget.value })} data-testid="kernel-plan-tool">
                       <For each={kernel.library().filter((c) => KINDS[op.strategy].includes(c.kind) || c.id === op.tool)}>{(c) => <option value={c.id}>{c.name}</option>}</For>
                     </select>
                     <span class="text-gray-500">{op.strategy}</span>
                   </div>
                   <div class="grid grid-cols-4 gap-1">
-                    <For each={OVERRIDES}>{(key) => <label class="text-[10px] text-gray-500">{key}<OptionalNumber value={own[key]} placeholder={t("cam.kernel.fromData")} testId={`kernel-plan-${key}`} onValue={(value) => kernel.patchOperation(index(), { [key]: value })} /></label>}</For>
+                    <For each={OVERRIDES}>{(key) => <label class="text-[11px] text-gray-500">{key}<OptionalNumber value={own[key]} placeholder={t("cam.kernel.fromData")} testId={`kernel-plan-${key}`} onValue={(value) => kernel.patchOperation(index(), { [key]: value })} /></label>}</For>
                   </div>
                 </div>
               )
@@ -434,15 +434,15 @@ export function KernelOperationControls(): JSX.Element {
           </Show>
           <For each={kernel.usedCutters()}>
             {(c) => (
-              <div class="flex gap-2 rounded border border-gray-200 dark:border-gray-700 p-1.5 text-xs" data-testid="kernel-cutter">
+              <div class="flex gap-2 rounded border border-gray-200 dark:border-gray-700 p-2 text-xs" data-testid="kernel-cutter">
                 <ToolSilhouette cutter={c} height={90} />
                 <div class="flex-1 space-y-1">
                   <div class="font-medium">{c.name}</div>
                   <div class="grid grid-cols-2 gap-1">
-                    <label class="text-[10px] text-gray-500">flutes mm<OptionalNumber value={c.fluteLength} placeholder="" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { fluteLength: v })} /></label>
-                    <label class="text-[10px] text-gray-500">stickout mm<OptionalNumber value={c.stickout} placeholder="" testId="kernel-cutter-stickout" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { stickout: Math.max(v, c.fluteLength) })} /></label>
-                    <label class="text-[10px] text-gray-500">holder Ø<OptionalNumber value={c.holder?.diameter} placeholder={t("cam.kernel.holderNone")} testId="kernel-cutter-holder" onValue={(v) => kernel.patchCutter(c.id, { holder: v === undefined ? null : { diameter: v, length: c.holder?.length ?? 40 } })} /></label>
-                    <label class="text-[10px] text-gray-500">holder length<OptionalNumber value={c.holder?.length} placeholder="" onValue={(v) => { const holder = c.holder; if (v !== undefined && holder !== undefined) kernel.patchCutter(c.id, { holder: { diameter: holder.diameter, length: v } }) }} /></label>
+                    <label class="text-[11px] text-gray-500">flutes mm<OptionalNumber value={c.fluteLength} placeholder="" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { fluteLength: v })} /></label>
+                    <label class="text-[11px] text-gray-500">stickout mm<OptionalNumber value={c.stickout} placeholder="" testId="kernel-cutter-stickout" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { stickout: Math.max(v, c.fluteLength) })} /></label>
+                    <label class="text-[11px] text-gray-500">holder Ø<OptionalNumber value={c.holder?.diameter} placeholder={t("cam.kernel.holderNone")} testId="kernel-cutter-holder" onValue={(v) => kernel.patchCutter(c.id, { holder: v === undefined ? null : { diameter: v, length: c.holder?.length ?? 40 } })} /></label>
+                    <label class="text-[11px] text-gray-500">holder length<OptionalNumber value={c.holder?.length} placeholder="" onValue={(v) => { const holder = c.holder; if (v !== undefined && holder !== undefined) kernel.patchCutter(c.id, { holder: { diameter: holder.diameter, length: v } }) }} /></label>
                   </div>
                 </div>
               </div>
@@ -464,7 +464,7 @@ export function KernelRunControls(): JSX.Element {
         {t(kernel.ownRun() ? "cam.kernel.generating" : "cam.kernel.generate")}
       </button>
       <Show when={kernel.ownRun() && kernel.progressLabel() !== undefined}>
-        <p class="text-[10px] text-gray-500" data-testid="kernel-progress" aria-live="polite">{kernel.progressLabel()}</p>
+        <p class="text-[11px] text-gray-500" data-testid="kernel-progress" aria-live="polite">{kernel.progressLabel()}</p>
       </Show>
       <Show when={!kernel.request()}><p class="text-xs text-gray-500">{t("cam.kernel.select")}</p></Show>
       <Show when={kernel.error()}><p role="alert" class="text-xs text-red-600">{kernel.error()}</p></Show>
@@ -493,7 +493,7 @@ export function KernelRunControls(): JSX.Element {
           <div class="flex flex-wrap gap-2" data-testid="kernel-tools">
             <For each={value().tools}>
               {(tool) => (
-                <div class="flex items-center gap-1 rounded border border-gray-200 bg-white px-1 py-0.5 text-[10px] text-gray-700" title={`${tool.name}: Ø${tool.diameter}, ${tool.fluteLength} mm flutes, ${tool.stickout} mm stickout${tool.holder ? `, holder Ø${tool.holder.diameter} x ${tool.holder.length}` : ""}`}>
+                <div class="flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700" title={`${tool.name}: Ø${tool.diameter}, ${tool.fluteLength} mm flutes, ${tool.stickout} mm stickout${tool.holder ? `, holder Ø${tool.holder.diameter} x ${tool.holder.length}` : ""}`}>
                   <ToolSilhouette cutter={tool as cam.kernel.Cutter} height={48} />
                   <span>T{tool.number}<br />Ø{tool.diameter}</span>
                 </div>

@@ -68,33 +68,36 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                 <button type="button" class="panel-icon-btn" title={t("cam.openSidebarHint")} aria-label={t("cam.openSidebarHint")} onClick={() => props.setIsOpen(true)}><List size={16} /></button>
               </Show>
               <Show when={props.activeTab === "settings"}>
-                <div class="space-y-4 p-1">
+                <div class="flex flex-col items-center gap-2 p-1">
                   <button
+                    type="button"
                     class="panel-icon-btn"
                     title={t("cam.toggleGrid")}
                     aria-label={t("cam.toggleGrid")}
                     aria-pressed={cad.gridVisible}
                     onClick={() => cad.toggleGrid()}
                   >
-                    <Grid size={20} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                    <Grid size={16} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
                   </button>
                   <button
+                    type="button"
                     class="panel-icon-btn"
                     title={t("cam.toggleAxis")}
                     aria-label={t("cam.toggleAxis")}
                     aria-pressed={cad.axisVisible}
                     onClick={() => cad.toggleAxis()}
                   >
-                    <Show when={cad.axisVisible} fallback={<EyeOff size={20} class="text-gray-600 dark:text-gray-400" />}><Eye size={20} class="text-blue-600 dark:text-blue-400" /></Show>
+                    <Show when={cad.axisVisible} fallback={<EyeOff size={16} class="text-gray-600 dark:text-gray-400" />}><Eye size={16} class="text-blue-600 dark:text-blue-400" /></Show>
                   </button>
                   <button
+                    type="button"
                     class="panel-icon-btn"
                     title={t("cam.toggleViewMode")}
                     aria-label={t("cam.toggleViewMode")}
                     aria-pressed={cad.viewMode === "3d"}
                     onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}
                   >
-                    <Box size={20} class={cad.viewMode === "3d" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                    <Box size={16} class={cad.viewMode === "3d" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
                   </button>
                 </div>
               </Show>

@@ -18,6 +18,7 @@ import { useJob } from "../hooks/useJob.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { loadConfig, saveConfig, useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
 import { AdvancedSection } from "./generator/AdvancedSection.tsx"
+import { GeneratorScene } from "../../../shared/ui/stageshow/scenes-workshop.tsx"
 import { AiSection } from "./generator/AiSection.tsx"
 import { CuttingSection } from "./generator/CuttingSection.tsx"
 import { EvidenceSection } from "./generator/EvidenceSection.tsx"
@@ -147,6 +148,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
           </button>
         </div>
       </header>
+
+      {/* The decorative strip: the cut the panel is about to run. It says nothing a screen reader needs. */}
+      <div class="panel-scene"><GeneratorScene /></div>
 
       <MachineSection />
       <OriginSection />

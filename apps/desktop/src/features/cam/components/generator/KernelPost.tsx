@@ -107,14 +107,14 @@ export default function KernelPost(props: {
         </div>
         <Show when={stored().length > 0}>
           <label class="block text-xs">{t("cam.post.stored")}
-            <select class="w-full rounded border border-gray-300 px-1 py-0.5 text-xs" data-testid="kernel-post-stored"
+            <select class="w-full rounded border border-gray-300 px-2 py-1 text-xs" data-testid="kernel-post-stored"
               onChange={(event) => { const row = stored().find((r) => r.id === event.currentTarget.value); if (row !== undefined) { setText(JSON.stringify(row.data, null, 2)); setStoredId(row.id); setIssues([]); setSample(undefined); setChecked(undefined) } event.currentTarget.value = "" }}>
               <option value="">{t("cam.post.choose")}</option>
               <For each={stored()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
             </select>
           </label>
         </Show>
-        <textarea class="w-full rounded border border-gray-300 px-1 py-0.5 font-mono text-xs" rows="10" spellcheck={false} value={text()} onInput={(event) => { setText(event.currentTarget.value); setChecked(undefined) }} data-testid="kernel-post-text" />
+        <textarea class="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs" rows="10" spellcheck={false} value={text()} onInput={(event) => { setText(event.currentTarget.value); setChecked(undefined) }} data-testid="kernel-post-text" />
         <div class="flex flex-wrap gap-2">
           <button type="button" class="ui-btn ui-btn-secondary" disabled={busy() || text().trim() === ""} onClick={() => void check()} data-testid="kernel-post-check">{t("cam.post.check")}</button>
           <button type="button" class="ui-btn ui-btn-secondary" disabled={checked() === undefined} onClick={() => props.onUse(checked())} data-testid="kernel-post-use">{t("cam.post.use")}</button>

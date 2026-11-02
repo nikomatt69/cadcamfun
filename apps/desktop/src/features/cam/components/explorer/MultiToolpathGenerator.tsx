@@ -160,39 +160,39 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     <div class="flex flex-col h-full" data-testid="multi-toolpath-generator">
       {/* Header */}
       <div class="bg-gray-900 border-b border-gray-700 p-4">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-bold text-white flex items-center gap-2">
-            <Layers size={24} />
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <Layers size={16} />
             {t("cam.explorer.multiToolpath")}
           </h2>
 
           <div class="flex items-center gap-2">
-            <button onClick={() => setShowElementSelector(!showElementSelector())} class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title={t("cam.multi.toggleElements")}>
-              {showElementSelector() ? <EyeOff size={20} /> : <Eye size={20} />}
+            <button type="button" onClick={() => setShowElementSelector(!showElementSelector())} class="flex-none p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" aria-pressed={showElementSelector()} aria-label={t("cam.multi.toggleElements")} title={t("cam.multi.toggleElements")}>
+              {showElementSelector() ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
 
-            <button
+            <button type="button"
               onClick={() => void generateAllToolpaths()}
               disabled={isGeneratingAll() || stats().totalToolpaths === 0}
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              class="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-2"
             >
               <Zap size={16} />
               {t("cam.multi.generateAll")}
             </button>
 
-            <button
+            <button type="button"
               onClick={() => void sendToVisualizer()}
               disabled={stats().generatedToolpaths === 0}
-              class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              class="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-2"
             >
               <Play size={16} />
               {t("cam.multi.view")}
             </button>
 
-            <button
+            <button type="button"
               onClick={downloadCombinedGCode}
               disabled={stats().generatedToolpaths === 0}
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              class="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-2"
             >
               <Download size={16} />
               {t("cam.multi.downloadGcode")}
@@ -204,22 +204,22 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
         <div class="grid grid-cols-4 gap-4 text-sm">
           <div class="bg-gray-800 rounded-lg p-3">
             <div class="text-gray-400">{t("cam.multi.statTotal")}</div>
-            <div class="text-2xl font-bold text-white">{stats().totalToolpaths}</div>
+            <div class="text-xl font-semibold text-white tabular-nums">{stats().totalToolpaths}</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
             <div class="text-gray-400">{t("cam.multi.statGenerated")}</div>
-            <div class="text-2xl font-bold text-green-400">{stats().generatedToolpaths}</div>
+            <div class="text-xl font-semibold text-white tabular-nums">{stats().generatedToolpaths}</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
             <div class="text-gray-400">{t("cam.multi.statDistance")}</div>
-            <div class="text-2xl font-bold text-blue-400">{(stats().totalDistance / 1000).toFixed(2)}m</div>
+            <div class="text-xl font-semibold text-white tabular-nums">{(stats().totalDistance / 1000).toFixed(2)}m</div>
           </div>
 
           <div class="bg-gray-800 rounded-lg p-3">
             <div class="text-gray-400">{t("cam.multi.statTime")}</div>
-            <div class="text-2xl font-bold text-yellow-400">{formatDuration(stats().totalTime)}</div>
+            <div class="text-xl font-semibold text-white tabular-nums">{formatDuration(stats().totalTime)}</div>
           </div>
         </div>
       </div>
@@ -244,8 +244,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
             fallback={
               <div class="flex items-center justify-center h-full">
                 <div class="text-center">
-                  <Layers size={64} class="text-gray-600 mx-auto mb-4" />
-                  <p class="text-gray-400 text-lg">{t("cam.multi.selectElement")}</p>
+                  <Layers size={32} class="text-gray-600 mx-auto mb-3" />
+                  <p class="text-gray-400 text-base">{t("cam.multi.selectElement")}</p>
                   <p class="text-gray-500 text-sm mt-2">{t("cam.multi.useSidebar")}</p>
                 </div>
               </div>
@@ -255,11 +255,11 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
               <div class="p-4">
                 <div class="mb-4 bg-gray-800 rounded-lg p-3 flex items-center justify-between">
                   <div class="flex items-center gap-2">
-                    <Box size={20} class="text-blue-400" />
-                    <span class="text-white">Configurazione toolpath per: {elementId()}</span>
+                    <Box size={16} class="text-gray-400" />
+                    <span class="text-white">{t("cam.explorer.selectedElement")}: {nameOf(elementId())}</span>
                   </div>
 
-                  <button onClick={() => setConfiguringElementId(null)} class="text-gray-400 hover:text-white transition-colors" aria-label={t("cam.explorer.close")}><X size={14} /></button>
+                  <button type="button" onClick={() => setConfiguringElementId(null)} class="flex-none p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors" aria-label={t("cam.explorer.close")}><X size={14} /></button>
                 </div>
 
                 <ToolpathGenerator

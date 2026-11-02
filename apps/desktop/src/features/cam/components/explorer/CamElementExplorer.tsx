@@ -33,6 +33,7 @@ import {
 } from "../../lib/explorer.ts"
 import { createBrowser } from "../../../cad/components/browser/browserState.ts"
 import { BrowserSections, BrowserToolbar, OriginBlock, RenameName, RowActions } from "../../../cad/components/browser/BrowserParts.tsx"
+import { NumberField } from "../../../../shared/components/panel/ui.tsx"
 import { assignmentProblem } from "../../lib/elementJob.ts"
 import { generateForElement } from "../../lib/elementGenerate.ts"
 import { useJob } from "../../hooks/useJob.ts"
@@ -57,15 +58,15 @@ function ElementIcon(props: { readonly type: string }): JSX.Element {
     <Show when={["group", "assembly", "component"].includes(kind())} fallback={
       <Show when={["cube", "box"].includes(kind())} fallback={
         <Show when={["circle", "sphere", "cylinder"].includes(kind())} fallback={
-          <Show when={kind() === "rectangle"} fallback={<Box size={16} class="text-gray-400" />}><Square size={16} class="text-yellow-400" /></Show>
-        }><Circle size={16} class="text-green-400" /></Show>
-      }><Box size={16} class="text-orange-400" /></Show>
-    }><Folder size={16} class="text-blue-400" /></Show>
+          <Show when={kind() === "rectangle"} fallback={<Box size={16} class="text-gray-500 dark:text-gray-400" />}><Square size={16} class="text-gray-500 dark:text-gray-400" /></Show>
+        }><Circle size={16} class="text-gray-500 dark:text-gray-400" /></Show>
+      }><Box size={16} class="text-gray-500 dark:text-gray-400" /></Show>
+    }><Folder size={16} class="text-gray-500 dark:text-gray-400" /></Show>
   )
 }
 
 const BTN = "p-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-md text-gray-700 dark:text-gray-300 flex items-center justify-center text-xs border border-gray-200 dark:border-gray-600 transition-colors"
-const FIELD = "w-full text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+const FIELD = "panel-input"
 
 const PARAM_FIELDS: ReadonlyArray<{ readonly key: keyof ElementParams; readonly label: Key; readonly min: number; readonly step: number }> = [
   { key: "depth", label: "cam.explorer.param.depth", min: 0.1, step: 0.5 },
@@ -178,7 +179,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
           onClick={event => selectNode(id(), event)}
           data-testid={`cam-element-${id()}`}
         >
-          <button
+          <button type="button"
             class="mr-2 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             onClick={event => { event.stopPropagation(); if (hasChildren()) setExpanded(previous => ({ ...previous, [id()]: !previous[id()] })) }}
           >
@@ -202,14 +203,14 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
         <Show when={isSelected()}>
           <div class="px-2 py-2 bg-gray-50 dark:bg-gray-700/30 border-l-2 border-blue-300 dark:border-blue-600/50 ml-2 text-xs">
             <div class="flex flex-wrap gap-2 mb-1">
-              <button class={`flex items-center ${panel() === "tool" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300"}`} onClick={() => setPanel(panel() === "tool" ? null : "tool")}>
+              <button type="button" class={`flex items-center ${panel() === "tool" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300"}`} onClick={() => setPanel(panel() === "tool" ? null : "tool")}>
                 <Wrench size={12} class="mr-1" /><span>{t("cam.explorer.tool")}</span>
               </button>
-              <button class={`flex items-center ${panel() === "material" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300"}`} onClick={() => setPanel(panel() === "material" ? null : "material")}>
+              <button type="button" class={`flex items-center ${panel() === "material" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300"}`} onClick={() => setPanel(panel() === "material" ? null : "material")}>
                 <Database size={12} class="mr-1" /><span>{t("cam.explorer.material")}</span>
               </button>
               <Show when={isMachinable(elements.elements.find(element => element.id === id()) ?? { id: id(), type: nodeProps.node.type })}>
-                <button class="flex items-center text-amber-600 dark:text-amber-400" onClick={() => useAsWorkpiece(id())} title={t("cam.explorer.useAsWorkpieceTitle")}>
+                <button type="button" class="flex items-center text-amber-600 dark:text-amber-400" onClick={() => useAsWorkpiece(id())} title={t("cam.explorer.useAsWorkpieceTitle")}>
                   <Box size={12} class="mr-1" /><span>{t("cam.explorer.useAsWorkpiece")}</span>
                 </button>
               </Show>
@@ -229,7 +230,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
                         <For each={PARAM_FIELDS}>{field => (
                           <div>
                             <label class="block text-gray-600 dark:text-gray-400">{t(field.label)}</label>
-                            <input type="number" class={FIELD} value={params()[field.key]} min={field.min} step={field.step} onInput={event => updateParam(id(), field.key, parseFloat(event.currentTarget.value))} />
+                            <NumberField class={FIELD} value={params()[field.key]} min={String(field.min)} step={String(field.step)} accept={value => value > 0} onValue={value => updateParam(id(), field.key, value)} />
                           </div>
                         )}</For>
                       </div>
@@ -280,14 +281,14 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
           <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{elements.elements.length}</span>
         </div>
         <div class="flex items-center space-x-1">
-          <button
+          <button type="button"
             class="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
             title={t("cam.explorer.multiToolpath")}
             onClick={() => setMultiOpen(true)}
           >
             <Layers size={14} />
           </button>
-          <button
+          <button type="button"
             class="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
             title={t("cam.explorer.relink")}
             onClick={() => camStore.syncWorkpieceFromCAD()}
@@ -308,8 +309,8 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
       </div>
 
       <div class="flex justify-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-4 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded(Object.fromEntries(allNodeIds(tree()).map(id => [id, true])))}>{t("cad.explorer.expandAll")}</button>
-        <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>{t("cad.explorer.collapseAll")}</button>
+        <button type="button" class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-4 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded(Object.fromEntries(allNodeIds(tree()).map(id => [id, true])))}>{t("cad.explorer.expandAll")}</button>
+        <button type="button" class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>{t("cad.explorer.collapseAll")}</button>
       </div>
 
       <OriginBlock />
@@ -322,22 +323,22 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
       <Show when={selection.selectedElementIds.length > 0}>
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div class="grid grid-cols-2 gap-2">
-            <button class={BTN} onClick={() => setMulti(!multi())} title={multi() ? t("cad.explorer.multiOff") : t("cad.explorer.multiOn")}>
+            <button type="button" class={BTN} onClick={() => setMulti(!multi())} title={multi() ? t("cad.explorer.multiOff") : t("cad.explorer.multiOn")}>
               <span class="w-3 h-3 rounded-sm border mr-2 border-gray-400 dark:border-gray-500 flex items-center justify-center">
                 <Show when={multi()}><span class="w-2 h-2 bg-blue-500 rounded-sm" /></Show>
               </span>
               {t("cad.explorer.multi")}
             </button>
-            <button class={BTN} title={t("cam.explorer.assignTool")} onClick={() => setPanel("tool")}><Wrench size={14} class="mr-1" />{t("cam.explorer.tool")}</button>
-            <button class={BTN} title={t("cam.explorer.assignMaterial")} onClick={() => setPanel("material")}><Database size={14} class="mr-1" />{t("cam.explorer.material")}</button>
-            <button
+            <button type="button" class={BTN} title={t("cam.explorer.assignTool")} onClick={() => setPanel("tool")}><Wrench size={14} class="mr-1" />{t("cam.explorer.tool")}</button>
+            <button type="button" class={BTN} title={t("cam.explorer.assignMaterial")} onClick={() => setPanel("material")}><Database size={14} class="mr-1" />{t("cam.explorer.material")}</button>
+            <button type="button"
               class="p-2 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-md text-green-600 dark:text-green-400 flex items-center justify-center text-xs border border-green-200 dark:border-green-800 transition-colors"
               onClick={() => void generateSelected()}
               title={t("cam.explorer.generateToolpath")}
             >
               <Code size={14} class="mr-1" />{t("cam.explorer.generate")}
             </button>
-            <button class={`${BTN} text-red-600 dark:text-red-400 col-span-2`} title={t("cam.explorer.deleteSelected")} onClick={deleteSelected}><Trash2 size={14} class="mr-1" />{t("browser.delete")}</button>
+            <button type="button" class={`${BTN} text-red-600 dark:text-red-400 col-span-2`} title={t("cam.explorer.deleteSelected")} onClick={deleteSelected}><Trash2 size={14} class="mr-1" />{t("browser.delete")}</button>
           </div>
         </div>
       </Show>
@@ -371,7 +372,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" data-testid="multi-toolpath-modal">
             <div class="w-full max-w-7xl h-[90vh] flex flex-col bg-gray-900 rounded-lg shadow-xl overflow-hidden">
               <div class="flex justify-end p-2 bg-gray-900">
-                <button onClick={() => setMultiOpen(false)} class="p-2 rounded-full text-gray-300 hover:bg-gray-700" title={t("cam.explorer.close")}><X size={20} /></button>
+                <button type="button" onClick={() => setMultiOpen(false)} class="p-2 rounded-full text-gray-300 hover:bg-gray-700" title={t("cam.explorer.close")}><X size={20} /></button>
               </div>
               <div class="flex-1 min-h-0">
                 <MultiToolpathGenerator onGCodeGenerated={gcode => props.onGCodeGenerated?.(gcode)} />
