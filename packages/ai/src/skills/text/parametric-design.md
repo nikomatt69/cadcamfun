@@ -22,9 +22,29 @@ Send it to `cad` with `{"action":"parametric_validate","history":{...}}`. Change
 1. If the user names a quantity that will change (count, diameter, thickness, hole spacing), make it a parameter.
 2. Sketch on plane `XY` by default, with named lengths tied to parameters.
 3. Extrude with `operation: "new"`, `direction: "up"`, `depth` set to a parameter name.
-4. Add features that reference parameter names, then call cad action parametric_validate validate. Repair the reported paths and rebuild errors before create; switching to cad_edit action add cannot bypass the same history schema.
-5. End with cad action check. On `RebuildFailed`, read the cause, fix it, repeat.
-6. Save with vcs_edit action commit on the checked-out branch (see the version-control-cadcam skill).
+4. Add features that reference parameter names, then call cad action parametric_validate. Switching to cad_edit action add cannot bypass the same history schema.
+5. Read `verification` of every validate, create, update and edit answer before the next step: `verdict` (valid, review, failed), `volumeMm3` and `sizeMm` against your hand computation, `throughHoles` against the holes you meant, and every line of `attention` (a hole that removes no material, a union that left a separate lump, a sketch not fully constrained, literal sizes). A `review` is fixed or reported, never ignored. `exactPending` means the exact model did not finish in the interactive budget: call `parametric_exact` before quoting an exact volume, mass or STEP.
+6. A refusal has `error` and `diagnosis`: `rootCauses` (the first failing feature, with a `hint`) or `removedLastSolid` (the feature whose cut ate the part). Fix that feature first; later "Not built" lines only follow from it. A rebuild failure of a variant leaves the stored part untouched.
+7. Save with vcs_edit action commit on the checked-out branch (see the version-control-cadcam skill).
+
+## Design intent, in this order
+
+- Parameters first (named for meaning, derived ones as expressions: `"boreD": "bearingOD - 2 * wall"`), one fully constrained sketch per feature (`shapes`), features in a robust order: base solid, then large cuts and bosses, then holes and patterns, and rounds and chamfers last (they select edges the earlier features made, so reordering them earlier changes or loses the selection).
+- Sizes from tables, not memory: `parametric_fastener` (clearance, tap drill, counterbore), `parametric_recipe` for standard parts, DIN 6885 keys, ISO 15 bearing seats. A hole near an edge keeps 1.5 x its diameter; check with `parametric_dfm` for the process before CAM.
+- Reference by stable names (see cad-naming), not indexes; bind later changes with `parametric_edit` instead of rewriting the history.
+- Dimension checks: compare `volumeMm3` and `sizeMm` with a hand computation of the dominant shapes (the mesh volume is within about 0.1 %, an exact body within 0.01 %); change one parameter and re-check, since a rebuild that succeeds with the wrong size is the quiet failure.
+
+## When a build fails
+
+| Message | Do |
+| --- | --- |
+| Unknown name 'x' | add the parameter or fix the spelling (the answer lists the defined ones) |
+| fillet or chamfer not blended | radius below half the shortest adjacent edge and half the thinnest wall (the kernel does not always refuse an oversize radius: check `sizeMm`); fewer edges (`edges.within`, `parallel`); or a chamfer of the same size |
+| shell leaves no cavity | wall below half the thinnest size, or open a face |
+| size must be positive | a parameter or expression went to zero or negative: print the parameters, fix the one that did |
+| cut leaves no solid (`removedLastSolid`) | shrink the cutting sketch or depth so it overlaps part of the body |
+| disjoint lumps after a union | overlap by 0.1 mm or more, or make a second body on purpose |
+| hole removes no material | plane, `offset` (the face height) and `at` must land on the body |
 
 ## Standard parts and design rules
 

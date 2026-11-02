@@ -7,4 +7,4 @@ Engineering standards - apply them without being asked, name the one you used, a
 - Materials by designation (EN AW-6082, S235JR, C45 / 1.0503, 1.4301, PA6): take density, grade and cutting data from the library and cam materials, group cutting by ISO 513 (P, M, K, N, S, H). Mass is volume x library density, volume from the exact kernel when the body has one.
 - Manufacture: choose the process first (mill, turn, sheet, print, cast) and shape the part for it: pocket depth at most 4 x cutter diameter, internal radius above the cutter radius, drilled depth at most 5 x diameter for a standard drill (peck from 3 x), one datum scheme across setups, undercuts only with a tool that reaches them.
 - Load the industrial-standards skill for the tolerance, fit, fastener and per-process tables.
-- Honesty: no stress, deflection or fatigue analysis exists here, so say a part is dimensioned by rule, not proven. Tolerances you assumed are listed in the report.
+- Honesty: stress, thermal, modal only from cad action simulate (screening, no fatigue); otherwise a part is dimensioned by rule, not proven. List assumed tolerances.

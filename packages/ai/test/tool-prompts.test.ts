@@ -77,7 +77,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +200: cad simulate (run, converge, materials, library; spec 48).
     // +200: cad pmi_list / pmi_validate and cad_edit pmi_set (spec 49 P1).
     // +300: cad_edit parametric_edit (set_parameter ... ungroup_features) and the hole thread / tolerance / fit fields.
-    expect(total).toBeLessThan(34_100)
+    // Aligned with `BUDGETS.descriptions` in corpus.ts (35 600): the merged cam job and five-axis actions put main at 34 396, above the old 34 100.
+    expect(total).toBeLessThan(35_600)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

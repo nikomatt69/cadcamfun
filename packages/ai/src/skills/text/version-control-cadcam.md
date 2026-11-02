@@ -21,7 +21,7 @@ vcs action diff returns entity-level changes (property path, before, after). Rea
 
 ## Restore
 
-vcs_edit action restore rolls named ids back to an earlier commit on the checked-out branch. Use it when a `RebuildFailed` is faster to revert than to repair.
+vcs_edit action restore rolls named ids back to an earlier commit on the checked-out branch. Use it when a failed rebuild is faster to revert than to repair.
 
 ## When version control fails
 

@@ -28,10 +28,10 @@ History additions
 Fillet radiusEnd varies the radius along a straight edge (chamfers refuse it). Sheet flanges [{end,length,angle,relief?{width,depth}}] extend exposed full-width edges with the sheet bendRadius; flatPatterns report the blank. Adjacent-edge corners are unsupported. Hole takes thread {designation,depth,fit?}, tolerance {upper,lower}, fit (H7) for the drawing; thread takes designation.
 
 Result (JSON)
-ok, ids, elements, projectId, drawingId; parametric writes include revision/report. ok:false explains refusal; nothing is stored on a failed exact construction.
+ok, ids, elements, projectId, drawingId; parametric writes add elementId, revision, verification {verdict, volumeMm3, sizeMm, attention[]}: read attention. ok:false: error, diagnosis {rootCauses, hint}; nothing stored.
 
 Do not use it
 For inspection use cad. Move or modify existing geometry instead of deleting and rebuilding it.
 
 After it
-Check with cad.check/cad.exact; for assemblies also cad.assembly and cad.distance before declaring completion.
+Verify with cad.check/exact; assemblies also cad.assembly and cad.distance.

@@ -105,9 +105,9 @@ export const recoveryHint = (message: string, history: History): string | undefi
     const known = Object.keys(history.parameters)
     return `Define '${unknown[1]}' in parameters (value or expression) or fix the spelling.${known.length > 0 ? ` Defined: ${known.slice(0, 12).join(", ")}${known.length > 12 ? ", ..." : ""}.` : " The history has no parameters yet."}`
   }
-  if (/leaves no cavity|shell/i.test(message)) return "Use a wall below half the thinnest dimension, or open a face (open: top). Shell before cutting holes into thin walls."
+  if (/leaves no cavity|shell/i.test(message)) return "Use a wall below half the thinnest dimension, or open a face (open: top). "
   if (/Not blended|Native curved fillet|blend/i.test(message)) {
-    return "Lower the radius below the shortest adjacent edge and half the thinnest wall, select fewer edges (edges.within / parallel), fillet before holes and shells, or use a chamfer of the same size."
+    return "Lower the radius below half the shortest adjacent edge and half the thinnest wall, select fewer edges (edges.within / parallel), or use a chamfer of the same size."
   }
   if (/must be positive|positive width|positive depth/i.test(message)) return "A size evaluated to zero or less with the current parameters: check the expression and the parameter values it uses."
   if (/Not built: it needs '([^']+)'/.test(message)) return "Only follows from the earlier failure; fix that feature first."
