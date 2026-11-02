@@ -31,7 +31,7 @@ import type { AiEvent as StreamEvent, AiMessage } from "../lib/types.ts"
 const formatTimestamp = (iso: string): string => {
   try {
     const date = new Date(iso)
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   } catch {
     return ""
   }
@@ -105,7 +105,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
                       <div class="assistant-markdown" data-testid="ai-markdown" innerHTML={renderAssistantMarkdown(text())} />
                     </Show>
                     <Show when={streaming() && last()}>
-                      <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
+                      <span class="ml-0.5 inline-block motion-safe:animate-pulse" aria-hidden="true">▍</span>
                     </Show>
                   </div>
                 )
@@ -160,7 +160,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
           </p>
         </Show>
         <Show when={props.message.status === "streaming" && segments().length === 0}>
-          <span class="inline-block animate-pulse text-sm" aria-hidden="true">▍</span>
+          <span class="inline-block text-sm motion-safe:animate-pulse" aria-hidden="true">▍</span>
         </Show>
         <Show when={(props.message.attachments?.length ?? 0) > 0}>
           <p class="assistant-message-attachments" data-testid="message-attachments">

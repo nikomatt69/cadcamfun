@@ -44,6 +44,11 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
   let transcript: HTMLDivElement | undefined
 
   const running = (): boolean => ai.status() === "streaming" || ai.status() === "connecting"
+  const announcement = (): string => {
+    if (running()) return t("ai.runtime.streaming")
+    const last = ai.messages().at(-1)
+    return last?.role === "assistant" && last.status !== "streaming" ? last.text : ""
+  }
 
   let content: HTMLDivElement | undefined
 
@@ -75,14 +80,24 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
     if (["PageUp", "Home", "ArrowUp"].includes(event.key) && event.target === transcript) letGo()
   }
   // A press on the scroll container itself (not on its content) is the scrollbar: dragging it away lets go.
+  const stopDragging = (): void => {
+    dragging = false
+    window.removeEventListener("pointerup", stopDragging)
+    window.removeEventListener("pointercancel", stopDragging)
+  }
   const handlePointerDown = (event: PointerEvent): void => {
     if (event.target !== transcript) return
     dragging = true
-    window.addEventListener("pointerup", () => { dragging = false }, { once: true })
+    window.addEventListener("pointerup", stopDragging, { once: true })
+    window.addEventListener("pointercancel", stopDragging, { once: true })
   }
 
   let scrollFrame: number | undefined
-  onCleanup(() => { if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame) })
+  onCleanup(() => {
+    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
+    window.removeEventListener("pointerup", stopDragging)
+    window.removeEventListener("pointercancel", stopDragging)
+  })
 
   const followSoon = (): void => {
     if (scrollFrame !== undefined || !props.followLatest) return
@@ -120,7 +135,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
     <div class="relative flex min-h-0 flex-1 flex-col">
       <Show when={ai.messages().length > 0}>
         <div class="assistant-transcript-tools">
-          <label class="assistant-search">
+          <div class="assistant-search">
             <Search size={12} aria-hidden="true" />
             <input
               type="search"
@@ -139,7 +154,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                 <X size={12} aria-hidden="true" />
               </button>
             </Show>
-          </label>
+          </div>
         </div>
       </Show>
       <div
@@ -151,7 +166,10 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
         onTouchMove={handleTouch}
         onKeyDown={handleKey}
         onPointerDown={handlePointerDown}
-        aria-live="polite"
+        tabIndex={0}
+        role="log"
+        aria-label={t("ai.title")}
+        aria-live="off"
         data-testid="ai-transcript"
       >
         <div ref={content} class="assistant-transcript-content">
@@ -279,6 +297,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
         </Show>
         </div>
       </div>
+      <span class="sr-only" role="status">{announcement()}</span>
       <Show when={!props.followLatest && ai.messages().length > 0}>
         <button
           type="button"

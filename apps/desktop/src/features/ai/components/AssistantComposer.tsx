@@ -62,6 +62,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
       class="assistant-composer"
       onSubmit={(event) => {
         event.preventDefault()
+        if (props.draft.trim().length === 0 || overLimit()) return
         props.onSend("queue")
       }}
     >
@@ -120,7 +121,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
                 </button>
               </li>
             )}</For>
-            <For each={props.fileProblems}>{(problem) => <li class="assistant-attachment-problem">{problem}</li>}</For>
+            <For each={props.fileProblems}>{(problem) => <li class="assistant-attachment-problem" role="alert">{problem}</li>}</For>
           </ul>
         </Show>
         <div class="assistant-compose-input-row">
@@ -150,6 +151,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
               }}
               onKeyDown={props.onKeyDown}
               aria-describedby={`${promptId}-hint`}
+              aria-invalid={overLimit() || undefined}
             />
             <Show when={props.completion !== undefined}>
               <p class="assistant-completion" data-testid="ai-completion" aria-hidden="true">{props.completion}</p>
