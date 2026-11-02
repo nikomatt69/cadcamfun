@@ -144,8 +144,8 @@ export function ProjectDetailScreen(): JSX.Element {
     <button type="button" class={ICON_BUTTON} title={t("vcs.tab.history")} aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={16} /></button>
   )
 
-  const empty = (icon: JSX.Element, title: string, text: string, label: string, kind: ModalKind): JSX.Element => (
-    <StageEmpty icon={icon} title={title} hint={text}>
+  const empty = (icon: JSX.Element, title: string, text: string, label: string, kind: ModalKind, preview: "cad" | "cam" | "library"): JSX.Element => (
+    <StageEmpty icon={icon} preview={preview} title={title} hint={text}>
       <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open(kind)}><Plus size={14} aria-hidden="true" />{label}</button>
     </StageEmpty>
   )
@@ -231,7 +231,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.drawings")}</h2>
                     <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("drawing")}><Plus size={14} aria-hidden="true" />{t("pages.new.drawing")}</button>
                   </div>
-                  <Show when={drawings().length > 0} fallback={empty(<File size={22} />, "No drawings yet", "Create your first drawing to start designing in the CAD editor.", "Create Drawing", "drawing")}>
+                  <Show when={drawings().length > 0} fallback={empty(<File size={22} />, "No drawings yet", "Create your first drawing to start designing in the CAD editor.", "Create Drawing", "drawing", "cad")}>
                     {cards(drawings(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><Grid size={28} /></div>, (row) => navigate(`/cad?drawingId=${row.id}`), (row) => (
                       <>
                         {historyButton("drawings", row)}
@@ -248,7 +248,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.components")}</h2>
                     <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("component")}><Plus size={14} aria-hidden="true" />{t("pages.new.component")}</button>
                   </div>
-                  <Show when={components().length > 0} fallback={empty(<File size={22} />, "No components yet", "Create reusable components to use across your CAD drawings.", "Create Component", "component")}>
+                  <Show when={components().length > 0} fallback={empty(<File size={22} />, "No components yet", "Create reusable components to use across your CAD drawings.", "Create Component", "component", "library")}>
                     {cards(components(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><File size={28} /></div>, (row) => navigate(`/components/${row.id}`), (row) => historyButton("components", row))}
                   </Show>
                 </Show>
@@ -258,7 +258,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("pages.project.toolpaths")}</h2>
                     <button type="button" class={TOOLBAR_PRIMARY} onClick={() => open("toolpath")}><Plus size={14} aria-hidden="true" />{t("pages.new.toolpath")}</button>
                   </div>
-                  <Show when={toolpaths().length > 0} fallback={empty(<Wrench size={22} />, "No toolpaths yet", "Create toolpaths to generate G-code for your machine.", "Create Toolpath", "toolpath")}>
+                  <Show when={toolpaths().length > 0} fallback={empty(<Wrench size={22} />, "No toolpaths yet", "Create toolpaths to generate G-code for your machine.", "Create Toolpath", "toolpath", "cam")}>
                     {cards(toolpaths(), <div class="flex h-16 w-16 items-center justify-center border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40"><Wrench size={28} /></div>, openToolpath, (row) => historyButton("toolpaths", row), true)}
                   </Show>
                 </Show>
