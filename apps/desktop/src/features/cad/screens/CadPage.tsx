@@ -289,15 +289,15 @@ export default function CadPage(): JSX.Element {
 
               <Show when={rightPanel() === "constraints"}>
                 <SidebarSection id="cad-plugins" title={t("cad.plugins")} icon={Puzzle}>
-                  <div class="flex-shrink-0 flex space-x-1 px-2 pt-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                  <div class="flex-shrink-0 flex space-x-1 px-2 pt-2 border-b border-[color:var(--ent-line)] overflow-x-auto">
                     <For each={sidebarPlugins()}>{(plugin) =>
-                      <button class={`px-3 py-2 rounded-t text-sm font-medium transition-colors ${pluginId() === plugin.id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"}`} onClick={() => setPluginId(plugin.id)}>{plugin.title}</button>}
+                      <button class={`px-3 py-2 rounded-t text-xs font-medium transition-colors ${pluginId() === plugin.id ? "bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]" : "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-inset)]"}`} onClick={() => setPluginId(plugin.id)}>{plugin.title}</button>}
                     </For>
                   </div>
-                  <div class="flex-1 p-4 overflow-auto">
-                    <Show when={sidebarPlugins().find((plugin) => plugin.id === pluginId())}>{(plugin) => <p class="text-sm text-gray-600 dark:text-gray-300">{plugin().description}</p>}</Show>
+                  <div class="flex-1 p-3 overflow-auto">
+                    <Show when={sidebarPlugins().find((plugin) => plugin.id === pluginId())}>{(plugin) => <p class="text-xs text-[color:var(--ent-text-muted)]">{plugin().description}</p>}</Show>
                     <Show when={sidebarPlugins().length === 0}>
-                      <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">{t("cad.noSidebarPlugins")}</div>
+                      <div class="h-full flex items-center justify-center text-[color:var(--ent-text-muted)] text-xs">{t("cad.noSidebarPlugins")}</div>
                     </Show>
                   </div>
                 </SidebarSection>
