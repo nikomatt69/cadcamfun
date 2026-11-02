@@ -10,6 +10,7 @@
  * The "Most Active Users" table still renders the five hard-coded sample rows the legacy page
  * shipped with, random numbers included.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { BarChart2, Calendar, Users } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
@@ -98,9 +99,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
     <Show
       when={!firstLoad()}
       fallback={
-        <div class="flex h-60 items-center justify-center">
-          <span class="inline-block h-12 w-12 animate-spin rounded-full border-2 border-b-2 border-blue-500" />
-        </div>
+        <LoadingState label={t("common.loading")} rows={4} />
       }
     >
       <Show

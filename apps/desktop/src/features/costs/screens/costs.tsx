@@ -75,8 +75,8 @@ export function CostsScreen(): JSX.Element {
         <article class={PANEL} aria-label={t("costs.result")}>
           <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h2>
           <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
-            <For each={lines(r())}>{([label, value]) => <><dt>{label}</dt><dd class="text-right">{money(value, r().currencyCode)}</dd></>}</For>
-            <dt class="font-semibold">{t("costs.total")}</dt><dd class="text-right font-semibold">{money(r().totalCost, r().currencyCode)}</dd>
+            <For each={lines(r())}>{([label, value]) => <><dt>{label}</dt><dd class="text-right tabular-nums">{money(value, r().currencyCode)}</dd></>}</For>
+            <dt class="font-semibold">{t("costs.total")}</dt><dd class="text-right font-semibold tabular-nums">{money(r().totalCost, r().currencyCode)}</dd>
           </dl>
           <p class="mt-3 text-xs text-slate-600 dark:text-slate-300">
             {t("costs.pathLength")}: {r().details.calculatedValues.totalPathLengthMm.toFixed(1)} · {t("costs.machineMinutes")}: {r().details.calculatedValues.machineTimeMinutes.toFixed(1)}

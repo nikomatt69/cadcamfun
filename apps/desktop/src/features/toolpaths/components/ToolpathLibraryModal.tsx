@@ -2,6 +2,7 @@
  * "Standard Library" modal (legacy `PredefinedToolpathsLibrary`): browses the predefined toolpaths, filtered by
  * machine type, operation and a search term, and hands the chosen one back to the list, which creates a copy.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import { Download, Search } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
@@ -71,7 +72,7 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
         </select>
       </div>
 
-      <Show when={!loading()} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400" role="status">{t("pages.loading.library")}</p>}>
+      <Show when={!loading()} fallback={<LoadingState label={t("pages.loading.library")} />}>
         <Show when={items().length > 0} fallback={<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("pages.no.toolpaths.match.your.filters")}</p>}>
           <ul class="max-h-[60vh] divide-y divide-gray-200 overflow-y-auto dark:divide-gray-700">
             <For each={items()}>{(item) => (

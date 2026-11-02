@@ -47,7 +47,7 @@ const statCard = (
     initial={{ opacity: 0, scale: 0.9 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.3, delay }}
-    hover={{ y: -5, scale: 1.02, transition: { duration: 0.2 } }}
+    hover={{ y: -2, transition: { duration: 0.2 } }}
     class={cardClass}
   >
     <div class="mb-3 flex items-center justify-between">
@@ -80,7 +80,7 @@ export function AiDashboard(): JSX.Element {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          class="flex items-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-2xl font-bold text-transparent"
+          class="flex items-center text-2xl font-bold text-gray-900 dark:text-white"
         >
           <Cpu size={24} class="mr-3 text-blue-500" />
           {t("aiDash.title")}
@@ -100,9 +100,9 @@ export function AiDashboard(): JSX.Element {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.3 + index() * 0.05 }}
-                hover={{ scale: 1.03, backgroundColor: "rgba(59, 130, 246, 0.05)", transition: { duration: 0.15 } }}
+                hover={{ backgroundColor: "rgba(59, 130, 246, 0.05)", transition: { duration: 0.15 } }}
                 press={{ scale: 0.98 }}
-                class={`px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                class={`px-4 py-2 text-sm font-medium transition-colors duration-150 ${
                   activeTab() === tab.key
                     ? "scale-105 bg-blue-500 text-white shadow-md"
                     : "text-gray-600 hover:bg-white/40 dark:text-gray-300 dark:hover:bg-gray-700/40"
@@ -170,7 +170,7 @@ export function AiDashboard(): JSX.Element {
                           initial={{ width: "0%" }}
                           animate={{ width: `${pct}%` }}
                           transition={{ duration: 1, easing: "ease-out" }}
-                          class="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
+                          class="h-full rounded-full bg-blue-500"
                         />
                       </div>
                       <span class="sr-only">{model}</span>
@@ -289,7 +289,7 @@ export function AiDashboard(): JSX.Element {
               </h3>
               <button
                 type="button"
-                class="rounded-xl border border-white/30 bg-white/60 p-2 text-gray-500 transition-all duration-200 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-400 dark:hover:bg-gray-700/80"
+                class="rounded-xl border border-white/30 bg-white/60 p-2 text-gray-500 transition-colors duration-150 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-400 dark:hover:bg-gray-700/80"
                 aria-label={t("aiDash.refresh")}
               >
                 <RefreshCw size={16} />

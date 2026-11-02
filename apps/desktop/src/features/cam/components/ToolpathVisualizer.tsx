@@ -539,7 +539,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <aside class="toolpath-visualizer__panel toolpath-visualizer__operations" aria-label={t("cam.operations.title")} data-testid="operations-panel">
             <div class="mb-2 flex items-center justify-between">
               <h3 class="text-sm font-semibold">{t("cam.operations.title")}</h3>
-              <button type="button" class="rounded p-1 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setOperationsOpen(false)}><X size={16} /></button>
+              <button type="button" class="rounded p-1.5 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setOperationsOpen(false)}><X size={16} /></button>
             </div>
             <ol class="space-y-1">
               <For each={spans()}>{(span) => {
@@ -553,9 +553,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                     <Show when={multiTool().get(span.path)}>{(m) => <span class="rounded bg-amber-500/20 px-1 text-[10px] text-amber-200" title={t("cam.operations.multiTool")} data-testid="operation-multitool">{m().position}/{m().total}</span>}</Show>
                     <span class="tabular-nums text-slate-400">{Math.round(span.end - span.start)} s</span>
                     <span class="text-slate-400" title={(() => { const m = path !== undefined ? props.toolModels?.get(path.toolId) : undefined; return m !== undefined ? cam.describeTool(m) : undefined })()} data-testid="operation-tool">{path?.toolId ?? ""}</span>
-                    <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.toggle")} aria-pressed={visible()} data-testid="operation-visible" onClick={() => toggleHidden(span.path)}>{visible() ? <Eye size={14} /> : <EyeOff size={14} />}</button>
-                    <button type="button" class="rounded px-1 hover:bg-white/10" title={t("cam.operations.isolate")} data-testid="operation-isolate" onClick={() => isolate(span.path)}>{t("cam.operations.only")}</button>
-                    <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.go")} data-testid="operation-go" onClick={() => navigate(span.start)}><Play size={13} /></button>
+                    <button type="button" class="rounded p-1.5 hover:bg-white/10" aria-label={t("cam.operations.toggle")} aria-pressed={visible()} data-testid="operation-visible" onClick={() => toggleHidden(span.path)}>{visible() ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+                    <button type="button" class="rounded px-2 py-1 hover:bg-white/10" title={t("cam.operations.isolate")} data-testid="operation-isolate" onClick={() => isolate(span.path)}>{t("cam.operations.only")}</button>
+                    <button type="button" class="rounded p-1.5 hover:bg-white/10" aria-label={t("cam.operations.go")} data-testid="operation-go" onClick={() => navigate(span.start)}><Play size={13} /></button>
                   </li>
                 )
               }}</For>
@@ -569,7 +569,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <aside class="toolpath-visualizer__panel toolpath-visualizer__settings" aria-label={t("cam.visualizer.settings")}>
             <div class="mb-3 flex items-center justify-between">
               <h3 class="text-sm font-semibold">{t("cam.visualizer.settings")}</h3>
-              <button type="button" class="rounded p-1 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setSettingsOpen(false)}><X size={16} /></button>
+              <button type="button" class="rounded p-1.5 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setSettingsOpen(false)}><X size={16} /></button>
             </div>
             <div class="space-y-3">
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}

@@ -14,7 +14,7 @@ import { t, type Key } from "../../../i18n/index.ts"
 import { useCamStore } from "../store/camStore.ts"
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-const hover = { scale: 1.04, backgroundColor: "rgba(59, 130, 246, 0.1)" }
+const hover = { backgroundColor: "rgba(59, 130, 246, 0.1)" }
 const press = { scale: 0.96 }
 
 export type OperationId = "profile" | "pocket" | "engrave" | "drill" | "face"
@@ -61,13 +61,13 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
             <For each={OPERATIONS}>
               {(op) => (
                 <Motion.button
-                  class={`px-3 py-2 rounded-xl text-sm font-medium border transition-all duration-200 ${
+                  class={`px-3 py-2 rounded-xl text-sm font-medium border transition-colors duration-150 ${
                     cam.operation === op.id
                       ? "bg-blue-600 text-white border-blue-600 shadow"
                       : "bg-white/60 dark:bg-gray-800/60 border-white/40 dark:border-gray-600/40 text-gray-700 dark:text-gray-200 hover:bg-white/80 dark:hover:bg-gray-700/80"
                   }`}
                   onClick={() => cam.setOperation(op.id)}
-                  hover={cam.operation === op.id ? hover : { scale: 1.02 }}
+                  hover={cam.operation === op.id ? hover : { backgroundColor: "rgba(59, 130, 246, 0.06)" }}
                   press={press}
                 >
                   {t(op.label)}
@@ -119,7 +119,6 @@ export default function GeneratorPanel(props: GeneratorPanelProps): JSX.Element 
         <Motion.button
           class="ui-btn ui-btn-primary w-full justify-center mt-4"
           onClick={() => props.onGenerate?.()}
-          hover={{ scale: 1.02 }}
           press={{ scale: 0.97 }}
         >
           {t("cam.gen.panel.generate")}

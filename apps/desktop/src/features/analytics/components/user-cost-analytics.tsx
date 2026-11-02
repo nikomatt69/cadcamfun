@@ -130,7 +130,7 @@ function StatCard(props: StatCardProps): JSX.Element {
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4 }}
-      hover={{ scale: 1.02, transition: { duration: 0.2 } }}
+      hover={{ transition: { duration: 0.2 } }}
     >
       <div class="flex items-center justify-between">
         <div>
@@ -378,7 +378,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
   )
 
   const tabClass = (active: boolean): string =>
-    `rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
+    `rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150 ${
       active
         ? "bg-blue-500 text-white shadow-md"
         : "text-gray-600 hover:bg-white/40 dark:text-gray-300 dark:hover:bg-gray-700/40"
@@ -549,7 +549,6 @@ function EmptyCard(props: EmptyCardProps): JSX.Element {
           <Motion.button
             type="button"
             class="rounded-lg bg-blue-500 px-6 py-3 text-white transition-colors duration-200 hover:bg-blue-600"
-            hover={{ scale: 1.05 }}
             press={{ scale: 0.95 }}
             onClick={() => props.onAction?.()}
           >

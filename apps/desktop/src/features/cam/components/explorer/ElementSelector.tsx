@@ -158,23 +158,23 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                     </div>
 
                     <div class="flex items-center gap-1">
-                      <button onClick={() => store.toggleToolpathVisibility(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" title={toolpath.visible ? "Nascondi" : "Mostra"}>
+                      <button onClick={() => store.toggleToolpathVisibility(toolpath.id)} class="rounded p-1.5 text-gray-400 hover:text-white transition-colors" title={toolpath.visible ? "Nascondi" : "Mostra"}>
                         {toolpath.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                       </button>
 
-                      <button onClick={() => props.onSelectElement(toolpath.elementId)} class="p-1 text-gray-400 hover:text-white transition-colors" title={t("cam.multi.editSettings")}>
+                      <button onClick={() => props.onSelectElement(toolpath.elementId)} class="rounded p-1.5 text-gray-400 hover:text-white transition-colors" title={t("cam.multi.editSettings")}>
                         <Settings size={16} />
                       </button>
 
-                      <button onClick={() => store.moveToolpathUp(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === 0} title={t("cam.multi.moveUp")} aria-label={t("cam.multi.moveUp")}>
+                      <button onClick={() => store.moveToolpathUp(toolpath.id)} class="rounded p-1.5 text-gray-400 hover:text-white transition-colors" disabled={index() === 0} title={t("cam.multi.moveUp")} aria-label={t("cam.multi.moveUp")}>
                         <ChevronUp size={16} />
                       </button>
 
-                      <button onClick={() => store.moveToolpathDown(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === store.toolpaths.length - 1} title={t("cam.multi.moveDown")} aria-label={t("cam.multi.moveDown")}>
+                      <button onClick={() => store.moveToolpathDown(toolpath.id)} class="rounded p-1.5 text-gray-400 hover:text-white transition-colors" disabled={index() === store.toolpaths.length - 1} title={t("cam.multi.moveDown")} aria-label={t("cam.multi.moveDown")}>
                         <ChevronDown size={16} />
                       </button>
 
-                      <button onClick={() => store.removeToolpath(toolpath.id)} class="p-1 text-red-400 hover:text-red-300 transition-colors" title={t("cam.multi.remove")}>
+                      <button onClick={() => store.removeToolpath(toolpath.id)} class="rounded p-1.5 text-red-400 hover:text-red-300 transition-colors" title={t("cam.multi.remove")}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -191,7 +191,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                   {/* Progress bar once the G-code exists */}
                   <Show when={toolpath.gcode}>
                     <div class="mt-2 bg-gray-700 rounded-full h-1 overflow-hidden">
-                      <div class="h-full bg-green-500 transition-all duration-500" style={{ width: "100%" }} />
+                      <div class="h-full bg-green-500 transition-[width] duration-500" style={{ width: "100%" }} />
                     </div>
                   </Show>
                 </div>

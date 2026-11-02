@@ -317,7 +317,7 @@ export default function GCodeViewer(props: GCodeViewerProps): JSX.Element {
       <Show when={showScrollTop()}>
         <button
           onClick={() => container?.scrollTo({ top: 0, behavior: "smooth" })}
-          class="fixed bottom-6 right-6 p-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none transition-all duration-300 z-10"
+          class="fixed bottom-6 right-6 p-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none transition-colors duration-150 z-10"
           aria-label={t("cam.gen.viewer.toStart")}
         >
           <ChevronUp size={20} />

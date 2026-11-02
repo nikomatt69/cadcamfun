@@ -404,9 +404,9 @@ export function KernelOperationControls(): JSX.Element {
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={12} /></button>
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={12} /></button>
-                      <button type="button" class="px-1 rounded text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={12} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={12} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={12} /></button>
+                      <button type="button" class="rounded px-2 py-1 text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={12} /></button>
                     </span>
                   </div>
                   <div class="flex items-center gap-1">

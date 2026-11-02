@@ -427,7 +427,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                                 </div>
                               </div>
                               <Show when={me.data()?.id === comment.userId}>
-                                <button type="button" class="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title={t("pages.delete.comment")} onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
+                                <button type="button" class="rounded p-1.5 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title={t("pages.delete.comment")} onClick={() => void removeComment(comment.id)}><Trash2 size={13} aria-hidden="true" /></button>
                               </Show>
                             </div>
                           )}</For>

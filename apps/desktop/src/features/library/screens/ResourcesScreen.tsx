@@ -25,7 +25,7 @@ import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-gen
 import { useAiStore } from "../../ai/index.ts"
 import { cam } from "@cadcamfun/core"
 import { actionKey } from "../../ai/lib/editor-sync.ts"
-import { CARD, CardBanner, FIELD, ICON_BUTTON, INPUT, LABEL, StageEmpty, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { CARD, CardBanner, FIELD, ICON_BUTTON, INPUT, LABEL, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 export type { ResourceKind }
 type Row = Readonly<Record<string, unknown>>
@@ -417,13 +417,14 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       />
       </>}
     >
-            <Show when={!loading()} fallback={<p class="p-8 text-center text-sm text-slate-500 dark:text-slate-400" role="status">{t("common.loading")} {lower}...</p>}>
+            <Show when={!loading()} fallback={<StageLoading label={`${t("common.loading")} ${lower}...`} />}>
               <Show when={error() === undefined} fallback={<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{error()}</div>}>
                 <Show
                   when={filtered().length > 0}
                   fallback={
                     <StageEmpty
                       icon={<Icon size={22} />}
+                      preview={hasFilters() ? undefined : "library"}
                       title={t("library.emptyKind", { type: lower })}
                       hint={hasFilters() ? t("library.detail.noMatch", { name: lower }) : t("library.detail.createFirst", { name: meta.singular })}
                     >

@@ -84,7 +84,7 @@ export function AiSection(): JSX.Element {
           <h4 class="text-sm font-medium text-blue-800 mb-2">{t("cam.gen.ai.suggestions")}</h4>
           <Show
             when={!gen.isAIProcessing}
-            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin h-5 w-5 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
+            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin motion-reduce:animate-none h-5 w-5 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
           >
             <Show when={gen.aiSuggestions.length > 0} fallback={<p class="text-sm text-blue-600">{t("cam.gen.ai.enableHint")}</p>}>
               <ul class="space-y-2">

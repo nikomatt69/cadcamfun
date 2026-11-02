@@ -51,7 +51,7 @@ export function PrintResultSection(): JSX.Element {
                 </div>
                 <PrintLayerPreview />
                 <dl class="panel-kv">
-                  <dt>{t("cam.gen.pp.travel")}</dt><dd>{(stats().travelMm / 1000).toFixed(2)} m</dd>
+                  <dt>{t("cam.gen.pp.travel")}</dt><dd class="tabular-nums">{(stats().travelMm / 1000).toFixed(2)} m</dd>
                   <dt>{t("cam.gen.pr.retractions")}</dt><dd>{stats().retractions}</dd>
                 </dl>
               </>

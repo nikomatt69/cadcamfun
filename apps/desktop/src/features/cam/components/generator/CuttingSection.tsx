@@ -110,10 +110,10 @@ export function CuttingSection(): JSX.Element {
       <div class="panel-group">
         <h4 class="panel-group__title">{t("cam.gen.cut.stats")}</h4>
         <dl class="panel-kv">
-          <dt>{t("cam.gen.cut.speed")}</dt><dd>{stats().cuttingSpeed.toFixed(1)} m/min</dd>
+          <dt>{t("cam.gen.cut.speed")}</dt><dd class="tabular-nums">{stats().cuttingSpeed.toFixed(1)} m/min</dd>
           <dt>{t("cam.gen.cut.chipLoad")}</dt><dd>{chipLoad()} {t("cad.millimeters")}</dd>
-          <dt>{t("cam.gen.cut.mrr")}</dt><dd>{stats().materialRemovalRate.toFixed(2)} cm³/min</dd>
-          <dt>{t("cam.gen.cut.effStepover")}</dt><dd>{effectiveStepover().toFixed(2)} {t("cad.millimeters")}</dd>
+          <dt>{t("cam.gen.cut.mrr")}</dt><dd class="tabular-nums">{stats().materialRemovalRate.toFixed(2)} cm³/min</dd>
+          <dt>{t("cam.gen.cut.effStepover")}</dt><dd class="tabular-nums">{effectiveStepover().toFixed(2)} {t("cad.millimeters")}</dd>
         </dl>
       </div>
     </Section>

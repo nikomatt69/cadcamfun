@@ -7,6 +7,7 @@
  * answered with, so those cards showed `N/A`; here they read the contract's own field names
  * (`totalAiRequests`, `totalCadDrawings`, `totalStorageUsage`, …).
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, type JSX } from "solid-js"
 import {
   Activity, Database, Eye, FileText, Folder, GitMerge, Grid, HardDrive, Users, Wrench, Zap
@@ -148,9 +149,7 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
           </Show>
         </>
       }>
-        <div class="flex h-60 items-center justify-center">
-          <span class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-        </div>
+        <LoadingState label={t("common.loading")} rows={4} />
       </Show>
     </div>
   )

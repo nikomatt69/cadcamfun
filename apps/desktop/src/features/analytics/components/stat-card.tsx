@@ -22,7 +22,7 @@ export function StatCard(props: StatCardProps): JSX.Element {
             <dl>
               <dt class="truncate text-xs font-medium text-gray-500 sm:text-sm dark:text-gray-300">{props.title}</dt>
               <dd>
-                <div class="text-base font-medium text-gray-900 sm:text-lg dark:text-white">
+                <div class="text-base font-medium tabular-nums text-gray-900 sm:text-lg dark:text-white">
                   {typeof props.value === "number" ? props.value.toLocaleString() : props.value}
                 </div>
                 <Show when={props.subValue !== undefined && props.subValue !== ""}>

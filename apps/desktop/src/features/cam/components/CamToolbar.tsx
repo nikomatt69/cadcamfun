@@ -72,9 +72,8 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
         transition={{ duration: 0.6, delay: 0.6 }}
       >
         <Motion.button
-          class="mr-2 p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 focus:outline-none transition-all duration-200 border border-white/40 dark:border-gray-600/40 shadow-sm"
+          class="mr-2 p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 focus:outline-none transition-colors duration-150 border border-white/40 dark:border-gray-600/40 shadow-sm"
           onClick={() => cam.toggleSidebar()}
-          hover={{ scale: 1.05 }}
           press={{ scale: 0.95 }}
           aria-label={t("cam.toggleSidebar")}
         >
@@ -161,12 +160,11 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             <Motion.button
               onClick={() => cam.setActiveTab(tab.id)}
               aria-pressed={cam.activeTab === tab.id}
-              class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium backdrop-blur-sm transition-all duration-200 ${
+              class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium backdrop-blur-sm transition-colors duration-150 ${
                 cam.activeTab === tab.id
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-white/70 dark:bg-gray-700/70 text-gray-700 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-gray-600/90 border border-white/40 dark:border-gray-600/40"
               }`}
-              hover={{ scale: 1.02 }}
               press={{ scale: 0.98 }}
             >
               {tab.icon(16)}
@@ -176,9 +174,8 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
         </For>
         <Motion.button
           onClick={() => props.onToggleChat()}
-          class="flex items-center px-3 py-2 text-sm font-medium bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-200"
+          class="flex items-center px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors duration-150"
           aria-label={t(props.showChat ? "cam.chatClose" : "cam.chatOpen")}
-          hover={{ scale: 1.05 }}
           press={{ scale: 0.95 }}
         >
           <Show when={props.showChat} fallback={<PanelRight size={16} />}><PanelRightClose size={16} /></Show>

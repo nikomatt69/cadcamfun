@@ -5,6 +5,7 @@
  * The legacy hook keeps `limit`/`offset` inside the same filter object, so changing a
  * filter after paging keeps the offset; that is preserved here on purpose.
  */
+import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { TrendPreview } from "../../../shared/ui/stageshow/scenes-cam.tsx"
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
@@ -226,9 +227,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
                 </p>
               </div>
             }>
-              <div class="p-6 text-center">
-                <span class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-              </div>
+              <LoadingState label={t("history.loading")} rows={4} />
             </Show>
           }
         >
@@ -274,7 +273,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
                 >
                   {loading() ? (
                     <>
-                      <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      <span class="inline-block h-4 w-4 animate-spin motion-reduce:animate-none rounded-full border-2 border-white/40 border-t-white" />
                       <span class="ml-2">{t("history.loading")}</span>
                     </>
                   ) : t("history.loadMore")}
