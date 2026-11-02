@@ -16,6 +16,7 @@ import { availableParallelism, totalmem } from "node:os"
 import { Data, Duration, Effect, Fiber, Layer, Semaphore } from "effect"
 import { cam } from "@cadcamfun/core"
 import { BoundedCache } from "@cadcamfun/util/bounded-cache"
+import { observeKernelJob } from "./observability.ts"
 import { KERNEL_JOBS, type KernelJobName, type KernelJobProgress, type KernelJobs } from "./kernel-jobs.ts"
 
 // ---------------------------------------------------------------- errors
@@ -100,6 +101,7 @@ const outputSize = (name: KernelJobName, value: unknown): { readonly bytes: numb
 
 const record = (job: KernelJobName, outcome: KernelJobOutcome, times: { readonly waitedMs: number; readonly ranMs: number }, value?: unknown, id = `k${++jobSequence}`): void => {
   history.push({ id, job, outcome, ...times, ...(value === undefined ? { bytes: 0, moves: 0 } : outputSize(job, value)), at: Date.now() })
+  observeKernelJob(job, outcome, times.waitedMs)
   if (history.length > KERNEL_HISTORY_SIZE) history.splice(0, history.length - KERNEL_HISTORY_SIZE)
 }
 
@@ -115,11 +117,29 @@ let running = 0
 let waiting = 0
 
 /**
+ * The jobs waiting for a slot, in the order they will get one (the semaphore wakes its waiters first in, first out). A job that
+ * was told at admission how many were ahead of it is told again each time that number drops, so a person watching the queue sees
+ * it move instead of a number that never changes.
+ */
+interface Place { readonly announced: boolean; readonly tell: (ahead: number) => void }
+const line: Place[] = []
+
+/** The job leaves the line (it got its slot, or it gave up waiting) and those behind it hear their new place. */
+const leaveLine = (place: Place): void => {
+  const at = line.indexOf(place)
+  if (at < 0) return
+  line.splice(at, 1)
+  for (let i = at; i < line.length; i++) if (line[i]!.announced) line[i]!.tell(i)
+}
+
+/**
  * A run shared by every caller of the same request: a detached fiber, so no single caller owns it. `callers` counts the ones
  * still waiting; the last one to leave interrupts the run. `listeners` receive its progress.
  */
 interface Flight {
   readonly listeners: Set<(progress: KernelJobProgress) => void>
+  /** The latest progress the run reported, so a caller that joins late starts from where the run is, not from silence. */
+  last?: KernelJobProgress
   callers: number
   fiber?: Fiber.Fiber<unknown, KernelJobError>
 }
@@ -292,10 +312,14 @@ const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]
     })
     if (closing) return refuse("cancelled", `Kernel job ${name} was refused: the server is shutting down.`)
     if (waiting >= KERNEL_QUEUE_LIMIT) return refuse("busy", `Kernel job ${name} was refused: ${waiting} jobs are already waiting for one of the ${KERNEL_WORKERS} workers. Try again when one has finished.`)
-    if (running >= KERNEL_WORKERS) options.onProgress?.({ stage: "queued", ahead: waiting })
+    const announced = running >= KERNEL_WORKERS
+    if (announced) options.onProgress?.({ stage: "queued", ahead: waiting })
+    const place: Place = { announced, tell: (ahead) => options.onProgress?.({ stage: "queued", ahead }) }
+    line.push(place)
     waiting++
     const inSlot = Effect.suspend(() => {
       waiting--
+      leaveLine(place)
       running++
       ranFrom = performance.now()
       if (closing) return Effect.fail(new KernelJobError(name, "cancelled", `Kernel job ${name} was stopped: the server is shutting down.`))
@@ -316,6 +340,7 @@ const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]
     return slots.withPermits(1)(inSlot).pipe(Effect.onInterrupt(() => Effect.sync(() => {
       if (ranFrom !== undefined) return
       waiting--
+      leaveLine(place)
       counters.aborted++
       record(name, "cancelled", times(), undefined, id)
     })))
@@ -336,7 +361,7 @@ const shared = <K extends KernelJobName>(key: string, name: K, input: KernelJobs
       const run = execute(name, input, {
         ...(options.deadlineMs !== undefined ? { deadlineMs: options.deadlineMs } : {}),
         ...(options.workerUrl !== undefined ? { workerUrl: options.workerUrl } : {}),
-        onProgress: (progress) => { for (const to of [...created.listeners]) to(progress) }
+        onProgress: (progress) => { created.last = progress; for (const to of [...created.listeners]) to(progress) }
       }).pipe(
         Effect.tap((value) => Effect.sync(() => results.set(key, { value, bytes: bytesOf(name, value) }))),
         Effect.ensuring(Effect.sync(() => { if (flights.get(key) === created) flights.delete(key) }))
@@ -346,6 +371,7 @@ const shared = <K extends KernelJobName>(key: string, name: K, input: KernelJobs
       counters.joined++
       flight.callers++
       flight.listeners.add(listen)
+      if (flight.last !== undefined) listen(flight.last)
     }
     const joined = flight
     const fiber = joined.fiber as Fiber.Fiber<Output<K>, KernelJobError>

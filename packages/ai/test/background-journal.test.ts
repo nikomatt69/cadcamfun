@@ -119,4 +119,28 @@ describe("recovery after a restart", () => {
     await again.dispose()
     expect(delivered.length).toBe(before)
   })
+
+  test("one record that cannot be read back or written does not stop the recovery of the others", async () => {
+    const memory = memoryJournal([
+      stored("unreadable", { childSessionId: "gone-for-now" }),
+      // Its report was committed before the child session was removed, then the process died.
+      stored("finished", { text: "report" }),
+      stored("editor", { edits: true, agent: "editor" })
+    ])
+    // The host is not ready to read the child session, and the journal refuses every write.
+    const failWrites = memory.journal.write
+    memory.journal.write = async () => { throw new Error("disk full") }
+    const ran: string[] = []
+    const manager = new BackgroundTaskManager({ journal: memory.journal, now: () => now, onCompletion: () => undefined })
+    manager.setRecoveryReader(async () => { throw new Error("host not ready") })
+    manager.setRunner(async (input) => { ran.push(input.prompt); return "again" })
+    const recovery = await manager.recover()
+    // The reader is asked again (it only reads), the editor is reported uncertain, the report is kept for redelivery.
+    expect(recovery.resumed).toEqual(["unreadable"])
+    expect(recovery.uncertain).toEqual(["editor"])
+    expect(recovery.redelivered).toEqual(["finished"])
+    expect(manager.read(owner, "finished")).toMatchObject({ text: "report", persistenceError: "disk full" })
+    memory.journal.write = failWrites
+    await manager.dispose()
+  })
 })

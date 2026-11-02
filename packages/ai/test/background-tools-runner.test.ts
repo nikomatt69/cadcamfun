@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { BackgroundToolsRunner } from "../src/nikcli/background-tools-runner.ts"
+import { BackgroundToolsRunner, failureReport } from "../src/nikcli/background-tools-runner.ts"
+import { SUBAGENTS } from "../src/nikcli/agents.ts"
 import type { NikCliRuntime } from "../src/nikcli/runtime.ts"
 
 const drain = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -197,6 +198,17 @@ describe("BackgroundToolsRunner", () => {
     ].join("\n"))
   })
 
+  test("a report of a few very long lines is cut by size too", async () => {
+    const seen: string[] = []
+    const stub = stubHost({ promptAsync: async (input: unknown) => { seen.push((input as { parts: Array<{ text: string }> }).parts[0]!.text); return undefined } })
+    const runner = new BackgroundToolsRunner(stub, { runner: async () => "x".repeat(50_000) })
+    runner.manager.enqueue({ description: "wide", prompt: "p", projectId: "project-wide", parentSessionId: "parent-wide" })
+    await drain(80)
+    await runner.dispose()
+    expect(seen[0]!.length).toBeLessThan(12_500)
+    expect(seen[0]).toContain("...(truncated)")
+  })
+
   test("a long report is truncated at 100 lines with a pointer to the full result", async () => {
     const seen: string[] = []
     const stub = stubHost({
@@ -217,5 +229,120 @@ describe("BackgroundToolsRunner", () => {
     expect(body).not.toContain("line 101")
     expect(body).toContain("\n...(truncated)")
     expect(body).toContain(`Use agent action read (taskId="${task.id}") for the full result.`)
+  })
+})
+
+/** A host whose specialist session the test scripts: what the prompt does, what the child had written, and which sessions were removed. */
+const scriptedHost = (script: { prompt: (input: { signal?: AbortSignal }) => Promise<unknown>; written?: string }) => {
+  const removed: string[] = []
+  const aborted: string[] = []
+  const runtime = {
+    host: () => Effect.promise(async () => ({
+      projectId: "p", directory: "/tmp",
+      client: {
+        session: {
+          create: async () => ({ id: "child-1" }),
+          abort: async (input: { sessionID: string }) => { aborted.push(input.sessionID); return true },
+          remove: async (input: { sessionID: string }) => { removed.push(input.sessionID); return true },
+          messages: async () => script.written === undefined ? [] : [{ info: { role: "assistant" }, parts: [{ type: "text", text: script.written }] }]
+        },
+        "session-prompt": { prompt: (input: unknown, options?: { signal?: AbortSignal }) => script.prompt({ ...(input as object), ...(options?.signal ? { signal: options.signal } : {}) }), promptAsync: async () => undefined }
+      }
+    }))
+  }
+  return { runtime: runtime as unknown as NikCliRuntime, removed, aborted }
+}
+const finished = async (runner: BackgroundToolsRunner, owner: { projectId: string; parentSessionId: string }, id: string) => runner.manager.wait(owner, id)
+
+describe("a specialist that does not finish", () => {
+  test("the parent reads why, what it had written, and that an editor may have changed the drawing", async () => {
+    const host = scriptedHost({ prompt: async () => { throw new Error("The provider rejected the tool schema") }, written: "Moved bracket-2 by 20 mm; was about to regroup." })
+    const runner = new BackgroundToolsRunner(host.runtime)
+    const owner = { projectId: "p", parentSessionId: "parent-fail" }
+    const task = runner.manager.enqueue({ ...owner, prompt: "p", description: "move", agent: "editor", edits: true })
+    const settled = await finished(runner, owner, task.id)
+    await runner.dispose()
+    expect(settled.status).toBe("error")
+    expect(settled.error).toContain("The CAD editor stopped before it finished: The provider rejected the tool schema")
+    expect(settled.error).toContain("part of its work may already be in the drawing")
+    expect(settled.error).toContain("Moved bracket-2 by 20 mm; was about to regroup.")
+    // Nothing is left behind: the failed child's session is removed, its last words travel in the error.
+    expect(host.removed).toEqual(["child-1"])
+  })
+
+  test("a read-only specialist's failure carries no warning about the drawing", async () => {
+    const host = scriptedHost({ prompt: async () => { throw new Error("invalid request") } })
+    const runner = new BackgroundToolsRunner(host.runtime)
+    const owner = { projectId: "p", parentSessionId: "parent-read" }
+    const task = runner.manager.enqueue({ ...owner, prompt: "p", description: "scan", agent: "researcher" })
+    const settled = await finished(runner, owner, task.id)
+    await runner.dispose()
+    expect(settled.error).toContain("stopped before it finished: invalid request")
+    expect(settled.error).not.toContain("drawing")
+    expect(settled.error).not.toContain("What it had written")
+  })
+
+  test("a specialist past its time limit is stopped and the parent is told it ran out of time", async () => {
+    const spec = SUBAGENTS.researcher as { timeoutMs: number }
+    const original = spec.timeoutMs
+    spec.timeoutMs = 40
+    try {
+      const host = scriptedHost({
+        prompt: ({ signal }) => new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("This operation was aborted")), { once: true })),
+        written: "Found 3 of 5 holes so far."
+      })
+      const runner = new BackgroundToolsRunner(host.runtime)
+      const owner = { projectId: "p", parentSessionId: "parent-slow" }
+      const task = runner.manager.enqueue({ ...owner, prompt: "p", description: "slow scan", agent: "researcher" })
+      const settled = await finished(runner, owner, task.id)
+      await runner.dispose()
+      expect(settled.status).toBe("error")
+      expect(settled.error).toContain("ran out of time")
+      expect(settled.error).toContain("Found 3 of 5 holes so far.")
+      expect(settled.error).not.toContain("This operation was aborted")
+      expect(host.aborted).toEqual(["child-1"])
+      expect(host.removed).toEqual(["child-1"])
+    } finally {
+      spec.timeoutMs = original
+    }
+  })
+
+  test("a cancelled specialist is stopped in the host and its session is removed, with no failure text", async () => {
+    const host = scriptedHost({ prompt: ({ signal }) => new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true })), written: "partial" })
+    const runner = new BackgroundToolsRunner(host.runtime)
+    const owner = { projectId: "p", parentSessionId: "parent-cancel-2" }
+    const task = runner.manager.enqueue({ ...owner, prompt: "p", description: "scan", agent: "researcher" })
+    await drain(30)
+    runner.manager.cancel(owner, task.id)
+    const settled = await finished(runner, owner, task.id)
+    await runner.dispose()
+    expect(settled.status).toBe("cancelled")
+    expect(settled.error).toBeUndefined()
+    expect(host.aborted).toEqual(["child-1"])
+    expect(host.removed).toEqual(["child-1"])
+  })
+
+  test("a specialist that ends without text reports what it wrote earlier; with nothing at all it is an error, not an empty success", async () => {
+    const earlier = scriptedHost({ prompt: async () => ({ parts: [{ type: "tool" }] }), written: "Done: hole-1 8 mm." })
+    const runner = new BackgroundToolsRunner(earlier.runtime)
+    const owner = { projectId: "p", parentSessionId: "parent-quiet" }
+    const first = runner.manager.enqueue({ ...owner, prompt: "p", description: "quiet", agent: "researcher" })
+    expect(await finished(runner, owner, first.id)).toMatchObject({ status: "completed", text: "Done: hole-1 8 mm." })
+    await runner.dispose()
+
+    const silent = scriptedHost({ prompt: async () => ({ parts: [] }) })
+    const second = new BackgroundToolsRunner(silent.runtime)
+    const task = second.manager.enqueue({ ...owner, prompt: "p", description: "silent", agent: "modeler", edits: true })
+    const settled = await finished(second, owner, task.id)
+    await second.dispose()
+    expect(settled.status).toBe("error")
+    expect(settled.error).toContain("ended without writing a report")
+    expect(settled.error).toContain("part of its work may already be in the drawing")
+  })
+
+  test("the failure text caps a very long last message", () => {
+    const error = failureReport({ title: "CAM programmer", cause: new Error("x"), edits: false, partial: "a".repeat(9_000) })
+    expect(error.message.length).toBeLessThan(4_400)
+    expect(error.message).toContain("...(truncated)")
   })
 })

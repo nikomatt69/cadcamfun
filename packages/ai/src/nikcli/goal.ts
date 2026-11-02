@@ -38,6 +38,8 @@ export const parseGoalArguments = (input: string): GoalCommand => {
     if (!/^\d+$/.test(raw ?? "") || !Number.isSafeInteger(tokenBudget) || tokenBudget <= 0) throw new Error("--token-budget must be a positive integer")
     objective = objective.replace(budget[0], " ").trim()
   }
+  // Only a budget was typed: the host would store an empty objective and loop on nothing, which can never be reached.
+  if (objective === "") throw new Error("A goal needs an objective: /goal <what must be true when it is done> [--token-budget N]")
   return { type: "objective", objective, ...(tokenBudget !== undefined ? { tokenBudget } : {}) }
 }
 

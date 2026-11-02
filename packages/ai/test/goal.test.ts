@@ -26,6 +26,11 @@ describe("/goal, as nikcli parses it", () => {
     }
   })
 
+  test("a budget alone is not a goal", () => {
+    expect(() => parseGoalArguments("--token-budget 5000")).toThrow("A goal needs an objective")
+    expect(() => parseGoalArguments("  --token-budget 1 ")).toThrow("A goal needs an objective")
+  })
+
   test("a message is a goal line only when it starts with /goal", () => {
     expect(goalArgumentsOf("/goal Build a flange")).toBe("Build a flange")
     expect(goalArgumentsOf("  /goal   pause  ")).toBe("pause")

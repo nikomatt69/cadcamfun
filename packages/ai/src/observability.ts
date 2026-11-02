@@ -66,6 +66,42 @@ export const aiHostOperationDuration = Metric.histogram("cadcamfun_ai_host_opera
   boundaries: latencyBoundaries
 })
 
+/** Specialist jobs that stopped, by specialist and how (completed, error, cancelled). */
+export const aiBackgroundTasks = Metric.counter("cadcamfun_ai_background_tasks_total", {
+  description: "Specialist jobs that stopped, by agent and outcome"
+})
+export const aiBackgroundTaskDuration = Metric.histogram("cadcamfun_ai_background_task_duration_ms", {
+  description: "Time from the start of a specialist's run to its end",
+  boundaries: [1000, 5000, 15000, 60000, 180000, 300000, 600000]
+})
+/** Kernel jobs, by job and how they ended (completed, cached, deadline, cancelled, failed, crashed, busy). */
+export const kernelJobsTotal = Metric.counter("cadcamfun_kernel_jobs_total", {
+  description: "Kernel jobs, by job and outcome"
+})
+export const kernelJobWait = Metric.histogram("cadcamfun_kernel_job_wait_ms", {
+  description: "Time a kernel job waited for a worker slot; a rising tail means the queue is the bottleneck",
+  boundaries: [10, 100, 1000, 5000, 15000, 60000, 300000]
+})
+
+/** A specialist job that stopped. Metrics never fail the work they describe. */
+export const observeBackgroundTask = (task: { readonly agent?: string; readonly status: string; readonly startedAt?: number; readonly finishedAt?: number }): void => {
+  try {
+    const labels = { agent: task.agent ?? "researcher", outcome: task.status }
+    Effect.runSync(Metric.update(Metric.withAttributes(aiBackgroundTasks, labels), 1))
+    if (task.startedAt !== undefined && task.finishedAt !== undefined) {
+      Effect.runSync(Metric.update(Metric.withAttributes(aiBackgroundTaskDuration, { agent: labels.agent }), Math.max(0, task.finishedAt - task.startedAt)))
+    }
+  } catch { /* observability only */ }
+}
+
+/** A kernel job that ended (or was answered from the cache or refused). */
+export const observeKernelJob = (job: string, outcome: string, waitedMs: number): void => {
+  try {
+    Effect.runSync(Metric.update(Metric.withAttributes(kernelJobsTotal, { job, outcome }), 1))
+    if (waitedMs > 0) Effect.runSync(Metric.update(kernelJobWait, waitedMs))
+  } catch { /* observability only */ }
+}
+
 export const observeHostOperation = (timing: HostOperationTiming): Effect.Effect<void> => {
   const labels = { tool: timing.tool, mode: timing.mode, phase: timing.phase, outcome: timing.outcome }
   return Effect.all([

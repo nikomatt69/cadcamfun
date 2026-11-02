@@ -18,6 +18,8 @@ export const CADCAM_WORKER_AGENT = SUBAGENTS.researcher.host
 /** A specialist whose provider call failed for a reason that passes is asked again this many times. */
 const WORKER_RESUMES = 2
 const WORKER_BACKOFF_MS = 3_000
+/** The most characters of a report that the wake message carries; `agent` action read has the rest. */
+export const WAKE_MAX_CHARS = 12_000
 
 const extractWorkerText = (
   parts: ReadonlyArray<{ type: string; text?: string }> | undefined
@@ -35,6 +37,36 @@ const describePromptFailure = (result: { name?: string; data?: { message?: strin
   if (result.data?.message) return result.data.message
   if (result.name) return result.name
   return "Worker prompt rejected by the host"
+}
+
+/** The last words a specialist wrote, or "" when it wrote none: what a failed run still has to say. */
+const lastWords = (messages: ReadonlyArray<{ info: { role: string; summary?: boolean }; parts: ReadonlyArray<{ type: string; text?: string }> }>): string => {
+  for (const message of [...messages].reverse()) {
+    if (message.info.role !== "assistant" || message.info.summary === true) continue
+    const text = extractWorkerText(message.parts)
+    if (text.trim() !== "") return text.trim()
+  }
+  return ""
+}
+
+/** How much of a failed specialist's last message the parent is given. */
+export const PARTIAL_OUTPUT_CHARS = 4_000
+
+/**
+ * What the parent reads when a specialist did not finish: why it stopped (a timeout says so and how long it had), what it had
+ * written, and, when it changes the document, that part of its work may already be in the drawing. A bare "timeout" or
+ * "MessageAbortedError" leaves the parent to guess whether anything happened; this does not.
+ */
+export const failureReport = (input: { readonly title: string; readonly cause: unknown; readonly timedOutAfterMs?: number; readonly edits: boolean; readonly partial: string }): Error => {
+  const reason = input.cause instanceof Error ? input.cause.message : String(input.cause)
+  const lines = [
+    input.timedOutAfterMs !== undefined
+      ? `The ${input.title} ran out of time after ${Math.round(input.timedOutAfterMs / 60_000)} minutes and was stopped before it finished.`
+      : `The ${input.title} stopped before it finished: ${reason}`
+  ]
+  if (input.edits) lines.push("It changes the document, so part of its work may already be in the drawing: read the current revision and the affected ids before running it again, and do not repeat steps that may have completed.")
+  if (input.partial !== "") lines.push("", "What it had written when it stopped:", input.partial.length > PARTIAL_OUTPUT_CHARS ? `${input.partial.slice(0, PARTIAL_OUTPUT_CHARS)}\n...(truncated)` : input.partial)
+  return new Error(lines.join("\n"), { cause: input.cause })
 }
 
 const runPromise = <A, E>(eff: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(eff as never)
@@ -87,7 +119,8 @@ class WorkerRunner {
         let aborting: Promise<unknown> | undefined
         const abortChild = () => { aborting ??= host.client.session.abort({ sessionID: session.id }).catch(() => undefined) }
         controller.signal.addEventListener("abort", abortChild, { once: true })
-        const timer = setTimeout(() => controller.abort(new Error(`${spec.id} timeout`)), spec.timeoutMs)
+        let timedOut = false
+        const timer = setTimeout(() => { timedOut = true; controller.abort(new Error(`${spec.id} timeout`)) }, spec.timeoutMs)
         const onAbort = () => controller.abort(input.signal.reason ?? new Error("parent cancelled"))
         if (input.signal.aborted) controller.abort(input.signal.reason ?? new Error("parent cancelled"))
         input.signal.addEventListener("abort", onAbort, { once: true })
@@ -108,7 +141,11 @@ class WorkerRunner {
               )
               if (result.info?.error?.name !== undefined) throw new Error(result.info.error.data?.message ?? result.info.error.name)
               if (result.name !== undefined) throw new Error(describePromptFailure(result))
-              report = extractWorkerText(result.parts)
+              let written = extractWorkerText(result.parts).trim()
+              // The run ended on a tool result or an empty message: whatever it wrote earlier is still its report.
+              if (written === "") written = lastWords(await host.client.session.messages({ sessionID: session.id, limit: 40 }).catch(() => []))
+              if (written === "") throw new Error("it ended without writing a report")
+              report = written
               return report
             } catch (cause) {
               const message = cause instanceof Error ? cause.message : String(cause)
@@ -123,6 +160,11 @@ class WorkerRunner {
               text = "The connection to the model failed and has been restored. Continue from where you stopped: do not repeat steps that already completed (read the conversation and the tool results), and finish the job."
             }
           }
+        } catch (cause) {
+          // The parent cancelled it: the manager records a cancellation, which needs no explanation.
+          if (input.signal.aborted) throw cause
+          const partial = lastWords(await host.client.session.messages({ sessionID: session.id, limit: 40 }).catch(() => []))
+          throw failureReport({ title: spec.title, cause, ...(timedOut ? { timedOutAfterMs: spec.timeoutMs } : {}), edits: spec.edits, partial })
         } finally {
           clearTimeout(timer)
           input.signal.removeEventListener("abort", onAbort)
@@ -131,13 +173,11 @@ class WorkerRunner {
         }
       } finally {
         release()
-        // Failed storage retains the native evidence. Removing it here would make an acknowledged result unrecoverable.
-        if (report !== undefined) {
-          await input.report?.(report)
-          await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
-        } else if (input.childSession === undefined) {
-          await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
-        }
+        // Failed storage retains the native evidence: removing it would make an acknowledged result unrecoverable.
+        if (report !== undefined) await input.report?.(report)
+        // A run that failed or was cancelled has said everything it will say (the error carries its last words), so its
+        // session goes too; only a crash of this process, which never reaches here, leaves one for `recoverReport`.
+        await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
       }
     })() as Promise<string>
     return await work
@@ -230,14 +270,17 @@ export class BackgroundToolsRunner {
     if (this.disposed || this.retired.has(this.ownerKey(task))) return
     const summary = task.status === "completed" ? task.text ?? "" : task.error ?? ""
     const summaryLines = summary.split("\n")
+    // Lines are not a size: a report of a hundred very long lines would fill the parent's context from a single wake.
+    const shown = summaryLines.slice(0, 100).join("\n")
+    const cut = shown.length > WAKE_MAX_CHARS
     const body = [
       `Background task "${task.description}" finished.`,
       `Status: ${task.status}`,
       `Task ID: ${task.id}`,
       "",
       "Result:",
-      summaryLines.slice(0, 100).join("\n"),
-      summaryLines.length > 100 ? "\n...(truncated)" : "",
+      cut ? shown.slice(0, WAKE_MAX_CHARS) : shown,
+      summaryLines.length > 100 || cut ? "\n...(truncated)" : "",
       "",
       `Use agent action read (taskId="${task.id}") for the full result.`
     ].join("\n")

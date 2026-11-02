@@ -254,6 +254,39 @@ describe("the job queue, the shared runs and the result cache", () => {
     expect(free).not.toContain("queued")
   })
 
+  test("a waiting job hears its place move as the jobs ahead of it start, and a caller that joins late hears where the run is", async () => {
+    clearKernelJobCache()
+    const running = Array.from({ length: KERNEL_WORKERS }, (_, i) => runKernelJob("cam-plan", distinct(400 + i)))
+    const places: Array<number | string> = []
+    const first = runKernelJob("cam-plan", distinct(410), {})
+    const second = runKernelJob("cam-plan", distinct(411), { onProgress: (p) => places.push(p.stage === "queued" ? p.ahead : p.stage) })
+    // Admitted behind one waiting job.
+    expect(places[0]).toBe(1)
+    const late: Array<number | string> = []
+    const joined = runKernelJob("cam-plan", distinct(411), { onProgress: (p) => late.push(p.stage === "queued" ? p.ahead : p.stage) })
+    // The late caller starts from the run's latest word, not from silence.
+    expect(late[0]).toBe(1)
+    await Promise.all([...running, first, second, joined])
+    // `first` started: the second was told it is now at the head of the line (0 ahead) before it ran.
+    expect(places.slice(0, 2)).toEqual([1, 0])
+    expect(late.slice(0, 2)).toEqual([1, 0])
+    expect(kernelJobStats().waiting).toBe(0)
+  })
+
+  test("a job that gives up waiting moves everyone behind it up", async () => {
+    clearKernelJobCache()
+    const running = Array.from({ length: KERNEL_WORKERS }, (_, i) => runKernelJob("cam-plan", distinct(500 + i)))
+    const leaving = new AbortController()
+    const gone = runKernelJob("cam-plan", distinct(510), { signal: leaving.signal })
+    const places: Array<number | string> = []
+    const behind = runKernelJob("cam-plan", distinct(511), { onProgress: (p) => places.push(p.stage === "queued" ? p.ahead : p.stage) })
+    expect(places).toEqual([1])
+    leaving.abort()
+    await expect(gone).rejects.toMatchObject({ reason: "cancelled" })
+    expect(places).toEqual([1, 0])
+    await Promise.all([...running, behind])
+  })
+
   test("a job that fails is not cached", async () => {
     clearKernelJobCache()
     const bad = { ...base, part: { kind: "elements" as const, elements: "nope" as never } }

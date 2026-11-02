@@ -12,22 +12,33 @@ export const RETRY_BACKOFF_FACTOR = 2
 export const RETRY_MAX_DELAY_NO_HEADERS = 30_000
 export const RETRY_MAX_DELAY = 2_147_483_647
 export const RETRY_MAX_ATTEMPTS = 5
+/**
+ * The longest pause a provider's own `retry-after` may ask for before the call is given up instead: a request that sleeps for an
+ * hour (a daily quota that resets later) looks like a hang, and the person is better told at once to try again later.
+ */
+export const RETRY_MAX_WAIT = 300_000
+
+/** The pause the provider itself asked for (`retry-after-ms`, or `retry-after` as seconds or a date), or undefined when it asked for none. */
+export const retryAfterMs = (failure?: ApiFailure): number | undefined => {
+  const headers = failure?.responseHeaders
+  if (!headers) return undefined
+  const ms = Number.parseFloat(headers["retry-after-ms"] ?? "")
+  if (!Number.isNaN(ms)) return ms
+  const retryAfter = headers["retry-after"]
+  if (retryAfter) {
+    const seconds = Number.parseFloat(retryAfter)
+    if (!Number.isNaN(seconds)) return Math.ceil(seconds * 1000)
+    const until = Date.parse(retryAfter) - Date.now()
+    if (!Number.isNaN(until) && until > 0) return Math.ceil(until)
+  }
+  return undefined
+}
 
 /** Milliseconds to wait before attempt `attempt + 1` (`attempt` counts from 1). */
 export const delay = (attempt: number, failure?: ApiFailure): number => {
   const base = RETRY_INITIAL_DELAY * RETRY_BACKOFF_FACTOR ** (attempt - 1)
-  const headers = failure?.responseHeaders
-  if (headers) {
-    const ms = Number.parseFloat(headers["retry-after-ms"] ?? "")
-    if (!Number.isNaN(ms)) return ms
-    const retryAfter = headers["retry-after"]
-    if (retryAfter) {
-      const seconds = Number.parseFloat(retryAfter)
-      if (!Number.isNaN(seconds)) return Math.ceil(seconds * 1000)
-      const until = Date.parse(retryAfter) - Date.now()
-      if (!Number.isNaN(until) && until > 0) return Math.ceil(until)
-    }
-  }
+  const asked = retryAfterMs(failure)
+  if (asked !== undefined) return asked
   // 10% jitter keeps many clients from retrying in step.
   return Math.min(base + base * Math.random() * 0.1, RETRY_MAX_DELAY_NO_HEADERS)
 }
@@ -82,7 +93,8 @@ export const providerRetry = <E>(attempts: number, failure: (error: E) => ApiFai
     Schedule.setInputType<E>(),
     Schedule.while(({ input }) => {
       const parsed = failure(input)
-      return parsed !== undefined && retryable(parsed) !== undefined
+      // A provider that asks for more than `RETRY_MAX_WAIT` is not waited for: the failure is reported instead.
+      return parsed !== undefined && retryable(parsed) !== undefined && (retryAfterMs(parsed) ?? 0) <= RETRY_MAX_WAIT
     }),
     Schedule.modifyDelay(({ input, attempt }) => Effect.succeed(Duration.millis(Math.min(delay(attempt, failure(input)), RETRY_MAX_DELAY))))
   )

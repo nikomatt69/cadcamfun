@@ -1,3 +1,5 @@
+import { observeBackgroundTask } from "../observability.ts";
+
 export const MAX_BACKGROUND_TASKS = 4;
 export const MAX_QUEUED_BACKGROUND_TASKS = 16;
 
@@ -225,14 +227,18 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
       const attempt = stored.attempt ?? 1;
       if (stored.status === "queued" || stored.status === "running") {
         if (stored.text === undefined && stored.childSessionId !== undefined && stored.edits !== true && this.options.recoverReport !== undefined) {
-          const text = await this.options.recoverReport(stored);
+          // A reader that cannot be read back (the host is not ready, a transport error) must not stop the boot or hide the
+          // other tasks: it is read-only, so it runs again within its attempts, exactly as if it had left no report.
+          const text = await this.options.recoverReport(stored).catch(() => undefined);
           if (text !== undefined) stored = { ...stored, text };
         }
         // The report was committed before the child was removed. Finishing that write must not rerun the work.
         if (stored.text !== undefined) {
           const entry: Entry = { task: { ...stored, status: "completed", finishedAt: now, delivered: false }, controller: new AbortController(), persisted: Promise.resolve() };
           this.entries.set(stored.id, entry);
-          await this.persistOutcome(entry, entry.task);
+          // A journal that refuses the write keeps the report in memory and retries; it never fails the recovery.
+          try { await this.persistOutcome(entry, entry.task); }
+          catch (cause) { this.storageFailed(entry, entry.task, cause); redelivered.push(stored.id); continue; }
           this.notify(entry);
           redelivered.push(stored.id);
           continue;
@@ -250,7 +256,8 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         const entry: Entry = { task: { ...stored, status: "error", error, finishedAt: now, delivered: false }, controller: new AbortController(), persisted: Promise.resolve() };
         entry.controller.abort();
         this.entries.set(stored.id, entry);
-        await this.record(entry.task);
+        try { await this.record(entry.task); }
+        catch (cause) { this.storageFailed(entry, entry.task, cause); uncertain.push(stored.id); continue; }
         entry.durable = true;
         this.notify(entry);
         uncertain.push(stored.id);
@@ -258,8 +265,8 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
       }
       if (stored.delivered === true || stored.background === false || stored.status === "cancelled") {
         if (stored.delivered === true && now - (stored.finishedAt ?? 0) > TASK_RETENTION_MS) {
-          await journal.remove(stored.id);
-          pruned++;
+          // Pruning is housekeeping: a record that cannot be removed now is removed by the next recovery.
+          if (await journal.remove(stored.id).then(() => true, () => false)) pruned++;
           continue;
         }
         const entry: Entry = { task: stored, controller: new AbortController(), persisted: Promise.resolve(), durable: true };
@@ -531,6 +538,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         // Abort is only a request: release capacity after the actual runner settles.
         this.active.delete(work);
         this.occupied.delete(entry);
+        observeBackgroundTask(entry.task);
         this.drain();
         this.notify(entry);
       });

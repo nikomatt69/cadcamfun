@@ -4,7 +4,7 @@
  * the only production caller of the catalogue's contribution seam.
  */
 import type { ActionContribution } from "../actions/action.ts"
-import type { BackgroundTaskManagerInterface, BackgroundTaskOwner } from "./background-tasks.ts"
+import { BackgroundTaskManagerError, type BackgroundTask, type BackgroundTaskManagerInterface, type BackgroundTaskOwner } from "./background-tasks.ts"
 import { SUBAGENT_IDS, SUBAGENTS, isSubagentId, subagentCatalogue } from "./agents.ts"
 import type { ToolContext } from "../tools/define.ts"
 import { AgentBriefReport } from "@cadcamfun/api"
@@ -87,6 +87,32 @@ export const agentJobPrompt = (input: Record<string, unknown>): AgentJob => {
   return { ok: true, prompt: lines.join("\n").trimEnd() }
 }
 
+/**
+ * The document state the brief was written against. The specialist does not see this conversation, and the target is bound to its
+ * tools out of its sight, so without this it cannot tell that the drawing moved on while it was queued. Nothing is added when
+ * the call carries no target (a host without a drawing).
+ */
+export const baselineSection = (target: { readonly drawingId?: string; readonly revision?: string } | undefined): string => {
+  if (target === undefined || (target.drawingId === undefined && target.revision === undefined)) return ""
+  return [
+    "", "", "Document baseline (when this job was delegated):",
+    ...(target.drawingId !== undefined ? [`- Drawing: ${target.drawingId}`] : []),
+    ...(target.revision !== undefined ? [`- Revision: ${target.revision}`] : []),
+    "If a tool shows a newer revision or an id from Ids is gone, re-read the targets before changing anything and say so in your report."
+  ].join("\n")
+}
+
+/**
+ * A task as the model reads it back with `list` and `read`. The brief it wrote, the trusted target and the host's own bookkeeping stay
+ * out: the model has the brief (`start` echoes it once, as the proof of what the specialist was given), and repeating it, and the whole
+ * report of every task in a list, on every later call is context spent on nothing. A list gives the
+ * size of each report; `read` gives the report itself.
+ */
+export const presentTask = (task: BackgroundTask, withReport = true): Record<string, unknown> => {
+  const { prompt: _prompt, target: _target, deliveryAgent: _deliveryAgent, childSessionId: _childSessionId, text, ...rest } = task
+  return withReport ? { ...rest, ...(text !== undefined ? { text } : {}) } : { ...rest, ...(text !== undefined ? { reportChars: text.length } : {}) }
+}
+
 /** The four contributions of the delegation tool, keyed by the catalogue's action id. */
 export const backgroundToolContributions = (manager: BackgroundTaskManagerInterface): Readonly<Record<string, ActionContribution>> => {
   const call = (action: string) => async (input: never, context: ToolContext): Promise<unknown> => {
@@ -112,19 +138,27 @@ export const backgroundToolContributions = (manager: BackgroundTaskManagerInterf
       // nikcli's `background` is optional and defaults to true: start returns at once and the completion wakes this
       // conversation. Only an explicit false makes the call wait for the report.
       const background = backgroundFlag(value["background"]) ?? true
-      const task = manager.enqueue({
-        description: String(value["description"]), prompt: job.prompt,
-        ...owner, agent: spec.id, edits: spec.edits, background,
-        ...(context.taskTarget !== undefined ? { target: context.taskTarget } : {})
-      })
+      let task: BackgroundTask
+      try {
+        task = manager.enqueue({
+          description: String(value["description"]), prompt: job.prompt + baselineSection(context.taskTarget),
+          ...owner, agent: spec.id, edits: spec.edits, background,
+          ...(context.taskTarget !== undefined ? { target: context.taskTarget } : {})
+        })
+      } catch (error) {
+        if (error instanceof BackgroundTaskManagerError && error.code === "queue_full") {
+          return refuse("Too many specialist jobs are already waiting. Read the reports that have finished, cancel the jobs you no longer need (agent action cancel), or start this one with background false so it runs in this call.")
+        }
+        throw error
+      }
       const admitted = manager.accepted !== undefined ? await manager.accepted(owner, task.id) : task
       // The caller asked to wait: the specialist works inside this tool call and its report is the call's result.
       if (background) return admitted
       return { ...(await manager.wait(owner, task.id, context.signal)), specialists: subagentCatalogue() }
     }
-    if (action === "agent.list") return manager.list(owner)
+    if (action === "agent.list") return manager.list(owner).map((task) => presentTask(task, false))
     const taskId = String(value["taskId"])
-    return action === "agent.read" ? manager.read(owner, taskId) : manager.cancel(owner, taskId)
+    return presentTask(action === "agent.read" ? manager.read(owner, taskId) : manager.cancel(owner, taskId))
   }
   return {
     "agent.start": call("agent.start"),

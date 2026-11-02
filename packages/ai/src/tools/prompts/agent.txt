@@ -5,7 +5,7 @@ start returns at once by default; completion wakes this conversation. Continue i
 
 Actions
 - start: one job for a researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer.
-- list: tasks started here, with status.
+- list: tasks started here, with status and report size (read gives the report).
 - read: one task's full findings.
 - cancel: stop a task no longer needed.
 

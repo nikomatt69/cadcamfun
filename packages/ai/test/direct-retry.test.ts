@@ -59,6 +59,20 @@ describe("DirectModel retries the way nikcli does", () => {
     expect(waits).toEqual([7000])
   })
 
+  test("a provider that asks for a very long pause is not waited for", async () => {
+    const { model, calls } = flaky([apiError(429, "daily quota used", { responseHeaders: { "retry-after": "3600" } })])
+    const waits: number[] = []
+    const exit = await run(model, waits)
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(calls()).toBe(1)
+    expect(waits).toEqual([])
+    // Five minutes is still waited out.
+    const short = flaky([apiError(429, "slow down", { responseHeaders: { "retry-after": "300" } })])
+    const shortWaits: number[] = []
+    expect(Exit.isSuccess(await run(short.model, shortWaits))).toBe(true)
+    expect(shortWaits).toEqual([300_000])
+  })
+
   test("a bad key is not retried", async () => {
     const { model, calls } = flaky([apiError(401, "invalid x-api-key")])
     const exit = await run(model)

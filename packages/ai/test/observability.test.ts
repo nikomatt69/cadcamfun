@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Layer, Metric, Stream, Tracer } from "effect"
 import { AiProviderError } from "../src/errors.ts"
 import type { AiEvent } from "../src/events.ts"
-import { countTurn, observeEvent, observedTurn } from "../src/observability.ts"
+import { countTurn, observeBackgroundTask, observeEvent, observeKernelJob, observedTurn } from "../src/observability.ts"
 
 /**
  * Metrics live in the registry of the runtime that runs the effect, so every measurement
@@ -147,5 +147,27 @@ describe("observedTurn", () => {
     }))
     expect(result.failed).toBe(true)
     expect(result.durationDelta).toBe(1)
+  })
+})
+
+describe("background work is measured too", () => {
+  test("a stopped specialist job is counted by agent and outcome, with how long it ran", async () => {
+    const delta = await measure(Effect.gen(function*() {
+      const before = yield* counterOf("cadcamfun_ai_background_tasks_total", { agent: "modeler", outcome: "error" })
+      const ranBefore = yield* histogramCountOf("cadcamfun_ai_background_task_duration_ms", { agent: "modeler" })
+      yield* Effect.sync(() => observeBackgroundTask({ agent: "modeler", status: "error", startedAt: 1_000, finishedAt: 4_000 }))
+      return [(yield* counterOf("cadcamfun_ai_background_tasks_total", { agent: "modeler", outcome: "error" })) - before, (yield* histogramCountOf("cadcamfun_ai_background_task_duration_ms", { agent: "modeler" })) - ranBefore]
+    }))
+    expect(delta).toEqual([1, 1])
+  })
+
+  test("a kernel job is counted by job and outcome, and only a job that waited feeds the wait histogram", async () => {
+    const delta = await measure(Effect.gen(function*() {
+      const before = yield* counterOf("cadcamfun_kernel_jobs_total", { job: "cam-plan", outcome: "busy" })
+      const waitsBefore = yield* histogramCountOf("cadcamfun_kernel_job_wait_ms")
+      yield* Effect.sync(() => { observeKernelJob("cam-plan", "busy", 0); observeKernelJob("cam-plan", "completed", 250) })
+      return [(yield* counterOf("cadcamfun_kernel_jobs_total", { job: "cam-plan", outcome: "busy" })) - before, (yield* histogramCountOf("cadcamfun_kernel_job_wait_ms")) - waitsBefore]
+    }))
+    expect(delta).toEqual([1, 1])
   })
 })
