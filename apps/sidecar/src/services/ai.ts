@@ -41,7 +41,7 @@ import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
 import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
-import { KernelJobError, featureEditOf, normalizeElement, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { KernelJobError, editHistory, featureEditOf, normalizeElement, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -936,7 +936,11 @@ const toolHandlers = Effect.gen(function*() {
       const element = loaded.elements.find((e) => e.id === input.elementId && e.type === "parametric")
       if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }
       const history = element["history"]
-      if (input.action === "inspect") return { ...inspectParametric(history), elementId: element.id, ...where(loaded) }
+      if (input.action === "inspect") {
+        const inspected = inspectParametric(history)
+        // The dimensions a structural edit can bind (path, label, value); a history the schema refuses has none to list.
+        return { ...inspected, ...("history" in inspected ? { features: outlineHistory(inspected.history, input.feature) } : {}), elementId: element.id, ...where(loaded) }
+      }
       if (input.action === "test") return { ...(await testParametric(history, input)), elementId: element.id, ...where(loaded) }
       if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
       if (input.action === "timeline") {
@@ -945,6 +949,16 @@ const toolHandlers = Effect.gen(function*() {
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
         return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), report: edited.report, ...where(loaded) }
+      }
+      if (input.action === "edit") {
+        const edited = editHistory(history, input.edits)
+        if (!edited.ok) return { ...edited, ...where(loaded) }
+        const updated = { ...element, history: edited.history }
+        await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
+        return {
+          ok: true, mutation: "edit", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), report: edited.report,
+          applied: edited.applied, ...(edited.removed.length > 0 ? { removed: edited.removed } : {}), ...where(loaded)
+        }
       }
       const changed = changeParameters(history, input.parameters)
       if (!changed.ok) return changed

@@ -41,8 +41,8 @@ Send it to `cad` with `{"action":"parametric_validate","history":{...}}`. Change
 ## Editing later
 
 - Resize: cad action parametric_validate inspect, then update with the real elementId, returned expectedRevision and `parameters: {width:70}`. Features and element ID stay. Inspect again if the revision is stale.
-- Add a feature: append it to the same parametric's history.
-- Rewrite the whole history only when the user asks. It is destructive.
+- Anything else, on the stored part, with `cad_edit` `parametric_edit` (elementId, expectedRevision, `edits`, all or nothing): `set_parameter` (adds a new name too), `rename_parameter` (formulas follow), `remove_parameter`, `set_dimension` (feature, path from `parametric_inspect`, number or expression: bind a literal to a parameter), `insert_feature` (new id, after a feature or at the end), `replace_feature` (same id and type, full definition), `remove_feature` (`cascade: true` when dependents go with it), `rename_feature`, `group_features`, `ungroup_features`. A rebuild error the edits cause refuses the list and names it. Never rewrite the whole history to change one thing; the user must ask for that.
+- Hole `thread` {designation, depth, fit}, `tolerance` {upper, lower} and `fit` (H7) are drawing data: the drawing prints them, the geometry stays the tap drill or nominal diameter.
 
 ## When not to use parametric
 
@@ -51,4 +51,4 @@ Send it to `cad` with `{"action":"parametric_validate","history":{...}}`. Change
 
 ## Limitations
 
-- Not available in a history: variable-radius fillets, fillets between non-coaxial curved faces (the exact model drops to the mesh), shell of a Boolean result, loft guide rails and tangency, pattern along a path. Say so instead of faking them.
+- Not available in a history: fillets between non-coaxial curved faces (the exact model drops to the mesh), shell of a Boolean result, loft guide rails and tangency. Say so instead of faking them. Variable-radius fillets (`radiusEnd` on straight edges) and patterns along a path (`kind: "path"`) exist.

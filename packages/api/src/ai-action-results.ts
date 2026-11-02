@@ -100,7 +100,11 @@ const parametricReport = {
   solids: Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, closedSolid: Schema.Boolean, shells: int, throughHoles: nullable(int) }), [record]))
 } as const
 const parametricValidate = Schema.Struct(parametricReport)
-const parametricInspect = Schema.Struct({ ...parametricReport, elementId: str, revision: str, history: record, ...drawingRef })
+const parametricInspect = Schema.Struct({
+  ...parametricReport, elementId: str, revision: str, history: record,
+  /** Every feature with its editable dimensions (path, label, value): the paths `parametric_edit` set_dimension takes. */
+  features: Schema.optionalKey(Schema.Array(record)), ...drawingRef
+})
 const parametricTest = Schema.Struct({ ok: Schema.Boolean, revision: str, mutated: Schema.Literal(false), cases: Schema.Array(record), elementId: str, ...drawingRef })
 const parametricDfm = Schema.Struct({ ok: Schema.Boolean, process: str, toolDiameter: num, issues: Schema.Array(record), metrics: Schema.Struct({ bodies: int, volumeMm3: num }) })
 const parametricExact = Schema.Struct({
@@ -180,6 +184,11 @@ const editor = Schema.Struct({ ok: Schema.Literal(true), actions: Schema.Array(S
 const parametricCreated = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, ...drawingRef })
 const parametricUpdated = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("update"), ids: strings, elements, revision: str, report: record, ...drawingRef })
 const parametricTimeline = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("timeline"), ids: strings, elements, revision: str, report: record, ...drawingRef })
+/** A structural edit of a stored part: what each edit did, the features that went with a removal, and the rebuild report. */
+const parametricEdited = Schema.Struct({
+  ok: Schema.Literal(true), mutation: Schema.Literal("edit"), ids: strings, elements, revision: str, report: record, applied: strings,
+  removed: Schema.optionalKey(strings), ...drawingRef
+})
 const recipeCreated = Schema.Struct({ ok: Schema.Literal(true), recipe: str, history: record, report: Schema.Struct(parametricReport), created: parametricCreated })
 const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, source: Schema.Struct({ id: str, type: str }), notes: strings, ...drawingRef })
 
@@ -372,6 +381,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.parametric_create": write(["drawing"], parametricCreated),
   "cad_edit.parametric_update": write(["drawing"], parametricUpdated),
   "cad_edit.parametric_timeline": write(["drawing"], parametricTimeline),
+  "cad_edit.parametric_edit": write(["drawing"], parametricEdited),
   "cad_edit.parametric_recipe_create": write(["drawing"], recipeCreated),
   "cad_edit.parametric_convert": write(["drawing"], converted),
 

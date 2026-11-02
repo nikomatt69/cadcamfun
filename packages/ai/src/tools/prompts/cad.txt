@@ -13,7 +13,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - inspect_origins: ids?, layerId?, offset?, limit?; origins, bounds, distance from zero.
 - drawing: elementId or history, options?; dimensioned PDF/SVG; GDT, datums, balloons in options.
 - parametric_validate: history; validate before storing.
-- parametric_inspect: elementId; parameters and revision.
+- parametric_inspect: elementId, feature?; parameters, revision, dimension paths.
 - parametric_test: elementId, cases (1-12); dimensional checks, variants.
 - parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material? (metal|cast|plastic), minWall?, envelope?.
 - parametric_exact: elementId or history, includeStep?, name?; exact body or why mesh-only.
@@ -25,7 +25,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - pmi_validate: pmi; validate, store nothing.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - kernel: op health|refs|resolve, elementId or history, body?, kinds?, limit?, refs?, parameters?, after?, madeAfter?; stable refs (skill cad-naming); resolve gives exact|split|merged|deleted|ambiguous.
-- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.
+- workflow: op sketch|assembly|sheet|mesh_import|mesh_export; entities, constraints?, drag?; definitions, occurrences (overrides?), subAssemblies?, configurations?|designTable?, configuration?, mates?, drive?, checks?; elementId or history, options?, format? pdf|svg|stl|obj|3mf; attachment or data, unit?, repair?, requireSolid?; not stored; skill cad-workflow.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview; names from exact.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.
 - offset: id, distance; outward offset preview, rounded convex corners; unsupported says why.

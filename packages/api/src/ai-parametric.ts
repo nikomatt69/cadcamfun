@@ -138,7 +138,13 @@ const feature = Schema.Union([
       Schema.Literals(["simple", "counterbore", "countersink"]),
       "simple (default), counterbore (flat recess for a screw head: needs headDiameter and headDepth) or countersink (cone for a flat head: needs headDiameter; angle is the included cone angle, default 90)."
     )),
-    headDiameter: optional(dimension), headDepth: optional(dimension), angle: optional(dimension)
+    headDiameter: optional(dimension), headDepth: optional(dimension), angle: optional(dimension),
+    thread: optional(described(
+      Schema.Struct({ designation: text(40), depth: dimension, fit: optional(text(20)) }),
+      "Cosmetic thread note (the geometry stays the tap drill): designation M8, M8x1 or G1/2\", depth in mm, fit such as 6H. The drawing prints it; a metric size whose tap drill differs from diameter by more than 0.15 mm warns."
+    )),
+    tolerance: optional(described(Schema.Struct({ upper: dimension, lower: dimension }), "Diameter tolerance in mm printed on the drawing (+upper / -lower).")),
+    fit: optional(described(text(20), "ISO 286 hole fit for the drawing, such as H7 (H holes only; the deviation comes from the IT grade)."))
   }),
   Schema.Struct({
     id, type: Schema.Literal("pattern"), ...timeline, feature: optional(id),
@@ -227,7 +233,7 @@ const feature = Schema.Union([
   described(
     Schema.Struct({
       id, type: Schema.Literal("thread"), ...timeline, kind: Schema.Literals(["external", "internal"]), diameter: dimension, pitch: dimension, length: dimension, at: optional(pair), offset: optional(dimension),
-      handedness: optional(Schema.Literals(["right", "left"])), cut: optional(Schema.Boolean), axis: optional(axis3), operation: optional(operation), targets
+      designation: optional(described(text(40), "Drawing name such as M8 or G1/2\" (default M + diameter).")), handedness: optional(Schema.Literals(["right", "left"])), cut: optional(Schema.Boolean), axis: optional(axis3), operation: optional(operation), targets
     }),
     "Modelled ISO metric thread along Z at [x,y], starting at height offset. external = a threaded rod of the major diameter (default operation new; union it onto a stud); internal = the tool for a tapped hole (default operation subtract: the cavity is the tap drill plus the groove). cut:true (external only) cuts the thread into the shaft already there instead of making a rod. axis x or y runs it sideways: then at = [y,z] / [z,x] and offset = x / y. Pitch from the ISO table (M8 1.25, M10 1.5)."
   ),
@@ -271,6 +277,9 @@ const feature = Schema.Union([
   )
 ])
 type Feature = typeof feature.Type
+/** One feature of a history (any type), for the edit actions that insert or replace a feature of a stored part. */
+export const ParametricFeature = feature
+export type ParametricFeature = Feature
 
 // ---------------------------------------------------------------- the history
 
@@ -402,6 +411,27 @@ export const ParametricHistory = described(
 ).check(Schema.makeFilter((history) => [...historyIssues(history.features), ...timelineIssues(history)]))
 export type ParametricHistory = typeof ParametricHistory.Type
 
+// ---------------------------------------------------------------- structural edits of a stored part
+
+const parameterName = Schema.String.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/))
+/**
+ * One edit of a stored part's history. `cad_edit.parametric_edit` applies a list of them in order, all or nothing: every parameter,
+ * dimension and feature of the history can be reached without rewriting it. A dimension is a number or an expression of the parameters.
+ */
+export const ParametricEdit = Schema.Union([
+  described(Schema.Struct({ op: Schema.Literal("set_parameter"), name: parameterName, value: dimension }), "Add a parameter or change it: a number or an expression of other parameters (\"width / 2\")."),
+  described(Schema.Struct({ op: Schema.Literal("rename_parameter"), from: parameterName, to: parameterName }), "Rename a parameter; every formula and dimension that uses it follows."),
+  described(Schema.Struct({ op: Schema.Literal("remove_parameter"), name: parameterName }), "Remove a parameter nothing uses any more (refused otherwise, naming the users)."),
+  described(Schema.Struct({ op: Schema.Literal("set_dimension"), feature: id, path: text(120), value: dimension }), "Set one dimension of a feature to a number or an expression (bind a literal to a parameter). path as listed by parametric_inspect: depth, at.0, sketch.shapes.0.width, sketch.constraints.2.value."),
+  described(Schema.Struct({ op: Schema.Literal("replace_feature"), feature }), "Replace the feature with the same id and type by this full definition (change fields set_dimension cannot reach: edge selection, shape list, kind). Name, group and suppression carry over unless given."),
+  described(Schema.Struct({ op: Schema.Literal("insert_feature"), feature, after: optional(id), atStart: optional(Schema.Boolean) }), "Insert a new feature (new id) after the feature `after`; by default at the end of the timeline, atStart:true at the top. Everything it names must come before it."),
+  described(Schema.Struct({ op: Schema.Literal("remove_feature"), id, cascade: optional(Schema.Boolean) }), "Remove a feature. Features that cannot exist without it (the extrudes of a sketch, patterns of a hole, ...) are refused and named unless cascade:true removes them too."),
+  described(Schema.Struct({ op: Schema.Literal("rename_feature"), id, name: optional(text(100)) }), "Display name of a feature in the timeline; omit name to go back to the id."),
+  described(Schema.Struct({ op: Schema.Literal("group_features"), group: id, name: text(100), ids: between(Schema.Array(id), 1, 80) }), "Put consecutive features in a timeline group (created or renamed)."),
+  described(Schema.Struct({ op: Schema.Literal("ungroup_features"), group: id }), "Dissolve a timeline group; its features stay.")
+])
+export type ParametricEdit = typeof ParametricEdit.Type
+
 // ---------------------------------------------------------------- the parametric actions
 
 const elementId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -474,7 +504,7 @@ export const ParametricDrawingOptions = Schema.Struct({
 export const PARAMETRIC_ACTION_INPUTS = {
   "cad.drawing": Schema.Struct({ elementId: optional(elementId), history: optional(ParametricHistory), options: optional(ParametricDrawingOptions) }),
   "cad.parametric_validate": Schema.Struct({ history: ParametricHistory }),
-  "cad.parametric_inspect": Schema.Struct({ elementId }),
+  "cad.parametric_inspect": Schema.Struct({ elementId, feature: optional(described(id, "List the dimensions of this feature only (all of them, with labels); by default every feature, capped.")) }),
   "cad.parametric_test": Schema.Struct({ elementId, cases: between(Schema.Array(ParametricTestCase), 1, 12) }),
   "cad.parametric_dfm": Schema.Struct({
     elementId: optional(elementId), history: optional(ParametricHistory), process: optional(Schema.Literals(["mill", "turn", "print"])),
@@ -510,6 +540,11 @@ export const PARAMETRIC_ACTION_INPUTS = {
     input.suppress === undefined && input.release === undefined && input.rollback === undefined && input.rollForward === undefined && input.move === undefined
       ? "Send at least one of suppress, release, rollback, rollForward or move"
       : input.rollback !== undefined && input.rollForward === true ? "Send rollback or rollForward, not both" : true)),
+  /** Structural edits (parameters, any dimension, add / replace / remove / rename / group features): atomic, checked by a rebuild. */
+  "cad_edit.parametric_edit": Schema.Struct({
+    elementId, expectedRevision: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    edits: between(Schema.Array(ParametricEdit), 1, 40)
+  }),
   "cad_edit.parametric_recipe_create": Schema.Struct({ recipe, params: recipeParams, name: optional(name), ...placement }),
   "cad_edit.parametric_convert": Schema.Struct({ elementId, depth: optional(length), name: optional(name) })
 } as const

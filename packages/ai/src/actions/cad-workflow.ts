@@ -130,22 +130,51 @@ const runAssembly = (input: CadWorkflowInput) => {
       return { ...common, history: s.history as unknown as History }
     })
     const known = new Set(defs.map((d) => d.id))
-    const occurrences: assembly.Occurrence[] = input.occurrences.map((o) => {
-      if (!known.has(o.definition)) throw new Error(`Occurrence '${o.id}' uses the unknown definition '${o.definition}' (defined: ${[...known].join(", ")})`)
-      const rot = o.rotate === undefined ? brep.IDENTITY : brep.rotation(normalised(o.rotate.axis, `occurrence '${o.id}' rotate.axis`), o.rotate.degrees * RAD)
-      return { id: o.id, definition: o.definition, transform: brep.compose(rot, brep.translation(o.at ?? { x: 0, y: 0, z: 0 })), ...(o.grounded === true ? { grounded: true } : {}), ...(o.suppressed === true ? { suppressed: true } : {}) }
+    const subIds = new Set((input.subAssemblies ?? []).map((sub) => sub.id))
+    const clash = [...subIds].find((sid) => known.has(sid))
+    if (clash !== undefined) throw new Error(`The sub-assembly '${clash}' has the id of a part definition; give it its own id.`)
+    const placeOccurrence = (o: NonNullable<CadWorkflowInput["occurrences"]>[number], where: string): assembly.Occurrence => {
+      if (!known.has(o.definition) && !subIds.has(o.definition)) {
+        throw new Error(`${where} '${o.id}' uses the unknown definition '${o.definition}' (defined: ${[...known, ...subIds].join(", ")})`)
+      }
+      const rot = o.rotate === undefined ? brep.IDENTITY : brep.rotation(normalised(o.rotate.axis, `${where} '${o.id}' rotate.axis`), o.rotate.degrees * RAD)
+      return {
+        id: o.id, definition: o.definition, transform: brep.compose(rot, brep.translation(o.at ?? { x: 0, y: 0, z: 0 })),
+        ...(o.grounded === true ? { grounded: true } : {}), ...(o.suppressed === true ? { suppressed: true } : {}),
+        ...(o.overrides !== undefined ? { overrides: o.overrides } : {})
+      }
+    }
+    const occurrences: assembly.Occurrence[] = input.occurrences.map((o) => placeOccurrence(o, "Occurrence"))
+    const subAssemblies = (input.subAssemblies ?? []).map((sub) => ({ id: sub.id, name: sub.name ?? sub.id, occurrences: sub.occurrences.map((o) => placeOccurrence(o, `Sub-assembly '${sub.id}' occurrence`)) }))
+    if (input.configurations !== undefined && input.designTable !== undefined) throw new Error("Send configurations or designTable, not both.")
+    const configurations: assembly.Configuration[] = input.designTable !== undefined
+      ? assembly.configurationsFromTable({ columns: input.designTable.columns, rows: input.designTable.rows })
+      : (input.configurations ?? []).map((c) => ({ name: c.name, ...(c.parameters !== undefined ? { parameters: c.parameters } : {}), ...(c.suppressed !== undefined ? { suppressed: c.suppressed } : {}), ...(c.hidden !== undefined ? { hidden: c.hidden } : {}) }))
+    const active = input.configuration
+    if (active !== undefined && !configurations.some((c) => c.name === active)) {
+      throw new Error(`There is no configuration '${active}'${configurations.length > 0 ? ` (defined: ${configurations.map((c) => c.name).join(", ")})` : "; define configurations or a designTable first"}.`)
+    }
+    const model: assembly.Assembly = {
+      definitions: defs, occurrences,
+      ...(subAssemblies.length > 0 ? { subAssemblies } : {}),
+      ...(configurations.length > 0 ? { configurations } : {})
+    }
+    // Mates name leaf occurrences by path (`gearbox/bolt2` inside a sub-assembly); a suppressed one is not there.
+    const ids = new Set(assembly.flattenAssembly(model, active).map((f) => f.path))
+    // The poses a solve found, written onto the leaf occurrences (sub-assemblies expanded), so the checks see the solved model.
+    const placedModel = (transforms: ReadonlyMap<string, brep.Transform>): assembly.Assembly => ({
+      definitions: defs, ...(configurations.length > 0 ? { configurations } : {}),
+      occurrences: assembly.flattenAssembly(model, active).map((f) => ({ id: f.path, definition: f.definition, transform: transforms.get(f.path) ?? f.transform, overrides: f.overrides }))
     })
-    const model: assembly.Assembly = { definitions: defs, occurrences }
-    const ids = new Set(occurrences.map((o) => o.id))
     const mates: assembly.Mate[] = ((input.mates ?? []) as unknown as Rec[]).map((m, i) => {
       const where = `mates[${i}] (${String(m["kind"])})`
       const operand = (key: string): assembly.Operand => {
         const raw = m[key] as Rec | undefined
         if (raw === undefined || typeof raw["occurrence"] !== "string") throw new Error(`${where}: '${key}' must be {occurrence, feature}`)
         const occId = raw["occurrence"]
-        if (!ids.has(occId)) throw new Error(`${where}: '${key}' refers to the unknown occurrence '${occId}'`)
+        if (!ids.has(occId)) throw new Error(`${where}: '${key}' refers to the unknown occurrence '${occId}' (occurrences: ${[...ids].join(", ")})`)
         if (raw["face"] !== undefined) {
-          const def = defs.find((d) => d.id === occurrences.find((o) => o.id === occId)!.definition)!
+          const def = defs.find((d) => d.id === assembly.flattenAssembly(model, active).find((f) => f.path === occId)!.definition)!
           return { occurrence: occId, feature: assembly.featureOfFace(assembly.definitionBrep(def), Number(raw["face"])) }
         }
         return { occurrence: occId, feature: featureOf(raw["feature"] as Rec, `${where} ${key}.feature`) }
@@ -159,6 +188,7 @@ const runAssembly = (input: CadWorkflowInput) => {
       return { ...rest, kind: m["kind"], a: operand("a"), b: operand("b") } as unknown as assembly.Mate
     })
     const checks = new Set(input.checks ?? [])
+    const solveOptions: assembly.SolveAssemblyOptions = active !== undefined ? { configuration: active } : {}
     return brep.withBudget(EXACT_ACTION_BUDGET_MS, () => {
       const present = (solution: assembly.AssemblySolution) => ({
         status: solution.status, dof: solution.dof, residual: solution.residual, freedom: solution.freedom, redundantMates: solution.redundantMates,
@@ -168,7 +198,7 @@ const runAssembly = (input: CadWorkflowInput) => {
       const placements = (solution: assembly.AssemblySolution): Rec =>
         Object.fromEntries([...solution.transforms].map(([path, t]) => [path, { t: [round(t.t.x, 4), round(t.t.y, 4), round(t.t.z, 4)], m: t.m.map((v) => round(v, 6)) }]))
       const interference = (placed: assembly.Assembly) => {
-        const r = assembly.interferenceOf(placed, {})
+        const r = assembly.interferenceOf(placed, { ...(active !== undefined ? { configuration: active } : {}) })
         return {
           clashes: r.interferences.map((i) => ({ a: i.a, b: i.b, volumeMm3: round(i.volume, 4), kind: i.kind })), touching: r.touching.length,
           ...(r.undetermined.length > 0 ? { undetermined: r.undetermined } : {}), pairsChecked: r.checked
@@ -177,14 +207,14 @@ const runAssembly = (input: CadWorkflowInput) => {
       if (input.drive !== undefined) {
         const d = input.drive
         const values = Array.from({ length: d.steps }, (_, k) => d.from + ((d.to - d.from) * k) / (d.steps - 1))
-        const frames = assembly.sweepJoint(model, mates, d.joint, values, {})
+        const frames = assembly.sweepJoint(model, mates, d.joint, values, solveOptions)
         const wantClash = checks.has("interference")
         if (wantClash && frames.length > 60) return fail("assembly", "interference during a drive is limited to 60 steps.")
         let firstClash: Rec | undefined
         const out = frames.map(({ value, solution }) => {
           let clashes: number | undefined
           if (wantClash && solution.residual <= 1e-6) {
-            const found = interference(assembly.withTransforms(model, solution.transforms)).clashes
+            const found = interference(placedModel(solution.transforms)).clashes
             clashes = found.length
             if (found.length > 0 && firstClash === undefined) firstClash = { value: round(value, 4), clashes: found }
           }
@@ -197,15 +227,15 @@ const runAssembly = (input: CadWorkflowInput) => {
           ...(stopped ? { error: `The drive stopped at step ${frames.length} of ${values.length}: the mates cannot be satisfied there.` } : {}), placements: placements(last)
         }
       }
-      const solution = assembly.solveAssembly(model, mates, {})
-      const placed = assembly.withTransforms(model, solution.transforms)
+      const solution = assembly.solveAssembly(model, mates, solveOptions)
+      const placed = placedModel(solution.transforms)
       const solved = solution.status !== "conflicting" && solution.status !== "failed"
       return {
-        ok: solved, op: "assembly" as const, ...present(solution), ...(solution.message !== undefined ? { error: solution.message } : {}), placements: placements(solution),
+        ok: solved, op: "assembly" as const, ...(active !== undefined ? { configuration: active } : {}), ...(configurations.length > 0 ? { configurations: configurations.map((c) => c.name) } : {}), leaves: [...ids], ...present(solution), ...(solution.message !== undefined ? { error: solution.message } : {}), placements: placements(solution),
         ...(solved && checks.has("interference") ? { interference: interference(placed) } : {}),
-        ...(solved && checks.has("mass") ? { mass: (() => { const m = assembly.assemblyMass(placed); return { volumeMm3: round(m.volume, 3), massG: round(m.mass, 4), centroid: { x: round(m.centroid.x, 4), y: round(m.centroid.y, 4), z: round(m.centroid.z, 4) }, inertiaGmm2: m.inertia.map((v) => round(v, 3)), unweighted: m.unweighted } })() } : {}),
-        ...(solved && checks.has("bom") ? { bom: assembly.bomOf(placed).map((r) => ({ item: r.item, name: r.name, quantity: r.quantity, ...(r.designation !== undefined ? { designation: r.designation } : {}), ...(r.mass !== undefined ? { massG: round(r.mass, 4) } : {}) })) } : {}),
-        ...(solved && checks.has("clearance") ? { clearance: assembly.clearanceOf(placed, 5).slice(0, 30).map((c) => ({ a: c.a, b: c.b, distance: round(c.distance, 4), overlap: c.overlap })) } : {})
+        ...(solved && checks.has("mass") ? { mass: (() => { const m = assembly.assemblyMass(placed, active); return { volumeMm3: round(m.volume, 3), massG: round(m.mass, 4), centroid: { x: round(m.centroid.x, 4), y: round(m.centroid.y, 4), z: round(m.centroid.z, 4) }, inertiaGmm2: m.inertia.map((v) => round(v, 3)), unweighted: m.unweighted } })() } : {}),
+        ...(solved && checks.has("bom") ? { bom: assembly.bomOf(placed, active).map((r) => ({ item: r.item, name: r.name, quantity: r.quantity, ...(r.designation !== undefined ? { designation: r.designation } : {}), ...(r.mass !== undefined ? { massG: round(r.mass, 4) } : {}) })) } : {}),
+        ...(solved && checks.has("clearance") ? { clearance: assembly.clearanceOf(placed, 5, active).slice(0, 30).map((c) => ({ a: c.a, b: c.b, distance: round(c.distance, 4), overlap: c.overlap })) } : {})
       }
     })
   } catch (e) {
