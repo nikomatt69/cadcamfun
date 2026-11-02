@@ -29,7 +29,7 @@ export function Field(props: FieldProps): JSX.Element {
         {props.label}
         <Show when={props.required === true}><span class="ui-field-required" aria-hidden="true">*</span></Show>
       </span>
-      {props.children({ id, describedBy: describedBy() })}
+      {props.children({ id, get describedBy() { return describedBy() } })}
       <Show when={props.hint !== undefined}>
         <span id={`${id}-hint`} class="ui-field-hint">{props.hint}</span>
       </Show>
@@ -49,6 +49,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
   return (
     <input
       class={["ui-input", own.invalid === true ? "ui-input-invalid" : "", own.class ?? ""].filter(Boolean).join(" ")}
+      aria-invalid={own.invalid === true ? "true" : undefined}
       {...rest}
     />
   )
@@ -63,6 +64,7 @@ export function Select(props: SelectProps): JSX.Element {
   return (
     <select
       class={["ui-select", own.invalid === true ? "ui-select-invalid" : "", own.class ?? ""].filter(Boolean).join(" ")}
+      aria-invalid={own.invalid === true ? "true" : undefined}
       {...rest}
     >
       {own.children}
@@ -79,6 +81,7 @@ export function Textarea(props: TextareaProps): JSX.Element {
   return (
     <textarea
       class={["ui-textarea", own.invalid === true ? "ui-textarea-invalid" : "", own.class ?? ""].filter(Boolean).join(" ")}
+      aria-invalid={own.invalid === true ? "true" : undefined}
       {...rest}
     />
   )
