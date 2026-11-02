@@ -34,7 +34,7 @@ const MODEL_USAGE: Readonly<Record<string, { readonly name: string; readonly req
 }
 
 const cardClass =
-  "rounded-2xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-md dark:border-gray-600/30 dark:bg-gray-800/80"
+  "rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
 
 const statCard = (
   titleKey: Parameters<typeof t>[0],
@@ -45,18 +45,17 @@ const statCard = (
   delay: number
 ): JSX.Element => (
   <Motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
+    initial={{ opacity: 0, y: 8 }}
+    animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3, delay }}
-    hover={{ y: -2, transition: { duration: 0.2 } }}
     class={cardClass}
   >
     <div class="mb-3 flex items-center justify-between">
       <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">{t(titleKey)}</h3>
-      <Icon size={16} class={iconClass} />
+      <Icon size={16} aria-hidden="true" class={iconClass} />
     </div>
     <div class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
-    <p class={`text-xs ${iconClass}`}>{caption}</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">{caption}</p>
   </Motion.div>
 )
 
@@ -83,7 +82,7 @@ export function AiDashboard(): JSX.Element {
           transition={{ duration: 0.5, delay: 0.1 }}
           class="flex items-center text-2xl font-bold text-gray-900 dark:text-white"
         >
-          <Cpu size={24} class="mr-3 text-blue-500" />
+          <Cpu size={20} class="mr-3 text-blue-500" />
           {t("aiDash.title")}
         </Motion.h2>
 
@@ -91,7 +90,7 @@ export function AiDashboard(): JSX.Element {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          class="flex rounded-xl border border-white/30 bg-white/60 p-1 shadow-md backdrop-blur-sm dark:border-gray-600/30 dark:bg-gray-700/60"
+          class="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
         >
           <For each={TABS}>
             {(tab, index) => (
@@ -105,8 +104,8 @@ export function AiDashboard(): JSX.Element {
                 press={{ scale: 0.98 }}
                 class={`px-4 py-2 text-sm font-medium transition-colors duration-150 ${
                   activeTab() === tab.key
-                    ? "scale-105 bg-blue-500 text-white shadow-md"
-                    : "text-gray-600 hover:bg-white/40 dark:text-gray-300 dark:hover:bg-gray-700/40"
+                    ? "bg-blue-500 text-white"
+                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/60"
                 }`}
               >
                 <span class="flex items-center">
@@ -129,22 +128,22 @@ export function AiDashboard(): JSX.Element {
         >
           {statCard("aiDash.responseTime", `${Math.round(averageResponseTime)}ms`,
             averageResponseTime > 0 ? t("aiDash.livePerformance") : t("aiDash.noDataYet"),
-            Clock, "text-green-500", 0.1)}
+            Clock, "text-gray-500 dark:text-gray-400", 0.1)}
           {statCard("aiDash.successRate", `${percentage(successfulRequests)}%`,
-            t("aiDash.successfulCount", { done: successfulRequests, total: totalRequests }), Target, "text-blue-500", 0.2)}
+            t("aiDash.successfulCount", { done: successfulRequests, total: totalRequests }), Target, "text-gray-500 dark:text-gray-400", 0.2)}
           {statCard("aiDash.tokensUsed", tokenUsage.toLocaleString(),
-            t("aiDash.totalConsumed"), Zap, "text-purple-500", 0.3)}
+            t("aiDash.totalConsumed"), Zap, "text-gray-500 dark:text-gray-400", 0.3)}
           {statCard("aiDash.totalRequests", String(totalRequests),
-            t("aiDash.todayCount", { count: todayRequests }), Activity, "text-orange-500", 0.4)}
+            t("aiDash.todayCount", { count: todayRequests }), Activity, "text-gray-500 dark:text-gray-400", 0.4)}
         </Motion.div>
       </Show>
 
       {/* Performance */}
       <Show when={activeTab() === "performance"}>
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} class="space-y-6">
-          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
+          <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
             <h3 class="mb-4 flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
-              <TrendingUp size={18} class="mr-2 text-blue-500" />
+              <TrendingUp size={16} class="mr-2 text-blue-500" />
               {t("aiDash.modelDistribution")}
             </h3>
             <div class="space-y-4">
@@ -183,40 +182,40 @@ export function AiDashboard(): JSX.Element {
           </Motion.div>
 
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
+            <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
               <h3 class="mb-4 text-lg font-medium text-gray-700 dark:text-gray-300">{t("aiDash.performanceMetrics")}</h3>
               <div class="space-y-4">
-                <div class="flex items-center justify-between rounded-xl bg-green-50 p-3 dark:bg-green-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.avgResponseTime")}</span>
-                  <span class="font-bold text-green-600 dark:text-green-400">{Math.round(averageResponseTime)}ms</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">{Math.round(averageResponseTime)}ms</span>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-blue-50 p-3 dark:bg-blue-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.successRate")}</span>
-                  <span class="font-bold text-blue-600 dark:text-blue-400">{percentage(successfulRequests)}%</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">{percentage(successfulRequests)}%</span>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-purple-50 p-3 dark:bg-purple-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.errorRate")}</span>
-                  <span class="font-bold text-purple-600 dark:text-purple-400">
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">
                     {totalRequests > 0 ? (100 - percentage(successfulRequests)).toFixed(1) : 0}%
                   </span>
                 </div>
               </div>
             </Motion.div>
 
-            <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} class={cardClass}>
+            <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} class={cardClass}>
               <h3 class="mb-4 text-lg font-medium text-gray-700 dark:text-gray-300">{t("aiDash.usageStatistics")}</h3>
               <div class="space-y-4">
-                <div class="flex items-center justify-between rounded-xl bg-orange-50 p-3 dark:bg-orange-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.totalRequests")}</span>
-                  <span class="font-bold text-orange-600 dark:text-orange-400">{totalRequests}</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">{totalRequests}</span>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-indigo-50 p-3 dark:bg-indigo-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.tokensProcessed")}</span>
-                  <span class="font-bold text-indigo-600 dark:text-indigo-400">{tokenUsage.toLocaleString()}</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">{tokenUsage.toLocaleString()}</span>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-pink-50 p-3 dark:bg-pink-900/20">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.activeModels")}</span>
-                  <span class="font-bold text-pink-600 dark:text-pink-400">0</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">0</span>
                 </div>
               </div>
             </Motion.div>
@@ -228,38 +227,38 @@ export function AiDashboard(): JSX.Element {
       <Show when={activeTab() === "context"}>
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} class="space-y-6">
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
-              <h3 class="mb-4 flex items-center text-lg font-medium text-blue-800 dark:text-blue-200">
-                <Activity size={18} class="mr-2" />
+            <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
+              <h3 class="mb-4 flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
+                <Activity size={16} class="mr-2" />
                 {t("aiDash.cadElements")}
               </h3>
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.totalElements")}</span>
-                  <span class="font-bold text-blue-600 dark:text-blue-400">0</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">0</span>
                 </div>
               </div>
             </Motion.div>
 
-            <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
-              <h3 class="mb-4 flex items-center text-lg font-medium text-purple-800 dark:text-purple-200">
-                <MessageCircle size={18} class="mr-2" />
+            <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
+              <h3 class="mb-4 flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
+                <MessageCircle size={16} class="mr-2" />
                 {t("aiDash.activeContext")}
               </h3>
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.documents")}</span>
-                  <span class="font-bold text-purple-600 dark:text-purple-400">0</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">0</span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 dark:text-gray-300">{t("aiDash.contextSize")}</span>
-                  <span class="font-bold text-purple-600 dark:text-purple-400">0KB</span>
+                  <span class="font-bold tabular-nums text-gray-900 dark:text-white">0KB</span>
                 </div>
               </div>
             </Motion.div>
           </div>
 
-          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} class={cardClass}>
+          <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} class={cardClass}>
             <h3 class="mb-4 text-lg font-medium text-gray-700 dark:text-gray-300">{t("aiDash.environment")}</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
@@ -282,18 +281,18 @@ export function AiDashboard(): JSX.Element {
       {/* Insights */}
       <Show when={activeTab() === "insights"}>
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} class="space-y-6">
-          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
+          <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} class={cardClass}>
             <div class="mb-6 flex items-center justify-between">
               <h3 class="flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
-                <Target size={18} class="mr-2 text-green-500" />
+                <Target size={16} class="mr-2 text-green-500" />
                 {t("aiDash.documentIntelligence")}
               </h3>
               <button
                 type="button"
-                class="rounded-xl border border-white/30 bg-white/60 p-2 text-gray-500 transition-colors duration-150 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-400 dark:hover:bg-gray-700/80"
+                class="rounded-xl border border-gray-200 bg-white p-2 text-gray-500 transition-colors duration-150 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                 aria-label={t("aiDash.refresh")}
               >
-                <RefreshCw size={16} />
+                <RefreshCw size={14} aria-hidden="true" />
               </button>
             </div>
 
@@ -305,9 +304,9 @@ export function AiDashboard(): JSX.Element {
             </div>
           </Motion.div>
 
-          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
+          <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} class={cardClass}>
             <h3 class="mb-4 flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
-              <MessageCircle size={18} class="mr-2 text-blue-500" />
+              <MessageCircle size={16} class="mr-2 text-blue-500" />
               {t("aiDash.recentHistory")}
             </h3>
             <div class="max-h-64 space-y-3 overflow-y-auto">

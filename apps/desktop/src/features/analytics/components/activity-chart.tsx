@@ -18,18 +18,8 @@ export type ChartMetric =
   | "activityCount" | "toolpathsGenerated" | "connections" | "programRuns" | "aiRequests"
   | "cadDrawings" | "storageUsage" | "projects" | "components" | "toolpaths"
 
-const METRIC_COLORS: Readonly<Record<string, string>> = {
-  activityCount: "#4f46e5",
-  aiRequests: "#8884d8",
-  cadDrawings: "#82ca9d",
-  storageUsage: "#ffc658",
-  projects: "#ff7300",
-  components: "#00C49F",
-  toolpaths: "#0088FE",
-  toolpathsGenerated: "#fbbf24",
-  connections: "#a855f7",
-  programRuns: "#ec4899"
-}
+/** One series is drawn at a time, so the colour never says which metric: it is the app accent. */
+const SERIES_COLOR = "var(--ent-accent, #2557d6)"
 
 const WIDTH = 720
 const HEIGHT = 256
@@ -76,7 +66,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
   const data = createMemo((): readonly Record<string, string | number>[] =>
     (reply.data() as { chartData?: readonly Record<string, string | number>[] } | undefined)?.chartData ?? [])
   const chartLabel = metric.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim()
-  const color = METRIC_COLORS[metric] ?? "#4f46e5"
+  const color = SERIES_COLOR
 
   const plot = createMemo(() => {
     const rows = data()
@@ -98,7 +88,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
     <Show
       when={!reply.loading()}
       fallback={
-        <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+        <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <div class="w-full max-w-sm"><LoadingState label={t("admin.chart.loading")} rows={3} /></div>
         </div>
       }
@@ -106,9 +96,9 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
       <Show
         when={!reply.error()}
         fallback={
-          <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+          <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div class="flex flex-col items-center text-center">
-              <AlertCircle class="mb-2 h-8 w-8 text-red-500" />
+              <AlertCircle aria-hidden="true" class="mb-2 h-8 w-8 text-red-500" />
               <h3 class="mb-2 text-lg font-medium text-gray-900 dark:text-white">{t("admin.chart.unable")}</h3>
               <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">{reply.error()}</p>
               <button type="button" class="btn btn-primary" onClick={() => void reply.refetch()}>{t("admin.chart.retry")}</button>
@@ -119,7 +109,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
         <Show
           when={data().length > 0}
           fallback={
-            <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+            <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg bg-white p-6 shadow dark:bg-gray-800">
               <div class="w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><AnalyticsScene /></div>
               <p class="text-sm text-gray-500 dark:text-gray-400">{t("admin.chart.empty")}</p>
             </div>
@@ -129,7 +119,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            class="rounded-lg bg-white p-6 shadow-lg transition-shadow duration-300 hover:shadow-xl dark:bg-gray-800"
+            class="rounded-lg bg-white p-6 shadow dark:bg-gray-800"
           >
             <h3 class="mb-4 text-center text-sm font-medium text-gray-600 sm:text-base dark:text-gray-400">
               {t("admin.chart.trend", { label: chartLabel, groupBy })}
@@ -142,7 +132,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
                     return (
                       <>
                         <line x1={LEFT} y1={y} x2={WIDTH - RIGHT} y2={y} stroke="currentColor" stroke-opacity="0.15" stroke-dasharray="3 3" />
-                        <text x={LEFT - 6} y={y + 3} text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.7">{tick}</text>
+                        <text x={LEFT - 6} y={y + 3} text-anchor="end" font-size="11" fill="currentColor" fill-opacity="0.7">{tick}</text>
                       </>
                     )
                   }}
@@ -185,7 +175,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
                         x={plot().x(index())}
                         y={HEIGHT - BOTTOM + 14}
                         text-anchor="end"
-                        font-size="10"
+                        font-size="11"
                         fill="currentColor"
                         fill-opacity="0.7"
                         transform={`rotate(-45 ${plot().x(index())} ${HEIGHT - BOTTOM + 14})`}

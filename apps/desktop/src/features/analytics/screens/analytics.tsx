@@ -151,7 +151,7 @@ export function AnalyticsScreen(): JSX.Element {
             </select>
           </label>
           <button type="button" class={TOOLBAR_BUTTON} onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}>
-            <BarChart2 size={16} aria-hidden="true" />
+            <BarChart2 size={14} aria-hidden="true" />
             {t(chartType() === "line" ? "dash.showBar" : "dash.showLine")}
           </button>
         </Show>

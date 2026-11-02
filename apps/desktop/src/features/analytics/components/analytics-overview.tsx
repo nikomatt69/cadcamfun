@@ -84,9 +84,9 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
 
   const typeIcon = (type: string): JSX.Element => {
     switch (type) {
-      case "project": return <FileText class={`${iconClass} text-blue-500`} />
-      case "component": return <Database class={`${iconClass} text-green-500`} />
-      case "tool": return <Wrench class={`${iconClass} text-orange-500`} />
+      case "project": return <FileText class={`${iconClass} text-gray-500`} />
+      case "component": return <Database class={`${iconClass} text-gray-500`} />
+      case "tool": return <Wrench class={`${iconClass} text-gray-500`} />
       case "page_view": return <Eye class={`${iconClass} text-gray-500`} />
       default: return <Activity class={`${iconClass} text-gray-500`} />
     }
@@ -97,7 +97,7 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
       <Show when={loading()} fallback={
         <>
           <Show when={error()}>
-            <div class="space-y-2 rounded-md bg-red-50 p-4 text-red-700 shadow-sm">
+            <div class="space-y-2 rounded-md bg-red-50 p-4 text-red-700">
               <div class="flex items-center">
                 <span class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">!</span>
                 <p class="font-semibold">{t("admin.analytics.loadFailed")}</p>
@@ -132,7 +132,7 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
           </div>
 
           <Show when={byType().size > 0}>
-            <div class="mt-4 rounded-lg bg-[#F8FBFF] p-3 shadow sm:p-4 dark:bg-gray-800 dark:text-white">
+            <div class="mt-4 rounded-lg bg-gray-50 p-3 shadow sm:p-4 dark:bg-gray-800 dark:text-white">
               <h3 class="mb-3 text-base font-medium text-gray-900 sm:text-lg dark:text-white">{t("admin.analytics.byType")}</h3>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <For each={[...byType().entries()].sort((a, b) => b[1] - a[1])}>

@@ -86,10 +86,10 @@ interface SystemKey {
 type Tab = "personal" | "system"
 
 /** `.reference/src/components/analytics/UserCostAnalytics.tsx` `COLORS`. */
-const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"]
+const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#64748B", "#0EA5E9"]
 
 const cardClass =
-  "rounded-2xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-md dark:border-gray-600/30 dark:bg-gray-800/80"
+  "rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 4 }).format(amount)
@@ -128,10 +128,9 @@ function StatCard(props: StatCardProps): JSX.Element {
   return (
     <Motion.div
       class={cardClass}
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      hover={{ transition: { duration: 0.2 } }}
     >
       <div class="flex items-center justify-between">
         <div>
@@ -381,8 +380,8 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
   const tabClass = (active: boolean): string =>
     `rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150 ${
       active
-        ? "bg-blue-500 text-white shadow-md"
-        : "text-gray-600 hover:bg-white/40 dark:text-gray-300 dark:hover:bg-gray-700/40"
+        ? "bg-blue-500 text-white"
+        : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/60"
     }`
 
   const loadingPersonal = (): boolean => personal.loading() && personal.data() === undefined
@@ -392,7 +391,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
     <div class="space-y-8">
       <Show when={isAdmin()}>
         <Motion.div
-          class="inline-flex space-x-2 rounded-2xl border border-white/30 bg-white/60 p-2 shadow-lg backdrop-blur-sm dark:border-gray-600/30 dark:bg-gray-700/60"
+          class="inline-flex space-x-2 rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -444,13 +443,13 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
                   <div class="space-y-6">
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                       <StatCard label={t("cost.system.users")} value={formatNumber(stats().totalUsers)}
-                        icon={<Users class="h-8 w-8 text-blue-500" />} />
+                        icon={<Users class="h-8 w-8 text-gray-500" />} />
                       <StatCard label={t("cost.totalCost")} value={formatCurrency(stats().totalCost)}
-                        icon={<DollarSign class="h-8 w-8 text-green-500" />} />
+                        icon={<DollarSign class="h-8 w-8 text-gray-500" />} />
                       <StatCard label={t("cost.system.avgCost")} value={formatCurrency(stats().averageCostPerUser)}
-                        icon={<Activity class="h-8 w-8 text-purple-500" />} />
+                        icon={<Activity class="h-8 w-8 text-gray-500" />} />
                       <StatCard label={t("cost.totalTokens")} value={formatNumber(stats().totalTokens)}
-                        icon={<Cpu class="h-8 w-8 text-orange-500" />} />
+                        icon={<Cpu class="h-8 w-8 text-gray-500" />} />
                     </div>
 
                     <Motion.div class={cardClass} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -485,16 +484,16 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
                   <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard label={t("cost.totalCost")} value={formatCurrency(data().totalCost)}
                       growth={breakdown()?.trends.costGrowth}
-                      icon={<DollarSign class="h-8 w-8 text-blue-500" />} />
+                      icon={<DollarSign class="h-8 w-8 text-gray-500" />} />
                     <StatCard label={t("cost.totalTokens")} value={formatNumber(data().totalTokens)}
                       growth={breakdown()?.trends.tokensGrowth}
-                      icon={<Activity class="h-8 w-8 text-green-500" />} />
+                      icon={<Activity class="h-8 w-8 text-gray-500" />} />
                     <StatCard label={t("cost.requests")} value={formatNumber(data().totalRequests)}
                       growth={breakdown()?.trends.requestsGrowth}
-                      icon={<Cpu class="h-8 w-8 text-purple-500" />} />
+                      icon={<Cpu class="h-8 w-8 text-gray-500" />} />
                     <StatCard label={t("cost.efficiency")} value={data().costEfficiencyScore.toFixed(1)}
                       caption={t("cost.efficiencyCaption")}
-                      icon={<TrendingUp class="h-8 w-8 text-orange-500" />} />
+                      icon={<TrendingUp class="h-8 w-8 text-gray-500" />} />
                   </div>
 
                   <Motion.div class={cardClass} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
@@ -540,8 +539,8 @@ function EmptyCard(props: EmptyCardProps): JSX.Element {
   return (
     <Motion.div
       class={`${cardClass} p-12 text-center`}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <div class="flex flex-col items-center space-y-4">
@@ -561,8 +560,7 @@ function EmptyCard(props: EmptyCardProps): JSX.Element {
           <Motion.button
             type="button"
             class="rounded-lg bg-blue-500 px-6 py-3 text-white transition-colors duration-200 hover:bg-blue-600"
-            press={{ scale: 0.95 }}
-            onClick={() => props.onAction?.()}
+                        onClick={() => props.onAction?.()}
           >
             {props.action}
           </Motion.button>

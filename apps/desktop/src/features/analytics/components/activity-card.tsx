@@ -10,7 +10,7 @@ export interface ActivityCardProps {
 
 export function ActivityCard(props: ActivityCardProps): JSX.Element {
   return (
-    <div class="rounded-lg border bg-white p-3 shadow-sm transition duration-150 hover:shadow-md dark:border-gray-600 dark:bg-gray-900">
+    <div class="rounded-lg border bg-white p-3 dark:border-gray-600 dark:bg-gray-900">
       <div class="flex items-center">
         <div class="flex-shrink-0">{props.icon}</div>
         <div class="ml-2 sm:ml-3">

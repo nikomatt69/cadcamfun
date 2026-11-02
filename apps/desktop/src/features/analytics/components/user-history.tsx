@@ -39,8 +39,8 @@ const BADGE: Readonly<Record<string, string>> = {
   updated: "bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100",
   deleted: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
   viewed: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100",
-  exported: "bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-100",
-  imported: "bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-100"
+  exported: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100",
+  imported: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
 }
 
 const badgeClass = (action: string): string => BADGE[action] ?? BADGE.viewed!
@@ -127,14 +127,14 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
           class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
           onClick={() => setShowFilters((open) => !open)}
         >
-          <Filter class="mr-1 h-4 w-4" />
+          <Filter aria-hidden="true" class="mr-2 h-4 w-4" />
           {t("history.filters")}
-          <ChevronDown class={`ml-1 h-4 w-4 transform transition-transform ${showFilters() ? "rotate-180" : ""}`} />
+          <ChevronDown aria-hidden="true" class={`ml-2 h-4 w-4 transform transition-transform ${showFilters() ? "rotate-180" : ""}`} />
         </button>
       </div>
 
       <Show when={showFilters()}>
-        <div class="mb-4 rounded-lg bg-[#F8FBFF] p-4 shadow dark:bg-gray-800 dark:text-white">
+        <div class="mb-4 rounded-lg bg-gray-50 p-4 shadow dark:bg-gray-800 dark:text-white">
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("history.dateRange")}</h3>
@@ -212,7 +212,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
         </div>
       </Show>
 
-      <div class="rounded-lg bg-[#F8FBFF] shadow dark:bg-gray-800 dark:text-white">
+      <div class="rounded-lg bg-gray-50 shadow dark:bg-gray-800 dark:text-white">
         <Show
           when={logs().length > 0}
           fallback={
@@ -235,10 +235,10 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
             <ul class="divide-y divide-gray-200 dark:divide-gray-600">
               <For each={logs()}>
                 {(activity) => (
-                  <li class="px-4 py-4 hover:bg-gray-50 sm:px-6 dark:hover:bg-gray-700">
+                  <li class="px-4 py-4 hover:bg-gray-100 sm:px-6 dark:hover:bg-gray-700">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <div class="flex items-center space-x-2">
-                        <span class={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${badgeClass(activity.action)}`}>
+                        <span class={`rounded-md px-2 py-1 text-xs font-medium capitalize ${badgeClass(activity.action)}`}>
                           {pretty(activity.action)}
                         </span>
                         <p class="text-sm font-medium capitalize text-gray-900 dark:text-white">{pretty(activity.itemType)}</p>
