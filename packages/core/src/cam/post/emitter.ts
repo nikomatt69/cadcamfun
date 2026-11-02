@@ -953,7 +953,7 @@ const planesOf = (program: Program, options: Partial<PostOptions>, dialect: Dial
 }
 
 const planeKey = (p: TiltedPlane | undefined): string | undefined =>
-  p === undefined ? undefined : JSON.stringify([p.frame.origin, p.frame.xAxis, p.frame.yAxis, p.frame.zAxis, p.layout ?? null, p.solution ?? null])
+  p === undefined ? undefined : JSON.stringify([p.frame.origin, p.frame.xAxis, p.frame.yAxis, p.frame.zAxis, p.layout ?? null, p.solution ?? null, p.legacy === true])
 
 export const emitProgram = (program: Program, userOptions: Partial<PostOptions>, dialect: Dialect): string => {
   rejectUnwritable(program, dialect)
