@@ -1,5 +1,4 @@
 import { For, Show, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import { ChevronDown, ChevronUp, Copy, Maximize2, Move, RotateCcw, Sliders, Trash2, X } from "lucide-solid"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -19,9 +18,8 @@ export interface FloatingToolbarProps {
   readonly ai?: () => JSX.Element
 }
 
-const MODES = ["create", "transform", "library", "ai"] as const
-type Mode = (typeof MODES)[number]
-const TOOL_BUTTON = "p-2 bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white hover:bg-gray-100 rounded-md shadow-sm flex flex-col items-center justify-center text-xs"
+type Mode = "create" | "transform" | "library" | "ai"
+const TOOL_BUTTON = "flex flex-col items-center justify-center gap-1 rounded-md bg-slate-50 p-2 text-xs text-slate-700 hover:bg-slate-100 aria-pressed:bg-blue-50 aria-pressed:text-blue-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:aria-pressed:bg-blue-950 dark:aria-pressed:text-blue-300"
 
 /** The draggable tool window over the canvas: create (tool panel), transform actions, library and AI tabs. */
 export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Element {
@@ -115,9 +113,11 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
     onCleanup(() => { observer.disconnect(); window.removeEventListener("resize", clamp) })
   })
 
-  const reason = (action: string) => (noSelection() ? "No element selected" : isLayerLocked() ? "Layer is locked" : action)
+  const reason = (action: string) => (noSelection() ? t("cad.noElementSelected") : isLayerLocked() ? t("cad.layerLocked") : action)
   const blocked = () => noSelection() || isLayerLocked()
   const nextView = () => (cad.viewMode === "2d" ? "3D" : "2D")
+  const availableModes = (): Mode[] => ["create", "transform", ...(props.library ? ["library" as const] : []), ...(props.ai ? ["ai" as const] : [])]
+  const modeLabel = (mode: Mode): string => t(`cad.${mode}`)
 
   const panel = () => (
     <Show when={mode() === "create"} fallback={
@@ -127,12 +127,12 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         </Show>
       }>
         <div class="cad-floating-transforms">
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Move Element")} onClick={() => transform.setMode("translate")}><Move size={16} class="mb-1" /><span>{t("cad.move")}</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Rotate Element")} onClick={() => transform.setMode("rotate")}><RotateCcw size={16} class="mb-1" /><span>{t("cad.rotate")}</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Scale Element")} onClick={() => transform.setMode("scale")}><Maximize2 size={16} class="mb-1" /><span>{t("cad.scale")}</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Duplicate Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.duplicateElement(selected.id) }}><Copy size={16} class="mb-1" /><span>{t("cad.ribbon.copy")}</span></button>
-          <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Delete Element")} onClick={() => { const selected = elements.selectedElement; if (selected) elements.deleteElement(selected.id) }}><Trash2 size={16} class="mb-1" /><span>{t("cad.customElements.delete")}</span></button>
-          <button class={TOOL_BUTTON} title={`Switch to ${nextView()} View`} onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}><Sliders size={16} class="mb-1" /><span>{nextView()}</span></button>
+          <button type="button" class={TOOL_BUTTON} disabled={blocked()} aria-pressed={transform.mode === "translate"} title={reason(t("cad.move"))} onClick={() => transform.setMode("translate")}><Move size={16} aria-hidden="true" /><span>{t("cad.move")}</span></button>
+          <button type="button" class={TOOL_BUTTON} disabled={blocked()} aria-pressed={transform.mode === "rotate"} title={reason(t("cad.rotate"))} onClick={() => transform.setMode("rotate")}><RotateCcw size={16} aria-hidden="true" /><span>{t("cad.rotate")}</span></button>
+          <button type="button" class={TOOL_BUTTON} disabled={blocked()} aria-pressed={transform.mode === "scale"} title={reason(t("cad.scale"))} onClick={() => transform.setMode("scale")}><Maximize2 size={16} aria-hidden="true" /><span>{t("cad.scale")}</span></button>
+          <button type="button" class={TOOL_BUTTON} disabled={blocked()} title={reason(t("cad.ribbon.copy"))} onClick={() => { const selected = elements.selectedElement; if (selected) elements.duplicateElement(selected.id) }}><Copy size={16} aria-hidden="true" /><span>{t("cad.ribbon.copy")}</span></button>
+          <button type="button" class={TOOL_BUTTON} disabled={blocked()} title={reason(t("cad.customElements.delete"))} onClick={() => { const selected = elements.selectedElement; if (selected) elements.deleteElement(selected.id) }}><Trash2 size={16} aria-hidden="true" /><span>{t("cad.customElements.delete")}</span></button>
+          <button type="button" class={TOOL_BUTTON} title={cad.viewMode === "2d" ? t("cad.view3d") : t("cad.view2d")} onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}><Sliders size={16} aria-hidden="true" /><span>{nextView()}</span></button>
         </div>
       </Show>
     }>
@@ -152,22 +152,22 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         on:pointerdown={start} on:pointermove={move} on:pointerup={stop} on:pointercancel={stop}
         on:lostpointercapture={() => { pointerId = undefined; setDragging(false) }} on:keydown={moveWithKeys}>
         <div class="flex items-center space-x-1">
-          <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={expanded() ? t("cad.collapse") : t("cad.expand")}>
+          <button type="button" aria-expanded={expanded()} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label={expanded() ? t("cad.collapse") : t("cad.expand")}>
             <Show when={expanded()} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
-          </Motion.button>
+          </button>
           <span class="text-xs font-medium text-gray-700 dark:text-gray-200">{t("cad.tb.cadTools")}</span>
         </div>
-        <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={t("cad.drawing.close")}><X size={14} /></Motion.button>
+        <Show when={props.onClose}><button type="button" onClick={() => props.onClose?.()} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label={t("cad.drawing.close")}><X size={14} /></button></Show>
       </div>
 
       <Show when={expanded()}>
         <div class="cad-floating-body">
           <div class="cad-floating-tabs" role="group" aria-label={t("cad.ribbon.toolModes")}>
-            <For each={MODES}>{(tab) =>
-              <Motion.button
-                aria-pressed={mode() === tab} onClick={() => setMode(tab)} hover={{ scale: 1.05 }} press={{ scale: 0.95 }}
-                class={`flex-1 px-2 py-1 text-xs font-medium rounded-md ${mode() === tab ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
-              >{tab === "ai" ? t("cad.ai") : tab.charAt(0).toUpperCase() + tab.slice(1)}</Motion.button>}
+            <For each={availableModes()}>{(tab) =>
+              <button type="button"
+                aria-pressed={mode() === tab} onClick={() => setMode(tab)}
+                class={`flex-1 px-2 py-1 text-xs font-medium rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${mode() === tab ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
+              >{modeLabel(tab)}</button>}
             </For>
           </div>
           <div class="cad-floating-content">{panel()}</div>
