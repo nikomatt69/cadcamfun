@@ -502,6 +502,8 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     pts: SsiPoint[]
     readonly closed: boolean
     readonly ringPlane?: { readonly origin: Vec3; readonly normal: Vec3 }
+    /** Seeded from exact coaxial circles: interior vertices must lie within the fit of the curve, not the wider snap radius. */
+    readonly exactCircle?: boolean
   }
   const ssis: Ssi[] = []
   const onEdgeOf = (sd: SolidData, fi: number, pts: ReadonlyArray<SsiPoint>): boolean => {
@@ -593,7 +595,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
         const refined = refineSsiPolyline(fa.surface, fbF.surface, pl.pts, pl.closed, tol, fitTol)
         if (refined === undefined) { warnings.push(`face ${ia}×${ib}: intersection curve could not be refined`); continue }
         if (onEdgeOf(S[0], ia, refined) || onEdgeOf(S[1], ib, refined)) continue
-        ssis.push({ fa: ia, fb: ib, pts: refined, closed: pl.closed })
+        ssis.push({ fa: ia, fb: ib, pts: refined, closed: pl.closed, ...(circles !== undefined ? { exactCircle: true } : {}) })
       }
     })
   })
@@ -695,7 +697,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     }
     // Ordered vertices along the curve (by segment, then position).
     const along = onCurve
-      .filter((o) => o.d <= onTol || endVids.has(o.vid))
+      .filter((o) => c.exactCircle !== true || o.d <= onTol || endVids.has(o.vid))
       .map((o) => ({ ...o, pos: o.seg + o.f }))
       .sort((x, y) => x.pos - y.pos)
       .filter((o, i, arr) => i === 0 || o.vid !== arr[i - 1]!.vid)

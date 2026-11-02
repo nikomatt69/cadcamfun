@@ -92,6 +92,17 @@ describe("aligned fuzz residuals are solved in place or named (spec 42 gate 1)",
     expect(Math.abs(vol(out.i) - mc) / mc).toBeLessThan(0.01)
   })
 
+  test("seed 78: a cylinder pair whose intersection curve passes a vertex a few seed chords off the polyline stays exact (no displacement)", () => {
+    // The interior-vertex filter of the exact coaxial circles (within the fit) must not apply to mesh-seeded curves, whose vertices sit
+    // within the snap radius; with it, this pair lost a vertex and fell back to the displacement.
+    const { A, B, out } = run(78)
+    expect(A.faces[0]!.surface.kind).toBe("cylinder")
+    expect(B.faces[0]!.surface.kind).toBe("cylinder")
+    expect(out.counters.recoveredByDisplacement).toBe(0)
+    expect(out.warnings.some((w) => w.includes("displaced"))).toBe(false)
+    identities(A, B, out, 1e-7)
+  })
+
   test("seed 116: a circle that is the sphere's seam through its poles is solved exactly", () => {
     const { A, B, out } = run(116)
     expect(A.faces[0]!.surface.kind).toBe("sphere")
