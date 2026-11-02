@@ -77,21 +77,21 @@ export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; reado
   })
   return <section class="space-y-4" data-testid="toolpath-program-details">
     <ResourceGeometryPreview elements={elements()} program={program()} origin={artifact()?.origin} />
-    <Show when={!elements().length}><p class="text-xs text-slate-500 dark:text-slate-400">{t("cam.resource.noGeometry")}</p></Show>
+    <Show when={!elements().length}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.resource.noGeometry")}</p></Show>
     <StatGrid columns={3} items={[...summary().map((field) => ({ label: field.label, value: String(field.value) })), ...motion()]} />
     <div>
-      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("cam.resource.operations", { count: operations().length })}</h3>
-      <Show when={operations().length} fallback={<p class="text-xs text-slate-500 dark:text-slate-400">{t("cam.resource.noOperations")}</p>}>
-        <ol class="space-y-2" data-testid="saved-operations"><For each={operations()}>{(operation, index) => <li class="rounded-[5px] border border-slate-200 p-3 dark:border-slate-700">
-          <h4 class="text-xs font-semibold text-slate-900 dark:text-white">{index() + 1}. {operation.name}</h4>
-          <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+      <h3 class="mb-2 text-[13px] font-semibold text-[color:var(--ent-text)]">{t("cam.resource.operations", { count: operations().length })}</h3>
+      <Show when={operations().length} fallback={<p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.resource.noOperations")}</p>}>
+        <ol class="space-y-2" data-testid="saved-operations"><For each={operations()}>{(operation, index) => <li class="rounded-[5px] border border-[color:var(--ent-line)] p-3">
+          <h4 class="text-xs font-semibold text-[color:var(--ent-text)]">{index() + 1}. {operation.name}</h4>
+          <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-[color:var(--ent-text-muted)]">
             <Show when={operation.strategy}><div><dt class="inline">{t("cam.resource.strategy")}: </dt><dd class="inline">{operation.strategy}</dd></div></Show>
             <div><dt class="inline">{t("cam.resource.tool")}: </dt><dd class="inline">{operation.tool}</dd></div>
             <div>{t("cam.resource.moves", { count: operation.moves })}</div>
           </dl>
-          <Show when={Object.keys(operation.parameters).length}><details class="mt-2 text-xs"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.parameters")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(operation.parameters, null, 2)}</pre></details></Show>
-          <Show when={operation.gcode}><details class="mt-2 text-xs"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.operationCode")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{operation.gcode}</pre></details></Show>
-          <For each={operation.warnings}>{(warning) => <p class="mt-2 text-[11px] text-amber-600 dark:text-amber-400">{warning}</p>}</For>
+          <Show when={Object.keys(operation.parameters).length}><details class="mt-2 text-xs"><summary class="cursor-pointer text-[color:var(--ent-accent)]">{t("cam.resource.parameters")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3 font-mono text-[11px] text-[color:var(--ent-text)]">{JSON.stringify(operation.parameters, null, 2)}</pre></details></Show>
+          <Show when={operation.gcode}><details class="mt-2 text-xs"><summary class="cursor-pointer text-[color:var(--ent-accent)]">{t("cam.resource.operationCode")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3 font-mono text-[11px] text-[color:var(--ent-text)]">{operation.gcode}</pre></details></Show>
+          <For each={operation.warnings}>{(warning) => <p class="mt-2 text-[11px] text-[color:var(--ent-warn)]">{warning}</p>}</For>
         </li>}</For></ol>
       </Show>
     </div>

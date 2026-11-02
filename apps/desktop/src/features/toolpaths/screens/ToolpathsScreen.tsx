@@ -209,7 +209,7 @@ export function ToolpathsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
-            <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--ent-text-faint)]" />
             <input
               type="search"
               name="search"
@@ -246,12 +246,12 @@ export function ToolpathsScreen(): JSX.Element {
         </label>
 
         <div class="flex items-center justify-between gap-2 pt-1">
-          <button type="button" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:text-white" onClick={clearFilters} disabled={!hasFilters()}>
-            <X size={13} aria-hidden="true" />{t("pages.clear.filters")}
+          <button type="button" class="inline-flex items-center gap-1 text-[11px] font-medium text-[color:var(--ent-text-muted)] transition-colors hover:text-[color:var(--ent-text)] disabled:opacity-40" onClick={clearFilters} disabled={!hasFilters()}>
+            <X size={14} aria-hidden="true" />{t("pages.clear.filters")}
           </button>
           <div class="workspace-view-toggle" role="group" aria-label={t("cam.multi.view")}>
-            <button type="button" class="workspace-view-toggle__btn" title={t("pages.grid.view")} aria-label={t("pages.grid.view")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
-            <button type="button" class="workspace-view-toggle__btn" title={t("pages.list.view")} aria-label={t("pages.list.view")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.grid.view")} aria-label={t("pages.grid.view")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
+            <button type="button" class="workspace-view-toggle__btn" title={t("pages.list.view")} aria-label={t("pages.list.view")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
           </div>
         </div>
       </>}
@@ -296,10 +296,10 @@ export function ToolpathsScreen(): JSX.Element {
                               <tr onClick={() => openDetail(row)}>
                                 <td>
                                   <div class="flex items-center gap-2">
-                                    <div class="flex h-7 w-7 items-center justify-center rounded-[5px] border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"><Code size={15} class="text-slate-400" aria-hidden="true" /></div>
+                                    <div class="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)]"><Code size={16} class="text-[color:var(--ent-text-faint)]" aria-hidden="true" /></div>
                                     <div>
-                                      <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-slate-900 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-white dark:hover:text-blue-300" onClick={(event) => event.stopPropagation()}>{row.name}</A>
-                                      <Show when={row.description}><div class="max-w-xs truncate text-[11px] text-slate-500 dark:text-slate-400">{row.description}</div></Show>
+                                      <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-[color:var(--ent-text)] hover:text-[color:var(--ent-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={(event) => event.stopPropagation()}>{row.name}</A>
+                                      <Show when={row.description}><div class="max-w-xs truncate text-[11px] text-[color:var(--ent-text-muted)]">{row.description}</div></Show>
                                     </div>
                                   </div>
                                 </td>
@@ -307,14 +307,14 @@ export function ToolpathsScreen(): JSX.Element {
                                   <span class={`${BADGE} mr-1`}>{TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}</span>
                                   <span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span>
                                 </td>
-                                <td class="text-slate-500 dark:text-slate-400">{projectName(row.projectId)}</td>
-                                <td class="text-slate-500 dark:text-slate-400">{formatDate(row.updatedAt)}</td>
+                                <td class="text-[color:var(--ent-text-muted)]">{projectName(row.projectId)}</td>
+                                <td class="text-[color:var(--ent-text-muted)]">{formatDate(row.updatedAt)}</td>
                                 <td onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
-                                    <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("cam.multi.downloadGcode")} aria-label={`${t("cam.multi.downloadGcode")}: ${row.name}`} onClick={() => navigate(`/toolpaths/${encodeURIComponent(row.id)}?download=true`)}><Download size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={16} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cam.multi.downloadGcode")} aria-label={`${t("cam.multi.downloadGcode")}: ${row.name}`} onClick={() => navigate(`/toolpaths/${encodeURIComponent(row.id)}?download=true`)}><Download size={16} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={16} aria-hidden="true" /></button>
+                                    <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                                   </div>
                                 </td>
                               </tr>
@@ -329,25 +329,25 @@ export function ToolpathsScreen(): JSX.Element {
                         <div class={CARD}>
                           <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500">
                           <CardBanner
-                            icon={<Wrench size={18} aria-hidden="true" />}
+                            icon={<Wrench size={16} aria-hidden="true" />}
                             badge={TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}
                             leftBadge={row.isPublic ? t("save.publicProject") : undefined}
                           />
                           <div class="flex flex-1 flex-col gap-1.5 p-3">
-                            <h3 class="text-xs font-semibold text-slate-900 dark:text-white">{row.name}</h3>
-                            <Show when={row.description}><p class="line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
-                            <div class="mt-auto space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <h3 class="text-xs font-semibold text-[color:var(--ent-text)]">{row.name}</h3>
+                            <Show when={row.description}><p class="line-clamp-2 text-[11px] text-[color:var(--ent-text-muted)]">{row.description}</p></Show>
+                            <div class="mt-auto space-y-1 text-[11px] text-[color:var(--ent-text-muted)]">
                               <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>
                               <div class="flex items-center justify-between gap-2"><span>{t("cam.save.project")}</span><span class="max-w-[60%] truncate text-right">{projectName(row.projectId)}</span></div>
                             </div>
                           </div>
                           </A>
-                          <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 dark:border-slate-700/70">
-                            <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(row.updatedAt)}</span>
+                          <div class="flex items-center justify-between border-t border-[color:var(--ent-line)] px-3 py-2">
+                            <span class="text-[11px] text-[color:var(--ent-text-muted)]">{t("projects.column.updated")} {formatDate(row.updatedAt)}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                              <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={15} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={15} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("pages.use.in.cam")} aria-label={`${t("pages.use.in.cam")}: ${row.name}`} onClick={() => handOffToCam(row, navigate)}><Cpu size={16} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${row.name}`} onClick={() => openEdit(row)}><Edit size={16} aria-hidden="true" /></button>
+                              <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
                             </div>
                           </div>
                         </div>

@@ -82,10 +82,10 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
                   <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
                   <div class="mt-1 flex gap-1 text-xs">
                     <span class="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{TYPE_LABEL[item.type] ?? item.type}</span>
-                    <span class="rounded-full bg-purple-100 px-2 py-0.5 font-semibold text-purple-800 dark:bg-purple-900 dark:text-purple-300">{OPERATION_LABEL[item.operationType] ?? item.operationType}</span>
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-200">{OPERATION_LABEL[item.operationType] ?? item.operationType}</span>
                   </div>
                 </div>
-                <button type="button" class="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50" disabled={props.projectId === ""} onClick={() => props.onSelect(item)}>
+                <button type="button" class="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={props.projectId === ""} onClick={() => props.onSelect(item)}>
                   <Download size={14} aria-hidden="true" />{t("ai.suggestions.apply")}
                 </button>
               </li>
