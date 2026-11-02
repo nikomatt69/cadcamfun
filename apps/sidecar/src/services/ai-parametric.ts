@@ -1,23 +1,56 @@
 /** Project adaptation of the existing parametric kernel. Tests never persist a variant. */
 import { createHash } from "node:crypto"
 import { moveFeatureTo, rebuild, usesOf, withRollback, withSuppressed, type History } from "@cadcamfun/core"
-import { decodeHistory, diagnose, type Diagnosis, KernelJobError, parametricReport, runKernelJob, verificationOf, type ParametricHandlerInput } from "@cadcamfun/ai"
+import {
+  compareVariants, decodeHistory, densityOfLibraryRow, densityOfMaterial, designTableView, diagnose, type Diagnosis, KernelJobError, materialOfElement, parametricReport, runKernelJob,
+  verificationOf, type ParametricHandlerInput, type VerificationMaterial
+} from "@cadcamfun/ai"
 
 export const historyRevision = (history: unknown): string => createHash("sha256").update(JSON.stringify(history)).digest("hex")
 
-export const inspectParametric = (history: unknown) => {
+/**
+ * The material an element carries (`material` or `metadata.material`), resolved to a density: the CAM material library first (grade, EN
+ * or AISI number, trade name), then a row of the user's own library by name (`properties.density`). `lookup` is the user's library for
+ * a name the first one does not know; a name neither knows comes back as `unknown`, so the verdict says why there is no mass.
+ */
+export const materialFor = async (element: Readonly<Record<string, unknown>>, lookup?: (name: string) => Promise<VerificationMaterial["density"]>): Promise<VerificationMaterial | undefined> => {
+  const name = materialOfElement(element)
+  if (name === undefined) return undefined
+  const density = densityOfMaterial(name) ?? (lookup === undefined ? undefined : await lookup(name))
+  return density !== undefined ? { density } : { unknown: name }
+}
+
+/** A library row's density, for `materialFor`. */
+export const libraryDensity = (rows: ReadonlyArray<{ readonly name: string; readonly properties: unknown }>, name: string) => {
+  const row = rows.find((r) => r.name.trim().toLowerCase() === name.trim().toLowerCase())
+  return row === undefined ? undefined : densityOfLibraryRow(row.name, row.properties)
+}
+
+export const inspectParametric = (history: unknown, material?: VerificationMaterial) => {
   const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false, error: "Stored parametric history is invalid.", problems: decoded.problems.slice(0, 8) }
   const report = parametricReport(decoded.data)
   return {
     // The verdict first (what the assistant reads), then the full rebuild report; a failure also says where it started.
-    verification: verificationOf(decoded.data, report), ...(report.ok ? {} : { diagnosis: diagnose(decoded.data, report) }),
+    verification: verificationOf(decoded.data, report, material), ...(report.ok ? {} : { diagnosis: diagnose(decoded.data, report) }),
     ...report, history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) }))
   }
 }
 
 /** The compact verdict to put beside a stored change (a create, update, edit or timeline step): the rebuild report is kept by the caller. */
-export const verificationFor = (history: History, report: ReturnType<typeof parametricReport>) => verificationOf(history, report)
+export const verificationFor = (history: History, report: ReturnType<typeof parametricReport>, material?: VerificationMaterial) => verificationOf(history, report, material)
+
+/**
+ * The configurations of a stored part: the design table and, on request, every variant rebuilt and measured with the part's material
+ * (so each row has its mass). Reads only: the stored part is not changed, the variants are histories of their own.
+ */
+export const configurationsOfPart = (history: unknown, compare: boolean, material?: VerificationMaterial) => {
+  const decoded = decodeHistory(history)
+  if (!decoded.success) return { ok: false as const, error: "Stored parametric history is invalid.", problems: decoded.problems.slice(0, 8) }
+  const table = designTableView(decoded.data)
+  if (table === undefined) return { ok: true as const, active: null, designTable: null, note: "The part has no configurations: cad_edit parametric_edit add_configuration records the current state as Default and the new variant." }
+  return { ok: true as const, active: decoded.data.configuration ?? null, designTable: table, ...(compare ? { variants: compareVariants(decoded.data, material) } : {}) }
+}
 
 export const changeParameters = (history: unknown, parameters: Readonly<Record<string, number | string>>) => {
   const decoded = decodeHistory(history)

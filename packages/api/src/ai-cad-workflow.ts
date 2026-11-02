@@ -51,9 +51,11 @@ const definition = Schema.Struct({
   shape: Schema.Union([
     Schema.Struct({ kind: Schema.Literal("box"), x: positive, y: positive, z: positive }),
     Schema.Struct({ kind: Schema.Literal("cylinder"), radius: positive, height: positive }),
-    Schema.Struct({ kind: Schema.Literal("history"), history: ParametricHistory })
+    Schema.Struct({ kind: Schema.Literal("history"), history: ParametricHistory }),
+    /** A parametric part already in the drawing: its stored history (so a parameter edit of the part reaches the assembly), `configuration` shows one of its variants, its material gives the density when `density` is not sent. */
+    Schema.Struct({ kind: Schema.Literal("part"), elementId: id, configuration: optional(id) })
   ]),
-  /** g/cm^3; needed for mass. */
+  /** g/cm^3; needed for mass. Omitted: the library density of `material` (a part's own material when the shape is a `part`). */
   density: optional(positive),
   material: optional(id),
   designation: optional(id)
@@ -108,8 +110,15 @@ export const CadWorkflowInput = Schema.Struct({
   /** The configuration to solve and check (mass, bom, interference, clearance follow it); default none. */
   configuration: optional(id),
   mates: optional(Schema.Array(WorkflowMate).check(Schema.isMaxLength(1000))),
-  /** Sweep the revolute or slider mate `joint` from `from` to `to` in `steps` solves. */
-  drive: optional(Schema.Struct({ joint: id, from: Schema.Finite, to: Schema.Finite, steps: Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 361 })) })),
+  /**
+   * Sweep the revolute or slider mate `joint` from `from` to `to` in `steps` solves. `couple` ties other revolute or slider mates to it:
+   * each takes `ratio` x the driven value at every step (a rack on a pinion: the slide in mm per degree is pitch radius x pi / 180, signed by
+   * the direction of each slider's axis), so a gear train or a rack-and-pinion moves as one; limits of the coupled joints are reported as violations.
+   */
+  drive: optional(Schema.Struct({
+    joint: id, from: Schema.Finite, to: Schema.Finite, steps: Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 361 })),
+    couple: optional(Schema.Array(Schema.Struct({ joint: id, ratio: Schema.Finite })).check(Schema.isMinLength(1), Schema.isMaxLength(8)))
+  })),
   checks: optional(Schema.Array(Schema.Literals(["interference", "mass", "bom", "clearance"])).check(Schema.isMinLength(1), Schema.isMaxLength(4))),
   // sheet, mesh_export
   elementId: optional(id),

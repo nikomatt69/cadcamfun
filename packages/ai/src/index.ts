@@ -76,6 +76,8 @@ export { backgroundToolContributionsFor, makeAiBackgroundLayer } from "./nikcli/
 
 export * from "./parametric.ts"
 export * from "./parametric-edit.ts"
+export * from "./parametric-configurations.ts"
+export * from "./parametric-mass.ts"
 export * from "./parametric-verification.ts"
 // The handler contract is the one callers narrow on (`Extract<..., { action: "test" }>`). The action-parameter
 // union carries no `action` discriminant — `defineActionTool` adds it as the tool discriminator — so exporting it

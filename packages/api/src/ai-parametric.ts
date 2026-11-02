@@ -424,6 +424,8 @@ export type ParametricHistory = typeof ParametricHistory.Type
 // ---------------------------------------------------------------- structural edits of a stored part
 
 const parameterName = Schema.String.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/))
+/** The id of a configuration (the history editors accept the same characters). */
+const configurationId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,40}$/))
 /**
  * One edit of a stored part's history. `cad_edit.parametric_edit` applies a list of them in order, all or nothing: every parameter,
  * dimension and feature of the history can be reached without rewriting it. A dimension is a number or an expression of the parameters.
@@ -438,7 +440,17 @@ export const ParametricEdit = Schema.Union([
   described(Schema.Struct({ op: Schema.Literal("remove_feature"), id, cascade: optional(Schema.Boolean) }), "Remove a feature. Features that cannot exist without it (the extrudes of a sketch, patterns of a hole, ...) are refused and named unless cascade:true removes them too."),
   described(Schema.Struct({ op: Schema.Literal("rename_feature"), id, name: optional(text(100)) }), "Display name of a feature in the timeline; omit name to go back to the id."),
   described(Schema.Struct({ op: Schema.Literal("group_features"), group: id, name: text(100), ids: between(Schema.Array(id), 1, 80) }), "Put consecutive features in a timeline group (created or renamed)."),
-  described(Schema.Struct({ op: Schema.Literal("ungroup_features"), group: id }), "Dissolve a timeline group; its features stay.")
+  described(Schema.Struct({ op: Schema.Literal("ungroup_features"), group: id }), "Dissolve a timeline group; its features stay."),
+  // Design configurations: named variants of the part (parameter values plus the suppressed features); one is shown at a time.
+  described(Schema.Struct({ op: Schema.Literal("add_configuration"), name: text(100), id: optional(configurationId), values: optional(ParametricParameters), suppress: optional(between(Schema.Array(id), 1, 80)), release: optional(between(Schema.Array(id), 1, 80)) }), "New variant that starts from what the part shows now (the first one also keeps the current state as \"Default\"), then takes `values` (existing parameters) and `suppress` / `release` (feature ids). It becomes the shown one."),
+  described(Schema.Struct({ op: Schema.Literal("set_configuration"), id: configurationId, values: optional(ParametricParameters), clear: optional(between(Schema.Array(parameterName), 1, 80)), suppress: optional(between(Schema.Array(id), 1, 80)), release: optional(between(Schema.Array(id), 1, 80)) }), "Change a variant: `values` set parameters, `clear` makes them follow the current value again, `suppress` / `release` change which features it leaves out."),
+  described(Schema.Struct({ op: Schema.Literal("activate_configuration"), id: configurationId }), "Show a variant: its values and suppressed features are written into the part (edits made to the shown one are kept in it first)."),
+  described(Schema.Struct({ op: Schema.Literal("rename_configuration"), id: configurationId, name: text(100) }), "Rename a variant (names are unique)."),
+  described(Schema.Struct({ op: Schema.Literal("remove_configuration"), id: configurationId }), "Remove a variant; the model stays as it shows now."),
+  // Sketch constraints.
+  described(Schema.Struct({ op: Schema.Literal("add_sketch_constraint"), feature: id, constraint }), "Add a constraint (type and its fields, as in a sketch) to the sketch feature. Refused, naming the constraints that clash, when the sketch can no longer be solved."),
+  described(Schema.Struct({ op: Schema.Literal("remove_sketch_constraint"), feature: id, index: intBetween(0, 199) }), "Remove the constraint at `index` of the sketch's own constraint list (parametric_inspect with the feature lists them)."),
+  described(Schema.Struct({ op: Schema.Literal("set_constraint_driven"), feature: id, index: intBetween(0, 199), driven: Schema.Boolean }), "Turn a dimension into a reference measurement (driven:true: it measures and constrains nothing) or back into a driving one.")
 ])
 export type ParametricEdit = typeof ParametricEdit.Type
 
@@ -516,6 +528,8 @@ export const PARAMETRIC_ACTION_INPUTS = {
   "cad.parametric_validate": Schema.Struct({ history: ParametricHistory }),
   "cad.parametric_inspect": Schema.Struct({ elementId, feature: optional(described(id, "List the dimensions of this feature only (all of them, with labels); by default every feature, capped.")) }),
   "cad.parametric_test": Schema.Struct({ elementId, cases: between(Schema.Array(ParametricTestCase), 1, 12) }),
+  /** The design table of a part's configurations; `compare` also rebuilds and measures every variant (volume, mass, bounds), the stored part untouched. */
+  "cad.parametric_configurations": Schema.Struct({ elementId, compare: optional(Schema.Boolean) }),
   "cad.parametric_dfm": Schema.Struct({
     elementId: optional(elementId), history: optional(ParametricHistory), process: optional(Schema.Literals(["mill", "turn", "print"])),
     toolDiameter: optional(length), material: optional(Schema.Literals(["metal", "cast", "plastic"])), minWall: optional(length),
@@ -535,7 +549,7 @@ export const PARAMETRIC_ACTION_INPUTS = {
   "cad.parametric_recipe": Schema.Struct({ recipe, params: recipeParams }),
   /** Reading the conversion builds the history; nothing is created. */
   "cad.parametric_from_element": Schema.Struct({ elementId, depth: optional(length) }),
-  "cad_edit.parametric_create": Schema.Struct({ history: ParametricHistory, name, ...placement }),
+  "cad_edit.parametric_create": Schema.Struct({ history: ParametricHistory, name, material: optional(described(name, "Material grade or designation from the material library (aluminium, EN AW-6082, S235JR, PA6, ...): the verification then carries massG = volume x density.")), ...placement }),
   "cad_edit.parametric_update": Schema.Struct({ elementId, parameters: ParametricParameters, expectedRevision: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
   /**
    * Timeline edits (spec 58): suppress or release features (nothing is deleted; what needs a suppressed feature leaves the model too),

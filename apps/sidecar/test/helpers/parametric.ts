@@ -9,6 +9,7 @@ const ROUTES: Readonly<Record<string, readonly [tool: "cad" | "cad_edit", action
   validate: ["cad", "parametric_validate"],
   inspect: ["cad", "parametric_inspect"],
   test: ["cad", "parametric_test"],
+  configurations: ["cad", "parametric_configurations"],
   dfm: ["cad", "parametric_dfm"],
   fastener: ["cad", "parametric_fastener"],
   recipe: ["cad", "parametric_recipe"],

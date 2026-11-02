@@ -45,10 +45,10 @@ export const PROMPT_BUDGETS = {
   system: 13_000,
   /** One mode, one family style or one specialist prompt. */
   staticEntry: 10_000,
-  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. Raised to 35 600 when cad_edit parametric_edit (structural edits of a stored part) joined, to 36 000 when the build verification result (volume, bounds, attention) joined cad and cad_edit. */
-  descriptions: 36_000,
-  /** One tool description (4 550, in step with tool-prompts.test.ts: cad and cad_edit carry the whole parametric surface). */
-  description: 4_550,
+  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. Raised to 35 600 when cad_edit parametric_edit (structural edits of a stored part) joined, to 36 000 when the build verification result (volume, bounds, attention) joined cad and cad_edit, to 36 700 when the design configurations, the sketch constraint edits and the mass / centre of gravity of the verification joined (cad_edit +480, cad +200). */
+  descriptions: 36_700,
+  /** One tool description (5 050, in step with tool-prompts.test.ts: cad and cad_edit carry the whole parametric surface; cad_edit holds the design configurations and the sketch constraint edits, 5 024 characters). */
+  description: 5_050,
   /** One skill body. */
   skill: 17_000,
   /** All skill descriptions together (the `skill` tool lists them on every request). Raised from 2 600 to 3 300: 23 skills now cost 3 199 (fea-simulation, cam-turning, cam-post, cad-workflow, fusion-360-modelling joined). */

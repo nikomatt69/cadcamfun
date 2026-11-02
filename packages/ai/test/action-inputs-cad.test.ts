@@ -95,17 +95,19 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
     accept: [
       { op: "sketch", entities: [{ id: "a", kind: "point", x: 0, y: 0 }, { id: "b", kind: "point", x: 3, y: 1 }, { id: "l", kind: "line", p1: "a", p2: "b" }], constraints: [{ type: "fixed", point: "a" }, { type: "length", line: "l", value: 5 }], drag: { entity: "b", to: { x: 0, y: 5 } } },
       { op: "assembly", definitions: [{ id: "blk", shape: { kind: "box", x: 10, y: 10, z: 10 } }], occurrences: [{ id: "o1", definition: "blk", grounded: true }], checks: ["interference", "mass"], drive: { joint: "h", from: 0, to: 90, steps: 10 } },
+      { op: "assembly", definitions: [{ id: "rack", shape: { kind: "part", elementId: "a", configuration: "m3" }, material: "aluminium" }], occurrences: [{ id: "o1", definition: "rack", grounded: true }], drive: { joint: "p", from: 0, to: 90, steps: 4, couple: [{ joint: "s", ratio: 0.2793 }] } },
       { op: "sheet", history, format: "pdf", options: { size: "A3" } },
       { op: "mesh_import", data: "c29saWQ=", unit: "inch", repair: { maxHoleEdges: 8 }, requireSolid: true },
       { op: "mesh_export", elementId: "a", format: "3mf", unit: "millimeter" }
     ],
-    refuse: [{}, { op: "scan" }, { op: "sketch", entities: [] }, { op: "sketch", entities: [{ id: "a", kind: "circle", center: "c", radius: 0 }] }, { op: "sketch", entities: [{ id: "a", kind: "point", x: 0, y: 0 }], constraints: [{ type: "bogus" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 0, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 1, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }], drive: { joint: "h", from: 0, to: 1, steps: 1 } }, { op: "mesh_export", format: "gcode" }, { op: "mesh_import", unit: "furlong", data: "c29saWQ=" }]
+    refuse: [{}, { op: "scan" }, { op: "sketch", entities: [] }, { op: "sketch", entities: [{ id: "a", kind: "circle", center: "c", radius: 0 }] }, { op: "sketch", entities: [{ id: "a", kind: "point", x: 0, y: 0 }], constraints: [{ type: "bogus" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 0, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 1, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }], drive: { joint: "h", from: 0, to: 1, steps: 1 } }, { op: "mesh_export", format: "gcode" }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "part" } }], occurrences: [{ id: "o", definition: "x" }] }, { op: "assembly", definitions: [{ id: "x", shape: { kind: "box", x: 1, y: 1, z: 1 } }], occurrences: [{ id: "o", definition: "x" }], drive: { joint: "h", from: 0, to: 1, steps: 3, couple: [] } }, { op: "mesh_import", unit: "furlong", data: "c29saWQ=" }]
   },
   "cad.parametric_exact": { accept: [{ elementId: "a", includeStep: true }], refuse: [{ includeStep: "yes" }, { name: "" }] },
+  "cad.parametric_configurations": { accept: [{ elementId: "a" }, { elementId: "a", compare: true }], refuse: [{}, { elementId: "a", compare: "yes" }] },
   "cad.parametric_fastener": { accept: [{}, { size: "M6", fit: "medium" }], refuse: [{ fit: "loose" }, { shaftDiameter: 0 }] },
   "cad.parametric_recipe": { accept: [{ recipe: "flange" }, { recipe: "flange", params: { boltCount: 6 } }], refuse: [{ recipe: "teapot" }, {}] },
   "cad.parametric_from_element": { accept: [{ elementId: "a" }, { elementId: "a", depth: 4 }], refuse: [{ elementId: "a", depth: -1 }] },
-  "cad_edit.parametric_create": { accept: [{ history, name: "Plate" }, { history, name: "Plate", x: 5, layer: "L" }, { history: tapered, name: "Tapered" }], refuse: [{ history }, { history, name: "" }, { history: dangling, name: "P" }] },
+  "cad_edit.parametric_create": { accept: [{ history, name: "Plate" }, { history, name: "Plate", x: 5, layer: "L" }, { history, name: "Plate", material: "S235JR" }, { history: tapered, name: "Tapered" }], refuse: [{ history }, { history, name: "" }, { history: dangling, name: "P" }] },
   "cad_edit.parametric_update": { accept: [{ elementId: "a", parameters: { w: 60 }, expectedRevision: "r1" }], refuse: [{ elementId: "a", parameters: { "1w": 3 }, expectedRevision: "r1" }, { elementId: "a", parameters: {} }] },
   "cad_edit.parametric_timeline": {
     accept: [{ elementId: "a", expectedRevision: "r1", suppress: ["f1"] }, { elementId: "a", expectedRevision: "r1", rollback: "f2" }, { elementId: "a", expectedRevision: "r1", rollForward: true }, { elementId: "a", expectedRevision: "r1", move: { feature: "f1", to: 2 } }],
@@ -115,14 +117,23 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
     accept: [
       { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_parameter", name: "w", value: 60 }] },
       { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_dimension", feature: "e1", path: "depth", value: "w / 2" }, { op: "remove_feature", id: "h1", cascade: true }] },
-      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "fillet", radius: "r", edges: { parallel: "z" } }, after: "e1" }] }
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "fillet", radius: "r", edges: { parallel: "z" } }, after: "e1" }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "add_configuration", name: "Wide", values: { w: 90, d: "w / 2" }, suppress: ["h1"] }, { op: "set_configuration", id: "wide", clear: ["d"], release: ["h1"] }, { op: "activate_configuration", id: "default" }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "rename_configuration", id: "wide", name: "Wider" }, { op: "remove_configuration", id: "wide" }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "add_sketch_constraint", feature: "s1", constraint: { type: "length", line: "l2", value: "d" } }, { op: "remove_sketch_constraint", feature: "s1", index: 3 }, { op: "set_constraint_driven", feature: "s1", index: 2, driven: true }] }
     ],
     refuse: [
       { elementId: "a", expectedRevision: "r1", edits: [] },
       { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_parameter", name: "1w", value: 3 }] },
       { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_dimension", feature: "e1", path: "depth" }] },
       { elementId: "a", edits: [{ op: "set_parameter", name: "w", value: 3 }] },
-      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "extrude", depth: 3 } }] }
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "insert_feature", feature: { id: "f9", type: "extrude", depth: 3 } }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "add_configuration" }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "add_configuration", name: "Bad id", id: "not valid!" }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "activate_configuration", id: "x".repeat(41) }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "set_configuration", id: "wide", suppress: [] }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "add_sketch_constraint", feature: "s1", constraint: { type: "bogus" } }] },
+      { elementId: "a", expectedRevision: "r1", edits: [{ op: "remove_sketch_constraint", feature: "s1", index: -1 }] }
     ]
   },
   "cad_edit.parametric_recipe_create": { accept: [{ recipe: "flange" }, { recipe: "flange", name: "F", z: 0 }], refuse: [{ recipe: "flange", name: "" }] },

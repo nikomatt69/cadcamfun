@@ -22,7 +22,8 @@ export type ParametricHandlerInput =
   | { action: "convert"; elementId: string; depth?: number; name?: string; create: boolean }
   | { action: "validate"; history: History }
   | { action: "test"; elementId: string; cases: Input<"cad.parametric_test">["cases"] }
-  | { action: "create"; history: History; name: string; x?: number; y?: number; z?: number; layer?: string }
+  | { action: "configurations"; elementId: string; compare?: boolean }
+  | { action: "create"; history: History; name: string; material?: string; x?: number; y?: number; z?: number; layer?: string }
   | { action: "update"; elementId: string; parameters: Input<"cad_edit.parametric_update">["parameters"]; expectedRevision: string }
   | ({ action: "timeline" } & Input<"cad_edit.parametric_timeline">)
   | ({ action: "edit" } & Input<"cad_edit.parametric_edit">)
@@ -102,6 +103,9 @@ const of = <T extends ParametricHandlerInput>(input: T, context: ActionContext) 
 export const runParametricInspect = (input: Input<"cad.parametric_inspect">, context: ActionContext) =>
   of({ action: "inspect", elementId: input.elementId, ...(input.feature !== undefined ? { feature: input.feature } : {}) }, context)
 export const runParametricTest = (input: Input<"cad.parametric_test">, context: ActionContext) => of({ action: "test", elementId: input.elementId, cases: input.cases }, context)
+/** The design table of a stored part's configurations; with `compare`, every variant rebuilt and measured (the host reads the part and its material). */
+export const runParametricConfigurations = (input: Input<"cad.parametric_configurations">, context: ActionContext) =>
+  of({ action: "configurations", elementId: input.elementId, ...(input.compare !== undefined ? { compare: input.compare } : {}) }, context)
 
 /** A sheet is a read-only derived artifact, never a new drawing or a change to the part. */
 export const runParametricDrawing = async (input: Input<"cad.drawing">, context: ActionContext) => {
@@ -131,7 +135,7 @@ export const runParametricDrawing = async (input: Input<"cad.drawing">, context:
 }
 export const runParametricCreate = (input: Input<"cad_edit.parametric_create">, context: ActionContext) =>
   of({
-    action: "create", history: input.history, name: input.name,
+    action: "create", history: input.history, name: input.name, ...(input.material !== undefined ? { material: input.material } : {}),
     ...(input.x !== undefined ? { x: input.x } : {}), ...(input.y !== undefined ? { y: input.y } : {}),
     ...(input.z !== undefined ? { z: input.z } : {}), ...(input.layer !== undefined ? { layer: input.layer } : {})
   }, context)

@@ -19,7 +19,7 @@ without constraining.
 - The solver finds the solution nearest the drawn geometry, not every solution: draw roughly where you want it.
 
 ## op `assembly`: place, mate, check
-`definitions` (box: corner at the origin; cylinder: base centre at the origin, axis z; or a `history`), `occurrences` (`at`, `rotate`,
+`definitions` (box: corner at the origin; cylinder: base centre at the origin, axis z; a `history`; or a stored parametric `part` {elementId, configuration?}: its own history, so editing the part's parameters or showing one of its variants changes the assembly, and its `material` gives the density), `occurrences` (`at`, `rotate`,
 `grounded`: ground at least one), `mates`. Features are given in the part's own frame: `{kind:"point",p}`, `{kind:"axis",origin,dir,radius?}`,
 `{kind:"plane",origin,normal}` (outward). Instead of a feature an operand may name a `face` index of the definition's exact body (a box: 0 bottom, 1 top, 2 -y, 3 +y, 4 -x, 5 +x; a cylinder: its curved face is the axis).
 Mate kinds: coincident (point-point, point-plane, point-axis, plane-plane with `offset`, `flip`; axis-axis), concentric, parallel, perpendicular,
@@ -29,8 +29,8 @@ point away from their solids and a coincident mate.
 - Read `status` and `dof` (a pin in a hole with its shoulder seated leaves 1: the spin), `freedom` per occurrence, `redundantMates`,
   `conflictSet`. `placements` is the world pose of every occurrence: translation `t` and row-major rotation `m`.
 - Variants and structure: an occurrence of a `history` definition takes `overrides` (`{w: 60}`: its parameters, rebuilt exactly for that copy only). `subAssemblies` (`{id, occurrences}`) are reusable groups placed by an occurrence whose `definition` is the group's id; mates, `placements` and `leaves` then name parts by path (`gearbox/bolt2`). Grounding a sub-assembly grounds every part in it: ground one part inside instead. `configurations` (`{name, parameters: {definitionId: {w: 80}}, suppressed: [paths], hidden}`) or a `designTable` (columns `name`, `definition.parameter`, `suppress:<path>`; rows) define named variants, and `configuration` picks the one that is solved and checked (mass, bom, interference, clearance); order of precedence: definition value, configuration, occurrence override. Compare variants by calling once per configuration.
-- `checks`: interference (exact overlap volume per pair), mass (needs `density` on the definitions), bom, clearance.
-- `drive: {joint, from, to, steps}` sweeps a revolute or slider mate; each step starts from the previous pose. `firstClash` is the first
+- `checks`: interference (exact overlap volume per pair), mass (needs `density` on the definitions, or a `material` the library knows: aluminium, S235JR, PA6, ...), bom, clearance.
+- `drive: {joint, from, to, steps}` sweeps a revolute or slider mate; each step starts from the previous pose. `couple: [{joint, ratio}]` ties other revolute or slider mates to it (each takes ratio x the driven value): a rack on a pinion has ratio = pitch radius x pi / 180 mm per degree, positive when the slider's own axis points the way the rack travels, so the sign of a jaw follows the direction of its mate axis; a gear pair has the tooth ratio. A coupled joint past its `limits` is reported as that joint's `violation` (value asked, limit), not clamped silently. `firstClash` is the first
   step where parts overlap (interference check, at most 60 steps). A step that cannot be solved ends the drive and says so.
 
 ## op `sheet`: the production drawing

@@ -5,12 +5,13 @@
  * Every refusal names what is wrong; no silent fallback.
  */
 import type { CadWorkflowInput } from "@cadcamfun/api"
-import { assembly, brep, drawing, exchange, meshTopology, rebuildExact, createSketchSession, solveSketch, sketchProfiles, polygonArea, SketchError, type Constraint, type History, type SketchEntity } from "@cadcamfun/core"
+import { assembly, brep, configurationHistory, configurationsOf, drawing, exchange, meshTopology, rebuildExact, createSketchSession, solveSketch, sketchProfiles, polygonArea, SketchError, type Constraint, type History, type SketchEntity } from "@cadcamfun/core"
 import { EXACT_ACTION_BUDGET_MS, decodeHistory } from "../parametric.ts"
 import { KernelJobError, runKernelJob } from "../kernel-job.ts"
 import { getAttachment, attachmentNames } from "../attachments.ts"
 import type { ActionContext } from "./action.ts"
 import { closedMesh } from "./export.ts"
+import { densityOfMaterial } from "../parametric-mass.ts"
 
 type Rec = Record<string, unknown>
 const RAD = Math.PI / 180
@@ -119,14 +120,55 @@ const MATE_VALUES: Readonly<Record<string, ReadonlyArray<string>>> = {
   distance: ["value"], angle: ["value"]
 }
 
+/** The name a mate is known by: its id, else its kind and the count of the unnamed ones before it (the solver's own naming). */
+const mateNames = (mates: ReadonlyArray<assembly.Mate>): ReadonlyArray<string> => {
+  let counter = 0
+  return mates.map((m) => m.id ?? `${m.kind}#${counter++}`)
+}
+
+/**
+ * `assembly.sweepJoint` with other joints tied to the driven one: at every step each coupled revolute or slider mate is given
+ * `ratio` x the driven value, and the whole set is solved from the previous pose. A coupled value beyond its limits is clamped by the
+ * solver and read back as that joint's violation, so a stop is reported, never silently ignored.
+ */
+const sweepCoupled = (
+  model: assembly.Assembly, mates: ReadonlyArray<assembly.Mate>, jointId: string, couple: ReadonlyArray<{ readonly joint: string; readonly ratio: number }>,
+  values: ReadonlyArray<number>, options: assembly.SolveAssemblyOptions
+): assembly.JointSweepFrame[] => {
+  const names = mateNames(mates)
+  const indexOf = (id: string, what: string): number => {
+    const at = names.indexOf(id)
+    if (at < 0) throw new Error(`${what} '${id}' is not a mate (mates: ${names.join(", ")})`)
+    const kind = mates[at]!.kind
+    if (kind !== "revolute" && kind !== "slider") throw new Error(`${what} '${id}' is a ${kind} mate: only revolute and slider joints can be driven or coupled`)
+    return at
+  }
+  const target = indexOf(jointId, "Driven joint")
+  const tied = couple.map((c) => ({ at: indexOf(c.joint, "Coupled joint"), ratio: c.ratio }))
+  if (tied.some((t) => t.at === target)) throw new Error(`The driven joint '${jointId}' cannot be coupled to itself`)
+  const frames: assembly.JointSweepFrame[] = []
+  let start: ReadonlyMap<string, brep.Transform> | undefined
+  for (const value of values) {
+    const driven = mates.map((m, i) => (i === target ? { ...m, value } : tied.some((t) => t.at === i) ? { ...m, value: value * tied.find((t) => t.at === i)!.ratio } : m) as assembly.Mate)
+    const solution = assembly.solveAssembly(model, driven, { ...options, analyze: false, ...(start !== undefined ? { start } : {}) })
+    frames.push({ value, solution })
+    if (solution.status === "failed" || solution.status === "conflicting" || solution.residual > 1e-6) break
+    start = solution.transforms
+  }
+  return frames
+}
+
 const runAssembly = (input: CadWorkflowInput) => {
   if (input.definitions === undefined || input.occurrences === undefined) return fail("assembly", "assembly needs definitions and occurrences.")
   try {
     const defs: assembly.PartDefinition[] = input.definitions.map((d) => {
       const s = d.shape
-      const common = { id: d.id, name: d.name ?? d.id, ...(d.density !== undefined ? { density: d.density } : {}), ...(d.material !== undefined ? { material: d.material } : {}), ...(d.designation !== undefined ? { designation: d.designation } : {}) }
+      // The density of a part is what was sent, else the library's for its material (g/cm^3): the mass and bill of materials follow the grade.
+      const density = d.density ?? (d.material === undefined ? undefined : densityOfMaterial(d.material)?.densityGcm3)
+      const common = { id: d.id, name: d.name ?? d.id, ...(density !== undefined ? { density } : {}), ...(d.material !== undefined ? { material: d.material } : {}), ...(d.designation !== undefined ? { designation: d.designation } : {}) }
       if (s.kind === "box") return { ...common, brep: brep.makeBox(s.x, s.y, s.z) }
       if (s.kind === "cylinder") return { ...common, brep: brep.makeCylinder(s.radius, s.height) }
+      if (s.kind === "part") throw new Error(`Definition '${d.id}' is a stored part that was not resolved.`)
       return { ...common, history: s.history as unknown as History }
     })
     const known = new Set(defs.map((d) => d.id))
@@ -207,7 +249,7 @@ const runAssembly = (input: CadWorkflowInput) => {
       if (input.drive !== undefined) {
         const d = input.drive
         const values = Array.from({ length: d.steps }, (_, k) => d.from + ((d.to - d.from) * k) / (d.steps - 1))
-        const frames = assembly.sweepJoint(model, mates, d.joint, values, solveOptions)
+        const frames = d.couple === undefined ? assembly.sweepJoint(model, mates, d.joint, values, solveOptions) : sweepCoupled(model, mates, d.joint, d.couple, values, solveOptions)
         const wantClash = checks.has("interference")
         if (wantClash && frames.length > 60) return fail("assembly", "interference during a drive is limited to 60 steps.")
         let firstClash: Rec | undefined
@@ -347,10 +389,45 @@ const runMeshExport = async (input: CadWorkflowInput, context: ActionContext) =>
   }
 }
 
+/**
+ * The definitions that are stored parts, read from the project: each becomes a definition of its history (the variant `configuration`
+ * names when given), with the part's material when the definition has none. A part that is not in the drawing, a variant that does not
+ * exist or one that cannot be shown is refused with what exists, before anything is solved.
+ */
+const resolveParts = async (input: CadWorkflowInput, context: ActionContext): Promise<{ readonly input: CadWorkflowInput } | { readonly error: Rec }> => {
+  const definitions = input.definitions
+  if (definitions === undefined || !definitions.some((d) => d.shape.kind === "part")) return { input }
+  if (context.handlers.parametric === undefined) return { error: fail("assembly", "Parametric project tools are unavailable in this host, so a stored part cannot be read.") }
+  const resolved: Array<NonNullable<CadWorkflowInput["definitions"]>[number]> = []
+  for (const d of definitions) {
+    const s = d.shape
+    if (s.kind !== "part") { resolved.push(d); continue }
+    const inspected = await context.handlers.parametric(context.projectId, { action: "inspect", elementId: s.elementId }) as Rec | undefined
+    if (inspected === undefined || inspected["ok"] === false) return { error: fail("assembly", `Definition '${d.id}': ${typeof inspected?.["error"] === "string" ? inspected["error"] : "the part could not be read."}`) }
+    const decoded = decodeHistory(inspected["history"])
+    if (!decoded.success) return { error: fail("assembly", `Definition '${d.id}': the part '${s.elementId}' has no readable parametric history.`) }
+    let history = decoded.data
+    if (s.configuration !== undefined) {
+      const shown = configurationHistory(history, s.configuration)
+      if (shown.refusal !== undefined) {
+        const names = configurationsOf(history).map((c) => c.id)
+        return { error: fail("assembly", `Definition '${d.id}': ${shown.refusal}${shown.refusal.startsWith("no configuration") ? ` (the part has ${names.length === 0 ? "none" : names.join(", ")})` : ""}.`) }
+      }
+      history = shown.history
+    }
+    const material = d.material ?? (typeof inspected["material"] === "string" ? inspected["material"] : undefined)
+    resolved.push({ ...d, shape: { kind: "history", history: history as never }, ...(material !== undefined ? { material } : {}) })
+  }
+  return { input: { ...input, definitions: resolved } }
+}
+
 export const runCadWorkflow = async (input: CadWorkflowInput, context: ActionContext): Promise<unknown> => {
   switch (input.op) {
     case "sketch": return runSketch(input)
-    case "assembly": return runAssembly(input)
+    case "assembly": {
+      const parts = await resolveParts(input, context)
+      return "error" in parts ? parts.error : runAssembly(parts.input)
+    }
     case "sheet": return runSheet(input, context)
     case "mesh_import": return runMeshImport(input, context)
     case "mesh_export": return runMeshExport(input, context)

@@ -9,6 +9,7 @@
  */
 import { dimensionsOf, meshVolume, rebuild, type History } from "@cadcamfun/core"
 import type { parametricReport } from "./parametric.ts"
+import { massGrams, type MaterialDensity } from "./parametric-mass.ts"
 
 type Report = ReturnType<typeof parametricReport>
 
@@ -16,6 +17,26 @@ const round = (x: number, digits = 3): number => Math.round(x * 10 ** digits) / 
 
 /** A dimension path that names a size (not a coordinate or a tolerance): the ones worth binding to a parameter. */
 const SIZE_PATH = /(width|height|diameter|radius|radiusX|radiusY|depth|thickness|length|size|distance)$/
+
+/** What the sketch solver says of one sketch that is not fully constrained: the degrees of freedom left and who is to blame. */
+export interface SketchVerdict {
+  readonly id: string
+  readonly status: string
+  /** Degrees of freedom left (0 when fully constrained; a clash or a failed solve reports what the solver found). */
+  readonly dof: number
+  readonly conflicts?: ReadonlyArray<string>
+  readonly redundant?: ReadonlyArray<string>
+  readonly freePoints?: ReadonlyArray<string>
+  readonly message?: string
+}
+
+/** The material of the part for the mass: the resolved density, or the name the library does not know. */
+export interface VerificationMaterial {
+  readonly density?: MaterialDensity
+  readonly unknown?: string
+}
+
+type Xyz = { readonly x: number; readonly y: number; readonly z: number }
 
 export interface Verification {
   /** `valid`: built and nothing to review; `review`: built, but read `attention` before going on; `failed`: no usable solid. */
@@ -26,10 +47,19 @@ export interface Verification {
   readonly volumeSource: "exact" | "mesh"
   /** Bounding box extents x, y, z in mm (from the mesh: a round part reads up to 0.02 mm short). */
   readonly sizeMm: { readonly x: number; readonly y: number; readonly z: number } | null
+  /** Bounding box in mm in the part's own frame (from the mesh: a round part reads up to 0.02 mm short). */
+  readonly boundsMm: { readonly min: Xyz; readonly max: Xyz } | null
+  /** Centre of gravity (uniform density) in mm in the part's own frame, from the exact bodies' mass properties; absent while a body has only a mesh. */
+  readonly centerOfGravityMm?: Xyz
+  /** Present when the part has a material the library knows: the grade, its density in g/cm3, and `massG` = volume x density in grams (same source as the volume). */
+  readonly material?: { readonly name: string; readonly densityGcm3: number; readonly source: MaterialDensity["source"] }
+  readonly massG?: number
   readonly closedSolid: boolean
   readonly throughHoles: number | null
   readonly exactBodies: number
   readonly sketchesFullyConstrained: boolean
+  /** The sketches that are not fully constrained, with their degrees of freedom and the constraints that clash or repeat; absent when all are. */
+  readonly sketches?: ReadonlyArray<SketchVerdict>
   /** Exact-model notes (a curve the exact kernel could not refine further): the volume above already includes their effect; not a failure. */
   readonly exactWarnings?: ReadonlyArray<string>
   /** Set when the exact model did not finish inside the interactive budget: ask `parametric_exact` before quoting an exact volume or exporting STEP. */
@@ -39,7 +69,7 @@ export interface Verification {
 }
 
 /** The verdict of one rebuild report for the stored or proposed history. */
-export const verificationOf = (history: History, report: Report): Verification => {
+export const verificationOf = (history: History, report: Report, material?: VerificationMaterial): Verification => {
   const attention: string[] = []
   const bodies = report.bodyCount
   const exact = report.exact
@@ -66,8 +96,19 @@ export const verificationOf = (history: History, report: Report): Verification =
   if (report.ok === false && bodies > 0 && (report.volumeMm3 ?? 0) <= 1e-9) attention.push("The body has no volume left: a cut or intersect consumed it.")
   else if (bodies > 0 && !closedSolid) attention.push("A body is not a closed solid (open or non-manifold edges): it cannot be machined or printed; read `solids[].summary`.")
   const loose = report.sketches.filter((s) => s.status !== "fully-constrained")
-  if (loose.length > 0) {
-    attention.push(`Sketch ${loose.map((s) => `'${s.id}' is ${s.status}`).join(", ")}: dimension it until it is fully constrained so a parameter edit cannot move it.`)
+  const sketches: SketchVerdict[] = loose.map((s) => ({
+    id: s.id, status: s.status, dof: s.degreesOfFreedom,
+    ...(s.conflicts !== undefined ? { conflicts: s.conflicts } : {}), ...(s.redundant !== undefined ? { redundant: s.redundant } : {}),
+    ...(s.freePoints !== undefined ? { freePoints: s.freePoints } : {}), ...(s.message !== undefined ? { message: s.message } : {})
+  }))
+  for (const s of sketches) {
+    if (s.status === "under-constrained") {
+      attention.push(`Sketch '${s.id}' is under-constrained: ${s.dof} degree(s) of freedom left${s.freePoints !== undefined ? ` (points that can still move: ${s.freePoints.join(", ")})` : ""}. Dimension it (parametric_edit add_sketch_constraint) so a parameter edit cannot move it.`)
+    } else if (s.status === "over-constrained") {
+      attention.push(`Sketch '${s.id}' is over-constrained${s.redundant !== undefined ? `: ${s.redundant.join(", ")} repeat what the others say` : ""}. Remove one with parametric_edit remove_sketch_constraint, or make a dimension a reference (set_constraint_driven).`)
+    } else if (s.status === "conflicting" || s.status === "failed") {
+      attention.push(`Sketch '${s.id}' ${s.status === "failed" ? "could not be solved" : "has constraints that cannot all hold"}${s.conflicts !== undefined ? `: ${s.conflicts.join(", ")}` : ""}${s.message !== undefined ? ` (${s.message})` : ""}. Read parametric_inspect with feature '${s.id}', then remove or relax one of them.`)
+    } else attention.push(`Sketch '${s.id}' is ${s.status}: dimension it until it is fully constrained so a parameter edit cannot move it.`)
   }
   if (Object.keys(history.parameters).length === 0) attention.push("No named parameters: every size is a literal. Name the sizes the user may change so the part can be edited by parameter.")
   else {
@@ -81,17 +122,31 @@ export const verificationOf = (history: History, report: Report): Verification =
     attention.push(`Not built: ${report.timeline.notBuilt.map((n) => `${n.id} (${n.state})`).join(", ")}. The volume above leaves them out.`)
   }
 
+  if (material?.unknown !== undefined) attention.push(`Material '${material.unknown}' is not in the library, so there is no density and no mass: use a grade or designation the material library knows (steel, aluminium, EN AW-6082, S235JR, PA6, ...).`)
   const extent = report.bounds === null ? null : { x: round(report.bounds.max.x - report.bounds.min.x, 2), y: round(report.bounds.max.y - report.bounds.min.y, 2), z: round(report.bounds.max.z - report.bounds.min.z, 2) }
+  const volume = exactVolume !== undefined ? round(exactVolume) : report.volumeMm3 === null ? null : round(report.volumeMm3)
+  // The centre of gravity of the whole part: each exact body's centroid weighted by its volume (uniform density).
+  const weighted = allExact && exactVolume !== undefined && exactVolume > 0
+    ? exact.reduce((sum, b) => {
+      if (!("centroid" in b) || !("volumeMm3" in b)) return sum
+      const w = b.volumeMm3 as number, c = b.centroid as Xyz
+      return { x: sum.x + c.x * w, y: sum.y + c.y * w, z: sum.z + c.z * w }
+    }, { x: 0, y: 0, z: 0 })
+    : undefined
   return {
     verdict: !report.ok ? "failed" : attention.length > 0 ? "review" : "valid",
     bodies,
-    volumeMm3: exactVolume !== undefined ? round(exactVolume) : report.volumeMm3 === null ? null : round(report.volumeMm3),
+    volumeMm3: volume,
     volumeSource: exactVolume !== undefined ? "exact" : "mesh",
     sizeMm: extent,
+    boundsMm: report.bounds === null ? null : { min: { x: round(report.bounds.min.x), y: round(report.bounds.min.y), z: round(report.bounds.min.z) }, max: { x: round(report.bounds.max.x), y: round(report.bounds.max.y), z: round(report.bounds.max.z) } },
+    ...(weighted !== undefined && exactVolume !== undefined ? { centerOfGravityMm: { x: round(weighted.x / exactVolume), y: round(weighted.y / exactVolume), z: round(weighted.z / exactVolume) } } : {}),
+    ...(material?.density !== undefined && volume !== null ? { material: { name: material.density.name, densityGcm3: material.density.densityGcm3, source: material.density.source }, massG: round(massGrams(volume, material.density.densityGcm3)) } : {}),
     closedSolid,
     throughHoles,
     exactBodies: exact.filter((b) => b.exact).length,
     sketchesFullyConstrained: loose.length === 0,
+    ...(sketches.length > 0 ? { sketches } : {}),
     ...(report.warnings.length > 0 ? { exactWarnings: report.warnings.slice(0, 3) } : {}),
     ...(pending.length > 0 ? { exactPending: `${pending.length} body(ies) were too much work for the interactive budget (a big model, not a busy machine); the volume is the mesh volume (about 0.05 % low on round parts). Call parametric_exact for the exact volume and validity before quoting mass or exporting STEP.` } : {}),
     attention
