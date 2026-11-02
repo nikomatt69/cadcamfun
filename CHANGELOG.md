@@ -3,6 +3,14 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.60 (November 2026)
+
+## Desktop
+
+- Cam-page uses the post target select and its nine real posts
+- The generator selection test renders the operation section inside AppProvider and KernelSession
+- Translate the 48 PMI panel keys into the ten other languages; the PMI conflict fallback is no longer an English literal
+
 ## v0.1.59 (November 2026)
 
 ## Desktop
