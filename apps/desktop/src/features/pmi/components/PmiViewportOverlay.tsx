@@ -40,10 +40,10 @@ export default function PmiViewportOverlay(props: { readonly scene: () => THREE.
         <For each={labels()}>{(l) => <line x1={l.anchorX} y1={l.anchorY} x2={l.x} y2={l.y} stroke={l.broken ? "#dc2626" : "#f59e0b"} stroke-width="1" />}</For>
       </svg>
       <For each={labels()}>{(l) => (
-        <div data-testid="pmi-label" data-kind={l.kind} style={{ position: "absolute", left: `${l.x}px`, top: `${l.y}px`, transform: "translate(-50%,-50%)", color: l.broken ? "#fca5a5" : "#fde68a", "background-color": "rgba(0,0,0,0.78)", padding: "2px 6px", "border-radius": "3px", "font-size": "11px", "font-weight": "600", "line-height": "14px", "white-space": "nowrap", border: l.kind === "datum" ? "1px solid #fde68a" : "none" }}>{l.text}</div>
+        <div data-testid="pmi-label" data-kind={l.kind} style={{ position: "absolute", left: `${l.x}px`, top: `${l.y}px`, transform: "translate(-50%,-50%)", color: l.broken ? "#fca5a5" : "#fde68a", "background-color": "#111827", padding: "2px 6px", "border-radius": "3px", "font-size": "11px", "font-weight": "600", "line-height": "14px", "white-space": "nowrap", border: l.kind === "datum" ? "1px solid #fde68a" : "none" }}>{l.text}</div>
       )}</For>
       <Show when={unanchored().length > 0}>
-        <div data-testid="pmi-unanchored" style={{ position: "absolute", left: "8px", bottom: "8px", color: "#fecaca", "background-color": "rgba(0,0,0,0.78)", padding: "3px 7px", "font-size": "11px", "font-weight": "600", "line-height": "14px", "border-radius": "2px" }}>
+        <div data-testid="pmi-unanchored" style={{ position: "absolute", left: "8px", bottom: "8px", color: "#fecaca", "background-color": "#111827", padding: "3px 7px", "font-size": "11px", "font-weight": "600", "line-height": "14px", "border-radius": "2px" }}>
           {t("cad.pmi.unanchored", { count: unanchored().length })}
         </div>
       </Show>

@@ -106,7 +106,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
               <For each={group.annotations}>{(a) => (
                 <li>
                   <button type="button" data-testid="pmi-annotation" data-kind={a.kind} data-broken={isBroken(issues(), a.id)}
-                    class="flex w-full items-center gap-2 rounded px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    class="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--panel-accent)]"
                     aria-pressed={store.selectedAnnotationId === a.id}
                     style={store.selectedAnnotationId === a.id
                       ? { "border": "1px solid var(--panel-accent)", "background": "var(--panel-accent-soft)", "color": "var(--panel-text)", "font-size": "12px" }
@@ -117,7 +117,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
                     <Show when={isBroken(issues(), a.id)}><Badge tone="bad">{t("cad.pmi.broken")}</Badge></Show>
                   </button>
                   <Show when={store.selectedAnnotationId === a.id}>
-                    <div class="px-2 py-1" style={{ ...MUTED, "font-size": "12px" }}>
+                    <div class="px-3 py-2" style={{ ...MUTED, "font-size": "12px" }}>
                       <For each={a.refs}>{(r) => <div>{refLabel(r)}</div>}</For>
                       <For each={issuesFor(issues(), a.id)}>{(i) => <p role="alert" style={BAD}>{i.message}</p>}</For>
                       <button type="button" class={BUTTON} data-testid="pmi-remove-annotation" onClick={() => store.removeAnnotation(a.id)}>{t("cad.pmi.remove")}</button>

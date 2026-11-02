@@ -7,6 +7,7 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { pmi } from "@cadcamfun/core"
 import { INPUT } from "../../../shared/components/panel/ui.tsx"
+import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { useSelectionStore } from "../../cad/store/selectorStore.ts"
@@ -15,7 +16,7 @@ import { usePmiStore } from "../pmi-store.ts"
 
 type Kind = pmi.PmiAnnotation["kind"]
 const KINDS: readonly Kind[] = ["dimensional-size", "dimensional-location", "geometric-tolerance", "datum", "datum-target", "surface-texture", "note"]
-const num = (s: string): number => (s.trim() === "" ? NaN : Number(s))
+const num = (s: string): number => (s.trim() === "" ? NaN : Number(s.trim().replace(",", ".")))
 const MUTED = { color: "var(--panel-text-muted)" } as const
 const BAD = { color: "var(--panel-bad)" } as const
 
@@ -62,8 +63,12 @@ export default function PmiAnnotationForm(props: { readonly captureId: string | 
     store.addAnnotation({ ...annotation, captureId: targetCaptureId })
   }
 
-  const field = (label: string, value: () => string, set: (v: string) => void, numeric = false): JSX.Element =>
-    <label class="block"><span class="panel-label">{label}</span><input class={INPUT} type={numeric ? "number" : "text"} step={numeric ? "any" : undefined} value={value()} onInput={(e) => set(e.currentTarget.value)} /></label>
+  /** `required` numbers go through NumberField (comma decimals, expressions); `optional` ones (Ra, Rz) may be emptied, so they stay plain decimal text. */
+  const field = (label: string, value: () => string, set: (v: string) => void, numeric: boolean | "optional" = false): JSX.Element =>
+    <label class="block"><span class="panel-label">{label}</span>
+      <Show when={numeric === true} fallback={<input class={`${INPUT}${numeric === "optional" ? " tabular-nums" : ""}`} type="text" inputmode={numeric === "optional" ? "decimal" : undefined} autocomplete="off" value={value()} onInput={(e) => set(e.currentTarget.value)} />}>
+        <NumberField label={label} class={`${INPUT} tabular-nums`} value={value()} onChange={(next) => set(String(next))} />
+      </Show></label>
 
   return (
     <div class="space-y-2" data-testid="pmi-authoring-form">
@@ -81,7 +86,7 @@ export default function PmiAnnotationForm(props: { readonly captureId: string | 
         <label class="flex items-center gap-2" style={{ ...MUTED, "font-size": "12px" }}><input type="checkbox" checked={gdtDiameter()} onChange={(e) => setGdtDiameter(e.currentTarget.checked)} />{t("cad.pmi.diameter")}</label>
       </div></Show>
       <Show when={kind() === "datum" || kind() === "datum-target"}><div class="grid grid-cols-2 gap-2">{field(t("cad.pmi.letter"), letter, setLetter)}<Show when={kind() === "datum-target"}>{field(t("cad.pmi.target"), target, setTarget)}</Show></div></Show>
-      <Show when={kind() === "surface-texture"}><div class="grid grid-cols-2 gap-2">{field("Ra", ra, setRa, true)}{field("Rz", rz, setRz, true)}{field(t("cad.pmi.lay"), lay, setLay)}{field(t("cad.pmi.process"), process, setProcess)}</div></Show>
+      <Show when={kind() === "surface-texture"}><div class="grid grid-cols-2 gap-2">{field("Ra", ra, setRa, "optional")}{field("Rz", rz, setRz, "optional")}{field(t("cad.pmi.lay"), lay, setLay)}{field(t("cad.pmi.process"), process, setProcess)}</div></Show>
       <Show when={kind() === "note"}>{field(t("cad.pmi.text"), text, setText)}</Show>
       <Show when={error()}><p role="alert" style={{ ...BAD, "font-size": "12px" }}>{error()}</p></Show>
       <button type="button" class="panel-btn panel-btn--primary panel-btn--block" data-testid="pmi-create" onClick={create}>{t("cad.pmi.create")}</button>
