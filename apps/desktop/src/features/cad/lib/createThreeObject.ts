@@ -10,6 +10,8 @@ import { initializeElementTransform } from "./element-transform.ts";
 import { applyMaterialLook, elementMaterialName } from "../../../viewport/render-look.ts";
 import { currentLookTier } from "../../../viewport/render-look-setting.ts";
 import { buildExtraElement, isExtraElement } from "./extra-elements.ts";
+import { applyElementOpacity } from "./appearance.ts";
+import { meshIsClosed } from "./mesh-quality.ts";
 import { createSketchOverlays, historyErrors, historyView } from "./history-view.ts";
 
 /** The edges of solids and curves: a mid-dark grey that lets the face colour show through, not black, so a part reads as one body and not as a drawing of one. */
@@ -18,7 +20,7 @@ const EDGE_STYLE = { color: 0x59606a, opacity: 0.45 } as const
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
 
 /** A solid mesh in scene coordinates as a Three mesh (the drawing's origin offset is added; smooth normals are not wanted on a CAD solid). */
-const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }, onEdgesReady?: () => void): THREE.Mesh => {
+const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }, onEdgesReady?: () => void, sheet = false): THREE.Mesh => {
   // Smooth across the facets of a curved face, sharp along a real edge (a crease angle of 30 degrees).
   const shaded = creasedNormals({ positions: Float32Array.from(mesh.positions), indices: Uint32Array.from(mesh.indices) });
   const positions = shaded.positions;
@@ -31,7 +33,7 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
   geometry.setIndex(new THREE.BufferAttribute(shaded.indices, 1));
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3));
-  const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false });
+  const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false, ...(sheet ? { side: THREE.DoubleSide } : {}) });
   const result = new THREE.Mesh(geometry, material);
   if (!element.wireframe) {
     // The solid's edges (the native Rust path for a big mesh): faces step back a little so the lines sit on top of them.
@@ -184,6 +186,8 @@ const Y_UP_BUILT = new Set(["wall", "floor", "roof", "window", "door", "stair", 
 
 export const createThreeObject = (element: any, originOffset = useCADStore.getState().originOffset, onEdgesReady?: () => void): THREE.Object3D | null => {
   const object = buildObject(element, originOffset, onEdgesReady);
+  // The appearance fields every element shares: its `opacity`, then its `material` (below).
+  if (object !== null) applyElementOpacity(object, element);
   // The element's `material` (aluminum, steel, plastic, a catalogue grade...) sets metalness / roughness (and the colour when the element has none).
   if (object !== null) { const name = elementMaterialName(element); if (name !== undefined) applyMaterialLook(object, element, currentLookTier(), cam.kernel.findMaterial(name)?.family); }
   if (object === null || !Y_UP_BUILT.has(element.type)) return object;
@@ -2216,46 +2220,27 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
         return pointCloud;
 
-      case "mesh":
-        // For a custom mesh, we need vertices and faces data
+      case "mesh": {
+        // A triangle mesh (an STL/OBJ/3MF import, a Boolean result): shaded like any solid, smooth across a curved surface and sharp along a
+        // real edge, with its edges drawn. One that is not a closed skin is a sheet and is drawn two-sided, so no triangle vanishes.
         if (!element.vertices || !element.faces) return null;
-
-        const meshGeometry = new THREE.BufferGeometry();
-
-        // Convert vertices to Float32Array
-        const vertices2 = new Float32Array(element.vertices.length * 3);
+        const meshPositions = new Float32Array(element.vertices.length * 3);
         element.vertices.forEach((vertex: any, i: number) => {
-          vertices2[i * 3] = vertex.x + originOffset.x;
-          vertices2[i * 3 + 1] = vertex.y + originOffset.y;
-          vertices2[i * 3 + 2] = (vertex.z || 0) + originOffset.z;
+          meshPositions[i * 3] = vertex.x;
+          meshPositions[i * 3 + 1] = vertex.y;
+          meshPositions[i * 3 + 2] = vertex.z || 0;
         });
-
-        // Convert faces to indices
-        const indices2: number[] = [];
+        const meshIndices: number[] = [];
         element.faces.forEach((face: any) => {
-          if (Array.isArray(face) && face.length >= 3) {
-            // Basic triangles
-            indices2.push(face[0], face[1], face[2]);
-
-            // If more than 3 vertices (quad or n-gon), triangulate
-            for (let i = 3; i < face.length; i++) {
-              indices2.push(face[0], face[i - 1], face[i]);
-            }
-          }
+          // A triangle, or a quad / n-gon fanned from its first vertex.
+          if (!Array.isArray(face) || face.length < 3) return;
+          for (let i = 2; i < face.length; i++) meshIndices.push(face[0], face[i - 1], face[i]);
         });
-
-        meshGeometry.setIndex(indices2);
-        meshGeometry.setAttribute("position", new THREE.BufferAttribute(vertices2, 3));
-        meshGeometry.computeVertexNormals();
-
-        const meshMaterial = new THREE.MeshStandardMaterial({
-          color: element.color || 0x4285f4,
-          wireframe: element.wireframe || false
-        });
-
-        const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
-        ensureObjectMetadata(mesh, element.id);
-        return mesh;
+        if (meshIndices.length === 0 || meshIndices.some((index) => !(index >= 0 && index < element.vertices.length))) return null;
+        const meshObject = solidObject({ positions: meshPositions, indices: Uint32Array.from(meshIndices) }, element, originOffset, onEdgesReady, !meshIsClosed(meshIndices));
+        ensureObjectMetadata(meshObject, element.id);
+        return meshObject;
+      }
 
       case "group":
         const group = new THREE.Group();
