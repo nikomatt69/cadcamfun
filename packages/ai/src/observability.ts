@@ -1,6 +1,7 @@
 import { Effect, Metric, Stream } from "effect"
 import type { AiEvent } from "./events.ts"
 import type { AiError } from "./errors.ts"
+import type { HostOperationTiming } from "./nikcli/request-timing.ts"
 
 /**
  * The AI metric catalogue.
@@ -39,6 +40,39 @@ export const aiToolCalls = Metric.counter("cadcamfun_ai_tool_calls_total", {
 export const aiFailures = Metric.counter("cadcamfun_ai_failures_total", {
   description: "AI turns that ended in a failure, by error code"
 })
+
+const latencyBoundaries = [100, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000]
+export const aiFirstActivity = Metric.histogram("cadcamfun_ai_first_activity_ms", {
+  description: "Turn start to first model content or tool activity; includes host setup",
+  boundaries: latencyBoundaries
+})
+export const aiInterActionGap = Metric.histogram("cadcamfun_ai_inter_action_gap_ms", {
+  description: "Last primary tool result to next model content or tool activity; not provider-only latency",
+  boundaries: latencyBoundaries
+})
+export const aiToolDuration = Metric.histogram("cadcamfun_ai_tool_duration_ms", {
+  description: "Observed tool call to result, including permission waits and execution",
+  boundaries: latencyBoundaries
+})
+export const aiLoopTransitions = Metric.counter("cadcamfun_ai_loop_transitions_total", {
+  description: "AI loop continuations and recoveries, by phase"
+})
+
+export const aiHostOperations = Metric.counter("cadcamfun_ai_host_operations_total", {
+  description: "Host-owned permission and execution phases, including detached runs"
+})
+export const aiHostOperationDuration = Metric.histogram("cadcamfun_ai_host_operation_duration_ms", {
+  description: "Host-owned permission wait or tool execution; permission includes classifier and human waits",
+  boundaries: latencyBoundaries
+})
+
+export const observeHostOperation = (timing: HostOperationTiming): Effect.Effect<void> => {
+  const labels = { tool: timing.tool, mode: timing.mode, phase: timing.phase, outcome: timing.outcome }
+  return Effect.all([
+    Metric.update(Metric.withAttributes(aiHostOperations, labels), 1),
+    Metric.update(Metric.withAttributes(aiHostOperationDuration, labels), timing.durationMs)
+  ], { discard: true })
+}
 
 const count = (metric: Metric.Counter<number>, attributes: Readonly<Record<string, string>>): Effect.Effect<void> =>
   Metric.update(Metric.withAttributes(metric, attributes), 1)
@@ -97,14 +131,46 @@ export const observedTurn = (
   startedAt: number,
   attributes: { readonly provider: string; readonly model: string; readonly session: string }
 ): Stream.Stream<AiEvent, AiError> =>
-  stream.pipe(
-    Stream.withSpan("ai.turn", {
-      attributes: {
-        "ai.provider": attributes.provider,
-        "ai.model": attributes.model,
-        "ai.session": attributes.session
-      }
-    }),
-    Stream.tap(observeEvent),
-    Stream.onExit(() => observeTurnDuration(Date.now() - startedAt))
-  )
+  Stream.suspend(() => {
+    let firstActivity = false
+    let lastPrimaryResult: number | undefined
+    const pending = new Map<string, number>()
+    return stream.pipe(
+      Stream.withSpan("ai.turn", {
+        attributes: {
+          "ai.provider": attributes.provider,
+          "ai.model": attributes.model,
+          "ai.session": attributes.session
+        }
+      }),
+      Stream.tap(observeEvent),
+      Stream.tap((event) => Effect.gen(function* () {
+        const now = Date.now()
+        const primary = !("agent" in event && event.agent !== undefined)
+        const active = primary && (event.type === "tool_call" || event.type === "tool_progress" ||
+          ((event.type === "delta" || event.type === "reasoning") && event.text.length > 0))
+        const labels = { provider: attributes.provider, model: attributes.model }
+        if (active && !firstActivity) {
+          firstActivity = true
+          yield* Metric.update(Metric.withAttributes(aiFirstActivity, labels), Math.max(0, now - startedAt))
+        }
+        if (active && lastPrimaryResult !== undefined && pending.size === 0) {
+          yield* Metric.update(Metric.withAttributes(aiInterActionGap, labels), Math.max(0, now - lastPrimaryResult))
+          lastPrimaryResult = undefined
+        }
+        if (primary && event.type === "tool_call") pending.set(event.callId, now)
+        if (primary && event.type === "tool_result") {
+          const began = pending.get(event.callId)
+          if (began !== undefined) {
+            pending.delete(event.callId)
+            yield* Metric.update(Metric.withAttributes(aiToolDuration, { ...labels, tool: event.tool, outcome: event.ok ? "ok" : "error" }), Math.max(0, now - began))
+            if (pending.size === 0) lastPrimaryResult = now
+          }
+        }
+        if (event.type === "turn" && (event.phase === "continuing" || event.phase === "recovering")) {
+          yield* Metric.update(Metric.withAttributes(aiLoopTransitions, { ...labels, phase: event.phase }), 1)
+        }
+      })),
+      Stream.onExit(() => observeTurnDuration(Date.now() - startedAt))
+    )
+  })

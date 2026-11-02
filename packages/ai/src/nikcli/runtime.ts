@@ -26,6 +26,8 @@ import { providerOAuth } from "./provider-oauth.ts"
 import { readOAuthGrants } from "./oauth-store.ts"
 import { toolPermissionPattern } from "./permission-modes.ts"
 import { exposedActions, EXPOSED_TOOL_IDS, nameOf } from "../actions/catalogue.ts"
+import { observeHostOperation } from "../observability.ts"
+import { hostOperationTimer } from "./request-timing.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolContext {
@@ -218,6 +220,9 @@ export const makeNikCliRuntime = (
   options: NikCliRuntimeOptions
 ): Effect.Effect<NikCliRuntime, AiConfigError, Scope.Scope> =>
   Effect.gen(function* () {
+    // Native host callbacks outlive UI streams; keep their measurements on the owning runtime's metric/tracing context.
+    const runHere = Effect.runPromiseWith(yield* Effect.context<never>())
+    const timeHostOperation = hostOperationTimer((timing) => runHere(observeHostOperation(timing)))
     const paths = isolatedPaths(options.dataDir)
     const projectDirectories = new Map<string, string>()
     const ledgerMod = options.engineeringLedger ? yield* Effect.try({
@@ -364,17 +369,17 @@ export const makeNikCliRuntime = (
             const action = EXPOSED_TOOL_IDS.includes(spec.id)
               ? exposedActions(spec.id).find((entry) => nameOf(entry) === (args as { action?: unknown }).action)
               : undefined
-            await ctx.ask({ permission: spec.id, patterns: [pattern], always: [pattern], metadata: {
+            await timeHostOperation({ tool: spec.id, agent: ctx.agent, phase: "permission", signal: ctx.abort }, () => ctx.ask({ permission: spec.id, patterns: [pattern], always: [pattern], metadata: {
               input: args,
               context: { application: "CADCAMFUN", projectId, ...(action ? { action: { id: action.id, kind: action.kind, effects: action.effects } } : {}) }
-            } })
+            } }))
             assertOpen()
             const call: HostToolContext = { sessionId: ctx.sessionID, projectId, signal: ctx.abort, ...(ctx.callID ? { callId: `${ctx.callID}#${ordinal}` } : {}), messageId: ctx.messageID }
             // Under `code_mode` the call id is the program's, not this tool's: record what happened so the program's inner calls
             // reach the editor as they finish (see `program-calls.ts`).
-            const result: HostToolAnswer = await (spec.executeWithFiles
+            const result: HostToolAnswer = await timeHostOperation({ tool: spec.id, agent: ctx.agent, phase: "execution", signal: ctx.abort }, () => (spec.executeWithFiles
               ? spec.executeWithFiles(args, call)
-              : spec.execute(args, call).then((output) => ({ output }))).catch((cause: unknown) => {
+              : spec.execute(args, call).then((output) => ({ output })))).catch((cause: unknown) => {
               recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: cause instanceof Error ? cause.message : String(cause), failed: true })
               throw cause
             })

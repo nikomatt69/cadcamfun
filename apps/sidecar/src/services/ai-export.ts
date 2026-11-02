@@ -3,7 +3,7 @@
  * and which stock a stored verification still describes. `ai.ts` binds them to the repositories and the storage service.
  */
 import { cad, cam } from "@cadcamfun/core"
-import type { ToolHandlersShape } from "@cadcamfun/ai"
+import { runKernelJob, type ToolHandlersShape } from "@cadcamfun/ai"
 
 type Exported = Awaited<ReturnType<NonNullable<ToolHandlersShape["cadExportBodies"]>>>
 type Stock = Awaited<ReturnType<NonNullable<ToolHandlersShape["operationStock"]>>>
@@ -11,16 +11,8 @@ type Stock = Awaited<ReturnType<NonNullable<ToolHandlersShape["operationStock"]>
 const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
 /** The exact solids a request names (or all of them), each with the reason when one cannot be exported. */
-export const bodiesForExport = (elements: Parameters<typeof cad.sceneParts>[0], ids: ReadonlyArray<string> | undefined): Exported => {
-  const scene = cad.sceneParts(cad.selectElements(elements, ids))
-  const wanted = ids === undefined ? undefined : new Set(ids)
-  const parts = scene.parts.filter((p) => wanted === undefined || wanted.has(p.id))
-  const missing = ids?.filter((id) => !parts.some((p) => p.id === id)) ?? []
-  const skipped = scene.skipped.map((s) => `${s.name} (${s.reason})`)
-  if (parts.length === 0) return { ok: false, error: ids === undefined ? "The drawing has no exact solid to export." : "None of the requested elements has an exact solid to export.", skipped, missing }
-  if (missing.length > 0) return { ok: false, error: "Some requested elements have no exact solid to export.", skipped, missing }
-  return { ok: true, bodies: parts.map((p) => ({ id: p.id, name: p.name, brep: p.brep })), skipped }
-}
+export const bodiesForExport = (elements: Parameters<typeof cad.sceneParts>[0], ids: ReadonlyArray<string> | undefined, signal?: AbortSignal): Promise<Exported> =>
+  runKernelJob("cad-export-scene", { elements, ...(ids !== undefined ? { ids } : {}) }, { signal })
 
 /** A file name the storage folder keeps as it is: no folder, no leading dot, no character a file system or a URL treats specially. */
 export const safeFileName = (name: string): string => {

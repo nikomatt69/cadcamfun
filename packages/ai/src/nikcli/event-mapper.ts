@@ -43,6 +43,8 @@ export interface EventMapperState {
   todos: ReadonlyArray<{ readonly content: string; readonly status: string }>
   /** Tool calls started in this turn, by the agent and by its specialists. */
   toolCalls: number
+  /** Completed tool evidence, keyed by call identity so a bounded history read cannot manufacture progress from a count. */
+  readonly successfulCalls: Map<string, string>
   /** The most recent tool call ended in an error, and what it said; cleared by the next success. */
   lastToolError: string | undefined
   readonly toolErrors: Map<string, string>
@@ -72,6 +74,7 @@ export const newMapperState = (): EventMapperState => ({
   sessionError: undefined,
   todos: [],
   toolCalls: 0,
+  successfulCalls: new Map(),
   lastToolError: undefined,
   toolErrors: new Map(),
   ownTexts: new Set(),
@@ -466,7 +469,7 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
  * Maps one host event to the application's events. A `code_mode` program's inner calls are interleaved with its own part:
  * after its start and before its result, so the transcript and the editor see them in the order they ran.
  */
-export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
+const mapHostEventWithPrograms = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
   const events = mapHostEventParts(sessionId, event, state)
   const part = event.type === "message.part.updated" ? rec(event.properties["part"]) : undefined
   if (part === undefined || str(part["type"]) !== "tool") return events
@@ -483,4 +486,15 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
   if (inner.length === 0) return events
   const result = events.findIndex((e) => e.type === "tool_result" && e.callId === callId)
   return result === -1 ? [...events, ...inner] : [...events.slice(0, result), ...inner, ...events.slice(result)]
+}
+
+export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
+  const events = mapHostEventWithPrograms(sessionId, event, state)
+  for (const mapped of events) {
+    if (mapped.type !== "tool_result") continue
+    // A partial mutation may have committed useful work despite an error. Preserve that evidence without treating
+    // a started call, an unsuccessful retry or a changed error message as progress.
+    if (mapped.ok || outputRecord(mapped.output)?.["mutationApplied"] === true) state.successfulCalls.set(mapped.callId, mapped.tool)
+  }
+  return events
 }

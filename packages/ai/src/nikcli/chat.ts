@@ -448,11 +448,11 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let attempt = 0
         const maxContinues = input.autoContinues ?? (input.goalArguments !== undefined ? 50 : DEFAULT_AUTO_CONTINUES)
         let continuations = 0
-        let callsAtNudge: number | undefined
-        let errorAtNudge: string | undefined
+        let successesAtNudge: ReadonlyMap<string, string> | undefined
+        let failedToolsAtNudge: ReadonlySet<string> = new Set()
         let stalls = 0
         let stepResumes = 0
-        let callsAtStepLimit: number | undefined
+        let successesAtStepLimit = 0
         const answers: string[] = []
         let parts: Array<{ type: "text"; text: string; synthetic?: boolean; metadata?: Record<string, unknown> } | { type: "file"; mime: string; filename: string; url: string }> = [
           { type: "text", text: input.message },
@@ -575,9 +575,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           if (result.info === undefined && result.name === STEP_LIMIT_NAME) {
             // Keep moving: the host session was aborted by the pump; wait for it to settle, then start the next run.
             const settle = Date.now() + 5_000
-            while (!subscriber.signal.aborted && !state.idle && Date.now() < settle) await pause(25)
-            const progressed = state.toolCalls > (callsAtStepLimit ?? 0)
-            if (controller.signal.aborted || subscriber.signal.aborted) return
+            while (!controller.signal.aborted && !state.idle && Date.now() < settle) await pause(25)
+            const progressed = state.successfulCalls.size > successesAtStepLimit
+            // A detached webview is not a cancellation: the session still owns this run and its next budget.
+            if (controller.signal.aborted) return
             if (!progressed || stepResumes >= MAX_STEP_RESUMES) {
               suspended = false
               offer({ type: "error", sessionId, code: "internal", message: `${STEP_LIMIT_MESSAGE} It made no further progress on its own: review the last tool result, then tell it to continue.` })
@@ -585,7 +586,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               return
             }
             stepResumes += 1
-            callsAtStepLimit = state.toolCalls
+            successesAtStepLimit = state.successfulCalls.size
             suspended = false
             stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
             state.idle = false
@@ -625,9 +626,12 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
           if (!failure && !controller.signal.aborted && continuationState !== undefined && maxContinues > 0) {
             const text = answerOf()
-            // A nudge that produced no tool call at all did not help: stop nudging rather than loop on words.
-            const repeatedError = errorAtNudge !== undefined && continuationState.lastToolError === errorAtNudge
-            stalls = callsAtNudge !== undefined && (continuationState.toolCalls === callsAtNudge || repeatedError) ? stalls + 1 : 0
+            // Stored snapshots have bounded, changing windows. Compare completed call identities, never started-call
+            // counts or error wording. While recovering a failed tool, unrelated successful reads do not fix it.
+            const previousSuccesses = successesAtNudge
+            const progressed = previousSuccesses === undefined || [...continuationState.successfulCalls].some(([callId, tool]) =>
+              !previousSuccesses.has(callId) && (failedToolsAtNudge.size === 0 || failedToolsAtNudge.has(tool)))
+            stalls = progressed ? 0 : stalls + 1
             const nudge = continuationFor(continuationState, text, result.info?.finish)
             if (nudge !== undefined) {
               if (stalls >= MAX_STALLS || continuations >= maxContinues) {
@@ -640,8 +644,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               if (text.trim() !== "") answers.push(text)
               continuations += 1
               offer({ type: "turn", sessionId, phase: "continuing", reason: nudge })
-              callsAtNudge = continuationState.toolCalls
-              errorAtNudge = continuationState.lastToolError
+              successesAtNudge = new Map(continuationState.successfulCalls)
+              failedToolsAtNudge = new Set(continuationState.toolErrors.keys())
               state.idle = false
               state.retry = undefined
               state.sessionError = undefined

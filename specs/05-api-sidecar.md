@@ -1,5 +1,14 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Assistant worker cancellation and export responsiveness (2026-11-02)
+
+Owner-requested performance scope is recorded in spec 23. WP4 export solid acquisition now awaits the
+scoped pure kernel worker; file storage, authorization and current-verification checks stay in the
+existing adapters. Existing heavy AI handler calls inherit immutable invocation cancellation, including
+older handler signatures without an explicit signal. The optional internal export-handler signal is
+additive; HTTP/action schemas and generated clients are unchanged. Regenerate the API reference and run
+AI/sidecar/desktop checks plus focused bridge/export and drawing-binding regressions.
+
 ## Mobile production costs parity (2026-10-25)
 
 Owner-requested WP13/WP4 scope is recorded in spec 13. Before exposing the existing production-cost routes to paired devices, WP4 fixes awaited visibility selection in `ProductionCostRepo.materialCostFor` / `toolWearFor`, rejects inaccessible material/tool references on cost creation, and refuses inaccessible operation-cost references when saving an estimate. These preserve the existing HTTP shapes and 404 access-denied behavior; no database migration or new endpoint is required. Regression coverage includes separate accounts and real pinned-gateway phone writes read back through desktop HTTP. Cost mutation notifications use the existing `resources.changed` host event.

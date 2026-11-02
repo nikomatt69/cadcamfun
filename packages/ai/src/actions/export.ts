@@ -5,19 +5,15 @@
  * carries the bytes, so a large mesh cannot swamp the context, and never an absolute path.
  */
 import type { CadExportInput, CamExportInput, ExportedFile } from "@cadcamfun/api"
-import { brep, cam, exchange, meshTopology, rebuildExact } from "@cadcamfun/core"
+import { cam } from "@cadcamfun/core"
 import { createHash } from "node:crypto"
-import { EXACT_ACTION_BUDGET_MS, decodeHistory } from "../parametric.ts"
+import { runKernelJob } from "../kernel-job.ts"
+import type { ExportBody as Body } from "./export-kernel.ts"
 import type { ActionContext } from "./action.ts"
+export { closedMesh, encodeMesh, type BodyMesh } from "./export-kernel.ts"
 
 type Rec = Record<string, unknown>
-type MeshFormat = "stl" | "stl_ascii" | "obj" | "3mf"
-type LengthUnit = NonNullable<CadExportInput["unit"]>
-
-const round = (x: number, d = 4): number => Math.round(x * 10 ** d) / 10 ** d
 const fail = (error: string, extra: Rec = {}) => ({ ok: false as const, error, ...extra })
-
-interface Body { readonly id: string; readonly name: string; readonly brep: brep.Brep }
 
 /** What a file is called on disk and served as: the extension follows the format, never the model's input. */
 const FORMATS: Readonly<Record<string, { readonly extension: string; readonly mime: string }>> = {
@@ -33,62 +29,9 @@ const MIME_TEXT = "text/plain"
 
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
-/** One binary or text file from named meshes. STL cannot hold several objects, so the meshes are joined into one. */
-export const encodeMesh = (format: MeshFormat, meshes: ReadonlyArray<exchange.NamedMesh>, name: string, unit: LengthUnit = "millimeter"): Uint8Array => {
-  if (format === "3mf") return exchange.write3mf(meshes, { unit })
-  if (format === "obj") return new TextEncoder().encode(exchange.writeObj(meshes))
-  const positions: number[] = [], indices: number[] = []
-  for (const { mesh } of meshes) {
-    const base = positions.length / 3
-    for (const v of mesh.positions) positions.push(v)
-    for (const i of mesh.indices) indices.push(i + base)
-  }
-  const joined = { positions: Float64Array.from(positions), indices: Uint32Array.from(indices) }
-  return format === "stl_ascii" ? new TextEncoder().encode(exchange.writeStlAscii(joined, name)) : exchange.writeStl(joined, name)
-}
-
-/** Chord tolerances tried in turn when the kernel's own tessellation leaves a crack between two faces (mm). */
-const CHORD_LADDER: ReadonlyArray<number | undefined> = [undefined, 0.01, 0.005, 0.02, 0.05]
-
-export interface BodyMesh {
-  readonly mesh: exchange.MeshData
-  /** The chord tolerance that gave a closed mesh, mm; absent when the kernel's default did. */
-  readonly tolerance?: number
-  /** Triangles split where one face sampled a shared edge more finely than its neighbour (a T-junction); the geometry does not move. */
-  readonly tJunctions?: number
-  /** Present when no tolerance closed the mesh and the cracks were filled: what was repaired. */
-  readonly repaired?: { readonly filledHoles: number; readonly filledTriangles: number; readonly remaining: ReadonlyArray<string> }
-}
-
-/**
- * The watertight mesh of an exact body. A tolerance the caller asked for is used as it is; otherwise the kernel's default is tried
- * first and, when it leaves a crack between two faces, the T-junctions are split, then a ladder of other tolerances is tried (each with the
- * same split), and as a last resort the cracks are filled.
- * Whatever was changed is returned, never hidden: a mesh that is still open says so in `remaining`.
- */
-export const closedMesh = (body: brep.Brep, tolerance?: number): BodyMesh => {
-  const ladder = tolerance !== undefined ? [tolerance] : CHORD_LADDER
-  let first: exchange.MeshData | undefined
-  for (const chordTol of ladder) {
-    const mesh = exchange.brepMesh(body, chordTol === undefined ? {} : { chordTol })
-    first ??= mesh
-    const used = chordTol !== undefined && tolerance === undefined ? { tolerance: chordTol } : {}
-    if (meshTopology(mesh).solid) return { mesh, ...used }
-    // Two faces that sample their shared edge differently leave a crack the geometry does not have: split the triangle that runs past.
-    const joined = exchange.closeByTJunctions(mesh)
-    if (joined.closed) return { mesh: joined.mesh, ...used, tJunctions: joined.splitEdges }
-  }
-  const fixed = exchange.repairMesh(first!, { maxHoleEdges: 64 })
-  return { mesh: fixed.mesh, repaired: { filledHoles: fixed.report.defects.filledHoles, filledTriangles: fixed.report.defects.filledTriangles, remaining: fixed.report.remaining } }
-}
-
-const meshStats = (meshes: ReadonlyArray<exchange.NamedMesh>) => meshes.map(({ name, mesh }) => {
-  const t = meshTopology(mesh)
-  return { name, triangles: t.triangles, solid: t.solid, volumeMm3: round(t.volume, 3) }
-})
-
 /** Hands the bytes to the host and shapes its answer; a host that stores nothing says so instead of pretending. */
 const store = async (context: ActionContext, stem: string, format: string, bytes: Uint8Array, extension?: string): Promise<{ ok: true; file: ExportedFile } | ReturnType<typeof fail>> => {
+  context.signal?.throwIfAborted()
   if (context.handlers.saveFile === undefined) return fail("File export is unavailable in this host: nothing was written.")
   const spec = FORMATS[format]
   const ext = extension ?? spec?.extension ?? "bin"
@@ -103,52 +46,27 @@ const stemOf = (given: string | undefined, fallback: string): string => given ??
 
 export const bodiesOf = async (input: { readonly ids?: ReadonlyArray<string> | undefined; readonly history?: Record<string, unknown> | undefined }, context: ActionContext): Promise<{ readonly bodies: ReadonlyArray<Body>; readonly warnings: ReadonlyArray<string> } | ReturnType<typeof fail>> => {
   if (input.history !== undefined && input.ids !== undefined) return fail("Send ids (elements of the drawing) or history (a part sent inline), not both.")
-  if (input.history !== undefined) {
-    const decoded = decodeHistory(input.history)
-    if (!decoded.success) return fail("The history is not a valid parametric history.")
-    const history = decoded.data
-    const exact = brep.withBudget(EXACT_ACTION_BUDGET_MS, () => rebuildExact(history))
-    const bodies = exact.bodies.filter((b) => b.brep !== undefined).map((b) => ({ id: b.id, name: b.id, brep: b.brep! }))
-    const missing = exact.bodies.filter((b) => b.brep === undefined).map((b) => b.id)
-    if (bodies.length === 0) return fail("No body of the history has an exact model to export.", { reasons: missing })
-    return { bodies, warnings: missing.length > 0 ? [`Bodies without an exact model were left out: ${missing.join(", ")}.`] : [] }
-  }
+  if (input.history !== undefined) return runKernelJob("cad-export-bodies", { history: input.history }, { signal: context.signal })
   if (context.handlers.cadExportBodies === undefined) return fail("The exact solids of the drawing are unavailable in this host.")
-  const got = await context.handlers.cadExportBodies(context.projectId, input.ids)
+  const got = await context.handlers.cadExportBodies(context.projectId, input.ids, context.signal)
   if (!got.ok) return fail(got.error, { ...(got.skipped !== undefined ? { skipped: got.skipped } : {}), ...(got.missing !== undefined ? { missing: got.missing } : {}) })
   return { bodies: got.bodies, warnings: got.skipped.length > 0 ? [`Elements without an exact solid were left out: ${got.skipped.join(", ")}.`] : [] }
 }
 
-/** The kernel's long loops stop at the deadline `withBudget` sets, which only covers synchronous work: meshing and writing stay inside it, storing is awaited outside. */
-const render = (input: CadExportInput, bodies: ReadonlyArray<Body>, stem: string) => brep.withBudget(EXACT_ACTION_BUDGET_MS, () => {
-  if (input.format === "step" || input.format === "iges") {
-    const parts = bodies.map(({ name, brep: b }) => ({ name, brep: b }))
-    const text = input.format === "step" ? brep.writeStepBreps(parts) : brep.writeIgesBreps(parts)
-    return { bytes: new TextEncoder().encode(text), stats: bodies.map((b) => ({ name: b.name })), open: [] as string[], notes: [] as string[] }
-  }
-  const made = bodies.map((b) => ({ name: b.name, ...closedMesh(b.brep, input.tolerance) }))
-  const meshes = made.map((m) => ({ name: m.name, mesh: m.mesh }))
-  const stats = meshStats(meshes).map((s, k) => ({ ...s, ...(made[k]!.tolerance !== undefined ? { chordTolMm: made[k]!.tolerance } : {}), ...(made[k]!.tJunctions !== undefined ? { tJunctionsSplit: made[k]!.tJunctions } : {}), ...(made[k]!.repaired !== undefined ? { repaired: made[k]!.repaired } : {}) }))
-  const notes = made.flatMap((m) => [
-    ...(m.tolerance !== undefined ? [`${m.name}: the default tessellation left a crack between two faces; meshed at ${m.tolerance} mm chord tolerance instead.`] : []),
-    ...(m.tJunctions !== undefined ? [`${m.name}: two faces sampled a shared edge differently; ${m.tJunctions} triangle edge(s) were split to close it (no vertex moved).`] : []),
-    ...(m.repaired !== undefined ? [`${m.name}: no tolerance closed the mesh; ${m.repaired.filledHoles} cracks (${m.repaired.filledTriangles} triangles) were filled.`] : [])
-  ])
-  return { bytes: encodeMesh(input.format, meshes, stem, input.unit), stats, open: stats.filter((s) => !("solid" in s) || !s.solid).map((s) => s.name), notes }
-})
-
 export const runCadExport = async (input: CadExportInput, context: ActionContext): Promise<unknown> => {
   try {
-    const got = await bodiesOf(input, context)
-    if ("ok" in got) return got
-    const { bodies, warnings } = got
-    const stem = stemOf(input.name, bodies.length === 1 ? bodies[0]!.name.replace(/[^A-Za-z0-9._\-()]+/g, "_") || "part" : "parts")
-    const made = render(input, bodies, stem)
+    if (input.history !== undefined && input.ids !== undefined) return fail("Send ids (elements of the drawing) or history (a part sent inline), not both.")
+    const source = input.history !== undefined ? undefined : await bodiesOf(input, context)
+    if (source !== undefined && "ok" in source) return source
+    const made = await runKernelJob("cad-export", { input, ...(source !== undefined ? { source } : {}) }, { signal: context.signal })
+    if (!made.ok) return made
+    context.signal?.throwIfAborted()
+    const stem = made.stem
     const saved = await store(context, stem, input.format, made.bytes)
     if (!saved.ok) return saved
     return {
       ok: true, format: input.format, file: saved.file, bodies: made.stats, ...(input.format === "step" || input.format === "iges" ? {} : { unit: input.format === "3mf" ? input.unit ?? "millimeter" : "millimeter" }),
-      warnings: [...warnings, ...made.notes, ...(made.open.length > 0 ? [`Not a closed manifold after meshing (a slicer may refuse it): ${made.open.join(", ")}.`] : [])]
+      warnings: made.warnings
     }
   } catch (cause) {
     return fail(cause instanceof Error ? cause.message : String(cause))
@@ -174,21 +92,14 @@ const runCamStock = async (input: CamExportInput, context: ActionContext): Promi
   if (context.handlers.operationStock === undefined) return fail("The verified stock is unavailable in this host.")
   const got = await context.handlers.operationStock(context.projectId, input.operationId)
   if (!got.ok) return fail(got.error)
-  let mesh: cam.verify.StockMesh
-  try { mesh = cam.verify.stockMeshFromPreview(got.preview, { floor: got.floor }) } catch (cause) { return fail(cause instanceof Error ? cause.message : String(cause)) }
-  const format = input.format ?? "stl"
-  const name = `stock-${input.operationId.slice(0, 8)}`
-  const meshes = [{ name, mesh: { positions: mesh.positions, indices: mesh.indices } }]
-  const stats = meshStats(meshes)
-  const saved = await store(context, stemOf(input.name, name), format, encodeMesh(format, meshes, name, input.unit))
+  const made = await runKernelJob("cam-export-stock", { input, preview: got.preview, floor: got.floor }, { signal: context.signal })
+  if (!made.ok) return made
+  context.signal?.throwIfAborted()
+  const saved = await store(context, stemOf(input.name, made.name), made.format, made.bytes)
   if (!saved.ok) return saved
   return {
-    ok: true, format, file: saved.file, operationId: input.operationId, bodies: stats,
-    cellMm: round(Math.max(mesh.cellX, mesh.cellY)), thinCells: mesh.thinCells, programHash: got.programHash,
-    warnings: [
-      `The stock is the height field of the verified program at ${round(Math.max(mesh.cellX, mesh.cellY))} mm cells: faceted, and it cannot hold an undercut.`,
-      ...(mesh.thinCells > 0 ? [`${mesh.thinCells} cells have no material above the floor (a cut through the stock): they have no thickness in the mesh.`] : [])
-    ]
+    ok: true, format: made.format, file: saved.file, operationId: input.operationId, bodies: made.stats,
+    cellMm: made.cellMm, thinCells: made.thinCells, programHash: got.programHash, warnings: made.warnings
   }
 }
 

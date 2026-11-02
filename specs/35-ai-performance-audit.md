@@ -1,5 +1,158 @@
 # 35 — AI performance audit: why it was fast, why it is slow, and the improvement plan
 
+## 2026-11-02 re-audit (current findings; earlier sections are historical)
+
+Status: implementation in progress following the owner's request for a coherent, responsive long-running
+CAD/CAM agent. The 2026-10-20 verdict below must not be treated as a description of the current tree.
+Source inspection confirms that primaries now have 25-step run budgets, ordinary automatic continuations
+are capped at eight, schemas are deferred except `cad` and `agent`, date-only environment text and separate
+editor observations stabilize context, status reads use a bounded snapshot, and many kernel paths already
+use scoped workers. Disabling these safeguards or rebuilding the host is not the proposed remedy.
+
+### Verified defects addressed in this increment
+
+1. `packages/ai/src/nikcli/chat.ts` renewed a spent run budget only while the UI subscriber was connected.
+   The host event monitor remained active after disconnect, but its next budget renewal returned early,
+   leaving the long task stopped. Renewal now follows the host controller, preserving explicit cancellation
+   while allowing detached progress. The regression checks that the next prompt continues the saved work
+   instead of replaying the original request.
+2. `apps/desktop/src/features/ai/lib/stream.ts` counted failed reconnections using lifetime greetings.
+   After one healthy connection, later failures never incremented the counter. A per-connection greeting
+   flag now bounds consecutive failures and retains backoff.
+3. `apps/desktop/src/features/ai/store/following.ts` captured editor ownership on every remote event.
+   Ownership is now frozen at remote-turn admission, before asynchronous history loading; navigation
+   invalidates it through the existing editor-generation check.
+4. The same follower discarded the journal's reset flag. It now starts coalesced authoritative drawing
+   reconciliation on a gap, preserves the active response, and repairs partial history at completion before
+   releasing queued work. It does not replace the active transcript mid-stream.
+5. A new session's follower previously waited behind the previous session's pending history read. A new
+   epoch now starts a new event chain; post-await checks prevent old work changing the new follower state.
+
+### Latency evidence and limits
+
+- Current text corpus: base system 12,877 characters; all tool descriptions 35,874; all on-demand skill
+  bodies 109,115; 126 catalogue actions across 16 exposed tools. These are corpus sizes, **not** the request payload: deferred tool loading and skills
+  mean the entire corpus is not sent on every step. JSON schemas, history and images are additional.
+- Auto routes registered catalogue calls, including reads, through native classification
+  (`permission-modes.ts`). The installed SDK's `SessionAutoMode.classify` sends a stage-one request and,
+  unless allowed there, a second request. It also constructs transcript context for classification. This
+  proves additional serial work in Auto, not that Auto explains every user's pause. Ask is the desktop
+  default; the user reports the symptom generally, without a specific mode/provider.
+- The pinned SDK's classifier model falls back to the conversation model when not configured. Thus a
+  slow main model can also be used to review actions. Changing review routing requires scoped policy and
+  provider tests; do not remove checks to improve a benchmark.
+- Exact naming (`actions/cad-kernel-naming.ts`) and inline-history export/meshing (`actions/export.ts`)
+  performed synchronous exact geometry on the sidecar event loop. Naming is now moved to the existing
+  scoped `cad-naming` worker job, with invocation cancellation, content-keyed reuse and byte-accounted
+  cached reports. Health, reference listing and resolution retain the same pure implementation and
+  outputs. Export/meshing and scene-to-solid acquisition now also use the scoped worker seam (see continuation below).
+  The 60-second build budget is a ceiling, **not** a measured stall.
+- The first host remains demand-loaded deliberately (spec 23). Its cold import can stall the event loop;
+  blindly enabling warm-up would move that stall into startup rather than isolate it.
+
+New metrics in `packages/ai/src/observability.ts` record first model/tool activity, time from the last
+primary tool result to next model/tool activity, observed call-to-result duration (including permissions),
+and loop transitions. Parallel tools and specialist activity are kept out of the primary gap calculation.
+These stream-level measurements do not isolate provider TTFT, classifier time, queue time or native
+event-loop delay. They also do not observe detached execution after their consumer disconnects. The additional
+host-owned operation timing described below does cover detached permission and execution phases. No prompts,
+arguments, results or session identifiers are added as metric labels.
+
+### Remaining architecture work, in dependency order
+
+1. **Module: turn execution.** Keep session ownership, cancellation and finalization behind its existing
+   interface. Host-owned permission/execution timing and completed-call progress evidence are now implemented.
+   Complete provider-request timing only through a supported request lifecycle seam; none was found in the pinned
+   public host hooks. This improves locality and makes the same seam testable through both desktop
+   and mobile adapters without duplicating loop policy.
+2. **Module: exact kernel jobs.** Naming and export now use the worker seam. Remaining synchronous parametric
+   validation, recipe reporting, exact inspection and project parameter/timeline rebuilds still need that
+   interface. Keep authorization and
+   persistence in their current adapter; verify identical geometry and errors, cancellation releasing slots,
+   and compiled-sidecar packaging. The existing sidecar worker calls now inherit immutable invocation cancellation.
+   This gives UI responsiveness leverage without changing geometry contracts.
+3. **Module: conversation following.** The reconnect/reset fixes use the existing interface. A future
+   authoritative snapshot merge must repair active history without replacing live bubbles, preserve local
+   edits and make failed reconciliation visible/retryable. Tests must include navigation during history reads,
+   out-of-order completion, journal overflow and queued local sends.
+4. Measure representative short and long tasks with real configured providers: per-stage p50/p95, model-call
+   count, cache use, tool/queue time and sidecar event-loop delay. Compare Auto/Ask/Approve with identical
+   geometry and permissions appropriate to each mode. Fake-provider fixtures prove wiring and policies,
+   not model quality or production speed. No percentage speedup is established by this increment.
+
+The goal remains active until the broader owner-requested architecture and performance work is verified.
+
+### Verification of the first increment
+
+- Loop/metrics/background scheduler and runner: 34 tests pass.
+- Desktop mounted agent panel, editor sync and follower regressions: 15 tests pass.
+- Real embedded host with a simulated provider, Auto permission path: 1 test passes. Initial execution
+  required loopback-listen permission; the successful run also emitted optional provider-discovery warnings.
+- Kernel jobs and naming contracts: 31 tests pass, including worker/inline equality for health/refs/resolve,
+  event-loop heartbeat during a cancellable naming job, queue/caching and shutdown behavior.
+- AI, sidecar and desktop typechecks pass; API reference generation reports 332 operations and is unchanged.
+- Production-patched sidecar compilation succeeds. A fresh temporary project invokes `cad.kernel` health
+  through the compiled HTTP action interface and receives `ok: true` with one body from its embedded worker.
+- Full-repository tests, native WebKit acceptance and real-provider latency benchmarks were not run.
+
+### Continuation: exports, progress evidence and host timing
+
+- CAD inline-history export rebuilds and encodes in one pure worker job. Exporting saved elements acquires
+  exact solids in `cad-export-scene` before worker encoding. Verified CAM stock meshing/encoding uses
+  `cam-export-stock`. Authorization, current verification checks and file persistence remain in the action
+  and sidecar adapters. Files are never stored after a cancelled worker; formats, units, mesh-repair notes
+  and SHA-256 receipts are preserved. Exact-body reads can reuse byte-accounted content-keyed results;
+  encoded export bytes are not cached. Existing callers of `closedMesh` and `encodeMesh` remain compatible.
+- Every `runOwnedKernelJob` in the existing sidecar AI adapter defaults to the admitted invocation's signal.
+  A regression starts a real exact-analysis worker through an older handler with no signal argument,
+  then cancels its invocation and verifies cancellation and an unchanged stored drawing.
+- Budget renewal now requires confirmed completed calls rather than started calls. Automatic recovery uses
+  completed-call identities rather than a numeric snapshot count or the wording of the latest error.
+  Alternating failures and unrelated successful reads do not keep a failed edit alive indefinitely;
+  confirmed edits and partial committed mutations still count as progress. Detached bounded snapshots
+  retain identity-based progress even when their visible call count stays constant.
+- Native registration records separate `permission` and `execution` durations on the owning Effect v4
+  context, even without a UI subscriber. Permission includes classifier, cached approval and human wait;
+  it is not a claim of pure classifier latency. Measurement failure preserves the original tool result
+  or error. Labels contain tool/mode/phase/outcome, never arguments, credentials, URLs or session ids.
+- The pinned host exposes a pre-request `chat.params` hook but no supported complete-response hook suitable
+  for exact provider TTFT or full streaming request duration. No global fetch interception was introduced.
+- Returning A → B → A while a drawing read is pending now transfers coalesced reconciliation to the valid
+  current editor generation. Reset recovery retries transient drawing-read failures at most twice, cancels
+  delayed retries on navigation/disposal, and logs an exhausted recovery through the app's Effect runtime.
+- The unused native share-sync subsystem is now explicitly disabled at host isolation. The existing
+  `share: disabled` configuration denied publishing while still installing listeners and deferred DB reads;
+  a local probe exposed those reads after teardown. `NIKCLI_DISABLE_SHARE=1` prevents the unused listeners.
+
+Controlled embedded-host probe, 120 ms added before every loopback simulated-provider response, two
+identical read tool calls followed by a final answer, host warmed before measurement:
+Approve made three primary requests, no classifier request, 673 ms total; Auto made the same three primary
+requests plus two classifier requests, 917 ms; Ask made three primary requests with two immediately
+automated permission replies, 629 ms. Thus this Auto fixture adds exactly two serial provider requests;
+its roughly 244 ms excess over Approve matches the injected 240 ms. These are a local mechanism check,
+not production speed or quality measurements. Real human approval time is deliberately absent from the
+Ask fixture, and a stage-two classifier review may add more requests than this stage-one-allow case.
+
+The first broad AI run executed 1,266 tests: 1,262 passed and four failed. The failures were an unscoped
+metric-series test query, an overly strict heartbeat ordering assertion, generated inventory line drift,
+and an export scene fixture missing canonical history defaults. Each was corrected and checked in focus;
+the final broad verification is recorded after it finishes. The actual heartbeat implementation was not
+changed: a concurrently queued heartbeat can drain after the last data value while completion still
+follows the source, so the test now checks preserved data ordering and termination.
+
+Final verification of this continuation:
+
+- Complete AI suite: **1,266 passed, zero failed**, across 118 files (155.26 s); this includes native host,
+  isolation, permissions, tools, goals, recovery, worker queues/cancellation and prompt/inventory checks.
+- Desktop mounted agent, streamed-burst performance, follower and editor-sync suite: **19 passed**.
+- Sidecar export bridge and invocation/drawing-binding suite: **14 passed**.
+- AI/sidecar/desktop typechecks pass; generated API reference remains unchanged. The harness inventory
+  was regenerated from its existing script because implementation line numbers moved.
+- Production-patched compilation passes. The compiled HTTP smoke validates exact naming, inline-history
+  STL export (12,000 mm³), saved-drawing STEP export and matching on-disk file byte counts/SHA-256 receipts.
+- The broader remaining parametric offload and real-provider latency work above remain open. No native
+  WebKit, full-repository or production-provider benchmark success is implied by these checks.
+
 Status: audit (analysis only, no runtime change shipped by this document). Date: 2026-10-20.
 Scope: `packages/ai`, `apps/sidecar/src/services/ai*.ts`, `apps/sidecar/src/http/ai.ts`,
 `apps/desktop/src/features/ai`. Method: full source read of the turn path, measured sizes

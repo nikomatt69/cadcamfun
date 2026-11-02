@@ -77,6 +77,19 @@ describe("everything the agent does is visible", () => {
 })
 
 describe("tool output diagnostics", () => {
+  test("progress requires a completed success or a confirmed partial mutation, not call starts or changed failures", () => {
+    const state = newMapperState()
+    const update = (callID: string, status: string, output?: unknown) => map(state, part({ type: "tool", callID, tool: "cad_edit", state: { status, input: {}, ...(output !== undefined ? { output: JSON.stringify(output) } : {}) } }))
+    update("running", "running")
+    update("failed", "completed", { ok: false, error: "first failure" })
+    update("changed-failure", "completed", { ok: false, error: "another failure" })
+    expect(state.successfulCalls.size).toBe(0)
+    update("partial", "completed", { ok: false, error: "one skipped", skipped: ["locked"], mutationApplied: true })
+    update("success", "completed", { ok: true })
+    update("success", "completed", { ok: true })
+    expect([...state.successfulCalls]).toEqual([["partial", "cad_edit"], ["success", "cad_edit"]])
+  })
+
   test("a later successful read does not erase a failed CAD mutation", () => {
     const state = newMapperState()
     const result = (callID: string, tool: string, output: unknown) => map(state, part({ type: "tool", callID, tool, state: { status: "completed", input: {}, output: JSON.stringify(output) } }))

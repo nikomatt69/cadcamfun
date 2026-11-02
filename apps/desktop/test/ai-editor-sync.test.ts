@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { resetStores } from "./helpers/reset-stores.ts"
-import { applyOps, mirrorToolResult, opsFor } from "../src/features/ai/lib/editor-sync.ts"
+import { applyOps, captureEditorOwner, mirrorToolResult, opsFor, reconcileCoalesced } from "../src/features/ai/lib/editor-sync.ts"
+import { useDocumentStore } from "../src/features/cad/store/documentStore.ts"
+import { Effect } from "effect"
 import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
 import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
 import { useCADStore } from "../src/features/cad/store/cadStore.ts"
@@ -8,6 +10,30 @@ import { plateTemplate } from "@cadcamfun/core"
 
 const json = (value: unknown) => JSON.stringify(value)
 const cube = { id: "e1", type: "cube", layerId: "default", x: 1, y: 2, z: 3, width: 10, height: 10, depth: 10 }
+
+test("returning to a drawing during an old read still reconciles the new editor generation", async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  let reads = 0
+  const app = {
+    client: { drawings: { get: () => {
+      reads++
+      return reads === 1
+        ? Effect.promise(async () => { await gate; return { data: { elements: [{ ...cube, id: "obsolete" }] } } })
+        : Effect.succeed({ data: { elements: [{ ...cube, id: "current" }] } })
+    } } },
+    runtime: { run: Effect.runPromise }
+  } as unknown as Parameters<typeof reconcileCoalesced>[0]
+  useDocumentStore.getState().setDocument({ projectId: "project", drawingId: "drawing" })
+  const first = reconcileCoalesced(app, captureEditorOwner())
+  useDocumentStore.getState().setDocument({ projectId: "project", drawingId: "other" })
+  useDocumentStore.getState().setDocument({ projectId: "project", drawingId: "drawing" })
+  const current = reconcileCoalesced(app, captureEditorOwner())
+  release()
+  await Promise.all([first, current])
+  expect(reads).toBe(2)
+  expect(useElementsStore.getState().elements.map((element) => element.id)).toEqual(["current"])
+})
 
 beforeEach(() => {
   for (const element of [...useElementsStore.getState().elements]) useElementsStore.getState().deleteElement(element.id)

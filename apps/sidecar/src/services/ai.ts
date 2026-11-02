@@ -134,11 +134,16 @@ const toolHandlers = Effect.gen(function*() {
   const liveEvents = yield* LiveEvents
   /** The account of the chat turn that called a tool (the local profile until one has). */
   const acting = () => actingCell.get(local)
+  /** Every heavy tool call belongs to the admitted invocation, including older handlers without a signal parameter. */
+  const runOwnedKernelJob: typeof runKernelJob = (name, input, options = {}) => {
+    const signal = options.signal ?? actingCell.turn(local).signal
+    return runKernelJob(name, input, { ...options, ...(signal !== undefined ? { signal } : {}) })
+  }
   /** Runs the kernel in its worker, announcing the run on the project's live stream (desktop and phone follow the same progress). */
   const manufactureRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-manufacture">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
     const report = camProgressReporter(liveEvents, projectId, runId)
-    const result = await runKernelJob("cam-manufacture", job, { ...(signal !== undefined ? { signal } : {}), onProgress: report }).catch(cancelled)
+    const result = await runOwnedKernelJob("cam-manufacture", job, { ...(signal !== undefined ? { signal } : {}), onProgress: report }).catch(cancelled)
     report(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
     return result
   }
@@ -355,7 +360,7 @@ const toolHandlers = Effect.gen(function*() {
         depth: -request.profile[request.profile.length - 1]!.z, stepdown: request.stepdown ?? 4,
         rpm: request.rpm ?? 800, feedrate: (request.feedMmRev ?? 0.2) * Math.round(request.rpm ?? 800), noseRadius: 0, latheZero: "face"
       }))
-      const { program } = await runKernelJob("cam-parse", { gcode: plan.nc, name: "Program" })
+      const { program } = await runOwnedKernelJob("cam-parse", { gcode: plan.nc, name: "Program" })
       const document = Schema.decodeUnknownSync(CamProgramDocument)({
         format: "cadcamfun-cam", version: 1, gcode: plan.nc, program,
         settings, printer: decodePrinter({}),
@@ -382,7 +387,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!built.ok) return { ...built, ...where(loaded) }
       const { job, stockNote } = built
       if (input.planOnly === true) {
-        const plan = await runKernelJob("cam-plan", job, signal === undefined ? {} : { signal }).catch(cancelled)
+        const plan = await runOwnedKernelJob("cam-plan", job, signal === undefined ? {} : { signal }).catch(cancelled)
         return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, error: "The kernel could not plan this job; see issues.", issues: plan.issues, ...where(loaded) }
       }
       const run = await manufactureRun(projectId, job, signal)
@@ -459,7 +464,7 @@ const toolHandlers = Effect.gen(function*() {
             issues.push(...dfm.issues)
           }
           const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: elements, ...(loaded.data["stock"] !== undefined ? { stock: loaded.data["stock"] } : {}) })
-          const generated = issues.some((i) => i.severity === "error") ? undefined : await runKernelJob("cam-generate", { settings, geometry, printer: decodePrinter(split.printer) })
+          const generated = issues.some((i) => i.severity === "error") ? undefined : await runOwnedKernelJob("cam-generate", { settings, geometry, printer: decodePrinter(split.printer) })
           if (generated?.error) issues.push({ severity: "error", code: "GENERATION", message: generated.error })
           for (const message of generated?.response.warnings ?? []) issues.push({ severity: "error", code: "GENERATION_FINDING", message })
           if (generated !== undefined && generated.response.stats.cutLength <= 0) issues.push({ severity: "error", code: "EMPTY_PATH", message: "The proposal produces no cutting moves." })
@@ -640,7 +645,7 @@ const toolHandlers = Effect.gen(function*() {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        return exactForModel(await runKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } }), where(loaded))
+        return exactForModel(await runOwnedKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } }), where(loaded))
       } catch (error) { return kernelFailed("The exact analysis failed", error) }
     },
     cadTitleBlock: async (projectId, input) => {
@@ -682,7 +687,7 @@ const toolHandlers = Effect.gen(function*() {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        return setupsForModel(await runKernelJob("cad-setups", {
+        return setupsForModel(await runOwnedKernelJob("cad-setups", {
           elements: loaded.elements,
           options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.fixture !== undefined ? { fixture: input.fixture } : {}), ...(input.allowed !== undefined ? { allowed: input.allowed } : {}) }
         }), where(loaded))
@@ -692,7 +697,7 @@ const toolHandlers = Effect.gen(function*() {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        return assemblyForModel(await runKernelJob("cad-assembly", { elements: loaded.elements, options: input.washers !== undefined ? { washers: input.washers } : {} }), where(loaded))
+        return assemblyForModel(await runOwnedKernelJob("cad-assembly", { elements: loaded.elements, options: input.washers !== undefined ? { washers: input.washers } : {} }), where(loaded))
       } catch (error) { return kernelFailed("The assembly analysis failed", error) }
     },
     cadShell: async (projectId, input) => {
@@ -742,10 +747,10 @@ const toolHandlers = Effect.gen(function*() {
         }
       } catch (error) { return { ok: false, error: `Fastening failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
-    cadExportBodies: async (projectId, ids) => {
+    cadExportBodies: async (projectId, ids, signal) => {
       { const denied = await refused(projectId); if (denied) return { ok: false as const, error: (denied as { error?: string }).error ?? "Not allowed." } }
       const loaded = await load(projectId)
-      try { return bodiesForExport(loaded.elements, ids) }
+      try { return await bodiesForExport(loaded.elements, ids, signal ?? actingCell.turn(local).signal) }
       catch (error) { return { ok: false as const, error: `The exact solids could not be read: ${error instanceof Error ? error.message : String(error)}` } }
     },
     saveFile: async (projectId, file) => {
@@ -792,7 +797,7 @@ const toolHandlers = Effect.gen(function*() {
       try {
         const edit = featureEditOf(input)
         if (typeof edit === "string") return { ok: false, error: edit }
-        const report = await runKernelJob("cad-hole", { elements: loaded.elements, edit })
+        const report = await runOwnedKernelJob("cad-hole", { elements: loaded.elements, edit })
         return { ...report, ...where(loaded) }
       }
       catch (error) { return kernelFailed("The hole edit failed", error) }
@@ -859,7 +864,7 @@ const toolHandlers = Effect.gen(function*() {
         const camContext = capture.context["cam"] as { selectedOperationId?: unknown; toolpaths?: unknown } | undefined
         const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await run(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
         const programError = camContext?.selectedOperationId && mode === "cam" && (!selected || selected.row.drawingId !== loaded.id || !selected.row.gcode) ? "The selected CAM operation has no saved program in the active drawing." : undefined
-        const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText((await runKernelJob("cam-parse", { gcode: selected.row.gcode, name: "Program" })).program)).digest("hex") : undefined
+        const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText((await runOwnedKernelJob("cam-parse", { gcode: selected.row.gcode, name: "Program" })).program)).digest("hex") : undefined
         // The toolpaths of the program on screen: what the capture draws, in the model's words.
         const shownToolpaths = mode === "cam" && Array.isArray(camContext?.toolpaths) ? camContext.toolpaths : undefined
         return {
@@ -1152,11 +1157,11 @@ const toolHandlers = Effect.gen(function*() {
           if (tool?.maxRPM && settings.rpm > tool.maxRPM) { results.push({ name: candidate.name, ok: false, error: `Requested RPM ${settings.rpm} exceeds the cutter limit ${tool.maxRPM}.` }); continue }
           if (material && candidate.params["material"] === undefined) { results.push({ name: candidate.name, ok: false, error: "Specify params.material as the verified generator cutting family for this library material; the name alone is not a physical mapping." }); continue }
           const request = { settings, geometry }
-          const generated = await runKernelJob("cam-generate", request as never)
+          const generated = await runOwnedKernelJob("cam-generate", request as never)
           if (generated.error) { results.push({ name: candidate.name, ok: false, error: generated.error }); continue }
           const built = cam.verify.verifyRequestFor(request as never, generated.response.gcode, { tool: { ...(tool?.cuttingLength ? { cuttingLength: tool.cuttingLength } : {}), ...(tool?.shankDiameter ? { shankDiameter: tool.shankDiameter } : {}) } })
           if (!built.ok) { results.push({ name: candidate.name, ok: false, error: built.error }); continue }
-          const report = await runKernelJob("cam-verify", built.request)
+          const report = await runOwnedKernelJob("cam-verify", built.request)
           const suggestions = cam.generator.suggestFor(settings, geometry)
           results.push({ name: candidate.name, ok: report.ok, settings, sources: { tool: tool ? { id: tool.id, name: tool.name, diameter: tool.diameter, type: tool.type, material: tool.material, flutes: tool.numberOfFlutes, maxRPM: tool.maxRPM, cuttingLength: tool.cuttingLength, shankDiameter: tool.shankDiameter } : null, material: material ? { id: material.id, name: material.name, properties: material.properties } : null }, suggestions, generation: generated.response.stats, verification: { ok: report.ok, stats: report.stats, issues: report.issues.slice(0, 20) } })
         } catch { results.push({ name: candidate.name, ok: false, error: "Candidate settings could not be validated or calculated." }) }
@@ -1167,7 +1172,7 @@ const toolHandlers = Effect.gen(function*() {
       await assertWrite(drawingId)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { gcode: "", stats: { error: found.error } }
-      const { response, error } = await runKernelJob("cam-generate", found.request as never).catch((cause: unknown) => ({ response: undefined, error: kernelFailed("Generation failed", cause).error }))
+      const { response, error } = await runOwnedKernelJob("cam-generate", found.request as never).catch((cause: unknown) => ({ response: undefined, error: kernelFailed("Generation failed", cause).error }))
       if (error || response === undefined) return { gcode: "", stats: { error: error ?? "Generation failed" } }
       await assertWrite(drawingId)
       const previous = record((await run(toolpaths.find(acting().id, found.id)))?.row.data)
@@ -1233,7 +1238,7 @@ const toolHandlers = Effect.gen(function*() {
         ...(options.start !== undefined ? { start: options.start } : {})
       })
       if (!built.ok) return { ok: false, error: built.error, operationId }
-      const report = await runKernelJob("cam-verify", built.request)
+      const report = await runOwnedKernelJob("cam-verify", built.request)
       const modelled = { holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined, fixtures: built.request.fixtures.length, target: built.request.target !== undefined }
       const evidence = {
         report, revision, requestRevision, programRevision: identity(program), programHash, modelled,

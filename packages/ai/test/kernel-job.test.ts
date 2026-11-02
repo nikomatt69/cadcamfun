@@ -2,6 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobEffect, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
+import { parseHistory } from "../src/parametric.ts"
 import { Effect, Exit, Fiber, Layer, Schema, Scope } from "effect"
 
 setDefaultTimeout(120_000)
@@ -32,11 +33,49 @@ const heavy = {
 }
 
 describe("kernel jobs in a scoped worker (AI-11 Step 10)", () => {
+  test("export workers preserve exact bodies, encoded bytes and mesh repair evidence", async () => {
+    const elements = [{ id: "part", type: "parametric", name: "Plate", history: parseHistory(plate), x: 0, y: 0, z: 0 }]
+    const sceneInput = { elements, ids: ["part"] }
+    const inlineScene = runKernelJobInline("cad-export-scene", sceneInput)
+    const scene = await runKernelJob("cad-export-scene", sceneInput)
+    expect(scene).toEqual(inlineScene)
+    if (!scene.ok) throw new Error(scene.error)
+    const bodies = await runKernelJob("cad-export-bodies", { history: plate })
+    expect(bodies).toEqual(runKernelJobInline("cad-export-bodies", { history: plate }))
+    for (const format of ["stl", "stl_ascii", "obj", "3mf"] as const) {
+      const inlineInput = { input: { format, history: plate, name: "plate" } }
+      const inline = runKernelJobInline("cad-export", inlineInput)
+      expect(await runKernelJob("cad-export", inlineInput)).toEqual(inline)
+      const drawingInput = { input: { format, name: "plate" }, source: { bodies: scene.bodies, warnings: ["Sketch omitted"] } }
+      expect(await runKernelJob("cad-export", drawingInput)).toEqual(runKernelJobInline("cad-export", drawingInput))
+    }
+    const stock = { input: { kind: "stock" as const, operationId: "op", format: "stl" as const }, floor: 0,
+      preview: { nx: 2, ny: 2, minX: 0, minY: 0, cellX: 5, cellY: 5, minZ: 6, maxZ: 12, heights: [12, 6, 12, 12], gouge: [] } }
+    expect(await runKernelJob("cam-export-stock", stock)).toEqual(runKernelJobInline("cam-export-stock", stock))
+  })
+
   test("the worker path returns exactly what the inline path returns", async () => {
-    for (const [name, input] of [["acceptance", { history: plate, checks }], ["parametric-report", { history: plate }]] as const) {
+    for (const [name, input] of [["acceptance", { history: plate, checks }], ["parametric-report", { history: plate }],
+      ...(["health", "refs", "resolve"] as const).map((op) => ["cad-naming", { history: plate, input: { op, refs: ["face:plate|plate.top"], parameters: { width: 48 } } }] as const)
+    ] as const) {
       const inline = runKernelJobInline(name, input as never)
       const worker = await runKernelJob(name, input as never)
       expect(JSON.parse(JSON.stringify(worker))).toEqual(JSON.parse(JSON.stringify(inline)))
+    }
+  })
+
+  test("exact naming leaves the event loop responsive and cancellation releases its caller", async () => {
+    let beats = 0
+    const heartbeat = setInterval(() => { beats++ }, 5)
+    const controller = new AbortController()
+    const cancel = setTimeout(() => controller.abort(), 40)
+    try {
+      const result = runKernelJob("cad-naming", { input: { op: "health" }, history: heavy as never }, { signal: controller.signal })
+      await expect(result).rejects.toMatchObject({ _tag: "KernelJobError", reason: "cancelled" })
+      expect(beats).toBeGreaterThan(0)
+    } finally {
+      clearInterval(heartbeat)
+      clearTimeout(cancel)
     }
   })
 

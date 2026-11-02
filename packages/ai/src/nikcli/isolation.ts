@@ -129,6 +129,8 @@ export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): 
   NIKCLI_DISABLE_MODELS_FETCH: "1",
   NIKCLI_DISABLE_AUTOUPDATE: "1",
   NIKCLI_DISABLE_ANALYTICS: "1",
+  // `share: disabled` denies publishing but still installs native synchronization listeners; disable that unused subsystem too.
+  NIKCLI_DISABLE_SHARE: "1",
   DO_NOT_TRACK: "1",
   NIKCLI_SKIP_PLUGIN_INSTALL: "1",
   NIKCLI_DISABLE_LSP_DOWNLOAD: "1",

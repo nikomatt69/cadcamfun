@@ -11,8 +11,9 @@
  * acts while the window is idle, so the two never apply one event twice.
  */
 import { batch, type Accessor, type Setter } from "solid-js"
+import { Effect } from "effect"
 import { followSessionEvents } from "../lib/stream.ts"
-import { captureEditorOwner, type EditorOwner } from "../lib/editor-sync.ts"
+import { captureEditorOwner, reconcileCoalesced, type EditorOwner } from "../lib/editor-sync.ts"
 import type { AppState } from "../../../shared/state/context.ts"
 import type { AiActivity, AiEvent, AiMessage } from "../lib/types.ts"
 
@@ -57,10 +58,28 @@ export const createSessionFollower = (ctx: SessionFollowerContext): SessionFollo
   let controller: AbortController | undefined
   let followed: string | undefined
   let remote = false
+  let editorOwner: EditorOwner | undefined
   /** The turn was joined in the middle, or ended while the connection was down: the live view is not the whole story. */
   let partial = false
   let epoch = 0
   let chain: Promise<void> = Promise.resolve()
+  let repair = 0
+  let repairTimer: ReturnType<typeof setTimeout> | undefined
+
+  const recoverDrawing = (owner: EditorOwner): void => {
+    const mine = epoch
+    const version = ++repair
+    clearTimeout(repairTimer)
+    const attempt = (n: number): void => {
+      if (mine !== epoch || version !== repair || ctx.isDisposed() || !owner.current()) return
+      void reconcileCoalesced(ctx.app, owner).catch(() => {
+        if (mine !== epoch || version !== repair || ctx.isDisposed() || !owner.current()) return
+        if (n < 2) repairTimer = setTimeout(() => attempt(n + 1), 500 * 2 ** n)
+        else void ctx.app.runtime.run(Effect.logWarning("Could not reconcile the editor after a session journal reset")).catch(() => undefined)
+      })
+    }
+    attempt(0)
+  }
 
   // Frames are handled one at a time and in order: a turn begins with a read of the host's history.
   const enqueue = (work: () => Promise<void> | void): void => {
@@ -76,11 +95,14 @@ export const createSessionFollower = (ctx: SessionFollowerContext): SessionFollo
    */
   const begin = async (sid: string, joined: boolean, prompted: boolean): Promise<void> => {
     if (remote || ctx.status() !== "idle") return
+    const mine = epoch
     remote = true
+    editorOwner = captureEditorOwner()
     partial = joined
     if (!prompted) {
       // The prompt the other device sent is in the host's copy of the conversation, not in this window's.
       await ctx.refreshHistory(sid)
+      if (mine !== epoch) return
       // Someone started a turn here meanwhile, or left the conversation: that turn owns the window.
       if (!remote || ctx.isDisposed() || ctx.sessionId() !== sid || ctx.status() !== "idle") { remote = false; return }
     }
@@ -99,14 +121,21 @@ export const createSessionFollower = (ctx: SessionFollowerContext): SessionFollo
 
   const end = async (sid: string): Promise<void> => {
     if (!remote) return
+    const mine = epoch
     remote = false
     const active = ctx.activeAssistantId()
     if (active !== undefined) ctx.patchMessage(active, (prev) => prev.status === "streaming" ? { ...prev, status: "done", finishedAt: new Date().toISOString() } : prev)
+    if (partial && ctx.sessionId() === sid) {
+      // History cannot replace a streaming bubble. Repair it before finish dispatches the next queued turn.
+      ctx.setStatus(next())
+      await ctx.refreshHistory(sid)
+      if (mine !== epoch || ctx.sessionId() !== sid || ctx.status() === "connecting" || ctx.status() === "streaming") return
+    }
     ctx.finish(next())
-    if (partial && ctx.sessionId() === sid) await ctx.refreshHistory(sid)
   }
 
   const onEvent = (event: AiEvent): void => enqueue(async () => {
+    const mine = epoch
     const sid = followed
     if (sid === undefined || ctx.sessionId() !== sid) return
     if (!remote) {
@@ -115,20 +144,32 @@ export const createSessionFollower = (ctx: SessionFollowerContext): SessionFollo
       else if (event.type === "turn" && event.phase === "start") await begin(sid, false, false)
       else return
     }
-    if (!remote) return
-    ctx.apply(event, captureEditorOwner())
+    if (mine !== epoch || ctx.sessionId() !== sid || !remote) return
+    if (editorOwner !== undefined) ctx.apply(event, editorOwner)
     if (event.type === "done" || event.type === "error") await end(sid)
   })
 
-  const onConnected = (busy: boolean): void => enqueue(async () => {
+  const onConnected = (busy: boolean, reset: boolean): void => enqueue(async () => {
+    const mine = epoch
     const sid = followed
     if (sid === undefined || ctx.sessionId() !== sid) return
+    if (reset) {
+      partial = true
+      const owner = remote && editorOwner !== undefined ? editorOwner : captureEditorOwner()
+      // A journal gap can hide mutations even while the model is still working; recover geometry without replacing its live bubble.
+      recoverDrawing(owner)
+      if (!remote && !busy && ctx.status() === "idle") await ctx.refreshHistory(sid)
+    }
+    if (mine !== epoch || ctx.sessionId() !== sid) return
     if (busy && !remote) await begin(sid, true, false)
     else if (!busy && remote) { partial = true; await end(sid) }
   })
 
   const stop = (): void => {
     epoch += 1
+    repair += 1
+    clearTimeout(repairTimer)
+    chain = Promise.resolve()
     controller?.abort()
     controller = undefined
     followed = undefined
@@ -146,7 +187,7 @@ export const createSessionFollower = (ctx: SessionFollowerContext): SessionFollo
       void followSessionEvents(ctx.app.client, {
         sessionId,
         signal: mine.signal,
-        onConnected: (frame) => onConnected(frame.busy),
+        onConnected: (frame) => onConnected(frame.busy, frame.reset),
         onEvent
       }).catch(() => undefined)
     },

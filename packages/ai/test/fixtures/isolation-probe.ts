@@ -79,6 +79,7 @@ console.log(
       agentsHaveCadcam: agents.includes("cadcam-build"),
       sharedConfigHasAgents: sharedConfig["agent"] !== undefined,
       envScrubbed: process.env["NIKCLI_DB"] === undefined && process.env["NIKCLI_AUTH_CONTENT"] === undefined,
+      sharingDisabled: process.env["NIKCLI_DISABLE_SHARE"] === "1",
       sentinelDatabase: fs.existsSync(`${fakeHome}/sentinel.db`),
       authHasSentinel: auth.includes("SENTINEL_AUTH_KEY")
     })

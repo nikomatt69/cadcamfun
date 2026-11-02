@@ -65,7 +65,7 @@ export interface ToolHandlersShape {
   /** Inserts the exact screws, washers and nuts the shared holes of the open drawing still need (smart fasteners). */
   cadFasten?(projectId: string, input: { readonly washers?: boolean }): Promise<unknown>
   /** The exact solids of the open drawing (all of them, or `ids`), for export; elements with no exact solid are named in `skipped`. */
-  cadExportBodies?(projectId: string, ids?: ReadonlyArray<string>): Promise<
+  cadExportBodies?(projectId: string, ids?: ReadonlyArray<string>, signal?: AbortSignal): Promise<
     | { readonly ok: true; readonly bodies: ReadonlyArray<{ readonly id: string; readonly name: string; readonly brep: cad.brep.Brep }>; readonly skipped: ReadonlyArray<string> }
     | { readonly ok: false; readonly error: string; readonly skipped?: ReadonlyArray<string>; readonly missing?: ReadonlyArray<string> }
   >

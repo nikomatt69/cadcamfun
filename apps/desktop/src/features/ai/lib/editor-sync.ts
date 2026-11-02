@@ -379,7 +379,7 @@ export async function reconcileFromStored(app: { readonly client: unknown; reado
 }
 
 type ReconcileApp = Parameters<typeof reconcileFromStored>[0]
-const inflight = new Map<string, { again: boolean; done: Promise<void> }>()
+const inflight = new Map<string, { again: boolean; done: Promise<void>; app: ReconcileApp; owner: EditorOwner }>()
 
 /**
  * `reconcileFromStored` for a stream of tool results: at most one read of the stored drawing is in flight per drawing, and
@@ -387,19 +387,27 @@ const inflight = new Map<string, { again: boolean; done: Promise<void> }>()
  * reports a hundred results in one burst; each of them needs the editor to catch up, not a hundred reads.
  */
 export const reconcileCoalesced = (app: ReconcileApp, owner: EditorOwner = captureEditorOwner()): Promise<void> => {
-  const key = owner.drawingId ?? ""
+  if (owner.drawingId === null || !owner.current()) return Promise.resolve()
+  const key = JSON.stringify([owner.projectId, owner.drawingId])
   const running = inflight.get(key)
   if (running !== undefined) {
+    // Returning to the same drawing creates a new generation; its read must not inherit the obsolete owner's cancellation.
+    running.app = app
+    running.owner = owner
     running.again = true
     return running.done
   }
-  const entry: { again: boolean; done: Promise<void> } = { again: false, done: Promise.resolve() }
+  const entry = { again: false, done: Promise.resolve(), app, owner }
   entry.done = (async () => {
     try {
       do {
         entry.again = false
-        await reconcileFromStored(app, owner)
-      } while (entry.again && owner.current())
+        try { await reconcileFromStored(entry.app, entry.owner) }
+        catch (cause) {
+          // A newer valid caller still needs its snapshot, even if the read it joined failed.
+          if (!entry.again || !entry.owner.current()) throw cause
+        }
+      } while (entry.again && entry.owner.current())
     } finally {
       inflight.delete(key)
     }

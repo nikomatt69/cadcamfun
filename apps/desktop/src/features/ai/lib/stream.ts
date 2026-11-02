@@ -398,6 +398,7 @@ export const followSessionEvents = async (client: Client, input: FollowInput): P
   let failures = 0
   const calls: CallState = { started: new Set<string>(), finished: new Set<string>() }
   while (!input.signal.aborted && failures < FOLLOW_MAX_FAILURES) {
+    let greeted = false
     const connection = new AbortController()
     const abort = () => connection.abort()
     input.signal.addEventListener("abort", abort, { once: true })
@@ -412,6 +413,7 @@ export const followSessionEvents = async (client: Client, input: FollowInput): P
           if (connection.signal.aborted) return
           arm()
           if (frame.type === "server.connected") {
+            greeted = true
             failures = 0
             // A reset greeting carries the live edge; the old cursor would replay nothing.
             if (frame.reset === true || cursor === undefined) cursor = frame.seq
@@ -436,7 +438,8 @@ export const followSessionEvents = async (client: Client, input: FollowInput): P
     }
     if (input.signal.aborted) return
     // A connection that never greeted counts as a failure; one that did was healthy and just ended.
-    if (greetings === 0 || failures > 0) failures += 1
+    if (!greeted) failures += 1
+    if (failures >= FOLLOW_MAX_FAILURES) return
     await new Promise<void>((resolve) => {
       const wait = setTimeout(done, Math.min(FOLLOW_RECONNECT_MIN_MS * 2 ** Math.max(failures, 0), FOLLOW_RECONNECT_MAX_MS))
       function done() { clearTimeout(wait); input.signal.removeEventListener("abort", done); resolve() }

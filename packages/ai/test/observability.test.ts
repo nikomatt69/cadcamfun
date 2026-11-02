@@ -21,11 +21,12 @@ const counterOf = (id: string, attributes: Record<string, string>) =>
     })
   )
 
-const histogramCountOf = (id: string) =>
+const histogramCountOf = (id: string, attributes: Readonly<Record<string, string>> = {}) =>
   Metric.snapshot.pipe(
     Effect.map((all) => {
-      const entry = all.find((candidate) => candidate.id === id)
-      return entry?.type === "Histogram" ? entry.state.count : 0
+      return all.reduce((total, candidate) => candidate.id === id && candidate.type === "Histogram" &&
+        Object.entries(attributes).every(([key, value]) => candidate.attributes?.[key] === value)
+        ? total + candidate.state.count : total, 0)
     })
   )
 
@@ -77,6 +78,29 @@ describe("the AI metric catalogue", () => {
 })
 
 describe("observedTurn", () => {
+  test("latency separates parallel tools, specialist activity and the gap after the last primary result", async () => {
+    const events: AiEvent[] = [
+      { type: "tool_call", sessionId: "s", callId: "a", tool: "cad", input: {} },
+      { type: "tool_call", sessionId: "s", callId: "b", tool: "cad", input: {} },
+      { type: "tool_result", sessionId: "s", callId: "a", tool: "cad", ok: true, output: "" },
+      { type: "tool_progress", sessionId: "s", callId: "b", tool: "cad", chars: 10 },
+      { type: "tool_result", sessionId: "s", callId: "b", tool: "cad", ok: true, output: "" },
+      { type: "tool_call", sessionId: "s", agent: "modeler", callId: "child", tool: "cad_edit", input: {} },
+      { type: "reasoning", sessionId: "s", text: "Next check" },
+      { type: "delta", sessionId: "s", text: "Finished" },
+      { type: "turn", sessionId: "s", phase: "continuing" },
+      { type: "done", sessionId: "s", text: "Finished" }
+    ]
+    const ids = ["cadcamfun_ai_first_activity_ms", "cadcamfun_ai_inter_action_gap_ms", "cadcamfun_ai_tool_duration_ms"]
+    const delta = await Effect.runPromise(Effect.gen(function* () {
+      const before = yield* Effect.all(ids.map((id) => histogramCountOf(id, { provider: "timing", model: "test" })))
+      yield* Stream.runDrain(observedTurn(Stream.fromIterable(events), Date.now(), { provider: "timing", model: "test", session: "s" }))
+      const after = yield* Effect.all(ids.map((id) => histogramCountOf(id, { provider: "timing", model: "test" })))
+      return after.map((n, i) => n - (before[i] ?? 0))
+    }))
+    expect(delta).toEqual([1, 1, 2])
+  })
+
   test("events pass through untouched, the duration is recorded and the turn becomes a span", async () => {
     const spans: Array<Tracer.NativeSpan> = []
     const tracer = Tracer.make({

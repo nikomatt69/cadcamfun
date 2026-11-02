@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { buildTools } from "@cadcamfun/ai"
+import { buildTools, clearKernelJobCache, kernelJobStats } from "@cadcamfun/ai"
 import { plateTemplate } from "@cadcamfun/core"
 import { Context, Effect } from "effect"
 import { DrawingRepo, drawingContentHash } from "../src/repos/drawing-repo.ts"
@@ -16,6 +16,33 @@ const elementsOf = async (drawingId: string): Promise<ReadonlyArray<{ id: string
   ((await app.call(`/api/drawings/${drawingId}`)).body.data?.elements ?? []) as ReadonlyArray<{ id: string }>
 
 describe("a turn is bound to the drawing it was admitted for", () => {
+  test("legacy exact-analysis handlers inherit cancellation from their admitted invocation", async () => {
+    const services = await app.services()
+    const acting = Context.get(services, ActingUser)
+    const user = Context.get(services, LocalProfile).user
+    const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Cancelled inspection" } })).body.id as string
+    const drawingId = (await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: {
+      name: "Plate", data: { elements: [{ id: "plate", type: "parametric", history: plateTemplate(), x: 0, y: 0, z: 0 }] }
+    } })).body.id as string
+    expect(await acting.bind(projectId, "cancel-inspection", user, "Inspect the plate", drawingId)).toBe(true)
+    const handlers = await app.toolHandlers()
+    const controller = new AbortController()
+    clearKernelJobCache()
+    const before = kernelJobStats().counters.started
+    const pending = acting.invoke(projectId, "cancel-inspection", () => handlers.cadExact!(projectId, {}), controller.signal)
+    try {
+      const deadline = Date.now() + 3_000
+      while (kernelJobStats().counters.started === before && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 1))
+      expect(kernelJobStats().counters.started).toBeGreaterThan(before)
+      controller.abort()
+      expect(await pending).toMatchObject({ ok: false, error: expect.stringContaining("cancelled") })
+      expect((await elementsOf(drawingId)).map((element) => element.id)).toEqual(["plate"])
+    } finally {
+      controller.abort()
+      await pending.catch(() => undefined)
+    }
+  })
+
   test("two drawings of one project: the tools act on the bound one, whatever another window's editor snapshot says", async () => {
     const services = await app.services()
     const acting = Context.get(services, ActingUser)

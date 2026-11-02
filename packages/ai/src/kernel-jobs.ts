@@ -3,6 +3,8 @@
  * drift. Inputs and outputs are plain data (structured-clone safe); histories are decoded here, at the job's own boundary.
  */
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
+import { cadKernelReport } from "./actions/cad-kernel-report.ts"
+import { cadExport, cadExportBodies, cadExportScene, camStockExport } from "./actions/export-kernel.ts"
 import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
 import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } from "./parametric.ts"
 
@@ -154,6 +156,11 @@ export const cadImportStep = ({ step, history, idPrefix, tolerance, keepAccepted
 type ManufacturingInput = cam.kernel.ManufacturingJob & cam.kernel.PrepareOptions
 
 export interface KernelJobs {
+  readonly "cad-export-scene": { readonly input: Parameters<typeof cadExportScene>[0]; readonly output: ReturnType<typeof cadExportScene> }
+  readonly "cad-export": { readonly input: Parameters<typeof cadExport>[0]; readonly output: ReturnType<typeof cadExport> }
+  readonly "cad-export-bodies": { readonly input: Parameters<typeof cadExportBodies>[0]; readonly output: ReturnType<typeof cadExportBodies> }
+  readonly "cam-export-stock": { readonly input: Parameters<typeof camStockExport>[0]; readonly output: ReturnType<typeof camStockExport> }
+  readonly "cad-naming": { readonly input: Parameters<typeof cadKernelReport>[0]; readonly output: ReturnType<typeof cadKernelReport> }
   readonly acceptance: { readonly input: { readonly history: unknown; readonly checks: ReadonlyArray<AcceptanceCheck>; readonly budgetMs?: number }; readonly output: AcceptanceReport }
   readonly "parametric-report": { readonly input: { readonly history: unknown }; readonly output: ReturnType<typeof parametricReport> }
   /** The CAM kernel on a whole job (spec 29): NC plus evidence; progress is reported before each operation and stage. */
@@ -187,6 +194,11 @@ export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.Genera
 export type KernelJobName = keyof KernelJobs
 
 export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]["input"], report?: (progress: KernelJobProgress) => void) => KernelJobs[K]["output"] } = {
+  "cad-export-scene": cadExportScene,
+  "cad-export": cadExport,
+  "cad-export-bodies": cadExportBodies,
+  "cam-export-stock": camStockExport,
+  "cad-naming": cadKernelReport,
   acceptance: (input) => acceptPart(parseHistory(input.history), input.checks, input.budgetMs === undefined ? {} : { budgetMs: input.budgetMs }),
   "parametric-report": (input) => parametricReport(parseHistory(input.history)),
   "cam-manufacture": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runJob(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),

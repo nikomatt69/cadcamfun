@@ -56,6 +56,7 @@ describe("embedded host never reads the user's nikcli state (spec 08 section 1.1
     expect(result["readsInstanceConfig"]).toBe(true)
     expect(result["agentsHaveCadcam"]).toBe(true)
     expect(result["sharedConfigHasAgents"]).toBe(false)
+    expect(result["sharingDisabled"]).toBe(true)
   }, 120_000)
 
   test("inherited database and authentication overrides are blocked", async () => {

@@ -2,6 +2,43 @@
 
 Status: adopted lifecycle, demand-loading and rendering changes implemented and regression-checked. The remaining architectural work below is not implemented. Owners: WP8 (AI runtime), WP3/WP4 (typed catalogue filter, HTTP/services), WP6/WP7 (bootstrap, queries and viewport), WP9 (plugin RPC), WP10 (native updater). Related specifications record each cross-work-package change before implementation. No database migration in this increment.
 
+## Long-running assistant coherence (2026-11-02)
+
+Owner-requested performance and architecture refinement owns WP8 `packages/ai` and WP6
+`apps/desktop/src/features/ai` plus their existing tests. Keep the existing host and transport interfaces:
+disconnect is not cancellation, remote-turn editor ownership is captured once before asynchronous history
+loading, and reconnect failures are counted per connection rather than over the follower's lifetime.
+WP8 records observed first activity, inter-action gaps, permission-inclusive tool duration and loop
+transitions without logging prompts or tool payloads. These observations are not provider-only latency.
+No permission rule or deterministic CAD/CAM verification is weakened. Source-backed findings and remaining
+work extend spec 35; unfinished architecture work is not declared complete by these fixes.
+
+The same WP8 increment moves the pure `cad.kernel` naming report behind the existing scoped kernel-job
+interface. History acquisition and project authorization stay in the action adapter; only plain validated
+history/input crosses to the worker. Preserve reference outcomes, Boolean counters and diagnostics, pass
+the invocation abort signal, and check worker/inline equivalence. No new model-visible action is added.
+
+The export continuation also moves inline-history rebuild, CAD tessellation/encoding and verified-stock
+meshing/encoding through that worker interface. The action adapter still acquires authorized drawing or
+verification data and stores bytes only after worker success and a cancellation check. Keep formats,
+units, mesh repair diagnostics, SHA-256 identities and persisted bytes equivalent. Inline-history CAD
+export performs rebuild and encoding in one job; the reusable bodies reader uses the same pure rebuild
+implementation. No worker may persist files, access a project repository or bypass mutation admission.
+
+WP4 integration for export owns `apps/sidecar/src/services/ai-export.ts`, the export handler in
+`apps/sidecar/src/services/ai.ts` and existing export tests: drawing-to-exact-solid acquisition is itself
+a pure worker job. `cadExportBodies` accepts an optional invocation signal, preserving existing callers;
+the sidecar supplies authorized elements and awaits the worker. The HTTP and action schemas are unchanged.
+
+All kernel calls inside the existing WP4 AI tool adapter inherit `ActingUser`'s immutable invocation signal
+when a caller does not supply one explicitly. This uses the same async-local-to-Effect invocation seam
+already used for identity and drawing ownership. Cancellation must release workers used by inspection,
+generation and verification, including handler signatures that predate an explicit signal argument.
+
+Host isolation also sets the pinned SDK's `NIKCLI_DISABLE_SHARE`: the existing `share: disabled` setting
+denies publishing but does not prevent native share-sync event listeners and deferred database reads.
+Sharing remains disabled as before; unused synchronization must not tax every session event or outlive teardown.
+
 ## Decision and evidence
 
 Reference checkout: `/Volumes/SSD/Projects/nikcli`, inspected on 2026-10-09. The application uses published `sdk-next@1.428.0`; reference-checkout APIs are architectural evidence, not an assumed surface of the pinned bundle.
@@ -46,6 +83,20 @@ Regressions must cover cancelled-editor exclusion, queue bounds with free global
 
 ## Change log
 
+- 2026-11-02: owner-requested long-task refinement: detached budget renewal, observed latency metrics,
+  bounded follower reconnection, frozen editor ownership, journal-reset drawing reconciliation and
+  epoch-isolated event handling. Exact naming uses the existing cancellable kernel-worker seam.
+  AI/sidecar/desktop typechecks pass; focused loop, scheduler, follower, editor and real-host regressions
+  pass. Production-patched sidecar compilation and temporary-project naming invocation pass.
+  Export worker migration and real-provider stage timing remain open.
+- 2026-11-02 continuation: export solid acquisition, tessellation and encoding now use cancellable pure
+  jobs, including verified CAM stock; legacy heavy AI handlers inherit admitted invocation cancellation.
+  Native operation timing distinguishes permission wait from execution on the owning Effect v4 context.
+  Loop recovery tracks confirmed completion identities. Coalesced editor reconciliation survives return
+  navigation and retries transient reset failures with bounded lifecycle-owned timers. Native share-sync
+  listeners are disabled consistently with the existing share policy. AI suite 1,266/1,266, UI suite 19/19,
+  sidecar export/binding suite 14/14, three typechecks and compiled export/receipt smoke pass. Remaining
+  synchronous parametric paths and production-provider request measurements are documented in spec 35.
 - 2026-10-09: local nikcli inspection; WP8 lifecycle contract and WP4 delegation to the session-owning service specified before implementation.
 
 

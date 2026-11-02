@@ -8,6 +8,7 @@ import { buildRecipe, exchange, rebuildExact } from "@cadcamfun/core"
 import { decodeHistory } from "../src/parametric.ts"
 import { runAction } from "../src/actions/catalogue.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
+import { clearKernelJobCache, kernelJobStats, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
 
 const bracket = {
   parameters: { w: 40 },
@@ -16,6 +17,25 @@ const bracket = {
     { id: "e", type: "extrude", sketch: "s", depth: 10, operation: "new" }
   ]
 }
+
+test("export workers preserve binary mesh bytes and the solid evidence across the worker seam", async () => {
+  for (const format of ["stl", "stl_ascii", "obj", "3mf"] as const) {
+    const input = { input: { history: bracket, format, name: "equivalence" } }
+    const inline = runKernelJobInline("cad-export", input)
+    const worker = await runKernelJob("cad-export", input)
+    expect(worker).toEqual(inline)
+  }
+  const decoded = decodeHistory(bracket)
+  if (!decoded.success) throw new Error("Invalid scene fixture")
+  const scene = { elements: [{ id: "plate", type: "parametric", name: "Plate", history: decoded.data, x: 0, y: 0, z: 0 }], ids: ["plate"] }
+  clearKernelJobCache()
+  const selected = await runKernelJob("cad-export-scene", scene)
+  expect(selected.ok).toBe(true)
+  expect(selected).toEqual(runKernelJobInline("cad-export-scene", scene))
+  const stock = { input: { kind: "stock" as const, operationId: "op", format: "stl" as const }, floor: 0,
+    preview: { nx: 2, ny: 2, minX: 0, minY: 0, cellX: 5, cellY: 5, minZ: 6, maxZ: 12, heights: [12, 6, 12, 12], gouge: [] } }
+  expect(await runKernelJob("cam-export-stock", stock)).toEqual(runKernelJobInline("cam-export-stock", stock))
+}, 30_000)
 
 const host = () => {
   const files = new Map<string, Uint8Array>()
@@ -45,6 +65,21 @@ const volumeOfStl = (bytes: Uint8Array): number => {
 }
 
 describe("cad_edit.export", () => {
+  test("cancelling an admitted export worker never stores a partial file", async () => {
+    const { files, handlers } = host()
+    const controller = new AbortController()
+    const before = kernelJobStats().counters.started
+    const pending = runAction("cad_edit.export", { format: "stl", history: bracket }, { handlers, projectId: "p1", signal: controller.signal })
+    try {
+      const deadline = Date.now() + 3_000
+      while (kernelJobStats().counters.started === before && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 1))
+      expect(kernelJobStats().counters.started).toBeGreaterThan(before)
+      controller.abort()
+      expect(await pending).toMatchObject({ ok: false })
+      expect(files.size).toBe(0)
+    } finally { controller.abort(); await pending }
+  })
+
   test("an STL of a history is stored, closed, with the volume of the part, and the answer carries no bytes", async () => {
     const { files, handlers } = host()
     const r = await call("cad_edit.export", { format: "stl", history: bracket, name: "bracket" }, handlers)
