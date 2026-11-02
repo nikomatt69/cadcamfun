@@ -3,6 +3,18 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.69 (November 2026)
+
+## Desktop
+
+- Dashboard first-run block with the CAD scene when no project exists
+- NumberField keeps its name attribute (forms and tests address inputs by name)
+
+## Sidecar
+
+- Add profile screen and pairing story component; update settings navigation
+- Design configurations action, mass in results, sketch DOF diagnostics, gripper scenario (agent stopped by rate limit, unverified)
+
 ## v0.1.68 (November 2026)
 
 ## Core
