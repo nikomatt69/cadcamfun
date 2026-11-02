@@ -5,7 +5,7 @@
 import { For, Show, createSignal, createMemo, onCleanup, createEffect, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
 import { Effect } from "effect"
-import { CheckCircle, ExternalLink, FileText, Info, Puzzle, Search, ToggleLeft, ToggleRight, Trash2, Upload, X } from "lucide-solid"
+import { CheckCircle, ExternalLink, FileText, Info, LoaderCircle, Puzzle, Search, ToggleLeft, ToggleRight, Trash2, Upload, X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
@@ -125,8 +125,8 @@ export function PluginsScreen(): JSX.Element {
     overlays={<>
     <Show when={installOpen()}>
       <div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeInstall() }}>
-        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900">
-          <div class="mb-4 flex items-center justify-between"><h2 id="install-plugin-heading" class="text-lg font-semibold">{t("plugins.install")}</h2><button onClick={closeInstall} disabled={pending()} aria-label={t("common.close")}><X size={20} /></button></div>
+        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-lg bg-white p-6  dark:bg-slate-900">
+          <div class="mb-4 flex items-center justify-between"><h2 id="install-plugin-heading" class="text-base font-semibold">{t("plugins.install")}</h2><button onClick={closeInstall} disabled={pending()} aria-label={t("common.close")}><X size={20} /></button></div>
           <div class="mb-4 border-b border-slate-200 dark:border-slate-700"><span class="inline-block border-b-2 border-blue-600 px-4 py-2 text-sm font-medium text-blue-600">{t("plugins.uploadFile")}</span></div>
           <button type="button" class="mb-6 w-full rounded-lg border-2 border-dashed p-6 text-center" classList={{ "border-blue-500 bg-blue-50 dark:bg-blue-900/10": dragging(), "border-green-500 bg-green-50 dark:bg-green-900/10": !!file(), "border-slate-300 dark:border-slate-700": !dragging() && !file() }} disabled={pending()} onClick={() => picker?.click()} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); chooseFile(e.dataTransfer?.files[0]) }}>
             <Show when={file()} fallback={<><Upload class="mx-auto mb-2 text-slate-400" size={32} /><p class="mb-1 font-medium text-slate-700 dark:text-slate-300">{t("plugins.dropPackage")}</p><p class="text-sm text-slate-500">{t("plugins.browsePackage")}</p></>}>{(selected) => <><CheckCircle class="mx-auto mb-2 text-green-500" size={36} /><p class="font-medium text-green-600">{selected().name}</p><p class="mt-1 text-sm text-slate-500">{(selected().size / 1024).toFixed(1)} KB</p></>}</Show>
@@ -137,7 +137,7 @@ export function PluginsScreen(): JSX.Element {
         </div>
       </div>
     </Show>
-    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
+    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-lg bg-white p-6  dark:bg-slate-900"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
     </>}
   >
     <Toast message={notice()} />
@@ -179,8 +179,8 @@ export function PluginsScreen(): JSX.Element {
 
 /** `DetailSection` — the legacy card with the `<h2>` rule under the title. */
 const DetailSection = (props: { readonly title: string; readonly children: JSX.Element; readonly class?: string }): JSX.Element => (
-  <div class={`mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:p-6 dark:border-slate-700 dark:bg-slate-900 ${props.class ?? ""}`}>
-    <h2 class="mb-3 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-700 dark:border-slate-700 dark:text-gray-200">
+  <div class={`mb-6 rounded-lg border border-slate-200 bg-white p-4 md:p-6 dark:border-slate-700 dark:bg-slate-900 ${props.class ?? ""}`}>
+    <h2 class="mb-3 border-b border-slate-200 pb-2 text-base font-semibold text-slate-700 dark:border-slate-700 dark:text-gray-200">
       {props.title}
     </h2>
     <div class="prose prose-sm max-w-none text-slate-600 dark:text-slate-400">{props.children}</div>
@@ -193,22 +193,9 @@ const CodeBlock = (props: { readonly children: JSX.Element }): JSX.Element => (
   </pre>
 )
 
-/** The legacy inline spinner SVG, verbatim. */
-const LoadingSpinner = (): JSX.Element => (
-  <svg
-    class="mr-3 -ml-1 inline-block h-5 w-5 animate-spin text-white"
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-  >
-    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-    <path
-      class="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-    />
-  </svg>
-)
+/** The inline spinner of a busy button. */
+const LoadingSpinner = (): JSX.Element => <LoaderCircle size={16} class="mr-2 -ml-1 inline-block animate-spin text-white" aria-hidden="true" />
+
 
 const BADGE_COLORS: Readonly<Record<"success" | "warning" | "error" | "info", string>> = {
   success: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
@@ -350,7 +337,7 @@ export function PluginDetailScreen(): JSX.Element {
       <Show when={!plugin.error()} fallback={
         <div class="mx-auto max-w-4xl p-4 md:p-8">
           <div class="relative mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
-            <strong class="font-bold">{t("plugins.detail.errorLoading")} </strong>
+            <strong class="font-medium">{t("plugins.detail.errorLoading")} </strong>
             <span class="block sm:inline">{describe(plugin.error())}</span>
           </div>
           <A href="/plugins" class="mt-4 inline-block text-blue-600 hover:underline dark:text-blue-400">{t("plugins.detail.backToPlugins")}</A>
@@ -359,7 +346,7 @@ export function PluginDetailScreen(): JSX.Element {
         <Show when={plugin.data()} fallback={
           <div class="mx-auto max-w-4xl p-4 md:p-8">
             <div class="mb-4 rounded border border-yellow-400 bg-yellow-100 px-4 py-3 text-yellow-700" role="alert">
-              <strong class="font-bold">{t("plugins.detail.notFoundTitle")}</strong>
+              <strong class="font-medium">{t("plugins.detail.notFoundTitle")}</strong>
             </div>
             <A href="/plugins" class="mt-4 inline-block text-blue-600 hover:underline dark:text-blue-400">{t("plugins.detail.backToPlugins")}</A>
           </div>
@@ -381,7 +368,7 @@ export function PluginDetailScreen(): JSX.Element {
                 />}
               </Show>
               <div class="min-w-0">
-                <h2 class="truncate text-2xl font-semibold tracking-[-0.015em] text-slate-900 dark:text-gray-50" title={current().manifest.name}>
+                <h2 class="truncate text-xl font-semibold text-slate-900 dark:text-gray-50" title={current().manifest.name}>
                   {current().manifest.name}
                 </h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -407,7 +394,7 @@ export function PluginDetailScreen(): JSX.Element {
                 type="button"
                 disabled={pending()}
                 onClick={() => void uninstall()}
-                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-red-600 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-red-600 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.uninstalling")}</>}>
                   {t("plugins.uninstall")}
@@ -421,7 +408,7 @@ export function PluginDetailScreen(): JSX.Element {
                     type="button"
                     disabled={pending()}
                     onClick={() => void toggleEnabled(true)}
-                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-green-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-green-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.activating")}</>}>
                       {t("plugins.detail.activate")}
@@ -433,7 +420,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => void toggleEnabled(false)}
-                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-yellow-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-yellow-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.deactivating")}</>}>
                     {t("plugins.detail.deactivate")}
@@ -446,7 +433,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => setShowSettings(true)}
-                  class="whitespace-nowrap rounded bg-slate-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="whitespace-nowrap rounded bg-slate-500 px-4 py-2 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("plugins.detail.configure")}
                 </button>
@@ -460,7 +447,7 @@ export function PluginDetailScreen(): JSX.Element {
               type="button"
               disabled={pending() || generating()}
               onClick={() => void generateReadme()}
-              class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText size={16} class="mr-2" />
               {t(generating() ? "plugins.detail.generating" : "plugins.detail.generateReadme")}
@@ -469,8 +456,8 @@ export function PluginDetailScreen(): JSX.Element {
 
           {/* README Generation Area */}
           <Show when={showReadme()}>
-            <div class="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:p-6 dark:border-slate-700 dark:bg-slate-900">
-              <h2 class="mb-3 text-lg font-semibold text-slate-700 dark:text-gray-200">{t("plugins.detail.readmeHeading")}</h2>
+            <div class="mb-6 rounded-lg border border-slate-200 bg-white p-4 md:p-6 dark:border-slate-700 dark:bg-slate-900">
+              <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-gray-200">{t("plugins.detail.readmeHeading")}</h2>
               <Show when={generating()}>
                 <div class="flex items-center justify-center py-10">
                   <LoadingSpinner /> <span class="ml-2 text-slate-500">{t("plugins.detail.generating")}</span>
@@ -478,7 +465,7 @@ export function PluginDetailScreen(): JSX.Element {
               </Show>
               <Show when={readmeError()}>
                 <div class="relative mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
-                  <strong class="mr-2 font-bold">{t("plugins.detail.readmeError")}</strong>
+                  <strong class="mr-2 font-medium">{t("plugins.detail.readmeError")}</strong>
                   <span class="block sm:inline">{readmeError()}</span>
                 </div>
               </Show>
@@ -515,7 +502,7 @@ export function PluginDetailScreen(): JSX.Element {
           {/* Action Error Display */}
           <Show when={actionError()}>
             <div class="relative mb-6 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
-              <strong class="font-bold">{t("plugins.detail.actionFailed")} </strong>
+              <strong class="font-medium">{t("plugins.detail.actionFailed")} </strong>
               <span class="block sm:inline">{actionError()}</span>
               <button
                 type="button"
@@ -523,7 +510,7 @@ export function PluginDetailScreen(): JSX.Element {
                 aria-label={t("common.close")}
                 onClick={() => setActionError(undefined)}
               >
-                <span class="text-xl" aria-hidden="true">×</span>
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
           </Show>

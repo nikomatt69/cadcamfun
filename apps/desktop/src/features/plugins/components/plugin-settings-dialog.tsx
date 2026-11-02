@@ -179,15 +179,15 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
             when={!loading()}
             fallback={
               <div class="flex items-center justify-center py-12">
-                <Loader class="mr-2 motion-safe:animate-spin text-blue-500" />
+                <Loader class="mr-2 motion-safe:animate-spin text-blue-500" size={16} />
                 <span class="text-gray-600 dark:text-gray-300">{t("plugins.settings.loading")}</span>
               </div>
             }
           >
             <Show when={error() !== undefined}>
-                <div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+                <div role="alert" class="mb-4 rounded-md bg-red-50 p-4 dark:bg-red-900/20">
                   <div class="flex items-start">
-                    <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-red-500" />
+                    <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-red-500" size={16} />
                     <div>
                       <h3 class="mb-1 font-medium text-red-600 dark:text-red-400">{t("plugins.settings.errorTitle")}</h3>
                       <p class="text-sm text-gray-600 dark:text-gray-300">{error()}</p>
@@ -200,7 +200,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                 fallback={
                   <div class="p-6 text-center">
                     <Info class="mx-auto mb-3 text-gray-400 dark:text-gray-500" size={32} />
-                    <h3 class="mb-2 text-lg font-medium text-gray-700 dark:text-gray-300">{t("plugins.settings.noSettings")}</h3>
+                    <h3 class="mb-2 text-base font-medium text-gray-700 dark:text-gray-300">{t("plugins.settings.noSettings")}</h3>
                     <p class="text-gray-500 dark:text-gray-400">{t("plugins.settings.noSettingsBody")}</p>
                   </div>
                 }
@@ -221,7 +221,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                   </For>
 
                   <Show when={saved()}>
-                    <div role="status" class="flex items-start rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800/30 dark:bg-green-900/20">
+                    <div role="status" class="flex items-start rounded-md bg-green-50 p-3 dark:bg-green-900/20">
                       <Save class="mr-2 mt-0.5 flex-shrink-0 text-green-500" size={16} />
                       <span class="text-sm text-green-600 dark:text-green-400">{t("plugins.settings.saved")}</span>
                     </div>
@@ -230,7 +230,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
               </Show>
 
             <Show when={hasSettings()}>
-              <div class="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-5 dark:border-gray-700">
+              <div class="mt-8 flex justify-end gap-3 border-t border-gray-200 pt-5 dark:border-gray-700">
                 <button
                   type="button"
                   class="rounded-md px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -241,7 +241,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                 </button>
                 <button
                   type="button"
-                  class="flex min-w-[90px] items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                  class="flex min-w-[90px] items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
                   disabled={saving() || saved()}
                   onClick={() => void save()}
                 >
