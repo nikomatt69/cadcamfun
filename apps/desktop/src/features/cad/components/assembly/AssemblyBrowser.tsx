@@ -7,7 +7,7 @@ import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
  * a kind) rather than the legacy `prompt`, so the panel never blocks the editor.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-solid"
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-solid"
 import { t, type Key } from "../../../../i18n/index.ts"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 import type { AssemblyNode, NodeType } from "../../types/assembly.ts"
@@ -40,17 +40,18 @@ function Row(props: {
   return (
     <div>
       <div
-        class={`py-1 px-2 flex items-center cursor-pointer text-sm ${store.activeNodeId === props.node.id ? "bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"}`}
+        class={`py-1 px-2 flex items-center gap-1 text-sm ${store.activeNodeId === props.node.id ? "bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"}`}
         style={{ "padding-left": `${props.depth * 12 + 4}px` }}
-        onClick={() => props.onSelect(props.node.id)}
       >
-        <button type="button" class="panel-btn" onClick={(event) => { event.stopPropagation(); props.toggle(props.node.id) }}>
-          <Show when={children().length > 0} fallback={<span class="inline-block w-3 h-3" />}>
+        <Show when={children().length > 0} fallback={<span class="h-7 w-7 shrink-0" aria-hidden="true" />}>
+          <button type="button" class="panel-icon-btn shrink-0" aria-expanded={open()} aria-label={t("browser.toggleSection", { name: props.node.name })} onClick={() => props.toggle(props.node.id)}>
             <Show when={open()} fallback={<ChevronRight class="w-3 h-3 text-gray-500" />}><ChevronDown class="w-3 h-3 text-gray-500" /></Show>
-          </Show>
+          </button>
+        </Show>
+        <button type="button" class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-pressed={store.activeNodeId === props.node.id} onClick={() => props.onSelect(props.node.id)}>
+          <span class="min-w-0 truncate text-gray-900 dark:text-gray-100">{props.node.name || `${props.node.type} ${props.node.id.slice(0, 4)}`}</span>
+          <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{t(KIND_LABEL[props.node.type])}</span>
         </button>
-        <span class="truncate text-gray-900 dark:text-gray-100">{props.node.name || `${props.node.type} ${props.node.id.slice(0, 4)}`}</span>
-        <span class="ml-1.5 text-xs text-gray-500 dark:text-gray-400">({t(KIND_LABEL[props.node.type])})</span>
       </div>
       <Show when={children().length > 0 && open()}>
         <For each={children()}>{(child) => <Row node={child} depth={props.depth + 1} childrenOf={props.childrenOf} expanded={props.expanded} toggle={props.toggle} onSelect={props.onSelect} />}</For>
@@ -87,6 +88,7 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
     if (kind() === "subassembly") store.addSubassembly(label, position, rotation, parentId)
     else if (kind() === "group") store.addGroup(label, position, rotation, parentId)
     else store.addComponent(label, position, rotation, parentId, "", {})
+    if (parentId !== null) setExpanded((previous) => new Set([...previous, parentId]))
     setName("")
     setAdding(false)
   }
@@ -103,11 +105,11 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
   return (
     <PanelCard title={t("cad.assembly.structure")} actions={<>
 <div class="flex items-center gap-1">
-          <button type="button" class="panel-btn" onClick={() => setAdding(!adding())}>
+          <button type="button" class="panel-btn" aria-expanded={adding()} onClick={() => setAdding(!adding())}>
             {adding() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.add")}`}
           </button>
           <Show when={selected()}>
-            <button type="button" class="panel-icon-btn panel-icon-btn--danger" onClick={removeSelected} title={t("cad.assembly.deleteNode")}>
+            <button type="button" class="panel-icon-btn panel-icon-btn--danger" onClick={removeSelected} title={t("cad.assembly.deleteNode")} aria-label={t("cad.assembly.deleteNode")}>
               <Trash2 class="w-4 h-4" />
             </button>
           </Show>
@@ -119,13 +121,14 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
           <input
             type="text"
+            aria-label={t("cad.assembly.nodeName")}
             placeholder={t("cad.assembly.nodeName")}
             class="panel-input"
             value={name()}
             onInput={(event) => setName(event.currentTarget.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") addNode() }}
+            onKeyDown={(event) => { if (event.key === "Enter") addNode(); else if (event.key === "Escape") setAdding(false) }}
           />
-          <select class="panel-input" value={kind()} onChange={(event) => setKind(event.currentTarget.value as NodeType)}>
+          <select class="panel-input" aria-label={t("library.field.type")} value={kind()} onChange={(event) => setKind(event.currentTarget.value as NodeType)}>
             <For each={Object.keys(KIND_LABEL) as ReadonlyArray<NodeType>}>{(option) => <option value={option}>{t(KIND_LABEL[option])}</option>}</For>
           </select>
           <button type="button" class="panel-btn panel-btn--primary" disabled={!name().trim()} onClick={addNode}>

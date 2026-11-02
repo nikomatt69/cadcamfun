@@ -38,9 +38,10 @@ export default function PmiAnnotationForm(props: { readonly captureId: string | 
   const datumLetters = createMemo(() => store.set.annotations.filter((a) => a.kind === "datum").map((a) => (a as { letter: string }).letter))
 
   const create = (): void => {
-    const captureId = props.captureId ?? store.activeCaptureId ?? store.addCapture("Default")
     const el = selectedElement()
     if (kind() !== "note" && el === undefined) { setError(t("cad.pmi.needSelection")); return }
+    const existingCaptureId = props.captureId ?? store.activeCaptureId
+    const captureId = existingCaptureId ?? newPmiId("capture")
     const refs: readonly pmi.PmiRef[] = el === undefined ? [] : [refFromElement(el)]
     const base = { id: newPmiId("pmi"), captureId, refs }
     let annotation: pmi.PmiAnnotation
@@ -57,7 +58,8 @@ export default function PmiAnnotationForm(props: { readonly captureId: string | 
     const issues = pmi.validatePmiSet(candidate).filter((i) => i.annotationId === annotation.id)
     if (issues.length > 0) { setError(issues.map((i) => i.message).join("; ")); return }
     setError("")
-    store.addAnnotation(annotation)
+    const targetCaptureId = existingCaptureId ?? store.addCapture("Default")
+    store.addAnnotation({ ...annotation, captureId: targetCaptureId })
   }
 
   const field = (label: string, value: () => string, set: (v: string) => void, numeric = false): JSX.Element =>
@@ -71,7 +73,7 @@ export default function PmiAnnotationForm(props: { readonly captureId: string | 
         </select></label>
       <p style={{ ...MUTED, "font-size": "12px" }} data-testid="pmi-selected-ref">{selectedElement() === undefined ? t("cad.pmi.noSelection") : `${t("cad.pmi.selected")}: ${selectedElement()!.name ?? selectedElement()!.id}`}</p>
       <Show when={datumLetters().length > 0}><p style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.datums")}: {datumLetters().join(", ")}</p></Show>
-      <Show when={kind() === "dimensional-size" || kind() === "dimensional-location"}><div class="grid grid-cols-3 gap-2">{field(t("cad.pmi.nominal"), nominal, setNominal, true)}{field(t("cad.pmi.upper"), upper, setUpper, true)}{field(t("cad.pmi.lower"), lower, setLower, true)}</div></Show>
+      <Show when={kind() === "dimensional-size" || kind() === "dimensional-location"}><div class="grid gap-2" style={{ "grid-template-columns": "repeat(auto-fit, minmax(70px, 1fr))" }}>{field(t("cad.pmi.nominal"), nominal, setNominal, true)}{field(t("cad.pmi.upper"), upper, setUpper, true)}{field(t("cad.pmi.lower"), lower, setLower, true)}</div></Show>
       <Show when={kind() === "geometric-tolerance"}><div class="grid grid-cols-2 gap-2">
         <label class="block"><span class="panel-label">{t("cad.pmi.gdtKind")}</span><select class={INPUT} value={gdtKind()} onChange={(e) => setGdtKind(e.currentTarget.value)}><For each={GDT_KINDS}>{(k) => <option value={k}>{k}</option>}</For></select></label>
         {field(t("cad.pmi.gdtValue"), gdtValue, setGdtValue, true)}

@@ -20,16 +20,16 @@ export default function AssemblyPanel(): JSX.Element {
 
   return (
     <div class="inspector-assembly">
-      <div class="panel-header">
+      <div class="panel-header flex-wrap gap-2">
         <h2 class="panel-header__title">{t("cad.assembly.title")}</h2>
-        <div class="flex items-center gap-1">
+        <div class="flex flex-wrap items-center gap-1">
           <button type="button" class="panel-btn" onClick={() => store.undo()}>
             {t("cad.assembly.undo")}
           </button>
           <button type="button" class="panel-btn" onClick={() => store.redo()}>
             {t("cad.assembly.redo")}
           </button>
-          <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 ml-2">
+          <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 sm:ml-2">
             <input type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-blue-600" checked={store.showJoints} onChange={(event) => store.setJointsVisibility(event.currentTarget.checked)} />
             {t("cad.assembly.showJoints")}
           </label>

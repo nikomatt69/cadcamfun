@@ -70,9 +70,11 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
   const reload = (): void => {
     const id = drawingId()
     if (id === null) return
-    setLoadedFor(null)
     store.setStatus("loading")
-    void loadPmi(app, id).then((r) => store.setSet(r.set, id), () => store.setStatus("error", t("cad.pmi.loadFailed")))
+    void loadPmi(app, id).then(
+      (r) => { if (drawingId() === id) store.setSet(r.set, id) },
+      () => { if (drawingId() === id) store.setStatus("error", t("cad.pmi.loadFailed")) }
+    )
   }
 
   const body = (
@@ -87,8 +89,8 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
             <option value="">{t("cad.pmi.allCaptures")}</option>
             <For each={store.set.captures}>{(c) => <option value={c.id}>{c.name}</option>}</For>
           </select></label>
-        <div class="flex items-center gap-2">
-          <input class={`${INPUT} min-w-0 flex-1`} data-testid="pmi-capture-name" placeholder={t("cad.pmi.captureName")} value={captureName()} onInput={(e) => setCaptureName(e.currentTarget.value)} />
+        <div class="flex flex-wrap items-center gap-2">
+          <input class={`${INPUT} min-w-[8rem] flex-1`} data-testid="pmi-capture-name" aria-label={t("cad.pmi.captureName")} placeholder={t("cad.pmi.captureName")} value={captureName()} onInput={(e) => setCaptureName(e.currentTarget.value)} />
           <button type="button" class={`${BUTTON} shrink-0 whitespace-nowrap`} data-testid="pmi-add-capture" onClick={() => { store.addCapture(captureName()); setCaptureName("") }}>{t("cad.pmi.addCapture")}</button>
           <Show when={store.activeCaptureId}><button type="button" class={`${BUTTON} shrink-0 whitespace-nowrap`} data-testid="pmi-remove-capture" onClick={() => store.removeCapture(store.activeCaptureId!)}>{t("cad.pmi.removeCapture")}</button></Show>
         </div>
@@ -104,7 +106,8 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
               <For each={group.annotations}>{(a) => (
                 <li>
                   <button type="button" data-testid="pmi-annotation" data-kind={a.kind} data-broken={isBroken(issues(), a.id)}
-                    class="flex w-full items-center gap-2 rounded px-2 py-1 text-left"
+                    class="flex w-full items-center gap-2 rounded px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    aria-pressed={store.selectedAnnotationId === a.id}
                     style={store.selectedAnnotationId === a.id
                       ? { "border": "1px solid var(--panel-accent)", "background": "var(--panel-accent-soft)", "color": "var(--panel-text)", "font-size": "12px" }
                       : { "border": "1px solid var(--panel-border-strong)", "background": "var(--panel-bg)", "color": "var(--panel-text)", "font-size": "12px" }}
@@ -140,7 +143,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
       {/* Save / load with CAS */}
       <div class="mt-4 flex gap-2 border-t pt-3" style={DIVIDER}>
         <button type="button" class={`${BUTTON} panel-btn--primary flex-1`} data-testid="pmi-save" disabled={store.status === "saving" || store.status === "loading"} onClick={() => void save()}>{t("cad.pmi.save")}</button>
-        <button type="button" class={`${BUTTON} shrink-0 whitespace-nowrap`} data-testid="pmi-reload" onClick={reload}>{t("cad.pmi.reload")}</button>
+        <button type="button" class={`${BUTTON} shrink-0 whitespace-nowrap`} data-testid="pmi-reload" disabled={store.status === "saving" || store.status === "loading"} onClick={reload}>{t("cad.pmi.reload")}</button>
       </div>
       <Show when={store.status === "conflict"}><div class="mt-2"><Note kind="bad" role="alert">{t("cad.pmi.conflict")}{store.error !== undefined ? ` ${store.error}` : ""}</Note></div></Show>
       <Show when={store.status === "error" && store.error !== undefined}><p role="alert" class="mt-2" style={{ ...BAD, "font-size": "12px" }}>{store.error}</p></Show>
@@ -149,7 +152,7 @@ export default function PmiPanel(props: { readonly embedded?: boolean }): JSX.El
       {/* Drawing derivation: same rows the sheet consumes */}
       <div class="mt-3 border-t pt-3" style={DIVIDER} data-testid="pmi-drawing-section">
         <h4 class="panel-group__title">{t("cad.pmi.drawingTitle")}</h4>
-        <Show when={rows().dimensions.length + rows().gdt.length + rows().datums.length + rows().notes.length === 0}><p style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.drawingEmpty")}</p></Show>
+        <Show when={rows().dimensions.length + rows().gdt.length + rows().datums.length + rows().datumTargets.length + rows().surfaceTextures.length + rows().notes.length === 0}><p style={{ ...MUTED, "font-size": "12px" }}>{t("cad.pmi.drawingEmpty")}</p></Show>
         <ul class="mt-1 space-y-1" style={{ ...MUTED, "font-size": "12px" }}>
           <For each={rows().dimensions}>{(d) => <li data-testid="pmi-drawing-dimension">{d.text}</li>}</For>
           <For each={rows().gdt}>{(g) => <li data-testid="pmi-drawing-gdt">{g.spec.kind} {g.text}{(g.spec.datums ?? []).length > 0 ? ` | ${(g.spec.datums ?? []).join(" | ")}` : ""}</li>}</For>
