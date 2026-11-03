@@ -177,7 +177,7 @@ export function ApprovalDock({ approvals, gutter, onDecide, onSkip, onShow }: {
         </View>
 
         {approval.kind === "permission" && approval.target ? (
-          <View style={{ borderRadius: 10, borderCurve: "continuous", paddingHorizontal: 10, paddingVertical: 7, backgroundColor: hexToRgba(palette.ink, isDark ? 0.08 : 0.05) }}>
+          <View style={{ borderRadius: 10, borderCurve: "continuous", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: hexToRgba(palette.ink, isDark ? 0.08 : 0.05) }}>
             <Text selectable numberOfLines={2} maxFontSizeMultiplier={1.3} style={{ color: palette.ink, ...mono(12) }}>{approval.target}</Text>
             {more ? <Text maxFontSizeMultiplier={1.3} style={{ marginTop: 2, color: palette.muted, ...typeStyle(11) }}>{more}</Text> : null}
           </View>

@@ -262,7 +262,7 @@ export function ToolpathReview({
         {machine ? (
           <View accessibilityRole="summary" style={{ gap: 3 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
                 <Text style={{ color: palette.accentStrong, ...type(12, { weight: "700" }) }}>{MACHINE_LABELS[machine.kind]}</Text>
               </View>
               <Text selectable style={{ flexShrink: 1, color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>

@@ -18,7 +18,7 @@ export function TagBadges({ collection, target }: { collection: TagCollection; t
 }
 function TagBadge({ tag }: { tag: ListTag }) {
   const { palette } = useTheme()
-  return <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 3, paddingHorizontal: 7, borderRadius: 8, backgroundColor: hexToRgba(tag.color, 0.13) }}><Dot color={tag.color} /><Text style={{ color: palette.ink, ...type(12) }}>{tag.name}</Text></View>
+  return <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: hexToRgba(tag.color, 0.13) }}><Dot color={tag.color} /><Text style={{ color: palette.ink, ...type(12) }}>{tag.name}</Text></View>
 }
 function Dot({ color }: { color: string }) { return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} /> }
 

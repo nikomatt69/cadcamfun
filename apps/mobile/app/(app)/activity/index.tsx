@@ -317,7 +317,7 @@ function ActivityRow({ row, wrap, onPress, onActions, onToggle, onDelete }: { ro
       accessibilityHint={target ? "Opens the update. Long press for more actions." : "Marks as read. Long press for more actions."}
       accessibilityActions={[{ name: "toggle", label: row.isRead ? "Mark as unread" : "Mark as read" }, { name: "delete", label: "Delete" }]}
       onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === "toggle") onToggle(); else if (event.nativeEvent.actionName === "delete") onDelete() }}
-      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" }}
+      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 12, marginHorizontal: -8, borderRadius: 12, borderCurve: "continuous" }}
     >
       <View style={{ width: 28, height: 24, alignItems: "center", justifyContent: "center", marginTop: 0 }}>
         <Icon size={21} color={toneColor(palette, category.tone)} strokeWidth={2} />

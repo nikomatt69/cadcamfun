@@ -59,7 +59,7 @@ export function FlatRow({
       {trailing ? <View style={{ flexShrink: 0, maxWidth: "40%", alignSelf: "center" }}>{trailing}</View> : showChevron ? <ChevronRight size={16} color={palette.muted} strokeWidth={2} style={{ alignSelf: "center" }} /> : null}
     </>
   )
-  const frame = { flexDirection: "row" as const, alignItems: "flex-start" as const, gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" as const }
+  const frame = { flexDirection: "row" as const, alignItems: "flex-start" as const, gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 12, marginHorizontal: -8, borderRadius: 12, borderCurve: "continuous" as const }
   if (!interactive) {
     return (
       <View accessible accessibilityLabel={accessibilityLabel ?? [title, subtitle, meta].filter(Boolean).join(". ")} style={frame}>{body}</View>

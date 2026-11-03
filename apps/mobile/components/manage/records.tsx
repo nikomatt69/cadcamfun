@@ -65,7 +65,7 @@ export function RecordRow({ icon: Icon, leading, title, subtitle, meta, trailing
       accessibilityRole="button"
       accessibilityLabel={label ?? [title, subtitle, meta].filter(Boolean).join(". ")}
       accessibilityHint={hint}
-      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" }}
+      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 12, marginHorizontal: -8, borderRadius: 12, borderCurve: "continuous" }}
     >
       <View style={{ width: 28, alignItems: "center", marginTop: 1 }}>
         {leading ?? (Icon ? <Icon size={21} color={palette.soft} strokeWidth={2} /> : null)}

@@ -48,7 +48,7 @@ export function SurfaceCard({
     : tone === "panel" ? palette.panel
       : tone === "raised" ? palette.surfaceRaised
         : tone === "background" ? hexToRgba(palette.background, 0.9) : palette.surface
-  const borderColor = washed ? washed.border : palette.border
+  const borderColor = washed ? "transparent" : palette.border
 
   const body = (
     <>

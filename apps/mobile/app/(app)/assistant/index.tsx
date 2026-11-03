@@ -280,7 +280,7 @@ function ConversationRow({ item, collection, current, wrap, onPress, onActions }
       accessibilityLabel={[title, meta, ...assignedTags(collection, tagTarget("session", item.id)).map((tag) => `Tag: ${tag.name}`)].filter(Boolean).join(". ")}
       accessibilityHint="Opens this conversation. Long press for actions."
       accessibilityState={{ selected: current }}
-      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" }}
+      style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 12, marginHorizontal: -8, borderRadius: 12, borderCurve: "continuous" }}
     >
       <View style={{ width: 16, alignItems: "center", marginTop: 3 }}>
         <Glyph busy={item.busy} current={current} />

@@ -133,7 +133,7 @@ export function ImageThumb({ uri, label, hint = "Opens the image full screen", o
           style={{ width: "100%", height: "100%" }} />
       )}
       {badge ? (
-        <View pointerEvents="none" style={{ position: "absolute", left: 6, top: 6, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderCurve: "continuous", backgroundColor: hexToRgba("#000000", isDark ? 0.6 : 0.5) }}>
+        <View pointerEvents="none" style={{ position: "absolute", left: 8, top: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderCurve: "continuous", backgroundColor: hexToRgba("#000000", isDark ? 0.6 : 0.5) }}>
           <Text style={{ color: ON_DARK, fontVariant: ["tabular-nums"], ...typeStyle(11, { weight: "600" }) }}>{badge}</Text>
         </View>
       ) : null}
