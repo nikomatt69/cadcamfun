@@ -11,6 +11,7 @@ import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { Field, NumberField, INPUT } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
+import { SetupExamples } from "./generator/SetupExamples.tsx"
 
 export interface WorkpieceSetupProps {
   readonly workpiece: Workpiece
@@ -36,6 +37,7 @@ export default function WorkpieceSetup(props: WorkpieceSetupProps): JSX.Element 
           {MATERIALS.map((material) => <option value={material}>{material}</option>)}
         </select>
       </Field>
+      <SetupExamples area="stock" workpiece={props.workpiece} onWorkpiece={props.onChangeWorkpiece} />
       <p class="panel-hint">{t("cam.unitsNotice")}</p>
     </SidebarSection>
   )

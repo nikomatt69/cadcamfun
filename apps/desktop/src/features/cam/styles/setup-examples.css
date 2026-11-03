@@ -1,0 +1,196 @@
+/* ==========================================================================
+   The miniatures of the generator panel (SectionExamples.tsx) and the examples picker (SetupExamples.tsx).
+   Quiet grays from the panel tokens, one accent for the thing the drawing is about, hairlines, no gradients,
+   no translucent overlaps. Base rules sit in :where() so a class below always wins without a specificity race.
+   ========================================================================== */
+
+/* ---- the shared frame (PreviewStage) ------------------------------------ */
+.panel-preview__caption { align-items: center; padding: 8px 12px 0; }
+.panel-preview__title { color: var(--panel-text); font-size: 12px; font-weight: 600; line-height: 18px; }
+.panel-preview__meta { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; }
+.panel-preview__chip {
+  padding: 0 6px; border-radius: 4px; background: var(--panel-bg-inset); color: var(--panel-text-muted);
+  font: 500 10.5px/16px var(--ent-mono); white-space: nowrap;
+}
+.panel-preview__viewport {
+  margin: 8px 12px 12px; overflow: hidden; border-radius: var(--ent-control-radius); background: var(--panel-bg);
+  background-image:
+    linear-gradient(var(--panel-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--panel-border) 1px, transparent 1px);
+  background-size: 16px 16px; background-position: -1px -1px;
+}
+.panel-preview__foot { padding: 0 12px 12px; }
+.panel-preview.panel-preview--compact svg { height: auto; aspect-ratio: 320 / 128; }
+.panel-preview__viewport > svg { background: transparent; }
+
+/* ---- drawing base -------------------------------------------------------- */
+:where(.panel-preview svg) :where(line, path, polyline) { fill: none; stroke: var(--panel-text-muted); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+:where(.panel-preview svg) :where(polygon, rect, ellipse, circle) { fill: var(--panel-bg); stroke: var(--panel-border-strong); stroke-width: 0.8; }
+:where(.panel-preview svg) text { fill: var(--panel-text-muted); font: 500 10px/1 system-ui, sans-serif; stroke: none; }
+
+/* shaded blocks: fixtures and jaws are one step darker than the part, the part keeps the face shades of panel.css */
+.iso--fixture .panel-preview__face--top { fill: var(--panel-bg-inset); }
+.iso--fixture .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-border) 70%, var(--panel-bg-inset)); }
+.iso--fixture .panel-preview__face--end { fill: var(--panel-border); }
+.iso--jaw .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-text-faint) 55%, var(--panel-bg)); }
+.iso--jaw .panel-preview__face--side { fill: var(--panel-text-faint); }
+.iso--jaw .panel-preview__face--end { fill: color-mix(in srgb, var(--panel-text-faint) 70%, var(--panel-border)); }
+.iso--print-layer .panel-preview__face--top { fill: var(--panel-accent-soft); }
+.iso--print-layer .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-accent) 30%, var(--panel-bg)); }
+.iso--print-layer .panel-preview__face--end { fill: color-mix(in srgb, var(--panel-accent) 20%, var(--panel-bg)); }
+.iso--mat-steel .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-text-muted) 22%, var(--panel-bg)); }
+.iso--mat-steel .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-text-muted) 48%, var(--panel-bg)); }
+.iso--mat-titanium .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-text-muted) 32%, var(--panel-bg)); }
+.iso--mat-titanium .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-text-muted) 60%, var(--panel-bg)); }
+.iso--mat-brass .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-warn) 16%, var(--panel-bg)); }
+.iso--mat-brass .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-warn) 34%, var(--panel-bg)); }
+.iso--mat-wood .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-warn) 12%, var(--panel-bg)); }
+.iso--mat-wood .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-warn) 26%, var(--panel-bg)); }
+.iso--mat-plastic .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-accent) 10%, var(--panel-bg)); }
+.iso--mat-plastic .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-accent) 24%, var(--panel-bg)); }
+.iso--mat-composite .panel-preview__face--top { fill: color-mix(in srgb, var(--panel-text) 26%, var(--panel-bg)); }
+.iso--mat-composite .panel-preview__face--side { fill: color-mix(in srgb, var(--panel-text) 52%, var(--panel-bg)); }
+.panel-preview__face--outline { fill: none; stroke: var(--panel-text-faint); stroke-dasharray: 3 3; }
+.panel-preview__hatch { fill: none; stroke: var(--panel-text-muted); stroke-width: 0.7; }
+
+/* ---- workholding --------------------------------------------------------- */
+.panel-preview__contact { stroke: var(--panel-accent); stroke-width: 1.8; }
+.panel-preview__contact-dot { fill: var(--panel-accent); stroke: var(--panel-bg); stroke-width: 1.5; }
+.panel-preview__force { stroke: var(--panel-accent); stroke-width: 1.4; stroke-dasharray: 4 2; }
+.panel-preview__suction { stroke: var(--panel-accent); stroke-width: 1.2; stroke-dasharray: 2 2; }
+.panel-preview__clamp { stroke: var(--panel-text-muted); stroke-width: 3.4; }
+.panel-preview__bolt { fill: var(--panel-bg-inset); stroke: var(--panel-text-muted); }
+.panel-preview__bolt-mark { stroke: var(--panel-text-muted); stroke-width: 1; }
+.panel-preview__hole { fill: var(--panel-text-faint); stroke: none; }
+.panel-preview__drop { stroke: var(--panel-text-faint); stroke-dasharray: 2 2; }
+.panel-preview__open { fill: none; stroke: var(--panel-text-faint); }
+.panel-preview__bed { stroke: var(--panel-border-strong); stroke-width: 2; }
+.panel-preview__centre { stroke: var(--panel-text-faint); stroke-dasharray: 5 3; stroke-width: 0.8; }
+.panel-preview__chuck { fill: var(--panel-border); }
+.panel-preview__chuck-step { fill: var(--panel-bg-inset); stroke: none; }
+.panel-preview__jaw { fill: var(--panel-text-faint); }
+.panel-preview__bar { fill: color-mix(in srgb, var(--panel-border) 50%, var(--panel-bg)); }
+.panel-preview__bar-edge { stroke: var(--panel-border-strong); }
+.panel-preview__bar-end { fill: var(--panel-border); }
+.panel-preview__grip { fill: var(--panel-accent-soft); stroke: var(--panel-accent); }
+.panel-preview__tailstock { fill: var(--panel-border); }
+.panel-preview__quill { stroke: var(--panel-text-muted); stroke-width: 2; }
+.panel-preview__spin { stroke: var(--panel-accent); stroke-width: 1.4; }
+.panel-preview__spin-head { fill: var(--panel-accent); stroke: none; }
+.panel-preview__rail { stroke: var(--panel-text-faint); stroke-width: 1.4; }
+.panel-preview__belt { stroke: var(--panel-accent); stroke-width: 1; stroke-dasharray: 3 2; }
+.panel-preview__motor { fill: var(--panel-border-strong); }
+.panel-preview__arm { stroke: var(--panel-text-muted); stroke-width: 1.2; }
+.panel-preview__plate { fill: var(--panel-bg-inset); }
+.panel-preview__nozzle { fill: var(--panel-text-muted); stroke: none; }
+.panel-preview__spindle { fill: var(--panel-border-strong); }
+.panel-preview__tool-line { stroke: var(--panel-accent); stroke-width: 1.8; }
+.panel-preview__turret { fill: var(--panel-border-strong); }
+.panel-preview__axis-set line { stroke: var(--panel-text-muted); stroke-width: 1; }
+.panel-preview__axis-set text { fill: var(--panel-text-muted); }
+.panel-preview__measure line { stroke: var(--panel-text-faint); stroke-width: 0.8; }
+.panel-preview__measure text { fill: var(--panel-text-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.panel-preview__axis { fill: var(--panel-accent); font-weight: 600; }
+.panel-preview__caption-note { fill: var(--panel-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.panel-preview__offset { fill: var(--panel-accent); font: 600 12px var(--ent-mono); }
+.panel-preview__code { fill: var(--panel-text); font: 500 10px var(--ent-mono); }
+.panel-preview__hash { fill: var(--panel-text-faint); font: 500 9px var(--ent-mono); }
+
+/* ---- materials ----------------------------------------------------------- */
+.panel-preview__section { stroke: var(--panel-text-faint); stroke-dasharray: 4 3; }
+.panel-preview__spool { fill: var(--panel-border); }
+.panel-preview__spool-hub { fill: var(--panel-bg); }
+.panel-preview__spool-core { fill: var(--panel-border-strong); }
+.panel-preview__filament { stroke: var(--panel-accent); stroke-width: 1.6; }
+.panel-preview__bead { stroke: var(--panel-accent); stroke-width: 1.6; }
+.panel-preview__bead-line { stroke: var(--panel-accent); stroke-width: 2.4; }
+
+/* ---- cutting, cycles, lathe, print (miniatures of the operation sections) --- */
+.panel-preview__pocket { fill: var(--panel-accent-soft); stroke: var(--panel-accent); }
+.panel-preview__cutter-ring { fill: none; stroke: var(--panel-text-faint); stroke-dasharray: 3 3; }
+.panel-preview__cutter { fill: var(--panel-bg); stroke: var(--panel-text-muted); }
+.panel-preview__flute { stroke: var(--panel-text-muted); }
+.panel-preview__shank { stroke: var(--panel-text-muted); stroke-width: 3; }
+.panel-preview__centre-dot { fill: var(--panel-accent); stroke: none; }
+.panel-preview__drill-line { stroke: var(--panel-text-muted); stroke-width: 2; }
+.panel-preview__drill-tip { fill: var(--panel-text-muted); stroke: none; }
+.panel-preview__tool { fill: var(--panel-text-muted); stroke: none; }
+.panel-preview__holder { stroke: var(--panel-text-muted); stroke-width: 3; }
+.panel-preview__bore { stroke: var(--panel-text-faint); stroke-dasharray: 4 2; }
+.panel-preview__groove { fill: var(--panel-bg-inset); stroke: var(--panel-text-faint); stroke-dasharray: 2 2; }
+.panel-preview__thread { stroke: var(--panel-text-faint); }
+.panel-preview__part-line { stroke: var(--panel-accent); stroke-dasharray: 4 3; stroke-width: 1.4; }
+.panel-preview__wall { fill: none; stroke: var(--panel-accent); }
+.panel-preview__infill { stroke: var(--panel-text-faint); }
+
+/* ---- advanced ------------------------------------------------------------ */
+.panel-preview__stock-top { fill: color-mix(in srgb, var(--panel-border) 48%, var(--panel-bg)); }
+.panel-preview__contour { fill: none; stroke: var(--panel-text-muted); }
+.panel-preview__finish { fill: none; stroke: var(--panel-accent); stroke-dasharray: 4 2; }
+.panel-preview__lead { stroke: var(--panel-text-faint); }
+.panel-preview__arc { stroke: var(--panel-accent); stroke-width: 1.6; }
+.panel-preview__tab { fill: var(--panel-text-muted); stroke: none; }
+.panel-preview__leader { stroke: var(--panel-text-faint); stroke-dasharray: 3 2; }
+.panel-preview__rest { fill: var(--panel-accent-soft); stroke: var(--panel-accent); stroke-dasharray: 3 2; }
+
+/* ---- assistant ----------------------------------------------------------- */
+.panel-preview__prompt, .panel-preview__params, .panel-preview__report { fill: var(--panel-bg); stroke: var(--panel-border-strong); }
+.panel-preview__prompt-mark { stroke: var(--panel-accent); stroke-width: 1.4; }
+.panel-preview__prompt-text { fill: var(--panel-text); font: 500 10px var(--ent-mono); }
+.panel-preview__quiet-line { stroke: var(--panel-border-strong); stroke-width: 3; }
+.panel-preview__flow { stroke: var(--panel-accent); stroke-width: 1.6; }
+.panel-preview__flow--off { stroke: var(--panel-text-faint); stroke-dasharray: 3 3; }
+.panel-preview__flow-head { fill: var(--panel-accent); stroke: none; }
+.panel-preview__flow-head--off { fill: var(--panel-text-faint); }
+.panel-preview__param-label { fill: var(--panel-text-faint); font: 500 10px var(--ent-mono); }
+.panel-preview__param-value { fill: var(--panel-text); font: 500 10px var(--ent-mono); font-variant-numeric: tabular-nums; }
+.panel-preview__ai--off { opacity: 0.55; }
+
+/* ---- verification -------------------------------------------------------- */
+.panel-preview__check { fill: none; stroke: currentcolor; stroke-width: 1.2; }
+.panel-preview__check-mark { fill: none; stroke: currentcolor; stroke-width: 1.3; }
+.panel-preview__check--ok { color: var(--panel-ok); }
+.panel-preview__check--warn { color: var(--panel-warn); }
+.panel-preview__check--bad { color: var(--panel-bad); }
+
+/* ---- set-ups and origins -------------------------------------------------- */
+.panel-preview__setup-arrow { stroke: var(--panel-accent); stroke-width: 1.6; }
+.panel-preview__setup-head { fill: var(--panel-accent); stroke: none; }
+.panel-preview__origin-dot { fill: var(--panel-accent); stroke: var(--panel-bg); stroke-width: 1.5; }
+.panel-preview__face-lit { fill: var(--panel-accent-soft); stroke: var(--panel-accent); stroke-width: 1; }
+.panel-preview__face-lit--hidden { fill: none; stroke-dasharray: 3 2; }
+
+/* ---- the real cutter assembly -------------------------------------------- */
+.setup-tool { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 128px; padding: 10px 0 14px; }
+.panel-preview .setup-tool__silhouette { height: 100%; width: auto; max-width: 100%; aspect-ratio: auto; }
+.setup-tool__floor { position: absolute; left: 24px; right: 24px; bottom: 10px; height: 0; border-top: 2px solid var(--panel-border-strong); }
+
+/* ---- the picker ---------------------------------------------------------- */
+.setup-examples { display: grid; gap: 8px; min-width: 0; }
+.setup-examples__toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: var(--ent-control-h); padding: 0 8px;
+  border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); background: transparent;
+  color: var(--panel-text-muted); font-family: inherit; font-size: 12px; font-weight: 500; line-height: 16px; cursor: pointer; text-align: left;
+}
+.setup-examples__toggle:hover { background: var(--panel-bg-inset); color: var(--panel-text); }
+.setup-examples__toggle:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+.setup-examples__toggle-label { flex: 1 1 auto; min-width: 0; }
+.setup-examples__count { color: var(--panel-text-faint); font-variant-numeric: tabular-nums; }
+.setup-examples__body { display: grid; gap: 8px; min-width: 0; }
+.setup-examples__note { margin: 0; color: var(--panel-text-muted); font-size: 11px; line-height: 16px; }
+.setup-examples__thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; }
+.setup-examples__thumb {
+  position: relative; display: flex; align-items: center; justify-content: center; height: 40px; padding: 2px; min-width: 0;
+  border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); background: var(--panel-bg-inset); cursor: pointer;
+}
+.setup-examples__thumb:hover { border-color: var(--panel-border-strong); }
+.setup-examples__thumb:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+.setup-examples__thumb[aria-pressed="true"] { border-color: var(--panel-accent); background: var(--panel-accent-soft); }
+.setup-examples__thumb svg { display: block; width: 100%; height: 100%; }
+.setup-examples__thumb text, .setup-examples__thumb .panel-preview__measure { display: none; }
+.setup-examples__thumb .setup-tool { height: 100%; padding: 2px 0; }
+.setup-examples__thumb .setup-tool__floor { display: none; }
+.setup-examples__thumb-mark { position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--panel-ok); }
+.setup-examples__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.setup-examples__state { color: var(--panel-text-faint); font-size: 11px; }
+.setup-examples__state[data-active="true"] { color: var(--panel-ok); }

@@ -4,8 +4,11 @@
  * the origin / geometry / operation diagrams. Values come from the live settings; anything not available cheaply is
  * left out rather than invented.
  */
-import { For, Show, createUniqueId, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createUniqueId, type JSX } from "solid-js"
+import type { cam } from "@cadcamfun/core"
 import { PreviewStage } from "./PreviewStage.tsx"
+import { ToolSilhouette } from "../ToolSilhouette.tsx"
+import "../../styles/setup-examples.css"
 
 export type SectionExampleKind =
   | "workholding"
@@ -20,15 +23,36 @@ export type SectionExampleKind =
   | "evidence"
   | "kernel-setup"
   | "print-verify"
+  | "origin"
+  | "post"
+  | "tool"
+  | "stock"
 
-export interface SectionExampleProps {
+/** What a workholding miniature can draw: the four holdings of the settings plus the two a machine brings (vacuum table, rotary table). */
+export type HoldingScene = "vise" | "clamps" | "plate" | "none" | "vacuum" | "rotary"
+
+/** What a scene needs to be drawn; the caption (title, detail, chip) belongs to the frame around it. */
+export interface SceneProps {
   readonly kind: SectionExampleKind
-  readonly title: string
-  readonly testId: string
   readonly detail?: string | undefined
   readonly chip?: string | undefined
   readonly family?: "mill" | "lathe" | "3dprinter" | undefined
-  readonly holding?: "vise" | "clamps" | "plate" | "none" | undefined
+  readonly holding?: HoldingScene | undefined
+  /** Parallels under the stock, mm: the stock stands on them in the vise. */
+  readonly parallels?: number | undefined
+  readonly kinematics?: "bed-slinger" | "corexy" | "delta" | "cartesian" | undefined
+  /** `machine`: which machine the miniature draws. */
+  readonly variant?: "vmc" | "fiveaxis" | "router" | undefined
+  /** `origin`: where the zero sits. */
+  readonly originKind?: "center" | "corner" | "machine" | "face" | "chuck" | undefined
+  /** `origin`: the work offset written next to the zero. */
+  readonly offset?: string | undefined
+  /** `post`: the first lines the dialect writes. */
+  readonly postLines?: ReadonlyArray<string> | undefined
+  /** `tool`: the cutter drawn as its real assembly. */
+  readonly cutter?: cam.kernel.Cutter | undefined
+  /** `stock`: the raw piece, mm. */
+  readonly stock?: { readonly x: number; readonly y: number; readonly z: number } | undefined
   readonly jawAxis?: "x" | "y" | undefined
   readonly material?: string | undefined
   readonly toolDiameter?: number | undefined
@@ -63,6 +87,11 @@ export interface SectionExampleProps {
   readonly chuck?: "3-jaw" | "4-jaw" | "collet" | undefined
   readonly bed?: { readonly width: number; readonly depth: number; readonly height: number } | undefined
   readonly nozzle?: number | undefined
+}
+
+export interface SectionExampleProps extends SceneProps {
+  readonly title: string
+  readonly testId: string
 }
 
 type XY = readonly [number, number]
@@ -153,7 +182,77 @@ const hatchOf = (tone: string): "metal" | "wood" | "plastic" | "composite" => to
 
 // ---------------------------------------------------------------- workholding
 
-function MillHoldScene(props: { readonly holding: "vise" | "clamps" | "plate" | "none"; readonly jawAxis: "x" | "y" }): JSX.Element {
+/** The tilted platter of a trunnion between its two cheeks, drawn in the panel's projection; `tilt` is degrees about X. */
+function Trunnion(props: { readonly cx: number; readonly cy: number; readonly z: number; readonly tilt?: number; readonly part?: boolean }): JSX.Element {
+  const { cx, cy } = props
+  const tilt = ((props.tilt ?? 32) * Math.PI) / 180
+  const rise = props.z
+  /** A rectangle of the platter (centred on the rotation axis), lifted `lift` along the platter's normal. */
+  const plate = (w: number, d: number, lift: number): string => {
+    const corners: ReadonlyArray<XY> = [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]]
+    return pts(corners.map(([x, y]) => iso(cx, cy, x, y * Math.cos(tilt) - lift * Math.sin(tilt), rise + y * Math.sin(tilt) + lift * Math.cos(tilt))))
+  }
+  const hub = iso(cx, cy, 0, 0, rise)
+  const reach = iso(cx, cy, 0, -26, rise + 28)
+  return (
+    <g>
+      <Box cx={cx} cy={cy} x={-52} y={-26} z={-30} w={104} d={52} h={10} tone="fixture" />
+      <Box cx={cx} cy={cy} x={-52} y={-8} z={-20} w={10} d={16} h={rise + 26} tone="fixture" />
+      <polygon points={plate(70, 44, 0)} class="panel-preview__face panel-preview__face--side" />
+      <Show when={props.part !== false}>
+        <polygon points={plate(40, 24, 8)} class="panel-preview__face panel-preview__face--top" />
+      </Show>
+      <Box cx={cx} cy={cy} x={42} y={-8} z={-20} w={10} d={16} h={rise + 26} tone="fixture" />
+      <path d={`M${hub[0] - 40} ${hub[1] - 34} A 22 22 0 0 1 ${hub[0] - 22} ${hub[1] - 44}`} class="panel-preview__spin" />
+      <polygon points={`${hub[0] - 22},${hub[1] - 44} ${hub[0] - 27},${hub[1] - 45} ${hub[0] - 24},${hub[1] - 39}`} class="panel-preview__spin-head" />
+      <line x1={reach[0]} y1={reach[1] - 14} x2={reach[0]} y2={reach[1]} class="panel-preview__tool-line" />
+    </g>
+  )
+}
+
+/** A mill vise: two jaws gripping the stock across `axis`'s perpendicular, the stock standing on parallels. */
+function ViseScene(props: { readonly jawAxis: "x" | "y"; readonly parallels: number }): JSX.Element {
+  const cx = 160, cy = 56
+  const lift = props.parallels > 0 ? Math.min(14, Math.max(4, props.parallels * 0.8)) : 0
+  const stock = { cx, cy, x: 0, y: 0, z: lift, w: 88, d: 32, h: 30 }
+  const jawLow = 22
+  const at = (x: number, y: number, z: number): XY => iso(cx, cy, x, y, z)
+  /** The clamping force: two short arrows pointing at the stock from the outside of each jaw. */
+  const force = (x1: number, y1: number, x2: number, y2: number): JSX.Element => {
+    const a = at(x1, y1, lift + 14), b = at(x2, y2, lift + 14)
+    return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} class="panel-preview__force" />
+  }
+  return (
+    <g>
+      <Box cx={cx} cy={cy} x={-24} y={-22} z={-14} w={136} d={76} h={14} tone="fixture" />
+      <Show when={lift > 0}>
+        <Box cx={cx} cy={cy} x={6} y={-2} z={0} w={14} d={36} h={lift} tone="fixture" />
+        <Box cx={cx} cy={cy} x={68} y={-2} z={0} w={14} d={36} h={lift} tone="fixture" />
+      </Show>
+      <Show when={props.jawAxis === "x"} fallback={
+        <g>
+          <Box cx={cx} cy={cy} x={-14} y={-4} z={0} w={14} d={40} h={jawLow + lift} tone="jaw" />
+          <Box {...stock} />
+          <Box cx={cx} cy={cy} x={88} y={-4} z={0} w={14} d={40} h={jawLow + lift} tone="jaw" />
+          {force(-20, 16, -4, 16)}
+          {force(108, 16, 92, 16)}
+        </g>
+      }>
+        <g>
+          <Box cx={cx} cy={cy} x={-8} y={-14} z={0} w={104} d={14} h={jawLow + lift} tone="jaw" />
+          <Box {...stock} />
+          <Box cx={cx} cy={cy} x={-8} y={32} z={0} w={104} d={14} h={jawLow + lift} tone="jaw" />
+          {force(44, -20, 44, -4)}
+          {force(44, 52, 44, 36)}
+        </g>
+      </Show>
+      <circle cx={at(44, 16, lift + 30)[0]} cy={at(44, 16, lift + 30)[1]} r="2.4" class="panel-preview__contact-dot" />
+      <text x={at(props.jawAxis === "x" ? 100 : 44, props.jawAxis === "x" ? 40 : 52, 0)[0]} y={at(props.jawAxis === "x" ? 100 : 44, props.jawAxis === "x" ? 40 : 52, 0)[1] + 12} text-anchor="middle" class="panel-preview__axis">{props.jawAxis.toUpperCase()}</text>
+    </g>
+  )
+}
+
+function MillHoldScene(props: { readonly holding: HoldingScene; readonly jawAxis: "x" | "y"; readonly parallels: number }): JSX.Element {
   const cx = 160, cy = 56
   const stock = { cx, cy, x: 0, y: 0, z: 0, w: 88, d: 32, h: 32 }
   const contact = (x: number): JSX.Element => {
@@ -161,73 +260,111 @@ function MillHoldScene(props: { readonly holding: "vise" | "clamps" | "plate" | 
     return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} class="panel-preview__contact" />
   }
   return (
-    <Show when={props.holding !== "none"} fallback={
-      <g>
-        <Box cx={cx} cy={cy} x={-26} y={-4} z={-24} w={140} d={40} h={12} tone="fixture" />
-        <Box {...stock} />
-        <line x1={iso(cx, cy, 44, 16, 0)[0]} y1={iso(cx, cy, 44, 16, 0)[1]} x2={iso(cx, cy, 44, 16, -12)[0]} y2={iso(cx, cy, 44, 16, -12)[1]} class="panel-preview__drop" />
-        <circle cx={iso(cx, cy, 44, 16, -12)[0]} cy={iso(cx, cy, 44, 16, -12)[1]} r="2" class="panel-preview__open" />
-      </g>
-    }>
-      <Box cx={cx} cy={cy} x={-22} y={-4} z={-12} w={132} d={40} h={12} tone="fixture" />
-      <Show when={props.holding === "vise"}>
-        <Box cx={cx} cy={cy} x={-13} y={0} z={0} w={13} d={32} h={46} tone="jaw" />
-        <Box cx={cx} cy={cy} x={88} y={0} z={0} w={13} d={32} h={46} tone="jaw" />
-        <Box {...stock} />
-        {contact(0)}
-        {contact(88)}
-        <line x1={iso(cx, cy, -8, 32, 44)[0]} y1={iso(cx, cy, -8, 32, 44)[1]} x2={iso(cx, cy, 4, 32, 37)[0]} y2={iso(cx, cy, 4, 32, 37)[1]} class="panel-preview__force" />
-        <line x1={iso(cx, cy, 96, 32, 44)[0]} y1={iso(cx, cy, 96, 32, 44)[1]} x2={iso(cx, cy, 84, 32, 37)[0]} y2={iso(cx, cy, 84, 32, 37)[1]} class="panel-preview__force" />
-        <circle cx={iso(cx, cy, 44, 16, 32)[0]} cy={iso(cx, cy, 44, 16, 32)[1]} r="2.4" class="panel-preview__contact-dot" />
-        <text x={iso(cx, cy, 0, 40, 48)[0]} y={iso(cx, cy, 0, 40, 48)[1]} text-anchor="middle" class="panel-preview__axis">{props.jawAxis.toUpperCase()}</text>
-      </Show>
-      <Show when={props.holding === "clamps"}>
-        <Box {...stock} />
-        <line x1={iso(cx, cy, -14, 16, 38)[0]} y1={iso(cx, cy, -14, 16, 38)[1]} x2={iso(cx, cy, 30, 16, 38)[0]} y2={iso(cx, cy, 30, 16, 38)[1]} class="panel-preview__clamp" />
-        <line x1={iso(cx, cy, 58, 16, 38)[0]} y1={iso(cx, cy, 58, 16, 38)[1]} x2={iso(cx, cy, 102, 16, 38)[0]} y2={iso(cx, cy, 102, 16, 38)[1]} class="panel-preview__clamp" />
-        <Box cx={cx} cy={cy} x={-22} y={8} z={0} w={10} d={16} h={38} tone="fixture" />
-        <Box cx={cx} cy={cy} x={100} y={8} z={0} w={10} d={16} h={38} tone="fixture" />
-        <line x1={iso(cx, cy, 12, 16, 32)[0]} y1={iso(cx, cy, 12, 16, 32)[1]} x2={iso(cx, cy, 24, 16, 32)[0]} y2={iso(cx, cy, 24, 16, 32)[1]} class="panel-preview__contact" />
-        <line x1={iso(cx, cy, 64, 16, 32)[0]} y1={iso(cx, cy, 64, 16, 32)[1]} x2={iso(cx, cy, 76, 16, 32)[0]} y2={iso(cx, cy, 76, 16, 32)[1]} class="panel-preview__contact" />
-        <circle cx={iso(cx, cy, -18, 16, 38)[0]} cy={iso(cx, cy, -18, 16, 38)[1]} r="3" class="panel-preview__bolt" />
-        <circle cx={iso(cx, cy, 106, 16, 38)[0]} cy={iso(cx, cy, 106, 16, 38)[1]} r="3" class="panel-preview__bolt" />
-        <line x1={iso(cx, cy, -18, 16, 38)[0]} y1={iso(cx, cy, -18, 16, 38)[1] - 3} x2={iso(cx, cy, -18, 16, 38)[0]} y2={iso(cx, cy, -18, 16, 38)[1] + 3} class="panel-preview__bolt-mark" />
-        <line x1={iso(cx, cy, 106, 16, 38)[0]} y1={iso(cx, cy, 106, 16, 38)[1] - 3} x2={iso(cx, cy, 106, 16, 38)[0]} y2={iso(cx, cy, 106, 16, 38)[1] + 3} class="panel-preview__bolt-mark" />
-      </Show>
-      <Show when={props.holding === "plate"}>
-        <Box cx={cx} cy={cy} x={-34} y={-10} z={-12} w={156} d={52} h={12} tone="fixture" />
-        <Box cx={cx} cy={cy} x={-6} y={0} z={0} w={6} d={32} h={20} tone="fixture" />
-        <Box cx={cx} cy={cy} x={88} y={0} z={0} w={6} d={32} h={20} tone="fixture" />
-        <Box {...stock} />
-        {contact(0)}
-        {contact(88)}
-        <For each={[[-28, -4], [-28, 36], [122, -4], [122, 36], [8, -14], [80, -14], [8, 46], [80, 46]] as ReadonlyArray<readonly [number, number]>}>
-          {([x, y]) => {
-            const at = iso(cx, cy, x, y, 0)
-            return <ellipse cx={at[0]} cy={at[1]} rx="2.6" ry="1.3" class="panel-preview__hole" />
-          }}
-        </For>
-      </Show>
-    </Show>
+    <Switch>
+      <Match when={props.holding === "none"}>
+        <g>
+          <Box cx={cx} cy={cy} x={-26} y={-4} z={-24} w={140} d={40} h={12} tone="fixture" />
+          <Box {...stock} />
+          <line x1={iso(cx, cy, 44, 16, 0)[0]} y1={iso(cx, cy, 44, 16, 0)[1]} x2={iso(cx, cy, 44, 16, -12)[0]} y2={iso(cx, cy, 44, 16, -12)[1]} class="panel-preview__drop" />
+          <circle cx={iso(cx, cy, 44, 16, -12)[0]} cy={iso(cx, cy, 44, 16, -12)[1]} r="2" class="panel-preview__open" />
+        </g>
+      </Match>
+      <Match when={props.holding === "vacuum"}>
+        <g>
+          <Box cx={cx} cy={cy} x={-50} y={-30} z={-14} w={188} d={96} h={14} tone="fixture" />
+          <For each={[0, 1, 2, 3, 4, 5, 6, 7]}>
+            {(index) => {
+              const at = iso(cx, cy, -34 + index * 24, 62, -7)
+              return <ellipse cx={at[0]} cy={at[1]} rx="2.4" ry="1.2" class="panel-preview__hole" />
+            }}
+          </For>
+          <Box cx={cx} cy={cy} x={-20} y={-14} z={0} w={148} d={62} h={5} tone="stock" />
+          <For each={[0, 1, 2, 3]}>
+            {(index) => {
+              const top = iso(cx, cy, 10 + index * 32, 17, 5), bottom = iso(cx, cy, 10 + index * 32, 17, -6)
+              return <line x1={top[0]} y1={top[1] - 12} x2={bottom[0]} y2={bottom[1]} class="panel-preview__suction" />
+            }}
+          </For>
+        </g>
+      </Match>
+      <Match when={props.holding === "rotary"}>
+        <Trunnion cx={cx} cy={cy + 14} z={30} />
+      </Match>
+      <Match when={props.holding === "vise"}>
+        <ViseScene jawAxis={props.jawAxis} parallels={props.parallels} />
+      </Match>
+      <Match when={props.holding === "clamps"}>
+        <g>
+          <Box cx={cx} cy={cy} x={-22} y={-4} z={-12} w={132} d={40} h={12} tone="fixture" />
+          <Box {...stock} />
+          <line x1={iso(cx, cy, -14, 16, 38)[0]} y1={iso(cx, cy, -14, 16, 38)[1]} x2={iso(cx, cy, 30, 16, 38)[0]} y2={iso(cx, cy, 30, 16, 38)[1]} class="panel-preview__clamp" />
+          <line x1={iso(cx, cy, 58, 16, 38)[0]} y1={iso(cx, cy, 58, 16, 38)[1]} x2={iso(cx, cy, 102, 16, 38)[0]} y2={iso(cx, cy, 102, 16, 38)[1]} class="panel-preview__clamp" />
+          <Box cx={cx} cy={cy} x={-22} y={8} z={0} w={10} d={16} h={38} tone="fixture" />
+          <Box cx={cx} cy={cy} x={100} y={8} z={0} w={10} d={16} h={38} tone="fixture" />
+          <line x1={iso(cx, cy, 12, 16, 32)[0]} y1={iso(cx, cy, 12, 16, 32)[1]} x2={iso(cx, cy, 24, 16, 32)[0]} y2={iso(cx, cy, 24, 16, 32)[1]} class="panel-preview__contact" />
+          <line x1={iso(cx, cy, 64, 16, 32)[0]} y1={iso(cx, cy, 64, 16, 32)[1]} x2={iso(cx, cy, 76, 16, 32)[0]} y2={iso(cx, cy, 76, 16, 32)[1]} class="panel-preview__contact" />
+          <circle cx={iso(cx, cy, -18, 16, 38)[0]} cy={iso(cx, cy, -18, 16, 38)[1]} r="3" class="panel-preview__bolt" />
+          <circle cx={iso(cx, cy, 106, 16, 38)[0]} cy={iso(cx, cy, 106, 16, 38)[1]} r="3" class="panel-preview__bolt" />
+          <line x1={iso(cx, cy, -18, 16, 38)[0]} y1={iso(cx, cy, -18, 16, 38)[1] - 3} x2={iso(cx, cy, -18, 16, 38)[0]} y2={iso(cx, cy, -18, 16, 38)[1] + 3} class="panel-preview__bolt-mark" />
+          <line x1={iso(cx, cy, 106, 16, 38)[0]} y1={iso(cx, cy, 106, 16, 38)[1] - 3} x2={iso(cx, cy, 106, 16, 38)[0]} y2={iso(cx, cy, 106, 16, 38)[1] + 3} class="panel-preview__bolt-mark" />
+        </g>
+      </Match>
+      <Match when={props.holding === "plate"}>
+        <g>
+          <Box cx={cx} cy={cy} x={-34} y={-10} z={-12} w={156} d={52} h={12} tone="fixture" />
+          <Box cx={cx} cy={cy} x={-6} y={0} z={0} w={6} d={32} h={20} tone="fixture" />
+          <Box cx={cx} cy={cy} x={88} y={0} z={0} w={6} d={32} h={20} tone="fixture" />
+          <Box {...stock} />
+          {contact(0)}
+          {contact(88)}
+          <For each={[[-28, -4], [-28, 36], [122, -4], [122, 36], [8, -14], [80, -14], [8, 46], [80, 46]] as ReadonlyArray<readonly [number, number]>}>
+            {([x, y]) => {
+              const at = iso(cx, cy, x, y, 0)
+              return <ellipse cx={at[0]} cy={at[1]} rx="2.6" ry="1.3" class="panel-preview__hole" />
+            }}
+          </For>
+        </g>
+      </Match>
+    </Switch>
   )
 }
 
 function LatheHoldScene(props: { readonly gripLength?: number | undefined; readonly tailstock?: boolean | undefined; readonly chuck?: "3-jaw" | "4-jaw" | "collet" | undefined }): JSX.Element {
   const grip = Math.max(8, Math.min(54, (props.gripLength ?? 12) * 1.8))
+  const collet = props.chuck === "collet"
   return (
     <g>
       <line x1="38" y1="108" x2="286" y2="108" class="panel-preview__bed" />
       <line x1="42" y1="66" x2="284" y2="66" class="panel-preview__centre" />
-      <rect x="48" y="40" width="48" height="52" rx="2" class="panel-preview__chuck" />
-      <rect x="56" y="48" width="32" height="8" rx="1" class="panel-preview__chuck-step" />
-      <rect x="56" y="76" width="32" height="8" rx="1" class="panel-preview__chuck-step" />
-      <rect x="92" y="52" width="16" height="12" rx="1" class="panel-preview__jaw" />
-      <rect x="92" y="68" width="16" height="12" rx="1" class="panel-preview__jaw" />
-      <rect x="92" y="84" width="16" height="12" rx="1" class="panel-preview__jaw" />
-      <rect x="106" y="54" width="142" height="24" rx="2" class="panel-preview__bar" />
-      <ellipse cx="248" cy="66" rx="5" ry="12" class="panel-preview__bar-end" />
-      <rect x="106" y="54" width={grip} height="24" class="panel-preview__grip" />
-      <line x1="106" y1="54" x2="106" y2="78" class="panel-preview__contact" />
+      <Show when={collet} fallback={
+        <g>
+          <rect x="48" y="40" width="48" height="52" rx="2" class="panel-preview__chuck" />
+          <rect x="56" y="48" width="32" height="8" rx="1" class="panel-preview__chuck-step" />
+          <rect x="56" y="76" width="32" height="8" rx="1" class="panel-preview__chuck-step" />
+          <Show when={props.chuck === "4-jaw"} fallback={
+            <g>
+              <rect x="92" y="52" width="16" height="12" rx="1" class="panel-preview__jaw" />
+              <rect x="92" y="68" width="16" height="12" rx="1" class="panel-preview__jaw" />
+              <rect x="92" y="84" width="16" height="12" rx="1" class="panel-preview__jaw" />
+            </g>
+          }>
+            <g>
+              <rect x="92" y="46" width="16" height="16" rx="1" class="panel-preview__jaw" />
+              <rect x="92" y="70" width="16" height="16" rx="1" class="panel-preview__jaw" />
+            </g>
+          </Show>
+        </g>
+      }>
+        <g>
+          <rect x="48" y="46" width="38" height="40" rx="2" class="panel-preview__chuck" />
+          <polygon points="86,46 108,56 108,76 86,86" class="panel-preview__jaw" />
+          <line x1="96" y1="56" x2="96" y2="76" class="panel-preview__chuck-step" />
+        </g>
+      </Show>
+      <rect x="106" y={collet ? 60 : 54} width="142" height={collet ? 12 : 24} rx="2" class="panel-preview__bar" />
+      <ellipse cx="248" cy="66" rx={collet ? 3 : 5} ry={collet ? 6 : 12} class="panel-preview__bar-end" />
+      <rect x="106" y={collet ? 60 : 54} width={grip} height={collet ? 12 : 24} class="panel-preview__grip" />
+      <line x1="106" y1={collet ? 60 : 54} x2="106" y2={collet ? 72 : 78} class="panel-preview__contact" />
       <Show when={props.tailstock === true}>
         <polygon points="248,48 280,56 280,76 248,84" class="panel-preview__tailstock" />
         <line x1="240" y1="66" x2="248" y2="66" class="panel-preview__quill" />
@@ -241,57 +378,96 @@ function LatheHoldScene(props: { readonly gripLength?: number | undefined; reado
         <path d="M66 34 A8 8 0 1 0 82 34" class="panel-preview__spin" />
         <polygon points="66,34 63,31 63,37" class="panel-preview__spin-head" />
       </Show>
+      <Show when={collet}>
+        <path d="M60 36 A8 8 0 1 1 76 36" class="panel-preview__spin" />
+        <polygon points="76,36 79,33 79,39" class="panel-preview__spin-head" />
+      </Show>
     </g>
   )
 }
 
-function PrinterHoldScene(props: { readonly buildHeight?: number | undefined }): JSX.Element {
+function PrinterHoldScene(props: { readonly buildHeight?: number | undefined; readonly kinematics?: "bed-slinger" | "corexy" | "delta" | "cartesian" | undefined }): JSX.Element {
   const cx = 160, cy = 58
   const partTop = 30
   return (
-    <g>
-      <Box cx={cx} cy={cy} x={-46} y={-28} z={-10} w={92} d={56} h={10} tone="fixture" />
-      <Box cx={cx} cy={cy} x={-18} y={-12} z={0} w={36} d={24} h={partTop} />
-      <line x1={iso(cx, cy, -18, 12, 0)[0]} y1={iso(cx, cy, -18, 12, 0)[1]} x2={iso(cx, cy, 18, 12, 0)[0]} y2={iso(cx, cy, 18, 12, 0)[1]} class="panel-preview__contact" />
-      <line x1="52" y1="30" x2="52" y2="104" class="panel-preview__rail" />
-      <line x1="268" y1="30" x2="268" y2="104" class="panel-preview__rail" />
-      <line x1="52" y1="30" x2="268" y2="30" class="panel-preview__rail" />
-      <line x1="160" y1="30" x2="160" y2="42" class="panel-preview__rail" />
-      <polygon points="153,42 167,42 164,50 156,50" class="panel-preview__nozzle" />
-      <Measure x1={282} y1={iso(cx, cy, 0, 0, 0)[1] - partTop} x2={282} y2={iso(cx, cy, 0, 0, 0)[1]} />
-    </g>
+    <Switch>
+      <Match when={props.kinematics === "corexy"}>
+        <g>
+          <Box cx={cx} cy={cy} x={-46} y={-28} z={-10} w={92} d={56} h={10} tone="fixture" />
+          <Box cx={cx} cy={cy} x={-18} y={-12} z={0} w={36} d={24} h={partTop} />
+          <rect x="52" y="26" width="216" height="8" rx="1" class="panel-preview__rail" />
+          <line x1="52" y1="30" x2="268" y2="30" class="panel-preview__rail" />
+          <line x1="60" y1="30" x2="260" y2="30" class="panel-preview__belt" />
+          <line x1="160" y1="30" x2="160" y2="42" class="panel-preview__rail" />
+          <polygon points="153,42 167,42 164,50 156,50" class="panel-preview__nozzle" />
+          <rect x="46" y="22" width="12" height="12" rx="1" class="panel-preview__motor" />
+          <rect x="262" y="22" width="12" height="12" rx="1" class="panel-preview__motor" />
+          <line x1="52" y1="34" x2="52" y2="104" class="panel-preview__rail" />
+          <line x1="268" y1="34" x2="268" y2="104" class="panel-preview__rail" />
+        </g>
+      </Match>
+      <Match when={props.kinematics === "delta"}>
+        <g>
+          <ellipse cx="160" cy="98" rx="62" ry="12" class="panel-preview__plate" />
+          <Box cx={cx} cy={cy + 12} x={-14} y={-10} z={0} w={28} d={20} h={26} />
+          <For each={[96, 160, 224]}>
+            {(x) => <line x1={x} y1="20" x2={x} y2="100" class="panel-preview__rail" />}
+          </For>
+          <line x1="96" y1="26" x2="152" y2="46" class="panel-preview__arm" />
+          <line x1="224" y1="26" x2="168" y2="46" class="panel-preview__arm" />
+          <line x1="160" y1="36" x2="160" y2="46" class="panel-preview__arm" />
+          <polygon points="152,46 168,46 164,54 156,54" class="panel-preview__nozzle" />
+          <circle cx="96" cy="26" r="2.4" class="panel-preview__bolt" />
+          <circle cx="224" cy="26" r="2.4" class="panel-preview__bolt" />
+        </g>
+      </Match>
+      <Match when={true}>
+        <g>
+          <Box cx={cx} cy={cy} x={-46} y={-28} z={-10} w={92} d={56} h={10} tone="fixture" />
+          <Box cx={cx} cy={cy} x={-18} y={-12} z={0} w={36} d={24} h={partTop} />
+          <line x1={iso(cx, cy, -18, 12, 0)[0]} y1={iso(cx, cy, -18, 12, 0)[1]} x2={iso(cx, cy, 18, 12, 0)[0]} y2={iso(cx, cy, 18, 12, 0)[1]} class="panel-preview__contact" />
+          <line x1="52" y1="30" x2="52" y2="104" class="panel-preview__rail" />
+          <line x1="268" y1="30" x2="268" y2="104" class="panel-preview__rail" />
+          <line x1="52" y1="30" x2="268" y2="30" class="panel-preview__rail" />
+          <line x1="160" y1="30" x2="160" y2="42" class="panel-preview__rail" />
+          <polygon points="153,42 167,42 164,50 156,50" class="panel-preview__nozzle" />
+          <Measure x1={282} y1={iso(cx, cy, 0, 0, 0)[1] - partTop} x2={282} y2={iso(cx, cy, 0, 0, 0)[1]} />
+        </g>
+      </Match>
+    </Switch>
   )
 }
 
-function WorkholdingScene(props: SectionExampleProps): JSX.Element {
+function WorkholdingScene(props: SceneProps): JSX.Element {
   return (
-    <Show when={props.family !== "3dprinter"} fallback={<PrinterHoldScene buildHeight={props.buildHeight} />}>
-      <Show when={props.family === "lathe"} fallback={<MillHoldScene holding={props.holding ?? "vise"} jawAxis={props.jawAxis ?? "x"} />}>
-        <LatheHoldScene gripLength={props.gripLength} tailstock={props.tailstock} chuck={props.chuck} />
-      </Show>
-    </Show>
+    <Switch>
+      <Match when={props.family === "3dprinter"}><PrinterHoldScene buildHeight={props.buildHeight} kinematics={props.kinematics} /></Match>
+      <Match when={props.family === "lathe"}><LatheHoldScene gripLength={props.gripLength} tailstock={props.tailstock} chuck={props.chuck} /></Match>
+      <Match when={true}><MillHoldScene holding={props.holding ?? "vise"} jawAxis={props.jawAxis ?? "x"} parallels={props.parallels ?? 0} /></Match>
+    </Switch>
   )
 }
 
 // ---------------------------------------------------------------- machine
 
-function MachineScene(props: SectionExampleProps): JSX.Element {
+function MachineScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 60
   return (
-    <Show when={props.family !== "lathe"} fallback={
-      <g>
-        <line x1="36" y1="108" x2="286" y2="108" class="panel-preview__bed" />
-        <rect x="52" y="42" width="40" height="52" rx="2" class="panel-preview__chuck" />
-        <rect x="92" y="56" width="150" height="24" rx="2" class="panel-preview__bar" />
-        <polygon points="250,48 276,58 276,72 250,78" class="panel-preview__turret" />
-        <line x1="92" y1="66" x2="276" y2="66" class="panel-preview__centre" />
-        <g class="panel-preview__axis-set">
-          <line x1="44" y1="104" x2="64" y2="92" /><text x="67" y="93">X</text>
-          <line x1="44" y1="104" x2="24" y2="92" /><text x="14" y="93">Z</text>
+    <Switch>
+      <Match when={props.family === "lathe"}>
+        <g>
+          <line x1="36" y1="108" x2="286" y2="108" class="panel-preview__bed" />
+          <rect x="52" y="42" width="40" height="52" rx="2" class="panel-preview__chuck" />
+          <rect x="92" y="56" width="150" height="24" rx="2" class="panel-preview__bar" />
+          <polygon points="250,48 276,58 276,72 250,78" class="panel-preview__turret" />
+          <line x1="92" y1="66" x2="276" y2="66" class="panel-preview__centre" />
+          <g class="panel-preview__axis-set">
+            <line x1="44" y1="104" x2="64" y2="92" /><text x="67" y="93">X</text>
+            <line x1="44" y1="104" x2="24" y2="92" /><text x="14" y="93">Z</text>
+          </g>
         </g>
-      </g>
-    }>
-      <Show when={props.family !== "3dprinter"} fallback={
+      </Match>
+      <Match when={props.family === "3dprinter"}>
         <g>
           <Box cx={cx} cy={cy} x={-60} y={-42} z={-10} w={120} d={84} h={64} outline />
           <Box cx={cx} cy={cy} x={-48} y={-30} z={-10} w={96} d={60} h={10} tone="fixture" />
@@ -302,7 +478,35 @@ function MachineScene(props: SectionExampleProps): JSX.Element {
           <line x1="160" y1="28" x2="160" y2="42" class="panel-preview__rail" />
           <polygon points="153,42 167,42 164,50 156,50" class="panel-preview__nozzle" />
         </g>
-      }>
+      </Match>
+      <Match when={props.variant === "fiveaxis"}>
+        <g>
+          <Trunnion cx={cx} cy={cy + 20} z={26} tilt={28} />
+          <rect x="154" y="6" width="12" height="20" rx="1" class="panel-preview__spindle" />
+          <line x1="160" y1="26" x2="160" y2="40" class="panel-preview__tool-line" />
+          <g class="panel-preview__axis-set">
+            <line x1="38" y1="108" x2="58" y2="96" /><text x="61" y="97">X</text>
+            <line x1="38" y1="108" x2="18" y2="96" /><text x="8" y="97">Y</text>
+            <line x1="38" y1="108" x2="38" y2="88" /><text x="34" y="84">Z</text>
+          </g>
+        </g>
+      </Match>
+      <Match when={props.variant === "router"}>
+        <g>
+          <Box cx={cx} cy={cy + 8} x={-70} y={-44} z={-12} w={140} d={88} h={12} tone="fixture" />
+          <Box cx={cx} cy={cy + 8} x={-54} y={-30} z={0} w={108} d={60} h={5} tone="stock" />
+          <line x1="70" y1="40" x2="70" y2="96" class="panel-preview__rail" />
+          <line x1="250" y1="40" x2="250" y2="96" class="panel-preview__rail" />
+          <line x1="70" y1="40" x2="250" y2="40" class="panel-preview__rail" />
+          <rect x="154" y="34" width="12" height="16" rx="1" class="panel-preview__spindle" />
+          <line x1="160" y1="50" x2="160" y2="62" class="panel-preview__tool-line" />
+          <g class="panel-preview__axis-set">
+            <line x1="26" y1="108" x2="46" y2="96" /><text x="49" y="97">X</text>
+            <line x1="26" y1="108" x2="6" y2="96" /><text x="0" y="97">Y</text>
+          </g>
+        </g>
+      </Match>
+      <Match when={true}>
         <g>
           <Box cx={cx} cy={cy} x={-54} y={-34} z={-12} w={108} d={68} h={72} outline />
           <Box cx={cx} cy={cy} x={-10} y={-14} z={0} w={48} d={28} h={22} />
@@ -314,14 +518,14 @@ function MachineScene(props: SectionExampleProps): JSX.Element {
             <line x1="38" y1="104" x2="38" y2="84" /><text x="34" y="80">Z</text>
           </g>
         </g>
-      </Show>
-    </Show>
+      </Match>
+    </Switch>
   )
 }
 
 // ---------------------------------------------------------------- material
 
-function MaterialScene(props: SectionExampleProps): JSX.Element {
+function MaterialScene(props: SceneProps): JSX.Element {
   const hatch = createUniqueId()
   const tone = materialTone(props.material)
   return (
@@ -350,7 +554,7 @@ function MaterialScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- cutting
 
-function CuttingScene(props: SectionExampleProps): JSX.Element {
+function CuttingScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 54
   const ae = ((props.stepover ?? 45) / 100) * (props.toolDiameter ?? 6)
   const ap = props.stepdown ?? 2
@@ -380,7 +584,7 @@ function CuttingScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- fixed cycles
 
-function FixedCyclesScene(props: SectionExampleProps): JSX.Element {
+function FixedCyclesScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 58
   const actual = props.holes ?? []
   const fallback: ReadonlyArray<{ x: number; y: number }> = [{ x: -28, y: -12 }, { x: 0, y: -12 }, { x: 28, y: -12 }, { x: -28, y: 12 }, { x: 0, y: 12 }, { x: 28, y: 12 }]
@@ -411,7 +615,7 @@ function FixedCyclesScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- lathe
 
-function LatheScene(props: SectionExampleProps): JSX.Element {
+function LatheScene(props: SceneProps): JSX.Element {
   const op = props.operation ?? (props.turning === "internal" ? "boring" : props.turning === "face" ? "facing" : "turning")
   const cy = 66
   const inner = op === "boring" || props.turning === "internal"
@@ -477,7 +681,7 @@ function LatheScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- print profile
 
-function PrintProfileScene(props: SectionExampleProps): JSX.Element {
+function PrintProfileScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 64
   const layers = [0, 9, 18]
   const walls = Math.max(1, Math.min(5, Math.round(props.walls ?? 3)))
@@ -510,7 +714,7 @@ function PrintProfileScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- advanced
 
-function AdvancedScene(props: SectionExampleProps): JSX.Element {
+function AdvancedScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 64
   const tabs = Math.max(0, Math.min(8, Math.round(props.tabs ?? 0)))
   return (
@@ -547,7 +751,7 @@ function AdvancedScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- ai
 
-function AiScene(props: SectionExampleProps): JSX.Element {
+function AiScene(props: SceneProps): JSX.Element {
   const enabled = props.ai !== false
   return (
     <g classList={{ "panel-preview__ai--off": !enabled }}>
@@ -574,7 +778,7 @@ function AiScene(props: SectionExampleProps): JSX.Element {
 
 const statusClass = (status: string): string => status === "passed" ? "panel-preview__check--ok" : status === "failed" ? "panel-preview__check--bad" : "panel-preview__check--warn"
 
-function EvidenceScene(props: SectionExampleProps): JSX.Element {
+function EvidenceScene(props: SceneProps): JSX.Element {
   const checks = (props.checks ?? []).slice(0, 4)
   return (
     <g>
@@ -600,33 +804,181 @@ function EvidenceScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- setups
 
-function KernelSetupScene(props: SectionExampleProps): JSX.Element {
-  const cx = 160, cy = 66
-  const fixture = props.fixture !== false
+/** Which face of the part looks at the spindle for a manual set-up, with the way the tool comes to it. */
+const FACING: Readonly<Record<string, { readonly face: (w: number, d: number, h: number) => ReadonlyArray<readonly [number, number, number]>; readonly from: readonly [number, number, number]; readonly hidden: boolean }>> = {
+  "+Z": { face: (w, d, h) => [[0, 0, h], [w, 0, h], [w, d, h], [0, d, h]], from: [0, 0, 1], hidden: false },
+  "-Z": { face: (w, d) => [[0, 0, 0], [w, 0, 0], [w, d, 0], [0, d, 0]], from: [0, 0, -1], hidden: true },
+  "+X": { face: (w, d, h) => [[w, 0, 0], [w, d, 0], [w, d, h], [w, 0, h]], from: [1, 0, 0], hidden: false },
+  "-X": { face: (_w, d, h) => [[0, 0, 0], [0, d, 0], [0, d, h], [0, 0, h]], from: [-1, 0, 0], hidden: true },
+  "+Y": { face: (w, d, h) => [[0, d, 0], [w, d, 0], [w, d, h], [0, d, h]], from: [0, 1, 0], hidden: false },
+  "-Y": { face: (w, _d, h) => [[0, 0, 0], [w, 0, 0], [w, 0, h], [0, 0, h]], from: [0, -1, 0], hidden: true }
+}
+
+function KernelSetupScene(props: SceneProps): JSX.Element {
+  const cx = 160, cy = 72
+  const orientation = props.orientation ?? "+Z"
+  const facing = FACING[orientation] ?? FACING["+Z"]!
+  const w = 60, d = 34, h = 30
+  const at = (x: number, y: number, z: number): XY => iso(cx, cy, x - w / 2, y - d / 2, z)
+  const corners = facing.face(w, d, h)
+  const centre = corners.reduce<readonly [number, number, number]>((sum, [x, y, z]) => [sum[0] + x / corners.length, sum[1] + y / corners.length, sum[2] + z / corners.length], [0, 0, 0])
+  const tip = at(...centre)
+  const start = at(centre[0] + facing.from[0] * 40, centre[1] + facing.from[1] * 40, centre[2] + facing.from[2] * 40)
+  const dx = tip[0] - start[0], dy = tip[1] - start[1]
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len, uy = dy / len
   return (
     <g>
-      <Box cx={cx} cy={cy} x={-42} y={-18} z={-10} w={84} d={36} h={10} tone="fixture" />
-      <Box cx={cx} cy={cy} x={-20} y={-9} z={0} w={40} d={18} h={28} />
-      <Show when={fixture} fallback={
+      <Box cx={cx} cy={cy} x={-w / 2 - 14} y={-d / 2 - 10} z={-10} w={w + 28} d={d + 20} h={10} tone="fixture" />
+      <Box cx={cx} cy={cy} x={-w / 2} y={-d / 2} z={0} w={w} d={d} h={h} />
+      <polygon points={pts(corners.map(([x, y, z]) => at(x, y, z)))} class={facing.hidden ? "panel-preview__face-lit panel-preview__face-lit--hidden" : "panel-preview__face-lit"} />
+      <line x1={start[0]} y1={start[1]} x2={tip[0] - ux * 4} y2={tip[1] - uy * 4} class="panel-preview__setup-arrow" />
+      <polygon points={`${tip[0]},${tip[1]} ${tip[0] - ux * 9 - uy * 4},${tip[1] - uy * 9 + ux * 4} ${tip[0] - ux * 9 + uy * 4},${tip[1] - uy * 9 - ux * 4}`} class="panel-preview__setup-head" />
+      <text x={Math.max(12, Math.min(284, start[0] + 8))} y={Math.max(14, Math.min(118, start[1]))} class="panel-preview__caption-note">{orientation}</text>
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------- origin
+
+/** The zero of the program: a marker on the stock, the machine zero beside it, a lathe's face or chuck, a printer's plate. */
+function OriginScene(props: SceneProps): JSX.Element {
+  const kind = props.originKind ?? "center"
+  return (
+    <Switch>
+      <Match when={props.family === "lathe"}>
         <g>
-          <line x1={iso(cx, cy, -20, 9, 0)[0]} y1={iso(cx, cy, -20, 9, 0)[1]} x2={iso(cx, cy, 20, 9, 0)[0]} y2={iso(cx, cy, 20, 9, 0)[1]} class="panel-preview__drop" />
+          <line x1="34" y1="108" x2="288" y2="108" class="panel-preview__bed" />
+          <line x1="44" y1="66" x2="284" y2="66" class="panel-preview__centre" />
+          <rect x="44" y="38" width="42" height="56" rx="2" class="panel-preview__chuck" />
+          <rect x="86" y="52" width="12" height="28" rx="1" class="panel-preview__jaw" />
+          <rect x="98" y="48" width="152" height="36" rx="2" class="panel-preview__bar" />
+          <line x1="98" y1="48" x2="98" y2="84" class="panel-preview__contact" />
+          <circle cx={kind === "chuck" ? 98 : 250} cy="66" r="3.4" class="panel-preview__origin-dot" />
+          <line x1={kind === "chuck" ? 98 : 250} y1="66" x2={kind === "chuck" ? 150 : 198} y2="66" class="panel-preview__setup-arrow" />
+          <polygon points={kind === "chuck" ? "158,66 150,62 150,70" : "190,66 198,62 198,70"} class="panel-preview__setup-head" />
+          <text x={kind === "chuck" ? 104 : 232} y="40" class="panel-preview__axis">Z0</text>
         </g>
-      }>
-        <Box cx={cx} cy={cy} x={-30} y={-4} z={0} w={10} d={8} h={14} tone="fixture" />
-        <Box cx={cx} cy={cy} x={20} y={-4} z={0} w={10} d={8} h={14} tone="fixture" />
-        <line x1={iso(cx, cy, -20, 9, 0)[0]} y1={iso(cx, cy, -20, 9, 0)[1]} x2={iso(cx, cy, -20, 9, 14)[0]} y2={iso(cx, cy, -20, 9, 14)[1]} class="panel-preview__contact" />
-        <line x1={iso(cx, cy, 20, 9, 0)[0]} y1={iso(cx, cy, 20, 9, 0)[1]} x2={iso(cx, cy, 20, 9, 14)[0]} y2={iso(cx, cy, 20, 9, 14)[1]} class="panel-preview__contact" />
+      </Match>
+      <Match when={props.family === "3dprinter"}>
+        <g>
+          <Box cx={160} cy={62} x={-60} y={-40} z={-10} w={120} d={80} h={10} tone="fixture" />
+          <Box cx={160} cy={62} x={-16} y={-12} z={0} w={32} d={24} h={22} />
+          <circle cx={iso(160, 62, kind === "center" ? 0 : -60, kind === "center" ? 0 : 40, 0)[0]} cy={iso(160, 62, kind === "center" ? 0 : -60, kind === "center" ? 0 : 40, 0)[1]} r="3.6" class="panel-preview__origin-dot" />
+          <text x={iso(160, 62, kind === "center" ? 0 : -60, kind === "center" ? 0 : 40, 0)[0] + 8} y={iso(160, 62, kind === "center" ? 0 : -60, kind === "center" ? 0 : 40, 0)[1] + 12} class="panel-preview__axis">XY0</text>
+        </g>
+      </Match>
+      <Match when={true}>
+        {(() => {
+          const cx = 168, cy = 66, w = 100, d = 52, h = 18
+          const spot: Record<string, readonly [number, number, number]> = { center: [w / 2, d / 2, h], corner: [0, d, h], machine: [-34, d + 22, 0] }
+          const [px, py, pz] = spot[kind] ?? spot["center"]!
+          const marker = iso(cx, cy, px - w / 2, py - d / 2, pz)
+          const corner = iso(cx, cy, -w / 2, d / 2, h)
+          const axisX = iso(cx, cy, px - w / 2 + 36, py - d / 2, pz), axisY = iso(cx, cy, px - w / 2, py - d / 2 - 26, pz)
+          return (
+            <g>
+              <Box cx={cx} cy={cy} x={-w / 2 - 12} y={-d / 2 - 12} z={-10} w={w + 24} d={d + 24} h={10} tone="fixture" />
+              <Box cx={cx} cy={cy} x={-w / 2} y={-d / 2} z={0} w={w} d={d} h={h} />
+              <Show when={kind === "machine"}>
+                <line x1={marker[0]} y1={marker[1]} x2={corner[0]} y2={corner[1]} class="panel-preview__leader" />
+              </Show>
+              <line x1={marker[0]} y1={marker[1]} x2={axisX[0]} y2={axisX[1]} class="panel-preview__setup-arrow" />
+              <line x1={marker[0]} y1={marker[1]} x2={axisY[0]} y2={axisY[1]} class="panel-preview__setup-arrow" />
+              <text x={axisX[0] + 4} y={axisX[1] + 10} class="panel-preview__axis">X</text>
+              <text x={axisY[0] + 4} y={axisY[1] - 2} class="panel-preview__axis">Y</text>
+              <circle cx={marker[0]} cy={marker[1]} r="3.6" class="panel-preview__origin-dot" />
+              <Show when={props.offset}>{(offset) => <text x="22" y="26" class="panel-preview__offset">{offset()}</text>}</Show>
+            </g>
+          )
+        })()}
+      </Match>
+    </Switch>
+  )
+}
+
+// ---------------------------------------------------------------- post
+
+/** The first lines a dialect writes, as code on a quiet card. */
+function PostScene(props: SceneProps): JSX.Element {
+  const lines = (props.postLines ?? []).slice(0, 6)
+  return (
+    <g>
+      <rect x="24" y="14" width="272" height="100" rx="5" class="panel-preview__report" />
+      <For each={lines}>
+        {(line, index) => <text x="38" y={34 + index() * 15} class="panel-preview__code">{line}</text>}
+      </For>
+      <Show when={lines.length === 0}>
+        <For each={[0, 1, 2, 3]}>
+          {(index) => <line x1="38" y1={34 + index * 15} x2={150 + (index % 2) * 60} y2={34 + index * 15} class="panel-preview__quiet-line" />}
+        </For>
       </Show>
-      <line x1="160" y1="26" x2="160" y2="42" class="panel-preview__setup-arrow" />
-      <polygon points="160,20 155,29 165,29" class="panel-preview__setup-head" />
-      <text x="168" y="28" class="panel-preview__caption-note">{props.orientation ?? "+Z"}</text>
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------- tool
+
+/** A lathe insert on its holder, a parting blade or a printer nozzle: the tools the kernel's mill assemblies do not cover. */
+function ToolGlyphScene(props: SceneProps): JSX.Element {
+  return (
+    <Switch>
+      <Match when={props.family === "3dprinter"}>
+        <g>
+          <line x1="44" y1="104" x2="276" y2="104" class="panel-preview__bed" />
+          <rect x="140" y="12" width="40" height="22" rx="2" class="panel-preview__spindle" />
+          <polygon points="146,34 174,34 166,64 154,64" class="panel-preview__nozzle" />
+          <line x1="160" y1="64" x2="160" y2="86" class="panel-preview__bead" />
+          <line x1="104" y1="92" x2="216" y2="92" class="panel-preview__bead-line" />
+          <Measure x1={192} y1={34} x2={192} y2={64} />
+          <text x="204" y="52" class="panel-preview__caption-note">{props.nozzle === undefined ? "" : `Ø ${mm(props.nozzle)}`}</text>
+        </g>
+      </Match>
+      <Match when={true}>
+        <g>
+          <line x1="34" y1="108" x2="288" y2="108" class="panel-preview__bed" />
+          <line x1="44" y1="66" x2="284" y2="66" class="panel-preview__centre" />
+          <rect x="60" y="48" width="130" height="36" rx="2" class="panel-preview__bar" />
+          <Show when={props.operation === "parting"} fallback={
+            <g>
+              <polygon points="196,50 206,44 212,50 202,56" class="panel-preview__tool" />
+              <line x1="208" y1="46" x2="244" y2="14" class="panel-preview__holder" />
+            </g>
+          }>
+            <g>
+              <line x1="146" y1="44" x2="146" y2="88" class="panel-preview__part-line" />
+              <polygon points="140,36 152,36 150,48 142,48" class="panel-preview__tool" />
+              <line x1="146" y1="36" x2="146" y2="8" class="panel-preview__holder" />
+            </g>
+          </Show>
+        </g>
+      </Match>
+    </Switch>
+  )
+}
+
+// ---------------------------------------------------------------- stock
+
+/** The raw piece to scale, with its three dimensions. */
+function StockScene(props: SceneProps): JSX.Element {
+  const size = props.stock ?? { x: 100, y: 100, z: 20 }
+  const scale = Math.min(96 / Math.max(size.x, size.y), 70 / size.z, 1.4)
+  const w = size.x * scale, d = size.y * scale, h = Math.max(6, size.z * scale)
+  const cx = 160, cy = 62
+  const a = iso(cx, cy, -w / 2, d / 2, 0), b = iso(cx, cy, w / 2, d / 2, 0), c = iso(cx, cy, w / 2, -d / 2, 0)
+  return (
+    <g>
+      <Box cx={cx} cy={cy} x={-w / 2} y={-d / 2} z={0} w={w} d={d} h={h} />
+      <Measure x1={a[0] + 4} y1={a[1] + 12} x2={b[0] + 4} y2={b[1] + 12} label={mm(size.x)} />
+      <Measure x1={b[0] + 12} y1={b[1] + 4} x2={c[0] + 12} y2={c[1] + 4} label={mm(size.y)} />
+      <Measure x1={c[0] + 10} y1={c[1] - h} x2={c[0] + 10} y2={c[1]} label={mm(size.z)} />
     </g>
   )
 }
 
 // ---------------------------------------------------------------- verified print
 
-function PrintVerifyScene(props: SectionExampleProps): JSX.Element {
+function PrintVerifyScene(props: SceneProps): JSX.Element {
   const cx = 160, cy = 60
   return (
     <g>
@@ -644,11 +996,14 @@ function PrintVerifyScene(props: SectionExampleProps): JSX.Element {
 
 // ---------------------------------------------------------------- root
 
-export function SectionExample(props: SectionExampleProps): JSX.Element {
-  const label = (): string => [props.title, props.detail, props.chip].filter((value): value is string => value !== undefined && value !== "").join(" · ")
+const label = (props: { readonly title?: string | undefined; readonly detail?: string | undefined; readonly chip?: string | undefined }): string =>
+  [props.title, props.detail, props.chip].filter((value): value is string => value !== undefined && value !== "").join(" · ")
+
+/** The drawing alone: the scene of `kind` inside the shared 320 x 128 viewBox, or the real tool assembly for a cutter. */
+export function SectionScene(props: SceneProps & { readonly title?: string | undefined; readonly height?: number | undefined }): JSX.Element {
   return (
-    <PreviewStage title={props.title} detail={props.detail} chip={props.chip} testId={props.testId} compact ariaLabel={label()}>
-      <svg viewBox="0 0 320 128" role="img" aria-label={label()} data-example={props.kind}>
+    <Show when={props.kind === "tool" && props.cutter !== undefined} fallback={
+      <svg viewBox="0 0 320 128" role="img" aria-label={label(props)} data-example={props.kind}>
         <g class="panel-preview__scene">
           <Show when={props.kind === "workholding"}><WorkholdingScene {...props} /></Show>
           <Show when={props.kind === "machine"}><MachineScene {...props} /></Show>
@@ -662,8 +1017,25 @@ export function SectionExample(props: SectionExampleProps): JSX.Element {
           <Show when={props.kind === "evidence"}><EvidenceScene {...props} /></Show>
           <Show when={props.kind === "kernel-setup"}><KernelSetupScene {...props} /></Show>
           <Show when={props.kind === "print-verify"}><PrintVerifyScene {...props} /></Show>
+          <Show when={props.kind === "origin"}><OriginScene {...props} /></Show>
+          <Show when={props.kind === "post"}><PostScene {...props} /></Show>
+          <Show when={props.kind === "tool"}><ToolGlyphScene {...props} /></Show>
+          <Show when={props.kind === "stock"}><StockScene {...props} /></Show>
         </g>
       </svg>
+    }>
+      <div class="setup-tool" data-example="tool" role="img" aria-label={label(props)}>
+        <ToolSilhouette cutter={props.cutter!} height={props.height ?? 92} class="setup-tool__silhouette" />
+        <div class="setup-tool__floor" aria-hidden="true" />
+      </div>
+    </Show>
+  )
+}
+
+export function SectionExample(props: SectionExampleProps): JSX.Element {
+  return (
+    <PreviewStage title={props.title} detail={props.detail} chip={props.chip} testId={props.testId} compact ariaLabel={label(props)}>
+      <SectionScene {...props} />
     </PreviewStage>
   )
 }

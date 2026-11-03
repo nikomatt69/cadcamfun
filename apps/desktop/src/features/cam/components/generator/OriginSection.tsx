@@ -7,6 +7,7 @@ import { CheckRow, NumberField, Section } from "./ui.tsx"
 import { useJob } from "../../hooks/useJob.ts"
 import { originExample } from "../../lib/generator-preview.ts"
 import { ExamplePreview } from "./ExamplePreview.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 const FIELD = "panel-input"
@@ -73,6 +74,7 @@ export function OriginSection(): JSX.Element {
 
         </Match>
       </Switch>
+      <SetupExamples area="origin" />
     </Section>
   )
 }

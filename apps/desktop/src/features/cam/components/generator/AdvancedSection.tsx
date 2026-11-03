@@ -2,6 +2,7 @@ import { Show, type JSX } from "solid-js"
 import { Activity } from "lucide-solid"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { CheckRow, Field, Group, INPUT, LABEL, Note, NumberField, Section } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 /** "Advanced Settings": tolerance, path optimisation, arc fitting, strategies and tool compensation. */
@@ -60,6 +61,7 @@ export function AdvancedSection(): JSX.Element {
       </Group>
 
       <Note>{t("cam.gen.adv.advancedNote")}</Note>
+      <SetupExamples area="advanced" />
     </Section>
   )
 }

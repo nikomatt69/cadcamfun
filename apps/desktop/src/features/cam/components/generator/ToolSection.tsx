@@ -5,6 +5,7 @@ import { useRead } from "../../../../app/queries.ts"
 import { useGeneratorStore, type LibraryTool, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
 import { CheckRow, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 import { cam } from "@cadcamfun/core"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
 import { previewToolModel } from "../../lib/machine-view.ts"
@@ -164,6 +165,8 @@ export function ToolSection(): JSX.Element {
           <button type="button" class="panel-btn" onClick={upload}><Upload size={14} />{t("cam.tool.apply")}</button>
         </div>
       </div>
+
+      <SetupExamples area="tool" />
     </Section>
   )
 }

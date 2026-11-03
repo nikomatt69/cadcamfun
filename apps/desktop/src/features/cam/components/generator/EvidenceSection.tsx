@@ -9,6 +9,7 @@ import { Dynamic } from "solid-js/web"
 import type { cam } from "@cadcamfun/core"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Badge, Note } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 type Reference = NonNullable<cam.generator.ProgramRecord["cuttingData"]["reference"]>
@@ -93,6 +94,7 @@ export function EvidenceSection(): JSX.Element {
               <div>NC sha256 {e().program.sha256} · {e().program.lines} lines · {e().program.cutLength} {t("cad.millimeters")} {printer() ? "of bead" : "cut"} · {e().program.estimatedSeconds} s</div>
               <div>inputs {e().inputs.digest} · {printer() ? t("cam.gen.mach.printer") : `${e().tool.type} Ø${e().tool.diameter} ${e().tool.flutes}F`} · {e().inputs.material}</div>
             </div>
+            <SetupExamples area="evidence" />
           </div>
         </section>
       )}

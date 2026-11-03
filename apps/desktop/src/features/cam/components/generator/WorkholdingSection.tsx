@@ -9,6 +9,7 @@ import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorS
 import { NumberField } from "../../../cad/components/property-inputs/NumberField.tsx"
 import { t } from "../../../../i18n/index.ts"
 import { CheckRow, INPUT, LABEL, Section } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 
 export function WorkholdingSection(): JSX.Element {
   const gen = useGeneratorStore()
@@ -80,6 +81,7 @@ export function WorkholdingSection(): JSX.Element {
         <Show when={gen.settings.machineType !== "3dprinter"}>
           <CheckRow id="workholding-configured" checked={gen.settings.workholdingConfigured} onChange={(checked) => gen.patchSettings({ workholdingConfigured: checked })}>{t("cam.workholding.configured")}</CheckRow>
         </Show>
+        <SetupExamples area="workholding" />
       </div>
     </Section>
   )

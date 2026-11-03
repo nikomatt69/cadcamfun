@@ -3,6 +3,7 @@ import type { cam } from "@cadcamfun/core"
 import type { CadSetupsReport } from "@cadcamfun/api"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
+import { SetupExamples } from "./SetupExamples.tsx"
 
 type Plan = CadSetupsReport["parts"][number]["plan"]
 
@@ -46,6 +47,7 @@ export default function KernelSetups(props: {
     <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-setups">
       <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.setups.title")}</summary>
       <div class="space-y-2 pt-2">
+        <SetupExamples area="setup" after={(example) => props.onUse(example.patch.kernel?.setupOrientation ?? "+Z")} />
         <label class="panel-check">
           <input type="checkbox" checked={fixture() === "bottom"} onChange={(event) => setFixture(event.currentTarget.checked ? "bottom" : "none")} data-testid="kernel-setups-fixture" />
           {t("cam.setups.heldBottom")}

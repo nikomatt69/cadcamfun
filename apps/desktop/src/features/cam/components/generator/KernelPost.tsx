@@ -3,6 +3,7 @@ import type { CamMachineConfig } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
+import { SetupExamples } from "./SetupExamples.tsx"
 
 type Stored = { readonly id: string; readonly name: string; readonly data: unknown }
 
@@ -100,6 +101,7 @@ export default function KernelPost(props: {
       <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.post.title")}{props.current !== undefined ? ` (${t("cam.post.active")})` : ""}</summary>
       <div class="space-y-2 pt-2">
         <p class="panel-hint">{t("cam.post.hint")}</p>
+        <SetupExamples area="post" />
         <div class="flex flex-wrap gap-2">
           <For each={Object.keys(cam.BUILTIN_DEFINITIONS) as Array<keyof typeof cam.BUILTIN_DEFINITIONS>}>{(id) => (
             <button type="button" class="panel-btn" onClick={() => start(id)} data-testid={`kernel-post-start-${id}`}>{t("cam.post.startFrom", { post: id })}</button>

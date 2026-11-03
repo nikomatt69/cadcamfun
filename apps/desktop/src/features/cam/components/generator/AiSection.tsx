@@ -8,6 +8,7 @@ import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
 import { CheckRow, Group, INPUT, LABEL, Section } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 
 /** The assistant is optional here (the panel also mounts without the AI provider, e.g. in tests). */
 const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
@@ -114,6 +115,7 @@ export function AiSection(): JSX.Element {
           </div>
         </Group>
       </Show>
+      <SetupExamples area="ai" />
     </Section>
   )
 }

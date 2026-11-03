@@ -7,6 +7,7 @@ import { useRead } from "../../../../app/queries.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { Field, Group, INPUT, LABEL, Note, Section } from "./ui.tsx"
+import { SetupExamples } from "./SetupExamples.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 const MATERIAL_NAMES: Readonly<Record<string, string>> = {
@@ -169,6 +170,7 @@ export function MaterialSection(): JSX.Element {
           </Show>
         </select>
       </div>
+      <SetupExamples area="material" />
     </Section>
     )}>
       <Section id="material" icon={Package} title={t("cam.gen.pp.filament")} summary={filament().name} testId="material-section">
@@ -195,6 +197,7 @@ export function MaterialSection(): JSX.Element {
           gen.setPrinter({ fanSpeed: filament().fan })
           gen.flash(`${filament().name}: nozzle ${filament().nozzleTemperature} deg C, bed ${filament().bedTemperature} deg C`)
         }}>{t("cam.gen.mat.applyTemps")}</button>
+        <SetupExamples area="material" />
       </Section>
     </Show>
   )
