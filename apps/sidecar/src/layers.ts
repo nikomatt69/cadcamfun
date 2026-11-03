@@ -38,6 +38,7 @@ import { OrganizationsHandlers } from "./http/organizations.ts"
 import { ConversationsHandlers } from "./http/conversations.ts"
 import { ConversationRepo } from "./repos/conversation-repo.ts"
 import { CamSetupRepo } from "./repos/cam-setup-repo.ts"
+import { AiUsageRepo } from "./repos/ai-usage-repo.ts"
 import { NotificationsHandlers } from "./http/notifications.ts"
 import { ProductionCostsHandlers } from "./http/production-costs.ts"
 import { ProductionCostRepo } from "./repos/production-cost-repo.ts"
@@ -157,6 +158,7 @@ const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
 const PlatformServices = Layer.mergeAll(StorageService.layer, FileRepo.layer, MiscRepo.layer, KvStore.layer, LiveEvents.layer, AssistantTurns.layer)
 const IntegrationServices = Layer.mergeAll(
   PluginRegistryRepo.layer,
+  AiUsageRepo.layer,
   McpRepo.layer,
   Companion.layer.pipe(Layer.provide(Layer.mergeAll(KvStore.layer, AuthTokens.layer, IdentityLive))),
   VcsServices,

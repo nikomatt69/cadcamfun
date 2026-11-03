@@ -3732,6 +3732,13 @@ export type AiRevokeBridgeTokenInput = { readonly id: { readonly id: string }["i
 
 export type AiRevokeBridgeTokenOutput = { message: string }
 
+export type AiUsageOutput = {
+  models: Array<{ model: string; inputTokens: number; outputTokens: number; turns: number }>
+  totals: { inputTokens: number; outputTokens: number; turns: number }
+  since: string | null
+  updatedAt: string | null
+}
+
 export type AiAgentsOutput = Array<{
   id: string
   title: string

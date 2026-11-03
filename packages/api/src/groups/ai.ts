@@ -308,6 +308,14 @@ export const AiSessionMessage = Schema.Struct({
   usage: Schema.optionalKey(Schema.Struct({ inputTokens: Schema.Number, outputTokens: Schema.Number }))
 })
 export type AiSessionMessage = typeof AiSessionMessage.Type
+/** The tokens a person's assistant turns have used, per model and in all (RM-10). Cost is the client's arithmetic on the catalogue. */
+const UsageCounts = { inputTokens: Schema.Number, outputTokens: Schema.Number, turns: Schema.Number }
+export const AiUsageTotals = Schema.Struct({
+  models: Schema.Array(Schema.Struct({ model: Schema.String, ...UsageCounts })),
+  totals: Schema.Struct(UsageCounts),
+  since: Schema.NullOr(Schema.String), updatedAt: Schema.NullOr(Schema.String)
+})
+export type AiUsageTotals = typeof AiUsageTotals.Type
 /**
  * One page of a conversation, oldest first. `before` continues with older messages (pass it as `?before=`); null when this
  * page starts at the beginning of the conversation.
@@ -322,6 +330,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("issueBridgeToken", "/api/ai/bridge/tokens", { payload: BridgeTokenBody, success: BridgeTokenIssued, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("bridgeTokens", "/api/ai/bridge/tokens", { success: Schema.Array(BridgeTokenInfo), error: [InternalError] }),
     HttpApiEndpoint.delete("revokeBridgeToken", "/api/ai/bridge/tokens/:id", { params: bridgeTokenParam, success: message, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("usage", "/api/ai/usage", { success: AiUsageTotals, error: [InternalError] }),
     HttpApiEndpoint.get("agents", "/api/ai/agents", { success: Schema.Array(AssistantAgent), error: [InternalError] }),
     HttpApiEndpoint.post("sessionControl", "/api/ai/sessions/control", { payload: SessionControlBody, success: SessionControlReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),

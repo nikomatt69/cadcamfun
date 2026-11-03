@@ -20,6 +20,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { ProjectVcs } from "../services/project-vcs.ts"
+import { AiUsageRepo } from "../repos/ai-usage-repo.ts"
 import { makeAiContext } from "../services/ai-context.ts"
 import { HISTORY_SCAN_LIMIT, historyPage, sessionSummaries, type HostHistoryMessage, type HostHistorySession } from "../services/assistant-history.ts"
 
@@ -66,6 +67,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const projects = yield* ProjectRepo
   const drawings = yield* DrawingRepo
   const vcs = yield* ProjectVcs
+  const usage = yield* AiUsageRepo
   actingUser.configureDirectory(join(appConfig.dataDir, "ai", "session-owners"))
   const checkProject = Effect.fn("AiHttp.checkProject")(function*(projectId?: string) {
     const actor = yield* CurrentUser
@@ -121,6 +123,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       type: "error" as const, sessionId: payload.sessionId ?? "", code: e._tag === "AiConfigError" ? "config" as const : e._tag === "AiAborted" ? "aborted" as const : "provider" as const,
       message: aiError(e)
     })), Stream.tap((event) => {
+      // A finished turn adds its tokens to the person's running total (settings); a failure to write it never touches the turn.
+      if (event.type !== "done" || event.usage === undefined) return Effect.void
+      return usage.record(actor.id, payload.model ? `${payload.model.provider}/${payload.model.model}` : undefined, event.usage).pipe(
+        Effect.catch((cause) => Effect.logWarning("Could not record the turn's token usage", cause)))
+    }), Stream.tap((event) => {
       if (!payload.projectId || !event.sessionId) return Effect.void
       const finished = event.type === "done" || event.type === "error"
       if (announced && !finished) return Effect.void
@@ -262,6 +269,10 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       yield* ai.invalidateCatalogue
       return yield* status
     }))
+    .handle("usage", () => Effect.gen(function*() {
+      const actor = yield* CurrentUser
+      return yield* usage.totals(actor.id)
+    }).pipe(Effect.catchTag("DatabaseError", (cause) => Effect.logError("Failed to read the token usage", cause).pipe(Effect.andThen(Effect.fail(new InternalError({ message: "Failed to read the token usage" })))))))
     .handle("agents", () => Effect.succeed(ai.agents))
     .handle("sessionControl", ({ payload }) => Effect.gen(function*() {
       const projectId = yield* controlProject(payload.sessionId, payload.projectId)

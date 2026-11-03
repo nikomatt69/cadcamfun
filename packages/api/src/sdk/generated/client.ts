@@ -79,6 +79,7 @@ import type {
   AiBridgeTokensOutput,
   AiRevokeBridgeTokenInput,
   AiRevokeBridgeTokenOutput,
+  AiUsageOutput,
   AiAgentsOutput,
   AiSessionControlInput,
   AiSessionControlOutput,
@@ -1434,6 +1435,11 @@ export function make(options: ClientOptions) {
             declaredStatuses: [400, 500, 401],
             empty: false,
           },
+          requestOptions,
+        ),
+      usage: (requestOptions?: RequestOptions) =>
+        request<AiUsageOutput>(
+          { method: "GET", path: `/api/ai/usage`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
           requestOptions,
         ),
       agents: (requestOptions?: RequestOptions) =>

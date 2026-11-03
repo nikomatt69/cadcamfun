@@ -215,3 +215,46 @@ describe("/api/ai/chat/stream", () => {
     expect((await post("/api/ai/chat/abort", { sessionId: "s" })).status).toBe(400)
   })
 })
+
+describe("/api/ai/usage (RM-10)", () => {
+  const turn = async (extra: Record<string, unknown> = {}) => {
+    const r = await app.call("/api/ai/chat/stream", { method: "POST", json: { message: "hi", ...extra } })
+    const events = String(r.body).split("\n").filter((l) => l.startsWith("data:")).map((l) => JSON.parse(l.slice(5)))
+    expect(events.at(-1)).toMatchObject({ type: "done" })
+    return events.at(-1)
+  }
+
+  test("the total adds up every finished turn, per model, and survives anything but another turn", async () => {
+    await configure()
+    expect((await app.call("/api/ai/usage", { auth: false })).status).toBe(401)
+    const before = (await app.call("/api/ai/usage")).body
+    const base = before.totals as { inputTokens: number; outputTokens: number; turns: number }
+
+    const done = await turn()
+    expect(done.usage).toEqual({ inputTokens: 3, outputTokens: 5 })
+    await turn({ model: { provider: "anthropic", model: "claude-test" } })
+    await turn({ model: { provider: "anthropic", model: "claude-test" } })
+
+    const after = (await app.call("/api/ai/usage")).body
+    expect(after.totals).toEqual({ inputTokens: base.inputTokens + 9, outputTokens: base.outputTokens + 15, turns: base.turns + 3 })
+    const named = after.models.find((m: { model: string }) => m.model === "anthropic/claude-test")
+    expect(named).toEqual({ model: "anthropic/claude-test", inputTokens: 6, outputTokens: 10, turns: 2 })
+    expect(after.models.find((m: { model: string }) => m.model === "default")?.turns).toBeGreaterThanOrEqual(1)
+    expect(after.since).toBeTruthy()
+    expect(Date.parse(after.updatedAt)).toBeGreaterThanOrEqual(Date.parse(after.since))
+  })
+
+  test("another person's turns never count for you", async () => {
+    const password = "test-password-long"
+    await app.call("/api/auth/signup", { method: "POST", json: { email: "usage-stranger@example.com", name: "Stranger", password, confirmPassword: password } })
+    const headers = { "x-session-token": (await app.call("/api/auth/signin-direct", { method: "POST", json: { email: "usage-stranger@example.com", password } })).body.token }
+    expect((await app.call("/api/ai/usage", { headers })).body).toEqual({ models: [], totals: { inputTokens: 0, outputTokens: 0, turns: 0 }, since: null, updatedAt: null })
+  })
+
+  test("two turns that finish together both count", async () => {
+    await configure()
+    const base = (await app.call("/api/ai/usage")).body.totals.turns as number
+    await Promise.all([turn(), turn(), turn()])
+    expect((await app.call("/api/ai/usage")).body.totals.turns).toBe(base + 3)
+  })
+})
