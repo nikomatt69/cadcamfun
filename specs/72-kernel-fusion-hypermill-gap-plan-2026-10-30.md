@@ -415,3 +415,7 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `packages/ai/test/cam-breadth-actions.test.ts` (5, through the catalogue seam). The `cam` tool description is 4 818 characters (budget raised from 4 550 to 4 850;
   the detail is in the cam-post skill). **Open:** no desktop panel yet (the CAM page verifies only its own programs); foreign NC with tool length compensation
   per tool (the replay reads the NC tip position); the part must be closed; `convertNc` does not feed it.
+- 2026-11-03 (P3-1, step 4.1 first half): CAD to CAM associativity is no longer absent. `cam.kernel.partFingerprint` and `programStatus` (spec 59 A1, A2) tell whether the
+  model a stored kernel program was made from changed (`current` / `stale` with the class topology, geometry, rigid or inputs / `unknown` with the reason), over
+  `GET /api/toolpaths/:id/status` and as `modelChange` in the assistant's `cam review`. Open: regenerate with a diff, `matchOperations`, the desktop banner (spec 59 A3 to A7).
+

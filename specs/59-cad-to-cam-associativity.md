@@ -1,6 +1,6 @@
 # 59 — CAD → CAM associativity: know the model changed, say what changed, regenerate with a diff
 
-Status: specified 2026-10-25 (not built). Part of [spec 39](39-professional-parity-master-plan.md); gap G2 of [spec 57](57-parity-ledger-2026-10-25.md).
+Status: specified 2026-10-25; A1 (fingerprint) and A2 (status) built 2026-11-03, see the change log. Part of [spec 39](39-professional-parity-master-plan.md); gap G2 of [spec 57](57-parity-ledger-2026-10-25.md).
 Owner: WP2 (`packages/core/src/cam/kernel/{identity,snapshot,execute,planner}.ts`, new `cam/kernel/associativity.ts`); adapters WP3
 (`packages/api/src/groups/toolpaths.ts`), WP4 (`apps/sidecar/src/http/{toolpaths,workspace}.ts`), WP6 (`apps/desktop/src/features/cam`, `features/toolpaths`),
 WP8 (`packages/ai`). Depends on [58](58-parametric-timeline.md) (what is active in the model) and, for the durable form, [41](41-persistent-topological-naming.md) N6.
@@ -108,3 +108,14 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
 ## 8. Change log
 
 - 2026-10-25: created.
+- 2026-11-03 (build, A1 + A2 and their adapters): `cam/kernel/associativity.ts` has `partFingerprint` (schema `cam-kernel/part-geometry@1`: names, layers, colours,
+  visibility, metadata and a feature's `name`/`group`/`appearance` are left out, numbers are rounded to a nanometre, an unknown field counts as geometry) and
+  `programStatus(stored, current)` returning `current` (with the `displayOnly` element ids), `stale` (class `topology`, `geometry`, `rigid` with the translation, or
+  `inputs`; element ids; the settings that differ when the current settings are passed) or `unknown` with its reason. **Deviation from §3.1:** the fingerprint is
+  derived from the stored `kernelRequest.elements` and is not written into `identity.partGeometry`, so no artifact contract changes and every stored program already has a
+  status. Adapters: `GET /api/toolpaths/:id/status` (derived, never stored; `unknown` for a toolpath without a kernel request or a drawing) and `modelChange` on
+  `cam review` (the review stays `stale` on any drawing revision; `modelChange` says whether the geometry did change). Tests: `kernel/associativity.test.ts` (11),
+  `apps/sidecar/test/cam-program-status.test.ts` (2, through HTTP and the assistant's review). **Open:** A3 regenerate with a restore point, A4 `ProgramDiff`, A5
+  `matchOperations`, the desktop banner and badge (A6), partial regeneration (A7); the route compares the model only, the settings comparison needs the caller to pass
+  the current settings (the desktop has them).
+

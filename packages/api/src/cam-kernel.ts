@@ -142,3 +142,18 @@ export const CamSetupSheetData = Schema.Struct({
 })
 export const CamSetupSheet = Schema.Struct({ data: CamSetupSheetData, html: Schema.String })
 export type CamSetupSheet = typeof CamSetupSheet.Type
+
+/**
+ * Whether the drawing still matches the model a stored kernel program was made from (spec 59 A2). Derived on read, never stored.
+ * `stale` carries the class (`topology`: elements added or removed; `geometry`: a shape or placement changed; `rigid`: the whole part moved
+ * by `move`; `inputs`: only a setting differs) and the element ids; `unknown` always carries its reason and is never read as `current`.
+ */
+export const CamProgramStatus = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("current"), displayOnly: strings }),
+  Schema.Struct({
+    status: Schema.Literal("stale"), class: Schema.Literals(["topology", "geometry", "rigid", "inputs"]),
+    added: strings, removed: strings, changed: strings, move: Schema.optionalKey(xyz), inputs: strings, reasons: strings
+  }),
+  Schema.Struct({ status: Schema.Literal("unknown"), reason: Schema.String })
+])
+export type CamProgramStatus = typeof CamProgramStatus.Type

@@ -520,8 +520,10 @@ const toolHandlers = Effect.gen(function*() {
         const revision = drawingRevision(loaded)
         const stale = data["sourceRevision"] !== revision || stored.row.gcode !== artifact.nc || cam.kernel.sha256(artifact.nc) !== artifact.identity.nc
         const status = stale ? "stale" : artifact.release === "verified-program" ? "pass" : artifact.release
+        // Why the program is out of date, from the elements it was made from (spec 59 A2): a rename is not a model change, a moved part is not a resized one.
+        const modelChange = cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: loaded.elements })
         return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: data["sourceRevision"], release: artifact.release,
-          claims: artifact.claims, issues: artifact.issues, stock: artifact.stock, identity: artifact.identity, note: "Evidence covers the original native-kernel NC and its modelled capabilities; no program was regenerated." }
+          claims: artifact.claims, issues: artifact.issues, stock: artifact.stock, identity: artifact.identity, modelChange, note: "Evidence covers the original native-kernel NC and its modelled capabilities; no program was regenerated." }
       }
       if (data["format"] === "cadcamfun-cam") return { ok: false, status: "unverified", operationId, identity: { nc: cam.kernel.sha256(stored.row.gcode ?? "") }, note: "Saved or edited G-code has no current native verification." }
       const found = await operation(projectId, operationId)

@@ -197,7 +197,7 @@ const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Lit
 /** A plan check is a verdict: `ok` is false when an operation fails its checks. Validated against `revision`. */
 const planCheck = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, mutated: Schema.Literal(false), operations: Schema.Array(record) })
 /** A saved review is a verdict on one operation; `stale` and `unverified` are answers, not refusals. */
-const review = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed", "stale", "unverified", "preview", "blocked"]), operationId: str })
+const review = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed", "stale", "unverified", "preview", "blocked"]), operationId: str, modelChange: Schema.optionalKey(Schema.Unknown) })
 const machine = Schema.Struct({ kind: str, title: str, plane: str, axes: Schema.Array(record), xIsDiameter: Schema.Boolean, origins: Schema.Unknown })
 const operations = Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, name: str, generated: Schema.Boolean }), [record]))
 const compared = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), candidates: Schema.Array(record), ...drawingRef })

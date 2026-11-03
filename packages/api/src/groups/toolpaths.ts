@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { CamSetupSheet } from "../cam-kernel.ts"
+import { CamProgramStatus, CamSetupSheet } from "../cam-kernel.ts"
 import { BadRequest, Conflict, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, Envelope, EnvelopeOpt, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const NullStr = Schema.NullOr(Schema.String)
@@ -87,6 +87,7 @@ export class ToolpathsGroup extends HttpApiGroup.make("toolpaths")
     }),
     HttpApiEndpoint.delete("remove", "/api/toolpaths/:id", { params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.get("setupSheet", "/api/toolpaths/:id/setup-sheet", { params: id, success: CamSetupSheet, error: [BadRequest, NotFound, InternalError] }),
+    HttpApiEndpoint.get("status", "/api/toolpaths/:id/status", { params: id, success: CamProgramStatus, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("postCheck", "/api/toolpaths/post-check", { payload: PostCheckBody, success: PostCheck, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("listForDrawing", "/api/drawings/:id/toolpaths", { params: id, success: Schema.Array(ToolpathWithRefs), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createForDrawing", "/api/drawings/:id/toolpaths", {

@@ -7,6 +7,7 @@ import { ToolpathRepo, type ToolpathInput } from "../repos/toolpath-repo.ts"
 import { internal } from "./entity-io.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { isPortableProgram, prepareCamProgramData } from "../services/cam-program.ts"
+import { elementsOf } from "../services/ai-elements.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -64,6 +65,17 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
         if (typeof sheet === "string") return yield* new BadRequest({ message: sheet })
         return { data: sheet, html: cam.kernel.setupSheetHtml(sheet) }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to build the setup sheet"))))
+    .handle("status", ({ params }) =>
+      Effect.gen(function*() {
+        const found = yield* load(params.id)
+        const stored = found.row.data as { readonly kernelRequest?: unknown } | null
+        if (stored?.kernelRequest === undefined || stored.kernelRequest === null) return { status: "unknown" as const, reason: "this toolpath has no kernel request: only a program the CAM kernel generated from the drawing has a status" }
+        if (found.row.drawingId === null) return { status: "unknown" as const, reason: "this toolpath is not attached to a drawing, so there is no model to compare it with" }
+        const user = yield* CurrentUser
+        const owner = yield* drawings.find(user.id, found.row.drawingId)
+        if (owner === undefined) return { status: "unknown" as const, reason: "the drawing this program was made from cannot be opened" }
+        return cam.kernel.programStatus({ request: stored.kernelRequest }, { elements: elementsOf(owner.data) })
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to read the program status"))))
     .handle("postCheck", ({ payload }) =>
       Effect.sync(() => {
         const compiled = cam.compileDefinition(payload.definition)

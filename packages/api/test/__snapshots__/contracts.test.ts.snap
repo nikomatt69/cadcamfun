@@ -80839,6 +80839,203 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/toolpaths/{id}/status": {
+      "get": {
+        "operationId": "toolpaths.status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "displayOnly": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "status": {
+                          "enum": [
+                            "current",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "status",
+                        "displayOnly",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "added": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "changed": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "class": {
+                          "enum": [
+                            "topology",
+                            "geometry",
+                            "rigid",
+                            "inputs",
+                          ],
+                          "type": "string",
+                        },
+                        "inputs": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "move": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                            "z": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z",
+                          ],
+                          "type": "object",
+                        },
+                        "reasons": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "removed": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "status": {
+                          "enum": [
+                            "stale",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "status",
+                        "class",
+                        "added",
+                        "removed",
+                        "changed",
+                        "inputs",
+                        "reasons",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "reason": {
+                          "type": "string",
+                        },
+                        "status": {
+                          "enum": [
+                            "unknown",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "status",
+                        "reason",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "toolpaths",
+        ],
+      },
+    },
     "/api/toolpaths/{id}/versions": {
       "get": {
         "operationId": "toolpathExtras.listVersions",

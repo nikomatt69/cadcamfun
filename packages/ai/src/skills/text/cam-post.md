@@ -24,3 +24,9 @@ Replays NC the kernel did not write (another CAM system, a hand edit, a shop pos
 - Verdict `faults`: a gouge (with the first NC line that cuts below the part, and its depth), a rapid through material, or a travel violation. `incomplete`: nothing was found but the replay did not see every move (reasons are listed: an arc written with the table turned, an unknown tool, a part that is not closed). `clean`: every move was replayed and nothing was found.
 - Every figure carries `errorBoundMm`; a deviation under `thresholdMm` (tolerance plus that error) is not reported. `left` is stock left beyond the part plus the allowance: it is information, not a fault.
 - A clean replay is NOT controller acceptance and not a machine, vise or table collision check: say so. Use `cam job` for the full machine and fixture checks of a program the kernel writes.
+
+## Why a program is stale: `cam review` modelChange
+A saved kernel program keeps the elements it was made from. `cam review` compares them with the drawing now and returns `modelChange`:
+- `current` (with `displayOnly`: elements renamed, recoloured or moved to another layer, which never change the machined shape), `stale` or `unknown` (a legacy program, or a request without its elements: the reason is given and the program is never called current).
+- `stale` has a class: `topology` (elements added or removed), `geometry` (a shape or placement changed: the ids are in `changed`), `rigid` (the whole part moved by `move`: the program is right for the part but not for the machine zero, so move the work offset, do not regenerate blindly), `inputs` (the model is the same, a setting differs).
+- The review status `stale` also fires on a pure rename (the drawing revision changed); `modelChange.status: current` then says the geometry is the same. Report both: do not regenerate a program whose model did not change.

@@ -54,8 +54,8 @@ export const PROMPT_BUDGETS = {
   system: 13_000,
   /** One mode, one family style or one specialist prompt. */
   staticEntry: 10_000,
-  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. Raised to 35 600 when cad_edit parametric_edit (structural edits of a stored part) joined, to 36 000 when the build verification result (volume, bounds, attention) joined cad and cad_edit, to 36 500 when memory brain_read (the whole host memory file, paged) joined. */
-  descriptions: 36_500,
+  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. Raised to 35 600 when cad_edit parametric_edit (structural edits of a stored part) joined, to 36 000 when the build verification result (volume, bounds, attention) joined cad and cad_edit, to 36 500 when memory brain_read (the whole host memory file, paged) joined, to 37 000 when cam verify_nc (foreign NC replay) and the review's modelChange joined. */
+  descriptions: 37_000,
   /** One tool description (4 850, in step with tool-prompts.test.ts: cad and cad_edit carry the whole parametric surface; cam carries verify_nc, spec 72 step 0.6). */
   description: 4_850,
   /** One skill body. */

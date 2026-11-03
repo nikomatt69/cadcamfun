@@ -2828,40 +2828,45 @@ type Endpoint26_5Input = { readonly id: Endpoint26_5Request["params"]["id"] }
 const Endpoint26_5 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_5Input) =>
   raw["setupSheet"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint26_6Request = Parameters<RawClient["toolpaths"]["postCheck"]>[0]
-type Endpoint26_6Input = {
-  readonly definition: Endpoint26_6Request["payload"]["definition"]
-  readonly sample?: Endpoint26_6Request["payload"]["sample"]
-}
+type Endpoint26_6Request = Parameters<RawClient["toolpaths"]["status"]>[0]
+type Endpoint26_6Input = { readonly id: Endpoint26_6Request["params"]["id"] }
 const Endpoint26_6 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_6Input) =>
+  raw["status"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint26_7Request = Parameters<RawClient["toolpaths"]["postCheck"]>[0]
+type Endpoint26_7Input = {
+  readonly definition: Endpoint26_7Request["payload"]["definition"]
+  readonly sample?: Endpoint26_7Request["payload"]["sample"]
+}
+const Endpoint26_7 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_7Input) =>
   raw["postCheck"]({ payload: { definition: input["definition"], sample: input["sample"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint26_7Request = Parameters<RawClient["toolpaths"]["listForDrawing"]>[0]
-type Endpoint26_7Input = { readonly id: Endpoint26_7Request["params"]["id"] }
-const Endpoint26_7 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_7Input) =>
+type Endpoint26_8Request = Parameters<RawClient["toolpaths"]["listForDrawing"]>[0]
+type Endpoint26_8Input = { readonly id: Endpoint26_8Request["params"]["id"] }
+const Endpoint26_8 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_8Input) =>
   raw["listForDrawing"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint26_8Request = Parameters<RawClient["toolpaths"]["createForDrawing"]>[0]
-type Endpoint26_8Input = {
-  readonly id: Endpoint26_8Request["params"]["id"]
-  readonly name?: Endpoint26_8Request["payload"]["name"]
-  readonly description?: Endpoint26_8Request["payload"]["description"]
-  readonly data?: Endpoint26_8Request["payload"]["data"]
-  readonly gcode?: Endpoint26_8Request["payload"]["gcode"]
-  readonly projectId?: Endpoint26_8Request["payload"]["projectId"]
-  readonly type?: Endpoint26_8Request["payload"]["type"]
-  readonly operationType?: Endpoint26_8Request["payload"]["operationType"]
-  readonly isPublic?: Endpoint26_8Request["payload"]["isPublic"]
-  readonly thumbnail?: Endpoint26_8Request["payload"]["thumbnail"]
-  readonly materialId?: Endpoint26_8Request["payload"]["materialId"]
-  readonly machineConfigId?: Endpoint26_8Request["payload"]["machineConfigId"]
-  readonly toolId?: Endpoint26_8Request["payload"]["toolId"]
-  readonly simulation?: Endpoint26_8Request["payload"]["simulation"]
-  readonly baseUpdatedAt?: Endpoint26_8Request["payload"]["baseUpdatedAt"]
+type Endpoint26_9Request = Parameters<RawClient["toolpaths"]["createForDrawing"]>[0]
+type Endpoint26_9Input = {
+  readonly id: Endpoint26_9Request["params"]["id"]
+  readonly name?: Endpoint26_9Request["payload"]["name"]
+  readonly description?: Endpoint26_9Request["payload"]["description"]
+  readonly data?: Endpoint26_9Request["payload"]["data"]
+  readonly gcode?: Endpoint26_9Request["payload"]["gcode"]
+  readonly projectId?: Endpoint26_9Request["payload"]["projectId"]
+  readonly type?: Endpoint26_9Request["payload"]["type"]
+  readonly operationType?: Endpoint26_9Request["payload"]["operationType"]
+  readonly isPublic?: Endpoint26_9Request["payload"]["isPublic"]
+  readonly thumbnail?: Endpoint26_9Request["payload"]["thumbnail"]
+  readonly materialId?: Endpoint26_9Request["payload"]["materialId"]
+  readonly machineConfigId?: Endpoint26_9Request["payload"]["machineConfigId"]
+  readonly toolId?: Endpoint26_9Request["payload"]["toolId"]
+  readonly simulation?: Endpoint26_9Request["payload"]["simulation"]
+  readonly baseUpdatedAt?: Endpoint26_9Request["payload"]["baseUpdatedAt"]
 }
-const Endpoint26_8 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_8Input) =>
+const Endpoint26_9 = (raw: RawClient["toolpaths"]) => (input: Endpoint26_9Input) =>
   raw["createForDrawing"]({
     params: { id: input["id"] },
     payload: {
@@ -2889,9 +2894,10 @@ const adaptGroup26 = (raw: RawClient["toolpaths"]) => ({
   update: Endpoint26_3(raw),
   remove: Endpoint26_4(raw),
   setupSheet: Endpoint26_5(raw),
-  postCheck: Endpoint26_6(raw),
-  listForDrawing: Endpoint26_7(raw),
-  createForDrawing: Endpoint26_8(raw),
+  status: Endpoint26_6(raw),
+  postCheck: Endpoint26_7(raw),
+  listForDrawing: Endpoint26_8(raw),
+  createForDrawing: Endpoint26_9(raw),
 })
 
 type Endpoint27_0Request = Parameters<RawClient["toolpathExtras"]["library"]>[0]

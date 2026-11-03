@@ -7197,6 +7197,22 @@ export type ToolpathsSetupSheetOutput = {
   html: string
 }
 
+export type ToolpathsStatusInput = { readonly id: { readonly id: string }["id"] }
+
+export type ToolpathsStatusOutput =
+  | { status: "current"; displayOnly: Array<string> }
+  | {
+      status: "stale"
+      class: "topology" | "geometry" | "rigid" | "inputs"
+      added: Array<string>
+      removed: Array<string>
+      changed: Array<string>
+      move?: { x: number; y: number; z: number }
+      inputs: Array<string>
+      reasons: Array<string>
+    }
+  | { status: "unknown"; reason: string }
+
 export type ToolpathsPostCheckInput = {
   readonly definition: ToolpathsPostCheckPayload["definition"]
   readonly sample?: ToolpathsPostCheckPayload["sample"]

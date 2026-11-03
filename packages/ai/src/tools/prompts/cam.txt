@@ -6,7 +6,7 @@ Actions and Parameters (mm, mm/min, rpm)
 - operations, stock: no parameters; saved operations or configured stock.
 - plan_check: operations (1-8 of {type, params}), expectedRevision. A pass checks the plan, not the machined part.
 - setup_sheet: operationId; tools, operations, times of a saved kernel program.
-- review: operationId; pass/failed/stale/unverified/preview evidence for the saved drawing and NC.
+- review: operationId; pass/failed/stale/unverified/preview evidence for the saved drawing and NC; modelChange when stale.
 - suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material).
 - compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}).
 - analyze: operationId (full stored NC) or gcode; machineType adds axis checks. Empty findings never mean safe.
