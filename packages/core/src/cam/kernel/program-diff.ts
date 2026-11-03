@@ -5,6 +5,7 @@
  */
 import type { CamArtifact, Claim, OperationOutcome } from "./contracts.ts"
 import { canonicalJson } from "./identity.ts"
+import { matchOperations, type OperationMatching, type OperationPair } from "./operation-match.ts"
 
 const EPS_TIME = 0.05
 const EPS_LENGTH = 0.01
@@ -15,6 +16,9 @@ export type OperationField = "status" | "strategy" | "tool" | "cut" | "parameter
 export interface OperationChange {
   readonly id: string
   readonly name: string
+  /** The id the operation had in the stored program, when it was paired by its geometry and the id changed. */
+  readonly from?: string
+  readonly confidence?: number
   readonly fields: ReadonlyArray<OperationField>
   readonly timeSeconds: { readonly before: number; readonly after: number }
   readonly removedVolume: { readonly before: number; readonly after: number }
@@ -36,6 +40,12 @@ export interface ProgramDiff {
     readonly added: ReadonlyArray<{ readonly id: string; readonly name: string }>
     readonly removed: ReadonlyArray<{ readonly id: string; readonly name: string }>
     readonly changed: ReadonlyArray<OperationChange>
+    /** Operations paired by geometry rather than by id (a moved or resized feature), with the confidence of each pair. */
+    readonly matched: ReadonlyArray<OperationPair>
+    /** Overrides of the old program that the new one does not carry, and why. */
+    readonly droppedOverrides: OperationMatching["droppedOverrides"]
+    /** Overrides to set on the new operations to keep what the person tuned on the paired ones. */
+    readonly carried: OperationMatching["carried"]
   }
   readonly tools: { readonly added: ReadonlyArray<string>; readonly removed: ReadonlyArray<string> }
   readonly cycleTimeSeconds: { readonly before: number; readonly after: number; readonly delta: number }
@@ -68,31 +78,33 @@ const lineCounts = (nc: string): Map<string, number> => {
 }
 
 export const programDiff = (before: CamArtifact, after: CamArtifact): ProgramDiff => {
+  const matching = matchOperations(before, after)
   const oldOps = new Map(before.operations.map((o) => [o.id, o] as const))
   const newOps = new Map(after.operations.map((o) => [o.id, o] as const))
-  const added = after.operations.filter((o) => !oldOps.has(o.id)).map((o) => ({ id: o.id, name: o.name }))
-  const removed = before.operations.filter((o) => !newOps.has(o.id)).map((o) => ({ id: o.id, name: o.name }))
+  const added = matching.added.map((id) => ({ id, name: newOps.get(id)!.name }))
+  const removed = matching.removed.map((id) => ({ id, name: oldOps.get(id)!.name }))
   const changed: OperationChange[] = []
-  for (const next of after.operations) {
-    const prev = oldOps.get(next.id)
-    if (prev === undefined) continue
+  for (const pair of matching.pairs) {
+    const prev = oldOps.get(pair.before)!, next = newOps.get(pair.after)!
     const fields: OperationField[] = []
     if (prev.status !== next.status) fields.push("status")
     if (prev.strategy !== next.strategy) fields.push("strategy")
     if (prev.toolId !== next.toolId) fields.push("tool")
     if (prev.cut !== next.cut) fields.push("cut")
-    const parameters = parameterDiff(prev.parameters, next.parameters)
+    const parameters = parameterDiff(prev.parameters, next.parameters).filter((name) => pair.by === "id" || (name !== "id" && name !== "name"))
     if (parameters.length > 0) fields.push("parameters")
     if (Math.abs(prev.cutLength - next.cutLength) > EPS_LENGTH) fields.push("cutLength")
     if (Math.abs(prev.timeSeconds - next.timeSeconds) > EPS_TIME) fields.push("time")
     if (Math.abs(prev.removedVolume - next.removedVolume) > EPS_VOLUME) fields.push("removedVolume")
-    if (fields.length > 0) {
+    if (fields.length > 0 || pair.by === "signature") {
       changed.push({
         id: next.id, name: next.name, fields, parameters,
+        ...(pair.by === "signature" ? { from: pair.before, confidence: pair.confidence } : {}),
         timeSeconds: { before: prev.timeSeconds, after: next.timeSeconds }, removedVolume: { before: prev.removedVolume, after: next.removedVolume }
       })
     }
   }
+  const matched = matching.pairs.filter((p) => p.by === "signature")
 
   const oldTools = new Set(before.tools.map((t) => t.id)), newTools = new Set(after.tools.map((t) => t.id))
   const toolsAdded = [...newTools].filter((id) => !oldTools.has(id)).sort()
@@ -119,7 +131,7 @@ export const programDiff = (before: CamArtifact, after: CamArtifact): ProgramDif
   const identical = before.nc === after.nc
 
   const diff = {
-    operations: { added, removed, changed },
+    operations: { added, removed, changed, matched, droppedOverrides: matching.droppedOverrides, carried: matching.carried },
     tools: { added: toolsAdded, removed: toolsRemoved },
     cycleTimeSeconds: { before: before.cycleTimeSeconds, after: after.cycleTimeSeconds, delta: after.cycleTimeSeconds - before.cycleTimeSeconds },
     removedVolume: { before: removedBefore, after: removedAfter, delta: removedAfter - removedBefore },
