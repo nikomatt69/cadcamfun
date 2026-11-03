@@ -7334,6 +7334,23 @@ export type ToolpathExtrasRemoveCommentInput = {
 
 export type ToolpathExtrasRemoveCommentOutput = { message: string }
 
+export type ToolpathExtrasExportInput = {
+  readonly ids?: {
+    readonly ids?: string | ReadonlyArray<string> | undefined
+    readonly format?: string | undefined
+  }["ids"]
+  readonly format?: {
+    readonly ids?: string | ReadonlyArray<string> | undefined
+    readonly format?: string | undefined
+  }["format"]
+}
+
+export type ToolpathExtrasExportOutput = unknown
+
+export type ToolpathExtrasImportInput = { readonly payload: unknown }
+
+export type ToolpathExtrasImportOutput = { success: true; message: string; data: unknown | null }
+
 export type ToolpathGeneratorManufactureInput = {
   readonly setupOrientation?: ToolpathGeneratorManufacturePayload["setupOrientation"]
   readonly material: ToolpathGeneratorManufacturePayload["material"]

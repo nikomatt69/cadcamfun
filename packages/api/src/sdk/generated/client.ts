@@ -483,6 +483,10 @@ import type {
   ToolpathExtrasUpdateCommentOutput,
   ToolpathExtrasRemoveCommentInput,
   ToolpathExtrasRemoveCommentOutput,
+  ToolpathExtrasExportInput,
+  ToolpathExtrasExportOutput,
+  ToolpathExtrasImportInput,
+  ToolpathExtrasImportOutput,
   ToolpathGeneratorManufactureInput,
   ToolpathGeneratorManufactureOutput,
   ToolpathGeneratorParseInput,
@@ -4191,6 +4195,30 @@ export function make(options: ClientOptions) {
             path: `/api/toolpaths/${encodeURIComponent(input.id)}/comments/${encodeURIComponent(input.commentId)}`,
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      export: (input?: ToolpathExtrasExportInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasExportOutput>(
+          {
+            method: "GET",
+            path: `/api/toolpaths/export-import`,
+            query: { ids: input?.["ids"], format: input?.["format"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      import: (input: ToolpathExtrasImportInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasImportOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/export-import`,
+            body: input["payload"],
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,

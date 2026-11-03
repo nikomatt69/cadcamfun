@@ -2912,6 +2912,19 @@ const Endpoint27_7 = (raw: RawClient["toolpathExtras"]) => (input: Endpoint27_7I
     Effect.mapError(mapClientError),
   )
 
+type Endpoint27_8Request = Parameters<RawClient["toolpathExtras"]["export"]>[0]
+type Endpoint27_8Input = {
+  readonly ids?: Endpoint27_8Request["query"]["ids"]
+  readonly format?: Endpoint27_8Request["query"]["format"]
+}
+const Endpoint27_8 = (raw: RawClient["toolpathExtras"]) => (input?: Endpoint27_8Input) =>
+  raw["export"]({ query: { ids: input?.["ids"], format: input?.["format"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint27_9Request = Parameters<RawClient["toolpathExtras"]["import"]>[0]
+type Endpoint27_9Input = { readonly payload: Endpoint27_9Request["payload"] }
+const Endpoint27_9 = (raw: RawClient["toolpathExtras"]) => (input: Endpoint27_9Input) =>
+  raw["import"]({ payload: input["payload"] }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup27 = (raw: RawClient["toolpathExtras"]) => ({
   library: Endpoint27_0(raw),
   listVersions: Endpoint27_1(raw),
@@ -2921,6 +2934,8 @@ const adaptGroup27 = (raw: RawClient["toolpathExtras"]) => ({
   createComment: Endpoint27_5(raw),
   updateComment: Endpoint27_6(raw),
   removeComment: Endpoint27_7(raw),
+  export: Endpoint27_8(raw),
+  import: Endpoint27_9(raw),
 })
 
 type Endpoint28_0Request = Parameters<RawClient["toolpathGenerator"]["manufacture"]>[0]
