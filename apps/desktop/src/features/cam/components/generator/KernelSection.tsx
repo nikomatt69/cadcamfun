@@ -124,6 +124,19 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     if (value?.status === "ok" && value.value.release === "blocked") return value.value
     return store.kernelArtifact ?? (value?.status === "ok" ? value.value : undefined)
   })
+  /**
+   * Whether the model the program was made from changed (spec 59 A2). A program with its elements stored is compared by geometry, so a
+   * rename, a colour or a layer change is not a model change; one without them (older, or imported) falls back to the digest of all the
+   * element JSON, which can only over-report.
+   */
+  const partChanged = (value: CamKernelArtifact, elements: ReadonlyArray<Readonly<Record<string, unknown>>>): boolean => {
+    const stored = store.kernelRequest
+    if (stored !== undefined) {
+      const status = cam.kernel.programStatus({ request: stored }, { elements })
+      if (status.status !== "unknown") return status.status === "stale"
+    }
+    return value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements })
+  }
   const stale = () => {
     const value = artifact(), current = request()
     if (!value) return false
@@ -143,7 +156,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
       cam.kernel.canonicalJson(source?.stock ?? null) !== cam.kernel.canonicalJson(current.stock ?? null) ||
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
-      value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements }) ||
+      partChanged(value, current.elements) ||
       source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.breadth ?? null, source.tcp ?? false, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.tabs ?? null, current.breadth ?? null, current.tcp ?? false, current.nativeCycles ?? false, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
   }
   const requestId = createMemo(() => request()?.id)
