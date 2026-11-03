@@ -3,6 +3,33 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.81 (November 2026)
+
+## Core
+
+- Seeded overcuts in the kernel's own NC for three real parts are all found by the independent replay (spec 72 P0-4)
+- The part's height-field grid is aligned to its outer walls (wall finishing passes stayed 0.09 mm inside a wall); the kernel program of a plain plate verifies clean in the independent replay
+
+## Desktop
+
+- CAD property field labels and custom element templates go through t() (cad.prop.*, cad.template.*) in 11 languages, literal debt 230 -> 0
+- The toolpath list marks a native program whose model changed (spec 59 A6)
+- Preview and accept a regeneration from the toolpath detail screen (spec 59 A3, A4, A6), tested end to end over the real sidecar
+- Verify the NC in the editor with the independent replay (spec 72 step 0.6): verdict and findings with NC lines on the CAM page, in 11 languages
+- An answer recovered after a dropped stream says so, in 11 languages (RM-10 deliverable 3)
+- Writes carry an Idempotency-Key and survive a sidecar restart (RM-03 client adoption)
+
+## Sidecar
+
+- A person's token usage is kept across turns and read at GET /api/ai/usage (RM-10 deliverable 1, server side)
+
+## Documentation
+
+- Spec 72 records that a pocket with sharp corners cannot reach verified-program (no corner clean-up in the planner)
+- RM-09 follows the tree (most of the slice exists; flowline and swept cutters open)
+- RM-11 is built; its acceptance needs a live standalone run
+- Regenerate the harness inventory for the memory_edit prompt (typed notes)
+
 ## v0.1.80 (November 2026)
 
 - No notable changes
