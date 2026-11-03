@@ -219,7 +219,6 @@ export default function SettingsScreen() {
           {security.biometricsEnabled ? <NavRow icon={Lock} title="App lock" description={security.lockOnBackground ? `Requires Face ID ${lockAfterLabel(security.lockAfterSeconds).toLowerCase()}` : "Locks when the app starts"} /> : null}
           <NavRow icon={ClipboardCopy} title="Copy diagnostics" description="Version, connection and assistant status for support. Never includes your pairing token." chevron={false} onPress={() => void copy(diagnostics(), "Diagnostics copied")} />
         </SettingsSection>
-        <Text style={{ color: palette.muted, textAlign: "center", paddingBottom: 8, ...type(12) }}>Designed for the work you care about.</Text>
       </PageScroll>
     </ScreenFrame>
   )
