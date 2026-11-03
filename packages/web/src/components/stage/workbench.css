@@ -1,0 +1,172 @@
+/* Home hero: the CAD/CAM workbench. All rules belong to this scene. */
+.wb .ss-stage {
+  --gutter: 24px;
+  overflow: hidden;
+  background: transparent;
+  /* The window fades out at its foot instead of ending on a hard line over the page */
+  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+}
+
+.wb .wb-window {
+  position: absolute;
+  top: var(--gutter);
+  left: var(--gutter);
+  width: 640px;
+  height: 330px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+.wb .ss-stage[data-layout="compact"] .wb-window {
+  left: 16px;
+  top: 16px;
+  width: 400px;
+  height: 330px;
+}
+.wb .ss-stage[data-layout="compact"] .ss-window__side {
+  display: none;
+}
+
+.wb-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 44px 10px 12px;
+}
+.wb-side__head {
+  padding: 0 6px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ss-ink-4, #8a8a8a);
+}
+.wb-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: background 220ms ease;
+}
+.wb-step[data-on] {
+  background: var(--ss-accent-soft);
+}
+.wb-step[data-on] .wb-step__label {
+  font-weight: 600;
+}
+
+.wb-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wb-tool {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--ss-ink-3, #666);
+  transition: background 200ms ease, color 200ms ease;
+}
+.wb-tool[data-on] {
+  background: var(--ss-accent-soft);
+  color: var(--ss-accent);
+}
+.wb-tool[data-hover] { background: var(--ss-line); }
+.wb-post {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  margin-left: 6px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ss-accent);
+  transition: transform 140ms ease;
+}
+.wb-post[data-pressed] { transform: scale(0.96); }
+
+.wb-view {
+  position: relative;
+  height: 100%;
+  background: var(--ss-canvas);
+}
+.wb-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.wb-grid path {
+  fill: none;
+  stroke: var(--ss-line);
+  stroke-width: 0.5;
+}
+.wb-side-face { fill: var(--ss-ink-3, #999); opacity: 0.35; }
+.wb-top { fill: var(--ss-surface); stroke: var(--ss-ink-3, #888); stroke-width: 0.8; }
+.wb-hole { fill: var(--ss-canvas); stroke: var(--ss-ink-3, #888); stroke-width: 0.8; }
+.wb-pocket {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 0.8;
+  stroke-dasharray: 3 2;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.wb-pocket[data-on] { opacity: 0.9; }
+.wb-path {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1800ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wb-path[data-on] { stroke-dashoffset: 0; }
+
+.wb-chip {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-accent);
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow-satellite);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+.wb-chip[data-show] { opacity: 1; transform: none; }
+
+.wb .wb-terminal {
+  position: absolute;
+  left: 470px;
+  top: 150px;
+  width: 238px;
+  height: 140px;
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-satellite);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 350ms ease, transform 350ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.wb .wb-terminal[data-show] { opacity: 1; transform: none; }
+.wb .ss-stage[data-layout="compact"] .wb-terminal {
+  left: 150px;
+  top: 220px;
+  width: 200px;
+}
+.wb .wb-code { font-size: 10px; }

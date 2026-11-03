@@ -2,6 +2,7 @@
 export const prerender = true
 import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
+import TopicTile from "../../components/stage/TopicTile"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
@@ -38,6 +39,7 @@ const toc = [
   toc={toc}
 >
   <section id="status" class="doc-section">
+    <div class="doc-shot doc-shot--tile"><TopicTile kind="ai" client:only="react" /></div>
     <h2>Assistant services</h2>
 <p><code>@cadcamfun/ai</code> provides model access, conversation events, the action catalogue, prompts, skills, context assembly, and host integration. The default conversation engine is embedded nikcli; AI SDK v7 supplies direct text, streaming, and structured-output calls. The sidecar injects handlers for project mutations, libraries, history, and application storage.</p>
     <p>Chat can inspect and change a project through registered actions. Stateless title generation, design analysis, parameter recommendations, G-code optimization, and design-suggestion summaries return advice or structured output; those service methods do not save project edits. Review generated machining advice through deterministic CAM and verification before relying on it.</p>

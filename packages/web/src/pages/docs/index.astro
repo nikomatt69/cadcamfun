@@ -2,6 +2,7 @@
 export const prerender = true
 import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocsAssistantShot from "../../components/stage/DocsAssistantShot"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 
@@ -22,6 +23,7 @@ const toc = [
 
 <DocsLayout title="Overview" subtitle="CADCAMFUN brings drawing, solid modelling, toolpaths, project history, and an AI assistant into a local desktop application." description="CADCAMFUN brings drawing, solid modelling, toolpaths, project history, and an AI assistant into a local desktop application." toc={toc}>
   <section id="product" class="doc-section">
+    <div class="doc-shot"><DocsAssistantShot client:only="react" /></div>
     <h2>Product</h2>
     <p>The desktop combines a SolidJS workbench with a Tauri shell. The workbench edits drawings and models, displays geometry in a Three.js viewport, manages machining operations, and previews or exports G-code. Project data, tools, materials, machine configurations, and assistant state are managed by a Bun sidecar and stored locally.</p>
     <p>The computational kernel is shared between the desktop and sidecar. Interactive geometry can run in the webview without an HTTP round trip; persistent operations, provider calls, project history, and workflow execution go through sidecar services. Local storage does not require a hosted application account. AI providers, GitHub operations, payments, and software updates use their configured network services.</p>

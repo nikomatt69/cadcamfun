@@ -487,3 +487,8 @@ samp,
     translate: none;
   }
 }
+
+/* Stageshow illustrations sit on the page, not on a plate of their own. */
+.hero-stage {
+  min-width: 0;
+}

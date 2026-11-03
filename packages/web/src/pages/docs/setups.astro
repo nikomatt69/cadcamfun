@@ -2,6 +2,7 @@
 export const prerender = true
 import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
+import TopicTile from "../../components/stage/TopicTile"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
@@ -35,6 +36,7 @@ const toc = [
   toc={toc}
 >
   <section id="status" class="doc-section">
+    <div class="doc-shot doc-shot--tile"><TopicTile kind="post" client:only="react" /></div>
     <h2>A setup is manufacturing context</h2>
 <p>A manufacturing setup defines how a part sits relative to stock, fixtures, and tools. <code>cam.ManufacturingSetup</code> records an identifier, revision, rigid work frame, world-coordinate stock and fixture envelopes, and tool assemblies. The native kernel accepts a CAD snapshot and resources and produces ordered operation results and one posted program.</p>
     <p>Saved application programs use <code>CamProgramDocument</code>, the portable document also stored in <code>Toolpath.data</code>. This contract retains NC and its program representation together with the settings, stock, and drawing snapshot needed to reopen the workspace. Optional operations preserve separate operation identities; optional kernel data retains native source evidence.</p>

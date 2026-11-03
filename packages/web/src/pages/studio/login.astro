@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
+import HeroWorkbench from "../../components/stage/HeroWorkbench"
 import { text } from "../../i18n/catalog"
 
 const locale = Astro.locals.locale ?? "en"
@@ -19,6 +20,7 @@ const failed = text(locale, "Sign in failed")
         <p class="mt-4 max-w-md text-[15px] leading-relaxed text-terminal-muted">
           {text(locale, "The form checks the")} <code>User</code> {text(locale, "table in the SQLite file Drizzle migrates, and stores the session in")} <code>Session</code>.
         </p>
+        <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
       </div>
       <form id="studio-login" class="material rounded-[var(--radius-card)] p-6 sm:p-8">
         <label class="block text-[13px] font-semibold" for="email">{text(locale, "Email")}</label>

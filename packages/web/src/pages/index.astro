@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
 import Hero from "../components/Hero.astro"
 import Features from "../components/Features.astro"
+import ProductTiles from "../components/stage/ProductTiles"
 import InstallBlock from "../components/InstallBlock.astro"
 import { dependencyNote } from "../data/architecture"
 import { text } from "../i18n/catalog"
@@ -34,6 +35,17 @@ const docLinks = [
   <Navbar />
   <main id="main-content" class="flex-1">
     <Hero />
+    <section class="page-section" aria-labelledby="product-heading">
+      <div class="page-shell">
+        <p class="font-mono text-eyebrow uppercase text-terminal-accent">{text(locale, "In the app")}</p>
+        <h2 id="product-heading" class="font-display mt-3 max-w-xl text-[clamp(1.8rem,3vw,2.6rem)] font-bold tracking-[-0.035em]">
+          {text(locale, "From sketch to G-code in one window.")}
+        </h2>
+        <div class="mt-10">
+          <ProductTiles client:only="react" titles={[text(locale, "Toolpaths on the part"), text(locale, "An assistant that edits the model"), text(locale, "G-code from your post")]} />
+        </div>
+      </div>
+    </section>
     <Features />
     <section class="page-section border-t border-terminal-border/50" aria-labelledby="boundary-heading">
       <div class="page-shell">

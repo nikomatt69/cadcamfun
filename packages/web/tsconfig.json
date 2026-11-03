@@ -2,7 +2,9 @@
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
     "types": ["bun"],
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": { "react": ["./node_modules/@types/react"], "react/*": ["./node_modules/@types/react/*"] }
   },
-  "include": ["src/env.d.ts", "src/data", "src/lib", "script"]
+  "include": ["src/env.d.ts", "src/data", "src/lib", "src/components/stage", "src/stageshow", "script"]
 }

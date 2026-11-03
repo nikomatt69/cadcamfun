@@ -2,6 +2,7 @@ import { defineConfig } from "astro/config"
 import cloudflare from "@astrojs/cloudflare"
 import mdx from "@astrojs/mdx"
 import tailwind from "@astrojs/tailwind"
+import react from "@astrojs/react"
 
 export default defineConfig({
   site: "https://cadcam.fun",
@@ -10,7 +11,7 @@ export default defineConfig({
   // assistant) needs a wrangler login, so in dev the assistant answers 503
   // unless a nikcli backend is configured. Deployed Workers get the binding.
   adapter: cloudflare({ platformProxy: { enabled: true, remoteBindings: false } }),
-  integrations: [tailwind(), mdx()],
+  integrations: [tailwind(), mdx(), react()],
   vite: {
     define: {
       global: "globalThis",

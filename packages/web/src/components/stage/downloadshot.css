@@ -1,0 +1,20 @@
+.dl .ss-stage {
+  overflow: hidden;
+  background: transparent;
+  background-image: none;
+}
+.dl .dl-window {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 560px;
+  height: 330px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+.dl .dl-phone { position: absolute; left: 500px; top: 48px; box-shadow: var(--ss-shadow-satellite); }
+.dl .ss-stage[data-layout="compact"] .dl-window { left: 12px; width: 300px; }
+.dl .ss-stage[data-layout="compact"] .dl-phone { left: 218px; top: 90px; }
+.dl-side { display: flex; flex-direction: column; gap: 8px; padding: 46px 12px 12px; }
+.dl-step { display: flex; align-items: center; gap: 8px; height: 22px; font-size: 12px; }

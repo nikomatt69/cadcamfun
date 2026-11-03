@@ -397,3 +397,7 @@ html.docs-root {
     transform: none;
   }
 }
+
+/* Stageshow illustration at the head of a doc section */
+.doc-shot { margin: 0 0 1.5rem; max-width: 760px; }
+.doc-shot--tile { max-width: 400px; }

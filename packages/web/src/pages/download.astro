@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
+import DownloadShot from "../components/stage/DownloadShot"
 import { text } from "../i18n/catalog"
 import { ui } from "../i18n/ui"
 
@@ -44,6 +45,7 @@ const labels = {
       <p class="mt-4 max-w-2xl text-[16px] leading-relaxed text-terminal-muted">
         {text(locale, "Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.")}
       </p>
+      <div class="mt-10 max-w-[760px]"><DownloadShot client:only="react" /></div>
       <p id="download-detected" class="mt-4 text-[14px] text-terminal-muted"></p>
 
       <div class="mt-8 flex flex-wrap items-end gap-4">
