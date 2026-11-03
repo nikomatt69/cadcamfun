@@ -1,3 +1,47 @@
+import brandVisa from "./visa.svg?url"
+import brandMastercard from "./mastercard.svg?url"
+import brandAmex from "./amex.svg?url"
+import brandAmexTile from "./amex-tile.svg?url"
+import brandDiscover from "./discover.svg?url"
+import brandPaypal from "./paypal.svg?url"
+import brandStripe from "./stripe.svg?url"
+import brandNotion from "./notion.svg?url"
+import brandGmail from "./gmail.svg?url"
+import brandGoogleCalendar from "./google-calendar.svg?url"
+import brandGoogleDocs from "./google-docs.svg?url"
+import brand1password from "./1password.svg?url"
+import brand1passwordDark from "./1password-dark.svg?url"
+import brandFigma from "./figma.svg?url"
+import brandSlack from "./slack.svg?url"
+import brandGithub from "./github.svg?url"
+import brandGithubDark from "./github-dark.svg?url"
+import brandLinear from "./linear.svg?url"
+import brandLinearDark from "./linear-dark.svg?url"
+import brandDropboxGlyph from "./dropbox-glyph.svg?url"
+import brandGoogleDrive from "./google-drive.svg?url"
+import brandGoogleSheets from "./google-sheets.svg?url"
+import brandGoogleSlides from "./google-slides.svg?url"
+import brandGoogleMeet from "./google-meet.svg?url"
+import brandZoom from "./zoom.svg?url"
+import brandVercel from "./vercel.svg?url"
+import brandVercelDark from "./vercel-dark.svg?url"
+import brandShopify from "./shopify.svg?url"
+import brandBitcoin from "./bitcoin.svg?url"
+import brandEthereum from "./ethereum.svg?url"
+import brandSolana from "./solana.svg?url"
+import brandUsdc from "./usdc.svg?url"
+import brandTether from "./tether.svg?url"
+import brandChase from "./chase.svg?url"
+import brandWellsfargo from "./wellsfargo.svg?url"
+import brandBankofamerica from "./bankofamerica.svg?url"
+import brandBankofamericaDark from "./bankofamerica-dark.svg?url"
+import brandBarclays from "./barclays.svg?url"
+import brandHsbc from "./hsbc.svg?url"
+import brandMonzo from "./monzo.svg?url"
+import brandMonzoDark from "./monzo-dark.svg?url"
+import brandRevolut from "./revolut.svg?url"
+import brandRevolutDark from "./revolut-dark.svg?url"
+
 /** Local product artwork. No network lookup or runtime icon service. */
 export type BrandAsset = {
   name: string
@@ -13,215 +57,215 @@ export type BrandAsset = {
 export const brandMarks = {
   'visa': {
     name: "Visa", category: 'Payments',
-    light: new URL('./visa.svg', import.meta.url).href,
-    dark: new URL('./visa.svg', import.meta.url).href,
+    light: brandVisa,
+    dark: brandVisa,
     proportion: 1.56, scale: 0.9,
   },
   'mastercard': {
     name: "Mastercard", category: 'Payments',
-    light: new URL('./mastercard.svg', import.meta.url).href,
-    dark: new URL('./mastercard.svg', import.meta.url).href,
+    light: brandMastercard,
+    dark: brandMastercard,
     proportion: 1.56, scale: 0.9,
   },
   'amex': {
     name: "American Express", category: 'Payments',
-    light: new URL('./amex.svg', import.meta.url).href,
-    dark: new URL('./amex.svg', import.meta.url).href,
-    tileArtwork: new URL('./amex-tile.svg', import.meta.url).href, tileBackground: '#006fcf',
+    light: brandAmex,
+    dark: brandAmex,
+    tileArtwork: brandAmexTile, tileBackground: '#006fcf',
     proportion: 1.56, scale: 0.84,
   },
   'discover': {
     name: "Discover", category: 'Payments',
-    light: new URL('./discover.svg', import.meta.url).href,
-    dark: new URL('./discover.svg', import.meta.url).href,
+    light: brandDiscover,
+    dark: brandDiscover,
     proportion: 1.56, scale: 0.9,
   },
   'paypal': {
     name: "PayPal", category: 'Payments',
-    light: new URL('./paypal.svg', import.meta.url).href,
-    dark: new URL('./paypal.svg', import.meta.url).href,
+    light: brandPaypal,
+    dark: brandPaypal,
     proportion: 1, scale: 0.64,
   },
   'stripe': {
     name: "Stripe", category: 'Payments',
-    light: new URL('./stripe.svg', import.meta.url).href,
-    dark: new URL('./stripe.svg', import.meta.url).href,
+    light: brandStripe,
+    dark: brandStripe,
     proportion: 1, scale: 0.64,
   },
   'notion': {
     name: "Notion", category: 'Apps',
-    light: new URL('./notion.svg', import.meta.url).href,
-    dark: new URL('./notion.svg', import.meta.url).href,
+    light: brandNotion,
+    dark: brandNotion,
     proportion: 1, scale: 0.68,
   },
   'gmail': {
     name: "Gmail", category: 'Apps',
-    light: new URL('./gmail.svg', import.meta.url).href,
-    dark: new URL('./gmail.svg', import.meta.url).href,
+    light: brandGmail,
+    dark: brandGmail,
     proportion: 1, scale: 0.64,
   },
   'google-calendar': {
     name: "Google Calendar", category: 'Apps',
-    light: new URL('./google-calendar.svg', import.meta.url).href,
-    dark: new URL('./google-calendar.svg', import.meta.url).href,
+    light: brandGoogleCalendar,
+    dark: brandGoogleCalendar,
     proportion: 1, scale: 0.64,
   },
   'google-docs': {
     name: "Google Docs", category: 'Apps',
-    light: new URL('./google-docs.svg', import.meta.url).href,
-    dark: new URL('./google-docs.svg', import.meta.url).href,
+    light: brandGoogleDocs,
+    dark: brandGoogleDocs,
     proportion: 1, scale: 0.64,
   },
   '1password': {
     name: "1Password", category: 'Apps',
-    light: new URL('./1password.svg', import.meta.url).href,
-    dark: new URL('./1password-dark.svg', import.meta.url).href,
+    light: brand1password,
+    dark: brand1passwordDark,
     proportion: 1, scale: 0.64,
   },
   'figma': {
     name: "Figma", category: 'Apps',
-    light: new URL('./figma.svg', import.meta.url).href,
-    dark: new URL('./figma.svg', import.meta.url).href,
+    light: brandFigma,
+    dark: brandFigma,
     proportion: 1, scale: 0.68,
   },
   'slack': {
     name: "Slack", category: 'Apps',
-    light: new URL('./slack.svg', import.meta.url).href,
-    dark: new URL('./slack.svg', import.meta.url).href,
+    light: brandSlack,
+    dark: brandSlack,
     proportion: 1, scale: 0.64,
   },
   'github': {
     name: "GitHub", category: 'Apps',
-    light: new URL('./github.svg', import.meta.url).href,
-    dark: new URL('./github-dark.svg', import.meta.url).href,
+    light: brandGithub,
+    dark: brandGithubDark,
     proportion: 1, scale: 0.64,
   },
   'linear': {
     name: "Linear", category: 'Apps',
-    light: new URL('./linear.svg', import.meta.url).href,
-    dark: new URL('./linear-dark.svg', import.meta.url).href,
+    light: brandLinear,
+    dark: brandLinearDark,
     proportion: 1, scale: 0.64,
   },
   'dropbox': {
     name: "Dropbox", category: 'Apps',
     // The source artwork is the glyph on a square blue field; shown as the
     // blue glyph alone, so it sits on a tile like the other app marks
-    light: new URL('./dropbox-glyph.svg', import.meta.url).href,
-    dark: new URL('./dropbox-glyph.svg', import.meta.url).href,
+    light: brandDropboxGlyph,
+    dark: brandDropboxGlyph,
     proportion: 1, scale: 0.72,
   },
   'google-drive': {
     name: "Google Drive", category: 'Apps',
-    light: new URL('./google-drive.svg', import.meta.url).href,
-    dark: new URL('./google-drive.svg', import.meta.url).href,
+    light: brandGoogleDrive,
+    dark: brandGoogleDrive,
     proportion: 1, scale: 0.64,
   },
   'google-sheets': {
     name: "Google Sheets", category: 'Apps',
-    light: new URL('./google-sheets.svg', import.meta.url).href,
-    dark: new URL('./google-sheets.svg', import.meta.url).href,
+    light: brandGoogleSheets,
+    dark: brandGoogleSheets,
     proportion: 1, scale: 0.74,
   },
   'google-slides': {
     name: "Google Slides", category: 'Apps',
-    light: new URL('./google-slides.svg', import.meta.url).href,
-    dark: new URL('./google-slides.svg', import.meta.url).href,
+    light: brandGoogleSlides,
+    dark: brandGoogleSlides,
     proportion: 1, scale: 0.74,
   },
   'google-meet': {
     name: "Google Meet", category: 'Apps',
-    light: new URL('./google-meet.svg', import.meta.url).href,
-    dark: new URL('./google-meet.svg', import.meta.url).href,
+    light: brandGoogleMeet,
+    dark: brandGoogleMeet,
     proportion: 1, scale: 0.64,
   },
   'zoom': {
     name: "Zoom", category: 'Apps',
-    light: new URL('./zoom.svg', import.meta.url).href,
-    dark: new URL('./zoom.svg', import.meta.url).href,
+    light: brandZoom,
+    dark: brandZoom,
     proportion: 1, scale: 0.64,
   },
   'vercel': {
     name: "Vercel", category: 'Apps',
-    light: new URL('./vercel.svg', import.meta.url).href,
-    dark: new URL('./vercel-dark.svg', import.meta.url).href,
+    light: brandVercel,
+    dark: brandVercelDark,
     proportion: 1, scale: 0.64,
   },
   'shopify': {
     name: "Shopify", category: 'Apps',
-    light: new URL('./shopify.svg', import.meta.url).href,
-    dark: new URL('./shopify.svg', import.meta.url).href,
+    light: brandShopify,
+    dark: brandShopify,
     proportion: 1, scale: 0.68,
   },
   'bitcoin': {
     name: 'Bitcoin', category: 'Crypto',
-    light: new URL('./bitcoin.svg', import.meta.url).href,
-    dark: new URL('./bitcoin.svg', import.meta.url).href,
+    light: brandBitcoin,
+    dark: brandBitcoin,
     proportion: 1, scale: 0.68,
   },
   'ethereum': {
     name: 'Ethereum', category: 'Crypto',
-    light: new URL('./ethereum.svg', import.meta.url).href,
-    dark: new URL('./ethereum.svg', import.meta.url).href,
+    light: brandEthereum,
+    dark: brandEthereum,
     proportion: 1, scale: 0.68,
   },
   'solana': {
     name: 'Solana', category: 'Crypto',
-    light: new URL('./solana.svg', import.meta.url).href,
-    dark: new URL('./solana.svg', import.meta.url).href,
+    light: brandSolana,
+    dark: brandSolana,
     proportion: 1, scale: 0.68,
   },
   'usdc': {
     name: 'USDC', category: 'Crypto',
-    light: new URL('./usdc.svg', import.meta.url).href,
-    dark: new URL('./usdc.svg', import.meta.url).href,
+    light: brandUsdc,
+    dark: brandUsdc,
     proportion: 1, scale: 0.8,
   },
   'tether': {
     name: 'Tether', category: 'Crypto',
-    light: new URL('./tether.svg', import.meta.url).href,
-    dark: new URL('./tether.svg', import.meta.url).href,
+    light: brandTether,
+    dark: brandTether,
     proportion: 1, scale: 0.68,
   },
   'chase': {
     name: "Chase", category: 'Banks',
-    light: new URL('./chase.svg', import.meta.url).href,
-    dark: new URL('./chase.svg', import.meta.url).href,
+    light: brandChase,
+    dark: brandChase,
     proportion: 1, scale: 0.8,
   },
   'wellsfargo': {
     name: "Wells Fargo", category: 'Banks',
-    light: new URL('./wellsfargo.svg', import.meta.url).href,
-    dark: new URL('./wellsfargo.svg', import.meta.url).href,
+    light: brandWellsfargo,
+    dark: brandWellsfargo,
     proportion: 1, scale: 0.8,
   },
   'bankofamerica': {
     name: "Bank of America", category: 'Banks',
-    light: new URL('./bankofamerica.svg', import.meta.url).href,
-    dark: new URL('./bankofamerica-dark.svg', import.meta.url).href,
+    light: brandBankofamerica,
+    dark: brandBankofamericaDark,
     proportion: 1, scale: 0.8,
   },
   'barclays': {
     name: "Barclays", category: 'Banks',
-    light: new URL('./barclays.svg', import.meta.url).href,
-    dark: new URL('./barclays.svg', import.meta.url).href,
+    light: brandBarclays,
+    dark: brandBarclays,
     proportion: 1, scale: 0.8,
   },
   'hsbc': {
     name: "HSBC", category: 'Banks',
-    light: new URL('./hsbc.svg', import.meta.url).href,
-    dark: new URL('./hsbc.svg', import.meta.url).href,
+    light: brandHsbc,
+    dark: brandHsbc,
     proportion: 1, scale: 0.8,
   },
   'monzo': {
     name: "Monzo", category: 'Banks',
-    light: new URL('./monzo.svg', import.meta.url).href,
-    dark: new URL('./monzo-dark.svg', import.meta.url).href,
+    light: brandMonzo,
+    dark: brandMonzoDark,
     proportion: 1, scale: 0.8,
   },
   'revolut': {
     name: "Revolut", category: 'Banks',
-    light: new URL('./revolut.svg', import.meta.url).href,
-    dark: new URL('./revolut-dark.svg', import.meta.url).href,
+    light: brandRevolut,
+    dark: brandRevolutDark,
     proportion: 1, scale: 0.8,
   },
 } as const satisfies Record<string, BrandAsset>
