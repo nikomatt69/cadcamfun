@@ -153,3 +153,8 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   11 locales, machine-translated). The sentence logic is shared with the CAM page (`cam/lib/model-change.ts`, tested in `apps/desktop/test/model-change-text.test.ts`). **Not tested end to end:** the
   detail screen render needs a stored native program, which only a portable CAM document can create over HTTP; the logic is unit-tested and the component is typechecked. A program made from a selection shows
   unselected drawing elements as "added". **Open:** the list badge, Regenerate / Review buttons that call the preview and accept routes.
+- 2026-11-03 (build, A6 fourth part): the toolpath detail screen of a stored native program has "Preview regeneration" and "Accept this program" (`toolpath-regenerate-*`), calling
+  `POST /api/toolpaths/:id/regenerate` with and without `accept`: the diff sentences are the CAM page's (`diffLines`, shared in `cam/lib/model-change.ts`), a refusal shows its reason, an acceptance shows a toast
+  (the screen reads the replaced program again and remounts), and the old program stays as a version. Not offered for a program saved as a CAM page document. Six strings in 11 locales (machine-translated).
+  Test: `apps/desktop/test/toolpath-regenerate.test.ts` renders the real screen over the real sidecar: model status ok, byte-identical preview, model change named, preview diff, accept, version holds the old NC,
+  status ok again. This also covers the detail-screen render that spec 59's earlier entry left untested. **Open:** the program-list badge; applying `carried` overrides on accept; A7.

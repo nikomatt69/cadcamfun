@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Независимое воспроизведение: нет зарезов и быстрых ходов через материал. Это не приёмка на станке.",
   "cam.kernel.verifyNc.faults": "Независимое воспроизведение нашло проблемы в NC:",
   "cam.kernel.verifyNc.incomplete": "Независимое воспроизведение ничего не нашло, но оно неполное (вердикта нет):",
-  "cam.kernel.verifyNc.failed": "Проверку не удалось выполнить: {message}"
+  "cam.kernel.verifyNc.failed": "Проверку не удалось выполнить: {message}",
+  "cam.kernel.regenerate.preview": "Предпросмотр перегенерации",
+  "cam.kernel.regenerate.busy": "Выполняется…",
+  "cam.kernel.regenerate.accept": "Принять эту программу",
+  "cam.kernel.regenerate.accepted": "Перегенерация принята. Прежняя программа сохранена как версия этой траектории.",
+  "cam.kernel.regenerate.refused": "Не принято: {reason}",
+  "cam.kernel.regenerate.failed": "Перегенерация не удалась: {message}"
 }

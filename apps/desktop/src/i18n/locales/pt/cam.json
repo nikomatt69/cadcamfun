@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Reprodução independente: sem gouge nem rápidos através do material. Não é uma aceitação do comando.",
   "cam.kernel.verifyNc.faults": "A reprodução independente encontrou problemas no NC:",
   "cam.kernel.verifyNc.incomplete": "A reprodução independente não encontrou nada, mas está incompleta (sem veredito):",
-  "cam.kernel.verifyNc.failed": "A verificação não pôde ser executada: {message}"
+  "cam.kernel.verifyNc.failed": "A verificação não pôde ser executada: {message}",
+  "cam.kernel.regenerate.preview": "Pré-visualizar a regeneração",
+  "cam.kernel.regenerate.busy": "Em curso…",
+  "cam.kernel.regenerate.accept": "Aceitar este programa",
+  "cam.kernel.regenerate.accepted": "Regeneração aceita. O programa anterior fica guardado como versão desta trajetória.",
+  "cam.kernel.regenerate.refused": "Não aceita: {reason}",
+  "cam.kernel.regenerate.failed": "A regeneração falhou: {message}"
 }

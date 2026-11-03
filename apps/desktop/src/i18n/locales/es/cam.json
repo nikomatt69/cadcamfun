@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Repetición independiente: sin gouge ni rápidos a través del material. No es una aceptación del control.",
   "cam.kernel.verifyNc.faults": "La repetición independiente encontró problemas en el NC:",
   "cam.kernel.verifyNc.incomplete": "La repetición independiente no encontró nada, pero está incompleta (sin veredicto):",
-  "cam.kernel.verifyNc.failed": "No se pudo ejecutar la comprobación: {message}"
+  "cam.kernel.verifyNc.failed": "No se pudo ejecutar la comprobación: {message}",
+  "cam.kernel.regenerate.preview": "Vista previa de la regeneración",
+  "cam.kernel.regenerate.busy": "En curso…",
+  "cam.kernel.regenerate.accept": "Aceptar este programa",
+  "cam.kernel.regenerate.accepted": "Regeneración aceptada. El programa anterior se conserva como versión de esta trayectoria.",
+  "cam.kernel.regenerate.refused": "No aceptada: {reason}",
+  "cam.kernel.regenerate.failed": "Falló la regeneración: {message}"
 }

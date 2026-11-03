@@ -1,4 +1,4 @@
-import { For, Show, createMemo, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Schema } from "effect"
 import { CamKernelArtifact, CamProgramDocument, type ToolpathRow } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
@@ -6,7 +6,9 @@ import { ResourceGeometryPreview, resourceElements } from "../../library/compone
 import { StatGrid, type StatItem } from "../../library/components/ResourceStats.tsx"
 import { buildPlayback, playbackSegments } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
-import { programStatusText } from "../../cam/lib/model-change.ts"
+import { diffLines, programStatusText, type DiffLike } from "../../cam/lib/model-change.ts"
+import { useApp } from "../../../shared/state/context.ts"
+import { toast } from "../../../shared/ui/feedback.tsx"
 
 const minutes = (seconds: number): string => {
   const rounded = Math.round(seconds)
@@ -19,7 +21,8 @@ const decode = <A,>(schema: Schema.Codec<A>, value: unknown): A | undefined => {
   return result._tag === "Some" ? result.value : undefined
 }
 
-export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; readonly drawing?: unknown }): JSX.Element {
+export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; readonly drawing?: unknown; /** Called after a regeneration replaced the stored program, so the screen reads it again. */ readonly onChanged?: () => void }): JSX.Element {
+  const app = useApp()
   const document = createMemo(() => decode(CamProgramDocument, props.row.data))
   const artifact = createMemo(() => {
     const value = decode(CamKernelArtifact, record(props.row.data)["kernelArtifact"])
@@ -84,7 +87,48 @@ export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; reado
     const current = Array.isArray(list) ? list.filter((e): e is Record<string, unknown> => e !== null && typeof e === "object") : []
     return programStatusText(cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: current }))
   })
+  // Regenerating a stored native program (spec 59 A3, A4): a preview with the diff, then an accept that keeps the old program as a version.
+  // A program saved as a CAM page document is regenerated from the CAM page, which rebuilds the whole document.
+  const regenerable = createMemo(() => {
+    const data = record(props.row.data)
+    return data["kernelRequest"] !== undefined && data["kernelArtifact"] !== undefined && data["format"] !== "cadcamfun-cam" && props.row.drawingId != null
+  })
+  const [regen, setRegen] = createSignal<{ readonly state: "idle" } | { readonly state: "busy" } | { readonly state: "error"; readonly message: string } | { readonly state: "preview"; readonly diff: DiffLike; readonly failed?: string } | { readonly state: "accepted" } | { readonly state: "refused"; readonly reason: string; readonly diff: DiffLike }>({ state: "idle" })
+  const regenerate = async (accept: boolean): Promise<void> => {
+    setRegen({ state: "busy" })
+    try {
+      const result = await app.runtime.run(app.client.toolpaths.regenerate({ params: { id: props.row.id }, payload: { accept } }))
+      if (result.outcome.status === "failed") { setRegen({ state: "error", message: result.outcome.issues.map((i) => i.message).join("; ") }); return }
+      const diff = result.outcome.diff
+      // The screen reads the replaced program again (and so remounts this section): the notice is a toast, which outlives it.
+      if (accept && result.accepted) { setRegen({ state: "accepted" }); toast.success(t("cam.kernel.regenerate.accepted")); props.onChanged?.(); return }
+      if (accept) { setRegen({ state: "refused", reason: result.refusal ?? "", diff }); return }
+      setRegen({ state: "preview", diff })
+    } catch (cause) {
+      setRegen({ state: "error", message: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
   return <section class="space-y-4" data-testid="toolpath-program-details">
+    <Show when={regenerable()}>
+      <div class="space-y-2 text-xs" data-testid="toolpath-regenerate">
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="panel-btn" data-testid="toolpath-regenerate-preview" disabled={regen().state === "busy"} onClick={() => void regenerate(false)}>
+            {t(regen().state === "busy" ? "cam.kernel.regenerate.busy" : "cam.kernel.regenerate.preview")}
+          </button>
+          <Show when={regen().state === "preview" || regen().state === "refused"}>
+            <button type="button" class="panel-btn panel-btn--primary" data-testid="toolpath-regenerate-accept" onClick={() => void regenerate(true)}>{t("cam.kernel.regenerate.accept")}</button>
+          </Show>
+        </div>
+        <Show when={regen()}>{(state) => (
+          <div class="space-y-1" role="status" data-testid="toolpath-regenerate-result" data-state={state().state}>
+            <Show when={state().state === "error"}><p class="text-[color:var(--ent-warn)]">{t("cam.kernel.regenerate.failed", { message: (state() as { message: string }).message })}</p></Show>
+            <Show when={state().state === "accepted"}><p>{t("cam.kernel.regenerate.accepted")}</p></Show>
+            <Show when={state().state === "refused"}><p class="text-[color:var(--ent-warn)]">{t("cam.kernel.regenerate.refused", { reason: (state() as { reason: string }).reason })}</p></Show>
+            <For each={state().state === "preview" || state().state === "refused" ? diffLines((state() as { diff: DiffLike }).diff) : []}>{(line) => <p>{line}</p>}</For>
+          </div>
+        )}</Show>
+      </div>
+    </Show>
     <Show when={modelStatus()}>{(status) => (
       <p class={`text-xs ${status().tone === "warn" ? "text-[color:var(--ent-warn)]" : "text-[color:var(--ent-text-muted)]"}`} title={status().detail} data-testid="toolpath-model-status" data-tone={status().tone}>{status().text}</p>
     )}</Show>

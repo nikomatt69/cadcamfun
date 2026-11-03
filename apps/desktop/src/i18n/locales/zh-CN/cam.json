@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "独立回放：无过切，无快速移动穿过材料。这不等于数控系统验收。",
   "cam.kernel.verifyNc.faults": "独立回放在 NC 中发现问题：",
   "cam.kernel.verifyNc.incomplete": "独立回放未发现问题，但回放不完整（无结论）：",
-  "cam.kernel.verifyNc.failed": "无法运行验证：{message}"
+  "cam.kernel.verifyNc.failed": "无法运行验证：{message}",
+  "cam.kernel.regenerate.preview": "预览重新生成",
+  "cam.kernel.regenerate.busy": "处理中…",
+  "cam.kernel.regenerate.accept": "采用此程序",
+  "cam.kernel.regenerate.accepted": "已采用重新生成的程序。之前的程序保留为此刀路的一个版本。",
+  "cam.kernel.regenerate.refused": "未采用：{reason}",
+  "cam.kernel.regenerate.failed": "重新生成失败：{message}"
 }

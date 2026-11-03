@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "स्वतंत्र रीप्ले: कोई गॉज नहीं, सामग्री के बीच से कोई रैपिड नहीं। यह कंट्रोलर की स्वीकृति नहीं है।",
   "cam.kernel.verifyNc.faults": "स्वतंत्र रीप्ले को NC में समस्याएँ मिलीं:",
   "cam.kernel.verifyNc.incomplete": "स्वतंत्र रीप्ले को कुछ नहीं मिला, पर वह अधूरा है (कोई निर्णय नहीं):",
-  "cam.kernel.verifyNc.failed": "जाँच नहीं चल सकी: {message}"
+  "cam.kernel.verifyNc.failed": "जाँच नहीं चल सकी: {message}",
+  "cam.kernel.regenerate.preview": "पुनः-जनरेशन का पूर्वावलोकन",
+  "cam.kernel.regenerate.busy": "चल रहा है…",
+  "cam.kernel.regenerate.accept": "यह प्रोग्राम स्वीकार करें",
+  "cam.kernel.regenerate.accepted": "पुनः-जनरेशन स्वीकार हुआ। पिछला प्रोग्राम इस टूलपाथ के एक संस्करण के रूप में सुरक्षित है।",
+  "cam.kernel.regenerate.refused": "स्वीकार नहीं हुआ: {reason}",
+  "cam.kernel.regenerate.failed": "पुनः-जनरेशन विफल: {message}"
 }

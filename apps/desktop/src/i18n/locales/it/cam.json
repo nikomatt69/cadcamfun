@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Replay indipendente: nessun gouge, nessun rapido nel materiale. Non è un'accettazione del controllo.",
   "cam.kernel.verifyNc.faults": "Il replay indipendente ha trovato problemi nell'NC:",
   "cam.kernel.verifyNc.incomplete": "Il replay indipendente non ha trovato nulla, ma è incompleto (nessun verdetto):",
-  "cam.kernel.verifyNc.failed": "La verifica non è stata eseguita: {message}"
+  "cam.kernel.verifyNc.failed": "La verifica non è stata eseguita: {message}",
+  "cam.kernel.regenerate.preview": "Anteprima rigenerazione",
+  "cam.kernel.regenerate.busy": "In corso…",
+  "cam.kernel.regenerate.accept": "Accetta questo programma",
+  "cam.kernel.regenerate.accepted": "Rigenerazione accettata. Il programma precedente resta come versione di questo toolpath.",
+  "cam.kernel.regenerate.refused": "Non accettata: {reason}",
+  "cam.kernel.regenerate.failed": "Rigenerazione non riuscita: {message}"
 }

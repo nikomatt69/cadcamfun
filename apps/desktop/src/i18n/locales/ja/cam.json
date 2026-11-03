@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "独立したリプレイ：切り込み過ぎも、材料内の早送りもありません。制御装置での合格を意味しません。",
   "cam.kernel.verifyNc.faults": "独立したリプレイでNCに問題が見つかりました：",
   "cam.kernel.verifyNc.incomplete": "独立したリプレイでは何も見つかりませんでしたが、不完全です（判定なし）：",
-  "cam.kernel.verifyNc.failed": "検証を実行できませんでした：{message}"
+  "cam.kernel.verifyNc.failed": "検証を実行できませんでした：{message}",
+  "cam.kernel.regenerate.preview": "再生成をプレビュー",
+  "cam.kernel.regenerate.busy": "処理中…",
+  "cam.kernel.regenerate.accept": "このプログラムを採用",
+  "cam.kernel.regenerate.accepted": "再生成を採用しました。以前のプログラムはこのツールパスのバージョンとして保存されています。",
+  "cam.kernel.regenerate.refused": "採用されませんでした：{reason}",
+  "cam.kernel.regenerate.failed": "再生成に失敗しました：{message}"
 }

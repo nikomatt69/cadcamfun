@@ -284,7 +284,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                             <Show when={current().description}>
                               <p class="whitespace-pre-wrap text-xs leading-5 text-[color:var(--ent-text-muted)]">{current().description}</p>
                             </Show>
-                            <ToolpathProgramDetails row={current()} drawing={drawing()} />
+                            <ToolpathProgramDetails row={current()} drawing={drawing()} onChanged={() => void load()} />
                             <Show when={current().data && Object.keys(current().data as object).length > 0}>
                               <details class="border-t border-[color:var(--ent-line)] pt-3">
                                 <summary class="cursor-pointer text-xs font-semibold text-[color:var(--ent-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]">{t("pages.toolpath.settings")}</summary>

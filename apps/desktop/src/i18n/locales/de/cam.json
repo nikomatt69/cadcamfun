@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Unabhängiger Replay: kein Gouge, kein Eilgang durch Material. Das ist keine Steuerungsabnahme.",
   "cam.kernel.verifyNc.faults": "Der unabhängige Replay hat Probleme im NC gefunden:",
   "cam.kernel.verifyNc.incomplete": "Der unabhängige Replay fand nichts, ist aber unvollständig (kein Urteil):",
-  "cam.kernel.verifyNc.failed": "Die Prüfung konnte nicht laufen: {message}"
+  "cam.kernel.verifyNc.failed": "Die Prüfung konnte nicht laufen: {message}",
+  "cam.kernel.regenerate.preview": "Neuerzeugung ansehen",
+  "cam.kernel.regenerate.busy": "Läuft…",
+  "cam.kernel.regenerate.accept": "Dieses Programm übernehmen",
+  "cam.kernel.regenerate.accepted": "Neuerzeugung übernommen. Das vorige Programm bleibt als Version dieses Toolpaths erhalten.",
+  "cam.kernel.regenerate.refused": "Nicht übernommen: {reason}",
+  "cam.kernel.regenerate.failed": "Neuerzeugung fehlgeschlagen: {message}"
 }

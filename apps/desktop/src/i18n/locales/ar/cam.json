@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "إعادة تشغيل مستقلة: لا قطع زائد ولا حركة سريعة عبر المادة. هذا ليس قبولًا من وحدة التحكم.",
   "cam.kernel.verifyNc.faults": "وجدت إعادة التشغيل المستقلة مشكلات في NC:",
   "cam.kernel.verifyNc.incomplete": "لم تجد إعادة التشغيل المستقلة شيئًا لكنها غير مكتملة (بلا حكم):",
-  "cam.kernel.verifyNc.failed": "تعذّر تشغيل الفحص: {message}"
+  "cam.kernel.verifyNc.failed": "تعذّر تشغيل الفحص: {message}",
+  "cam.kernel.regenerate.preview": "معاينة إعادة التوليد",
+  "cam.kernel.regenerate.busy": "جارٍ العمل…",
+  "cam.kernel.regenerate.accept": "اعتماد هذا البرنامج",
+  "cam.kernel.regenerate.accepted": "تم اعتماد إعادة التوليد. يبقى البرنامج السابق نسخةً من مسار الأداة هذا.",
+  "cam.kernel.regenerate.refused": "لم يُعتمد: {reason}",
+  "cam.kernel.regenerate.failed": "فشلت إعادة التوليد: {message}"
 }

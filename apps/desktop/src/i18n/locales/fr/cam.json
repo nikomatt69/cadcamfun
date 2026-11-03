@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Rejeu indépendant : aucun gouge, aucun rapide dans la matière. Ce n'est pas une validation de la commande.",
   "cam.kernel.verifyNc.faults": "Le rejeu indépendant a trouvé des problèmes dans le NC :",
   "cam.kernel.verifyNc.incomplete": "Le rejeu indépendant n'a rien trouvé, mais il est incomplet (pas de verdict) :",
-  "cam.kernel.verifyNc.failed": "La vérification n'a pas pu s'exécuter : {message}"
+  "cam.kernel.verifyNc.failed": "La vérification n'a pas pu s'exécuter : {message}",
+  "cam.kernel.regenerate.preview": "Aperçu de la régénération",
+  "cam.kernel.regenerate.busy": "En cours…",
+  "cam.kernel.regenerate.accept": "Accepter ce programme",
+  "cam.kernel.regenerate.accepted": "Régénération acceptée. Le programme précédent est conservé comme version de ce parcours.",
+  "cam.kernel.regenerate.refused": "Non acceptée : {reason}",
+  "cam.kernel.regenerate.failed": "Échec de la régénération : {message}"
 }

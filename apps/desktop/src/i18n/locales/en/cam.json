@@ -1406,5 +1406,11 @@
   "cam.kernel.verifyNc.clean": "Independent replay: no gouge, no rapid through material. This is not controller acceptance.",
   "cam.kernel.verifyNc.faults": "Independent replay found problems in the NC:",
   "cam.kernel.verifyNc.incomplete": "Independent replay found nothing, but it is incomplete (no verdict):",
-  "cam.kernel.verifyNc.failed": "The check could not run: {message}"
+  "cam.kernel.verifyNc.failed": "The check could not run: {message}",
+  "cam.kernel.regenerate.preview": "Preview regeneration",
+  "cam.kernel.regenerate.busy": "Working…",
+  "cam.kernel.regenerate.accept": "Accept this program",
+  "cam.kernel.regenerate.accepted": "Regeneration accepted. The previous program is kept as a version of this toolpath.",
+  "cam.kernel.regenerate.refused": "Not accepted: {reason}",
+  "cam.kernel.regenerate.failed": "Regeneration failed: {message}"
 }
