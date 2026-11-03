@@ -104,3 +104,45 @@ test("regenerating needs a kernel program and the right to open it", async () =>
   expect((await app.call(`/api/toolpaths/${plain.body.id}/regenerate`, { method: "POST", json: {}, auth: false })).status).toBe(401)
   expect((await app.call("/api/toolpaths/no-such-toolpath/regenerate", { method: "POST", json: {} })).status).toBe(404)
 })
+
+test("accepting a regeneration keeps the old program as a restore point, replaces the stored one, and the program is current and reviewable after", async () => {
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Accept regeneration" } })).body.id
+  const drawing = (await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Plate", data: { elements: [plate] } } })).body.id
+  const handlers = await app.toolHandlers()
+  const saved = await handlers.manufactureOperation!(project, { material: "6061" }) as { ok: boolean; operationId: string }
+  expect(saved, JSON.stringify(saved)).toMatchObject({ ok: true })
+  const before = (await app.call(`/api/toolpaths/${saved.operationId}`)).body
+  const post = (json: unknown, auth = true) => app.call(`/api/toolpaths/${saved.operationId}/regenerate`, { method: "POST", json, auth })
+
+  await app.call(`/api/drawings/${drawing}`, { method: "PUT", json: { data: { elements: [{ ...plate, width: 55 }] } } })
+  expect((await handlers.reviewOperation!(project, saved.operationId))).toMatchObject({ status: "stale" })
+
+  // A preview replaces nothing; accepting does.
+  expect(Schema.decodeUnknownSync(CamRegenerateResult)((await post({ accept: false })).body).accepted).toBe(false)
+  expect((await app.call(`/api/toolpaths/${saved.operationId}`)).body.gcode).toBe(before.gcode)
+  expect((await post({ accept: true }, false)).status).toBe(401)
+  const accepted = Schema.decodeUnknownSync(CamRegenerateResult)((await post({ accept: true, message: "Longer plate" })).body)
+  expect(accepted.accepted).toBe(true)
+  const versionId = accepted.versionId
+  expect(typeof versionId).toBe("string")
+  if (accepted.outcome.status !== "ok") throw new Error("expected a regenerated artifact")
+
+  const after = (await app.call(`/api/toolpaths/${saved.operationId}`)).body
+  expect(after.gcode).toBe(accepted.outcome.artifact.nc)
+  expect(after.gcode).not.toBe(before.gcode)
+  expect(after.data.kernelArtifact.identity.nc).toBe(accepted.outcome.artifact.identity.nc)
+  // The restore point holds the program that was replaced, byte for byte.
+  const listed = await app.call(`/api/toolpaths/${saved.operationId}/versions`)
+  expect(listed.status, JSON.stringify(listed.body)).toBe(200)
+  const versions = listed.body as ReadonlyArray<{ id: string; gcode: string | null; changeMessage: string }>
+  const restore = versions.find((v) => v.id === versionId)
+  expect(restore).toMatchObject({ gcode: before.gcode, changeMessage: "Longer plate" })
+
+  // The stored program now matches the drawing: current, and the assistant's review is no longer stale.
+  expect(await status(saved.operationId)).toEqual({ status: "current", displayOnly: [] })
+  expect((await handlers.reviewOperation!(project, saved.operationId))).not.toMatchObject({ status: "stale" })
+  // Regenerating an unchanged model is the same bytes: the diff is empty.
+  const again = Schema.decodeUnknownSync(CamRegenerateResult)((await post({})).body)
+  if (again.outcome.status !== "ok") throw new Error("expected a regenerated artifact")
+  expect(again.outcome.diff.same).toBe(true)
+})

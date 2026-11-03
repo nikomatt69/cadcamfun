@@ -6,7 +6,7 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolpathRepo, type ToolpathInput } from "../repos/toolpath-repo.ts"
 import { internal } from "./entity-io.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
-import { isPortableProgram, prepareCamProgramData, runKernelRequest } from "../services/cam-program.ts"
+import { drawingRevision, isPortableProgram, prepareCamProgramData, runKernelRequest } from "../services/cam-program.ts"
 import { elementsOf } from "../services/ai-elements.ts"
 
 const fail = (message: string) => (e: unknown) =>
@@ -95,8 +95,32 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
         const request = yield* Schema.decodeUnknownEffect(CamKernelRequest)({ ...(stored.kernelRequest as object), elements: JSON.parse(JSON.stringify(elements)) }).pipe(
           Effect.mapError((e) => new BadRequest({ message: `The stored request cannot be run again: ${e.message}` })))
         const result = yield* runKernelRequest(request)
-        if (result.status === "failed") return { status, scope, outcome: { status: "failed" as const, issues: result.issues } }
-        return { status, scope, outcome: { status: "ok" as const, artifact: result.value, diff: cam.kernel.programDiff(previous, result.value) } }
+        if (result.status === "failed") return { status, scope, accepted: false, ...(payload.accept === true ? { refusal: "The kernel could not machine the drawing as it is now." } : {}), outcome: { status: "failed" as const, issues: result.issues } }
+        const diff = cam.kernel.programDiff(previous, result.value)
+        const outcome = { status: "ok" as const, artifact: result.value, diff }
+        if (payload.accept !== true) return { status, scope, accepted: false, outcome }
+
+        // Accepting: the program that is replaced is kept first as a version, and the row is written only if neither the toolpath nor the
+        // drawing changed since they were read (the check and the write are one transaction).
+        if (!found.canWrite) return yield* new Forbidden({ message: "You do not have permission to modify this toolpath" })
+        if (isPortableProgram(found.row.data)) return { status, scope, accepted: false, refusal: "This program is a saved CAM page document: accept the regeneration from the CAM page, which rebuilds the whole document.", outcome }
+        if (result.value.release === "blocked") return { status, scope, accepted: false, refusal: "The regenerated program is blocked by its own replay claims; nothing was replaced.", outcome }
+        if (!diff.safe && payload.force !== true) return { status, scope, accepted: false, refusal: "The regenerated program is not safe to accept (a lower release or a claim that got worse): review the diff, or accept with force.", outcome }
+        const drawingData = owner.data as Record<string, unknown>
+        const revision = drawingRevision({ id: owner.id, data: drawingData, elements: elementsOf(drawingData) })
+        const readAt = found.row.updatedAt
+        const version = yield* repo.createVersion(params.id, user.id, {
+          data: found.row.data, gcode: found.row.gcode ?? undefined,
+          changeMessage: payload.message ?? `Before regeneration: ${diff.operations.added.length} operations added, ${diff.operations.removed.length} removed, ${diff.operations.changed.length} changed`
+        })
+        const { verification: _verification, response: _response, ...kept } = (found.row.data ?? {}) as Record<string, unknown>
+        const written = yield* repo.updateWhere(
+          params.id,
+          (row, current) => row.updatedAt === readAt && drawingRevision({ id: owner.id, data: (current ?? {}) as Record<string, unknown>, elements: elementsOf(current) }) === revision,
+          () => ({ gcode: result.value.nc, data: { ...kept, kernelArtifact: result.value, kernelRequest: request, sourceRevision: revision } })
+        )
+        if (written === undefined) return yield* new Conflict({ message: "The toolpath or the drawing changed while the program was regenerated. Nothing was replaced." })
+        return { status, scope, accepted: true, versionId: version.id, outcome }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to regenerate the program"))))
     .handle("postCheck", ({ payload }) =>
       Effect.sync(() => {

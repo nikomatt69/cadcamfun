@@ -187,12 +187,28 @@ export type CamProgramDiff = typeof CamProgramDiff.Type
  * `scope: "program"` (default) regenerates from the current version of the elements the program was made from; `"drawing"` from every part
  * element of the drawing now (a program the assistant made from the whole drawing, with a feature added since).
  */
-export const CamRegenerateRequest = Schema.Struct({ scope: Schema.optionalKey(Schema.Literals(["program", "drawing"])) })
+export const CamRegenerateRequest = Schema.Struct({
+  scope: Schema.optionalKey(Schema.Literals(["program", "drawing"])),
+  /**
+   * Replace the stored program with the regenerated one (needs write access). The old program is kept first as a version of the toolpath
+   * (a restore point), and nothing is replaced when the drawing or the toolpath changed while the kernel ran. A diff that is not `safe`
+   * (a lower release or a claim that got worse) is refused unless `force` is true.
+   */
+  accept: Schema.optionalKey(Schema.Boolean),
+  force: Schema.optionalKey(Schema.Boolean),
+  /** The note on the restore point (default: what changed). */
+  message: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(200)))
+})
 
 /** A preview of regenerating a stored program: the new artifact and its diff against the stored one. Nothing is stored. */
 export const CamRegenerateResult = Schema.Struct({
   status: CamProgramStatus,
   scope: Schema.Literals(["program", "drawing"]),
+  /** True when the stored program was replaced; `refusal` says why it was not when `accept` was asked. */
+  accepted: Schema.Boolean,
+  refusal: Schema.optionalKey(Schema.String),
+  /** The restore point (a version of the toolpath) holding the program that was replaced. */
+  versionId: Schema.optionalKey(Schema.String),
   outcome: Schema.Union([
     Schema.Struct({ status: Schema.Literal("ok"), artifact: CamKernelArtifact, diff: CamProgramDiff }),
     Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })

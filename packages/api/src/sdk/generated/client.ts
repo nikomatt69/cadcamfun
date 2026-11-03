@@ -4302,9 +4302,9 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/toolpaths/${encodeURIComponent(input.id)}/regenerate`,
-            body: { scope: input["scope"] },
+            body: { scope: input["scope"], accept: input["accept"], force: input["force"], message: input["message"] },
             successStatus: 200,
-            declaredStatuses: [400, 404, 500, 401],
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,
           },
           requestOptions,

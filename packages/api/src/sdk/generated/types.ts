@@ -1229,7 +1229,12 @@ export type ToolpathsUpdatePayload = {
   readonly baseUpdatedAt?: string | undefined
 }
 
-export type ToolpathsRegeneratePayload = { readonly scope?: "program" | "drawing" }
+export type ToolpathsRegeneratePayload = {
+  readonly scope?: "program" | "drawing"
+  readonly accept?: boolean
+  readonly force?: boolean
+  readonly message?: string
+}
 
 export type ToolpathsPostCheckPayload = { readonly definition: unknown; readonly sample?: boolean }
 
@@ -7829,6 +7834,9 @@ export type ToolpathsStatusOutput =
 export type ToolpathsRegenerateInput = {
   readonly id: { readonly id: string }["id"]
   readonly scope?: ToolpathsRegeneratePayload["scope"]
+  readonly accept?: ToolpathsRegeneratePayload["accept"]
+  readonly force?: ToolpathsRegeneratePayload["force"]
+  readonly message?: ToolpathsRegeneratePayload["message"]
 }
 
 export type ToolpathsRegenerateOutput = {
@@ -7846,6 +7854,9 @@ export type ToolpathsRegenerateOutput = {
       }
     | { status: "unknown"; reason: string }
   scope: "program" | "drawing"
+  accepted: boolean
+  refusal?: string
+  versionId?: string
   outcome:
     | {
         status: "ok"

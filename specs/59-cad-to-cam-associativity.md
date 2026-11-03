@@ -129,3 +129,10 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
 - 2026-11-03 (build, A6 first part): the CAM page's kernel section shows what kind of model change made the program stale (`data-testid="kernel-model-change"`: geometry, topology,
   rigid move, or the settings that differ; four new strings in the 11 locales, machine-translated and not reviewed). Still open: the Regenerate / Review buttons and the diff view
   (`KernelDiff.tsx`), the stale badge in the program list and on the toolpath detail screen, acceptance with a restore point.
+- 2026-11-03 (build, A3 accept): `POST /api/toolpaths/:id/regenerate` with `accept: true` replaces the stored program. The program being replaced is first kept as a version of the toolpath
+  (the restore point, `versionId` in the answer, listed by `GET /api/toolpaths/:id/versions` with the old NC byte for byte), then the row is written only if neither the toolpath nor the
+  drawing changed since they were read (one transaction; otherwise 409 and nothing is replaced). Refused with a reason and nothing written: a diff that is not `safe` (lower release or a
+  claim that got worse) unless `force`, a blocked new program, a saved CAM page document (portable program: accepted from the CAM page). Needs write access (403 otherwise). After
+  accepting, the status is `current` and the assistant's review is no longer stale. The assistant's `cam regenerate` stays a preview: storing goes through `cam_edit manufacture`.
+  Test: `apps/sidecar/test/cam-program-status.test.ts` (5). **Open:** the desktop buttons and diff view (A6), `matchOperations` (A5), A7.
+

@@ -87940,6 +87940,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "accept": {
+                    "type": "boolean",
+                  },
+                  "force": {
+                    "type": "boolean",
+                  },
+                  "message": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
                   "scope": {
                     "enum": [
                       "program",
@@ -87961,6 +87971,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                    },
                     "outcome": {
                       "anyOf": [
                         {
@@ -90437,6 +90450,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         },
                       ],
                     },
+                    "refusal": {
+                      "type": "string",
+                    },
                     "scope": {
                       "enum": [
                         "program",
@@ -90569,10 +90585,14 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         },
                       ],
                     },
+                    "versionId": {
+                      "type": "string",
+                    },
                   },
                   "required": [
                     "status",
                     "scope",
+                    "accepted",
                     "outcome",
                   ],
                   "type": "object",
@@ -90601,6 +90621,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
             "description": "Unauthorized",
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
           "404": {
             "content": {
               "application/json": {
@@ -90610,6 +90640,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {

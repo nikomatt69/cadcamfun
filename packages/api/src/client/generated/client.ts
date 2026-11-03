@@ -2945,11 +2945,15 @@ type Endpoint27_7Request = Parameters<RawClient["toolpaths"]["regenerate"]>[0]
 type Endpoint27_7Input = {
   readonly id: Endpoint27_7Request["params"]["id"]
   readonly scope?: Endpoint27_7Request["payload"]["scope"]
+  readonly accept?: Endpoint27_7Request["payload"]["accept"]
+  readonly force?: Endpoint27_7Request["payload"]["force"]
+  readonly message?: Endpoint27_7Request["payload"]["message"]
 }
 const Endpoint27_7 = (raw: RawClient["toolpaths"]) => (input: Endpoint27_7Input) =>
-  raw["regenerate"]({ params: { id: input["id"] }, payload: { scope: input["scope"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["regenerate"]({
+    params: { id: input["id"] },
+    payload: { scope: input["scope"], accept: input["accept"], force: input["force"], message: input["message"] },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint27_8Request = Parameters<RawClient["toolpaths"]["postCheck"]>[0]
 type Endpoint27_8Input = {

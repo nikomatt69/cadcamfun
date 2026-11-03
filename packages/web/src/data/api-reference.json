@@ -55187,6 +55187,15 @@
                         "drawing"
                       ]
                     },
+                    "accepted": {
+                      "type": "boolean"
+                    },
+                    "refusal": {
+                      "type": "string"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
                     "outcome": {
                       "anyOf": [
                         {
@@ -57667,6 +57676,7 @@
                   "required": [
                     "status",
                     "scope",
+                    "accepted",
                     "outcome"
                   ],
                   "additionalProperties": false
@@ -57694,12 +57704,32 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
                 }
               }
             }
@@ -57727,6 +57757,16 @@
                       "program",
                       "drawing"
                     ]
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 200
                   }
                 },
                 "additionalProperties": false
