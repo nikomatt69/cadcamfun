@@ -28,8 +28,8 @@ export interface PropertyEditorModalProps {
   readonly children: JSX.Element
 }
 
-const CANCEL = "rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)]"
-const SAVE = "rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+const CANCEL = "rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] h-8 px-4 text-xs font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)]"
+const SAVE = "rounded-md bg-[color:var(--ent-action)] h-8 px-4 text-xs font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)] disabled:cursor-not-allowed disabled:opacity-50"
 
 /** The dialog of a property editor: centred, wide, with the actions pinned at the bottom. */
 export function PropertyEditorModal(props: PropertyEditorModalProps): JSX.Element {

@@ -335,14 +335,14 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-3">
             <button
               type="button"
-              class="rounded-md border border-[color:var(--ent-line-strong)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
+              class="rounded-md border border-[color:var(--ent-line-strong)] h-8 px-4 text-xs font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
               onClick={() => setOpen(false)}
             >
               {t("cad.saveElement.cancel")}
             </button>
             <button
               type="button"
-              class="rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
+              class="rounded-md bg-[color:var(--ent-action)] h-8 px-4 text-xs font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
               disabled={!canSave()}
               onClick={() => void save()}
             >

@@ -1455,13 +1455,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       onDragLeave={() => setDraggingComponent(false)}
     >
       <Show when={webglFailed()}>
-        <div class="absolute inset-0 flex items-center justify-center text-sm text-gray-300 px-6 text-center">{t("viewport.noWebgl")}</div>
+        <div class="absolute inset-0 flex items-center justify-center text-xs text-[color:var(--ent-text-muted)] px-6 text-center">{t("viewport.noWebgl")}</div>
       </Show>
 
       {props.children}
 
       <Show when={invalidItems().length > 0}>
-        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-red-900 px-3 py-2 text-xs text-white shadow-lg" role="alert" data-testid="invalid-elements">
+        <div class="absolute left-1/2 top-14 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-bad-soft)] px-3 py-2 text-xs text-[color:var(--ent-bad)] shadow-lg" role="alert" data-testid="invalid-elements">
           <p class="font-semibold">{t("cad.invalid.title", { count: invalidItems().length })}</p>
           <ul class="mt-1 space-y-0.5">
             <For each={invalidItems().slice(0, 4)}>{(item) => (
@@ -1475,11 +1475,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       <FlatPatternOverlay />
 
       <Show when={pickedSub()}>
-        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md bg-amber-600 px-3 py-1 text-xs text-white shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
+        {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 py-1.5 text-xs text-[color:var(--ent-text)] shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
       </Show>
 
       <Show when={issueItems().length > 0}>
-        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md bg-amber-900 px-3 py-2 text-xs text-white shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
+        <div class="absolute left-1/2 z-50 max-w-[min(92%,640px)] -translate-x-1/2 rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-warn-soft)] px-3 py-2 text-xs text-[color:var(--ent-warn)] shadow-lg" style={{ top: invalidItems().length > 0 ? "9rem" : "3.5rem" }} role="status" data-testid="feature-issues">
           <p class="font-semibold">{t("cad.issues.title", { count: issueItems().length })}</p>
           <ul class="mt-1 space-y-0.5">
             <For each={issueItems().slice(0, 4)}>{(item) => (
@@ -1542,40 +1542,40 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           </Show>
           <Show when={showPerformance()}>
             <div class="cad-viewport-popover p-3">
-              <h3 class="text-sm font-semibold mb-3">{t("cad.canvas.perfEvents")}</h3>
+              <h3 class="text-xs font-semibold mb-3">{t("cad.canvas.perfEvents")}</h3>
               <div class="mb-4" data-testid="look-tier">
                 <h4 class="text-xs font-semibold mb-2">{t("cad.canvas.visualQuality")}</h4>
                 <div class="flex gap-1" role="radiogroup" aria-label={t("cad.canvas.visualQuality")}>
                   <For each={LOOK_TIERS}>{(tier) =>
                     <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
-                      class={`flex-1 text-xs px-2 py-1 rounded capitalize ${lookTier() === tier ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>{tier}</button>}
+                      class={`h-7 flex-1 text-xs px-2 rounded capitalize ${lookTier() === tier ? "bg-[color:var(--ent-accent)] text-white" : "bg-[color:var(--ent-surface-inset)] text-[color:var(--ent-text)] hover:bg-[color:var(--ent-line)]"}`}>{tier}</button>}
                   </For>
                 </div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("cad.canvas.qualityHint")}</p>
+                <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{t("cad.canvas.qualityHint")}</p>
               </div>
               <div class="mb-4">
                 <h4 class="text-xs font-semibold mb-2">{t("cad.canvas.memory")}</h4>
-                <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">
+                <div class="text-xs space-y-1 tabular-nums text-[color:var(--ent-text-muted)]">
                   <div>JS Heap: {(memory().used / 1024 / 1024).toFixed(1)}MB</div>
                   <div>Total Heap: {(memory().total / 1024 / 1024).toFixed(1)}MB</div>
                   <div>Geometries: {memory().geometries}</div>
                   <div>Textures: {memory().textures}</div>
                 </div>
-                <div class="mt-2 space-x-2">
-                  <button onClick={cleanupMemory} class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">{t("cad.canvas.cleanup")}</button>
-                  <button onClick={refreshMemory} class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">{t("aiDash.refresh")}</button>
+                <div class="mt-2 flex gap-2">
+                  <button onClick={cleanupMemory} class="h-7 rounded bg-[color:var(--ent-action)] px-3 text-xs text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]">{t("cad.canvas.cleanup")}</button>
+                  <button onClick={refreshMemory} class="h-7 rounded bg-[color:var(--ent-surface-inset)] px-3 text-xs text-[color:var(--ent-text)] hover:bg-[color:var(--ent-line)]">{t("aiDash.refresh")}</button>
                 </div>
               </div>
-              <button onClick={() => setShowPerformance(false)} class="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">{t("cad.drawing.close")}</button>
+              <button onClick={() => setShowPerformance(false)} class="mt-4 h-7 w-full rounded bg-[color:var(--ent-surface-inset)] px-3 text-xs text-[color:var(--ent-text)] hover:bg-[color:var(--ent-line)]">{t("cad.drawing.close")}</button>
             </div>
           </Show>
         </div>
       </div>
       <Show when={transformControls.isTransforming}>
-        <div style="position:absolute;bottom:20px;left:20px;background-color:rgba(0,0,0,0.9);color:white;padding:12px 16px;border-radius:8px;font-size:12px;font-family:monospace;z-index:1002">
+        <div class="absolute bottom-5 left-5 z-[1002] rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-4 py-3 text-xs leading-5 tabular-nums text-[color:var(--ent-text)] shadow-lg">
           <div>{t("cad.mode")} {transformStore.mode.toUpperCase()}</div>
           <div>{t("cad.tb.elementsColon")} {selectedIds().length}</div>
-          <div style="font-size:10px;margin-top:4px;color:#9ca3af">{t("cad.canvas.enterEsc")}</div>
+          <div class="mt-1 text-[11px] text-[color:var(--ent-text-muted)]">{t("cad.canvas.enterEsc")}</div>
         </div>
       </Show>
 
@@ -1605,14 +1605,14 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
 
       <Show when={drawTool()}>
-        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white px-4 py-2 rounded-md shadow-lg z-100" data-testid="draw-hint">
-          <p class="text-sm font-medium">{drawStart() ? t("cad.draw.next") : t("cad.draw.first")}</p>
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] px-4 py-2 rounded-md shadow-lg z-100" data-testid="draw-hint">
+          <p class="text-xs font-medium">{drawStart() ? t("cad.draw.next") : t("cad.draw.first")}</p>
         </div>
       </Show>
 
       <Show when={isPlacing()}>
-        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-md shadow-lg z-100">
-          <p class="text-sm font-medium">{t("cad.canvas.placeComponent")}</p>
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] px-4 py-2 rounded-md shadow-lg z-100">
+          <p class="text-xs font-medium">{t("cad.canvas.placeComponent")}</p>
         </div>
       </Show>
       <Show when={isDraggingComponent()}><DragDropIndicator position={dropPosition()} screenPosition={dropScreen()} /></Show>
@@ -1623,22 +1623,22 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
       {props.footerDock}
       <div class="cad-viewport-footer__section" data-testid="display-mode-control">
-        <select class="rounded-md bg-gray-800 px-1.5 py-1 text-[11px] text-white" aria-label={t("cad.display")} title={t("cad.display")} value={cad.displayMode}
+        <select class="h-7 rounded-md bg-[color:var(--panel-bg-inset)] px-2 text-[11px] text-[color:var(--panel-text)]" aria-label={t("cad.display")} title={t("cad.display")} value={cad.displayMode}
           onChange={(event) => { const next = event.currentTarget.value; if (isDisplayMode(next)) cad.setDisplayMode(next) }}>
           <For each={DISPLAY_MODES}>{(mode) => <option value={mode} selected={cad.displayMode === mode}>{t(`cad.display.${mode}`)}</option>}</For>
         </select>
-        <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showSketches ? "var(--panel-accent)" : "#111827" }}
+        <button type="button" class="h-7 rounded-md px-2 text-[11px]" style={{ "background-color": cad.showSketches ? "var(--panel-accent)" : "var(--panel-bg-inset)", color: cad.showSketches ? "#fff" : "var(--panel-text)" }}
           aria-pressed={cad.showSketches} title={t("cad.sketches.toggle")} data-testid="show-sketches" onClick={() => cad.setShowSketches(!cad.showSketches)}>{t("cad.sketches")}</button>
         <Show when={sheetSource() !== undefined}>
-          <button type="button" class="rounded-md px-2 py-1 text-[11px] text-white" style={{ "background-color": cad.showFlatPattern ? "var(--panel-accent)" : "#111827" }}
+          <button type="button" class="h-7 rounded-md px-2 text-[11px]" style={{ "background-color": cad.showFlatPattern ? "var(--panel-accent)" : "var(--panel-bg-inset)", color: cad.showFlatPattern ? "#fff" : "var(--panel-text)" }}
             aria-pressed={cad.showFlatPattern} title={t("cad.flat.toggle")} data-testid="show-flat-pattern" onClick={() => cad.setShowFlatPattern(!cad.showFlatPattern)}>{t("cad.flat")}</button>
         </Show>
       </div>
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button
           type="button"
-          class="rounded-md px-2 py-1 text-[11px] text-white"
-          style={{ "background-color": cad.section.enabled ? "var(--panel-accent)" : "#111827" }}
+          class="h-7 rounded-md px-2 text-[11px]"
+          style={{ "background-color": cad.section.enabled ? "var(--panel-accent)" : "var(--panel-bg-inset)", color: cad.section.enabled ? "#fff" : "var(--panel-text)" }}
           aria-pressed={cad.section.enabled}
           title={t("cad.section")}
           onClick={() => {
@@ -1651,12 +1651,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           <div class="cad-viewport-footer__section-fields">
             <For each={SECTION_AXES}>{(axis) => (
               <button type="button" aria-pressed={cad.section.axis === axis} aria-label={`${t("cad.section.axis")} ${axis.toUpperCase()}`}
-                class="rounded px-2 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "var(--panel-accent)" : "#374151" }}
+                class="h-6 rounded px-2 uppercase" style={{ "background-color": cad.section.axis === axis ? "var(--panel-accent)" : "var(--panel-bg-inset)", color: cad.section.axis === axis ? "#fff" : "var(--panel-text)" }}
                 onClick={() => cad.setSection({ axis })}>{axis}</button>
             )}</For>
             <input type="range" aria-label={t("cad.section.constant")} min={sectionRange().min} max={sectionRange().max} step="0.5" value={cad.section.position}
               onInput={(event) => cad.setSection({ position: Number(event.currentTarget.value) })} />
-            <span class="w-16"><NumberField label={t("cad.section.constant")} class="w-full rounded bg-gray-700 px-2 py-0.5 text-right tabular-nums" step={0.5} value={cad.section.position}
+            <span class="w-16"><NumberField label={t("cad.section.constant")} class="h-6 w-full rounded bg-[color:var(--panel-bg-inset)] px-2 text-right tabular-nums text-[color:var(--panel-text)]" step={0.5} value={cad.section.position}
               onChange={(next) => cad.setSection({ position: next })} /></span>
             <label class="flex items-center gap-1"><input type="checkbox" checked={cad.section.inverted} onChange={(event) => cad.setSection({ inverted: event.currentTarget.checked })} />{t("cad.section.invert")}</label>
           </div>

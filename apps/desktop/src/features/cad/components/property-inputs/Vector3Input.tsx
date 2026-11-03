@@ -17,7 +17,7 @@ interface Vector3InputProps {
   readonly showUnit?: boolean
 }
 
-const INPUT = "w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs tabular-nums focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
+const INPUT = "w-full h-7 px-2 border border-[color:var(--ent-line-strong)] rounded-md text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)] focus:border-[color:var(--ent-accent)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text)]"
 
 /** Edits X/Y/Z of a vector (rotations, scales...). */
 export function Vector3Input(props: Vector3InputProps): JSX.Element {
@@ -26,11 +26,11 @@ export function Vector3Input(props: Vector3InputProps): JSX.Element {
   const degrees = () => props.showUnit !== false && (props.unit ?? "°") === "°"
   return (
     <div class="mb-2">
-      <label class="block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1">{props.label}</label>
+      <label class="block text-xs font-medium text-[color:var(--ent-text)] mb-1">{props.label}</label>
       <div class="grid grid-cols-3 gap-2">
         <For each={["x", "y", "z"] as const}>{(axis) =>
           <div>
-            <label for={props.name ? `${props.name}-${axis}` : undefined} class="block text-xs text-gray-500 dark:text-blue-400 mb-1">{axis.toUpperCase()}{unit()}</label>
+            <label for={props.name ? `${props.name}-${axis}` : undefined} class="block text-[11px] text-[color:var(--ent-text-muted)] mb-1">{axis.toUpperCase()}{unit()}</label>
             <NumberField
               id={props.name ? `${props.name}-${axis}` : undefined}
               name={props.name ? `${props.name}.${axis}` : undefined}

@@ -241,7 +241,7 @@ export default function CadPage(): JSX.Element {
         <div class="cad-workspace__body flex flex-1 overflow-hidden w-full">
           <EnhancedSidebarCad isOpen={sidebarOpen()} setIsOpen={setSidebarOpen} activeSidebarTab={sidebarTab()} setActiveSidebarTab={setSidebarTab} />
 
-          <div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2">
+          <div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-lg mr-2">
             <CADCanvas
               width="100%" height="100%" previewComponent={libraryComponent()} previewLibraryItem={libraryItem()}
               onComponentPlaced={() => { toast.success(t("cad.page.componentPlaced")); setLibraryComponent(null) }}

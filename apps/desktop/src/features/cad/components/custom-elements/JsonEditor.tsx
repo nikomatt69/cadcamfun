@@ -260,7 +260,7 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
       <div class="flex-1 relative">
         <textarea
           ref={textarea}
-          class={`w-full h-full p-3 pl-14 font-mono text-sm border-none resize-none focus:outline-none ${section() === "parameters" ? "bg-gray-900 text-yellow-400" : "bg-gray-900 text-green-400"}`}
+          class="h-full w-full resize-none border-none bg-[color:var(--ent-surface-inset)] p-3 pl-14 font-mono text-xs leading-5 text-[color:var(--ent-text)] focus:outline-none"
           value={currentCode()}
           spellcheck={false}
           onInput={(event) => {
@@ -274,7 +274,7 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
           }}
           placeholder={section() === "geometry" ? DEFAULT_GEOMETRY : section() === "material" ? DEFAULT_MATERIAL : "{}"}
         />
-        <div class="absolute left-0 top-0 w-12 h-full bg-gray-800 text-gray-500 text-xs font-mono p-3 text-right pointer-events-none select-none overflow-hidden">
+        <div class="absolute left-0 top-0 w-12 h-full border-r border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text-faint)] text-xs font-mono p-3 text-right pointer-events-none select-none overflow-hidden">
           <For each={Array.from({ length: Math.max(50, lineCount()) }, (_, index) => index + 1)}>{(line) => <div class="leading-5">{line}</div>}</For>
         </div>
       </div>

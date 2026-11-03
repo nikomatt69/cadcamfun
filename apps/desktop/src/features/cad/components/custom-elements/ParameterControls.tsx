@@ -200,15 +200,15 @@ export default function ParameterControls(props: ParameterControlsProps): JSX.El
                     <div class="grid grid-cols-3 gap-2">
                       <div>
                         <span class="block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1">{t("cad.customElements.min")}</span>
-                        <input type="number" class={FIELD} value={parameter.min ?? ""} onInput={(event) => editParameter(name, { min: event.currentTarget.value ? Number.parseFloat(event.currentTarget.value) : undefined })} />
+                        <NumberField optional deferred label={t("cad.customElements.min")} class={FIELD} value={parameter.min} onChange={(next) => editParameter(name, { min: next })} onClear={() => editParameter(name, { min: undefined })} />
                       </div>
                       <div>
                         <span class="block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1">{t("cad.customElements.max")}</span>
-                        <input type="number" class={FIELD} value={parameter.max ?? ""} onInput={(event) => editParameter(name, { max: event.currentTarget.value ? Number.parseFloat(event.currentTarget.value) : undefined })} />
+                        <NumberField optional deferred label={t("cad.customElements.max")} class={FIELD} value={parameter.max} onChange={(next) => editParameter(name, { max: next })} onClear={() => editParameter(name, { max: undefined })} />
                       </div>
                       <div>
                         <span class="block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1">{t("cad.customElements.step")}</span>
-                        <input type="number" class={FIELD} value={parameter.step ?? ""} onInput={(event) => editParameter(name, { step: event.currentTarget.value ? Number.parseFloat(event.currentTarget.value) : undefined })} />
+                        <NumberField optional deferred label={t("cad.customElements.step")} class={FIELD} value={parameter.step} onChange={(next) => editParameter(name, { step: next })} onClear={() => editParameter(name, { step: undefined })} />
                       </div>
                     </div>
                   </Show>

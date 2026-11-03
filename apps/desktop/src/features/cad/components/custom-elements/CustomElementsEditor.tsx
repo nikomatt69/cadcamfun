@@ -196,15 +196,15 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)] ring-1 ring-[color:var(--ent-line)] hover:bg-[color:var(--ent-surface-inset)]"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
+                <button type="button" class={ACTION + " h-8 bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)] ring-1 ring-[color:var(--ent-line)] hover:bg-[color:var(--ent-surface-inset)]"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
                   <Play class="w-4 h-4" />
                   <span>{t("cad.customElements.preview")}</span>
                 </button>
-                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
+                <button type="button" class={ACTION + " h-8 bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
                   <Save class="w-4 h-4" />
                   <span>{t("cad.customElements.save")}</span>
                 </button>
-                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-text)] text-[color:var(--ent-surface)] hover:bg-[color:var(--ent-text-muted)]"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
+                <button type="button" class={ACTION + " h-8 bg-[color:var(--ent-text)] text-[color:var(--ent-surface)] hover:bg-[color:var(--ent-text-muted)]"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
                   <Plus class="w-4 h-4" />
                   <span>{t("cad.customElements.addToScene")}</span>
                 </button>

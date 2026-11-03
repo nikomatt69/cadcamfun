@@ -184,7 +184,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
         </div>
         <p class="rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-warn-soft)] p-4 text-sm text-[color:var(--ent-warn)]">{t("cad.importExport.importWarning")}</p>
       </div>
-      <div class="px-6 py-4 bg-[color:var(--ent-surface-subtle)] border-t border-[color:var(--ent-line)] flex justify-end rounded-b-lg"><button type="button" class="px-4 py-2 rounded-md text-sm bg-[color:var(--ent-surface)] border border-[color:var(--ent-line-strong)]" onClick={props.onClose}>{t("common.cancel")}</button></div>
+      <div class="px-6 py-4 bg-[color:var(--ent-surface-subtle)] border-t border-[color:var(--ent-line)] flex justify-end rounded-b-lg"><button type="button" class="h-8 px-4 rounded-md text-xs bg-[color:var(--ent-surface)] border border-[color:var(--ent-line-strong)]" onClick={props.onClose}>{t("common.cancel")}</button></div>
     </Modal>
     <SaveCADAsProjectModal isOpen={showProject()} onClose={() => setShowProject(false)} organizations={organizations()} />
   </Show>

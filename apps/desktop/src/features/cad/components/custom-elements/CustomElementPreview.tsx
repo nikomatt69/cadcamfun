@@ -194,35 +194,35 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
   const triangles = (): number | undefined => (props.object ? triangleCount(props.object) : undefined)
 
   return (
-    <div class="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
+    <div class="relative h-full w-full overflow-hidden bg-[color:var(--ent-surface-inset)]">
       <div ref={mount} class="w-full h-full" />
 
       <Show when={props.isLoading}>
-        <div class="absolute inset-0 bg-white/75 dark:bg-gray-800/75 flex items-center justify-center">
-          <div class="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
-            <RefreshCcw class="w-5 h-5 animate-spin" />
+        <div class="absolute inset-0 bg-[color:var(--ent-surface-inset)] flex items-center justify-center">
+          <div class="flex items-center gap-2 text-[color:var(--ent-text-muted)] text-xs">
+            <RefreshCcw class="h-4 w-4 animate-spin motion-reduce:animate-none" />
             <span>{t("cad.customElements.generating")}</span>
           </div>
         </div>
       </Show>
 
       <Show when={!props.object && !props.isLoading}>
-        <div class="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
+        <div class="absolute inset-0 flex items-center justify-center text-xs text-[color:var(--ent-text-muted)]">
           <div class="text-center">
             <Package size={24} class="mx-auto mb-2" aria-hidden="true" />
             <div>{t("cad.customElements.noPreview")}</div>
-            <div class="text-sm">{t("cad.customElements.noPreviewHint")}</div>
+            <div class="mt-1 text-[11px] text-[color:var(--ent-text-faint)]">{t("cad.customElements.noPreviewHint")}</div>
           </div>
         </div>
       </Show>
 
-      <div class="absolute bottom-3 left-3 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] leading-4 text-slate-100 shadow-lg">
+      <div class="absolute bottom-3 left-3 rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 py-2 text-[11px] leading-4 text-[color:var(--ent-text-muted)] shadow-md">
         <div class="flex items-center gap-2"><MousePointer2 size={12} aria-hidden="true" />{t("cad.customElements.dragRotate")}</div>
         <div class="flex items-center gap-2"><ZoomIn size={12} aria-hidden="true" />{t("cad.customElements.scrollZoom")}</div>
       </div>
 
       <Show when={props.object && !props.isLoading}>
-        <div class="absolute left-3 top-3 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] leading-4 tabular-nums text-slate-100 shadow-lg">
+        <div class="absolute left-3 top-3 rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 py-2 text-[11px] leading-4 tabular-nums text-[color:var(--ent-text)] shadow-md">
           <div>{t("cad.customElements.triangles", { count: triangles() ?? 0 })}</div>
           <div>
             {t("cad.customElements.objectType")}: {props.object?.type}
