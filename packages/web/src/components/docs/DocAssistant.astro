@@ -787,7 +787,10 @@ const copy = {
   }
 </style>
 
-<script define:vars={{ copy }}>
+<script type="application/json" id="doc-assistant-copy" set:html={JSON.stringify(copy)} />
+
+<script>
+  const copy = JSON.parse(document.getElementById("doc-assistant-copy")?.textContent ?? "{}") as Record<string, string>
   type Role = "user" | "assistant"
   type Source = { title: string; href: string }
   type Artifact = { id: string; url: string; title: string; filename: string }

@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
 import HeroWorkbench from "../../components/stage/HeroWorkbench"
+import FlowWindow from "../../components/stage/FlowWindow"
 import { text } from "../../i18n/catalog"
 
 const locale = Astro.locals.locale ?? "en"
@@ -22,7 +23,8 @@ const failed = text(locale, "Sign in failed")
         </p>
         <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
       </div>
-      <form id="studio-login" class="material rounded-[var(--radius-card)] p-6 sm:p-8">
+      <FlowWindow client:load title={text(locale, "Sign in")}>
+      <form id="studio-login">
         <label class="block text-[13px] font-semibold" for="email">{text(locale, "Email")}</label>
         <input id="email" name="email" type="email" autocomplete="username" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px]" />
         <label class="mt-4 block text-[13px] font-semibold" for="password">{text(locale, "Password")}</label>
@@ -30,16 +32,20 @@ const failed = text(locale, "Sign in failed")
         <p id="studio-error" class="mt-4 hidden text-[13px] text-terminal-text" role="alert"></p>
         <button type="submit" class="pressable btn-fill mt-6 rounded-[var(--radius-sm)] px-4 py-2.5 text-[14px] font-semibold">{text(locale, "Sign in")}</button>
       </form>
+      </FlowWindow>
     </div>
   </main>
 </Layout>
 
-<script define:vars={{ failed }}>
-  const form = document.querySelector("#studio-login")
+<script type="application/json" id="studio-login-copy" set:html={JSON.stringify({ failed })} />
+
+<script>
+  const { failed } = JSON.parse(document.getElementById("studio-login-copy")?.textContent ?? "{}") as { failed: string }
+  const form = document.querySelector<HTMLFormElement>("#studio-login")
   const error = document.querySelector("#studio-error")
   form?.addEventListener("submit", async (event) => {
     event.preventDefault()
-    const data = new FormData(form as HTMLFormElement)
+    const data = new FormData(form!)
     const response = await fetch("/studio/api/login", {
       method: "POST",
       headers: { "content-type": "application/json" },

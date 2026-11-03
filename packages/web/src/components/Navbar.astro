@@ -2,6 +2,8 @@
 import Mark from "./Mark.astro"
 import LocaleSelector from "./LocaleSelector.astro"
 import NavTabs from "./stage/NavTabs"
+import ThemeSwitch from "./stage/ThemeSwitch"
+import FlowWindow from "./stage/FlowWindow"
 import { ui } from "../i18n/ui"
 
 const locale = Astro.locals.locale ?? "en"
@@ -32,37 +34,25 @@ function active(href: string) {
         <NavTabs client:load links={[...navItems, { href: "https://github.com/nikomatt69/cadcamfun", label: "GitHub", external: true }]} current={navItems.findIndex((item) => active(item.href))} />
         <LocaleSelector locale={locale} />
         <a href="/download" class="pressable btn-fill rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold">{ui(locale, "install")}</a>
-        <button
-          id="theme-toggle"
-          type="button"
-          class="pressable glass-chip flex h-9 w-9 items-center justify-center text-terminal-muted"
-          aria-label={ui(locale, "theme")}
-        >
-          <svg class="h-4 w-4 dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
-          </svg>
-        </button>
+        <ThemeSwitch client:load label={ui(locale, "theme")} />
       </nav>
 
       <div class="flex items-center gap-2 md:hidden">
-        <button id="theme-toggle-mobile" type="button" class="pressable glass-chip flex h-9 w-9 items-center justify-center" aria-label={ui(locale, "theme")}>
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
-          </svg>
-        </button>
+        <ThemeSwitch client:load label={ui(locale, "theme")} />
         <button id="nav-toggle" type="button" class="pressable glass-chip flex h-9 items-center px-3 text-[13px] font-semibold" aria-expanded="false" aria-controls="mobile-nav">
           {ui(locale, "menu")}
         </button>
       </div>
     </div>
     <div id="mobile-nav" class="mobile-nav hidden md:hidden" hidden>
-        <nav class="page-shell flex flex-col gap-1 py-3" aria-label={ui(locale, "menu")}>
+      <div class="page-shell py-3"><FlowWindow client:load title={ui(locale, "menu")}>
+        <nav class="flex flex-col gap-1" aria-label={ui(locale, "menu")}>
         {navItems.map((item) => (
           <a href={item.href} class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{item.label}</a>
         ))}
         <a href="https://github.com/nikomatt69/cadcamfun" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="/download" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{ui(locale, "install")}</a>
-      </nav>
+      </nav></FlowWindow></div>
     </div>
   </div>
   </div>
@@ -70,30 +60,6 @@ function active(href: string) {
 </header>
 
 <script>
-  const apply = (theme: string) => {
-    document.documentElement.setAttribute("data-theme", theme)
-    localStorage.setItem("theme", theme)
-  }
-
-  // One crossfade for the whole page. Per-surface colour transitions are
-  // frozen during the swap so nothing changes theme at its own pace.
-  const toggle = () => {
-    const root = document.documentElement
-    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark"
-    root.classList.add("theme-switching")
-    const release = () => requestAnimationFrame(() => root.classList.remove("theme-switching"))
-    const doc = document as Document & { startViewTransition?: (update: () => void) => { finished: Promise<void> } }
-    if (doc.startViewTransition) {
-      doc.startViewTransition(() => apply(next)).finished.finally(release)
-    } else {
-      apply(next)
-      release()
-    }
-  }
-
-  document.getElementById("theme-toggle")?.addEventListener("click", toggle)
-  document.getElementById("theme-toggle-mobile")?.addEventListener("click", toggle)
-
   const menu = document.getElementById("mobile-nav")
   const menuBtn = document.getElementById("nav-toggle")
   menuBtn?.addEventListener("click", () => {

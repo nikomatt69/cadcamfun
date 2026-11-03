@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
 import HeroWorkbench from "../../components/stage/HeroWorkbench"
+import FlowWindow from "../../components/stage/FlowWindow"
 import { text } from "../../i18n/catalog"
 
 const locale = Astro.locals.locale ?? "en"
@@ -40,8 +41,9 @@ export const prerender = false
       <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
 
       <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Workspace")}</h2>
-      <div id="studio-counts" class="mt-4 grid gap-3 sm:grid-cols-4"></div>
-      <div class="material mt-6 overflow-hidden rounded-[var(--radius-card)]">
+      <div class="mt-4"><FlowWindow client:load title={text(locale, "Workspace")}>
+      <div id="studio-counts" class="grid gap-3 pb-5 sm:grid-cols-4"></div>
+      <div class="-mx-5 -mb-5 overflow-hidden">
         <table class="w-full text-left text-[14px]">
           <thead>
             <tr>
@@ -52,6 +54,7 @@ export const prerender = false
           <tbody id="studio-projects"></tbody>
         </table>
       </div>
+      </FlowWindow></div>
 
       <h2 id="account" class="font-display mt-14 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Account")}</h2>
       <p class="mt-2 max-w-2xl text-[14px] leading-relaxed text-terminal-muted">
@@ -59,7 +62,8 @@ export const prerender = false
       </p>
       <p id="account-status" class="mt-3 text-[14px] text-terminal-muted" role="status"></p>
 
-      <form id="profile-form" class="material mt-6 hidden rounded-[var(--radius-card)] p-6" hidden>
+      <div class="mt-6"><FlowWindow client:load title={text(locale, "Profile")}>
+      <form id="profile-form" class="hidden" hidden>
         <h3 class="text-[15px] font-semibold">{text(locale, "Profile")}</h3>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <label class="block text-[13px] font-semibold">{text(locale, "Name")}<input id="profile-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
@@ -77,8 +81,10 @@ export const prerender = false
         <p id="profile-error" class="mt-3 hidden text-[13px]" role="alert"></p>
         <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Save profile")}</button>
       </form>
+      </FlowWindow></div>
 
-      <form id="password-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+      <div class="mt-4"><FlowWindow client:load title={text(locale, "Password")}>
+      <form id="password-form" class="hidden" hidden>
         <h3 class="text-[15px] font-semibold">{text(locale, "Password")}</h3>
         <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "Updates the password this Studio login checks. A desktop credential row for the same user is updated with the same hash.")}</p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -88,8 +94,10 @@ export const prerender = false
         <p id="password-error" class="mt-3 hidden text-[13px]" role="alert"></p>
         <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Change password")}</button>
       </form>
+      </FlowWindow></div>
 
-      <form id="git-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+      <div class="mt-4"><FlowWindow client:load title={text(locale, "Git identity")}>
+      <form id="git-form" class="hidden" hidden>
         <h3 class="text-[15px] font-semibold">{text(locale, "Git identity")}</h3>
         <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "The name and email written on this user's commits.")}</p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -99,8 +107,10 @@ export const prerender = false
         <p id="git-error" class="mt-3 hidden text-[13px]" role="alert"></p>
         <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Save git identity")}</button>
       </form>
+      </FlowWindow></div>
 
-      <section id="keys-panel" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+      <div class="mt-4"><FlowWindow client:load title={text(locale, "API keys")}>
+      <section id="keys-panel" class="hidden" hidden>
         <h3 class="text-[15px] font-semibold">{text(locale, "API keys")}</h3>
         <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "The secret is shown once. Studio stores only its SHA-256 hash, the same way the sidecar does.")}</p>
         <ul id="keys-list" class="mt-4 flex flex-col gap-2 text-[14px]"></ul>
@@ -111,11 +121,15 @@ export const prerender = false
         <p id="key-secret" class="mt-4 hidden break-all font-mono text-[13px]"></p>
         <p id="key-error" class="mt-3 hidden text-[13px]" role="alert"></p>
       </section>
+      </FlowWindow></div>
     </div>
   </main>
 </Layout>
 
-<script define:vars={{ copy }}>
+<script type="application/json" id="studio-copy" set:html={JSON.stringify(copy)} />
+
+<script>
+  const copy = JSON.parse(document.getElementById("studio-copy")?.textContent ?? "{}") as Record<string, string>
   type Profile = {
     email: string | null
     name: string | null

@@ -1,0 +1,33 @@
+.ss-stage.fw {
+  position: relative;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  background: transparent;
+  background-image: none;
+}
+.fw .fw-window {
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+  color: var(--ss-text-strong);
+}
+.fw .fw-body { padding: 20px; background: var(--ss-surface); }
+.fw .fw-body > form, .fw .fw-body > section, .fw .fw-body > div { margin: 0; }
+/* The page's scripts show and hide the form inside; an empty frame stays hidden with it */
+.ss-stage.fw:has(.fw-body > astro-slot > [hidden]), .ss-stage.fw:has(.fw-body > [hidden]) { display: none; }
+.fw astro-slot { display: contents; }
+.fw .fw-body table { width: 100%; }
+.fw .fw-body input:not([type="checkbox"]), .fw .fw-body textarea {
+  background: var(--ss-canvas);
+  border: 1px solid var(--ss-line);
+  border-radius: 6px;
+  color: var(--ss-text-strong);
+}
+.fw .fw-body input:focus-visible, .fw .fw-body textarea:focus-visible { outline: 2px solid var(--ss-accent); outline-offset: 1px; }
+.fw .fw-body .btn-fill { background: var(--ss-accent); color: #fff; border-radius: 6px; }
+.fw .fw-body input:not([type="checkbox"]), .fw .fw-body textarea { box-sizing: border-box; max-width: 100%; margin-left: 0; margin-right: 0; padding: 8px 12px; font: inherit; }
+.fw .fw-body button { border: 0; font: inherit; cursor: pointer; }
+.fw .fw-body a { text-decoration: none; color: var(--ss-text-strong); }
+.fw .fw-body label { color: var(--ss-text-strong); }
+.fw .fw-body .text-terminal-muted { color: var(--ss-text); }
