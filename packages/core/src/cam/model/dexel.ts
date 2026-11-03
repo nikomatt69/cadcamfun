@@ -49,6 +49,21 @@ export const gridAligned = (minX: number, minY: number, maxX: number, maxY: numb
   }
 }
 
+/**
+ * Sample columns centred on the nodes of `g` refined `r` times: (nx r + 1) x (ny r + 1) columns of the fine cell, the first centred on the grid's
+ * corner. Rays through them (with `NODE_JITTER`) see the part on the boundaries of every coarse column as well as inside it.
+ */
+export const nodeSampleGrid = (g: Grid, r: number): Grid => {
+  const fx = g.cellX / r, fy = g.cellY / r
+  return { minX: g.minX - fx / 2, minY: g.minY - fy / 2, nx: g.nx * r + 1, ny: g.ny * r + 1, cellX: fx, cellY: fy }
+}
+/** A small offset in fine cells, so no ray lies exactly on a lattice line (where triangle edges of an aligned part run). */
+export const NODE_JITTER = { x: 0.00731, y: 0.00519 } as const
+
+/** Sample columns the pooling may use: (nx r + 1)(ny r + 1) at most this many (3 x 3 when the part's grid allows it, else 2 x 2, else none). */
+export const REFINE_COLUMN_BUDGET = 2_000_000
+export const refineFactor = (g: Grid): number => ((g.nx * 3 + 1) * (g.ny * 3 + 1) <= REFINE_COLUMN_BUDGET ? 3 : (g.nx * 2 + 1) * (g.ny * 2 + 1) <= REFINE_COLUMN_BUDGET ? 2 : 1)
+
 const JITTER_X = 0.2360679775, JITTER_Y = 0.1415926536
 
 type Intervals = Float64Array
@@ -116,11 +131,11 @@ export class Dexels {
   }
 
   /** Fills the grid from a closed mesh. `unpaired` counts columns that had an odd number of hits (an open mesh). */
-  static fromMesh(mesh: Mesh64, grid: Grid): { readonly dexels: Dexels; readonly unpaired: number } {
+  static fromMesh(mesh: Mesh64, grid: Grid, jitter: { readonly x: number; readonly y: number } = { x: JITTER_X, y: JITTER_Y }): { readonly dexels: Dexels; readonly unpaired: number } {
     const { nx, ny, cellX, cellY, minX, minY } = grid
     const hits: number[][] = new Array(nx * ny)
     const p = mesh.positions
-    const ox = JITTER_X * cellX, oy = JITTER_Y * cellY
+    const ox = jitter.x * cellX, oy = jitter.y * cellY
     for (let t = 0; t + 2 < mesh.indices.length; t += 3) {
       const a = mesh.indices[t]! * 3, b = mesh.indices[t + 1]! * 3, c = mesh.indices[t + 2]! * 3
       const ax = p[a]!, ay = p[a + 1]!, az = p[a + 2]!
@@ -156,6 +171,23 @@ export class Dexels {
       return merge(Float64Array.from(out), EMPTY)
     })
     return { dexels: new Dexels(grid, cols), unpaired }
+  }
+
+  /**
+   * The same material on the coarse grid `coarse`, from a grid of sample columns centred on the nodes of the coarse grid refined `r` times
+   * (`nodeSampleGrid`): a coarse column holds the union of the columns at its (r+1) x (r+1) nodes, corners and edges included, so a height field
+   * read from it is as high as the highest part surface anywhere in its closed square (to the spacing of the nodes), never as low as one
+   * ray through it happened to be. Booleans are done on the sample columns first, so pooling does not widen a pocket.
+   */
+  pool(coarse: Grid, r: number): Dexels {
+    if (this.grid.nx !== coarse.nx * r + 1 || this.grid.ny !== coarse.ny * r + 1) throw new RangeError("Sample grid does not belong to the coarse grid at the given factor")
+    const cols = Array.from({ length: coarse.nx * coarse.ny }, (_, k): Intervals => {
+      const I = k % coarse.nx, J = (k - I) / coarse.nx
+      let acc: Intervals = EMPTY
+      for (let b = 0; b <= r; b++) for (let a = 0; a <= r; a++) acc = merge(acc, this.cols[(J * r + b) * this.grid.nx + I * r + a]!)
+      return acc
+    })
+    return new Dexels(coarse, cols)
   }
 
   private zip(other: Dexels, op: (a: Intervals, b: Intervals) => Intervals): Dexels {

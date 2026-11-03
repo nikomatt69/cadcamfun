@@ -210,7 +210,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   const levels = levelsOf(params, stock.origin.z)
   const warnings: string[] = [...part.warnings]
   let b = new MoveBuilder()
-  let surface = new Surface(part.grid, part.dexels.top(-Infinity))
+  let surface = new Surface(part.grid, (part.conservative ?? part.dexels).top(-Infinity))
   const cutter = cutterOf(tool, params.allowance)
   let stats = { levels: 0, lines: 0, loops: 0, points: 0 }
   const done = (moves: ReadonlyArray<Move>): SurfaceResult => ({
@@ -876,7 +876,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
       warnings.push(`The ${params.strategy} pass on this part would ask the drop-cutter more times than it can: ${describeWidening()}, so the operation is in the program`)
       b = new MoveBuilder()
       b.comment(`Surface ${params.strategy}: ${params.name}`)
-      surface = new Surface(part.grid, part.dexels.top(-Infinity))
+      surface = new Surface(part.grid, (part.conservative ?? part.dexels).top(-Infinity))
       stats = { levels: 0, lines: 0, loops: 0, points: 0 }
     }
   }

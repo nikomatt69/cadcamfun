@@ -3,12 +3,18 @@
  * dropped into a dexel grid, and the boolean elements combine their operands exactly. The result is what a 3-axis
  * strategy needs: the height of the finished surface in every column, undercuts and holes included.
  */
-import { Dexels, gridAligned, type Grid } from "./dexel.ts"
+import { Dexels, NODE_JITTER, gridAligned, nodeSampleGrid, refineFactor, type Grid } from "./dexel.ts"
 import { flattenElements } from "../generator/elements.ts"
 import { elementMesh, meshBounds, type Element, type Mesh64 } from "./element-mesh.ts"
 
 export interface PartModel {
   readonly dexels: Dexels
+  /**
+   * The same part as a ceiling for the drop-cutter: each column is as high as the highest surface anywhere in its closed square (rays through
+   * the nodes of a finer grid, pooled), so a tool kept above it never cuts into a wall that runs through a column. `dexels` keeps one ray per
+   * column and is the right one for volumes. Absent for a model built by hand.
+   */
+  readonly conservative?: Dexels
   readonly grid: Grid
   /** Elements that are not plain solids and so are not part of the model (type + name). */
   readonly skipped: ReadonlyArray<string>
@@ -102,17 +108,20 @@ export const buildPartModel = (elements: ReadonlyArray<Element>, options: ModelO
   if (grid.cellX > (options.cell ?? 0.25) * 1.001 || grid.cellY > (options.cell ?? 0.25) * 1.001) {
     warnings.push(`Surface resolution coarsened to ${Math.max(grid.cellX, grid.cellY).toFixed(3)} mm to keep the model within ${options.maxCells ?? 1_500_000} columns`)
   }
-  const fill = (n: (typeof roots)[number]): Dexels => {
+  const r = refineFactor(grid), fine = nodeSampleGrid(grid, r)
+  const fill = (n: (typeof roots)[number], onto: Grid, jitter?: { readonly x: number; readonly y: number }): Dexels => {
     if ("mesh" in n) {
-      const { dexels, unpaired } = Dexels.fromMesh(n.mesh, grid)
-      if (unpaired > 0) warnings.push(`${unpaired} column(s) of a solid had an odd number of surface hits (the mesh is not closed there)`)
+      const { dexels, unpaired } = Dexels.fromMesh(n.mesh, onto, jitter)
+      if (unpaired > 0 && jitter === undefined) warnings.push(`${unpaired} column(s) of a solid had an odd number of surface hits (the mesh is not closed there)`)
       return dexels
     }
-    const [first, ...rest] = n.operands.map(fill)
+    const [first, ...rest] = n.operands.map((o) => fill(o, onto, jitter))
     return rest.reduce((acc, d) => (n.op === "boolean-union" ? acc.union(d) : n.op === "boolean-subtract" ? acc.subtract(d) : acc.intersect(d)), first!)
   }
-  const dexels = roots.map(fill).reduce((acc, d) => acc.union(d))
-  return { dexels, grid, skipped, warnings, bounds: { min, max } }
+  const dexels = roots.map((n) => fill(n, grid)).reduce((acc, d) => acc.union(d))
+  // Booleans are done on the sample columns first, then pooled: a pocket is not widened by pooling its operands.
+  const conservative = roots.map((n) => fill(n, fine, NODE_JITTER)).reduce((acc, d) => acc.union(d)).pool(grid, r)
+  return { dexels, conservative, grid, skipped, warnings, bounds: { min, max } }
 }
 
 /**
@@ -143,5 +152,7 @@ export const buildPartModelFromMeshes = (
       return d
     })
     .reduce((acc, d) => acc.union(d))
-  return { dexels, grid, skipped: [], warnings, bounds: { min, max } }
+  const r = refineFactor(grid), fine = nodeSampleGrid(grid, r)
+  const conservative = wide.map((m) => Dexels.fromMesh(m, fine, NODE_JITTER).dexels).reduce((acc, d) => acc.union(d)).pool(grid, r)
+  return { dexels, conservative, grid, skipped: [], warnings, bounds: { min, max } }
 }
