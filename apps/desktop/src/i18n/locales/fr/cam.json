@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "Accepter ce programme",
   "cam.kernel.regenerate.accepted": "Régénération acceptée. Le programme précédent est conservé comme version de ce parcours.",
   "cam.kernel.regenerate.refused": "Non acceptée : {reason}",
-  "cam.kernel.regenerate.failed": "Échec de la régénération : {message}"
+  "cam.kernel.regenerate.failed": "Échec de la régénération : {message}",
+  "cam.kernel.model.badge": "Modèle modifié"
 }

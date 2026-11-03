@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "Dieses Programm übernehmen",
   "cam.kernel.regenerate.accepted": "Neuerzeugung übernommen. Das vorige Programm bleibt als Version dieses Toolpaths erhalten.",
   "cam.kernel.regenerate.refused": "Nicht übernommen: {reason}",
-  "cam.kernel.regenerate.failed": "Neuerzeugung fehlgeschlagen: {message}"
+  "cam.kernel.regenerate.failed": "Neuerzeugung fehlgeschlagen: {message}",
+  "cam.kernel.model.badge": "Modell geändert"
 }

@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "采用此程序",
   "cam.kernel.regenerate.accepted": "已采用重新生成的程序。之前的程序保留为此刀路的一个版本。",
   "cam.kernel.regenerate.refused": "未采用：{reason}",
-  "cam.kernel.regenerate.failed": "重新生成失败：{message}"
+  "cam.kernel.regenerate.failed": "重新生成失败：{message}",
+  "cam.kernel.model.badge": "模型已更改"
 }

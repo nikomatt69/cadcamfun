@@ -18,7 +18,7 @@ test("the detail screen of a stored native program says the model changed, previ
   expect(saved, JSON.stringify(saved)).toMatchObject({ ok: true })
   const before = (await app.sidecar.call(`/api/toolpaths/${saved.operationId}`)).body
 
-  // Same model: the screen says it still matches, and the preview is the same program byte for byte.
+  // Same model: the list has no badge, the screen says it still matches, and the preview is the same program byte for byte.
   const view = app.visit(`/toolpaths/${saved.operationId}`)
   try {
     const current = await app.wait(() => document.querySelector("[data-testid='toolpath-model-status'][data-tone='ok']"), 60_000)
@@ -31,6 +31,13 @@ test("the detail screen of a stored native program says the model changed, previ
 
   // The model changes: the screen names the change, the preview shows what changes, accepting replaces the program.
   await app.sidecar.call(`/api/drawings/${drawing}`, { method: "PUT", json: { data: { elements: [{ ...plate, width: 55 }] } } })
+  // The list marks the program whose model changed.
+  const list = app.visit("/toolpaths")
+  try {
+    const badge = await app.wait(() => document.querySelector("[data-testid='toolpath-stale-badge']"), 60_000)
+    expect(badge.textContent).toBe("Model changed")
+    expect(badge.getAttribute("title")).toContain("shape or placement")
+  } finally { list.dispose() }
   const changed = app.visit(`/toolpaths/${saved.operationId}`)
   try {
     const warn = await app.wait(() => document.querySelector("[data-testid='toolpath-model-status'][data-tone='warn']"), 60_000)

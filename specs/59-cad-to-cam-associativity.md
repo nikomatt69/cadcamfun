@@ -158,3 +158,7 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   (the screen reads the replaced program again and remounts), and the old program stays as a version. Not offered for a program saved as a CAM page document. Six strings in 11 locales (machine-translated).
   Test: `apps/desktop/test/toolpath-regenerate.test.ts` renders the real screen over the real sidecar: model status ok, byte-identical preview, model change named, preview diff, accept, version holds the old NC,
   status ok again. This also covers the detail-screen render that spec 59's earlier entry left untested. **Open:** the program-list badge; applying `carried` overrides on accept; A7.
+- 2026-11-03 (build, A6 fifth part): the toolpath list (grid and list views) marks a native program whose drawing no longer matches its model with a "Model changed" badge (`toolpath-stale-badge`, the
+  title carries the reason). Computed in the desktop from each row's stored `kernelRequest` and its drawing (at most 24 distinct drawings per load, one `drawings.get` each; a drawing that cannot be
+  opened gives no badge; only `stale` is marked, not `current` or `unknown`). One string in 11 locales. Test: `apps/desktop/test/toolpath-regenerate.test.ts` (list badge after a drawing edit).
+  **Open:** applying `carried` overrides on accept; A7.

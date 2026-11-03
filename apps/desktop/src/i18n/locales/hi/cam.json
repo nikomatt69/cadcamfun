@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "यह प्रोग्राम स्वीकार करें",
   "cam.kernel.regenerate.accepted": "पुनः-जनरेशन स्वीकार हुआ। पिछला प्रोग्राम इस टूलपाथ के एक संस्करण के रूप में सुरक्षित है।",
   "cam.kernel.regenerate.refused": "स्वीकार नहीं हुआ: {reason}",
-  "cam.kernel.regenerate.failed": "पुनः-जनरेशन विफल: {message}"
+  "cam.kernel.regenerate.failed": "पुनः-जनरेशन विफल: {message}",
+  "cam.kernel.model.badge": "मॉडल बदला"
 }

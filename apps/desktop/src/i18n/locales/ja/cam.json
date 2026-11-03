@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "このプログラムを採用",
   "cam.kernel.regenerate.accepted": "再生成を採用しました。以前のプログラムはこのツールパスのバージョンとして保存されています。",
   "cam.kernel.regenerate.refused": "採用されませんでした：{reason}",
-  "cam.kernel.regenerate.failed": "再生成に失敗しました：{message}"
+  "cam.kernel.regenerate.failed": "再生成に失敗しました：{message}",
+  "cam.kernel.model.badge": "モデル変更あり"
 }

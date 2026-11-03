@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "Принять эту программу",
   "cam.kernel.regenerate.accepted": "Перегенерация принята. Прежняя программа сохранена как версия этой траектории.",
   "cam.kernel.regenerate.refused": "Не принято: {reason}",
-  "cam.kernel.regenerate.failed": "Перегенерация не удалась: {message}"
+  "cam.kernel.regenerate.failed": "Перегенерация не удалась: {message}",
+  "cam.kernel.model.badge": "Модель изменена"
 }

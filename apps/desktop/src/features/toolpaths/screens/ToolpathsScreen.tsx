@@ -12,6 +12,8 @@ import { A, useNavigate, useSearchParams } from "@solidjs/router"
 import { Book, Code, Cpu, Download, Edit, Grid3x3, List, Plus, Search, Trash2, Wrench, X } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
+import { cam } from "@cadcamfun/core"
+import { programStatusText } from "../../cam/lib/model-change.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { onCacheInvalidated } from "../../../shared/state/queries.ts"
@@ -69,6 +71,30 @@ export function ToolpathsScreen(): JSX.Element {
   let loadSequence = 0
   let mounted = true
 
+  /** Programs the kernel made whose drawing no longer matches their model (spec 59 A2): computed here from the stored request and the drawing, 24 drawings at most. */
+  const [stale, setStale] = createSignal<ReadonlyMap<string, string>>(new Map())
+  const loadModelStatus = async (list: ReadonlyArray<ToolpathRow>, sequence: number): Promise<void> => {
+    const native = list.filter((row) => row.drawingId != null && row.data !== null && typeof row.data === "object" && (row.data as Record<string, unknown>)["kernelRequest"] !== undefined)
+    const ids = [...new Set(native.map((row) => row.drawingId!))].slice(0, 24)
+    const found = new Map<string, ReadonlyArray<Record<string, unknown>>>()
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const drawing = await run<{ readonly data?: unknown }>(app.client.drawings.get({ params: { id } }))
+        const elements = (drawing.data as { elements?: unknown } | null)?.elements
+        if (Array.isArray(elements)) found.set(id, elements.filter((e): e is Record<string, unknown> => e !== null && typeof e === "object"))
+      } catch { /* a drawing that cannot be opened gives no badge */ }
+    }))
+    if (!mounted || sequence !== loadSequence) return
+    const next = new Map<string, string>()
+    for (const row of native) {
+      const elements = found.get(row.drawingId!)
+      if (elements === undefined) continue
+      const status = cam.kernel.programStatus({ request: (row.data as Record<string, unknown>)["kernelRequest"] }, { elements })
+      if (status.status === "stale") next.set(row.id, programStatusText(status).text)
+    }
+    setStale(next)
+  }
+
   const load = async (): Promise<void> => {
     const sequence = ++loadSequence
     setLoading(true)
@@ -83,7 +109,7 @@ export function ToolpathsScreen(): JSX.Element {
           projectId: current.projectId || undefined
         }
       }))
-      if (mounted && sequence === loadSequence) setRows(list)
+      if (mounted && sequence === loadSequence) { setRows(list); void loadModelStatus(list, sequence) }
     } catch (cause) {
       if (mounted && sequence === loadSequence) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -300,6 +326,7 @@ export function ToolpathsScreen(): JSX.Element {
                                     <div>
                                       <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-[color:var(--ent-text)] hover:text-[color:var(--ent-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]" onClick={(event) => event.stopPropagation()}>{row.name}</A>
                                       <Show when={row.description}><div class="max-w-xs truncate text-[11px] text-[color:var(--ent-text-muted)]">{row.description}</div></Show>
+                                      <Show when={stale().get(row.id)}>{(reason) => <span class={BADGE} title={reason()} data-testid="toolpath-stale-badge">{t("cam.kernel.model.badge")}</span>}</Show>
                                     </div>
                                   </div>
                                 </td>
@@ -335,6 +362,7 @@ export function ToolpathsScreen(): JSX.Element {
                           />
                           <div class="flex flex-1 flex-col gap-1.5 p-3">
                             <h3 class="text-xs font-semibold text-[color:var(--ent-text)]">{row.name}</h3>
+                            <Show when={stale().get(row.id)}>{(reason) => <span class={BADGE} title={reason()} data-testid="toolpath-stale-badge">{t("cam.kernel.model.badge")}</span>}</Show>
                             <Show when={row.description}><p class="line-clamp-2 text-[11px] text-[color:var(--ent-text-muted)]">{row.description}</p></Show>
                             <div class="mt-auto space-y-1 text-[11px] text-[color:var(--ent-text-muted)]">
                               <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>

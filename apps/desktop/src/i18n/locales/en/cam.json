@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "Accept this program",
   "cam.kernel.regenerate.accepted": "Regeneration accepted. The previous program is kept as a version of this toolpath.",
   "cam.kernel.regenerate.refused": "Not accepted: {reason}",
-  "cam.kernel.regenerate.failed": "Regeneration failed: {message}"
+  "cam.kernel.regenerate.failed": "Regeneration failed: {message}",
+  "cam.kernel.model.badge": "Model changed"
 }

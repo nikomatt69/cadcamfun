@@ -1412,5 +1412,6 @@
   "cam.kernel.regenerate.accept": "اعتماد هذا البرنامج",
   "cam.kernel.regenerate.accepted": "تم اعتماد إعادة التوليد. يبقى البرنامج السابق نسخةً من مسار الأداة هذا.",
   "cam.kernel.regenerate.refused": "لم يُعتمد: {reason}",
-  "cam.kernel.regenerate.failed": "فشلت إعادة التوليد: {message}"
+  "cam.kernel.regenerate.failed": "فشلت إعادة التوليد: {message}",
+  "cam.kernel.model.badge": "تغيّر النموذج"
 }
