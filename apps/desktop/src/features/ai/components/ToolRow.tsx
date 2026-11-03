@@ -252,7 +252,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
       detail: () => (
         <div class="space-y-1">
           <Chips items={Object.entries(counts).map(([k, v]) => `${k} ×${String(v)}`)} />
-          <Show when={lo && hi}><p class="text-gray-500">x {mm(lo?.["x"])} … {mm(hi?.["x"])} · y {mm(lo?.["y"])} … {mm(hi?.["y"])} · z {mm(lo?.["z"])} … {mm(hi?.["z"])} {t("cad.millimeters")}</p></Show>
+          <Show when={lo && hi}><p class="assistant-meta-text">x {mm(lo?.["x"])} … {mm(hi?.["x"])} · y {mm(lo?.["y"])} … {mm(hi?.["y"])} · z {mm(lo?.["z"])} … {mm(hi?.["z"])} {t("cad.millimeters")}</p></Show>
         </div>
       ) }
   },
@@ -265,7 +265,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
       const metrics = rec(d?.["metrics"])
       return { icon: "✓", pending: "Checking the design rules...", title: `Design rules (${str(d?.["process"]) ?? str(input["process"]) ?? "mill"}, cutter Ø${mm(d?.["toolDiameter"] ?? input["toolDiameter"] ?? 6)} mm): ${issues.length === 0 ? "no findings" : issueCounts(issues) || plural(issues.length, "finding")}`,
         tone: d?.["ok"] === false ? "error" : issues.some((i) => i["severity"] === "warning") ? "warn" : "ok",
-        detail: () => <><Pair rows={[["Solids", num(metrics?.["bodies"]) === undefined ? undefined : String(metrics?.["bodies"])], ["Volume", num(metrics?.["volumeMm3"]) === undefined ? undefined : `${mm(num(metrics?.["volumeMm3"])! / 1000)} cm³`], ["Thinnest wall", num(metrics?.["minWallMm"]) === undefined ? undefined : `${mm(metrics?.["minWallMm"])} mm`]]} />{issues.length > 0 ? <Issues issues={issues} /> : <p class="text-gray-500">The part meets the rules for this process.</p>}</> }
+        detail: () => <><Pair rows={[["Solids", num(metrics?.["bodies"]) === undefined ? undefined : String(metrics?.["bodies"])], ["Volume", num(metrics?.["volumeMm3"]) === undefined ? undefined : `${mm(num(metrics?.["volumeMm3"])! / 1000)} cm³`], ["Thinnest wall", num(metrics?.["minWallMm"]) === undefined ? undefined : `${mm(metrics?.["minWallMm"])} mm`]]} />{issues.length > 0 ? <Issues issues={issues} /> : <p class="assistant-meta-text">The part meets the rules for this process.</p>}</> }
     }
     if (action === "recipe") {
       const report = rec(d?.["report"])
@@ -323,7 +323,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
     const preview = Array.isArray(d?.["preview"]) ? arr(d?.["preview"]).map(String).join("\n") : str(d?.["preview"]) ?? str(d?.["gcode"]) ?? ""
     const error = str(stats?.["error"]) ?? (d?.["ok"] === false ? str(d?.["error"]) ?? "Generation failed" : undefined)
     return { icon: "⌘", pending: "Generating G-code...", title: error ? "G-code not generated" : `G-code: ${plural(num(stats?.["lines"]) ?? 0, "line")} · ${mm(stats?.["cutLength"])} mm of cut · ${Math.round((num(stats?.["estimatedSeconds"]) ?? 0) / 60 * 10) / 10} min`, tone: error ? "error" : "ok",
-      detail: () => <div class="space-y-1"><Show when={error}><p class="text-red-600">{error}</p></Show><Pair rows={[["Rapid", num(stats?.["rapidLength"]) !== undefined ? `${mm(stats?.["rapidLength"])} mm` : undefined], ["Z", num(stats?.["minZ"]) !== undefined ? `${mm(stats?.["minZ"])} … ${mm(stats?.["maxZ"])} mm` : undefined]]} /><Show when={preview !== ""}><Code text={preview} numbered /></Show></div> }
+      detail: () => <div class="space-y-1"><Show when={error}><p class="assistant-status-error">{error}</p></Show><Pair rows={[["Rapid", num(stats?.["rapidLength"]) !== undefined ? `${mm(stats?.["rapidLength"])} mm` : undefined], ["Z", num(stats?.["minZ"]) !== undefined ? `${mm(stats?.["minZ"])} … ${mm(stats?.["maxZ"])} mm` : undefined]]} /><Show when={preview !== ""}><Code text={preview} numbered /></Show></div> }
   },
   "cam.analyze": ({ data }) => {
     const d = rec(data)
@@ -355,7 +355,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
   code_mode: ({ input, output, data }) => {
     const code = str(input["code"]) ?? ""
     return { icon: "{}", pending: "Running a program...", title: "Program run", tone: rec(data)?.["ok"] === false ? "error" : "ok",
-      detail: () => <div class="space-y-1"><Show when={code !== ""}><Code text={code} lines={10} /></Show><Show when={output !== undefined && output !== ""}><p class="whitespace-pre-wrap break-words text-gray-500">{clip(output!).slice(0, 800)}</p></Show></div> }
+      detail: () => <div class="space-y-1"><Show when={code !== ""}><Code text={code} lines={10} /></Show><Show when={output !== undefined && output !== ""}><p class="whitespace-pre-wrap break-words assistant-meta-text">{clip(output!).slice(0, 800)}</p></Show></div> }
   },
   "agent.start": ({ data, input }) => {
     const d = rec(data)

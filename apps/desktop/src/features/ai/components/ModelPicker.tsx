@@ -48,7 +48,7 @@ export function ModelPicker(): JSX.Element {
         <Show when={effortLabel()}>
           {(effort) => <span class="assistant-chip-effort">{effort()}</span>}
         </Show>
-        <ChevronDown size={12} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
+        <ChevronDown size={14} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
       </button>
       <Show when={open()}>
         <ModelMenu onSelect={() => setOpen(false)} />
@@ -70,7 +70,7 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
   })
   return (
     <div class="assistant-popover" onKeyDown={(event) => { if (event.key === "Escape") props.onSelect() }}>
-      <div class="assistant-popover-head space-y-1.5 p-2">
+      <div class="assistant-popover-head space-y-2 p-2">
         <input type="search" aria-label={t("ai.model.search")} placeholder={t("ai.model.search")} class="assistant-field" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
         <select aria-label={t("ai.model.provider")} class="assistant-field" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
           <option value="">{t("ai.model.allProviders")}</option>

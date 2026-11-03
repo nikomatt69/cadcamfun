@@ -38,7 +38,7 @@ export interface PluginSettingsDialogProps {
 }
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+  "w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]"
 
 const label = (key: string): string => {
   const spaced = key.replace(/([A-Z])/g, " $1")
@@ -178,18 +178,18 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
             when={!loading()}
             fallback={
               <div class="flex items-center justify-center py-12">
-                <Loader class="mr-2 motion-safe:animate-spin text-blue-500" size={16} />
-                <span class="text-gray-600 dark:text-gray-300">{t("plugins.settings.loading")}</span>
+                <Loader class="mr-2 motion-safe:animate-spin text-[color:var(--ent-accent)]" size={14} aria-hidden="true" />
+                <span class="text-[color:var(--ent-text-muted)]">{t("plugins.settings.loading")}</span>
               </div>
             }
           >
             <Show when={error() !== undefined}>
-                <div role="alert" class="mb-4 rounded-md bg-red-50 p-4 dark:bg-red-900/20">
+                <div role="alert" class="mb-4 rounded-md bg-[color:var(--ent-bad-soft)] p-3">
                   <div class="flex items-start">
-                    <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-red-500" size={16} />
+                    <AlertCircle class="mr-2 mt-0.5 flex-shrink-0 text-[color:var(--ent-bad)]" size={14} aria-hidden="true" />
                     <div>
-                      <h3 class="mb-1 font-medium text-red-600 dark:text-red-400">{t("plugins.settings.errorTitle")}</h3>
-                      <p class="text-sm text-gray-600 dark:text-gray-300">{error()}</p>
+                      <h3 class="mb-1 font-medium text-[color:var(--ent-bad)]">{t("plugins.settings.errorTitle")}</h3>
+                      <p class="text-sm text-[color:var(--ent-text-muted)]">{error()}</p>
                     </div>
                   </div>
                 </div>
@@ -198,41 +198,41 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                 when={hasSettings()}
                 fallback={
                   <div class="p-6 text-center">
-                    <Info class="mx-auto mb-3 text-gray-400 dark:text-gray-500" size={32} />
-                    <h3 class="mb-2 text-base font-medium text-gray-700 dark:text-gray-300">{t("plugins.settings.noSettings")}</h3>
-                    <p class="text-gray-500 dark:text-gray-400">{t("plugins.settings.noSettingsBody")}</p>
+                    <Info class="mx-auto mb-3 text-[color:var(--ent-text-faint)]" size={24} aria-hidden="true" />
+                    <h3 class="mb-2 text-sm font-medium text-[color:var(--ent-text)]">{t("plugins.settings.noSettings")}</h3>
+                    <p class="text-[color:var(--ent-text-muted)]">{t("plugins.settings.noSettingsBody")}</p>
                   </div>
                 }
               >
-                <div class="space-y-6">
+                <div class="space-y-4">
                   <For each={Object.entries(properties())}>
                     {([key, schema]) => (
-                      <div class="mb-4">
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" for={`setting-${key}`}>
+                      <div>
+                        <label class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]" for={`setting-${key}`}>
                           {label(key)}
                         </label>
                         {renderInput(key, schema)}
                         <Show when={schema.description !== undefined}>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{schema.description}</p>
+                          <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{schema.description}</p>
                         </Show>
                       </div>
                     )}
                   </For>
 
                   <Show when={saved()}>
-                    <div role="status" class="flex items-start rounded-md bg-green-50 p-3 dark:bg-green-900/20">
-                      <Save class="mr-2 mt-0.5 flex-shrink-0 text-green-500" size={16} />
-                      <span class="text-sm text-green-600 dark:text-green-400">{t("plugins.settings.saved")}</span>
+                    <div role="status" class="flex items-start rounded-md bg-[color:var(--ent-ok-soft)] p-3">
+                      <Save class="mr-2 mt-0.5 flex-shrink-0 text-[color:var(--ent-ok)]" size={14} aria-hidden="true" />
+                      <span class="text-sm text-[color:var(--ent-ok)]">{t("plugins.settings.saved")}</span>
                     </div>
                   </Show>
                 </div>
               </Show>
 
             <Show when={hasSettings()}>
-              <div class="mt-8 flex justify-end gap-3 border-t border-gray-200 pt-5 dark:border-gray-700">
+              <div class="mt-6 flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
                 <button
                   type="button"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-[color:var(--ent-text-muted)] transition-colors hover:bg-[color:var(--ent-surface-subtle)] disabled:opacity-50"
                   disabled={saving()}
                   onClick={props.onClose}
                 >
@@ -240,7 +240,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                 </button>
                 <button
                   type="button"
-                  class="flex min-w-[90px] items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                  class="flex min-w-[90px] items-center justify-center rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] transition-colors hover:bg-[color:var(--ent-action-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={saving() || saved()}
                   onClick={() => void save()}
                 >
@@ -248,7 +248,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                     when={!saving()}
                     fallback={
                       <>
-                        <Loader class="mr-2 motion-safe:animate-spin" size={16} />
+                        <Loader class="mr-2 motion-safe:animate-spin" size={14} aria-hidden="true" />
                         {t("plugins.settings.saving")}
                       </>
                     }
@@ -257,7 +257,7 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
                       when={!saved()}
                       fallback={
                         <>
-                          <Save class="mr-2" size={16} />
+                          <Save class="mr-2" size={14} aria-hidden="true" />
                           {t("plugins.settings.savedShort")}
                         </>
                       }

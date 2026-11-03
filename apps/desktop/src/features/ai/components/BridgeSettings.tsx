@@ -66,10 +66,10 @@ export function BridgeSettings(): JSX.Element {
 
   return (
     <div class="space-y-2" data-testid="ai-bridge">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.bridge.title")}</h3>
+      <h3 class="text-sm font-medium text-[color:var(--assistant-ink)]">{t("ai.bridge.title")}</h3>
       <p class="assistant-meta-text">{t("ai.bridge.hint")}</p>
 
-      <ul class="space-y-1.5" data-testid="ai-bridge-list">
+      <ul class="space-y-2" data-testid="ai-bridge-list">
         <For each={tokens()}>{(token) => (
           <li class="assistant-list-card" data-testid="ai-bridge-token" data-mode={token.mode}>
             <div class="min-w-0 flex-1">

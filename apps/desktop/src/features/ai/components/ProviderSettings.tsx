@@ -81,13 +81,13 @@ function ProviderRow(props: {
       <Show when={props.open}>
         <div class="assistant-provider-detail" data-testid="ai-provider-detail">
           <Show when={props.provider.id === "opencode" || props.provider.id === "opencode-go"}>
-            <section class="space-y-1.5" data-testid="ai-provider-opencode-connect">
+            <section class="space-y-2" data-testid="ai-provider-opencode-connect">
               <p class="assistant-meta-text">{props.provider.id === "opencode-go" ? t("ai.providers.openCodeGoHint") : t("ai.providers.openCodeZenHint")}</p>
               <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => openExternal("https://opencode.ai/auth")}>{t("ai.providers.openCodeAccount")}</button>
             </section>
           </Show>
           <Show when={oauthProvider()}>{(provider) => (
-            <section class="space-y-1.5" data-testid="ai-provider-oauth">
+            <section class="space-y-2" data-testid="ai-provider-oauth">
               <p class="assistant-meta-text">{t("ai.providers.subscriptionHint")}</p>
               <Show when={!authorization()}>
                 <button type="button" class="assistant-btn assistant-btn-primary" disabled={busy()} onClick={() => {
@@ -99,7 +99,7 @@ function ProviderRow(props: {
                 }}>{provider() === "openai" ? t("ai.providers.connectChatGPT") : t("ai.providers.connectSuperGrok")}</button>
               </Show>
               <Show when={authorization()}>{(attempt) => (
-                <div class="space-y-1.5" aria-live="polite">
+                <div class="space-y-2" aria-live="polite">
                   <p class="assistant-meta-text">{attempt().instructions}</p>
                   <button type="button" class="assistant-link-btn" onClick={() => openExternal(attempt().url)}>{t("ai.providers.openBrowser")}</button>
                   <Show when={attempt().method !== "auto"}>
@@ -116,7 +116,7 @@ function ProviderRow(props: {
             </section>
           )}</Show>
           <form
-            class="space-y-1.5"
+            class="space-y-2"
             onSubmit={(event) => {
               event.preventDefault()
               const value = key().trim()
@@ -170,7 +170,7 @@ function ProviderRow(props: {
             when={props.provider.models.length > 0}
             fallback={<p class="assistant-meta-text">{t("ai.catalogue.noProviderModels")}</p>}
           >
-            <div class="space-y-1.5 pt-1">
+            <div class="space-y-2 pt-1">
               <div class="assistant-section-label">{t("ai.catalogue.modelsLabel")}</div>
               <input type="search" class={FIELD} aria-label={t("ai.catalogue.searchModels")} placeholder={t("ai.catalogue.searchModels")} value={modelSearch()} onInput={(event) => { setModelSearch(event.currentTarget.value); setModelLimit(50) }} />
               <ul class="assistant-model-list">
@@ -219,7 +219,7 @@ export function ProviderSettings(): JSX.Element {
 
   return (
     <div class="space-y-2" data-testid="ai-provider-settings">
-      <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.providers.title")}</h4>
+      <h4 class="text-sm font-medium text-[color:var(--assistant-ink)]">{t("ai.providers.title")}</h4>
       <button type="button" class="assistant-btn assistant-btn-secondary" data-testid="ai-models-refresh"
         disabled={ai.catalogueRefreshing()} onClick={() => void ai.refreshCatalogue()}>
         {ai.catalogueRefreshing() ? t("ai.catalogue.refreshing") : t("ai.catalogue.refresh")}
@@ -245,7 +245,7 @@ export function ProviderSettings(): JSX.Element {
         {(model) => (
           <div class="flex items-center gap-2 text-xs" data-testid="ai-current-model">
             <span class="assistant-meta-text">{t("ai.model.current")}:</span>
-            <span class="font-mono text-gray-700 dark:text-gray-300">
+            <span class="font-mono text-[color:var(--assistant-ink)]">
               {model().provider}/{model().model}
             </span>
           </div>

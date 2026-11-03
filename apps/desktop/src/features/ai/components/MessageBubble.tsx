@@ -121,7 +121,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
               }
               if (kind === "retry") {
                 const current = () => segment() as Extract<GroupedSegment, { kind: "retry" }>
-                return <p class="assistant-retry-row" data-testid="ai-retry-row"><RefreshCw size={12} aria-hidden="true" />{t("ai.agent.retry", { n: current().attempt })} · {current().message}</p>
+                return <p class="assistant-retry-row" data-testid="ai-retry-row"><RefreshCw size={14} aria-hidden="true" />{t("ai.agent.retry", { n: current().attempt })} · {current().message}</p>
               }
               if (kind === "diagnostic") {
                 const current = () => segment() as Extract<GroupedSegment, { kind: "diagnostic" }>
@@ -173,7 +173,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
         </Show>
         <Show when={(props.message.attachments?.length ?? 0) > 0}>
           <p class="assistant-message-attachments" data-testid="message-attachments">
-            <For each={props.message.attachments}>{(name) => <span class="assistant-attachment-pill"><Paperclip size={12} aria-hidden="true" />{name}</span>}</For>
+            <For each={props.message.attachments}>{(name) => <span class="assistant-attachment-pill"><Paperclip size={14} aria-hidden="true" />{name}</span>}</For>
           </p>
         </Show>
         <Show when={props.message.status === "error" && props.message.error && props.message.error !== props.message.text}>
@@ -207,7 +207,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
           title={t("ai.message.copyTitle")}
           onClick={() => props.onCopy(props.message.text, props.message.id)}
         >
-          {props.copiedId === props.message.id ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+          {props.copiedId === props.message.id ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
           {props.copiedId === props.message.id ? t("ai.message.copied") : t("ai.message.copy")}
         </button>
         <Show when={!isUser() && props.message.status !== "streaming"}>
@@ -219,7 +219,7 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             data-testid="ai-regenerate"
             onClick={() => props.onRegenerate()}
           >
-            <RefreshCw size={12} aria-hidden="true" />
+            <RefreshCw size={14} aria-hidden="true" />
             {t("ai.message.regenerate")}
           </button>
         </Show>
@@ -257,7 +257,7 @@ function FeedbackButtons(props: { readonly messageId: string; readonly rating: "
         data-testid="ai-feedback-up"
         onClick={() => rate("up")}
       >
-        <ThumbsUp size={12} aria-hidden="true" />
+        <ThumbsUp size={14} aria-hidden="true" />
         {t("ai.feedback.up")}
       </button>
       <button
@@ -269,7 +269,7 @@ function FeedbackButtons(props: { readonly messageId: string; readonly rating: "
         data-testid="ai-feedback-down"
         onClick={() => { rate("down"); setCommenting(true) }}
       >
-        <ThumbsDown size={12} aria-hidden="true" />
+        <ThumbsDown size={14} aria-hidden="true" />
         {t("ai.feedback.down")}
       </button>
       <Show when={commenting()}>

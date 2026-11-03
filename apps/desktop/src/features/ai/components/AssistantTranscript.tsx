@@ -136,7 +136,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
       <Show when={ai.messages().length > 0}>
         <div class="assistant-transcript-tools">
           <div class="assistant-search">
-            <Search size={12} aria-hidden="true" />
+            <Search size={14} aria-hidden="true" />
             <input
               type="search"
               class="assistant-search-input"
@@ -151,7 +151,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
             </Show>
             <Show when={searching()}>
               <button type="button" class="assistant-icon-action" aria-label={t("ai.search.close")} data-testid="ai-search-close" onClick={() => setQuery("")}>
-                <X size={12} aria-hidden="true" />
+                <X size={14} aria-hidden="true" />
               </button>
             </Show>
           </div>
@@ -211,7 +211,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
                           aria-label={t("ai.suggestions.dismiss")}
                           onClick={() => ai.dismissSuggestion(suggestion.id)}
                         >
-                          <X size={12} aria-hidden="true" />
+                          <X size={14} aria-hidden="true" />
                         </button>
                       </li>
                     )}

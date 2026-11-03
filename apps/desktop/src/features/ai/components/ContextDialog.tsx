@@ -219,7 +219,7 @@ export function ContextDialog(props: { readonly onClose: () => void }): JSX.Elem
                   disabled={ai.controlBusy()}
                   onClick={() => void ai.loadContextBreakdown()}
                 >
-                  <RefreshCw size={12} aria-hidden="true" />
+                  <RefreshCw size={14} aria-hidden="true" />
                   {t("ai.context.dialog.refresh")}
                 </button>
               </span>

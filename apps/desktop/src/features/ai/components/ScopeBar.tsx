@@ -90,7 +90,7 @@ export function ScopeBar(): JSX.Element {
         >
           <FolderOpen size={14} aria-hidden="true" />
           <span class="assistant-scope-label">{scopeLabel()}</span>
-          <ChevronDown size={12} aria-hidden="true" />
+          <ChevronDown size={14} aria-hidden="true" />
         </button>
         <Show when={scopeOpen()}>
           <div class="assistant-scope-menu" role="listbox" aria-label={t("ai.composer.drawing")}>
@@ -149,7 +149,7 @@ export function ScopeBar(): JSX.Element {
           <Show when={(devices()?.devices.length ?? 0) > 0}>
             <span class="assistant-device-count">{devices()?.devices.length}</span>
           </Show>
-          <ChevronDown size={12} aria-hidden="true" />
+          <ChevronDown size={14} aria-hidden="true" />
         </summary>
         <div class="assistant-device-menu">
           <p class="assistant-device-menu-title">{t("ai.composer.executionDevice")}</p>

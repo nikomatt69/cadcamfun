@@ -90,7 +90,7 @@ function ControlMenu(props: {
         <Show when={props.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot(), margin: 0 }} aria-hidden="true" />}</Show>
         <Show when={props.showValue}>
           <span class="assistant-control-label">{selected()?.label ?? props.value}</span>
-          <ChevronDown size={12} class="assistant-control-chevron" aria-hidden="true" />
+          <ChevronDown size={14} class="assistant-control-chevron" aria-hidden="true" />
         </Show>
         <Show when={!props.showValue}>
           <span class="assistant-control-dot" aria-hidden="true" />
@@ -155,7 +155,7 @@ export function AssistantControls(): JSX.Element {
     <div class="assistant-chips" data-testid="ai-controls" aria-label={t("ai.controls.label")}>
       <ControlMenu
         id="permissions"
-        icon={<ShieldCheck size={12} aria-hidden="true" />}
+        icon={<ShieldCheck size={14} aria-hidden="true" />}
         label={t("ai.controls.permissions")}
         title={ai.permissionMode() === "auto" ? t("ai.controls.permissions.autoHint") : undefined}
         value={ai.permissionMode()}
@@ -170,7 +170,7 @@ export function AssistantControls(): JSX.Element {
 
       <ControlMenu
         id="agent"
-        icon={<Bot size={12} aria-hidden="true" />}
+        icon={<Bot size={14} aria-hidden="true" />}
         dot={AGENT_DOTS[ai.agent()]}
         label={t("ai.controls.agent")}
         title={agent()?.description}
@@ -189,7 +189,7 @@ export function AssistantControls(): JSX.Element {
       <Show when={variants().length > 0}>
         <ControlMenu
           id="thinking"
-          icon={<Brain size={12} aria-hidden="true" />}
+          icon={<Brain size={14} aria-hidden="true" />}
           label={t("ai.controls.thinking")}
           value={ai.model()?.variant ?? ""}
           showValue={true}

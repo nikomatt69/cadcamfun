@@ -120,7 +120,7 @@ export function TaskCard(props: TaskCardProps): JSX.Element {
                 aria-label={t("ai.tasks.copyReport")}
                 onClick={(event) => { event.preventDefault(); event.stopPropagation(); void copy(report()) }}
               >
-                {copied() ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+                {copied() ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                 {copied() ? t("ai.tasks.copied") : t("ai.tasks.copyReport")}
               </button>
             </summary>

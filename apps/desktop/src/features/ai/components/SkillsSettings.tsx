@@ -96,12 +96,12 @@ export function SkillsSettings(): JSX.Element {
   return (
     <div class="space-y-2" data-testid="ai-skills">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.skills.title")}</h3>
+        <h3 class="text-sm font-medium text-[color:var(--assistant-ink)]">{t("ai.skills.title")}</h3>
         <span class="assistant-meta-text">{t("ai.skills.count", { user: user().length, max: max(), builtIn: builtIn().length })}</span>
       </div>
       <p class="assistant-meta-text">{t("ai.skills.hint")}</p>
 
-      <ul class="space-y-1.5" data-testid="ai-skills-list">
+      <ul class="space-y-2" data-testid="ai-skills-list">
         <For each={skills()}>{(skill) => (
           <li class="assistant-list-card" data-testid={`ai-skill-${skill.name}`}>
             <div class="min-w-0 flex-1">

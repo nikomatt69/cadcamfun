@@ -27,12 +27,12 @@ export function ProviderBadge(): JSX.Element {
     <div class="assistant-provider-badge" data-testid="ai-provider-badge">
       <Show when={host() === "nikcli"} fallback={
         <span class="assistant-provider-pill" data-host="direct" title={t("ai.header.fallback")}>
-          <Cloud size={12} aria-hidden="true" />
+          <Cloud size={14} aria-hidden="true" />
           {t("ai.status.host.direct")}
         </span>
       }>
         <span class="assistant-provider-pill" data-host="nikcli" title={t("ai.status.host.nikcli")}>
-          <Cpu size={12} aria-hidden="true" />
+          <Cpu size={14} aria-hidden="true" />
           {t("ai.status.host.nikcli")}
         </span>
       </Show>

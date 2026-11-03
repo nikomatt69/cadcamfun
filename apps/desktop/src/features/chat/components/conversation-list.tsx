@@ -26,8 +26,8 @@ export function ConversationList(props: { readonly organizationId: string }): JS
 
         <div class="mt-3 flex items-center gap-2">
           <div class="relative min-w-0 flex-1">
-            <input type="search" aria-label={t("chat.searchPlaceholder")} placeholder={t("chat.searchPlaceholder")} class={`${FIELD} pl-8`} />
-            <Search size={14} class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="search" aria-label={t("chat.searchPlaceholder")} placeholder={t("chat.searchPlaceholder")} class={`${FIELD} pl-9`} />
+            <Search size={14} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           </div>
           <A href={`${root()}/chat/new`} title={t("chat.newDm")} aria-label={t("chat.newDm")} class={`${ICON_BUTTON} flex-none`}>
             <User size={14} aria-hidden="true" />

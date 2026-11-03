@@ -13,14 +13,12 @@ import { useRead } from "../../../app/queries.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { PairPreview } from "../../../shared/ui/stageshow/scenes-system.tsx"
 import { t } from "../../../i18n/index.ts"
-import { StageLoading, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { DANGER_BUTTON, FIELD, LABEL, StageError, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 const CARD = "ui-card ui-card-default !p-6"
-const LABEL = "mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-const FIELD = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-const PRIMARY = "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-const SECONDARY = "rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-const DANGER = "rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+const PRIMARY = `${TOOLBAR_PRIMARY} justify-center`
+const SECONDARY = `${TOOLBAR_BUTTON} justify-center`
+const DANGER = DANGER_BUTTON
 
 const qrSvg = (text: string): string => {
   const qr = qrcode(0, "M")
@@ -74,14 +72,14 @@ export function CompanionPanel(): JSX.Element {
   const state = () => status.data()
 
   return (
-    <div class="space-y-6">
+    <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("companion.title")}</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("companion.subtitle")}</p>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{t("companion.title")}</h3>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("companion.subtitle")}</p>
       </div>
 
       <Show when={status.loading() && !state()}><StageLoading label={t("common.loading")} /></Show>
-      <Show when={status.error()}><p role="alert" class="text-sm text-red-600 dark:text-red-400">{t("companion.error.load")}</p></Show>
+      <Show when={status.error()}><StageError message={t("companion.error.load")} /></Show>
 
       <Show when={state()}>
         {(s) => (
@@ -90,9 +88,9 @@ export function CompanionPanel(): JSX.Element {
               {/* What pairing does, shown: a phone scans the code and joins the list. */}
               <div class="companion-preview" aria-hidden="true"><PairPreview /></div>
               <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                  <span class={`inline-block h-2.5 w-2.5 rounded-full ${s().enabled ? "bg-green-500" : "bg-gray-400"}`} />
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+                <div class="flex items-center gap-2">
+                  <span class={`inline-block h-2 w-2 rounded-full ${s().enabled ? "bg-green-500" : "bg-gray-400"}`} />
+                  <p class="text-xs font-medium text-gray-900 dark:text-white">
                     {s().enabled ? t("companion.status.on", { port: String(s().port ?? "") }) : t("companion.status.off")}
                   </p>
                 </div>
@@ -104,13 +102,13 @@ export function CompanionPanel(): JSX.Element {
                 </Show>
               </div>
               <Show when={s().fingerprint}>
-                <p class="mt-3 break-all text-xs text-gray-500 dark:text-gray-400">{t("companion.fingerprint")}: <code>{s().fingerprint}</code></p>
+                <p class="mt-4 break-all text-xs text-gray-500 dark:text-gray-400">{t("companion.fingerprint")}: <code>{s().fingerprint}</code></p>
               </Show>
             </section>
 
             <Show when={s().enabled}>
               <section class={`${CARD} space-y-4`}>
-                <h4 class="text-base font-medium text-gray-900 dark:text-white">{t("companion.pair")}</h4>
+                <h4 class="text-[13px] font-semibold text-gray-900 dark:text-white">{t("companion.pair")}</h4>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label for="companion-name" class={LABEL}>{t("companion.pair.name")}</label>
@@ -130,7 +128,7 @@ export function CompanionPanel(): JSX.Element {
                     <>
                       {/* eslint-disable-next-line solid/no-innerhtml -- generated locally from the pairing link, no user HTML */}
                       <Show when={qr()}>
-                        <div class="mx-auto w-full max-w-64 rounded-lg bg-white p-2 shadow-sm" innerHTML={qr()} />
+                        <div class="mx-auto w-full max-w-64 rounded-lg border border-[color:var(--ent-line)] bg-white p-3" innerHTML={qr()} />
                       </Show>
                       <p class="text-center text-xs text-gray-500 dark:text-gray-400">{t("companion.pair.hint")}</p>
                       <div class="space-y-1">
@@ -147,7 +145,7 @@ export function CompanionPanel(): JSX.Element {
                           />
                           <button
                             type="button"
-                            class={copied() ? `${SECONDARY} flex items-center gap-2` : `${PRIMARY} flex items-center gap-2`}
+                            class={copied() ? SECONDARY : PRIMARY}
                             onClick={() => void copyLink()}
                             aria-label={t("companion.pair.copy")}
                           >
@@ -165,15 +163,15 @@ export function CompanionPanel(): JSX.Element {
             </Show>
 
             <section class={CARD}>
-              <h4 class="text-base font-medium text-gray-900 dark:text-white">{t("companion.devices")}</h4>
+              <h4 class="text-[13px] font-semibold text-gray-900 dark:text-white">{t("companion.devices")}</h4>
               <ul class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-                <For each={s().devices} fallback={<li class="py-2 text-sm text-gray-500 dark:text-gray-400">{t("companion.devices.empty")}</li>}>
+                <For each={s().devices} fallback={<li class="py-2 text-xs text-gray-500 dark:text-gray-400">{t("companion.devices.empty")}</li>}>
                   {(d) => (
                     <li class="flex flex-wrap items-center justify-between gap-4 py-3">
                       <div class="flex items-center gap-3">
-                        <Smartphone class="h-5 w-5 text-gray-400" aria-hidden="true" />
+                        <Smartphone size={16} class="text-gray-400" aria-hidden="true" />
                         <div>
-                          <p class="text-sm font-medium text-gray-900 dark:text-white">{d.name}</p>
+                          <p class="text-xs font-medium text-gray-900 dark:text-white">{d.name}</p>
                           <p class="text-xs text-gray-500 dark:text-gray-400">{d.lastSeen ? t("companion.devices.lastSeen", { when: new Date(d.lastSeen).toLocaleString() }) : t("companion.devices.never")}</p>
                         </div>
                       </div>

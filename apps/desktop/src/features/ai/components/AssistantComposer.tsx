@@ -113,11 +113,11 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
         <Show when={props.files.length > 0 || props.fileProblems.length > 0}>
           <ul class="assistant-attachments-row" data-testid="ai-attachments">
             <For each={props.files}>{(file) => (
-              <li class="assistant-attachment inline-flex items-center gap-1.5">
-                <Paperclip size={12} aria-hidden="true" />
+              <li class="assistant-attachment inline-flex items-center gap-2">
+                <Paperclip size={14} aria-hidden="true" />
                 <span class="truncate" title={file.name}>{file.name}</span>
                 <button type="button" aria-label={t("ai.attach.remove", { name: file.name })} onClick={() => props.onRemoveFile(file)}>
-                  <X size={12} aria-hidden="true" />
+                  <X size={14} aria-hidden="true" />
                 </button>
               </li>
             )}</For>
@@ -193,7 +193,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
                 title={t("ai.stop")}
                 aria-label={t("ai.stop")}
               >
-                <Square size={12} aria-hidden="true" />
+                <Square size={14} aria-hidden="true" />
               </button>
               <button
                 type="button"

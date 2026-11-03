@@ -421,7 +421,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       <Show when={ai.messages().length > 0 && ai.suggestions().length > 0 && !running()}>
         <section class="assistant-suggestions" data-testid="proactive-suggestions">
-          <p class="assistant-section-label"><Lightbulb size={12} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
+          <p class="assistant-section-label"><Lightbulb size={14} aria-hidden="true" /> {t("ai.suggestions.title")}</p>
           <ul>
             <For each={ai.suggestions().slice(0, 3)}>
               {(suggestion) => (
@@ -432,7 +432,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                     onClick={() => setDraft(suggestion.prompt)}
                     title={suggestion.description}
                   >
-                    <span class="assistant-suggestion-toast-icon"><Lightbulb size={12} aria-hidden="true" /></span>
+                    <span class="assistant-suggestion-toast-icon"><Lightbulb size={14} aria-hidden="true" /></span>
                     <span class="assistant-suggestion-toast-copy">
                       <strong>{suggestion.title}</strong>
                       <small>{suggestion.description}</small>
@@ -444,7 +444,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                     aria-label={t("ai.suggestions.dismiss")}
                     onClick={() => ai.dismissSuggestion(suggestion.id)}
                   >
-                    <X size={12} aria-hidden="true" />
+                    <X size={14} aria-hidden="true" />
                   </button>
                 </li>
               )}

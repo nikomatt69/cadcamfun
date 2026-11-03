@@ -16,15 +16,15 @@ import { agentLabel } from "./ToolRow.tsx"
 const kb = (chars: number): string => (chars < 1000 ? `${chars} B` : `${(chars / 1000).toFixed(1)} KB`)
 
 const icon = (todo: AiTodo): JSX.Element =>
-  todo.status === "completed" ? <Check size={12} aria-hidden="true" class="assistant-status-ok" />
-    : todo.status === "in_progress" ? <LoaderCircle size={12} aria-hidden="true" class="animate-spin assistant-status-active" />
-      : todo.status === "cancelled" ? <X size={12} aria-hidden="true" class="assistant-status-muted" />
-        : <Circle size={12} aria-hidden="true" class="assistant-status-muted" />
+  todo.status === "completed" ? <Check size={14} aria-hidden="true" class="assistant-status-ok" />
+    : todo.status === "in_progress" ? <LoaderCircle size={14} aria-hidden="true" class="animate-spin assistant-status-active" />
+      : todo.status === "cancelled" ? <X size={14} aria-hidden="true" class="assistant-status-muted" />
+        : <Circle size={14} aria-hidden="true" class="assistant-status-muted" />
 
 const taskIcon = (task: AiTask): JSX.Element =>
-  task.status === "completed" ? <Check size={12} aria-hidden="true" class="assistant-status-ok" />
-    : task.status === "running" || task.status === "queued" ? <LoaderCircle size={12} aria-hidden="true" class="animate-spin assistant-status-active" />
-      : <X size={12} aria-hidden="true" class={task.status === "error" ? "assistant-status-error" : "assistant-status-muted"} />
+  task.status === "completed" ? <Check size={14} aria-hidden="true" class="assistant-status-ok" />
+    : task.status === "running" || task.status === "queued" ? <LoaderCircle size={14} aria-hidden="true" class="animate-spin assistant-status-active" />
+      : <X size={14} aria-hidden="true" class={task.status === "error" ? "assistant-status-error" : "assistant-status-muted"} />
 
 export function AgentActivity(): JSX.Element {
   const ai = useAiStore()
@@ -78,7 +78,7 @@ export function AgentActivity(): JSX.Element {
               <span class="assistant-pill">{ai.tasks().filter((x) => x.status === "completed").length}/{ai.tasks().length}</span>
             </summary>
             <Show when={ai.tasks().some((x) => x.status === "queued" || x.status === "running")}>
-              <button type="button" class="assistant-btn-xs mt-1.5" data-testid="ai-tasks-stop" disabled={ai.controlBusy()} onClick={async () => { for (const task of ai.tasks().filter((x) => x.status === "queued" || x.status === "running")) await ai.cancelTask(task.id) }}>{t("ai.tasks.stopAll")}</button>
+              <button type="button" class="assistant-btn-xs mt-2" data-testid="ai-tasks-stop" disabled={ai.controlBusy()} onClick={async () => { for (const task of ai.tasks().filter((x) => x.status === "queued" || x.status === "running")) await ai.cancelTask(task.id) }}>{t("ai.tasks.stopAll")}</button>
             </Show>
             <ul class="assistant-tasks-list">
               <For each={ai.tasks()}>{(task) => (
@@ -91,7 +91,7 @@ export function AgentActivity(): JSX.Element {
                       <span class="assistant-meta-text">{t(`ai.tasks.status.${task.status}` as never)} · {task.background ? t("ai.tasks.background") : t("ai.tasks.inTurn")}</span>
                     </summary>
                     <Show when={task.status === "queued" || task.status === "running"}>
-                      <button type="button" class="assistant-btn-xs mt-1.5" disabled={ai.controlBusy()} onClick={() => void ai.cancelTask(task.id)}>{t("ai.controls.cancelTask")}</button>
+                      <button type="button" class="assistant-btn-xs mt-2" disabled={ai.controlBusy()} onClick={() => void ai.cancelTask(task.id)}>{t("ai.controls.cancelTask")}</button>
                     </Show>
                     <Show when={task.text ?? task.error}>
                       {(report) => <pre class="assistant-code-block mt-1.5 max-h-48" data-testid="ai-task-report">{report()}</pre>}

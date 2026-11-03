@@ -69,7 +69,7 @@ function CatalogueTool(props: { readonly tool: BridgeTool }): JSX.Element {
       <button type="button" class="assistant-catalogue-tool-head" aria-expanded={open()} onClick={() => setOpen(!open())}>
         <span class="assistant-catalogue-tool-id">{props.tool.id}</span>
         <span class="assistant-pill" data-kind={props.tool.kind}>{kindLabel(props.tool.kind)}</span>
-        <ChevronDown size={12} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
+        <ChevronDown size={14} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
       </button>
       <Show when={open()}>
         <div class="assistant-catalogue-tool-body">

@@ -94,7 +94,7 @@ export function ExtensionsSettings(): JSX.Element {
         <p class="text-xs assistant-meta-text">{t("ai.extensions.mcpHint")}</p>
         <Show when={ai.projectId()} fallback={<p class="text-xs assistant-meta-text">{t("ai.extensions.projectRequired")}</p>}>
           <Show when={servers.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
-          <ul class="space-y-1.5">
+          <ul class="space-y-2">
             <For each={servers()?.projectId === ai.projectId() ? servers()?.servers : []}>{(server) => (
               <li class="assistant-list-card gap-2">
                 <button type="button" class="min-w-0 flex-1 text-left" title={server.name} onClick={() => { setName(server.name); setConfig(JSON.stringify(server.config, null, 2)) }}>
@@ -125,7 +125,7 @@ export function ExtensionsSettings(): JSX.Element {
         <h3 class="text-sm font-medium">{t("ai.extensions.plugins")}</h3>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.pluginsHint")}</p>
         <Show when={plugins.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
-        <ul class="space-y-1.5"><For each={plugins()?.plugins}>{(plugin) => <li class="assistant-list-card gap-2">
+        <ul class="space-y-2"><For each={plugins()?.plugins}>{(plugin) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{plugin.name}</strong><span class="text-xs assistant-meta-text">{plugin.version} · {t("ai.extensions.toolCount", { count: plugin.tools })}{plugin.mods > 0 ? ` · ${t("ai.extensions.modCount", { count: plugin.mods })}` : ""}{plugin.modes > 0 ? ` · ${t("ai.extensions.modeCount", { count: plugin.modes })}` : ""}</span></div>
           <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Power size={14} aria-hidden="true" /></button>
           <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: plugin.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionPlugin({ params: { id: plugin.id } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Trash2 size={14} aria-hidden="true" /></button>
@@ -149,7 +149,7 @@ export function ExtensionsSettings(): JSX.Element {
         </div>
         <p class="text-xs assistant-meta-text">{t("ai.extensions.modsHint")}</p>
         <Show when={mods.loading}><LoadingState label={t("ai.extensions.loading")} rows={2} /></Show>
-        <ul class="space-y-1.5"><For each={mods()?.mods}>{(mod) => <li class="assistant-list-card gap-2">
+        <ul class="space-y-2"><For each={mods()?.mods}>{(mod) => <li class="assistant-list-card gap-2">
           <div class="min-w-0 flex-1"><strong class="block truncate">{mod.name}</strong><span class="text-xs assistant-meta-text">{mod.description} · {mod.origin === "plugin" ? t("ai.extensions.modFromPlugin", { name: mod.pluginId ?? "" }) : t("ai.extensions.modWrittenBy", { origin: mod.origin })}</span></div>
           <Show when={mod.origin !== "plugin"}>
             <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(mod.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: mod.name })} aria-pressed={mod.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionMod({ params: { id: mod.id }, payload: { enabled: !mod.enabled } })); await modActions.refetch() })}><Power size={14} aria-hidden="true" /></button>

@@ -104,9 +104,9 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
               value={searchQuery()}
               onInput={(event) => setSearchQuery(event.currentTarget.value)}
               placeholder={t("chat.memberSearch")}
-              class={`${FIELD} pl-8`}
+              class={`${FIELD} pl-9`}
             />
-            <Search size={14} class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <Search size={14} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           </div>
         </div>
 
@@ -119,7 +119,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
             <div class="flex flex-wrap gap-2">
               <For each={selected()}>
                 {(member) => (
-                  <div class="inline-flex items-center gap-2 rounded-[5px] bg-blue-50 py-1 pl-2 pr-1 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                  <div class="inline-flex items-center gap-2 rounded-[4px] bg-blue-50 py-1 pl-2 pr-1 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                     <span class="text-xs font-medium">{member.name ?? member.email ?? ""}</span>
                     <button
                       type="button"
@@ -127,7 +127,7 @@ export function NewConversation(props: NewConversationProps): JSX.Element {
                       class="rounded-[4px] p-0.5 text-blue-600 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-800/60"
                       aria-label={`${t("common.close")}: ${member.name ?? member.email ?? member.id}`}
                     >
-                      <X size={12} aria-hidden="true" />
+                      <X size={14} aria-hidden="true" />
                     </button>
                   </div>
                 )}

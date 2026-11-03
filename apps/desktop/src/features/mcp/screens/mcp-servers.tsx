@@ -1,8 +1,8 @@
 /**
  * The two directory-side MCP pages: `/mcp/directory` and `/mcp/servers/:id`.
  *
- * Ports of `.reference/src/pages/mcp/**`: the gradient page, the frosted cards, the
- * pulsing status dot, and the resources/tools tabs — with `solid-motionone` standing in
+ * Ports of `.reference/src/pages/mcp/**`: the neutral workspace pages, the
+ * status dot, and the resources/tools tabs — with `solid-motionone` standing in
  * for framer-motion's variants.
  */
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
@@ -15,17 +15,15 @@ import { useKeyedRead, useRead } from "../../../app/queries.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
 import {
-  CARD as ITEM_CARD, CardBanner, FIELD, RAIL_LABEL, StageEmpty, StageError, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage
+  CARD as ITEM_CARD, CardBanner, FIELD, RAIL_LABEL, StageEmpty, StageError, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage, WorkspaceTabs,
+  type WorkspaceTabItem
 } from "../../../shared/components/WorkspacePage.tsx"
 import { McpLoading, legacyFailure, legacyRead, serversFrom, type McpServerCard } from "../components/mcp.tsx"
 
 /** framer's `ease: [0.25, 0.1, 0.25, 1]`. */
 const EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1]
-/** The card spring (stiffness 300, damping 30) approximated with Motion One's tween. */
-const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 const PAGE_BG = "min-h-full"
-const CARD = "ui-card ui-card-heavy"
 
 /** The status dot: green while the server is active. */
 function McpStatusDot(props: { readonly enabled: boolean; readonly size: "sm" | "md" }): JSX.Element {
@@ -93,16 +91,16 @@ export function McpDirectoryScreen(): JSX.Element {
   return (
     <WorkspacePage
       title={t("mcp.directory.title")}
-      actions={<A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Settings size={16} aria-hidden="true" />{t("mcp.directory.manage")}</A>}
+      actions={<A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Settings size={14} aria-hidden="true" />{t("mcp.directory.manage")}</A>}
       rail={<>
         <label class="block">
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("mcp.directory.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+            <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" name="search" class={`${FIELD} pl-9`} placeholder={t("mcp.directory.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
+        <button type="button" class="inline-flex items-center gap-2 self-start text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
         <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400" role="status">{countLabel()}</p>
       </>}
     >
@@ -113,7 +111,7 @@ export function McpDirectoryScreen(): JSX.Element {
           fallback={
             <StageEmpty icon={<Database size={24} aria-hidden="true" />} preview={servers().length === 0 ? "connect" : undefined} title={servers().length === 0 ? t("mcp.directory.emptyTitle") : "No servers found"} hint={servers().length === 0 ? t("mcp.directory.emptyBody") : "No servers match your search criteria."}>
               <Show when={servers().length === 0} fallback={<button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>}>
-                <A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Plus size={16} aria-hidden="true" />{t("mcp.settings.add")}</A>
+                <A href="/settings/mcp" class={TOOLBAR_PRIMARY}><Plus size={14} aria-hidden="true" />{t("mcp.settings.add")}</A>
               </Show>
             </StageEmpty>
           }
@@ -131,8 +129,8 @@ export function McpDirectoryScreen(): JSX.Element {
                     <Show when={entry() !== undefined} fallback={<p class="text-xs italic text-gray-500 dark:text-gray-400">{server.enabled ? t("mcp.directory.infoMissing") : t("mcp.directory.disabledInfo")}</p>}>
                       <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
                         <div class="flex justify-between gap-3"><span>{entry()?.name}</span><Show when={entry()?.version !== undefined}><span>v{entry()?.version}</span></Show></div>
-                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-1"><Database size={12} aria-hidden="true" />{(entry()?.resources?.length ?? 0) === 1 ? t("mcp.directory.resourceOne", { count: 1 }) : t("mcp.directory.resourceMany", { count: entry()?.resources?.length ?? 0 })}</span></div>
-                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-1"><Zap size={12} aria-hidden="true" />{(entry()?.tools?.length ?? 0) === 1 ? t("mcp.directory.toolOne", { count: 1 }) : t("mcp.directory.toolMany", { count: entry()?.tools?.length ?? 0 })}</span></div>
+                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-2"><Database size={14} aria-hidden="true" />{(entry()?.resources?.length ?? 0) === 1 ? t("mcp.directory.resourceOne", { count: 1 }) : t("mcp.directory.resourceMany", { count: entry()?.resources?.length ?? 0 })}</span></div>
+                        <div class="flex justify-between gap-3"><span class="inline-flex items-center gap-2"><Zap size={14} aria-hidden="true" />{(entry()?.tools?.length ?? 0) === 1 ? t("mcp.directory.toolOne", { count: 1 }) : t("mcp.directory.toolMany", { count: entry()?.tools?.length ?? 0 })}</span></div>
                       </div>
                     </Show>
                   </div>
@@ -194,39 +192,36 @@ export function McpServerDetailsScreen(): JSX.Element {
   const details = () => info.data()
   const spinner = () => read.loading() && server() === undefined
 
-  const backToDirectory = (): JSX.Element => (
-    <A href="/mcp/directory">
-      <Motion.button
-        class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-white hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-      >
-        <ArrowLeft size={16} class="mr-2" />
-        {t("mcp.detail.back")}
-      </Motion.button>
-    </A>
+  const notFound = (): JSX.Element => (
+    <WorkspaceDetail title={t("mcp.directory.title")} backHref="/mcp/directory" backLabel={t("mcp.directory.title")}>
+      <StageEmpty icon={<Server size={24} aria-hidden="true" />} preview="lost" title={t("mcp.detail.notFound")} hint={error() ?? ""}>
+        <A href="/mcp/directory" class={TOOLBAR_BUTTON}><ArrowLeft size={14} aria-hidden="true" />{t("mcp.detail.back")}</A>
+      </StageEmpty>
+    </WorkspaceDetail>
   )
 
-  const notFound = (): JSX.Element => (
-    <Motion.div class={PAGE_BG} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, easing: EASE }}>
-      <div class="mx-auto max-w-7xl p-4 md:p-6">
-        <Motion.div
-          class="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-900"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, easing: CARD_EASE }}
-        >
-          <div class="mb-4 text-lg text-red-700 dark:text-red-300">{error() ?? t("mcp.detail.notFound")}</div>
-          <Motion.div>
-            <A href="/mcp/directory">
-              <button class="inline-flex items-center rounded-lg bg-gray-600 px-4 py-2.5 text-white hover:bg-gray-700">
-                <ArrowLeft size={16} class="mr-2" />
-                {t("mcp.detail.back")}
-              </button>
-            </A>
-          </Motion.div>
-        </Motion.div>
-      </div>
-    </Motion.div>
+  /** One configuration value: a quiet label over an inset mono value. */
+  const fact = (label: string, value: JSX.Element, breakAll = false): JSX.Element => (
+    <div class="rounded-[5px] bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+      <span class="block text-[11px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <div class={`mt-1 font-mono text-xs text-slate-900 dark:text-slate-100${breakAll ? " break-all" : ""}`}>{value}</div>
+    </div>
   )
+
+  /** The empty note of a tab or of a server that is off: one icon, one line. */
+  const note = (icon: JSX.Element, text: string): JSX.Element => (
+    <div class="flex flex-col items-center gap-2 px-4 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+      {icon}
+      <p>{text}</p>
+    </div>
+  )
+
+  const tabItems = (): ReadonlyArray<WorkspaceTabItem<"resources" | "tools">> => [
+    { id: "resources", label: t("mcp.detail.resourcesTab", { count: details()?.resources?.length ?? 0 }), icon: <Database size={14} aria-hidden="true" /> },
+    { id: "tools", label: t("mcp.detail.toolsTab", { count: details()?.tools?.length ?? 0 }), icon: <Zap size={14} aria-hidden="true" /> }
+  ]
+
+  const itemCard = "rounded-[5px] border border-slate-200 p-3 dark:border-slate-700"
 
   return (
     <Show
@@ -238,293 +233,154 @@ export function McpServerDetailsScreen(): JSX.Element {
       }
     >
       <Show when={server() !== undefined} fallback={notFound()}>
-        <WorkspaceDetail title={server()?.name ?? ""} subtitle="MCP server" backHref="/mcp/directory" backLabel={t("mcp.directory.title")}>
-          <div class="mx-auto w-full max-w-7xl">
+        <WorkspaceDetail
+          title={server()?.name ?? ""}
+          subtitle="MCP server"
+          backHref="/mcp/directory"
+          backLabel={t("mcp.directory.title")}
+          actions={<>
+            <button type="button" class={TOOLBAR_BUTTON} onClick={() => void toggleStatus()}>
+              <Activity size={14} aria-hidden="true" />
+              {server()?.enabled ? t("mcp.detail.disableServer") : t("mcp.detail.enableServer")}
+            </button>
+            <A href={`/settings/mcp/edit/${encodeURIComponent(server()?.id ?? "")}`} class={TOOLBAR_PRIMARY}>
+              <Pencil size={14} aria-hidden="true" />
+              {t("mcp.detail.editConfiguration")}
+            </A>
+          </>}
+        >
+          <div class="mx-auto w-full max-w-7xl space-y-3">
+            <Show when={error() !== undefined}><StageError message={error() ?? ""} /></Show>
 
-            <Show when={error() !== undefined}>
-              <Motion.div
-                class="mb-6 rounded-lg border border-red-200 bg-red-50 px-6 py-4 dark:border-red-800 dark:bg-red-900"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, easing: EASE }}
-              >
-                <div class="flex items-center text-red-700 dark:text-red-300">
-                  <Activity size={16} class="mr-2" />
-                  {error()}
-                </div>
-              </Motion.div>
-            </Show>
-
-            <Motion.div
-              class={`mb-8 overflow-hidden rounded-lg ${CARD}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, easing: CARD_EASE }}
-            >
-              <div class="border-b border-gray-100 p-6 dark:border-gray-700">
-                <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div class="flex items-center">
-                    <Motion.div
-                      class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600"
-                    >
-                      <Server size={24} class="text-white" />
-                    </Motion.div>
-                    <div>
-                      <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-50">
-                        {server()?.name}
-                      </h2>
-                      <span
-                        class={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${server()?.enabled
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"}`}
-                      >
-                        <McpStatusDot enabled={server()?.enabled === true} size="md" />
-                        {server()?.enabled ? t("mcp.directory.active") : t("mcp.directory.inactive")}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="flex flex-wrap gap-3">
-                    <Motion.button
-                      class={`inline-flex items-center rounded-lg px-4 py-2.5 font-medium text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server()?.enabled
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-green-600 hover:bg-green-700"}`}
-                      onClick={() => void toggleStatus()}
-                    >
-                      <Activity size={16} class="mr-2" />
-                      {server()?.enabled ? t("mcp.detail.disableServer") : t("mcp.detail.enableServer")}
-                    </Motion.button>
-
-                    <Motion.div>
-                      <A href={`/settings/mcp/edit/${encodeURIComponent(server()?.id ?? "")}`}>
-                        <button class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700">
-                          <Pencil size={16} class="mr-2" />
-                          {t("mcp.detail.editConfiguration")}
-                        </button>
-                      </A>
-                    </Motion.div>
-                  </div>
-                </div>
-
-                <div class="mb-4 flex items-center gap-4">
-                  <span class="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                    {server()?.type === "sse" ? t("mcp.type.sse") : t("mcp.type.stdio")}
-                  </span>
-                </div>
-
-                <div class="space-y-3">
-                  <Show
-                    when={server()?.type === "sse"}
-                    fallback={
-                      <>
-                        <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.command")}</span>
-                          <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.command}</div>
-                        </div>
-
-                        <Show when={argsPresent(server()?.args)}>
-                          <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.args")}</span>
-                            <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">
-                              {Array.isArray(server()?.args)
-                                ? (server()?.args as string[]).join(" ")
-                                : JSON.stringify(server()?.args)}
-                            </div>
-                          </div>
-                        </Show>
-
-                        <Show when={server()?.workingDirectory !== undefined && server()?.workingDirectory !== null && server()?.workingDirectory !== ""}>
-                          <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.settings.workingDirectory")}</span>
-                            <div class="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.workingDirectory}</div>
-                          </div>
-                        </Show>
-                      </>
-                    }
-                  >
-                    <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("mcp.detail.endpoint")}</span>
-                      <div class="mt-1 break-all font-mono text-sm text-gray-900 dark:text-gray-100">{server()?.url}</div>
-                    </div>
-                  </Show>
-                </div>
+            <section class="workspace-panel ui-card space-y-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class={`workspace-badge ${server()?.enabled ? "workspace-badge--ok" : ""}`}>
+                  <McpStatusDot enabled={server()?.enabled === true} size="md" />
+                  {server()?.enabled ? t("mcp.directory.active") : t("mcp.directory.inactive")}
+                </span>
+                <span class="workspace-badge">{server()?.type === "sse" ? t("mcp.type.sse") : t("mcp.type.stdio")}</span>
               </div>
 
-              <Show when={details() !== undefined}>
-                <div class="p-6">
-                  <div class="mb-6">
-                    <div class="mb-2 flex items-center gap-3">
-                      <Layers size={16} class="text-gray-600 dark:text-gray-400" />
-                      <span class="text-base font-medium text-gray-900 dark:text-white">{t("mcp.detail.infoTitle")}</span>
-                    </div>
-
-                    <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900">
-                      <div class="flex items-center justify-between">
-                        <span class="text-base font-medium text-gray-900 dark:text-white">{details()?.name}</span>
-                        <Show when={details()?.version !== undefined}>
-                          <span class="rounded-full bg-white px-3 py-1 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                            v{details()?.version}
-                          </span>
-                        </Show>
-                      </div>
-
-                      <Show when={details()?.instructions !== undefined}>
-                        <div class="mt-3 rounded-lg bg-white p-3 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          {details()?.instructions}
-                        </div>
-                      </Show>
-                    </div>
+              <Show
+                when={server()?.type === "sse"}
+                fallback={
+                  <div class="grid gap-2">
+                    {fact(t("mcp.settings.command"), server()?.command)}
+                    <Show when={argsPresent(server()?.args)}>
+                      {fact(t("mcp.settings.args"), Array.isArray(server()?.args) ? (server()?.args as string[]).join(" ") : JSON.stringify(server()?.args))}
+                    </Show>
+                    <Show when={server()?.workingDirectory !== undefined && server()?.workingDirectory !== null && server()?.workingDirectory !== ""}>
+                      {fact(t("mcp.settings.workingDirectory"), server()?.workingDirectory)}
+                    </Show>
                   </div>
+                }
+              >
+                {fact(t("mcp.detail.endpoint"), server()?.url, true)}
+              </Show>
+            </section>
 
-                  <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex space-x-8">
-                      <button
-                        class={`flex items-center border-b-2 px-1 py-3 text-sm font-medium focus:outline-none ${selectedTab() === "resources"
-                          ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"}`}
-                        onClick={() => setSelectedTab("resources")}
-                      >
-                        <Database size={16} class="mr-2" />
-                        {t("mcp.detail.resourcesTab", { count: details()?.resources?.length ?? 0 })}
-                      </button>
-                      <button
-                        class={`flex items-center border-b-2 px-1 py-3 text-sm font-medium focus:outline-none ${selectedTab() === "tools"
-                          ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"}`}
-                        onClick={() => setSelectedTab("tools")}
-                      >
-                        <Zap size={16} class="mr-2" />
-                        {t("mcp.detail.toolsTab", { count: details()?.tools?.length ?? 0 })}
-                      </button>
-                    </div>
+            <Show when={details() !== undefined}>
+              <section class="workspace-panel ui-card space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 text-xs font-semibold text-slate-900 dark:text-white">
+                    <Layers size={14} aria-hidden="true" class="text-slate-500 dark:text-slate-400" />
+                    {t("mcp.detail.infoTitle")}
                   </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-medium">{details()?.name}</span>
+                    <Show when={details()?.version !== undefined}><span class="workspace-badge">v{details()?.version}</span></Show>
+                  </div>
+                </div>
+                <Show when={details()?.instructions !== undefined}>
+                  <p class="rounded-[5px] bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">{details()?.instructions}</p>
+                </Show>
 
-                  <Show
-                    when={selectedTab() === "resources"}
-                    fallback={
-                      <Motion.div
-                        initial={{ opacity: 0, x: 5 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.4, easing: EASE }}
-                      >
-                        <Show
-                          when={(details()?.tools?.length ?? 0) > 0}
-                          fallback={
-                            <div class="py-12 text-center">
-                              <Zap size={48} class="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-                              <p class="text-gray-500 dark:text-gray-400">{t("mcp.detail.noTools")}</p>
-                            </div>
-                          }
-                        >
-                          <div class="grid gap-4">
-                            <For each={details()?.tools ?? []}>{(tool) =>
-                              <Motion.div
-                                class="rounded-lg border border-gray-200 bg-white p-4 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-800"
-                                initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
-                                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                                transition={{ duration: 0.4, easing: EASE }}
-                              >
-                                <div class="mb-2 font-medium text-gray-900 dark:text-white">{tool.name}</div>
-                                <Show when={tool.description !== undefined}>
-                                  <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">{tool.description}</div>
-                                </Show>
-                                <Show when={tool.parameters !== undefined && tool.parameters !== null}>
-                                  <div>
-                                    <div class="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t("mcp.detail.parameters")}</div>
-                                    <div class="space-y-2 text-sm">
-                                      <For each={Object.entries(parametersOf(tool.parameters))}>{([key, value]) =>
-                                        <div class="flex items-start space-x-3">
-                                          <div class="flex items-center">
-                                            <span class="rounded bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">{key}</span>
-                                            <Show when={requiredOf(tool.parameters).includes(key)}>
-                                              <span class="ml-1 text-xs text-red-500">*</span>
-                                            </Show>
-                                          </div>
-                                          <Show when={value.description !== undefined}>
-                                            <span class="flex-1 text-xs text-gray-500">{value.description}</span>
+                <WorkspaceTabs label={t("mcp.detail.infoTitle")} tabs={tabItems()} value={selectedTab()} onChange={setSelectedTab} />
+
+                <Show
+                  when={selectedTab() === "resources"}
+                  fallback={
+                    <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, easing: EASE }}>
+                      <Show when={(details()?.tools?.length ?? 0) > 0} fallback={note(<Zap size={24} aria-hidden="true" />, t("mcp.detail.noTools"))}>
+                        <div class="grid gap-2">
+                          <For each={details()?.tools ?? []}>{(tool) =>
+                            <div class={itemCard}>
+                              <div class="text-xs font-medium text-slate-900 dark:text-white">{tool.name}</div>
+                              <Show when={tool.description !== undefined}>
+                                <div class="mt-1 text-xs text-slate-600 dark:text-slate-400">{tool.description}</div>
+                              </Show>
+                              <Show when={tool.parameters !== undefined && tool.parameters !== null}>
+                                <div class="mt-3">
+                                  <div class="mb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("mcp.detail.parameters")}</div>
+                                  <div class="space-y-2">
+                                    <For each={Object.entries(parametersOf(tool.parameters))}>{([key, value]) =>
+                                      <div class="flex items-start gap-3">
+                                        <div class="flex items-center gap-1">
+                                          <span class="rounded-[4px] bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-800 dark:bg-slate-800 dark:text-slate-200">{key}</span>
+                                          <Show when={requiredOf(tool.parameters).includes(key)}>
+                                            <span class="text-xs text-red-600 dark:text-red-400">*</span>
                                           </Show>
                                         </div>
-                                      }</For>
-                                    </div>
-                                  </div>
-                                </Show>
-                              </Motion.div>
-                            }</For>
-                          </div>
-                        </Show>
-                      </Motion.div>
-                    }
-                  >
-                    <Motion.div
-                      initial={{ opacity: 0, x: -5 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.4, easing: EASE }}
-                    >
-                      <Show
-                        when={(details()?.resources?.length ?? 0) > 0}
-                        fallback={
-                          <div class="py-12 text-center">
-                            <Database size={48} class="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-                            <p class="text-gray-500 dark:text-gray-400">{t("mcp.detail.noResources")}</p>
-                          </div>
-                        }
-                      >
-                        <div class="grid gap-4">
-                          <For each={details()?.resources ?? []}>{(resource) =>
-                            <Motion.div
-                              class="rounded-lg border border-gray-200 bg-white p-4 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-800"
-                              initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
-                              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                              transition={{ duration: 0.4, easing: EASE }}
-                            >
-                              <div class="mb-2 font-medium text-gray-900 dark:text-white">{resource.name}</div>
-                              <div class="mb-2 rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">
-                                {resource.uriTemplate}
-                              </div>
-                              <Show when={resource.description !== undefined}>
-                                <div class="mb-3 text-sm text-gray-700 dark:text-gray-300">{resource.description}</div>
-                              </Show>
-
-                              <Show when={resource.arguments !== undefined && resource.arguments.length > 0}>
-                                <div>
-                                  <div class="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t("mcp.settings.args")}</div>
-                                  <div class="grid grid-cols-2 gap-2 text-sm">
-                                    <For each={resource.arguments ?? []}>{(argument) =>
-                                      <div class="flex items-center">
-                                        <span class="rounded bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                                          {argument.name}
-                                        </span>
-                                        <Show when={argument.required === true}>
-                                          <span class="ml-1 text-xs text-red-500">*</span>
+                                        <Show when={value.description !== undefined}>
+                                          <span class="flex-1 text-xs text-slate-500 dark:text-slate-400">{value.description}</span>
                                         </Show>
                                       </div>
                                     }</For>
                                   </div>
                                 </div>
                               </Show>
-                            </Motion.div>
+                            </div>
                           }</For>
                         </div>
                       </Show>
                     </Motion.div>
-                  </Show>
-                </div>
-              </Show>
+                  }
+                >
+                  <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, easing: EASE }}>
+                    <Show when={(details()?.resources?.length ?? 0) > 0} fallback={note(<Database size={24} aria-hidden="true" />, t("mcp.detail.noResources"))}>
+                      <div class="grid gap-2">
+                        <For each={details()?.resources ?? []}>{(resource) =>
+                          <div class={itemCard}>
+                            <div class="text-xs font-medium text-slate-900 dark:text-white">{resource.name}</div>
+                            <div class="mt-2 rounded-[4px] bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                              {resource.uriTemplate}
+                            </div>
+                            <Show when={resource.description !== undefined}>
+                              <div class="mt-2 text-xs text-slate-700 dark:text-slate-300">{resource.description}</div>
+                            </Show>
+                            <Show when={resource.arguments !== undefined && resource.arguments.length > 0}>
+                              <div class="mt-3">
+                                <div class="mb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">{t("mcp.settings.args")}</div>
+                                <div class="flex flex-wrap gap-2">
+                                  <For each={resource.arguments ?? []}>{(argument) =>
+                                    <div class="flex items-center gap-1">
+                                      <span class="rounded-[4px] bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                                        {argument.name}
+                                      </span>
+                                      <Show when={argument.required === true}>
+                                        <span class="text-xs text-red-600 dark:text-red-400">*</span>
+                                      </Show>
+                                    </div>
+                                  }</For>
+                                </div>
+                              </div>
+                            </Show>
+                          </div>
+                        }</For>
+                      </div>
+                    </Show>
+                  </Motion.div>
+                </Show>
+              </section>
+            </Show>
 
-              <Show when={details() === undefined && server()?.enabled === true}>
-                <div class="p-6 text-center">
-                  <Terminal size={48} class="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-                  <p class="text-gray-500 dark:text-gray-400">{t("mcp.detail.offline")}</p>
-                </div>
-              </Show>
+            <Show when={details() === undefined && server()?.enabled === true}>
+              <section class="workspace-panel ui-card">{note(<Terminal size={24} aria-hidden="true" />, t("mcp.detail.offline"))}</section>
+            </Show>
 
-              <Show when={server()?.enabled === false}>
-                <div class="p-6 text-center">
-                  <Settings size={48} class="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-                  <p class="text-gray-500 dark:text-gray-400">{t("mcp.detail.disabledNote")}</p>
-                </div>
-              </Show>
-            </Motion.div>
+            <Show when={server()?.enabled === false}>
+              <section class="workspace-panel ui-card">{note(<Settings size={24} aria-hidden="true" />, t("mcp.detail.disabledNote"))}</section>
+            </Show>
           </div>
         </WorkspaceDetail>
       </Show>

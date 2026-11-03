@@ -311,10 +311,10 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
           class="h-4 w-4 rounded border-gray-300 text-blue-600"
           disabled={busy()}
         />
-        <label for={id("enabled")} class="ml-2 block text-sm text-gray-700 dark:text-gray-300">{t("mcp.form.enabled")}</label>
+        <label for={id("enabled")} class="ml-2 block text-xs text-gray-700 dark:text-gray-300">{t("mcp.form.enabled")}</label>
       </div>
 
-      <div class="flex gap-3 pt-2">
+      <div class="flex gap-2 pt-3">
         <button
           type="submit"
           class={SUBMIT_BUTTON}

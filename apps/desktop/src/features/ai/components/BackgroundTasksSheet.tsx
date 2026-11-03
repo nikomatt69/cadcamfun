@@ -89,10 +89,10 @@ export function BackgroundTasksSheet(): JSX.Element {
           aria-expanded={open()}
           onClick={() => setOpen(true)}
         >
-          <Layers size={12} aria-hidden="true" />
+          <Layers size={14} aria-hidden="true" />
           <span>{t("ai.tasks.openSheet")}</span>
           <span class="assistant-pill" data-testid="ai-bg-active-count">{active().length}/{ai.tasks().length}</span>
-          <Show when={active().length > 0}><LoaderCircle size={12} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" /></Show>
+          <Show when={active().length > 0}><LoaderCircle size={14} aria-hidden="true" class="motion-safe:animate-spin assistant-status-active" /></Show>
         </button>
       </Show>
       <Show when={open()}>
@@ -124,7 +124,7 @@ export function BackgroundTasksSheet(): JSX.Element {
                 </button>
               </Show>
               <button type="button" class="assistant-btn-xs" data-testid="ai-bg-close" aria-label={t("ai.close")} onClick={() => setOpen(false)}>
-                <X size={12} aria-hidden="true" />
+                <X size={14} aria-hidden="true" />
               </button>
             </div>
             <Show when={ai.tasks().length > 0} fallback={<><div class="assistant-bg-sheet-preview" aria-hidden="true"><TasksPreview /></div><p class="assistant-bg-sheet-empty">{t("ai.tasks.sheetEmpty")}</p></>}>
