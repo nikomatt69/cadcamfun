@@ -34,7 +34,9 @@ describe("harness inventory", () => {
     expect(inventory.filter((entry) => !entry.prompt).map((entry) => entry.id)).toEqual([])
   })
 
+  // Rendering reads and parses every action, prompt, handler and test file: 5-15 s on a loaded machine, so the default 5 s limit
+  // reported a timeout as "inventory not current" when several files ran together.
   test("the committed inventory is current", () => {
     expect(readFileSync(INVENTORY_PATH, "utf8")).toBe(renderInventory())
-  })
+  }, 120_000)
 })
