@@ -3,6 +3,14 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.76 (November 2026)
+
+## Desktop
+
+- Examples must be reachable from the picker and lead with the clicked cell
+- Runnable examples for every operation and setup, translated in all locales
+- Add SetupExamples component to various sections for enhanced user guidance
+
 ## v0.1.75 (November 2026)
 
 ## Core
