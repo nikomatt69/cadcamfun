@@ -53,3 +53,5 @@ Gate: coverage rises per family; `--strict` is green only when 184/184. Handler 
 - 2026-10-12: made RM-03 the independent persistence prerequisite for RM-02 consumers and RM-09 acceptance, without a reverse RM-02 dependency. Documentation only; no gate claimed.
 - 2026-10-16: marketplace removed from the product (owner decision); the `/api/marketplace/*` rows and the Polar-webhook deliverable are gone, inventory total is 184.
 - 2026-11-03: step 1 started: `components/*` versions and comments (5 route files, coverage 131/184 with index, details, relationships, storage, export-import). Remaining in the family: library, analysis. Revision/receipt consolidation still open.
+- 2026-11-03: step 2 `toolpaths/export-import` done (coverage 132/184). Step 1 leaves `components/library` and `components/:id/analysis` open on purpose (see `11-api-parity-brief.md`). Step 3 (organisations, invitations, conversation) is next. Generated clients, contract snapshot and API reference regenerate once the in-flight `verify-nc` contract of another session has landed.
+

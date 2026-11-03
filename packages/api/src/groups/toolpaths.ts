@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { CamSetupSheet } from "../cam-kernel.ts"
-import { BadRequest, Conflict, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, EnvelopeOpt, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, Envelope, EnvelopeOpt, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const NullStr = Schema.NullOr(Schema.String)
 
@@ -176,6 +176,12 @@ export class ToolpathExtrasGroup extends HttpApiGroup.make("toolpathExtras")
     HttpApiEndpoint.put("updateComment", "/api/toolpaths/:id/comments/:commentId", {
       params: commentId, payload: Schema.Struct({ content: Schema.String }), success: ToolpathCommentRow, error: [BadRequest, Forbidden, NotFound, InternalError]
     }),
-    HttpApiEndpoint.delete("removeComment", "/api/toolpaths/:id/comments/:commentId", { params: commentId, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] })
+    HttpApiEndpoint.delete("removeComment", "/api/toolpaths/:id/comments/:commentId", { params: commentId, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] }),
+    // GET streams a JSON/ZIP download (raw response); POST imports into one project (envelope bodies).
+    HttpApiEndpoint.get("export", "/api/toolpaths/export-import", {
+      query: { ids: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.String)])), format: Schema.optional(Schema.String) },
+      success: Schema.Unknown, error: [EnvBadRequest, EnvNotFound, EnvInternal]
+    }),
+    HttpApiEndpoint.post("import", "/api/toolpaths/export-import", { payload: Schema.Unknown, success: Envelope(Schema.Unknown), error: [EnvBadRequest, EnvNotFound, EnvInternal] })
   )
 {}

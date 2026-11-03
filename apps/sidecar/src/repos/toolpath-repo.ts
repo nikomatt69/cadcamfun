@@ -5,6 +5,7 @@ import { and, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
+import { importLoop, type ImportResults } from "./import-loop.ts"
 
 type Row = typeof schema.toolpathTable.$inferSelect
 export const toToolpathRow = (t: Row): ToolpathRow => ({ ...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString() })
@@ -49,6 +50,13 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
   find(userId: string, id: string): Effect.Effect<{ row: ToolpathRow; project: { id: string; name: string; ownerId: string; organizationId: string | null }; canWrite: boolean } | undefined, DatabaseError>
   create(userId: string, d: ToolpathInput & { name: string; projectId: string; drawingId?: string; applyDefaults?: boolean }): Effect.Effect<ToolpathRow, DatabaseError>
   update(id: string, patch: Partial<ToolpathInput>): Effect.Effect<ToolpathRow, DatabaseError>
+  /**
+   * Toolpaths for an export, with their project's name. Without `ids`: the ones the user created. With `ids`: those among them
+   * the user created or that sit in a project of one of their organisations (public toolpaths of others are not exported).
+   */
+  exportable(userId: string, ids: ReadonlyArray<string> | undefined): Effect.Effect<Array<{ row: ToolpathRow; projectName: string }>, DatabaseError>
+  /** Legacy import loop into one project: `create` inserts, `update` upserts by id inside the project, `skip` inserts unless the id exists there. */
+  importMany(userId: string, projectId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   /**
    * Compare-and-set: inside one synchronous transaction, reads the toolpath and its drawing's data, and applies `patch`
    * only while `guard` still holds for both. `undefined` when the row is gone or the guard failed: nothing was written.
@@ -106,6 +114,40 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             }
             return { row: toToolpathRow(hit.t), project: hit.p, canWrite }
           }),
+        exportable: (userId, ids) =>
+          query("toolpaths.exportable", async (db) => {
+            const P = schema.projectTable
+            const orgIds = await orgIdsOf(db, userId)
+            const mine = eq(T.createdBy, userId)
+            const where = ids === undefined ? mine : and(inArray(T.id, [...ids]), or(mine, orgIds.length ? inArray(P.organizationId, orgIds) : undefined))
+            if (ids !== undefined && ids.length === 0) return []
+            const hits = await db.select({ t: T, projectName: P.name }).from(T).innerJoin(P, eq(T.projectId, P.id)).where(where).orderBy(desc(T.updatedAt))
+            return hits.map((h) => ({ row: toToolpathRow(h.t), projectName: h.projectName }))
+          }),
+        importMany: (userId, projectId, items, mode) =>
+          query("toolpaths.importMany", (db) => importLoop(items, mode, {
+            validate: (t) => (t.name ? undefined : "Missing required field: name"),
+            exists: async (id) => (await db.select({ id: T.id }).from(T).where(and(eq(T.id, id), eq(T.projectId, projectId))).limit(1)).length > 0,
+            create: async (t) => commitMutation(db, "toolpaths.import.create", (tx) => {
+              const row = tx.insert(T).values({
+                name: String(t.name), description: (t.description as string | undefined) || null, data: t.data || {}, gcode: (t.gcode as string | undefined) || "",
+                type: (t.type as string | undefined) || "mill", operationType: (t.operationType as string | undefined) || "contour",
+                projectId, createdBy: userId, isPublic: false
+              }).returning().get()
+              if (!row) throw new Error("Imported toolpath was not created")
+              return { result: row.id, resourceId: row.id, revision: row.updatedAt.toISOString() }
+            }),
+            update: async (id, t) => commitMutation(db, "toolpaths.import.update", (tx) => {
+              const previous = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!previous) throw new Error("Imported toolpath no longer exists")
+              const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              tx.update(T).set({
+                name: String(t.name), description: (t.description as string | undefined) || null, data: t.data || {}, gcode: (t.gcode as string | undefined) || "",
+                type: (t.type as string | undefined) || "mill", operationType: (t.operationType as string | undefined) || "contour", updatedAt
+              }).where(eq(T.id, id)).run()
+              return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+            })
+          })).pipe(Effect.tap(() => events.workspaceChanged(projectId))),
         create: (userId, d) =>
           query("toolpaths.create", (db) => commitMutation(db, "toolpaths.create", (tx) => {
             const row = tx.insert(T).values({
