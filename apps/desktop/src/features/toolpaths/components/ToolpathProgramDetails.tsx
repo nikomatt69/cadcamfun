@@ -6,6 +6,7 @@ import { ResourceGeometryPreview, resourceElements } from "../../library/compone
 import { StatGrid, type StatItem } from "../../library/components/ResourceStats.tsx"
 import { buildPlayback, playbackSegments } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
+import { programStatusText } from "../../cam/lib/model-change.ts"
 
 const minutes = (seconds: number): string => {
   const rounded = Math.round(seconds)
@@ -75,7 +76,18 @@ export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; reado
       ]
     } catch { return [] }
   })
+  // Whether the drawing still matches the model a native program was made from (spec 59 A2); the drawing arrives a moment after the row.
+  const modelStatus = createMemo(() => {
+    const data = record(props.row.data)
+    if (data["kernelRequest"] === undefined || props.drawing === undefined) return undefined
+    const list = record(props.drawing)["elements"]
+    const current = Array.isArray(list) ? list.filter((e): e is Record<string, unknown> => e !== null && typeof e === "object") : []
+    return programStatusText(cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: current }))
+  })
   return <section class="space-y-4" data-testid="toolpath-program-details">
+    <Show when={modelStatus()}>{(status) => (
+      <p class={`text-xs ${status().tone === "warn" ? "text-[color:var(--ent-warn)]" : "text-[color:var(--ent-text-muted)]"}`} title={status().detail} data-testid="toolpath-model-status" data-tone={status().tone}>{status().text}</p>
+    )}</Show>
     <ResourceGeometryPreview elements={elements()} program={program()} origin={artifact()?.origin} />
     <Show when={!elements().length}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.resource.noGeometry")}</p></Show>
     <StatGrid columns={3} items={[...summary().map((field) => ({ label: field.label, value: String(field.value) })), ...motion()]} />

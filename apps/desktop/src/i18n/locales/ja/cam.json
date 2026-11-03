@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "前回と同じプログラムです。NCはバイト単位で一致します。",
   "cam.kernel.diff.summary": "前回のプログラムとの比較：操作の追加 {added}、削除 {removed}、変更 {changed}。サイクルタイム {seconds} 秒。リリース {before} → {after}。",
   "cam.kernel.diff.worse": "悪化した検証：{claims}。",
-  "cam.kernel.diff.unsafe": "このプログラムは確認なしに採用できません。リリースレベルが下がったか、検証が悪化しています。"
+  "cam.kernel.diff.unsafe": "このプログラムは確認なしに採用できません。リリースレベルが下がったか、検証が悪化しています。",
+  "cam.kernel.model.current": "図面は、このプログラムの作成元のモデルと一致しています。",
+  "cam.kernel.model.unknown": "このプログラムは図面と比較できません。保存されたモデルがありません。"
 }

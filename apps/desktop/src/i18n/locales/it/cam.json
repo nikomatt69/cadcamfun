@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "Stesso programma di prima: l'NC è identico byte per byte.",
   "cam.kernel.diff.summary": "Rispetto al programma precedente: {added} operazioni aggiunte, {removed} rimosse, {changed} modificate; tempo ciclo {seconds} s; rilascio {before} → {after}.",
   "cam.kernel.diff.worse": "Verifiche peggiorate: {claims}.",
-  "cam.kernel.diff.unsafe": "Questo programma non è sicuro da adottare senza revisione: il rilascio è più basso o una verifica è peggiorata."
+  "cam.kernel.diff.unsafe": "Questo programma non è sicuro da adottare senza revisione: il rilascio è più basso o una verifica è peggiorata.",
+  "cam.kernel.model.current": "Il disegno corrisponde ancora al modello da cui è stato creato questo programma.",
+  "cam.kernel.model.unknown": "Questo programma non può essere confrontato con il disegno: non ha un modello salvato."
 }

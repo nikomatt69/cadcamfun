@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "Same program as before: the NC is byte for byte identical.",
   "cam.kernel.diff.summary": "Against the previous program: {added} operations added, {removed} removed, {changed} changed; cycle time {seconds} s; release {before} → {after}.",
   "cam.kernel.diff.worse": "Claims that got worse: {claims}.",
-  "cam.kernel.diff.unsafe": "This program is not safe to take over without review: its release is lower or a claim got worse."
+  "cam.kernel.diff.unsafe": "This program is not safe to take over without review: its release is lower or a claim got worse.",
+  "cam.kernel.model.current": "The drawing still matches the model this program was made from.",
+  "cam.kernel.model.unknown": "This program cannot be compared with the drawing: it has no stored model."
 }

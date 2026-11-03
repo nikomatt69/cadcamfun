@@ -148,3 +148,8 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   core function) and shows what changed (`data-testid="kernel-diff"`): "same program, byte for byte" or the operations added / removed / changed, the cycle-time delta and the release
   change, the claims that got worse and a warning when the new program is not safe to take over. Four strings in 11 locales (machine-translated, not reviewed). Test: `apps/desktop/test/cam-kernel.test.ts`.
   **Open:** a stale badge in the program list and on the toolpath detail screen; Regenerate / Review buttons on a stored program that call the preview and accept routes.
+- 2026-11-03 (build, A6 third part): the toolpath detail screen (`ToolpathProgramDetails`) says whether the drawing still matches the model a native program was made from
+  (`data-testid="toolpath-model-status"`, computed in the desktop from the stored `kernelRequest` and the drawing it loads, tone ok / warn / muted; `unknown` is never shown as current; two more strings in
+  11 locales, machine-translated). The sentence logic is shared with the CAM page (`cam/lib/model-change.ts`, tested in `apps/desktop/test/model-change-text.test.ts`). **Not tested end to end:** the
+  detail screen render needs a stored native program, which only a portable CAM document can create over HTTP; the logic is unit-tested and the component is typechecked. A program made from a selection shows
+  unselected drawing elements as "added". **Open:** the list badge, Regenerate / Review buttons that call the preview and accept routes.

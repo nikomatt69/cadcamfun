@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "Dasselbe Programm wie zuvor: Das NC ist Byte für Byte identisch.",
   "cam.kernel.diff.summary": "Gegenüber dem vorigen Programm: {added} Operationen hinzugefügt, {removed} entfernt, {changed} geändert; Zykluszeit {seconds} s; Freigabe {before} → {after}.",
   "cam.kernel.diff.worse": "Verschlechterte Nachweise: {claims}.",
-  "cam.kernel.diff.unsafe": "Dieses Programm sollte nicht ohne Prüfung übernommen werden: Die Freigabe ist niedriger oder ein Nachweis hat sich verschlechtert."
+  "cam.kernel.diff.unsafe": "Dieses Programm sollte nicht ohne Prüfung übernommen werden: Die Freigabe ist niedriger oder ein Nachweis hat sich verschlechtert.",
+  "cam.kernel.model.current": "Die Zeichnung entspricht weiterhin dem Modell, aus dem dieses Programm erzeugt wurde.",
+  "cam.kernel.model.unknown": "Dieses Programm kann nicht mit der Zeichnung verglichen werden: Es enthält kein gespeichertes Modell."
 }

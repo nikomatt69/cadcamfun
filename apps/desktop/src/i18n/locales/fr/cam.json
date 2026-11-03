@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "Même programme qu'avant : le NC est identique octet pour octet.",
   "cam.kernel.diff.summary": "Par rapport au programme précédent : {added} opérations ajoutées, {removed} supprimées, {changed} modifiées ; temps de cycle {seconds} s ; validation {before} → {after}.",
   "cam.kernel.diff.worse": "Vérifications dégradées : {claims}.",
-  "cam.kernel.diff.unsafe": "Ce programme ne doit pas être repris sans revue : sa validation est plus basse ou une vérification s'est dégradée."
+  "cam.kernel.diff.unsafe": "Ce programme ne doit pas être repris sans revue : sa validation est plus basse ou une vérification s'est dégradée.",
+  "cam.kernel.model.current": "Le dessin correspond toujours au modèle dont ce programme est issu.",
+  "cam.kernel.model.unknown": "Ce programme ne peut pas être comparé au dessin : il n'a pas de modèle enregistré."
 }

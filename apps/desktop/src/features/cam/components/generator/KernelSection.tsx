@@ -8,6 +8,7 @@ import { captureEditorOwner } from "../../../ai/lib/editor-sync.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { kernelRequestOf } from "../../lib/job.ts"
+import { modelChangeText } from "../../lib/model-change.ts"
 import { tcpRefusal } from "../../lib/kernel-tcp.ts"
 import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
@@ -85,18 +86,6 @@ const useKernel = (): KernelApi => {
 }
 
 /** Holds the kernel run. The machine, operation and footer sections render its controls; this is not a section of its own. */
-/** The sentence for a model change (spec 59 A2), or nothing when the model is the same. */
-const modelChangeText = (change: ReturnType<typeof cam.kernel.programStatus>): string | undefined => {
-  if (change.status !== "stale") return undefined
-  const count = change.added.length + change.removed.length + change.changed.length
-  const round = (n: number): string => String(Math.round(n * 1000) / 1000)
-  switch (change.class) {
-    case "geometry": return t("cam.kernel.model.geometry", { count })
-    case "topology": return t("cam.kernel.model.topology", { count })
-    case "rigid": return t("cam.kernel.model.rigid", { x: round(change.move?.x ?? 0), y: round(change.move?.y ?? 0), z: round(change.move?.z ?? 0) })
-    case "inputs": return t("cam.kernel.model.inputs", { settings: change.inputs.join(", ") })
-  }
-}
 
 /** The sentences for what a regeneration changed (spec 59 A4); none when there was no program before it. */
 const diffLines = (diff: ReturnType<typeof cam.kernel.programDiff> | undefined): ReadonlyArray<string> => {

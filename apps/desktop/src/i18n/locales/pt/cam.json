@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "O mesmo programa de antes: o NC é idêntico byte a byte.",
   "cam.kernel.diff.summary": "Em relação ao programa anterior: {added} operações adicionadas, {removed} removidas, {changed} alteradas; tempo de ciclo {seconds} s; liberação {before} → {after}.",
   "cam.kernel.diff.worse": "Verificações que pioraram: {claims}.",
-  "cam.kernel.diff.unsafe": "Este programa não é seguro de adotar sem revisão: a liberação é menor ou uma verificação piorou."
+  "cam.kernel.diff.unsafe": "Este programa não é seguro de adotar sem revisão: a liberação é menor ou uma verificação piorou.",
+  "cam.kernel.model.current": "O desenho ainda corresponde ao modelo a partir do qual este programa foi feito.",
+  "cam.kernel.model.unknown": "Este programa não pode ser comparado com o desenho: não tem um modelo guardado."
 }

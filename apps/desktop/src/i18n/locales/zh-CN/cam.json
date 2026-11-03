@@ -1398,5 +1398,7 @@
   "cam.kernel.diff.same": "与之前的程序相同：NC 逐字节一致。",
   "cam.kernel.diff.summary": "与上一个程序相比：新增 {added} 个工序，删除 {removed} 个，修改 {changed} 个；循环时间 {seconds} 秒；发布 {before} → {after}。",
   "cam.kernel.diff.worse": "变差的验证项：{claims}。",
-  "cam.kernel.diff.unsafe": "未经审查不应采用此程序：发布等级更低，或有验证项变差。"
+  "cam.kernel.diff.unsafe": "未经审查不应采用此程序：发布等级更低，或有验证项变差。",
+  "cam.kernel.model.current": "图纸仍与生成此程序时的模型一致。",
+  "cam.kernel.model.unknown": "无法将此程序与图纸比较：它没有保存模型。"
 }
