@@ -29,6 +29,26 @@ export const gridFor = (minX: number, minY: number, maxX: number, maxY: number, 
   return { minX, minY, nx, ny, cellX: w / nx, cellY: h / ny }
 }
 
+/**
+ * A grid over the part's bounds plus a margin whose cells divide the part's extent exactly, so the part's outer walls lie on cell
+ * boundaries (spec 72 finding, 2026-11-03). With the margin folded into one stretched cell size the outer walls fell anywhere inside a cell
+ * and a finishing pass along a wall was quantised by up to half a cell into it (0.09 mm on a 40 x 30 plate at the default 0.25 mm cell).
+ * The margin becomes a whole number of cells. A part with no extent in X or Y falls back to `gridFor`.
+ */
+export const gridAligned = (minX: number, minY: number, maxX: number, maxY: number, margin: number, cell: number, maxCells = 1_500_000): Grid => {
+  const w = maxX - minX, h = maxY - minY
+  if (!(w > 1e-6) || !(h > 1e-6)) return gridFor(minX - margin, minY - margin, maxX + margin, maxY + margin, cell, maxCells)
+  let c = Math.max(cell, 1e-6)
+  for (;;) {
+    const px = Math.max(1, Math.round(w / c)), py = Math.max(1, Math.round(h / c))
+    const cx = w / px, cy = h / py
+    const mx = Math.max(0, Math.ceil(margin / cx - 1e-9)), my = Math.max(0, Math.ceil(margin / cy - 1e-9))
+    const nx = px + 2 * mx, ny = py + 2 * my
+    if ((nx + 1) * (ny + 1) <= maxCells) return { minX: minX - mx * cx, minY: minY - my * cy, nx, ny, cellX: cx, cellY: cy }
+    c *= 1.1
+  }
+}
+
 const JITTER_X = 0.2360679775, JITTER_Y = 0.1415926536
 
 type Intervals = Float64Array

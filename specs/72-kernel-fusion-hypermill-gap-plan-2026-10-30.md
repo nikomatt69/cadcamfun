@@ -429,3 +429,9 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   and slope limited), and the height-field replay cannot see a sliver cut into a vertical wall. Two consequences: the `no-gouge` text "beyond 0.030 mm (one cell of lateral slack)" is not a bound on this
   strategy, and `Deviation.depth` is a ray length along the best of three axes, so a 0.3 mm overcut of a vertical wall can be reported as a depth of 2 mm (the verdict is right, the magnitude is not a normal
   distance). Next step: run the tri-dexel replay for 3-axis surface finishing too, or compensate the wall passes by the sampling error.
+- 2026-11-03 (fix of the finding above, P2-2 partly): the cause was the layout of the part's height-field grid, not the strategy. `buildPartModel*` stretched one cell size over the part plus its margin, so the part's outer
+  walls fell anywhere inside a cell (a 0.25 mm default cell gave 2.914 mm wall passes for a 3 mm ball; an explicit 0.1 or 0.5 mm resolution gave 3.000 and 2.997 because the walls happened to align). `gridAligned`
+  (`cam/model/dexel.ts`) chooses cell sizes that divide the part's extent exactly and a margin of whole cells, so both outer walls lie on cell boundaries; the wall passes of the same plate are now at 2.999 mm. The kernel
+  program of that plate (face, roughing, finishing) verifies clean in the independent tri-dexel replay (`kernel/verify-nc-kernel-program.test.ts`, which fails on the old layout), and the model, operations, kernel,
+  generator, verify and `test/cam` suites pass (151 + 415 + 1248, 0 failures). **Still open:** interior walls (a pocket, a boss) are not on the lattice, so their passes can still be quantised by up to half a cell; the
+  exact B-rep drop-cutter (spec 72 step 3.2) is the real fix. The `no-gouge` claim text still says "one cell of lateral slack", which is the bound for interior walls only.

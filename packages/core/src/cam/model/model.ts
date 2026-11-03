@@ -3,7 +3,7 @@
  * dropped into a dexel grid, and the boolean elements combine their operands exactly. The result is what a 3-axis
  * strategy needs: the height of the finished surface in every column, undercuts and holes included.
  */
-import { Dexels, gridFor, type Grid } from "./dexel.ts"
+import { Dexels, gridAligned, type Grid } from "./dexel.ts"
 import { flattenElements } from "../generator/elements.ts"
 import { elementMesh, meshBounds, type Element, type Mesh64 } from "./element-mesh.ts"
 
@@ -98,7 +98,7 @@ export const buildPartModel = (elements: ReadonlyArray<Element>, options: ModelO
   const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity]
   for (const m of meshes) { const b = meshBounds(m); for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a]!, b.min[a]!); max[a] = Math.max(max[a]!, b.max[a]!) } }
   const margin = options.margin ?? 0
-  const grid = gridFor(min[0] - margin, min[1] - margin, max[0] + margin, max[1] + margin, options.cell ?? 0.25, options.maxCells)
+  const grid = gridAligned(min[0], min[1], max[0], max[1], margin, options.cell ?? 0.25, options.maxCells)
   if (grid.cellX > (options.cell ?? 0.25) * 1.001 || grid.cellY > (options.cell ?? 0.25) * 1.001) {
     warnings.push(`Surface resolution coarsened to ${Math.max(grid.cellX, grid.cellY).toFixed(3)} mm to keep the model within ${options.maxCells ?? 1_500_000} columns`)
   }
@@ -132,7 +132,7 @@ export const buildPartModelFromMeshes = (
   const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity]
   for (const m of wide) { const b = meshBounds(m); for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a]!, b.min[a]!); max[a] = Math.max(max[a]!, b.max[a]!) } }
   const margin = options.margin ?? 0
-  const grid = gridFor(min[0] - margin, min[1] - margin, max[0] + margin, max[1] + margin, options.cell ?? 0.25, options.maxCells)
+  const grid = gridAligned(min[0], min[1], max[0], max[1], margin, options.cell ?? 0.25, options.maxCells)
   if (grid.cellX > (options.cell ?? 0.25) * 1.001 || grid.cellY > (options.cell ?? 0.25) * 1.001) {
     warnings.push(`Surface resolution coarsened to ${Math.max(grid.cellX, grid.cellY).toFixed(3)} mm to keep the model within ${options.maxCells ?? 1_500_000} columns`)
   }
