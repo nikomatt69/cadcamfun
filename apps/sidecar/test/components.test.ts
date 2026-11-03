@@ -306,3 +306,42 @@ describe("/api/components/:id/analysis", () => {
     expect((await app.call("/api/components/nope/analysis")).status).toBe(404)
   })
 })
+
+describe("expected-revision writes (baseUpdatedAt)", () => {
+  let id: string
+  beforeAll(async () => {
+    id = (await app.call("/api/components", { method: "POST", json: { projectId, name: "Shared plate", data: bracket } })).body.id
+  })
+
+  test("PUT with the revision that was read succeeds once; the same stale revision then answers 409 and writes nothing", async () => {
+    const read = (await app.call(`/api/components/${id}`)).body.updatedAt
+    const first = await app.call(`/api/components/${id}`, { method: "PUT", json: { name: "Mine", baseUpdatedAt: read } })
+    expect(first.status).toBe(200)
+    expect(first.body.updatedAt).not.toBe(read)
+
+    const stale = await app.call(`/api/components/${id}`, { method: "PUT", json: { name: "Theirs", baseUpdatedAt: read } })
+    expect(stale.status).toBe(409)
+    expect(stale.body.message).toBe("The component was saved elsewhere since it was read. Nothing was overwritten.")
+    expect((await app.call(`/api/components/${id}`)).body.name).toBe("Mine")
+
+    // Without a base the write is unconditional, as before.
+    expect((await app.call(`/api/components/${id}`, { method: "PUT", json: { name: "Forced" } })).status).toBe(200)
+  })
+
+  test("restoring a version against a stale revision answers 409 and leaves the component and its history alone", async () => {
+    const v = await app.call(`/api/components/${id}/versions`, { method: "POST", json: { data: { name: "snap", type: "custom" } } })
+    const stale = (await app.call(`/api/components/${id}`)).body.updatedAt
+    await app.call(`/api/components/${id}`, { method: "PUT", json: { description: "moved on" } })
+    const before = (await app.call(`/api/components/${id}/versions`)).body.length
+
+    const refused = await app.call(`/api/components/${id}/versions/restore`, { method: "POST", json: { versionId: v.body.id, baseUpdatedAt: stale } })
+    expect(refused.status).toBe(409)
+    expect((await app.call(`/api/components/${id}/versions`)).body).toHaveLength(before)
+    expect((await app.call(`/api/components/${id}`)).body.data.name).not.toBe("snap")
+
+    const current = (await app.call(`/api/components/${id}`)).body.updatedAt
+    const restored = await app.call(`/api/components/${id}/versions/restore`, { method: "POST", json: { versionId: v.body.id, baseUpdatedAt: current } })
+    expect(restored.status).toBe(200)
+    expect(restored.body.data.name).toBe("snap")
+  })
+})

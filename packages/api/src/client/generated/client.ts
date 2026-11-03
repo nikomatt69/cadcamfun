@@ -2618,6 +2618,7 @@ type Endpoint26_5Input = {
   readonly type?: Endpoint26_5Request["payload"]["type"]
   readonly isPublic?: Endpoint26_5Request["payload"]["isPublic"]
   readonly thumbnail?: Endpoint26_5Request["payload"]["thumbnail"]
+  readonly baseUpdatedAt?: Endpoint26_5Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint26_5 = (raw: RawClient["components"]) => (input: Endpoint26_5Input) =>
   raw["update"]({
@@ -2629,6 +2630,7 @@ const Endpoint26_5 = (raw: RawClient["components"]) => (input: Endpoint26_5Input
       type: input["type"],
       isPublic: input["isPublic"],
       thumbnail: input["thumbnail"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -2738,11 +2740,13 @@ type Endpoint26_18Request = Parameters<RawClient["components"]["restoreVersion"]
 type Endpoint26_18Input = {
   readonly id: Endpoint26_18Request["params"]["id"]
   readonly versionId?: Endpoint26_18Request["payload"]["versionId"]
+  readonly baseUpdatedAt?: Endpoint26_18Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint26_18 = (raw: RawClient["components"]) => (input: Endpoint26_18Input) =>
-  raw["restoreVersion"]({ params: { id: input["id"] }, payload: { versionId: input["versionId"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["restoreVersion"]({
+    params: { id: input["id"] },
+    payload: { versionId: input["versionId"], baseUpdatedAt: input["baseUpdatedAt"] },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint26_19Request = Parameters<RawClient["components"]["getVersion"]>[0]
 type Endpoint26_19Input = {

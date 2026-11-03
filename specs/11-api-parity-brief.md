@@ -106,3 +106,7 @@ Goal: every legacy route in `specs/api-inventory.md` exists in the sidecar with 
 - Steps 6 and 7 are **decided, not ported**: 41 legacy route files (AI provider proxies and code interpreter, the MCP dispatch family, `ml/*`, `websocket`, `og*`, `route`, `graphql-playground`, `test-webauthn`) are listed with a reason each in `packages/api/scripts/accepted-gaps.ts`. `bun run coverage` prints covered, accepted and open apart, and `--strict` now fails only on a route that is neither covered nor accepted (a test checks that every accepted route is a row of the inventory). Today: 143 covered, 41 accepted, 0 open, `--strict` green.
 - Deviations: the legacy `components/library` required an `id` query parameter the route never had and so always answered 400; it is served without it.
 - What RM-03 still owes: the revision / receipt consolidation (expected-revision writes, idempotent receipts, typed conflicts) before RM-02 persistence and RM-04.
+
+### RM-03 revision consolidation, slice 1: components (2026-11-03)
+
+- `PUT /api/components/:id` and `POST /api/components/:id/versions/restore` take an optional `baseUpdatedAt`: the write happens only while the component's `updatedAt` still equals it (check and write are one `commitMutation` transaction); otherwise 409 `Conflict`, nothing written, no receipt, and a restore adds no "Auto-saved before version restore" version. Without it the write stays unconditional (legacy). Same contract as drawings and toolpaths. Tests: `apps/sidecar/test/components.test.ts` ("expected-revision writes").

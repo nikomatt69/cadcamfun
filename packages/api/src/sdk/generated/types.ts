@@ -1158,6 +1158,7 @@ export type ComponentsUpdatePayload = {
   readonly type?: string | null | undefined
   readonly isPublic?: boolean | undefined
   readonly thumbnail?: string | null | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ComponentsCreateForProjectPayload = {
@@ -1174,7 +1175,10 @@ export type ComponentsCreateVersionPayload = {
   readonly changeMessage?: string | undefined
 }
 
-export type ComponentsRestoreVersionPayload = { readonly versionId?: string | undefined }
+export type ComponentsRestoreVersionPayload = {
+  readonly versionId?: string | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
 
 export type ComponentsAddCommentPayload = { readonly content?: string | undefined }
 
@@ -6919,6 +6923,7 @@ export type ComponentsUpdateInput = {
   readonly type?: ComponentsUpdatePayload["type"]
   readonly isPublic?: ComponentsUpdatePayload["isPublic"]
   readonly thumbnail?: ComponentsUpdatePayload["thumbnail"]
+  readonly baseUpdatedAt?: ComponentsUpdatePayload["baseUpdatedAt"]
 }
 
 export type ComponentsUpdateOutput = {
@@ -7073,6 +7078,7 @@ export type ComponentsCreateVersionOutput = {
 export type ComponentsRestoreVersionInput = {
   readonly id: { readonly id: string }["id"]
   readonly versionId?: ComponentsRestoreVersionPayload["versionId"]
+  readonly baseUpdatedAt?: ComponentsRestoreVersionPayload["baseUpdatedAt"]
 }
 
 export type ComponentsRestoreVersionOutput = {
