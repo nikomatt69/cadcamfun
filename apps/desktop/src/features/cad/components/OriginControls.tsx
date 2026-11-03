@@ -18,7 +18,7 @@ export default function OriginControls(): JSX.Element {
       </Field>}</For>
     </Grid>
     <div class="panel-grid panel-grid--2">
-      <For each={PRESETS}>{([preset, label]) => <button type="button" onClick={() => cad.setOriginPreset(preset)} class="panel-btn">{label}</button>}</For>
+      <For each={PRESETS}>{([preset, label]) => <button type="button" onClick={() => cad.setOriginPreset(preset)} class="panel-btn panel-btn--fit">{label}</button>}</For>
     </div>
     <button type="button" onClick={() => cad.resetOrigin()} class="panel-btn panel-btn--block">{t("cad.resetOrigin")}</button>
   </SidebarSection>

@@ -99,6 +99,7 @@ textarea.panel-input { height: auto; padding: 6px 8px; line-height: 16px; }
 .dark .panel-btn--primary { color: var(--ent-surface-inset); }
 .panel-btn--primary:hover { background: var(--panel-accent-hover); border-color: var(--panel-accent-hover); }
 .panel-btn--block { width: 100%; }
+.panel-btn--fit { padding-inline: 8px; white-space: nowrap; }
 .panel-btn svg { width: 14px; height: 14px; }
 .panel-actions { display: grid; gap: 6px; }
 
