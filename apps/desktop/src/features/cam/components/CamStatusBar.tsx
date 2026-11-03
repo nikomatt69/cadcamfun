@@ -60,19 +60,19 @@ export default function CamStatusBar(): JSX.Element {
       testId="cam-status-bar"
       left={
         <>
-          <Seg label={t("cam.status.view")} value={t(TAB_LABEL[cam.activeTab])} tone="blue" />
+          <Seg label={t("cam.status.view")} value={t(TAB_LABEL[cam.activeTab])} />
           <Seg label={t("cam.status.lines")} value={lines()} testId="status-lines" />
           <Seg label={t("cam.status.moves")} value={totals().moves} hideBelow="md" />
-          <Seg label={t("cam.status.cut")} value={`${totals().length.toFixed(1)} mm`} tone="cyan" hideBelow="lg" title={t("cam.status.feedLength")} />
-          <Seg label={t("cam.status.time")} value={clock(totals().seconds)} tone="green" title={t("cam.status.timeEstimate", { rate: RAPID_RATE })} hideBelow="md" />
-          <Show when={totals().minZ !== undefined}><Seg label={t("cam.status.minZ")} value={totals().minZ!.toFixed(2)} tone="amber" hideBelow="lg" /></Show>
+          <Seg label={t("cam.status.cut")} value={`${totals().length.toFixed(1)} mm`} hideBelow="lg" title={t("cam.status.feedLength")} />
+          <Seg label={t("cam.status.time")} value={clock(totals().seconds)} title={t("cam.status.timeEstimate", { rate: RAPID_RATE })} hideBelow="md" />
+          <Show when={totals().minZ !== undefined}><Seg label={t("cam.status.minZ")} value={totals().minZ!.toFixed(2)} hideBelow="lg" /></Show>
           <Sep />
           <Seg label={t("cam.status.tool")} value={`${gen.settings.toolType} Ø${gen.settings.toolDiameter}`} hideBelow="md" title={t("cam.status.toolTitle")} />
           <Seg label={t("cam.status.spindle")} value={gen.settings.rpm} hideBelow="xl" title={t("cam.status.spindleTitle")} />
           <Seg label={t("cam.status.feed")} value={gen.settings.feedrate} hideBelow="xl" title={t("cam.status.feedTitle")} />
-          <Seg label={t("cam.material")} value={<span class="capitalize">{gen.settings.material}</span>} tone="green" hideBelow="lg" />
+          <Seg label={t("cam.material")} value={<span class="capitalize">{gen.settings.material}</span>} hideBelow="lg" />
           <Show when={stock()}>
-            {(s) => <Seg label={t("cam.status.stock")} value={`${s().width.toFixed(1)} × ${s().height.toFixed(1)} × ${s().depth.toFixed(1)}`} tone="cyan" hideBelow="lg" title={t("cam.status.stockTitle")} />}
+            {(s) => <Seg label={t("cam.status.stock")} value={`${s().width.toFixed(1)} × ${s().height.toFixed(1)} × ${s().depth.toFixed(1)}`} hideBelow="lg" title={t("cam.status.stockTitle")} />}
           </Show>
           <Sep />
           <Seg label={t("cam.status.post")} value={cam.controller.toUpperCase()} hideBelow="lg" />
@@ -81,11 +81,11 @@ export default function CamStatusBar(): JSX.Element {
       }
       right={
         <>
-          <Show when={selection.selectedElementIds.length > 0}><Seg value={t("cam.selected", { count: selection.selectedElementIds.length })} tone="amber" /></Show>
+          <Show when={selection.selectedElementIds.length > 0}><Seg value={t("cam.selected", { count: selection.selectedElementIds.length })} /></Show>
           <Show when={cam.selectedOperationId}><Seg label={t("cam.status.op")} value={cam.selectedOperationId!} hideBelow="xl" /></Show>
           <Seg label={t("cam.verify")} value={verdict().text} tone={verdict().tone} title={t("cam.status.verifyTitle")} testId="status-verify" />
           <Show when={cam.playing || cam.playbackTime > 0}>
-            <Seg label={t("cam.status.sim")} value={`${clock(cam.playbackTime)} / ${clock(totals().seconds)}`} tone="purple" />
+            <Seg label={t("cam.status.sim")} value={`${clock(cam.playbackTime)} / ${clock(totals().seconds)}`} />
           </Show>
           <Sep />
           <ShellSegs />

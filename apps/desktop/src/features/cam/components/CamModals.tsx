@@ -99,7 +99,7 @@ export function CostsModal(props: { readonly isOpen: boolean; readonly onClose: 
   return (
     <Show when={props.isOpen}>
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-600/50 dark:bg-black/60 p-4"
         role="dialog"
         aria-modal="true"
         aria-label={t("costs.manager")}
@@ -107,15 +107,15 @@ export function CostsModal(props: { readonly isOpen: boolean; readonly onClose: 
       >
         <div
           ref={onDialogRef}
-          class="w-full max-w-7xl max-h-[70vh] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-xl"
+          class="w-full max-w-7xl max-h-[70vh] flex flex-col rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] shadow-xl"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div class="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h2 class="text-xl dark:text-blue-400 font-bold">{t("costs.manager")}</h2>
-            <button type="button" onClick={() => props.onClose()} class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={t("common.close")}><X size={20} class="dark:text-gray-300" /></button>
+          <div class="flex items-center justify-between border-b border-[color:var(--ent-line)] px-4 py-2.5">
+            <h2 class="text-sm font-semibold text-[color:var(--ent-text)]">{t("costs.manager")}</h2>
+            <button type="button" onClick={() => props.onClose()} class="inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)] hover:text-[color:var(--ent-text)]" aria-label={t("common.close")}><X size={16} /></button>
           </div>
-          <div class="flex-1 rounded-xl overflow-y-auto"><CostsScreen /></div>
+          <div class="flex-1 overflow-y-auto"><CostsScreen /></div>
         </div>
       </div>
     </Show>

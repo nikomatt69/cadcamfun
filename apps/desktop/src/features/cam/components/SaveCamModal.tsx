@@ -157,18 +157,18 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
       canSave={!!name().trim() && (mode() === "existing" ? !!projectId() && !loading() : mode() === "new" ? !!projectName().trim() : !!saved)}
       onClose={() => { if (!busy()) { if (props.projectOnly) props.onClose(); else setShowProject(false) } }}
       controls={<>
-        <label class="mb-4 block space-y-1 text-sm text-gray-700 dark:text-gray-300"><span>{t("cam.save.destination")}</span><select class={FIELD} name="camSaveDestination" disabled={busy()} value={mode()} onChange={(event) => setMode(event.currentTarget.value as "existing" | "new" | "update")}>
+        <label class="mb-4 block space-y-1 text-xs font-medium text-[color:var(--ent-text-muted)]"><span>{t("cam.save.destination")}</span><select class={FIELD} name="camSaveDestination" disabled={busy()} value={mode()} onChange={(event) => setMode(event.currentTarget.value as "existing" | "new" | "update")}>
           <Show when={saved}><option value="update">{t("cam.save.update")}</option></Show><option value="existing">{t("cam.save.existing")}</option><option value="new">{t("cam.save.new")}</option>
         </select></label>
-        <Show when={mode() === "existing"}><label class="mb-4 block space-y-1 text-sm text-gray-700 dark:text-gray-300"><span>{t("cam.save.project")}</span><select class={FIELD} name="camSaveProject" value={loading() ? "" : projectId()} disabled={busy() || loading()} onChange={(event) => setProjectId(event.currentTarget.value)}>
+        <Show when={mode() === "existing"}><label class="mb-4 block space-y-1 text-xs font-medium text-[color:var(--ent-text-muted)]"><span>{t("cam.save.project")}</span><select class={FIELD} name="camSaveProject" value={loading() ? "" : projectId()} disabled={busy() || loading()} onChange={(event) => setProjectId(event.currentTarget.value)}>
           <option value="">{t(loading() ? "cam.save.loading" : "cam.save.chooseProject")}</option><For each={projects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
         </select></label></Show>
-        <label class="mb-4 block space-y-1 text-sm text-gray-700 dark:text-gray-300"><span>{t("cam.save.name")}</span><input class={FIELD} name="camProgramName" value={name()} disabled={busy()} onInput={(event) => setName(event.currentTarget.value)} /></label>
+        <label class="mb-4 block space-y-1 text-xs font-medium text-[color:var(--ent-text-muted)]"><span>{t("cam.save.name")}</span><input class={FIELD} name="camProgramName" value={name()} disabled={busy()} onInput={(event) => setName(event.currentTarget.value)} /></label>
       </>}
       afterFields={<div class="space-y-2 text-sm">
-        <Show when={mode() === "new"}><p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.save.newHint")}</p></Show>
-        <Show when={mode() === "update"}><p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.save.versionHint")}</p></Show>
-        <Show when={saved}>{(value) => <A href={`/toolpaths/${value().id}`} class="text-blue-600 dark:text-blue-400" onClick={(event) => { if (busy()) event.preventDefault() }}>{t("cam.save.manage")}</A>}</Show>
+        <Show when={mode() === "new"}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.save.newHint")}</p></Show>
+        <Show when={mode() === "update"}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.save.versionHint")}</p></Show>
+        <Show when={saved}>{(value) => <A href={`/toolpaths/${value().id}`} class="text-[color:var(--ent-accent)] hover:underline" onClick={(event) => { if (busy()) event.preventDefault() }}>{t("cam.save.manage")}</A>}</Show>
       </div>} />
   </>
 }

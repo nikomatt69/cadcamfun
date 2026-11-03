@@ -18,6 +18,7 @@ import KernelSwarf from "./KernelSwarf.tsx"
 import { downloadText, setupSheetFile } from "../../lib/setupSheet.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
+import { NumberField as DimensionField } from "../../../cad/components/property-inputs/NumberField.tsx"
 import { INPUT, LABEL, NumberField } from "./ui.tsx"
 
 type Operation = cam.kernel.OperationSpec
@@ -31,12 +32,16 @@ const KINDS: Readonly<Record<Operation["strategy"], ReadonlyArray<Cutter["kind"]
 }
 const OVERRIDES = ["rpm", "feed", "stepdown", "stepover"] as const
 
-/** A number field whose empty value means "not set". */
+/**
+ * A number field whose empty value means "not set". It takes what people type (`0,2`, `0.2`, `40/2`) and commits when the entry is
+ * finished, not at every keystroke: a commit rebuilds the plan row or cutter card, which would drop the focus mid-entry.
+ * A value that is not above zero is "not set" too.
+ */
 function OptionalNumber(props: { readonly value: number | undefined; readonly placeholder: string; readonly testId?: string; readonly onValue: (value: number | undefined) => void }): JSX.Element {
   return (
-    <input
-      type="number" class="w-full rounded border border-gray-300 px-2 py-1 text-xs" placeholder={props.placeholder} value={props.value ?? ""} data-testid={props.testId}
-      onChange={(event) => { const raw = event.currentTarget.value.trim(); const v = Number(raw); props.onValue(raw === "" || !Number.isFinite(v) || v <= 0 ? undefined : v) }}
+    <DimensionField
+      optional deferred class="w-full rounded border border-gray-300 px-2 py-1 text-xs" placeholder={props.placeholder} value={props.value} testId={props.testId}
+      onChange={(value) => props.onValue(value <= 0 ? undefined : value)} onClear={() => props.onValue(undefined)}
     />
   )
 }

@@ -4,6 +4,7 @@ import { panelCycles, type PanelCycle } from "../../lib/cyclePanel.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
+import { NumberField } from "../../../cad/components/property-inputs/NumberField.tsx"
 
 const g = cam.generator
 
@@ -34,15 +35,15 @@ export function FixedCycleEditor(props: { readonly line: string; readonly onAppl
                     <Show when={field.required}><span class="required text-red-500 ml-1">*</span></Show>
                   </label>
                   <div class="param-input-group flex items-center">
-                    <input
+                    <NumberField
                       id={`param-${field.name}`}
-                      type="number"
+                      deferred
                       min={field.min}
                       max={field.max}
                       step={field.step || 1}
                       value={params()[field.name] ?? field.defaultValue}
-                      onChange={(event) => change(field.name, parseFloat(event.currentTarget.value))}
-                      class="flex-grow px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      onChange={(value) => change(field.name, value)}
+                      class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <Show when={field.unit}><span class="unit ml-2 text-sm text-gray-500 dark:text-gray-400">{field.unit}</span></Show>
                   </div>
