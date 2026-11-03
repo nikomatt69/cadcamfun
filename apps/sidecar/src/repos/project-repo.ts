@@ -1,6 +1,6 @@
 import type { ProjectRow, ProjectWithRelations } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { and, count, desc, eq, inArray, or } from "drizzle-orm"
+import { and, count, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 
@@ -135,6 +135,8 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               ...(await db.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, id))).map((r) => r.id)
             ]
             const [deleted] = await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId })
+            // Saved setups are key-value rows named after the project.
+            await db.delete(schema.localKeyValueTable).where(like(schema.localKeyValueTable.key, `camSetup/${id}/%`))
             await db.delete(schema.activityLogTable).where(inArray(schema.activityLogTable.itemId, ids))
             await db.delete(schema.aIAnalysisLogTable).where(inArray(schema.aIAnalysisLogTable.objectId, ids))
             return deleted

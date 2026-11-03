@@ -47,3 +47,16 @@ export const CamSetupGenerated = Schema.Struct({
   warnings: Schema.Array(Schema.String), issues: Schema.Array(CamSetupIssue)
 })
 export type CamSetupGenerated = typeof CamSetupGenerated.Type
+
+/**
+ * A saved setup (spec 14, RM-02 deliverable 5): the setup of a project under a name. `updatedAt` is its revision: a write that
+ * carries the `updatedAt` it read as `baseUpdatedAt` happens only while that is still current (409 otherwise).
+ */
+export const CamSetupDocument = Schema.Struct({
+  id: Schema.String, projectId: Schema.String, name: Schema.String, setup: p.SetupSchema, createdAt: Schema.String, updatedAt: Schema.String
+})
+export type CamSetupDocument = typeof CamSetupDocument.Type
+export const CamSetupSaveBody = Schema.Struct({ name: Schema.String, setup: p.SetupSchema })
+export const CamSetupUpdateBody = Schema.Struct({
+  name: Schema.optionalKey(Schema.String), setup: Schema.optionalKey(p.SetupSchema), baseUpdatedAt: Schema.optionalKey(Schema.String)
+})

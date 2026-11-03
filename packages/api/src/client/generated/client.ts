@@ -3471,10 +3471,61 @@ const Endpoint31_2 = (raw: RawClient["camSetup"]) => (input: Endpoint31_2Input) 
     Effect.mapError(mapClientError),
   )
 
+type Endpoint31_3Request = Parameters<RawClient["camSetup"]["list"]>[0]
+type Endpoint31_3Input = { readonly id: Endpoint31_3Request["params"]["id"] }
+const Endpoint31_3 = (raw: RawClient["camSetup"]) => (input: Endpoint31_3Input) =>
+  raw["list"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint31_4Request = Parameters<RawClient["camSetup"]["save"]>[0]
+type Endpoint31_4Input = {
+  readonly id: Endpoint31_4Request["params"]["id"]
+  readonly name: Endpoint31_4Request["payload"]["name"]
+  readonly setup: Endpoint31_4Request["payload"]["setup"]
+}
+const Endpoint31_4 = (raw: RawClient["camSetup"]) => (input: Endpoint31_4Input) =>
+  raw["save"]({ params: { id: input["id"] }, payload: { name: input["name"], setup: input["setup"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint31_5Request = Parameters<RawClient["camSetup"]["get"]>[0]
+type Endpoint31_5Input = {
+  readonly id: Endpoint31_5Request["params"]["id"]
+  readonly setupId: Endpoint31_5Request["params"]["setupId"]
+}
+const Endpoint31_5 = (raw: RawClient["camSetup"]) => (input: Endpoint31_5Input) =>
+  raw["get"]({ params: { id: input["id"], setupId: input["setupId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint31_6Request = Parameters<RawClient["camSetup"]["update"]>[0]
+type Endpoint31_6Input = {
+  readonly id: Endpoint31_6Request["params"]["id"]
+  readonly setupId: Endpoint31_6Request["params"]["setupId"]
+  readonly name?: Endpoint31_6Request["payload"]["name"]
+  readonly setup?: Endpoint31_6Request["payload"]["setup"]
+  readonly baseUpdatedAt?: Endpoint31_6Request["payload"]["baseUpdatedAt"]
+}
+const Endpoint31_6 = (raw: RawClient["camSetup"]) => (input: Endpoint31_6Input) =>
+  raw["update"]({
+    params: { id: input["id"], setupId: input["setupId"] },
+    payload: { name: input["name"], setup: input["setup"], baseUpdatedAt: input["baseUpdatedAt"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint31_7Request = Parameters<RawClient["camSetup"]["remove"]>[0]
+type Endpoint31_7Input = {
+  readonly id: Endpoint31_7Request["params"]["id"]
+  readonly setupId: Endpoint31_7Request["params"]["setupId"]
+}
+const Endpoint31_7 = (raw: RawClient["camSetup"]) => (input: Endpoint31_7Input) =>
+  raw["remove"]({ params: { id: input["id"], setupId: input["setupId"] } }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup31 = (raw: RawClient["camSetup"]) => ({
   plan: Endpoint31_0(raw),
   validate: Endpoint31_1(raw),
   generate: Endpoint31_2(raw),
+  list: Endpoint31_3(raw),
+  save: Endpoint31_4(raw),
+  get: Endpoint31_5(raw),
+  update: Endpoint31_6(raw),
+  remove: Endpoint31_7(raw),
 })
 
 type Endpoint32_0Request = Parameters<RawClient["library"]["list"]>[0]

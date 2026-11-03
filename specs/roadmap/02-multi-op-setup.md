@@ -63,3 +63,5 @@ Additional WP8 scope after RM-01: `packages/ai/src/actions/`, `packages/ai/src/t
 
 - v1: finish WP14 as a deep Setup module plus HTTP and desktop adapters.
 - 2026-10-12: clarified that pure/stateless work may proceed on disjoint files, but persisted consumers and completion wait for RM-03. Revision/receipt migration stays with RM-03/WP0; no reverse dependency or implementation claim.
+- 2026-11-03: deliverable 5 (persistence) built: `GET,POST /api/projects/:id/cam-setups`, `GET,PUT,DELETE .../:setupId` in the `camSetup` group, `CamSetupRepo` over the key-value table (`camSetup/<projectId>/<setupId>`) through `commitMutation` (write and receipt in one transaction; `baseUpdatedAt` stale -> 409; deleting the project deletes its setups). The persisted type is WP14's `Setup` (the vocabulary decision of spec 70 item 2 for the other two shapes stays open). Open: desktop UI to save/load a setup, AI `setup_plan` / `setup_generate` / `setup_save` actions (RM-01), setup/artifact identity and invalidation.
+

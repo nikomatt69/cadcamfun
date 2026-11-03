@@ -71,3 +71,65 @@ test("an operation that names an element the request does not carry is a 400 tha
   expect(response.status).toBe(400)
   expect(JSON.stringify(response.body)).toContain("Op b: b")
 })
+
+// ---- saved setups (RM-02 deliverable 5) ----
+const asStranger = async () => {
+  const password = "test-password-long"
+  await app.call("/api/auth/signup", { method: "POST", json: { email: "setup-stranger@example.com", name: "Stranger", password, confirmPassword: password } })
+  return { headers: { "x-session-token": (await app.call("/api/auth/signin-direct", { method: "POST", json: { email: "setup-stranger@example.com", password } })).body.token } }
+}
+
+test("saved setups: save, list, get, rename and replace; a stale revision answers 409 and writes nothing; delete", async () => {
+  const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Setups" } })).body.id
+  const url = `/api/projects/${projectId}/cam-setups`
+  expect((await app.call(url, { auth: false })).status).toBe(401)
+  expect((await app.call("/api/projects/nope/cam-setups")).status).toBe(404)
+  expect((await app.call(url, { method: "POST", json: { name: "  ", setup: setup(two) } })).body.message).toBe("Setup name is required")
+  expect((await app.call(url, { method: "POST", json: { name: "x" } })).status).toBe(400)
+
+  const saved = await app.call(url, { method: "POST", json: { name: "Bracket setup", setup: setup(two) } })
+  expect(saved.status).toBe(201)
+  expect(saved.body).toMatchObject({ projectId, name: "Bracket setup", setup: { id: "s", grouping: "single" } })
+  expect(saved.body.setup.operations).toHaveLength(2)
+  const id = saved.body.id
+  expect((await app.call(url)).body.map((d: { id: string }) => d.id)).toEqual([id])
+  expect((await app.call(`${url}/${id}`)).body).toEqual(saved.body)
+  expect((await app.call(`${url}/nope`)).status).toBe(404)
+
+  // The planner plans what was saved.
+  const plan = Schema.decodeUnknownSync(CamSetupPlan)((await post("plan", { setup: (await app.call(`${url}/${id}`)).body.setup })).body)
+  expect(plan.toolChanges).toBe(1)
+
+  expect((await app.call(`${url}/${id}`, { method: "PUT", json: {} })).body.message).toBe("No fields provided for update")
+  const renamed = await app.call(`${url}/${id}`, { method: "PUT", json: { name: "Renamed", baseUpdatedAt: saved.body.updatedAt } })
+  expect(renamed.status).toBe(200)
+  expect(renamed.body).toMatchObject({ name: "Renamed", createdAt: saved.body.createdAt })
+  expect(renamed.body.updatedAt).not.toBe(saved.body.updatedAt)
+
+  const stale = await app.call(`${url}/${id}`, { method: "PUT", json: { setup: setup([op("a", tool("t6", 6))]), baseUpdatedAt: saved.body.updatedAt } })
+  expect(stale.status).toBe(409)
+  expect((await app.call(`${url}/${id}`)).body.setup.operations).toHaveLength(2)
+  const replaced = await app.call(`${url}/${id}`, { method: "PUT", json: { setup: setup([op("a", tool("t6", 6))]), baseUpdatedAt: renamed.body.updatedAt } })
+  expect(replaced.body.setup.operations).toHaveLength(1)
+
+  expect((await app.call(`${url}/${id}`, { method: "DELETE" })).body).toEqual({ message: "Setup deleted successfully" })
+  expect((await app.call(`${url}/${id}`, { method: "DELETE" })).status).toBe(404)
+  expect((await app.call(url)).body).toEqual([])
+})
+
+test("saved setups stay with their project: strangers get 404, another project does not see them, deleting the project removes them", async () => {
+  const stranger = await asStranger()
+  const a = (await app.call("/api/projects", { method: "POST", json: { name: "A" } })).body.id
+  const b = (await app.call("/api/projects", { method: "POST", json: { name: "B" } })).body.id
+  const made = (await app.call(`/api/projects/${a}/cam-setups`, { method: "POST", json: { name: "Mine", setup: setup(two) } })).body
+  expect((await app.call(`/api/projects/${a}/cam-setups`, stranger)).status).toBe(404)
+  expect((await app.call(`/api/projects/${a}/cam-setups/${made.id}`, stranger)).status).toBe(404)
+  expect((await app.call(`/api/projects/${a}/cam-setups`, { method: "POST", json: { name: "x", setup: setup(two) }, ...stranger })).status).toBe(404)
+  expect((await app.call(`/api/projects/${b}/cam-setups`)).body).toEqual([])
+  expect((await app.call(`/api/projects/${b}/cam-setups/${made.id}`)).status).toBe(404)
+
+  await app.call(`/api/projects/${a}`, { method: "DELETE" })
+  const database = await app.database()
+  const left = await app.Effect.runPromise(database.query("test.left", (db) => db.select().from(app.schema.localKeyValueTable)))
+  expect(left.filter((row: { key: string }) => row.key.startsWith(`camSetup/${a}/`))).toEqual([])
+})

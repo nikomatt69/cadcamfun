@@ -551,6 +551,16 @@ import type {
   CamSetupValidateOutput,
   CamSetupGenerateInput,
   CamSetupGenerateOutput,
+  CamSetupListInput,
+  CamSetupListOutput,
+  CamSetupSaveInput,
+  CamSetupSaveOutput,
+  CamSetupGetInput,
+  CamSetupGetOutput,
+  CamSetupUpdateInput,
+  CamSetupUpdateOutput,
+  CamSetupRemoveInput,
+  CamSetupRemoveOutput,
   LibraryListInput,
   LibraryListOutput,
   LibraryCreateInput,
@@ -4736,6 +4746,63 @@ export function make(options: ClientOptions) {
             body: { setup: input["setup"], elements: input["elements"], stock: input["stock"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      list: (input: CamSetupListInput, requestOptions?: RequestOptions) =>
+        request<CamSetupListOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      save: (input: CamSetupSaveInput, requestOptions?: RequestOptions) =>
+        request<CamSetupSaveOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups`,
+            body: { name: input["name"], setup: input["setup"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      get: (input: CamSetupGetInput, requestOptions?: RequestOptions) =>
+        request<CamSetupGetOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: CamSetupUpdateInput, requestOptions?: RequestOptions) =>
+        request<CamSetupUpdateOutput>(
+          {
+            method: "PUT",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}`,
+            body: { name: input["name"], setup: input["setup"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: CamSetupRemoveInput, requestOptions?: RequestOptions) =>
+        request<CamSetupRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,

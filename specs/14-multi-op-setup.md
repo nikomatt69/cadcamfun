@@ -93,7 +93,7 @@ New group `camSetup` (additive; the legacy routes of `05-api-sidecar.md` are unt
   `reorderByTool`, `groupsOf`); `packages/api/src/{cam-setup.ts,groups/cam-setup.ts}` with `POST /api/cam/setups/{plan,validate,generate}`; sidecar
   `http/cam-setup.ts` (generate runs inline, not in a worker); desktop `lib/setup.ts`, `api/setup.ts`, `store/setupStore.ts`; the multi-toolpath panel
   downloads through `camSetup.generate`. `combineGCode` is deprecated and stays for the legacy text view.
-- Open: DB persistence of a setup (after RM-03), AI actions `setup_plan` / `setup_generate` (after RM-01), desktop controls for grouping / post /
+- Built 2026-11-03: saved setups per project (`/api/projects/:id/cam-setups`, revisioned by `updatedAt`, 409 on a stale copy). Open: AI actions `setup_plan` / `setup_generate` (after RM-01), desktop controls for grouping / post /
   retract (the store holds the choices, no UI sets them yet), `generate` in a worker, `fromPreviousStock` is the diameter hand-over only.
 
 ## 6. Change log
