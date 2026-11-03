@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Block 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "A tall block, for five-axis and tombstone work.",
   "cam.example.op.drill-back-bore.title": "Back bore",
-  "cam.example.op.drill-back-bore.desc": "Reach through the hole and cut the back face with a dwell at the bottom (G87)"
+  "cam.example.op.drill-back-bore.desc": "Reach through the hole and cut the back face with a dwell at the bottom (G87)",
+  "cam.kernel.model.geometry": "Model: the shape or placement of {count} element(s) changed.",
+  "cam.kernel.model.topology": "Model: {count} element(s) added, removed or changed.",
+  "cam.kernel.model.rigid": "Model: the whole part moved by X {x}, Y {y}, Z {z} mm. The program fits the part, not the work zero.",
+  "cam.kernel.model.inputs": "The model is the same; a setting changed: {settings}."
 }

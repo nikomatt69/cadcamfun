@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "ब्लॉक 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "ऊँचा ब्लॉक, पाँच-अक्ष और टॉम्बस्टोन काम के लिए।",
   "cam.example.op.drill-back-bore.title": "बैक बोर",
-  "cam.example.op.drill-back-bore.desc": "छेद से जाकर पिछली सतह काटें, नीचे ठहराव के साथ (G87)"
+  "cam.example.op.drill-back-bore.desc": "छेद से जाकर पिछली सतह काटें, नीचे ठहराव के साथ (G87)",
+  "cam.kernel.model.geometry": "मॉडल: {count} एलिमेंट का आकार या स्थान बदल गया।",
+  "cam.kernel.model.topology": "मॉडल: {count} एलिमेंट जोड़े, हटाए या बदले गए।",
+  "cam.kernel.model.rigid": "मॉडल: पूरा पार्ट X {x}, Y {y}, Z {z} मिमी खिसक गया। प्रोग्राम पार्ट के लिए सही है, वर्क ज़ीरो के लिए नहीं।",
+  "cam.kernel.model.inputs": "मॉडल वही है; एक सेटिंग बदल गई: {settings}।"
 }

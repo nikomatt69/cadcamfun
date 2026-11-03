@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Брусок 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "Высокий брусок для пятиосевых и позиционных работ.",
   "cam.example.op.drill-back-bore.title": "Обратное растачивание",
-  "cam.example.op.drill-back-bore.desc": "Пройти через отверстие и обработать заднюю грань с выдержкой внизу (G87)"
+  "cam.example.op.drill-back-bore.desc": "Пройти через отверстие и обработать заднюю грань с выдержкой внизу (G87)",
+  "cam.kernel.model.geometry": "Модель: форма или положение элементов ({count}) изменились.",
+  "cam.kernel.model.topology": "Модель: элементов добавлено, удалено или изменено: {count}.",
+  "cam.kernel.model.rigid": "Модель: вся деталь сдвинута на X {x}, Y {y}, Z {z} мм. Программа подходит детали, но не нулю заготовки.",
+  "cam.kernel.model.inputs": "Модель прежняя; изменилась настройка: {settings}."
 }

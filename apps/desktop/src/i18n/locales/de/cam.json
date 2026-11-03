@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Block 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "Ein hoher Block, für Fünf-Achs- und Turmaufspannungen.",
   "cam.example.op.drill-back-bore.title": "Rücksenken",
-  "cam.example.op.drill-back-bore.desc": "Durch das Loch greifen und die Rückseite mit einem Halt am Grund bearbeiten (G87)"
+  "cam.example.op.drill-back-bore.desc": "Durch das Loch greifen und die Rückseite mit einem Halt am Grund bearbeiten (G87)",
+  "cam.kernel.model.geometry": "Modell: Form oder Lage von {count} Element(en) hat sich geändert.",
+  "cam.kernel.model.topology": "Modell: {count} Element(e) hinzugefügt, entfernt oder geändert.",
+  "cam.kernel.model.rigid": "Modell: Das ganze Teil wurde um X {x}, Y {y}, Z {z} mm verschoben. Das Programm passt zum Teil, nicht zum Werkstücknullpunkt.",
+  "cam.kernel.model.inputs": "Das Modell ist gleich geblieben; eine Einstellung hat sich geändert: {settings}."
 }

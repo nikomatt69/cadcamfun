@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "方块 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "高方块，适合五轴和多面加工。",
   "cam.example.op.drill-back-bore.title": "反镗",
-  "cam.example.op.drill-back-bore.desc": "穿过孔加工背面，并在孔底停留（G87）"
+  "cam.example.op.drill-back-bore.desc": "穿过孔加工背面，并在孔底停留（G87）",
+  "cam.kernel.model.geometry": "模型：{count} 个元素的形状或位置已更改。",
+  "cam.kernel.model.topology": "模型：已添加、删除或更改 {count} 个元素。",
+  "cam.kernel.model.rigid": "模型：整个零件移动了 X {x}、Y {y}、Z {z} mm。程序适合该零件，但不适合工件零点。",
+  "cam.kernel.model.inputs": "模型相同；某项设置已更改：{settings}。"
 }

@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Blocco 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "Un blocco alto, per lavori a cinque assi e su tavola a cubo.",
   "cam.example.op.drill-back-bore.title": "Svasatura posteriore",
-  "cam.example.op.drill-back-bore.desc": "Passa dal foro e lavora la faccia posteriore con una sosta in fondo (G87)"
+  "cam.example.op.drill-back-bore.desc": "Passa dal foro e lavora la faccia posteriore con una sosta in fondo (G87)",
+  "cam.kernel.model.geometry": "Modello: la forma o la posizione di {count} elemento/i è cambiata.",
+  "cam.kernel.model.topology": "Modello: {count} elemento/i aggiunto/i, rimosso/i o modificato/i.",
+  "cam.kernel.model.rigid": "Modello: l'intero pezzo si è spostato di X {x}, Y {y}, Z {z} mm. Il programma è giusto per il pezzo, non per lo zero pezzo.",
+  "cam.kernel.model.inputs": "Il modello è lo stesso; è cambiata un'impostazione: {settings}."
 }

@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Bloc 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "Un bloc haut, pour les travaux cinq axes et en tour.",
   "cam.example.op.drill-back-bore.title": "Alésage par l'arrière",
-  "cam.example.op.drill-back-bore.desc": "Passe par le trou et usine la face arrière avec un arrêt au fond (G87)"
+  "cam.example.op.drill-back-bore.desc": "Passe par le trou et usine la face arrière avec un arrêt au fond (G87)",
+  "cam.kernel.model.geometry": "Modèle : la forme ou la position de {count} élément(s) a changé.",
+  "cam.kernel.model.topology": "Modèle : {count} élément(s) ajouté(s), supprimé(s) ou modifié(s).",
+  "cam.kernel.model.rigid": "Modèle : toute la pièce a été déplacée de X {x}, Y {y}, Z {z} mm. Le programme convient à la pièce, pas au zéro pièce.",
+  "cam.kernel.model.inputs": "Le modèle est identique ; un réglage a changé : {settings}."
 }

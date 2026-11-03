@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "Bloco 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "Um bloco alto, para trabalhos de cinco eixos e em torre.",
   "cam.example.op.drill-back-bore.title": "Mandrilamento traseiro",
-  "cam.example.op.drill-back-bore.desc": "Passa pelo furo e usina a face traseira com uma pausa no fundo (G87)"
+  "cam.example.op.drill-back-bore.desc": "Passa pelo furo e usina a face traseira com uma pausa no fundo (G87)",
+  "cam.kernel.model.geometry": "Modelo: a forma ou a posição de {count} elemento(s) mudou.",
+  "cam.kernel.model.topology": "Modelo: {count} elemento(s) adicionado(s), removido(s) ou alterado(s).",
+  "cam.kernel.model.rigid": "Modelo: a peça inteira se moveu X {x}, Y {y}, Z {z} mm. O programa serve à peça, não ao zero peça.",
+  "cam.kernel.model.inputs": "O modelo é o mesmo; uma configuração mudou: {settings}."
 }

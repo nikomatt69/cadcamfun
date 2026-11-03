@@ -63,6 +63,9 @@ test("the additive kernel section runs through the real sidecar and fills the ex
     expect(document.querySelector("[data-testid='kernel-stale']")).toBeNull()
     useElementsStore.getState().updateElement("plate", { width: 31 } as never)
     await app.wait(() => document.querySelector("[data-testid='kernel-stale']"))
+    // The banner says what kind of change it is (spec 59 A2): the shape of one element.
+    const change = await app.wait(() => document.querySelector("[data-testid='kernel-model-change']"))
+    expect(change.textContent).toContain("shape or placement of 1 element")
     useElementsStore.getState().updateElement("plate", { width: 30 } as never)
     await app.wait(() => !document.querySelector("[data-testid='kernel-stale']"))
     store.setGcode(`${store.gcode}\n; edited`)

@@ -54,6 +54,8 @@ interface KernelApi {
   readonly request: () => ReturnType<typeof kernelRequestOf> | undefined
   readonly artifact: () => CamKernelArtifact | undefined
   readonly stale: () => boolean
+  /** Why the model the program was made from differs from the drawing now (spec 59 A2); undefined when the program has no stored elements. */
+  readonly modelChange: () => ReturnType<typeof cam.kernel.programStatus> | undefined
   readonly planNotes: () => ReadonlyArray<string>
   readonly setPlanNotes: (notes: ReadonlyArray<string>) => void
   readonly plan: () => void
@@ -81,6 +83,19 @@ const useKernel = (): KernelApi => {
 }
 
 /** Holds the kernel run. The machine, operation and footer sections render its controls; this is not a section of its own. */
+/** The sentence for a model change (spec 59 A2), or nothing when the model is the same. */
+const modelChangeText = (change: ReturnType<typeof cam.kernel.programStatus>): string | undefined => {
+  if (change.status !== "stale") return undefined
+  const count = change.added.length + change.removed.length + change.changed.length
+  const round = (n: number): string => String(Math.round(n * 1000) / 1000)
+  switch (change.class) {
+    case "geometry": return t("cam.kernel.model.geometry", { count })
+    case "topology": return t("cam.kernel.model.topology", { count })
+    case "rigid": return t("cam.kernel.model.rigid", { x: round(change.move?.x ?? 0), y: round(change.move?.y ?? 0), z: round(change.move?.z ?? 0) })
+    case "inputs": return t("cam.kernel.model.inputs", { settings: change.inputs.join(", ") })
+  }
+}
+
 export function KernelSession(props: { readonly onGCodeGenerated: (code: string) => void; readonly children: JSX.Element }): JSX.Element {
   const app = useApp()
   const job = useJob()
@@ -137,6 +152,10 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     }
     return value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements })
   }
+  const modelChange = createMemo(() => {
+    const current = request(), stored = store.kernelRequest
+    return current === undefined || stored === undefined ? undefined : cam.kernel.programStatus({ request: stored }, { elements: current.elements })
+  })
   const stale = () => {
     const value = artifact(), current = request()
     if (!value) return false
@@ -270,7 +289,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
 
   return (
     <KernelContext.Provider value={{
-      settings, savedMachines, machineValue, linkPost, request, artifact, stale, planNotes, setPlanNotes, plan, operations, setOperations,
+      settings, savedMachines, machineValue, linkPost, request, artifact, stale, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
       patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result
     }}>
       {props.children}
@@ -491,6 +510,9 @@ export function KernelRunControls(): JSX.Element {
         <div class="space-y-2 text-xs" data-testid="kernel-evidence">
           <div class="flex justify-between gap-3 font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
           <Show when={kernel.stale()}><p role="status" class="text-[color:var(--panel-warn)]" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
+          <Show when={kernel.stale() ? kernel.modelChange() : undefined}>{(change) => (
+            <Show when={modelChangeText(change())}>{(text) => <p class="panel-hint" data-testid="kernel-model-change">{text()}</p>}</Show>
+          )}</Show>
           <p>{t("cam.kernel.summary", { operations: value().operations.length, tools: value().tools.length, seconds: value().cycleTimeSeconds.toFixed(1) })}</p>
           <button type="button" class="panel-btn" data-testid="kernel-setup-sheet" onClick={() => {
             const sheet = setupSheetFile(value(), kernel.request()?.name ?? value().jobId)

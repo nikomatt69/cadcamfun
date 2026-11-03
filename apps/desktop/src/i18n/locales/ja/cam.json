@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "ブロック 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "高いブロック。5 軸やタワー治具の加工向け。",
   "cam.example.op.drill-back-bore.title": "裏面ざぐり",
-  "cam.example.op.drill-back-bore.desc": "穴を通して裏面を加工し、底部で停止します (G87)"
+  "cam.example.op.drill-back-bore.desc": "穴を通して裏面を加工し、底部で停止します (G87)",
+  "cam.kernel.model.geometry": "モデル：{count}個の要素の形状または位置が変わりました。",
+  "cam.kernel.model.topology": "モデル：{count}個の要素が追加、削除または変更されました。",
+  "cam.kernel.model.rigid": "モデル：部品全体が X {x}、Y {y}、Z {z} mm 移動しました。プログラムは部品には合っていますが、ワーク原点には合いません。",
+  "cam.kernel.model.inputs": "モデルは同じです。設定が変わりました：{settings}。"
 }

@@ -1390,5 +1390,9 @@
   "cam.example.setup.stock-block.title": "كتلة 50 × 50 × 100",
   "cam.example.setup.stock-block.description": "كتلة عالية، لأعمال خمسة المحاور والتثبيت العمودي.",
   "cam.example.op.drill-back-bore.title": "توسيع خلفي",
-  "cam.example.op.drill-back-bore.desc": "يمر عبر الثقب ويقطع الوجه الخلفي مع توقف في القاع (G87)"
+  "cam.example.op.drill-back-bore.desc": "يمر عبر الثقب ويقطع الوجه الخلفي مع توقف في القاع (G87)",
+  "cam.kernel.model.geometry": "النموذج: تغيّر شكل أو موضع {count} عنصر.",
+  "cam.kernel.model.topology": "النموذج: تمت إضافة أو إزالة أو تغيير {count} عنصر.",
+  "cam.kernel.model.rigid": "النموذج: تحرّكت القطعة كلها بمقدار X {x} وY {y} وZ {z} مم. البرنامج يناسب القطعة لا نقطة الصفر.",
+  "cam.kernel.model.inputs": "النموذج لم يتغيّر؛ تغيّر إعداد: {settings}."
 }
