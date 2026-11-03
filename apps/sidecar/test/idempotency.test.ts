@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { retryingWrites } from "../../desktop/src/app/retrying-writes.ts"
 import { makeApp } from "./helpers.ts"
 
 let app: Awaited<ReturnType<typeof makeApp>>
@@ -80,3 +81,27 @@ describe("Idempotency-Key", () => {
     expect((await send(undefined, undefined, {}, `/api/projects/${id}`, "DELETE")).status).toBe(404)
   })
 })
+
+describe("the desktop client and the sidecar together", () => {
+  test("a write whose answer is lost on the way is applied once: the retry gets the stored result", async () => {
+    const before = await count()
+    let calls = 0
+    // The sidecar applies every request; the first answer never reaches the client.
+    const flaky = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls++
+      const response = await app.transport(input, init)
+      if (calls === 1) throw new TypeError("fetch failed: connection reset")
+      return response
+    }, { preconnect: fetch.preconnect })
+    const token = (await import("./helpers.ts")).TOKEN
+    const response = await retryingWrites(flaky as typeof fetch, { sleep: async () => undefined })(
+      new Request("http://sidecar.test/api/projects", { method: "POST", body: JSON.stringify({ name: "Lost answer" }), headers: { "content-type": "application/json", authorization: `Bearer ${token}` } })
+    )
+    expect(calls).toBe(2)
+    expect(response.status).toBe(201)
+    expect(response.headers.get("idempotent-replayed")).toBe("true")
+    expect((await response.json() as { name: string }).name).toBe("Lost answer")
+    expect(await count()).toBe(before + 1)
+  })
+})
+

@@ -3,6 +3,7 @@ import { Route, Router } from "@solidjs/router"
 import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js"
 import { createAppState, AppProvider, type AppState } from "../shared/state/context.ts"
 import { getEndpoint, isTauri, resetEndpoint, followingFetch, trackSidecarStatus } from "./sidecar.ts"
+import { retryingWrites } from "./retrying-writes.ts"
 import { clientLayer, runtimeForLayer, runtimeForClient, readClient } from "./client.ts"
 import { createFakeApi } from "../testing/fake-api.ts"
 import { BootScreen } from "../shared/components/boot-screen.tsx"
@@ -63,7 +64,7 @@ export default function App() {
             if (!active) {
               const endpoint = await getEndpoint()
               controller.signal.throwIfAborted()
-              active = runtimeForLayer(clientLayer(endpoint, followingFetch(endpoint)))
+              active = runtimeForLayer(clientLayer(endpoint, retryingWrites(followingFetch(endpoint))))
             }
             const client = await readClient(active)
             controller.signal.throwIfAborted()
