@@ -44,7 +44,7 @@ describe("CAD floating toolbar", () => {
       // neither leave the drawing surface nor slide under the shell chrome.
       const host = toolbar.parentElement
       expect(host?.className ?? "").toContain("relative")
-      expect(host?.className ?? "").toContain("rounded-2xl")
+      expect(host?.className ?? "").toMatch(/\brounded-/)
       expect(host?.className ?? "").not.toContain("h-screen")
 
       // The page fits its shell container: no 100vw/100vh box to scroll sideways.

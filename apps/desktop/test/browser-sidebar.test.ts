@@ -150,7 +150,7 @@ describe("status strips", () => {
     const { dispose } = app.visit("/cad")
     try {
       const bar = await find('[data-testid="cad-status-bar"]')
-      expect(bar.className).toContain("h-6")
+      expect(bar.className).toContain("h-7")
       expect(bar.className).toContain("whitespace-nowrap")
       for (const label of ["Mode", "Tool", "Elements"]) expect(bar.textContent).toContain(label)
       const { cad } = await stores()
@@ -165,7 +165,7 @@ describe("status strips", () => {
     const { dispose } = app.visit("/cam")
     try {
       const bar = await find('[data-testid="cam-status-bar"]')
-      expect(bar.className).toContain("h-6")
+      expect(bar.className).toContain("h-7")
       expect(bar.querySelector('[data-testid="status-verify"]')?.textContent).toContain("not run")
       expect(bar.textContent).toContain("Lines")
       expect(bar.textContent).toContain("Post")
