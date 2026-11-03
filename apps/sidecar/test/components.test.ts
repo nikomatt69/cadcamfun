@@ -158,3 +158,56 @@ describe("/api/components/:id/comments", () => {
 
 /** An id that is not the component's, to prove the comment lookup is scoped to the component in the path. */
 const other = (id: string) => `${id}-other`
+
+describe("/api/components (index, details, relationships)", () => {
+  let other: Record<string, string>
+  let a: string
+  let b: string
+  beforeAll(async () => {
+    const password = "test-password-long"
+    expect((await app.call("/api/auth/signup", { method: "POST", json: { email: "stranger@example.com", name: "Stranger", password, confirmPassword: password } })).status).toBe(201)
+    other = { "x-session-token": (await app.call("/api/auth/signin-direct", { method: "POST", json: { email: "stranger@example.com", password } })).body.token }
+    a = (await app.call("/api/components", { method: "POST", json: { projectId, name: "Gear 50%", description: "spur", isPublic: true } })).body.id
+    b = (await app.call("/api/components", { method: "POST", json: { projectId, name: "Assembly", type: "assembly", data: { references: [a] } } })).body.id
+  })
+
+  test("POST needs a name and a project the user can use; the type defaults to custom", async () => {
+    expect((await app.call("/api/components", { method: "POST", json: { name: "x" } })).body.message).toBe("Name and projectId are required")
+    expect((await app.call("/api/components", { method: "POST", json: { name: "x", projectId: "nope" } })).status).toBe(404)
+    expect((await app.call("/api/components", { method: "POST", json: { name: "x", projectId }, headers: other })).status).toBe(404)
+    expect((await app.call(`/api/components/${a}`)).body.type).toBe("custom")
+  })
+
+  test("GET lists the visible components; search narrows them, escapes wildcards and never reaches other users' rows", async () => {
+    const all = await app.call("/api/components")
+    expect(all.body.map((c: { id: string }) => c.id)).toEqual(expect.arrayContaining([a, b]))
+    expect((await app.call(`/api/components?projectId=${projectId}&type=assembly`)).body.map((c: { id: string }) => c.id)).toEqual([b])
+    expect((await app.call("/api/components?search=spur")).body.map((c: { id: string }) => c.id)).toEqual([a])
+    expect((await app.call("/api/components?search=50%25")).body.map((c: { id: string }) => c.id)).toEqual([a])
+    expect((await app.call("/api/components?search=%25")).body.map((c: { id: string }) => c.id)).toEqual([a])
+    // Legacy: `search` replaced the visibility filter and `public=true` added public rows of everyone.
+    expect((await app.call("/api/components?search=Gear&public=true", { headers: other })).body).toEqual([])
+  })
+
+  test("details carries the project, the rights and a drawing count of this component only", async () => {
+    const d = await app.call(`/api/components/${a}/details`)
+    expect(d.status).toBe(200)
+    expect(d.body).toMatchObject({ id: a, canEdit: true, canDelete: true, project: { id: projectId, organization: null }, usageStats: { usedInDrawings: 0 } })
+    expect(Object.keys(d.body.project.owner).sort()).toEqual(["email", "id", "name"])
+    await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Sheet", data: { placed: [a] } } })
+    await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Unrelated", data: {} } })
+    expect((await app.call(`/api/components/${a}/details`)).body.usageStats.usedInDrawings).toBe(1)
+    expect((await app.call("/api/components/nope/details")).status).toBe(404)
+    const stranger = await app.call(`/api/components/${a}/details`, { headers: other })
+    expect(stranger.status).toBe(403)
+    expect(stranger.body.message).toBe("You do not have permission to access this component")
+  })
+
+  test("relationships follow data.references both ways and stay inside what the user can see", async () => {
+    const fromA = await app.call(`/api/components/${a}/relationships`)
+    expect(fromA.body.data.relationships).toEqual([{ sourceId: b, targetId: a, type: "references" }])
+    expect(fromA.body.data.relatedComponents.map((c: { id: string }) => c.id)).toEqual([b])
+    expect((await app.call(`/api/components/${b}/relationships`)).body.data.relationships).toEqual([{ sourceId: b, targetId: a, type: "references" }])
+    expect((await app.call(`/api/components/${a}/relationships`, { headers: other })).status).toBe(404)
+  })
+})

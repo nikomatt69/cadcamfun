@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, InternalError, NotFound, envErr, normalizeComponentData, ok, validateComponentData } from "@cadcamfun/api"
+import { Api, BadRequest, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, Forbidden, InternalError, NotFound, envErr, normalizeComponentData, ok, validateComponentData } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ComponentRepo, type ComponentPatch } from "../repos/component-repo.ts"
@@ -27,16 +27,16 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
     return user
   })
 
-  // Legacy readers (versions, comments) also admit public components; the version restore needs write access.
+  // Readers of versions, comments and relationships need to be project owner or organisation member (a public flag admits nobody).
   const readable = Effect.fn("components.readable")(function*(id: string) {
     const user = yield* CurrentUser
-    const component = yield* components.access(user.id, id, "read")
+    const component = yield* components.access(user.id, id)
     if (!component) return yield* new NotFound({ message: "Component not found or access denied" })
     return { user, component }
   })
   const envReadable = Effect.fn("components.envReadable")(function*(id: string) {
     const user = yield* CurrentUser
-    const component = yield* components.access(user.id, id, "read")
+    const component = yield* components.access(user.id, id)
     if (!component) return yield* envErr(EnvNotFound, "Component not found or access denied")
     return { user, component }
   })
@@ -45,6 +45,38 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
   const trimmed = (content: string | undefined) => (content ?? "").trim() === "" ? undefined : content
 
   return handlers
+    .handle("list", ({ query }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        return yield* components.search(user.id, { projectId: query.projectId, type: query.type, search: query.search })
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch components"))))
+    .handle("create", ({ payload }) =>
+      Effect.gen(function*() {
+        if (!payload.name || !payload.projectId) return yield* new BadRequest({ message: "Name and projectId are required" })
+        const projectId = payload.projectId
+        const user = yield* projectAccess(projectId)
+        const component = yield* components.create(projectId, { ...payload, name: payload.name, type: payload.type || "custom" })
+        const organizationId = yield* components.projectOrganization(projectId)
+        if (organizationId) {
+          const creatorName = (yield* components.userName(user.id)) || "User"
+          yield* notifications.newComponent({ componentId: component.id, creatorId: user.id, componentName: component.name, organizationId, projectId, creatorName })
+            .pipe(Effect.catch((e) => Effect.logError("Error creating component notifications", e)))
+        }
+        return component
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create component"))))
+    .handle("details", ({ params }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const found = yield* components.details(user.id, params.id)
+        if (found === undefined) return yield* new NotFound({ message: "Component not found" })
+        if (found === "forbidden") return yield* new Forbidden({ message: "You do not have permission to access this component" })
+        return found
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch component details"))))
+    .handle("relationships", ({ params }) =>
+      Effect.gen(function*() {
+        const { user, component } = yield* envReadable(params.id)
+        return ok(yield* components.relationships(user.id, component))
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to fetch relationships"))))
     .handle("get", ({ params }) => load(params.id).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch component"))))
     .handle("update", ({ params, payload }) =>
       Effect.gen(function*() {
@@ -111,7 +143,7 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
         const user = yield* CurrentUser
         const componentId = params.id
         if (!payload.versionId) return yield* new BadRequest({ message: "Component ID and Version ID are required" })
-        if (!(yield* components.access(user.id, componentId, "write"))) return yield* new NotFound({ message: "Component not found or access denied" })
+        if (!(yield* components.access(user.id, componentId))) return yield* new NotFound({ message: "Component not found or access denied" })
         const version = yield* components.getVersion(componentId, payload.versionId)
         if (!version) return yield* new NotFound({ message: "Version not found" })
         if (version.data) {

@@ -63,6 +63,32 @@ export const ComponentCommentRow = Schema.Struct({
 })
 export const ComponentCommentBody = Schema.Struct({ content: Schema.optional(Schema.String) })
 
+/** POST /api/components: the project comes from the body. */
+export const ComponentCreateBody = Schema.Struct({ ...ComponentBody.fields, projectId: Schema.optional(Schema.String) })
+
+/** GET /api/components/:id/details: the component with its project, the viewer's rights and a usage count. */
+export const ComponentFullDetail = Schema.Struct({
+  ...ComponentRow.fields,
+  project: Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    description: NullStr,
+    ownerId: Schema.String,
+    owner: Schema.Struct({ id: Schema.String, name: NullStr, email: NullStr }),
+    organization: Schema.NullOr(Schema.Struct({ id: Schema.String, name: Schema.String, users: Schema.Array(Schema.Struct({ role: Schema.String })) }))
+  }),
+  usageStats: Schema.Struct({ usedInDrawings: Schema.Number }),
+  canEdit: Schema.Boolean,
+  canDelete: Schema.Boolean
+})
+
+export const ComponentRelationships = Schema.Struct({
+  relatedComponents: Schema.Array(Schema.Struct({
+    id: Schema.String, name: Schema.String, description: NullStr, type: NullStr, projectId: Schema.String, isPublic: Schema.Boolean
+  })),
+  relationships: Schema.Array(Schema.Struct({ sourceId: Schema.String, targetId: Schema.String, type: Schema.Literal("references") }))
+})
+
 const id = { id: Schema.String }
 const versionParams = { id: Schema.String, versionId: Schema.String }
 const commentParams = { id: Schema.String, commentId: Schema.String }
@@ -71,6 +97,15 @@ const Message = Schema.Struct({ message: Schema.String })
 
 export class ComponentsGroup extends HttpApiGroup.make("components")
   .add(
+    HttpApiEndpoint.get("list", "/api/components", {
+      query: { projectId: Schema.optional(Schema.String), type: Schema.optional(Schema.String), search: Schema.optional(Schema.String), public: Schema.optional(Schema.String) },
+      success: Schema.Array(ComponentRow), error: [InternalError]
+    }),
+    HttpApiEndpoint.post("create", "/api/components", {
+      payload: ComponentCreateBody, success: ComponentRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
+    }),
+    HttpApiEndpoint.get("details", "/api/components/:id/details", { params: id, success: ComponentFullDetail, error: [BadRequest, Forbidden, NotFound, InternalError] }),
+    HttpApiEndpoint.get("relationships", "/api/components/:id/relationships", { params: id, success: Envelope(ComponentRelationships), error: envErrors }),
     HttpApiEndpoint.get("get", "/api/components/:id", { params: id, success: ComponentDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/components/:id", {
       params: id, payload: ComponentBody, success: ComponentUpdated, error: [BadRequest, Forbidden, NotFound, InternalError]

@@ -1,6 +1,6 @@
-import type { ComponentCommentRow, ComponentDetail, ComponentRow, ComponentVersionDetail, ComponentVersionRow } from "@cadcamfun/api"
+import type { ComponentCommentRow, ComponentDetail, ComponentFullDetail, ComponentRelationships, ComponentRow, ComponentVersionDetail, ComponentVersionRow } from "@cadcamfun/api"
 import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
-import { and, desc, eq, inArray, or } from "drizzle-orm"
+import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
@@ -28,10 +28,10 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   update(id: string, patch: ComponentPatch): Effect.Effect<ComponentRow, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
   /**
-   * The component when the user may use it: `read` also admits public components, `write` only the project owner and the
-   * members of its organisation.
+   * The component when the user may use it: the project owner and the members of its organisation. The `isPublic` flag grants
+   * nothing to other people (the app's data-isolation rule; legacy admitted public components to every reader).
    */
-  access(userId: string, id: string, mode: "read" | "write"): Effect.Effect<ComponentRow | undefined, DatabaseError>
+  access(userId: string, id: string): Effect.Effect<ComponentRow | undefined, DatabaseError>
   listVersions(componentId: string): Effect.Effect<Array<typeof ComponentVersionDetail.Type>, DatabaseError>
   getVersion(componentId: string, versionId: string): Effect.Effect<typeof ComponentVersionDetail.Type | undefined, DatabaseError>
   createVersion(componentId: string, userId: string, data: unknown, changeMessage: string): Effect.Effect<typeof ComponentVersionRow.Type, DatabaseError>
@@ -46,6 +46,15 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   editComment(commentId: string, content: string): Effect.Effect<typeof ComponentCommentRow.Type, DatabaseError>
   removeComment(commentId: string): Effect.Effect<void, DatabaseError>
   isProjectOwner(userId: string, componentId: string): Effect.Effect<boolean, DatabaseError>
+  /**
+   * Components the user can see (own projects and their organisations'), newest first.
+   * `search` narrows that set: legacy replaced the visibility filter with it and so listed other people's components.
+   */
+  search(userId: string, filter: { projectId?: string | undefined; type?: string | undefined; search?: string | undefined }): Effect.Effect<ComponentRow[], DatabaseError>
+  /** The component with its project, the user's rights and how many drawings of the project mention it; `forbidden` when it exists but the user is no member. */
+  details(userId: string, id: string): Effect.Effect<typeof ComponentFullDetail.Type | "forbidden" | undefined, DatabaseError>
+  /** Components that reference this one (in `data.references`) and those it references, restricted to what the user can see. */
+  relationships(userId: string, component: ComponentRow): Effect.Effect<typeof ComponentRelationships.Type, DatabaseError>
   projectOrganization(projectId: string): Effect.Effect<string | null, DatabaseError>
   userName(userId: string): Effect.Effect<string | null, DatabaseError>
 }>()("cadcamfun/ComponentRepo") {
@@ -96,12 +105,11 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
         })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
-        access: (userId, id, mode) =>
+        access: (userId, id) =>
           query("components.access", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
-            const member = or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)
             const [hit] = await db.select({ c: T }).from(T).innerJoin(P, eq(T.projectId, P.id))
-              .where(and(eq(T.id, id), mode === "read" ? or(member, eq(T.isPublic, true)) : member)).limit(1)
+              .where(and(eq(T.id, id), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined))).limit(1)
             return hit ? toComponentRow(hit.c) : undefined
           }),
         listVersions: (componentId) =>
@@ -165,6 +173,65 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
         isProjectOwner: (userId, componentId) =>
           query("components.isProjectOwner", async (db) =>
             (await db.select({ id: T.id }).from(T).innerJoin(P, eq(T.projectId, P.id)).where(and(eq(T.id, componentId), eq(P.ownerId, userId))).limit(1)).length > 0),
+        search: (userId, filter) =>
+          query("components.search", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
+            const visible = or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)
+            const needle = filter.search ? `%${filter.search.replace(/[\\%_]/g, "\\$&")}%` : undefined
+            const hits = await db.select({ c: T }).from(T).innerJoin(P, eq(T.projectId, P.id)).where(and(
+              visible,
+              filter.projectId ? eq(T.projectId, filter.projectId) : undefined,
+              filter.type ? eq(T.type, filter.type) : undefined,
+              needle ? or(sql`${T.name} like ${needle} escape '\\'`, sql`${T.description} like ${needle} escape '\\'`) : undefined
+            )).orderBy(desc(T.updatedAt))
+            return hits.map((hit) => toComponentRow(hit.c))
+          }),
+        details: (userId, id) =>
+          query("components.details", async (db) => {
+            const [hit] = await db.select({ c: T, p: P, owner: { id: schema.userTable.id, name: schema.userTable.name, email: schema.userTable.email } }).from(T)
+              .innerJoin(P, eq(T.projectId, P.id)).innerJoin(schema.userTable, eq(P.ownerId, schema.userTable.id)).where(eq(T.id, id)).limit(1)
+            if (!hit) return undefined
+            const organization = hit.p.organizationId
+              ? (await db.select({ id: schema.organizationTable.id, name: schema.organizationTable.name }).from(schema.organizationTable).where(eq(schema.organizationTable.id, hit.p.organizationId)).limit(1))[0]
+              : undefined
+            const roles = organization
+              ? (await db.select({ role: schema.userOrganizationTable.role }).from(schema.userOrganizationTable)
+                .where(and(eq(schema.userOrganizationTable.organizationId, organization.id), eq(schema.userOrganizationTable.userId, userId)))).map((r) => ({ role: r.role as string }))
+              : []
+            const owns = hit.p.ownerId === userId
+            if (!owns && roles.length === 0) return "forbidden" as const
+            const [{ n } = { n: 0 }] = await db.select({ n: sql<number>`count(*)` }).from(schema.drawingTable)
+              .where(and(eq(schema.drawingTable.projectId, hit.p.id), like(schema.drawingTable.data, `%${id}%`)))
+            return {
+              ...toComponentRow(hit.c),
+              project: { id: hit.p.id, name: hit.p.name, description: hit.p.description, ownerId: hit.p.ownerId, owner: hit.owner, organization: organization ? { ...organization, users: roles } : null },
+              usageStats: { usedInDrawings: Number(n) },
+              canEdit: owns || roles.some((r) => r.role === "ADMIN" || r.role === "MANAGER"),
+              canDelete: owns || roles.some((r) => r.role === "ADMIN")
+            }
+          }),
+        relationships: (userId, component) =>
+          query("components.relationships", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
+            const visible = await db.select({ c: T }).from(T).innerJoin(P, eq(T.projectId, P.id))
+              .where(or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined))
+            const refsOf = (data: unknown): string[] => {
+              const value = typeof data === "string" ? (() => { try { return JSON.parse(data) as unknown } catch { return undefined } })() : data
+              const refs = typeof value === "object" && value !== null ? (value as { references?: unknown }).references : undefined
+              return Array.isArray(refs) ? refs.filter((r): r is string => typeof r === "string") : []
+            }
+            const slim = (c: Row) => ({ id: c.id, name: c.name, description: c.description, type: c.type, projectId: c.projectId, isPublic: c.isPublic })
+            const referencing = visible.map((v) => v.c).filter((c) => c.id !== component.id && refsOf(c.data).includes(component.id))
+            const wanted = new Set(refsOf(component.data))
+            const referenced = visible.map((v) => v.c).filter((c) => wanted.has(c.id))
+            return {
+              relatedComponents: [...referencing, ...referenced].map(slim),
+              relationships: [
+                ...referencing.map((c) => ({ sourceId: c.id, targetId: component.id, type: "references" as const })),
+                ...referenced.map((c) => ({ sourceId: component.id, targetId: c.id, type: "references" as const }))
+              ]
+            }
+          }),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>
