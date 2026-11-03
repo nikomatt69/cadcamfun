@@ -1,6 +1,6 @@
 {
   "name": "@cadcamfun/mobile",
-  "version": "0.1.71",
+  "version": "0.1.73",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
