@@ -5,6 +5,7 @@
  * The legacy hook keeps `limit`/`offset` inside the same filter object, so changing a
  * filter after paging keeps the offset; that is preserved here on purpose.
  */
+import { FIELD } from "../../../shared/components/WorkspacePage.tsx"
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { TimelineScene } from "../../../shared/ui/stageshow/index.ts"
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
@@ -35,12 +36,12 @@ const ACTION_OPTIONS = [
 ] as const
 
 const BADGE: Readonly<Record<string, string>> = {
-  created: "bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100",
-  updated: "bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100",
-  deleted: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
-  viewed: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100",
-  exported: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100",
-  imported: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
+  created: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200",
+  updated: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
+  deleted: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200",
+  viewed: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  exported: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  imported: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
 }
 
 const badgeClass = (action: string): string => BADGE[action] ?? BADGE.viewed!
@@ -121,42 +122,42 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
   return (
     <div class="space-y-4">
       <div class="flex items-center justify-between">
-        <h2 class="text-xl font-bold text-gray-900 dark:text-white">{t("history.your")}</h2>
+        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{t("history.your")}</h2>
         <button
           type="button"
-          class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+          class="inline-flex h-7 items-center gap-2 rounded-[5px] px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           onClick={() => setShowFilters((open) => !open)}
         >
-          <Filter aria-hidden="true" class="mr-2 h-4 w-4" />
+          <Filter aria-hidden="true" class="h-4 w-4" />
           {t("history.filters")}
-          <ChevronDown aria-hidden="true" class={`ml-2 h-4 w-4 transform transition-transform ${showFilters() ? "rotate-180" : ""}`} />
+          <ChevronDown aria-hidden="true" class={`h-4 w-4 transform transition-transform ${showFilters() ? "rotate-180" : ""}`} />
         </button>
       </div>
 
       <Show when={showFilters()}>
-        <div class="mb-4 rounded-lg bg-gray-50 p-4 shadow dark:bg-gray-800 dark:text-white">
+        <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("history.dateRange")}</h3>
+              <h3 class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">{t("history.dateRange")}</h3>
               <div class="space-y-2">
                 <div class="flex items-center">
-                  <label class="mr-2 inline-flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <Calendar class="mr-1 h-4 w-4" />{t("history.from")}
+                  <label class="mr-2 inline-flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                    <Calendar aria-hidden="true" class="h-4 w-4" />{t("history.from")}
                   </label>
                   <input
                     type="date"
-                    class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400"
+                    class={`${FIELD} !w-auto`}
                     value={dayInput(filters().startDate)}
                     onInput={(event) => setDate("startDate", event.currentTarget.value)}
                   />
                 </div>
                 <div class="flex items-center">
-                  <label class="mr-2 inline-flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <Calendar class="mr-1 h-4 w-4" />{t("history.to")}
+                  <label class="mr-2 inline-flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                    <Calendar aria-hidden="true" class="h-4 w-4" />{t("history.to")}
                   </label>
                   <input
                     type="date"
-                    class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400"
+                    class={`${FIELD} !w-auto`}
                     value={dayInput(filters().endDate)}
                     onInput={(event) => setDate("endDate", event.currentTarget.value)}
                   />
@@ -165,7 +166,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
             </div>
 
             <div>
-              <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("history.itemTypes")}</h3>
+              <h3 class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">{t("history.itemTypes")}</h3>
               <div class="grid grid-cols-2 gap-2">
                 <For each={[...ITEM_TYPE_OPTIONS]}>
                   {(type) => (
@@ -176,7 +177,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
                         checked={filters().itemTypes.includes(type)}
                         onChange={() => toggle("itemTypes", type)}
                       />
-                      <span class="ml-2 text-sm capitalize text-gray-700 dark:text-gray-300">{pretty(type)}</span>
+                      <span class="ml-2 text-sm capitalize text-slate-700 dark:text-slate-300">{pretty(type)}</span>
                     </label>
                   )}
                 </For>
@@ -184,7 +185,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
             </div>
 
             <div>
-              <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("history.actions")}</h3>
+              <h3 class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">{t("history.actions")}</h3>
               <div class="grid grid-cols-2 gap-2">
                 <For each={[...ACTION_OPTIONS]}>
                   {(action) => (
@@ -195,7 +196,7 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
                         checked={filters().actions.includes(action)}
                         onChange={() => toggle("actions", action)}
                       />
-                      <span class="ml-2 text-sm capitalize text-gray-700 dark:text-gray-300">{pretty(action)}</span>
+                      <span class="ml-2 text-sm capitalize text-slate-700 dark:text-slate-300">{pretty(action)}</span>
                     </label>
                   )}
                 </For>
@@ -206,21 +207,21 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
       </Show>
 
       <Show when={error()}>
-        <div class="rounded-md bg-red-50 p-4 text-red-800">
-          <p>{t("history.loadFailed")}</p>
-          <p class="text-sm">{error()}</p>
+        <div class="rounded-md border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300" role="alert">
+          <p class="text-sm font-medium">{t("history.loadFailed")}</p>
+          <p class="mt-1 text-sm">{error()}</p>
         </div>
       </Show>
 
-      <div class="rounded-lg bg-gray-50 shadow dark:bg-gray-800 dark:text-white">
+      <div class="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <Show
           when={logs().length > 0}
           fallback={
             <Show when={loading() && logs().length === 0} fallback={
               <div class="p-6 text-center">
-                <div class="mx-auto mb-3 max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><TimelineScene /></div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white">{t("history.empty")}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-300">
+                <div class="mx-auto mb-3 max-w-sm overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true"><TimelineScene /></div>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">{t("history.empty")}</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {filters().itemTypes.length > 0 || filters().actions.length > 0 || filters().startDate || filters().endDate
                     ? t("history.emptyFiltered")
                     : t("history.emptyHint")}
@@ -232,28 +233,28 @@ export function UserHistory(props: UserHistoryProps): JSX.Element {
           }
         >
           <div class="overflow-hidden">
-            <ul class="divide-y divide-gray-200 dark:divide-gray-600">
+            <ul class="divide-y divide-slate-200 dark:divide-slate-700">
               <For each={logs()}>
                 {(activity) => (
-                  <li class="px-4 py-4 hover:bg-gray-100 sm:px-6 dark:hover:bg-gray-700">
+                  <li class="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="flex items-center space-x-2">
+                      <div class="flex items-center gap-3">
                         <span class={`rounded-md px-2 py-1 text-xs font-medium capitalize ${badgeClass(activity.action)}`}>
                           {pretty(activity.action)}
                         </span>
-                        <p class="text-sm font-medium capitalize text-gray-900 dark:text-white">{pretty(activity.itemType)}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{t("history.id", { id: activity.itemId })}</p>
+                        <p class="text-sm font-medium capitalize text-slate-900 dark:text-white">{pretty(activity.itemType)}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{t("history.id", { id: activity.itemId })}</p>
                       </div>
-                      <div class="whitespace-nowrap text-xs text-gray-500 dark:text-gray-300">
+                      <div class="whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">
                         {new Date(activity.timestamp).toLocaleString()}
                       </div>
                     </div>
                     <Show when={activity.details !== undefined && Object.keys(activity.details).length > 0}>
                       <details class="mt-2 text-xs">
-                        <summary class="cursor-pointer text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                        <summary class="cursor-pointer text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
                           {t("history.details")}
                         </summary>
-                        <pre class="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                        <pre class="mt-1 overflow-x-auto rounded-md bg-slate-100 p-3 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           {JSON.stringify(activity.details, null, 2)}
                         </pre>
                       </details>

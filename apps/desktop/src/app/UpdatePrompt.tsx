@@ -10,8 +10,8 @@ import {
   reduceUpdate, releaseNotesOf, reopenUpdate, restartAfterUpdate, updateFailure, type AvailableUpdate, type UpdateEvent, type UpdateView
 } from "./updates.ts"
 
-const PRIMARY = "rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-const SECONDARY = "rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+const PRIMARY = "rounded-md bg-[color:var(--ent-action)] px-3 py-1.5 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
+const SECONDARY = "rounded-md border border-[color:var(--ent-line-strong)] px-3 py-1.5 text-sm text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
 
 /**
  * The update dialog (desktop shell only). It follows the shell's `update://status` events: a check the person asked for from the
@@ -111,32 +111,32 @@ export function UpdatePrompt(): JSX.Element {
   const body = (current: UpdateEvent): JSX.Element => {
     switch (current.status) {
       case "checking": return (
-        <p class="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200">
-          <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" aria-hidden="true" />{t("update.checking")}
+        <p class="flex items-center gap-3 text-sm text-[color:var(--ent-text)]">
+          <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--ent-accent)] border-t-transparent" aria-hidden="true" />{t("update.checking")}
         </p>
       )
-      case "upToDate": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.upToDate", { version: current.version })}</p>
+      case "upToDate": return <p class="text-sm text-[color:var(--ent-text)]">{t("update.upToDate", { version: current.version })}</p>
       case "available": return <AvailableBody update={current} />
       case "downloading": return (
         <div class="space-y-3" data-testid="update-progress">
           <div class="flex items-baseline justify-between gap-4">
-            <p class="text-sm font-medium text-gray-800 dark:text-gray-100">{t("update.downloading")}</p>
+            <p class="text-sm font-medium text-[color:var(--ent-text)]">{t("update.downloading")}</p>
             <Show when={percent(current) !== undefined}>
-              <span class="shrink-0 text-sm font-semibold tabular-nums text-gray-800 dark:text-gray-100">{percent(current)}%</span>
+              <span class="shrink-0 text-sm font-semibold tabular-nums text-[color:var(--ent-text)]">{percent(current)}%</span>
             </Show>
           </div>
-          <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(current) ?? undefined} aria-label={t("update.downloading")}>
-            <div class={`h-full rounded-full bg-blue-600 motion-safe:transition-[width] ${percent(current) === undefined ? "w-1/3 motion-safe:animate-pulse" : ""}`} style={percent(current) === undefined ? undefined : { width: `${percent(current)}%` }} />
+          <div class="h-2 overflow-hidden rounded-full bg-[color:var(--ent-surface-inset)]" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(current) ?? undefined} aria-label={t("update.downloading")}>
+            <div class={`h-full rounded-full bg-[color:var(--ent-accent)] motion-safe:transition-[width] ${percent(current) === undefined ? "w-1/3 motion-safe:animate-pulse" : ""}`} style={percent(current) === undefined ? undefined : { width: `${percent(current)}%` }} />
           </div>
-          <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+          <p class="text-xs tabular-nums text-[color:var(--ent-text-muted)]">
             {percent(current) === undefined ? formatBytes(current.downloaded) : `${formatBytes(current.downloaded)} / ${formatBytes(current.total ?? 0)}`}
           </p>
         </div>
       )
-      case "ready": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.ready", { version: current.version })}</p>
-      case "downloaded": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.downloaded", { version: current.version })}</p>
-      case "installing": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.installing")}</p>
-      case "failed": return <p role="alert" class="text-sm text-red-600 dark:text-red-400">{t("update.checkFailed")}<span class="mt-1 block text-xs text-gray-500">{current.message}</span></p>
+      case "ready": return <p class="text-sm text-[color:var(--ent-text)]">{t("update.ready", { version: current.version })}</p>
+      case "downloaded": return <p class="text-sm text-[color:var(--ent-text)]">{t("update.downloaded", { version: current.version })}</p>
+      case "installing": return <p class="text-sm text-[color:var(--ent-text)]">{t("update.installing")}</p>
+      case "failed": return <p role="alert" class="text-sm text-[color:var(--ent-bad)]">{t("update.checkFailed")}<span class="mt-1 block text-xs text-[color:var(--ent-text-muted)]">{current.message}</span></p>
     }
   }
 
@@ -146,7 +146,7 @@ export function UpdatePrompt(): JSX.Element {
     </Modal>
     <Show when={chip()}>{(current) => (
       <button type="button" data-testid="update-chip" onClick={() => { setView(reopenUpdate) }}
-        class="fixed bottom-10 right-4 z-50 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-lg hover:bg-blue-50 dark:border-blue-800 dark:bg-gray-800 dark:text-gray-100">
+        class="fixed bottom-10 right-4 z-50 rounded-full border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-1.5 text-xs text-[color:var(--ent-text)] shadow-lg hover:bg-[color:var(--ent-surface-subtle)]">
         {current().status === "downloading" ? t("update.chip.downloading", { percent: String(percent(current() as Extract<UpdateEvent, { status: "downloading" }>) ?? "…") }) : t(current().status === "downloaded" ? "update.title.downloaded" : "update.chip.ready")}
       </button>
     )}</Show>
@@ -158,19 +158,19 @@ function AvailableBody(props: { readonly update: AvailableUpdate }): JSX.Element
   return (
     <div class="space-y-3">
       <div class="update-preview" aria-hidden="true"><UpdatePreview /></div>
-      <p class="text-sm text-gray-800 dark:text-gray-100">
+      <p class="text-sm text-[color:var(--ent-text)]">
         {props.update.current === undefined ? t("update.available", { version: props.update.version }) : t("update.availableFrom", { version: props.update.version, current: props.update.current })}
       </p>
       <Show when={props.update.critical}>
-        <p role="alert" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{t("update.criticalNote")}</p>
+        <p role="alert" class="rounded-md border border-[color:var(--ent-bad)] bg-[color:var(--ent-bad-soft)] px-3 py-2 text-xs text-[color:var(--ent-bad)]">{t("update.criticalNote")}</p>
       </Show>
       <Show when={notes() !== ""}>
         <div>
-          <h4 class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-300">{t("update.notes")}</h4>
-          <pre data-testid="update-notes" class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-gray-50 p-2 font-sans text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-200">{notes()}</pre>
+          <h4 class="mb-1 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("update.notes")}</h4>
+          <pre data-testid="update-notes" class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-[color:var(--ent-surface-subtle)] p-3 font-sans text-xs text-[color:var(--ent-text)]">{notes()}</pre>
         </div>
       </Show>
-      <p class="text-xs text-gray-500">{t("update.savesFirst")}</p>
+      <p class="text-xs text-[color:var(--ent-text-muted)]">{t("update.savesFirst")}</p>
     </div>
   )
 }

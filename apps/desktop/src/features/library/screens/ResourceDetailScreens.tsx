@@ -255,8 +255,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       }
       overlays={
         <Modal open={deleteOpen()} title={t("library.detail.deleteTitle", { name: meta.title })} onClose={() => setDeleteOpen(false)}>
-          <p class="text-xs text-slate-600 dark:text-slate-300">{t("library.detail.deleteConfirm", { name: meta.title })}</p>
-          <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <p class="text-xs text-[color:var(--ent-text-muted)]">{t("library.detail.deleteConfirm", { name: meta.title })}</p>
+          <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-3">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</button>
             <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>{t("common.delete")}</button>
           </div>
@@ -429,7 +429,7 @@ function MaterialBars(props: { readonly properties: Row }): JSX.Element {
     { label: t("library.detail.thermal"), value: value("thermalConductivity"), max: 400, unit: "W/(m·K)" }
   ].filter((property) => property.value > 0))
   return <Show when={properties().length > 0}>
-    <div class="grid grid-cols-1 gap-3 rounded-md border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-3 rounded-md border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-2">
       <For each={properties()}>{(property) => <PropertyBar {...property} />}</For>
     </div>
   </Show>

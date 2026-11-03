@@ -28,7 +28,7 @@ function Grid(props: { readonly dark?: boolean }): JSX.Element {
       <div style={{ display: "grid", "grid-template-columns": "repeat(2, 360px)", gap: "20px" }}>
         {SCENES.map(([label, Scene]) => (
           <figure style={{ margin: "0" }}>
-            <figcaption style={{ "font-family": "ui-monospace, monospace", "font-size": "10px", color: props.dark === true ? "#9aa4b2" : "#5b6575", margin: "0 0 6px" }}>{label}</figcaption>
+            <figcaption style={{ "font-family": "ui-monospace, monospace", "font-size": "11px", color: props.dark === true ? "#9aa4b2" : "#5b6575", margin: "0 0 6px" }}>{label}</figcaption>
             <div style={{ overflow: "hidden", border: `1px solid ${props.dark === true ? "#2b323d" : "#dde1e7"}`, "border-radius": "6px" }}>
               <Scene />
             </div>

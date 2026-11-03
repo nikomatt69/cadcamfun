@@ -26,7 +26,7 @@ import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-gen
 import { useAiStore } from "../../ai/index.ts"
 import { cam } from "@cadcamfun/core"
 import { actionKey } from "../../ai/lib/editor-sync.ts"
-import { CARD, CardBanner, FIELD, ICON_BUTTON, INPUT, LABEL, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { CARD, CardBanner, FIELD, ICON_BUTTON, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 /** Dialog controls are portalled out of the page, so they use the --ent tokens instead of the Tailwind palette. */
 const DLG_INPUT = "w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-sm text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
@@ -477,12 +477,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                     </div>
                                   </div>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3"><span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{meta.badge(row)}</span></td>
+                                <td class="whitespace-nowrap px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">{meta.badge(row)}</span></td>
                                 <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{meta.facts(row).map((fact) => `${fact.label}: ${fact.value}`).join(" · ")}<Show when={props.kind === "components" && str(row["projectId"]) !== ""}>{` · ${projectName(str(row["projectId"]))}`}</Show></td>
                                 <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{formatDate(str(row["updatedAt"]))}</td>
                                 <td class="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-500 dark:text-slate-400">{str(row["id"]).substring(0, 8)}...</td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
-                                  <div class="flex justify-end gap-1">
+                                  <div class="flex justify-end gap-2">
                                     <Show when={row["builtin"] === true} fallback={<>
                                       <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${str(row["name"])}`} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
                                       <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${str(row["name"])}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
@@ -506,7 +506,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                           <div class="flex w-full flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
                             <Show when={str(row["description"] ?? row["notes"])}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{str(row["description"] ?? row["notes"])}</p></Show>
-                            <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            <div class="mt-auto space-y-2 text-xs text-slate-500 dark:text-slate-400">
                               <For each={meta.facts(row)}>{(fact) => (
                                 <div class="workspace-resource-fact"><span>{fact.label}</span><span>{fact.value}</span></div>
                               )}</For>
@@ -518,7 +518,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                           </A>
                           <div class="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800">
                             <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.column.updated")} {formatDate(str(row["updatedAt"]))}</span>
-                            <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
+                            <div class="flex gap-2" onClick={(event) => event.stopPropagation()}>
                               <Show when={row["builtin"] !== true}>
                                 <button type="button" class={ICON_BUTTON} title={t("cad.ribbon.edit")} aria-label={`${t("cad.ribbon.edit")}: ${str(row["name"])}`} onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
                                 <button type="button" class={ICON_BUTTON} title={t("common.delete")} aria-label={`${t("common.delete")}: ${str(row["name"])}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>

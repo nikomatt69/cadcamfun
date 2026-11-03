@@ -65,8 +65,8 @@ const getDeviceType = (transports: readonly string[]): string => {
 }
 
 /** Card surface — the neutral translucent panel of the list pages. */
-const CARD = "rounded-xl border border-slate-200/70 bg-white dark:border-slate-700/50 dark:bg-slate-900"
-const PRIMARY_BUTTON = "inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+const CARD = "rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+const PRIMARY_BUTTON = "inline-flex items-center gap-2 h-7 rounded-[5px] bg-blue-600 px-3 text-xs font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
 const ICON_BUTTON = "rounded-md p-1.5 text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 
 export function PasskeySettings(): JSX.Element {
@@ -113,7 +113,7 @@ export function PasskeySettings(): JSX.Element {
     <Show
       when={supported()}
       fallback={
-        <div class="rounded-xl border border-amber-200/70 bg-amber-50/70 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
           <div class="flex items-start gap-3">
             <AlertTriangle class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
             <div>
@@ -164,13 +164,13 @@ export function PasskeySettings(): JSX.Element {
 
         {/* Messages */}
         <Show when={error() !== undefined}>
-          <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
+          <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
             {error()}
           </div>
         </Show>
 
         <Show when={success() !== undefined}>
-          <div class="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
             {success()}
           </div>
         </Show>
@@ -195,7 +195,7 @@ export function PasskeySettings(): JSX.Element {
                 </div>
               }
             >
-              <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
+              <div class="divide-y divide-slate-200 dark:divide-slate-700">
                 <For each={passkeys()}>
                   {(passkey) => (
                     <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -233,7 +233,7 @@ export function PasskeySettings(): JSX.Element {
         </div>
 
         {/* Info Section */}
-        <div class={CARD + " p-6"}>
+        <div class={CARD + " p-4"}>
           <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.passkeys.about")}</h4>
           <ul class="space-y-2 text-sm text-slate-500 dark:text-slate-400">
             <li>• Passkeys are more secure than passwords - they can't be phished or stolen</li>

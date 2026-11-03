@@ -111,7 +111,7 @@ export function OrganizationsScreen(): JSX.Element {
       </>}
       overlays={
         <Modal open={showModal()} title={t("org.modal.title")} onClose={() => { if (!isSubmitting()) setShowModal(false) }}>
-          <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.modal.body")}</p>
+          <p class="text-sm text-[color:var(--ent-text-muted)]">{t("org.modal.body")}</p>
           {/* The legacy modal shows the list hook's `error`; a failed create lands here too. */}
           <Show when={error() ?? orgs.error()}><StageError message={String(error() ?? orgs.error())} /></Show>
           <form onSubmit={(event) => void submit(event)} class="space-y-4">
@@ -123,7 +123,7 @@ export function OrganizationsScreen(): JSX.Element {
               <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
               <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
             </div>
-            <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
               <button type="button" disabled={isSubmitting()} onClick={() => setShowModal(false)} class={CANCEL_BUTTON}>{t("org.modal.cancel")}</button>
               <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
             </div>
@@ -184,7 +184,7 @@ export function CreateOrganizationScreen(): JSX.Element {
       <div class="mx-auto w-full max-w-2xl">
         <div class={PANEL}>
           <div class="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
-            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-blue-50 dark:bg-blue-900/30"><Users size={16} aria-hidden="true" class="text-blue-600 dark:text-blue-400" /></div>
+            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800"><Users size={16} aria-hidden="true" class="text-slate-500 dark:text-slate-400" /></div>
             <div>
               <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.create.details")}</h2>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("org.create.lead")}</p>
@@ -200,7 +200,7 @@ export function CreateOrganizationScreen(): JSX.Element {
               <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
               <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
             </div>
-            <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
               <button type="button" onClick={() => navigate(-1)} class={CANCEL_BUTTON}>{t("common.cancel")}</button>
               <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
             </div>
@@ -413,7 +413,7 @@ export function OrganizationDetailScreen(): JSX.Element {
               </Show>
 
               <Modal open={showInviteModal()} title={t("org.invite.title")} onClose={() => setShowInviteModal(false)}>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{t("org.invite.body")}</p>
+                <p class="text-xs text-[color:var(--ent-text-muted)]">{t("org.invite.body")}</p>
                 <form onSubmit={submitInvite} class="space-y-3">
                   <div>
                     <label for="email" class={LABEL}>{t("org.invite.email")}</label>
@@ -427,7 +427,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                       <Show when={userRole() === "ADMIN"}><option value="ADMIN">{t("org.invite.roleAdmin")}</option></Show>
                     </select>
                   </div>
-                  <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-3">
                     <button type="button" onClick={() => setShowInviteModal(false)} class={CANCEL_BUTTON}>{t("org.modal.cancel")}</button>
                     <button type="submit" class={SUBMIT_BUTTON}>{t("org.invite.send")}</button>
                   </div>

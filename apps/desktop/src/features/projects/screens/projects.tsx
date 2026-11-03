@@ -152,7 +152,7 @@ export function ProjectsScreen(): JSX.Element {
             <label class={LABEL} for="project-description">{t("projects.descriptionLabel")}</label>
             <textarea id="project-description" class={INPUT} rows={3} placeholder={t("projects.descriptionPlaceholder")} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} />
           </div>
-          <div class="flex justify-end gap-2 border-t border-slate-200/60 pt-4 dark:border-slate-700/50">
+          <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setCreateOpen(false)}>{t("projects.cancel")}</button>
             <button type="submit" class={SUBMIT_BUTTON} disabled={create.pending() || !name().trim()}>{t("projects.create")}</button>
           </div>
@@ -165,7 +165,7 @@ export function ProjectsScreen(): JSX.Element {
             <label class={LABEL} for="project-rename">{t("projects.nameLabel")}</label>
             <input id="project-rename" class={INPUT} type="text" required value={name()} onInput={(event) => setName(event.currentTarget.value)} />
           </div>
-          <div class="flex justify-end gap-2 border-t border-slate-200/60 pt-4 dark:border-slate-700/50">
+          <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setEditing(undefined)}>{t("projects.cancel")}</button>
             <button type="submit" class={SUBMIT_BUTTON} disabled={rename.pending() || !name().trim()}>{t("projects.save")}</button>
           </div>
@@ -173,7 +173,7 @@ export function ProjectsScreen(): JSX.Element {
       </Modal>
 
       <Modal open={deleting() !== undefined} title={t("projects.delete")} onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-slate-700 dark:text-slate-300">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
+        <p class="text-sm text-[color:var(--ent-text)]">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
           <button type="button" class={DANGER_BUTTON} disabled={remove.pending()} onClick={() => void confirmDelete().catch(swallow)}>{t("common.delete")}</button>
@@ -185,19 +185,19 @@ export function ProjectsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
-            <Search size={15} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("pages.search.projects")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex h-7 items-center gap-1 self-start rounded-[4px] px-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-45 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
-          <X size={13} aria-hidden="true" />{t("manuals.clear")}
+        <button type="button" class="inline-flex h-7 items-center gap-2 self-start rounded-[4px] px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-45 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
+          <X size={14} aria-hidden="true" />{t("manuals.clear")}
         </button>
         <section aria-labelledby="recent-heading">
-          <h2 id="recent-heading" class="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
+          <h2 id="recent-heading" class="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
           <Show when={app.recents().length > 0} fallback={<p class="text-xs text-slate-500 dark:text-slate-400">{t("projects.recentEmpty")}</p>}>
-            <ul class="flex flex-col gap-0.5">
+            <ul class="flex flex-col gap-1">
               <For each={app.recents()}>{(recent) => (
-                <li class="flex min-h-7 items-center justify-between gap-2 rounded-[4px] px-1.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">
+                <li class="flex min-h-7 items-center justify-between gap-2 rounded-[4px] px-2 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">
                   <button type="button" class="truncate text-left text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200" onClick={() => open(recent)}>{recent.name}</button>
                   <span class="shrink-0 text-[11px] tabular-nums text-slate-500">{formatRecent(recent.openedAt)}</span>
                 </li>
@@ -227,18 +227,18 @@ export function ProjectsScreen(): JSX.Element {
               <div class={CARD}>
                 <button type="button" aria-label={`${t("projects.open")}: ${row.name}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" onClick={() => open(row)}>
                 <CardBanner icon={<FolderKanban size={26} aria-hidden="true" />} />
-                <div class="flex w-full flex-1 flex-col gap-2.5 p-4">
+                <div class="flex w-full flex-1 flex-col gap-2 p-4">
                   <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
                   <Show when={row.description}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{row.description}</p></Show>
-                  <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.drawings")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.drawings}</span></div>
-                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.components")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.components}</span></div>
+                  <div class="mt-auto space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.drawings")}</span><span class="min-w-[22px] rounded-full bg-slate-100 px-1.5 py-0.5 text-center font-medium tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">{row._count.drawings}</span></div>
+                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.components")}</span><span class="min-w-[22px] rounded-full bg-slate-100 px-1.5 py-0.5 text-center font-medium tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">{row._count.components}</span></div>
                   </div>
                 </div>
                 </button>
-                <div class="flex items-center justify-between border-t border-slate-200/60 bg-white/60 px-4 py-2.5 backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/40">
+                <div class="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800">
                   <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
-                  <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
+                  <div class="flex gap-2" onClick={(event) => event.stopPropagation()}>
                     <button type="button" class={ICON_BUTTON} title={t("projects.open")} aria-label={`${t("projects.open")}: ${row.name}`} onClick={() => open(row)}><FolderOpen size={16} aria-hidden="true" /></button>
                     <button type="button" class={ICON_BUTTON} title={t("projects.rename")} aria-label={`${t("projects.rename")}: ${row.name}`} onClick={() => openRename(row)}><Edit size={16} aria-hidden="true" /></button>
                     <button type="button" class={ICON_BUTTON} title={t("projects.delete")} aria-label={`${t("projects.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>

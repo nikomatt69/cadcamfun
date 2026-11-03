@@ -72,11 +72,11 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
 
   return (
     <div class={PANEL}>
-      <h3 class="text-[13px] font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.material.editTitle") : t("costs.material.addTitle")}</h3>
+      <h3 class="mb-4 text-[13px] font-semibold text-slate-900 dark:text-white">{isEditing() ? t("costs.material.editTitle") : t("costs.material.addTitle")}</h3>
 
       <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
         <div>
-          <label for="materialId" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material")}</label>
+          <label for="materialId" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.material")}</label>
           <select id="materialId" name="materialId" value={formData.materialId} onChange={handleChange} class={FIELD} required disabled={isEditing() || isLoadingMaterials() || !!materialError()}>
             <Show when={!isLoadingMaterials()} fallback={<option value="">{t("costs.material.loading")}</option>}>
               <Show when={!materialError()} fallback={<option value="">{materialError()}</option>}>
@@ -96,26 +96,26 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
         </div>
 
         <div>
-          <label for="costPerUnit" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.perUnit", { currency: formData.currencyCode })}</label>
+          <label for="costPerUnit" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.material.perUnit", { currency: formData.currencyCode })}</label>
           <div class="flex items-center gap-2">
             <NumberField id="costPerUnit" name="costPerUnit" value={formData.costPerUnit} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("costPerUnit", value)} />
             <select name="currencyCode" aria-label={t("costs.currency")} value={formData.currencyCode} onChange={handleChange} class={`${FIELD} !w-auto`}>
               <For each={availableCurrencies}>{(currency) => <option value={currency.code}>{currency.symbol} ({currency.code})</option>}</For>
             </select>
           </div>
-          <p class="text-xs text-gray-500 mt-1">{t("costs.material.unitHint")}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("costs.material.unitHint")}</p>
         </div>
 
         <div>
-          <label for="wasteFactor" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.waste")}</label>
+          <label for="wasteFactor" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.material.waste")}</label>
           <NumberField id="wasteFactor" name="wasteFactor" value={formData.wasteFactor} min="0" max="100" step="1" class={FIELD} accept={(value) => value >= 0 && value <= 100} onValue={(value) => setFormData("wasteFactor", value)} />
-          <p class="text-xs text-gray-500 mt-1">{t("costs.material.wasteHint")}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("costs.material.wasteHint")}</p>
         </div>
 
         <div>
-          <label for="minimumCharge" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.material.minimum", { currency: formData.currencyCode })}</label>
+          <label for="minimumCharge" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.material.minimum", { currency: formData.currencyCode })}</label>
           <NumberField id="minimumCharge" name="minimumCharge" value={formData.minimumCharge} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("minimumCharge", value)} />
-          <p class="text-xs text-gray-500 mt-1">{t("costs.material.minimumHint")}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("costs.material.minimumHint")}</p>
         </div>
 
         <div class="flex flex-wrap items-center justify-end gap-3 pt-2">

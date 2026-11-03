@@ -71,7 +71,7 @@ export function ProfileScreen(): JSX.Element {
 
   const itemCard = (item: UserItem, href: string, Icon: ItemIcon, withDescription: boolean): JSX.Element => (
     <A href={href} class={`${CARD} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`}>
-      <div class="flex h-20 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
+      <div class="flex h-20 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40">
         <Show
           when={typeof item.thumbnail === "string" && item.thumbnail.length > 0}
           fallback={<span class="flex h-10 w-10 items-center justify-center rounded-[5px] border border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"><Icon size={20} /></span>}
@@ -165,7 +165,7 @@ export function ProfileScreen(): JSX.Element {
                   </div>
 
                   <Show when={typeof me().bio === "string" && (me().bio?.length ?? 0) > 0}>
-                    <p class="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600 dark:border-slate-700/70 dark:text-slate-300">{me().bio}</p>
+                    <p class="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:text-slate-300">{me().bio}</p>
                   </Show>
                 </div>
 
@@ -176,7 +176,7 @@ export function ProfileScreen(): JSX.Element {
                 </div>
               </div>
 
-              <div class="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-700/70 lg:grid-cols-4">
+              <div class="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 lg:grid-cols-4">
                 {stat(<Folder size={14} aria-hidden="true" />, projects.data()?.length, t("shell.projects"))}
                 {stat(<Box size={14} aria-hidden="true" />, components.data()?.length, t("shell.components"))}
                 {stat(<Wrench size={14} aria-hidden="true" />, toolpaths.data()?.length, t("shell.toolpaths"))}

@@ -103,8 +103,8 @@ const DeviceIcon = (props: { readonly deviceInfo: DeviceInfo }): JSX.Element => 
 }
 
 /** Card surface — the neutral translucent panel of the list pages. */
-const CARD = "rounded-xl border border-slate-200/70 bg-white dark:border-slate-700/50 dark:bg-slate-900"
-const SECONDARY_BUTTON = "inline-flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+const CARD = "rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+const SECONDARY_BUTTON = "inline-flex items-center gap-2 h-7 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
 const ICON_BUTTON = "rounded-md p-1.5 text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 
 export function SessionManagement(): JSX.Element {
@@ -166,26 +166,26 @@ export function SessionManagement(): JSX.Element {
 
       {/* Messages */}
       <Show when={error() !== undefined}>
-        <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
+        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           {error()}
         </div>
       </Show>
 
       <Show when={success() !== undefined}>
-        <div class="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
           {success()}
         </div>
       </Show>
 
       <Show when={tokens.error() !== undefined}>
-        <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
+        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           <p>{t("settings.sessions.loadFailed")}</p>
           <p class="mt-1 break-all font-mono text-xs">{tokens.error()}</p>
         </div>
       </Show>
 
       {/* Current Session Info */}
-      <div class={CARD + " p-6"}>
+      <div class={CARD + " p-4"}>
         <h4 class="mb-4 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
           <CheckCircle class="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           {t("settings.sessions.current")}
@@ -208,7 +208,7 @@ export function SessionManagement(): JSX.Element {
 
       {/* Auth Sessions */}
       <div class={CARD}>
-        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+        <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
             <Shield class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.authTitle", { count: authSessions.length })}
@@ -216,14 +216,14 @@ export function SessionManagement(): JSX.Element {
         </div>
 
         <Show when={authSessions.length === 0}>
-          <div class="p-6" aria-hidden="true">
+          <div class="p-4" aria-hidden="true">
             <div class="mx-auto max-w-md overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
               <SessionsScene />
             </div>
           </div>
         </Show>
 
-        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
+        <div class="divide-y divide-slate-200 dark:divide-slate-700">
           <For each={authSessions}>
             {(session) => (
               <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -240,12 +240,12 @@ export function SessionManagement(): JSX.Element {
                     </h5>
                     <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                       <p class="flex items-center">
-                        <Clock class="h-3.5 w-3.5 mr-1.5" />
+                        <Clock class="mr-2 h-4 w-4" />
                         {t("settings.sessions.lastActive", { when: formatTimeAgo(session.lastActivity) })}
                       </p>
                       <Show when={session.location !== undefined}>
                         <p class="flex items-center">
-                          <MapPin class="h-3.5 w-3.5 mr-1.5" />
+                          <MapPin class="mr-2 h-4 w-4" />
                           {session.location?.city}, {session.location?.country} ({session.location?.ip})
                         </p>
                       </Show>
@@ -274,14 +274,14 @@ export function SessionManagement(): JSX.Element {
 
       {/* MCP Sessions */}
       <div class={CARD}>
-        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+        <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
             <Database class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.mcpTitle", { count: mcpSessions.length })}
           </h4>
         </div>
 
-        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
+        <div class="divide-y divide-slate-200 dark:divide-slate-700">
           <For each={mcpSessions}>
             {(session) => (
               <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -317,7 +317,7 @@ export function SessionManagement(): JSX.Element {
 
       {/* API Tokens */}
       <div class={CARD}>
-        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+        <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
             <Key class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.tokensTitle", { count: apiTokens().length })}
@@ -328,7 +328,7 @@ export function SessionManagement(): JSX.Element {
           <LoadingState label={t("settings.sessions.loading")} rows={3} />
         </Show>
 
-        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
+        <div class="divide-y divide-slate-200 dark:divide-slate-700">
           <For each={apiTokens()}>
             {(token) => (
               <div class="mx-2 flex items-center justify-between rounded-lg p-4 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -372,7 +372,7 @@ export function SessionManagement(): JSX.Element {
       </div>
 
       {/* Security Tips */}
-      <div class="rounded-xl border border-amber-200/70 bg-amber-50/70 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
+      <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
         <h4 class="mb-3 flex items-center text-sm font-medium text-amber-900 dark:text-amber-200">
           <AlertTriangle class="h-4 w-4 mr-2" />
           {t("settings.sessions.tips")}

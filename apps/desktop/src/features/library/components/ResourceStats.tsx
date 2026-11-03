@@ -2,7 +2,7 @@ import { For, Show, type JSX } from "solid-js"
 
 export interface StatItem { readonly label: string; readonly value: string }
 
-const TILE = "rounded-[5px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700/70 dark:bg-slate-800/40"
+const TILE = "rounded-[5px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40"
 
 /** The figures of a resource as a grid of labelled tiles, the same on every details page. */
 export function StatGrid(props: { readonly items: ReadonlyArray<StatItem>; readonly columns?: 2 | 3 | 4 }): JSX.Element {

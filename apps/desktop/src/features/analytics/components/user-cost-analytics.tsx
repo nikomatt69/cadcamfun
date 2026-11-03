@@ -89,7 +89,7 @@ type Tab = "personal" | "system"
 const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#64748B", "#0EA5E9"]
 
 const cardClass =
-  "rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+  "rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 4 }).format(amount)
@@ -97,20 +97,20 @@ const formatCurrency = (amount: number): string =>
 const formatNumber = (value: number): string => new Intl.NumberFormat().format(value)
 
 const trendColor = (growth: number): string =>
-  growth > 0 ? "text-red-500" : growth < 0 ? "text-green-500" : "text-gray-500"
+  growth > 0 ? "text-red-600 dark:text-red-400" : growth < 0 ? "text-green-600 dark:text-green-400" : "text-slate-500"
 
 /** The trend indicator next to a personal stat: up = red, down = green, flat = grey. */
 function TrendIcon(props: { readonly growth: number }): JSX.Element {
   return (
     <Show
       when={props.growth !== 0}
-      fallback={<Activity class="h-4 w-4 text-gray-500" />}
+      fallback={<Activity class="h-4 w-4 text-slate-500" />}
     >
       <Show
         when={props.growth > 0}
-        fallback={<TrendingDown class="h-4 w-4 text-green-500" />}
+        fallback={<TrendingDown class="h-4 w-4 text-green-600 dark:text-green-400" />}
       >
-        <TrendingUp class="h-4 w-4 text-red-500" />
+        <TrendingUp class="h-4 w-4 text-red-600 dark:text-red-400" />
       </Show>
     </Show>
   )
@@ -132,21 +132,21 @@ function StatCard(props: StatCardProps): JSX.Element {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-3">
         <div>
-          <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{props.label}</p>
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">{props.value}</p>
+          <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{props.label}</p>
+          <p class="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{props.value}</p>
           <Show when={props.growth !== undefined && props.growth !== 0}>
-            <div class={`flex items-center text-sm ${trendColor(props.growth ?? 0)}`}>
+            <div class={`mt-1 flex items-center text-xs ${trendColor(props.growth ?? 0)}`}>
               <TrendIcon growth={props.growth ?? 0} />
-              <span class="ml-1">{Math.abs(props.growth ?? 0).toFixed(1)}%</span>
+              <span class="ml-1.5 tabular-nums">{Math.abs(props.growth ?? 0).toFixed(1)}%</span>
             </div>
           </Show>
           <Show when={props.caption !== undefined}>
-            <p class="text-sm text-gray-500">{props.caption}</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{props.caption}</p>
           </Show>
         </div>
-        {props.icon}
+        <span class="flex-none text-slate-400 dark:text-slate-500">{props.icon}</span>
       </div>
     </Motion.div>
   )
@@ -246,7 +246,7 @@ function ModelPie(props: {
   }
 
   return (
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <svg viewBox="0 0 320 300" width="100%" height={300} role="img">
         <For each={slices()}>
           {(slice) => (
@@ -269,17 +269,17 @@ function ModelPie(props: {
       <div class="space-y-3">
         <For each={props.entries}>
           {(entry, index) => (
-            <div class="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+            <div class="flex items-center justify-between rounded-md bg-slate-50 p-3 dark:bg-slate-800/60">
               <div class="flex items-center">
                 <div
-                  class="mr-3 h-4 w-4 rounded-full"
+                  class="mr-3 h-3 w-3 rounded-full"
                   style={{ "background-color": COLORS[index() % COLORS.length] ?? COLORS[0] }}
                 />
-                <span class="font-medium text-gray-900 dark:text-white">{entry.model.split("-")[0] ?? entry.model}</span>
+                <span class="text-sm font-medium text-slate-900 dark:text-white">{entry.model.split("-")[0] ?? entry.model}</span>
               </div>
               <div class="text-right">
-                <div class="font-bold text-gray-900 dark:text-white">{formatCurrency(entry.usage.cost)}</div>
-                <div class="text-sm text-gray-500">{t("cost.tokensCount", { tokens: formatNumber(entry.usage.tokens) })}</div>
+                <div class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{formatCurrency(entry.usage.cost)}</div>
+                <div class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{t("cost.tokensCount", { tokens: formatNumber(entry.usage.tokens) })}</div>
               </div>
             </div>
           )}
@@ -378,32 +378,32 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
   )
 
   const tabClass = (active: boolean): string =>
-    `rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150 ${
+    `h-7 rounded-[5px] px-3 text-xs font-medium transition-colors duration-150 ${
       active
-        ? "bg-blue-500 text-white"
-        : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/60"
+        ? "bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white"
+        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/60"
     }`
 
   const loadingPersonal = (): boolean => personal.loading() && personal.data() === undefined
   const loadingSystem = (): boolean => isAdmin() && activeTab() === "system" && system.loading() && system.data() === undefined
 
   return (
-    <div class="space-y-8">
+    <div class="space-y-6">
       <Show when={isAdmin()}>
         <Motion.div
-          class="inline-flex space-x-2 rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
+          class="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <button type="button" class={tabClass(activeTab() === "personal")} onClick={() => setActiveTab("personal")}>
             <span class="flex items-center">
-              <DollarSign size={16} class="mr-2" />
+              <DollarSign size={14} aria-hidden="true" class="mr-2" />
               {t("cost.tab.personal")}
             </span>
           </button>
           <button type="button" class={tabClass(activeTab() === "system")} onClick={() => setActiveTab("system")}>
             <span class="flex items-center">
-              <Users size={16} class="mr-2" />
+              <Users size={14} aria-hidden="true" class="mr-2" />
               {t("cost.tab.system")}
             </span>
           </button>
@@ -419,8 +419,8 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
         <Show
           when={!personal.error() && !system.error()}
           fallback={
-            <Motion.div class="flex h-64 items-center justify-center text-red-500" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <AlertCircle class="mr-2 h-6 w-6" />
+            <Motion.div class="flex h-64 items-center justify-center text-sm text-red-600 dark:text-red-400" role="alert" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <AlertCircle aria-hidden="true" class="mr-2 h-5 w-5" />
               <span>{personal.error() ?? system.error()}</span>
             </Motion.div>
           }
@@ -432,7 +432,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
                 when={systemStats()}
                 fallback={
                   <EmptyCard
-                    icon={<Users class="h-12 w-12 text-gray-400" />}
+                    icon={<Users class="h-6 w-6 text-slate-400" />}
                     scene={<AnalyticsScene />}
                     title={t("cost.system.emptyTitle")}
                     body={t("cost.system.emptyBody")}
@@ -440,23 +440,23 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
                 }
               >
                 {(stats) => (
-                  <div class="space-y-6">
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  <div class="space-y-4">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                       <StatCard label={t("cost.system.users")} value={formatNumber(stats().totalUsers)}
-                        icon={<Users class="h-8 w-8 text-gray-500" />} />
+                        icon={<Users class="h-5 w-5" />} />
                       <StatCard label={t("cost.totalCost")} value={formatCurrency(stats().totalCost)}
-                        icon={<DollarSign class="h-8 w-8 text-gray-500" />} />
+                        icon={<DollarSign class="h-5 w-5" />} />
                       <StatCard label={t("cost.system.avgCost")} value={formatCurrency(stats().averageCostPerUser)}
-                        icon={<Activity class="h-8 w-8 text-gray-500" />} />
+                        icon={<Activity class="h-5 w-5" />} />
                       <StatCard label={t("cost.totalTokens")} value={formatNumber(stats().totalTokens)}
-                        icon={<Cpu class="h-8 w-8 text-gray-500" />} />
+                        icon={<Cpu class="h-5 w-5" />} />
                     </div>
 
                     <Motion.div class={cardClass} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-                      <h3 class="mb-6 text-xl font-bold text-gray-900 dark:text-white">{t("cost.topSpending")}</h3>
+                      <h3 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">{t("cost.topSpending")}</h3>
                       <Show
                         when={stats().topSpendingUsers.length > 0}
-                        fallback={<div class="py-12 text-center text-gray-500">{t("cost.noUsers")}</div>}
+                        fallback={<div class="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{t("cost.noUsers")}</div>}
                       >
                         <TopSpendingChart rows={stats().topSpendingUsers} />
                       </Show>
@@ -470,7 +470,7 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
               when={summary()}
               fallback={
                 <EmptyCard
-                  icon={<BarChart2 class="h-12 w-12 text-gray-400" />}
+                  icon={<BarChart2 class="h-6 w-6 text-slate-400" />}
                   scene={<AnalyticsScene />}
                   title={t("cost.emptyTitle")}
                   body={t("cost.emptyBody")}
@@ -480,37 +480,37 @@ export function UserCostAnalytics(props: UserCostAnalyticsProps): JSX.Element {
               }
             >
               {(data) => (
-                <div class="space-y-6">
-                  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <div class="space-y-4">
+                  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard label={t("cost.totalCost")} value={formatCurrency(data().totalCost)}
                       growth={breakdown()?.trends.costGrowth}
-                      icon={<DollarSign class="h-8 w-8 text-gray-500" />} />
+                      icon={<DollarSign class="h-5 w-5" />} />
                     <StatCard label={t("cost.totalTokens")} value={formatNumber(data().totalTokens)}
                       growth={breakdown()?.trends.tokensGrowth}
-                      icon={<Activity class="h-8 w-8 text-gray-500" />} />
+                      icon={<Activity class="h-5 w-5" />} />
                     <StatCard label={t("cost.requests")} value={formatNumber(data().totalRequests)}
                       growth={breakdown()?.trends.requestsGrowth}
-                      icon={<Cpu class="h-8 w-8 text-gray-500" />} />
+                      icon={<Cpu class="h-5 w-5" />} />
                     <StatCard label={t("cost.efficiency")} value={data().costEfficiencyScore.toFixed(1)}
                       caption={t("cost.efficiencyCaption")}
-                      icon={<TrendingUp class="h-8 w-8 text-gray-500" />} />
+                      icon={<TrendingUp class="h-5 w-5" />} />
                   </div>
 
                   <Motion.div class={cardClass} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
-                    <h3 class="mb-6 text-xl font-bold text-gray-900 dark:text-white">{t("cost.dailyTrends")}</h3>
+                    <h3 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">{t("cost.dailyTrends")}</h3>
                     <Show
                       when={data().dailyUsage.length > 0}
-                      fallback={<div class="py-12 text-center text-gray-500">{t("cost.noDaily")}</div>}
+                      fallback={<div class="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{t("cost.noDaily")}</div>}
                     >
                       <DailyUsageChart rows={data().dailyUsage} />
                     </Show>
                   </Motion.div>
 
                   <Motion.div class={cardClass} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
-                    <h3 class="mb-6 text-xl font-bold text-gray-900 dark:text-white">{t("cost.modelDistribution")}</h3>
+                    <h3 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">{t("cost.modelDistribution")}</h3>
                     <Show
                       when={modelEntries().length > 0}
-                      fallback={<div class="py-12 text-center text-gray-500">{t("cost.noModels")}</div>}
+                      fallback={<div class="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{t("cost.noModels")}</div>}
                     >
                       <ModelPie entries={modelEntries()} />
                     </Show>
@@ -538,7 +538,7 @@ interface EmptyCardProps {
 function EmptyCard(props: EmptyCardProps): JSX.Element {
   return (
     <Motion.div
-      class={`${cardClass} p-12 text-center`}
+      class={`${cardClass} !p-8 text-center`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -546,21 +546,21 @@ function EmptyCard(props: EmptyCardProps): JSX.Element {
       <div class="flex flex-col items-center space-y-4">
         <Show
           when={props.scene !== undefined}
-          fallback={<div class="rounded-full bg-gray-100 p-4 dark:bg-gray-700">{props.icon}</div>}
+          fallback={<div class="rounded-full bg-slate-100 p-4 dark:bg-slate-800">{props.icon}</div>}
         >
-          <div class="w-full max-w-md overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true">
+          <div class="w-full max-w-md overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true">
             {props.scene}
           </div>
         </Show>
         <div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">{props.title}</h3>
-          <p class="max-w-md text-gray-500 dark:text-gray-400">{props.body}</p>
+          <h3 class="mb-2 text-sm font-semibold text-slate-900 dark:text-white">{props.title}</h3>
+          <p class="max-w-md text-sm text-slate-500 dark:text-slate-400">{props.body}</p>
         </div>
         <Show when={props.action !== undefined}>
           <Motion.button
             type="button"
-            class="rounded-lg bg-blue-500 px-6 py-3 text-white transition-colors duration-200 hover:bg-blue-600"
-                        onClick={() => props.onAction?.()}
+            class="h-7 rounded-[5px] bg-blue-600 px-3 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700"
+            onClick={() => props.onAction?.()}
           >
             {props.action}
           </Motion.button>

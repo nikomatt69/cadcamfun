@@ -156,7 +156,7 @@ export function ProjectDetailScreen(): JSX.Element {
         {(row) => (
           <div class={CARD} data-testid={`project-card-${row.id}`}>
             <button type="button" aria-label={`${t("projects.open")}: ${row.name}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" onClick={() => onOpen(row)}>
-            <div class="flex h-24 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
+            <div class="flex h-24 items-center justify-center overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40">
               <Show when={row.thumbnail} fallback={thumb}>{(src) => <img src={src()} alt={row.name} class="h-full w-full object-contain" />}</Show>
             </div>
             <div class="p-3">
@@ -165,7 +165,7 @@ export function ProjectDetailScreen(): JSX.Element {
               <Show when={showDate && row.updatedAt}><div class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{t("projects.column.updated")} {formatDate(row.updatedAt)}</div></Show>
             </div>
             </button>
-            <Show when={actions}><div class="flex justify-end gap-1 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/30">{actions!(row)}</div></Show>
+            <Show when={actions}><div class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/30">{actions!(row)}</div></Show>
           </div>
         )}
       </For>
@@ -274,7 +274,7 @@ export function ProjectDetailScreen(): JSX.Element {
         <form onSubmit={(event) => void update(event)}>{nameFields()}<Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>{submit(t("settings.profile.save"), "Saving...")}</form>
       </Modal>
       <Modal open={modal() === "delete"} onClose={() => setModal(undefined)} title={t("pages.delete.project")} size="sm">
-        <p class="text-slate-600 dark:text-slate-300">{t("projects.delete")} <strong>{project()?.name}</strong> with all its drawings, components and toolpaths? This cannot be undone.</p>
+        <p class="text-sm text-[color:var(--ent-text-muted)]">{t("projects.delete")} <strong>{project()?.name}</strong> with all its drawings, components and toolpaths? This cannot be undone.</p>
         <Show when={problem()}><p class="ui-field-error" role="alert">{problem()}</p></Show>
         <div class="flex justify-end gap-2 mt-4">
           <button type="button" class={CANCEL_BUTTON} onClick={() => setModal(undefined)}>{t("projects.cancel")}</button>

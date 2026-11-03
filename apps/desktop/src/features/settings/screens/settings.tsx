@@ -18,7 +18,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { ProfileSettings } from "../components/profile-settings.tsx"
-import { WorkspacePage, WorkspaceTabs, PANEL } from "../../../shared/components/WorkspacePage.tsx"
+import { CANCEL_BUTTON, SUBMIT_BUTTON, WorkspacePage, WorkspaceTabs, PANEL } from "../../../shared/components/WorkspacePage.tsx"
 import { SessionManagement } from "../components/session-management.tsx"
 import { PasskeySettings } from "../components/passkey-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
@@ -108,7 +108,7 @@ export function SettingsScreen(): JSX.Element {
           </div>
 
           <div class="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <h4 class="text-base font-medium text-slate-900 dark:text-white">{t("settings.account.deletionTitle")}</h4>
+            <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.account.deletionTitle")}</h4>
             <div class="mt-2">
               <p class="text-sm text-slate-500 dark:text-slate-400">
                 Once you delete your account, you cannot go back. All your data will be permanently removed. Please
@@ -120,7 +120,7 @@ export function SettingsScreen(): JSX.Element {
                 type="button"
                 onClick={() => void handleDeleteAccount()}
                 disabled={isDeleting()}
-                class="inline-flex items-center justify-center rounded-lg border border-red-200/70 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors duration-150 ease-out hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
+                class="inline-flex h-7 items-center justify-center rounded-[5px] border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-700 transition-colors duration-150 ease-out hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
               >
                 {isDeleting() ? t("settings.account.deleting") : t("settings.account.delete")}
               </button>
@@ -194,9 +194,9 @@ export function SettingsScreen(): JSX.Element {
               </div>
             </div>
 
-            <div class="mt-8 rounded-lg border border-slate-200/60 bg-slate-50/70 p-4 dark:border-slate-700/40 dark:bg-slate-800/30">
+            <div class="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
               <div class="flex items-start">
-                <div class="flex-shrink-0">
+                <div class="flex-none">
                   <Globe class="h-5 w-5 text-slate-400" aria-hidden="true" />
                 </div>
                 <div class="ml-3">
@@ -221,7 +221,7 @@ export function SettingsScreen(): JSX.Element {
           {/* Email notifications */}
           <div class="mt-6">
             <fieldset>
-              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.email")}</legend>
+              <legend class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.notif.email")}</legend>
               <div class="mt-4 space-y-4">
                 <div class="flex items-start">
                   <div class="flex items-center h-5">
@@ -266,7 +266,7 @@ export function SettingsScreen(): JSX.Element {
           {/* Native desktop notifications, synced with the DB feed and the paired phone */}
           <div class="mt-6">
             <fieldset>
-              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.native")}</legend>
+              <legend class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.notif.native")}</legend>
               <div class="mt-4 flex items-start">
                 <div class="flex items-center h-5">
                   <input id="native-notifications" name="native-notifications" type="checkbox" checked={app.settings.settings().nativeNotifications} onChange={(event) => app.settings.update({ nativeNotifications: event.currentTarget.checked })} class="h-4 w-4 accent-blue-600" />
@@ -283,11 +283,11 @@ export function SettingsScreen(): JSX.Element {
           <Show when={inDesktopShell()}>
             <div class="mt-6" data-testid="settings-updates">
               <fieldset>
-                <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.updates.title")}</legend>
+                <legend class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.updates.title")}</legend>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("settings.updates.description")}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <button type="button" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700" onClick={() => void checkForUpdates().catch(() => toast.error(t("update.checkFailed")))}>{t("settings.updates.check")}</button>
-                  <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" onClick={() => void openReleaseNotes().catch(() => undefined)}>{t("update.releaseNotes")}</button>
+                  <button type="button" class={SUBMIT_BUTTON} onClick={() => void checkForUpdates().catch(() => toast.error(t("update.checkFailed")))}>{t("settings.updates.check")}</button>
+                  <button type="button" class={CANCEL_BUTTON} onClick={() => void openReleaseNotes().catch(() => undefined)}>{t("update.releaseNotes")}</button>
                 </div>
               </fieldset>
             </div>
@@ -296,7 +296,7 @@ export function SettingsScreen(): JSX.Element {
           {/* Push notifications */}
           <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
             <fieldset>
-              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.push")}</legend>
+              <legend class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.notif.push")}</legend>
               <div class="mt-4 space-y-4">
                 <div class="flex items-start">
                   <div class="flex items-center h-5">

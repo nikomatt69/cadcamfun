@@ -58,7 +58,7 @@ export function GitProfileSettings(): JSX.Element {
   const field = "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 
   return (
-    <div class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+    <div class="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
       <h3 class="mb-1 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
         <GitBranch class="mr-2 h-4 w-4" />
         {t("vcs.profile.title")}
@@ -90,7 +90,7 @@ export function GitProfileSettings(): JSX.Element {
           <button
             type="submit"
             disabled={saving() || !changed()}
-            class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+            class="flex items-center gap-2 h-7 rounded-[5px] bg-blue-600 px-3 text-xs font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             <Show when={saving()}>
               <div aria-hidden="true" class="h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-white border-t-transparent" />

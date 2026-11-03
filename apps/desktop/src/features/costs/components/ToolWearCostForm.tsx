@@ -68,11 +68,11 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
 
   return (
     <div class={PANEL}>
-      <h3 class="text-[13px] font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.wear.editTitle") : t("costs.wear.addTitle")}</h3>
+      <h3 class="mb-4 text-[13px] font-semibold text-slate-900 dark:text-white">{isEditing() ? t("costs.wear.editTitle") : t("costs.wear.addTitle")}</h3>
 
       <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
         <div>
-          <label for="toolId" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("status.tool")}</label>
+          <label for="toolId" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("status.tool")}</label>
           <select id="toolId" name="toolId" value={formData.toolId} onChange={handleChange} class={FIELD} required disabled={isEditing() || isLoadingTools() || !!toolError()}>
             <Show
               when={!isLoadingTools()}
@@ -95,24 +95,24 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
         </div>
 
         <div>
-          <label for="wearRatePerMeter" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.rate")}</label>
+          <label for="wearRatePerMeter" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.wear.rate")}</label>
           <NumberField id="wearRatePerMeter" name="wearRatePerMeter" value={formData.wearRatePerMeter} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("wearRatePerMeter", value)} />
-          <p class="text-xs text-gray-500 mt-1">{t("costs.wear.rateHint")}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("costs.wear.rateHint")}</p>
         </div>
 
         <div>
-          <label for="replacementCost" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.replacement", { currency: formData.currencyCode })}</label>
+          <label for="replacementCost" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.wear.replacement", { currency: formData.currencyCode })}</label>
           <NumberField id="replacementCost" name="replacementCost" value={formData.replacementCost} min="0" step="0.01" class={FIELD} accept={(value) => value >= 0} onValue={(value) => setFormData("replacementCost", value)} />
         </div>
 
         <div>
-          <label for="replacementThreshold" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.threshold")}</label>
+          <label for="replacementThreshold" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.wear.threshold")}</label>
           <NumberField id="replacementThreshold" name="replacementThreshold" value={formData.replacementThreshold} min="0" max="100" step="1" class={FIELD} accept={(value) => value >= 0 && value <= 100} onValue={(value) => setFormData("replacementThreshold", value)} />
-          <p class="text-xs text-gray-500 mt-1">{t("costs.wear.thresholdHint")}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("costs.wear.thresholdHint")}</p>
         </div>
 
         <div>
-          <label for="currencyCode" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.currency")}</label>
+          <label for="currencyCode" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("costs.currency")}</label>
           <select id="currencyCode" name="currencyCode" value={formData.currencyCode} onChange={handleChange} class={FIELD} required>
             <option value="EUR">EUR (€)</option> {/* i18n-ok currency code */}
             <option value="USD">USD ($)</option> {/* i18n-ok currency code */}

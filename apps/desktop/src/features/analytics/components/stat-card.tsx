@@ -14,19 +14,19 @@ export interface StatCardProps {
 export function StatCard(props: StatCardProps): JSX.Element {
   const isPositive = (): boolean | undefined => (props.change === undefined ? undefined : props.change >= 0)
   return (
-    <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900">
-      <div class="p-3 sm:p-5">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">{props.icon}</div>
-          <div class="ml-3 w-0 flex-1 sm:ml-5">
+    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div class="p-4">
+        <div class="flex items-center gap-3">
+          <div class="flex-none text-slate-400 dark:text-slate-500">{props.icon}</div>
+          <div class="w-0 flex-1">
             <dl>
-              <dt class="truncate text-xs font-medium text-gray-500 sm:text-sm dark:text-gray-300">{props.title}</dt>
+              <dt class="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{props.title}</dt>
               <dd>
-                <div class="text-base font-medium tabular-nums text-gray-900 sm:text-lg dark:text-white">
+                <div class="text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
                   {typeof props.value === "number" ? props.value.toLocaleString() : props.value}
                 </div>
                 <Show when={props.subValue !== undefined && props.subValue !== ""}>
-                  <div class="mt-0.5 text-xs text-gray-500 sm:text-sm dark:text-gray-400">{props.subValue}</div>
+                  <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{props.subValue}</div>
                 </Show>
               </dd>
             </dl>
@@ -35,17 +35,17 @@ export function StatCard(props: StatCardProps): JSX.Element {
       </div>
 
       <Show when={props.change !== undefined}>
-        <div class="bg-gray-50 px-3 py-2 sm:px-5 sm:py-3 dark:bg-gray-800">
-          <div class="flex items-center">
-            <div class={`flex-shrink-0 ${isPositive() ? "text-green-500" : "text-red-500"}`}>
+        <div class="border-t border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
+          <div class="flex items-center gap-2">
+            <div class={`flex-none ${isPositive() ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
               <Show when={isPositive()} fallback={<ArrowDown class="h-4 w-4" />}><ArrowUp class="h-4 w-4" /></Show>
             </div>
-            <div class="ml-2 text-xs sm:text-sm">
+            <div class="text-xs">
               <span class={`font-medium ${isPositive() ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {isPositive() ? "+" : ""}{props.change}%
               </span>
               <Show when={props.changeLabel !== undefined}>
-                <span class="text-gray-500 dark:text-gray-400"> {props.changeLabel}</span>
+                <span class="text-slate-500 dark:text-slate-400"> {props.changeLabel}</span>
               </Show>
             </div>
           </div>

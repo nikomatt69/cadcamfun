@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal, onCleanup, type JSX } from "solid-
 import X from "lucide-solid/icons/x"
 import { t, type Key } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
+import { CANCEL_BUTTON, FIELD } from "../../../shared/components/WorkspacePage.tsx"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { saveFile } from "../../../shared/lib/save-file.ts"
 import { COMMANDS, GROUPS, SCOPES, groupKeyOf, labelKeyOf, type CommandDef, type Scope } from "../../../shared/keybindings/catalog.ts"
@@ -120,13 +121,13 @@ export function KeybindingsSettings(): JSX.Element {
           <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("keys.title")}</h3>
           <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("keys.subtitle")}</p>
         </div>
-        <div class="flex items-center gap-2 text-sm">
-          <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-600" onClick={() => void exportMap()}>{t("keys.export")}</button>
-          <label class="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500 dark:border-slate-600">
+        <div class="flex items-center gap-2">
+          <button type="button" class={CANCEL_BUTTON} onClick={() => void exportMap()}>{t("keys.export")}</button>
+          <label class={`${CANCEL_BUTTON} cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-blue-500`}>
             {t("keys.import")}
             <input type="file" accept="application/json,.json" class="sr-only" onChange={(event) => { void importMap(event.currentTarget.files?.[0]); event.currentTarget.value = "" }} />
           </label>
-          <button type="button" class="rounded-md border border-red-200 px-3 py-1.5 text-red-700 dark:border-red-800 dark:text-red-300" onClick={() => { keys.resetAll(); setPending(undefined); toast.success(t("keys.resetDone")) }}>{t("keys.resetAll")}</button>
+          <button type="button" class={`${CANCEL_BUTTON} !border-red-200 !text-red-700 dark:!border-red-800 dark:!text-red-300`} onClick={() => { keys.resetAll(); setPending(undefined); toast.success(t("keys.resetDone")) }}>{t("keys.resetAll")}</button>
         </div>
       </div>
 
@@ -135,45 +136,45 @@ export function KeybindingsSettings(): JSX.Element {
       <div class="flex flex-wrap items-center gap-2">
         <div role="group" aria-label={t("keys.title")} class="flex flex-wrap gap-2">
           <For each={SCOPES}>{(tab) =>
-            <button type="button" aria-pressed={scope() === tab} onClick={() => { finish(); setPending(undefined); setScope(tab) }} class="rounded-md px-3 py-1.5 text-sm"
-              classList={{ "bg-blue-600 text-white": scope() === tab, "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200": scope() !== tab }}>{t(`keys.scope.${tab}` as Key)}</button>}
+            <button type="button" aria-pressed={scope() === tab} onClick={() => { finish(); setPending(undefined); setScope(tab) }} class="h-7 rounded-[5px] px-3 text-xs font-medium"
+              classList={{ "bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white": scope() === tab, "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700": scope() !== tab }}>{t(`keys.scope.${tab}` as Key)}</button>}
           </For>
         </div>
         <input type="search" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} placeholder={t("keys.search")} aria-label={t("keys.search")}
-          class="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm sm:ml-auto sm:w-auto sm:min-w-[14rem] dark:border-slate-600 dark:bg-slate-800" />
+          class={`${FIELD} min-w-0 sm:ml-auto sm:!w-auto sm:min-w-[14rem]`} />
       </div>
 
       <For each={rows()}>{(section) =>
         <section>
-          <h4 class="mb-1 text-xs font-semibold text-slate-500">{t(groupKeyOf(section.group) as Key)}</h4>
+          <h4 class="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{t(groupKeyOf(section.group) as Key)}</h4>
           <ul class="divide-y divide-slate-200 dark:divide-slate-700">
             <For each={section.list}>{(row) =>
               <li class="py-2" data-command={row.command.id}>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <span class="text-sm text-slate-800 dark:text-slate-200">
                     {row.label}
-                    <Show when={row.entry.customised}><span class="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">{t("keys.custom")}</span></Show>
+                    <Show when={row.entry.customised}><span class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{t("keys.custom")}</span></Show>
                   </span>
                   <span class="flex flex-wrap items-center gap-2">
                     <For each={row.entry.chords} fallback={<span class="text-xs text-slate-400">{t("keys.unbound")}</span>}>{(chord) =>
-                      <span class="inline-flex items-center gap-1 rounded-md border border-transparent hover:border-slate-300 dark:hover:border-slate-600">
+                      <span class="inline-flex items-center gap-2 rounded-md border border-transparent hover:border-slate-300 dark:hover:border-slate-600">
                         <button type="button" class="rounded px-2 py-1" aria-label={`${row.label}: ${displayChord(chord, keys.platform)}`} onClick={() => startRecording(row.command, formatChord(chord))}><ChordKeys chord={chord} platform={keys.platform} /></button>
                         <button type="button" class="inline-flex items-center rounded px-2 py-1 text-xs text-slate-400 hover:text-red-600" aria-label={`${t("keys.unbound")} ${displayChord(chord, keys.platform)}`} onClick={() => remove(row.command, formatChord(chord))}><X size={12} aria-hidden="true" /></button>
                       </span>}
                     </For>
-                    <button type="button" class="rounded-md border border-dashed border-slate-300 px-3 py-1 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300" onClick={() => startRecording(row.command, undefined)}>+ {t("keys.add")}</button>
+                    <button type="button" class="h-7 rounded-[5px] border border-dashed border-slate-300 px-3 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300" onClick={() => startRecording(row.command, undefined)}>+ {t("keys.add")}</button>
                     <Show when={row.entry.customised}>
                       <button type="button" class="text-xs text-slate-500 underline" onClick={() => { keys.reset(row.command.id); setPending(undefined) }}>{t("keys.reset")}</button>
                     </Show>
                   </span>
                 </div>
                 <Show when={recording()?.id === row.command.id}>
-                  <div class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm dark:bg-blue-900/20" role="status">
+                  <div class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800" role="status">
                     <span class="font-medium">{t("keys.record")}</span>
                     <span class="text-xs text-slate-500">{t("keys.recordHint")}</span>
                     <input type="text" value={typed()} onInput={(event) => setTyped(event.currentTarget.value)} placeholder="Mod+Shift+K" aria-label={t("keys.add")} // i18n-ok key chord
                       onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitTyped(row.command) } }}
-                      class="w-40 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs dark:border-slate-600 dark:bg-slate-800" />
+                      class="w-40 rounded-[5px] border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800" />
                     <button type="button" class="text-xs underline" onClick={finish}>{t("keys.cancel")}</button>
                   </div>
                 </Show>
@@ -181,7 +182,7 @@ export function KeybindingsSettings(): JSX.Element {
                   <div class="mt-2 flex flex-wrap items-center gap-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
                     <span>{pending()!.message}</span>
                     <Show when={pending()!.reassignable}>
-                      <button type="button" class="rounded-md bg-red-600 px-3 py-1 text-xs text-white" onClick={() => { const p = pending()!; commit(p.id, withChord(p.id, p.chord, p.replaces), p.replaces, true) }}>{t("keys.reassign")}</button>
+                      <button type="button" class="h-7 rounded-[5px] bg-red-600 px-3 text-xs font-medium text-white hover:bg-red-700" onClick={() => { const p = pending()!; commit(p.id, withChord(p.id, p.chord, p.replaces), p.replaces, true) }}>{t("keys.reassign")}</button>
                     </Show>
                     <button type="button" class="text-xs underline" onClick={() => setPending(undefined)}>{t("keys.cancel")}</button>
                   </div>

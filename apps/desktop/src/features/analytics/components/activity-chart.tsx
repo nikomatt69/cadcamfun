@@ -88,7 +88,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
     <Show
       when={!reply.loading()}
       fallback={
-        <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        <div class="flex h-64 items-center justify-center rounded-lg border border-slate-200 p-4 dark:border-slate-700">
           <div class="w-full max-w-sm"><LoadingState label={t("admin.chart.loading")} rows={3} /></div>
         </div>
       }
@@ -96,11 +96,11 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
       <Show
         when={!reply.error()}
         fallback={
-          <div class="flex h-64 items-center justify-center rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <div class="flex h-64 items-center justify-center rounded-lg border border-slate-200 p-4 dark:border-slate-700">
             <div class="flex flex-col items-center text-center">
-              <AlertCircle aria-hidden="true" class="mb-2 h-8 w-8 text-red-500" />
-              <h3 class="mb-2 text-lg font-medium text-gray-900 dark:text-white">{t("admin.chart.unable")}</h3>
-              <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">{reply.error()}</p>
+              <AlertCircle aria-hidden="true" class="mb-2 h-5 w-5 text-red-600 dark:text-red-400" />
+              <h3 class="mb-2 text-sm font-semibold text-slate-900 dark:text-white">{t("admin.chart.unable")}</h3>
+              <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{reply.error()}</p>
               <button type="button" class="btn btn-primary" onClick={() => void reply.refetch()}>{t("admin.chart.retry")}</button>
             </div>
           </div>
@@ -109,9 +109,9 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
         <Show
           when={data().length > 0}
           fallback={
-            <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-              <div class="w-full max-w-sm overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><AnalyticsScene /></div>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{t("admin.chart.empty")}</p>
+            <div class="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+              <div class="w-full max-w-sm overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" aria-hidden="true"><AnalyticsScene /></div>
+              <p class="text-sm text-slate-500 dark:text-slate-400">{t("admin.chart.empty")}</p>
             </div>
           }
         >
@@ -119,9 +119,9 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            class="rounded-lg bg-white p-6 shadow dark:bg-gray-800"
+            class="rounded-lg border border-slate-200 p-4 dark:border-slate-700"
           >
-            <h3 class="mb-4 text-center text-sm font-medium text-gray-600 sm:text-base dark:text-gray-400">
+            <h3 class="mb-4 text-center text-sm font-medium text-slate-600 dark:text-slate-400">
               {t("admin.chart.trend", { label: chartLabel, groupBy })}
             </h3>
             <div class="h-64">

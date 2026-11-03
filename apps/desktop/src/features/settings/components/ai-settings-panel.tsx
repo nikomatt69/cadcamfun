@@ -8,6 +8,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { BridgeSettings, ProviderSettings, SkillsSettings, useAiStore } from "../../ai/index.ts"
 import { DEFAULT_TEMPERATURE, defaultAiSettings, loadAiSettings, saveAiSettings, type AiSettings, type McpStrategy } from "./ai-settings.ts"
 import { getEndpoint } from "../../../app/sidecar.ts"
+import { Switch } from "../../../shared/ui/field.tsx"
 
 type TestStatus = "idle" | "testing" | "success" | "error"
 
@@ -49,7 +50,7 @@ const testConnection = async (endpointPath: string, apiKey: string | undefined):
 }
 
 const Chevron = (props: { readonly open: boolean }): JSX.Element => (
-  <ChevronDown size={16} aria-hidden="true" class={`ml-1.5 transform transition-transform ${props.open ? "rotate-180" : ""}`} />
+  <ChevronDown size={16} aria-hidden="true" class={`ml-2 transform transition-transform ${props.open ? "rotate-180" : ""}`} />
 )
 
 interface ToggleRowProps {
@@ -60,24 +61,12 @@ interface ToggleRowProps {
 }
 
 const ToggleRow = (props: ToggleRowProps): JSX.Element => (
-  <div class="flex justify-between items-center">
+  <div class="flex items-center justify-between gap-3">
     <div>
-      <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{props.label}</label>
-      <p class="text-xs text-gray-500 dark:text-gray-400">{props.hint}</p>
+      <label class="text-sm font-medium text-slate-700 dark:text-slate-300">{props.label}</label>
+      <p class="text-xs text-slate-500 dark:text-slate-400">{props.hint}</p>
     </div>
-    <div class="relative inline-block w-12 align-middle select-none">
-      <input
-        type="checkbox"
-        checked={props.checked}
-        onChange={(event) => props.onChange(event.currentTarget.checked)}
-        class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white dark:bg-gray-300 border-4 border-gray-300 dark:border-gray-600 appearance-none cursor-pointer"
-      />
-      <label
-        class={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${
-          props.checked ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-800"
-        }`}
-      />
-    </div>
+    <Switch checked={props.checked} onChange={props.onChange} />
   </div>
 )
 
@@ -134,31 +123,31 @@ export function AISettingsPanel(): JSX.Element {
   }
 
   return (
-    <div class="p-4 space-y-6">
-      <div class="flex items-center justify-between border-b border-slate-200/70 pb-4 dark:border-slate-700/50">
+    <div class="space-y-6 p-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-4 dark:border-slate-700">
         <h3 class="flex items-center text-lg font-medium leading-6 text-slate-900 dark:text-white">
           <Sliders class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           {t("settings.ai.title")}
         </h3>
 
-        <div class="flex space-x-2">
+        <div class="flex gap-2">
           <button
             type="button"
             onClick={() => void handleSaveSettings()}
             disabled={isSaving() || isLoading()}
-            class="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+            class="inline-flex h-7 items-center gap-2 rounded-[5px] bg-blue-600 px-3 text-xs font-medium text-white transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving()
-              ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
-              : <Save size={14} class="mr-1.5" />}
+              ? <RefreshCw size={14} class="animate-spin" />
+              : <Save size={14} />}
             {t("settings.ai.save")}
           </button>
         </div>
       </div>
 
       <Show when={saveSuccess()}>
-        <div class="px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm rounded flex items-center">
-          <Cpu size={14} class="mr-2" />
+        <div class="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
+          <Cpu size={14} />
           {t("settings.ai.saved")}
         </div>
       </Show>
@@ -173,7 +162,7 @@ export function AISettingsPanel(): JSX.Element {
         <BridgeSettings />
 
         <div>
-          <label for="ai-temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="ai-temperature" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             {t("settings.ai.temperature", { value: temperature().toFixed(1) })}
           </label>
           <input
@@ -187,43 +176,31 @@ export function AISettingsPanel(): JSX.Element {
               setSaveSuccess(false)
               setTemperature(Number.parseFloat(event.currentTarget.value))
             }}
-            class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700"
           />
-          <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div class="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>{t("settings.ai.precise")}</span>
             <span>{t("settings.ai.balancedTemp")}</span>
             <span>{t("settings.ai.creative")}</span>
           </div>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {t("settings.ai.temperatureHint")}
           </p>
         </div>
 
         {/* MCP (Model-Completions-Protocol) Section */}
-        <div class="pt-4 pb-2 border-t border-gray-200 dark:border-gray-700">
-          <div class="flex justify-between items-center">
+        <div class="border-t border-slate-200 pb-2 pt-4 dark:border-slate-700">
+          <div class="flex items-center justify-between gap-3">
             <div>
-              <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                <Server size={14} class="mr-1.5 text-gray-400" />
+              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                <Server size={14} class="text-slate-400" />
                 {t("settings.ai.mcp")}
               </label>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {t("settings.ai.mcpHint")}
               </p>
             </div>
-            <div class="relative inline-block w-12 align-middle select-none">
-              <input
-                type="checkbox"
-                checked={settings().mcpEnabled}
-                onChange={(event) => updateSettings({ mcpEnabled: event.currentTarget.checked })}
-                class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white dark:bg-gray-300 border-4 border-gray-300 dark:border-gray-600 appearance-none cursor-pointer"
-              />
-              <label
-                class={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${
-                  settings().mcpEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-800"
-                }`}
-              />
-            </div>
+            <Switch checked={settings().mcpEnabled} onChange={(checked) => updateSettings({ mcpEnabled: checked })} />
           </div>
 
           <Show when={settings().mcpEnabled}>
@@ -231,16 +208,16 @@ export function AISettingsPanel(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setShowMCPSettings(!showMCPSettings())}
-                class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+                class="flex items-center text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
               >
                 {showMCPSettings() ? t("settings.ai.hideMcp") : t("settings.ai.showMcp")}
                 <Chevron open={showMCPSettings()} />
               </button>
 
               <Show when={showMCPSettings()}>
-                <div class="mt-3 space-y-3 pl-3 border-l-2 border-blue-200 dark:border-blue-800">
+                <div class="mt-3 space-y-3 border-l-2 border-slate-200 pl-3 dark:border-slate-700">
                   <div>
-                    <label for="mcp-endpoint" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-endpoint" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.ai.mcpEndpoint")}
                     </label>
                     <input
@@ -249,15 +226,15 @@ export function AISettingsPanel(): JSX.Element {
                       placeholder="/api/mcp-protocol"
                       value={settings().mcpEndpoint ?? "/api/mcp-protocol"}
                       onInput={(event) => updateSettings({ mcpEndpoint: event.currentTarget.value })}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     />
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {t("settings.ai.mcpDefault")}
                     </p>
                   </div>
 
                   <div>
-                    <label for="mcp-api-key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-api-key" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.ai.mcpApiKey")}
                     </label>
                     <input
@@ -267,31 +244,31 @@ export function AISettingsPanel(): JSX.Element {
                       value={mcpApiKey()}
                       autocomplete="off"
                       onInput={(event) => setMcpApiKey(event.currentTarget.value)}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label for="mcp-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-strategy" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.ai.mcpStrategy")}
                     </label>
                     <select
                       id="mcp-strategy"
                       value={settings().mcpStrategy}
                       onChange={(event) => updateSettings({ mcpStrategy: event.currentTarget.value as McpStrategy })}
-                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     >
                       <option value="aggressive">{t("settings.ai.strategyAggressive")}</option>
                       <option value="balanced">{t("settings.ai.strategyBalanced")}</option>
                       <option value="conservative">{t("settings.ai.strategyConservative")}</option>
                     </select>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {t("settings.ai.strategyHint")}
                     </p>
                   </div>
 
                   <div>
-                    <label for="mcp-cache-lifetime" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-cache-lifetime" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.ai.mcpCache", { hours: (settings().mcpCacheLifetime || 86400000) / (1000 * 60 * 60) })}
                     </label>
                     <input
@@ -302,9 +279,9 @@ export function AISettingsPanel(): JSX.Element {
                       step="3600000"
                       value={settings().mcpCacheLifetime || 86400000}
                       onInput={(event) => updateSettings({ mcpCacheLifetime: Number.parseInt(event.currentTarget.value, 10) })}
-                      class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700"
                     />
-                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <div class="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
                       <span>1 hour</span>
                       <span>1 day</span>
                       <span>1 week</span>
@@ -316,17 +293,17 @@ export function AISettingsPanel(): JSX.Element {
                       type="button"
                       onClick={() => void runMcpTest()}
                       disabled={mcpTestStatus() === "testing"}
-                      class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors duration-150 ease-out hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                      class="inline-flex h-7 items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors duration-150 ease-out hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       {mcpTestStatus() === "testing"
-                        ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
-                        : <Server size={14} class="mr-1.5" />}
+                        ? <RefreshCw size={14} class="animate-spin" />
+                        : <Server size={14} />}
                       {t("settings.ai.mcpTest")}
                     </button>
 
                     <Show when={mcpTestStatus() !== "idle" && mcpTestResult() !== undefined}>
                       <div
-                        class={`mt-2 px-3 py-2 text-xs rounded ${
+                        class={`mt-2 rounded-md px-3 py-2 text-xs ${
                           mcpTestStatus() === "success"
                             ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
                             : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
@@ -342,7 +319,7 @@ export function AISettingsPanel(): JSX.Element {
           </Show>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        <div class="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
           <div class="space-y-3">
             <ToggleRow
               label={t("settings.ai.autoSuggest")}
@@ -383,16 +360,16 @@ export function AISettingsPanel(): JSX.Element {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced())}
-          class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+          class="flex items-center text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
         >
           {showAdvanced() ? t("settings.ai.hideAdvanced") : t("settings.ai.showAdvanced")}
           <Chevron open={showAdvanced()} />
         </button>
 
         <Show when={showAdvanced()}>
-          <div class="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+          <div class="mt-2 space-y-4 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div>
-              <label for="ai-max-tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="ai-max-tokens" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 {t("settings.ai.maxTokens", { value: settings().maxTokens })}
               </label>
               <input
@@ -403,9 +380,9 @@ export function AISettingsPanel(): JSX.Element {
                 step="500"
                 value={settings().maxTokens}
                 onInput={(event) => updateSettings({ maxTokens: Number.parseInt(event.currentTarget.value, 10) })}
-                class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700"
               />
-              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div class="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
                 <span>1000</span>
                 <span>4000</span>
                 <span>8000</span>
@@ -413,7 +390,7 @@ export function AISettingsPanel(): JSX.Element {
             </div>
 
             <div>
-              <label for="ai-suggestion-threshold" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="ai-suggestion-threshold" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 {t("settings.ai.suggestThreshold", { value: settings().suggestThreshold })}
               </label>
               <input
@@ -424,9 +401,9 @@ export function AISettingsPanel(): JSX.Element {
                 step="0.1"
                 value={settings().suggestThreshold}
                 onInput={(event) => updateSettings({ suggestThreshold: Number.parseFloat(event.currentTarget.value) })}
-                class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700"
               />
-              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div class="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
                 <span>{t("settings.ai.moreSuggestions")}</span>
                 <span>{t("settings.ai.balancedSuggest")}</span>
                 <span>{t("settings.ai.onlyRelevant")}</span>
@@ -437,18 +414,18 @@ export function AISettingsPanel(): JSX.Element {
               <button
                 type="button"
                 disabled
-                class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
               >
-                <Database size={14} class="mr-1.5" />
+                <Database size={14} />
                 {t("settings.ai.clearCache")}
               </button>
 
               <button
                 type="button"
                 onClick={() => ai.clear()}
-                class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                class="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
               >
-                <RefreshCw size={14} class="mr-1.5" />
+                <RefreshCw size={14} />
                 {t("settings.ai.clearHistory")}
               </button>
             </div>
@@ -457,46 +434,46 @@ export function AISettingsPanel(): JSX.Element {
       </fieldset>
 
       {/* Performance summary */}
-      <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-4">
-        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-          <Zap size={14} class="mr-1.5 text-gray-400" />
+      <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+        <h3 class="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <Zap size={14} class="text-slate-400" />
           {t("settings.ai.stats")}
         </h3>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.avgResponse")}</p>
-            <p class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.ai.avgResponse")}</p>
+            <p class="text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
               {Math.round(performance.averageResponseTime)} ms
             </p>
           </div>
 
           <div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.successRate")}</p>
-            <p class="text-lg font-medium text-gray-900 dark:text-gray-100">{Math.round(performance.successRate)}%</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.ai.successRate")}</p>
+            <p class="text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">{Math.round(performance.successRate)}%</p>
           </div>
         </div>
 
         <Show when={settings().mcpEnabled}>
-          <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-              <Server size={14} class="mr-1.5 text-gray-400" />
+          <div class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <h4 class="mb-2 flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <Server size={14} class="text-slate-400" />
               {t("settings.ai.mcpStats")}
             </h4>
-            <div class="flex space-x-4">
+            <div class="flex gap-4">
               <div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.savings")}</p>
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.ai.savings")}</p>
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-100">
                   --
                 </p>
               </div>
               <div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.strategy")}</p>
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{settings().mcpStrategy}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.ai.strategy")}</p>
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{settings().mcpStrategy}</p>
               </div>
               <div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.cacheLabel")}</p>
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.ai.cacheLabel")}</p>
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-100">
                   {((settings().mcpCacheLifetime || 86400000) / (1000 * 60 * 60)).toFixed(0)}h
                 </p>
               </div>
@@ -504,22 +481,22 @@ export function AISettingsPanel(): JSX.Element {
           </div>
         </Show>
 
-        <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
           <div class="flex items-center justify-between">
-            <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
-              <DollarSign size={14} class="mr-1.5" />
+            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <DollarSign size={14} />
               {t("settings.ai.costPerK", { cost: "--" })}
             </div>
-            <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
-              <Clock size={14} class="mr-1.5" />
+            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <Clock size={14} />
               {t("settings.ai.lastUpdate", { time: new Date(performance.lastSync).toLocaleTimeString() })}
             </div>
           </div>
         </div>
       </div>
 
-      <div class="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-xs rounded-lg flex items-start">
-        <AlertTriangle size={14} class="mr-2 flex-shrink-0 mt-0.5" />
+      <div class="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+        <AlertTriangle size={14} class="mt-0.5 flex-none" />
         <p>
           Advanced settings can affect performance and costs. The MCP protocol helps reduce costs and improve
           performance by optimizing requests through semantic caching.
@@ -527,8 +504,8 @@ export function AISettingsPanel(): JSX.Element {
       </div>
 
       <Show when={settings().mcpEnabled}>
-        <div class="p-3 mt-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-xs rounded-lg flex items-start">
-          <Shield size={14} class="mr-2 flex-shrink-0 mt-0.5" />
+        <div class="mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+          <Shield size={14} class="mt-0.5 flex-none" />
           <p>
             The MCP (Model-Completions-Protocol) is active. AI requests will be optimized through semantic caching,
             resulting in faster responses and reduced costs. The {settings().mcpStrategy} strategy is configured to{" "}

@@ -95,7 +95,7 @@ export function CostsScreen(): JSX.Element {
         <Show when={saved.data()?.length === 0}><p class="text-sm text-slate-500 dark:text-slate-400">{t("costs.recentEmpty")}</p></Show>
         <ul class="grid gap-2 text-sm">
           <For each={saved.data() ?? []}>{(row) =>
-            <li class={`${PANEL} flex justify-between gap-3 !p-3 text-slate-800 dark:text-gray-200`}><span class="min-w-0">{row.toolpath.name} · {formatDate(row.createdAt)}</span><span class="flex-none tabular-nums">{money(row.totalCost, row.currencyCode)}</span></li>}</For>
+            <li class={`${PANEL} flex justify-between gap-3 !p-3 text-slate-800 dark:text-slate-200`}><span class="min-w-0">{row.toolpath.name} · {formatDate(row.createdAt)}</span><span class="flex-none tabular-nums">{money(row.totalCost, row.currencyCode)}</span></li>}</For>
         </ul>
       </section>
     </div>

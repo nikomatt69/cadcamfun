@@ -10,7 +10,7 @@
 import { LoadingState } from "../../../shared/components/screen-parts.tsx"
 import { For, Show, type JSX } from "solid-js"
 import {
-  Activity, Database, Eye, FileText, Folder, GitMerge, Grid, HardDrive, Users, Wrench, Zap
+  Activity, AlertCircle, Database, Eye, FileText, Folder, GitMerge, Grid, HardDrive, Users, Wrench, Zap
 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
@@ -45,8 +45,8 @@ export interface AnalyticsOverviewProps {
   readonly isAdmin?: boolean
 }
 
-const iconClass = "h-6 w-6 sm:h-8 sm:w-8"
-const bigIcon = "h-8 w-8 sm:h-10 sm:w-10"
+const iconClass = "h-5 w-5"
+const bigIcon = "h-5 w-5"
 
 export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
   const general = useRead((client) => client.analytics.index({
@@ -84,11 +84,11 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
 
   const typeIcon = (type: string): JSX.Element => {
     switch (type) {
-      case "project": return <FileText class={`${iconClass} text-gray-500`} />
-      case "component": return <Database class={`${iconClass} text-gray-500`} />
-      case "tool": return <Wrench class={`${iconClass} text-gray-500`} />
-      case "page_view": return <Eye class={`${iconClass} text-gray-500`} />
-      default: return <Activity class={`${iconClass} text-gray-500`} />
+      case "project": return <FileText class={`${iconClass} `} />
+      case "component": return <Database class={`${iconClass} `} />
+      case "tool": return <Wrench class={`${iconClass} `} />
+      case "page_view": return <Eye class={`${iconClass} `} />
+      default: return <Activity class={`${iconClass} `} />
     }
   }
 
@@ -97,43 +97,43 @@ export function AnalyticsOverview(props: AnalyticsOverviewProps): JSX.Element {
       <Show when={loading()} fallback={
         <>
           <Show when={error()}>
-            <div class="space-y-2 rounded-md bg-red-50 p-4 text-red-700">
-              <div class="flex items-center">
-                <span class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">!</span>
-                <p class="font-semibold">{t("admin.analytics.loadFailed")}</p>
+            <div class="space-y-2 rounded-md border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300" role="alert">
+              <div class="flex items-center gap-2">
+                <AlertCircle size={16} aria-hidden="true" class="flex-none" />
+                <p class="text-sm font-semibold">{t("admin.analytics.loadFailed")}</p>
               </div>
-              <p class="ml-7 text-sm">{error()}</p>
+              <p class="pl-6 text-sm">{error()}</p>
             </div>
           </Show>
 
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             <StatCard title={t("admin.analytics.totalActivity")} value={totalActivityCount()}
-              icon={<Activity class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Activity class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.activeUsers")} value={0}
-              icon={<Users class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Users class={`${bigIcon} `} />} />
             <Show when={props.isAdmin}>
               <StatCard title={t("admin.analytics.totalUsers")} value={0}
-                icon={<Users class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+                icon={<Users class={`${bigIcon} `} />} />
             </Show>
             <StatCard title={t("admin.analytics.pageViews")} value={byType().get("page_view") ?? 0}
-              icon={<Eye class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Eye class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.aiRequests")} value={summary()?.totalAiRequests ?? "N/A"}
-              icon={<Zap class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Zap class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.cadDrawings")} value={summary()?.totalCadDrawings ?? "N/A"}
-              icon={<FileText class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<FileText class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.storage")} value={summary()?.totalStorageUsage ?? "N/A"}
-              icon={<HardDrive class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<HardDrive class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.projects")} value={summary()?.totalProjects ?? "N/A"}
-              icon={<Folder class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Folder class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.components")} value={summary()?.totalComponents ?? "N/A"}
-              icon={<Grid class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<Grid class={`${bigIcon} `} />} />
             <StatCard title={t("admin.analytics.toolpaths")} value={summary()?.totalToolpaths ?? "N/A"}
-              icon={<GitMerge class={`${bigIcon} text-gray-500 dark:text-gray-400`} />} />
+              icon={<GitMerge class={`${bigIcon} `} />} />
           </div>
 
           <Show when={byType().size > 0}>
-            <div class="mt-4 rounded-lg bg-gray-50 p-3 shadow sm:p-4 dark:bg-gray-800 dark:text-white">
-              <h3 class="mb-3 text-base font-medium text-gray-900 sm:text-lg dark:text-white">{t("admin.analytics.byType")}</h3>
+            <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+              <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-white">{t("admin.analytics.byType")}</h3>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <For each={[...byType().entries()].sort((a, b) => b[1] - a[1])}>
                   {([type, count]) => (

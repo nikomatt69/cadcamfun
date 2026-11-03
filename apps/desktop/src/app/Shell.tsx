@@ -258,7 +258,7 @@ export function Shell(props: ShellProps): JSX.Element {
             </div>
           </main>
           <Show when={layout() === "page"}><ReferenceFooter /></Show>
-          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={scrollToTop}><ChevronUp size={20} /></button></Show>
+          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={scrollToTop}><ChevronUp size={16} /></button></Show>
         </div>
 
         <AssistantPanel open={app.panelOpen()} onClose={() => app.setPanelOpen(false)} />

@@ -31,7 +31,7 @@ const formatDate = (iso: string): string =>
 const PlanIcon = (props: { readonly plan: string }): JSX.Element => {
   const icon = props.plan === "PRO" ? Star : props.plan === "ENTERPRISE" ? Crown : Shield
   const Icon = icon
-  return <Icon size={16} aria-hidden="true" class="text-blue-600 dark:text-blue-400" />
+  return <Icon size={16} aria-hidden="true" class="text-slate-500 dark:text-slate-400" />
 }
 
 
@@ -71,7 +71,7 @@ function SubscriptionCard(): JSX.Element {
       <div>
         <div class="mb-4 flex items-center gap-2">
           <PlanIcon plan={info()?.plan ?? "FREE"} />
-          <h3 class="text-base font-medium leading-6 text-slate-900 dark:text-white">{t("subscription.card.title")}</h3>
+          <h3 class="text-sm font-semibold leading-6 text-slate-900 dark:text-white">{t("subscription.card.title")}</h3>
         </div>
 
         <Show when={subscription.loading()}><LoadingState label={t("subscription.card.title")} /></Show>
@@ -92,7 +92,7 @@ function SubscriptionCard(): JSX.Element {
           </div>
         </Show>
 
-        <div class="border-t border-slate-200/70 pt-4 dark:border-slate-700/50">
+        <div class="border-t border-slate-200 pt-4 dark:border-slate-700">
           <dl class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 [&_dd]:tabular-nums">
             <div class="sm:col-span-1">
               <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.currentPlan")}</dt>
@@ -100,7 +100,7 @@ function SubscriptionCard(): JSX.Element {
                 <span class="text-sm font-medium text-slate-900 dark:text-white">{features().name || t("subscription.free")}</span>
                 <Show when={isOnTrial()}>
                   <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Clock size={12} aria-hidden="true" class="mr-1.5" />{t("subscription.trial")}
+                    <Clock size={12} aria-hidden="true" class="mr-2" />{t("subscription.trial")}
                   </span>
                 </Show>
               </dd>
@@ -139,7 +139,7 @@ function SubscriptionCard(): JSX.Element {
             <div class="sm:col-span-2">
               <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.features")}</dt>
               <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                <ul class="list-disc space-y-1 pl-5">
+                <ul class="list-disc space-y-2 pl-5">
                   <For each={features().features}>{(feature) => <li>{feature}</li>}</For>
                 </ul>
               </dd>
@@ -148,7 +148,7 @@ function SubscriptionCard(): JSX.Element {
             <div class="sm:col-span-2">
               <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.limits")}</dt>
               <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                <ul class="list-disc space-y-1 pl-5">
+                <ul class="list-disc space-y-2 pl-5">
                   <li>{t("subscription.limitProjects", { value: features().limits.maxProjects === -1 ? t("subscription.unlimited") : features().limits.maxProjects })}</li>
                   <li>{t("subscription.limitComponents", { value: features().limits.maxComponents === -1 ? t("subscription.unlimited") : features().limits.maxComponents })}</li>
                   <li>{storageValue(features().limits.maxStorage)}</li>
@@ -187,12 +187,12 @@ export function SubscriptionScreen(): JSX.Element {
       actions={<A class={TOOLBAR_PRIMARY} href="/pricing">{t("settings.subscription.viewPlans")}</A>}
     >
       <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{t("settings.subscription.subtitle")}</p>
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="space-y-6 lg:col-span-3">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div class="space-y-4 lg:col-span-3">
           <SubscriptionCard />
           <div class={PANEL}>
             <div>
-              <h3 class="text-base font-medium leading-6 text-slate-900 dark:text-white">{t("settings.subscription.helpTitle")}</h3>
+              <h3 class="text-sm font-semibold leading-6 text-slate-900 dark:text-white">{t("settings.subscription.helpTitle")}</h3>
               <div class="mt-2 max-w-xl text-sm text-slate-500 dark:text-slate-400">
                 <p>{t("settings.subscription.helpBody")}</p>
               </div>

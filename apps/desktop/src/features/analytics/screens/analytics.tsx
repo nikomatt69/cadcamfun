@@ -126,7 +126,7 @@ export function AnalyticsScreen(): JSX.Element {
       title={t("dash.title")}
       rail={<>
         <p class="text-[11px] text-slate-500 dark:text-slate-400">{t("dash.subtitle")}</p>
-        <div class="flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap gap-2">
           <For each={PRESETS}>
             {([preset, labelKey]) => (
               <button type="button" onClick={() => setDateRangePreset(preset)} class={TOOLBAR_BUTTON}>
@@ -173,7 +173,7 @@ export function AnalyticsScreen(): JSX.Element {
 
       <Show when={activeSection() === "charts"} keyed>
         <div class={PANEL}>
-          <h2 class="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{t("dash.trends")}</h2>
+          <h2 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">{t("dash.trends")}</h2>
           <Show when={chartsKey()} keyed>
             <ActivityChart
               startDate={dateRange().startDate}

@@ -8,6 +8,7 @@
  * (`.users`) for the same reason — legacy's `/api/admin/users` does not exist either.
  */
 import { ErrorState, LoadingState } from "../../../shared/components/screen-parts.tsx"
+import { FIELD, TOOLBAR_BUTTON } from "../../../shared/components/WorkspacePage.tsx"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { BarChart2, Calendar, Users } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
@@ -92,9 +93,9 @@ export function AdminAnalyticsScreen(): JSX.Element {
         when={isAdmin()}
         fallback={
           <section class="flex h-96 flex-col items-center justify-center">
-            <div class="mb-4 text-xl text-red-600">{t("admin.analytics.accessDenied")}</div>
-            <p class="mb-4 text-gray-600">{t("admin.analytics.noPermission")}</p>
-            <a class="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/analytics">
+            <div class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{t("admin.analytics.accessDenied")}</div>
+            <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("admin.analytics.noPermission")}</p>
+            <a class="inline-flex h-7 items-center rounded-[5px] bg-blue-600 px-3 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700" href="/analytics">
               {t("admin.analytics.goAnalytics")}
             </a>
           </section>
@@ -102,16 +103,16 @@ export function AdminAnalyticsScreen(): JSX.Element {
       >
         <section class="px-4 py-6">
           <div class="mb-6 flex flex-col justify-between md:flex-row md:items-center">
-            <h1 class="mb-4 text-2xl font-semibold tracking-[-0.015em] text-gray-900 md:mb-0 dark:text-gray-50">{t("admin.analytics.heading")}</h1>
+            <h1 class="mb-4 text-lg font-semibold tracking-[-0.01em] text-slate-900 md:mb-0 dark:text-slate-50">{t("admin.analytics.heading")}</h1>
 
-            <div class="flex flex-col items-center space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0">
+            <div class="flex flex-col items-center gap-3 sm:flex-row">
               <div class="relative flex w-full items-center sm:w-auto">
-                <Users class="absolute left-3 h-4 w-4 text-gray-500" />
+                <Users aria-hidden="true" class="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
                 <select
                   aria-label={t("admin.analytics.user")}
                   value={selectedUser()}
                   onChange={(event) => setSelectedUser(event.currentTarget.value)}
-                  class="w-full rounded-md border border-gray-300 py-2 pl-10 pr-8 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:w-auto"
+                  class={`${FIELD} !pl-9 sm:!w-auto`}
                 >
                   <option value="">{t("admin.analytics.allUsers")}</option>
                   <For each={users()}>
@@ -120,36 +121,36 @@ export function AdminAnalyticsScreen(): JSX.Element {
                 </select>
               </div>
 
-              <div class="flex items-center space-x-2">
-                <div class="flex items-center space-x-2">
-                  <Calendar class="h-4 w-4 text-gray-500" />
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                  <Calendar aria-hidden="true" class="h-4 w-4 text-slate-400" />
                   <input
                     type="date"
                     aria-label={t("history.from")}
-                    class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+                    class={`${FIELD} !w-auto`}
                     value={dayInput(dateRange().startDate)}
                     onInput={(event) => handleDateChange("start", event.currentTarget.value)}
                   />
                 </div>
-                <span class="text-sm text-gray-500">{t("admin.analytics.to")}</span>
-                <div class="flex items-center space-x-2">
-                  <Calendar class="h-4 w-4 text-gray-500" />
+                <span class="text-xs text-slate-500 dark:text-slate-400">{t("admin.analytics.to")}</span>
+                <div class="flex items-center gap-2">
+                  <Calendar aria-hidden="true" class="h-4 w-4 text-slate-400" />
                   <input
                     type="date"
                     aria-label={t("history.to")}
-                    class="form-input rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+                    class={`${FIELD} !w-auto`}
                     value={dayInput(dateRange().endDate)}
                     onInput={(event) => handleDateChange("end", event.currentTarget.value)}
                   />
                 </div>
               </div>
 
-              <div class="flex items-center space-x-2">
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+              <div class="flex items-center gap-2">
+                <button type="button" class={TOOLBAR_BUTTON}
                   onClick={() => setDateRangePreset("7days")}>7d</button>
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                <button type="button" class={TOOLBAR_BUTTON}
                   onClick={() => setDateRangePreset("30days")}>30d</button>
-                <button type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                <button type="button" class={TOOLBAR_BUTTON}
                   onClick={() => setDateRangePreset("90days")}>90d</button>
               </div>
             </div>
@@ -168,13 +169,13 @@ export function AdminAnalyticsScreen(): JSX.Element {
 
                 <div class="mt-6">
                   <div class="mb-2 flex items-center justify-between">
-                    <h2 class="text-lg font-medium text-gray-900 dark:text-white">{t("admin.analytics.trends")}</h2>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{t("admin.analytics.trends")}</h2>
                     <button
                       type="button"
-                      class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                      class={TOOLBAR_BUTTON}
                       onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}
                     >
-                      <BarChart2 class="mr-2 h-4 w-4" />
+                      <BarChart2 size={14} aria-hidden="true" />
                       {chartType() === "line" ? t("admin.analytics.showBar") : t("admin.analytics.showLine")}
                     </button>
                   </div>

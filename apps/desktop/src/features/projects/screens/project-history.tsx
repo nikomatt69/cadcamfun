@@ -16,7 +16,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { t } from "../../../i18n/index.ts"
 import { readGithubToken, saveGithubToken } from "../../../app/github-token.ts"
 import { ArrowLeft } from "lucide-solid"
-import { WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
+import { CANCEL_BUTTON, FIELD, SUBMIT_BUTTON, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
 import { CommitScene } from "../../../shared/ui/stageshow/index.ts"
 
 type Tab = "changes" | "history" | "branches" | "pulls" | "actions" | "github"
@@ -41,11 +41,11 @@ interface VcsStatus { readonly branch: string; readonly head: string | null; rea
 interface VcsBranches { readonly current: string; readonly branches: Readonly<Record<string, string>> }
 interface PullDetail { readonly pullRequest: Pull; readonly reviews: ReadonlyArray<Review>; readonly changes: ReadonlyArray<Change> }
 
-const BTN = "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50"
-const PRIMARY = "px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+const BTN = CANCEL_BUTTON
+const PRIMARY = SUBMIT_BUTTON
 const CARD = "ui-card ui-card-default !p-4"
-const INPUT = "w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-sm"
-const PILL = (state: string): string => `ml-2 rounded-full border px-2 py-0.5 text-xs ${state === "open" || state === "running" ? "text-blue-600" : state === "merged" || state === "success" || state === "approve" ? "text-green-600" : "text-red-600"}`
+const INPUT = FIELD
+const PILL = (state: string): string => `ml-2 rounded-full border px-2 py-0.5 text-[11px] font-medium ${state === "open" || state === "running" ? "border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300" : state === "merged" || state === "success" || state === "approve" ? "border-green-200 text-green-700 dark:border-green-800 dark:text-green-300" : "border-red-200 text-red-700 dark:border-red-800 dark:text-red-300"}`
 
 const short = (oid: string): string => oid.slice(0, 7)
 const show = (v: unknown): string => (typeof v === "string" ? v : JSON.stringify(v))
@@ -115,7 +115,7 @@ function RunTimeline(props: { readonly run: Run }): JSX.Element {
   return (
     <div class="mt-2 border-l-2 border-slate-200 pl-3 dark:border-slate-700">
       <Show when={events().length > 0} fallback={<p class="text-xs text-slate-500">{t("vcs.actions.noEvents")}</p>}>
-        <ul class="space-y-1 text-xs">
+        <ul class="space-y-2 text-xs">
           <For each={events()}>
             {(e) => (
               <li>
@@ -500,7 +500,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
                 <li>
                   <button type="button" aria-pressed={selected()?.oid === c.oid} class={`w-full rounded-md px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${selected()?.oid === c.oid ? "bg-blue-50 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`} onClick={() => selectCommit(c)}>
                     <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
-                    <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1.5 text-xs text-blue-700">{b}</span>}</For>
+                    <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">{b}</span>}</For>
                     <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-slate-500">{t("vcs.history.merge")}</span></Show>
                     <span class="block text-xs text-slate-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</span>
                   </button>
@@ -544,7 +544,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
           <Show when={!openPull()} fallback={
             <div class={`${CARD} space-y-3`}>
               <button type="button" class={BTN} aria-label={t("common.back")} onClick={() => setOpenPull(undefined)}><ArrowLeft size={14} aria-hidden="true" /></button>
-              <h2 class="text-lg font-medium">#{(loadedPull()?.pullRequest ?? openPull()!.pull).number} {(loadedPull()?.pullRequest ?? openPull()!.pull).title}<span class={PILL((loadedPull()?.pullRequest ?? openPull()!.pull).state)}>{(loadedPull()?.pullRequest ?? openPull()!.pull).state}</span><Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
+              <h2 class="text-sm font-semibold">#{(loadedPull()?.pullRequest ?? openPull()!.pull).number} {(loadedPull()?.pullRequest ?? openPull()!.pull).title}<span class={PILL((loadedPull()?.pullRequest ?? openPull()!.pull).state)}>{(loadedPull()?.pullRequest ?? openPull()!.pull).state}</span><Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
               <p class="text-sm text-slate-500">{(loadedPull()?.pullRequest ?? openPull()!.pull).head} → {(loadedPull()?.pullRequest ?? openPull()!.pull).base}</p>
               <Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).body}><p class="text-sm">{(loadedPull()?.pullRequest ?? openPull()!.pull).body}</p></Show>
               <h3 class="font-medium">{t("vcs.pulls.files")}</h3>
