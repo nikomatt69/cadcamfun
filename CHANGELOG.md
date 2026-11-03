@@ -3,6 +3,35 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.79 (November 2026)
+
+## Core
+
+- Seeded fault injection for verifyNc (30 overcuts found at the right pass, 15 clean programs verify); spec 72 records the 3D finishing wall finding
+
+## Desktop
+
+- Drop the forced CAM ribbon font size, the buttons already declare 12px/18px
+- Origin controls spacing
+- The toolpath detail screen says whether the drawing still matches the model of a native program (spec 59 A6)
+- A generation shows what changed against the previous program (spec 59 A4, A6): same bytes or operations, cycle time, release and worse claims, in 11 languages
+
+## Sidecar
+
+- Restore a library row from its history (RM-05)
+- Row versions and history for materials, tools and machine configurations (RM-05)
+- Admission through the sidecar handlers; map RM-01's four integration checks to their tests
+- Idempotency-Key for writes (RM-03 idempotent receipts)
+- The regeneration diff carries the operation matching (spec 59 A5): matched pairs with confidence, carried and dropped overrides
+
+## Web
+
+- Drop the per-page stage inserts now that DocsLayout heads every docs page
+
+## Documentation
+
+- RM-05 is in progress
+
 ## v0.1.78 (November 2026)
 
 ## Core
