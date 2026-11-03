@@ -3,6 +3,66 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.78 (November 2026)
+
+## Core
+
+- MatchOperations (spec 59 A5): operations pair by id, then by the geometry they machine with a confidence; overrides are carried or reported dropped; programDiff uses it
+- ProgramStatus ignores the stock block (a stock change is a setting, not a model change)
+- ProgramDiff (spec 59 A4): operations added/removed/changed, tools, cycle time, removed volume, claims, release and NC lines between two kernel programs
+- Stageshow faux product UI across the site
+- PartFingerprint and programStatus (spec 59 A1, A2): a stored kernel program is current, stale with a class (topology, geometry, rigid, inputs) or unknown with the reason
+- VerifyNc over HTTP and the assistant (spec 72 step 0.6): POST /api/toolpaths/verify-nc, kernel job cam-verify-nc, cam verify_nc action with verdict clean|faults|incomplete
+
+## Desktop
+
+- Icon-led search fields keep their pl-* padding under the page-wide control rule
+- Manuals search clears its lens at every width, profile edit button stays on one line
+- The stale banner of a kernel program says what changed (spec 59 A6): geometry, topology, rigid move or settings, in 11 languages
+- A kernel program is stale only when the model changed (spec 59 A2): a rename, colour or layer change no longer marks it out of date
+- Follow the 28px strip and the lg stage radius from the stageshow pass
+
+## Sidecar
+
+- Accept a regeneration with a restore point (spec 59 A3): POST /api/toolpaths/:id/regenerate accept
+- Projects and organisations take an expected revision; provider-connections probe ends its process
+- Saved multi-operation setups per project (RM-02 deliverable 5)
+- Materials, tools and machine configurations take an expected revision (409 on a stale copy)
+- Regeneration preview with a diff (spec 59 A3, A4): POST /api/toolpaths/:id/regenerate and cam regenerate
+- Components writes take an expected revision (baseUpdatedAt, 409 on a stale copy)
+- Components library and analysis; coverage gate with accepted gaps (RM-03, --strict green)
+- Conversations, messages and invitation accept (RM-03 step 3, coverage 141/184)
+- CAD to CAM associativity status (spec 59 A1, A2): GET /api/toolpaths/:id/status and modelChange in cam review
+- Organisation members, invitations and projects (RM-03 step 3a, coverage 135/184)
+- Toolpaths export-import (RM-03 step 2, coverage 132/184)
+- Components storage and export-import (RM-03 step 1)
+- Components index, details and relationships (RM-03 step 1, coverage 129/184)
+
+## API
+
+- Regenerate clients, API reference and contract snapshot after merging the toolpaths export-import routes with verify-nc
+
+## AI
+
+- The inventory render test gets a 120 s limit (it timed out at 5 s when run with other files and was read as drift)
+
+## Web
+
+- Stageshow nav, workspace cards and release list
+- Stageshow scenes for every docs topic, home diagrams, download sections; API groups and translations
+- Stageshow on every docs page, Studio and the quickstart
+
+## Integrations
+
+- Rebuild the hello-gear example bundle
+
+## Documentation
+
+- Correct the status lines of specs 26-29 against the tree (spec 70 step 0.2)
+- Spec 59 change log for the desktop banner
+- Regenerate the harness inventory with cam verify_nc
+- Components coverage is 131/184
+
 ## v0.1.77 (November 2026)
 
 ## Desktop
