@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.77 (November 2026)
+
+## Desktop
+
+- Floating tool grid truncates a long name instead of breaking it mid-word
+
+## Sidecar
+
+- Component versions and comments (RM-03 step 1); layers.ts split by domain with one shared identity service
+
 ## v0.1.76 (November 2026)
 
 ## Desktop
