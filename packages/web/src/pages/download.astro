@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
 import DownloadShot from "../components/stage/DownloadShot"
 import QuickstartTerminal from "../components/stage/QuickstartTerminal"
+import ReleaseBrowser from "../components/stage/ReleaseBrowser"
 import TopicTile from "../components/stage/TopicTile"
 import { text } from "../i18n/catalog"
 import { ui } from "../i18n/ui"
@@ -48,17 +49,7 @@ const labels = {
         {text(locale, "Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.")}
       </p>
       <div class="mt-10 max-w-[760px]"><DownloadShot client:only="react" /></div>
-      <p id="download-detected" class="mt-4 text-[14px] text-terminal-muted"></p>
-
-      <div class="mt-8 flex flex-wrap items-end gap-4">
-        <label class="block text-[13px] font-semibold" for="download-version">
-          {labels.version}
-          <select id="download-version" class="glass-chip mt-2 block bg-transparent px-3 py-2 text-[15px] font-medium"></select>
-        </label>
-        <a id="download-notes" class="pressable text-[14px] font-semibold text-terminal-accent" href="https://github.com/nikomatt69/cadcamfun/releases">{labels.allReleases}</a>
-      </div>
-      <p id="download-status" class="mt-6 text-[15px] text-terminal-muted" role="status">{labels.loading}</p>
-      <div id="download-platforms" class="mt-8 flex flex-col gap-8"></div>
+      <ReleaseBrowser client:only="react" labels={labels} />
 
       <section class="mt-14" aria-labelledby="homebrew-heading">
         <h2 id="homebrew-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "macOS with Homebrew")}</h2>
@@ -109,143 +100,8 @@ const labels = {
   </main>
 </Layout>
 
-<script define:vars={{ labels }}>
-  type Kind = "dmg" | "msi" | "nsis" | "deb" | "rpm" | "checksums" | "notes"
-  type Asset = { name: string; url: string; size: number; kind: Kind }
-  type Platform = { slug: string; assets: Asset[] }
-  type Version = { version: string; publishedAt: string; platforms: Platform[] }
-
-  const KIND_LABEL: Record<Kind, string> = {
-    dmg: labels.dmg,
-    msi: labels.msi,
-    nsis: labels.nsis,
-    deb: labels.deb,
-    rpm: labels.rpm,
-    checksums: labels.checksums,
-    notes: labels.notes,
-  }
-  const SLUG_LABEL: Record<string, string> = {
-    "macos-arm64": "Apple Silicon",
-    "macos-x64": "Intel",
-    "windows-x64": "x64",
-    "windows-arm64": "ARM64",
-    "linux-x64": "x64",
-    "linux-arm64": "ARM64",
-  }
-  const GROUPS = [
-    { title: "macOS", slugs: ["macos-arm64", "macos-x64"] },
-    { title: "Windows", slugs: ["windows-x64", "windows-arm64"] },
-    { title: "Linux", slugs: ["linux-x64", "linux-arm64"] },
-  ]
-
-  const status = document.querySelector("#download-status")
-  const platforms = document.querySelector("#download-platforms")
-  const versionSelect = document.querySelector("#download-version") as HTMLSelectElement | null
-  const detected = document.querySelector("#download-detected")
-  let versions: Version[] = []
-
-  function detectedSlugs(): string[] {
-    const ua = navigator.userAgent
-    if (/Windows/i.test(ua)) return /ARM64|aarch64/i.test(ua) ? ["windows-arm64"] : ["windows-x64"]
-    if (/Linux/i.test(ua) && !/Android/i.test(ua)) return /aarch64|arm64/i.test(ua) ? ["linux-arm64"] : ["linux-x64"]
-    if (/Mac/i.test(ua)) return ["macos-arm64", "macos-x64"]
-    return []
-  }
-
-  function formatSize(bytes: number): string {
-    if (!Number.isFinite(bytes) || bytes <= 0) return ""
-    const units = ["B", "KB", "MB", "GB"]
-    let value = bytes
-    let index = 0
-    while (value >= 1024 && index < units.length - 1) {
-      value /= 1024
-      index += 1
-    }
-    const digits = value >= 10 || index === 0 ? 0 : 1
-    return `${value.toFixed(digits)} ${units[index]}`
-  }
-
-  function render(version: Version | undefined) {
-    if (!platforms) return
-    platforms.replaceChildren()
-    if (!version) return
-    const hits = new Set(detectedSlugs())
-    for (const group of GROUPS) {
-      const section = document.createElement("section")
-      const heading = document.createElement("h2")
-      heading.className = "font-display text-[1.6rem] font-bold tracking-[-0.03em]"
-      heading.textContent = group.title
-      section.append(heading)
-      const list = document.createElement("ul")
-      list.className = "mt-4 grid gap-3 sm:grid-cols-2"
-      for (const slug of group.slugs) {
-        const platform = version.platforms.find((item) => item.slug === slug)
-        const card = document.createElement("li")
-        card.className = "material rounded-[var(--radius-card)] p-4"
-        if (hits.has(slug)) card.classList.add("nav-current")
-        const title = document.createElement("h3")
-        title.className = "text-[15px] font-semibold"
-        title.textContent = SLUG_LABEL[slug] ?? slug
-        card.append(title)
-        if (!platform) {
-          const empty = document.createElement("p")
-          empty.className = "mt-2 text-[13px] text-terminal-muted"
-          empty.textContent = labels.notInRelease
-          card.append(empty)
-        } else {
-          const assets = document.createElement("ul")
-          assets.className = "mt-3 flex flex-col gap-2"
-          for (const asset of platform.assets) {
-            const item = document.createElement("li")
-            const link = document.createElement("a")
-            link.href = asset.url
-            link.className = "text-[14px] font-semibold text-terminal-accent"
-            const size = formatSize(asset.size)
-            link.textContent = size ? `${KIND_LABEL[asset.kind]} · ${size}` : KIND_LABEL[asset.kind]
-            item.append(link)
-            assets.append(item)
-          }
-          card.append(assets)
-        }
-        list.append(card)
-      }
-      section.append(list)
-      platforms.append(section)
-    }
-  }
-
-  const highlighted = detectedSlugs()
-  if (detected) {
-    const os = highlighted[0]?.startsWith("macos") ? "macOS" : highlighted[0]?.startsWith("windows") ? "Windows" : highlighted[0]?.startsWith("linux") ? "Linux" : ""
-    detected.textContent = os ? labels.detected.replace("{os}", os) : ""
-  }
-
+<script>
   document.querySelector("#homebrew-copy")?.addEventListener("click", async () => {
     await navigator.clipboard.writeText("brew install --cask nikomatt69/tap/cadcamfun")
   })
-
-  versionSelect?.addEventListener("change", () => {
-    render(versions.find((version) => version.version === versionSelect.value))
-  })
-
-  try {
-    const response = await fetch("/api/releases")
-    if (!response.ok) throw new Error("unavailable")
-    const body = (await response.json()) as { versions?: Version[] }
-    versions = body.versions ?? []
-    if (versions.length === 0) {
-      if (status) status.textContent = labels.empty
-    } else if (versionSelect) {
-      if (status) status.textContent = ""
-      for (const version of versions) {
-        const option = document.createElement("option")
-        option.value = version.version
-        option.textContent = version.version
-        versionSelect.append(option)
-      }
-      render(versions[0])
-    }
-  } catch {
-    if (status) status.textContent = labels.failed
-  }
 </script>

@@ -1,0 +1,51 @@
+.ws .ss-fit { margin-inline: 0; }
+.ws .ss-stage { overflow: hidden; background: transparent; background-image: none; }
+.ws .ws-window {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 968px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+.ws .ss-stage[data-layout="compact"] .ws-window { left: 8px; width: 342px; }
+
+.ws-side { display: flex; flex-direction: column; gap: 8px; padding: 44px 10px 12px; }
+.ws-side__head, .ws-cell__role {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ss-text);
+}
+.ws-side__head { padding: 0 6px 2px; }
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 16px;
+  background: var(--ss-surface);
+  min-height: 100%;
+}
+.ws .ss-stage[data-layout="compact"] .ws-grid { grid-template-columns: 1fr; padding: 12px; }
+
+.ws-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 104px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ss-canvas);
+  box-shadow: 0 0 0 1px var(--ss-line);
+  color: inherit;
+  text-decoration: none;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.ws-cell:hover { background: var(--ss-accent-soft); }
+.ws-cell:focus-visible { outline: 2px solid var(--ss-accent); outline-offset: 2px; }
+.ws-cell[data-strong] { background: var(--ss-surface); }
+.ws-cell__role { color: var(--ss-accent); }
+.ws-cell__title { font-size: 14px; font-weight: 600; color: var(--ss-text-strong); overflow-wrap: anywhere; }
+.ws-cell__owns { font-size: 12px; line-height: 1.45; color: var(--ss-text); }

@@ -1,0 +1,50 @@
+.rl-detected, .rl-status { margin: 16px 0 0; font-size: 14px; color: rgb(var(--terminal-muted)); }
+.rl-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin-top: 24px; }
+.rl-label { display: block; font-size: 13px; font-weight: 600; }
+.rl-select {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: transparent;
+  border-radius: 6px;
+  border: 1px solid rgb(var(--terminal-border));
+  color: inherit;
+}
+.rl-all { font-size: 14px; font-weight: 600; color: rgb(var(--terminal-accent)); }
+.rl-list { display: flex; flex-direction: column; gap: 4px; margin-top: 24px; max-width: 760px; }
+.rl .ss-fit { margin-inline: 0; }
+.rl .ss-stage { overflow: hidden; background: transparent; background-image: none; }
+.rl .rl-window {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 728px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+.rl .ss-stage[data-layout="compact"] .rl-window { left: 8px; width: 342px; }
+.rl-body { display: flex; gap: 16px; padding: 16px; background: var(--ss-surface); min-height: 100%; }
+.rl .ss-stage[data-layout="compact"] .rl-body { flex-direction: column; gap: 16px; }
+.rl-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; padding: 0 4px; border-radius: 8px; }
+.rl-col[data-current] { background: var(--ss-accent-soft); padding: 0 8px; }
+.rl-col__title { display: block; height: 30px; line-height: 30px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ss-text); }
+.rl-asset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ss-accent);
+  text-decoration: none;
+}
+.rl-asset:hover { background: var(--ss-accent-soft); }
+.rl-asset:focus-visible { outline: 2px solid var(--ss-accent); outline-offset: -2px; }
+.rl-asset__name { flex: 1; min-width: 0; }
+.rl-asset__size { font-weight: 500; color: var(--ss-text); font-variant-numeric: tabular-nums; }
+.rl-empty { display: block; height: 36px; line-height: 36px; padding: 0 6px; font-size: 13px; color: var(--ss-text); }

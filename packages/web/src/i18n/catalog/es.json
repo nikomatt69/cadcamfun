@@ -7759,5 +7759,6 @@
   "From sketch to G-code in one window.": "Del boceto al código G en una sola ventana.",
   "Toolpaths on the part": "Trayectorias de herramienta sobre la pieza",
   "An assistant that edits the model": "Un asistente que edita el modelo",
-  "G-code from your post": "Código G desde tu posprocesador"
+  "G-code from your post": "Código G desde tu posprocesador",
+  "Apps": "Apps"
 }

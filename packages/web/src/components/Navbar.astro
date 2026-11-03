@@ -1,6 +1,7 @@
 ---
 import Mark from "./Mark.astro"
 import LocaleSelector from "./LocaleSelector.astro"
+import NavTabs from "./stage/NavTabs"
 import { ui } from "../i18n/ui"
 
 const locale = Astro.locals.locale ?? "en"
@@ -28,21 +29,7 @@ function active(href: string) {
       </a>
 
       <nav class="hidden items-center gap-2 md:flex" aria-label={ui(locale, "mainNav")}>
-        <div class="glass-chip flex items-center gap-1 p-1">
-          {navItems.map((item) => (
-            <a
-              href={item.href}
-              aria-current={active(item.href) ? "page" : undefined}
-              class:list={[
-                "pressable relative rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold",
-                active(item.href) ? "nav-current" : "text-terminal-muted",
-              ]}
-            >
-              {item.label}
-            </a>
-          ))}
-          <a href="https://github.com/nikomatt69/cadcamfun" class="pressable relative rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold text-terminal-muted" target="_blank" rel="noopener noreferrer">GitHub</a>
-        </div>
+        <NavTabs client:load links={[...navItems, { href: "https://github.com/nikomatt69/cadcamfun", label: "GitHub", external: true }]} current={navItems.findIndex((item) => active(item.href))} />
         <LocaleSelector locale={locale} />
         <a href="/download" class="pressable btn-fill rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold">{ui(locale, "install")}</a>
         <button

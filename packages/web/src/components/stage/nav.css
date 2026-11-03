@@ -1,0 +1,16 @@
+.nv .ss-fit { margin-inline: 0; }
+.nv .ss-stage { background: transparent; background-image: none; overflow: visible; }
+.nv .nv-seg { position: absolute; inset: 0; height: 36px; }
+.nv .nv-seg[data-none] .ss-seg__thumb { opacity: 0; }
+.nv .ss-seg__option { padding: 0; font-size: 13px; font-weight: 600; height: 32px; }
+.nv .ss-seg__option a {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--ss-text);
+  text-decoration: none;
+}
+.nv .ss-seg__option[data-on] a { color: var(--ss-text-strong); }
+.nv .ss-seg__option a:hover { color: var(--ss-text-strong); }
+.nv .ss-seg__option a:focus-visible { outline: 2px solid var(--ss-accent); outline-offset: -2px; border-radius: 6px; }
