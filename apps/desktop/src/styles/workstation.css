@@ -370,8 +370,8 @@
 .cad-floating-content > div { max-height: none; overflow: visible; padding: 0; background: transparent; box-shadow: none; }
 .cad-floating-content h4 { font-size: 11px; line-height: 14px; margin-bottom: 6px; }
 .cad-floating-content .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-.cad-floating-content .grid-cols-4 button { aspect-ratio: auto; min-height: 52px; border: 1px solid var(--workspace-border); background: var(--workspace-panel); border-radius: 5px; }
-.cad-floating-content .grid-cols-4 button > span { white-space: normal; overflow-wrap: break-word; }
+.cad-floating-content .grid-cols-4 button { aspect-ratio: auto; min-height: 52px; border: 1px solid var(--workspace-border); background: var(--workspace-panel); border-radius: 5px; padding-inline: 2px; }
+.cad-floating-content .grid-cols-4 button > span { max-width: 100%; white-space: normal; overflow-wrap: normal; text-overflow: ellipsis; overflow: hidden; }
 .cad-floating-transforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .cad-floating-transforms button { min-height: 46px; box-shadow: none; border: 1px solid var(--workspace-border); }
 .cad-floating-header:focus-visible { outline: 2px solid var(--ent-accent, #3b82f6); outline-offset: -2px; }
