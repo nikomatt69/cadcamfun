@@ -405,6 +405,14 @@ import type {
   PmiGetOutput,
   PmiUpdateInput,
   PmiUpdateOutput,
+  ComponentsListInput,
+  ComponentsListOutput,
+  ComponentsCreateInput,
+  ComponentsCreateOutput,
+  ComponentsDetailsInput,
+  ComponentsDetailsOutput,
+  ComponentsRelationshipsInput,
+  ComponentsRelationshipsOutput,
   ComponentsGetInput,
   ComponentsGetOutput,
   ComponentsUpdateInput,
@@ -415,6 +423,16 @@ import type {
   ComponentsListForProjectOutput,
   ComponentsCreateForProjectInput,
   ComponentsCreateForProjectOutput,
+  ComponentsSaveStorageInput,
+  ComponentsSaveStorageOutput,
+  ComponentsReadStorageInput,
+  ComponentsReadStorageOutput,
+  ComponentsRemoveStorageInput,
+  ComponentsRemoveStorageOutput,
+  ComponentsExportInput,
+  ComponentsExportOutput,
+  ComponentsImportInput,
+  ComponentsImportOutput,
   ComponentsListVersionsInput,
   ComponentsListVersionsOutput,
   ComponentsCreateVersionInput,
@@ -471,6 +489,8 @@ import type {
   ToolpathGeneratorParseOutput,
   ToolpathGeneratorVerifyInput,
   ToolpathGeneratorVerifyOutput,
+  ToolpathGeneratorVerifyNcInput,
+  ToolpathGeneratorVerifyNcOutput,
   CadExactAnalyzeInput,
   CadExactAnalyzeOutput,
   CadExactStepInput,
@@ -3636,6 +3656,65 @@ export function make(options: ClientOptions) {
         ),
     },
     components: {
+      list: (input?: ComponentsListInput, requestOptions?: RequestOptions) =>
+        request<ComponentsListOutput>(
+          {
+            method: "GET",
+            path: `/api/components`,
+            query: {
+              projectId: input?.["projectId"],
+              type: input?.["type"],
+              search: input?.["search"],
+              public: input?.["public"],
+            },
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      create: (input?: ComponentsCreateInput, requestOptions?: RequestOptions) =>
+        request<ComponentsCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/components`,
+            body: {
+              name: input?.["name"],
+              description: input?.["description"],
+              data: input?.["data"],
+              type: input?.["type"],
+              isPublic: input?.["isPublic"],
+              thumbnail: input?.["thumbnail"],
+              projectId: input?.["projectId"],
+            },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      details: (input: ComponentsDetailsInput, requestOptions?: RequestOptions) =>
+        request<ComponentsDetailsOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/details`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      relationships: (input: ComponentsRelationshipsInput, requestOptions?: RequestOptions) =>
+        request<ComponentsRelationshipsOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/relationships`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       get: (input: ComponentsGetInput, requestOptions?: RequestOptions) =>
         request<ComponentsGetOutput>(
           {
@@ -3703,6 +3782,65 @@ export function make(options: ClientOptions) {
             },
             successStatus: 201,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      saveStorage: (input: ComponentsSaveStorageInput, requestOptions?: RequestOptions) =>
+        request<ComponentsSaveStorageOutput>(
+          {
+            method: "POST",
+            path: `/api/components/${encodeURIComponent(input.id)}/storage`,
+            body: input["payload"],
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      readStorage: (input: ComponentsReadStorageInput, requestOptions?: RequestOptions) =>
+        request<ComponentsReadStorageOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/storage`,
+            query: { signedUrl: input["signedUrl"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeStorage: (input: ComponentsRemoveStorageInput, requestOptions?: RequestOptions) =>
+        request<ComponentsRemoveStorageOutput>(
+          {
+            method: "DELETE",
+            path: `/api/components/${encodeURIComponent(input.id)}/storage`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      export: (input?: ComponentsExportInput, requestOptions?: RequestOptions) =>
+        request<ComponentsExportOutput>(
+          {
+            method: "GET",
+            path: `/api/components/export-import`,
+            query: { ids: input?.["ids"], format: input?.["format"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      import: (input: ComponentsImportInput, requestOptions?: RequestOptions) =>
+        request<ComponentsImportOutput>(
+          {
+            method: "POST",
+            path: `/api/components/export-import`,
+            body: input["payload"],
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
             empty: false,
           },
           requestOptions,
@@ -4125,6 +4263,30 @@ export function make(options: ClientOptions) {
               target: input["target"],
               resolution: input["resolution"],
               tolerance: input["tolerance"],
+              start: input["start"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      verifyNc: (input: ToolpathGeneratorVerifyNcInput, requestOptions?: RequestOptions) =>
+        request<ToolpathGeneratorVerifyNcOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/verify-nc`,
+            body: {
+              nc: input["nc"],
+              part: input["part"],
+              stock: input["stock"],
+              tools: input["tools"],
+              tolerance: input["tolerance"],
+              allowance: input["allowance"],
+              cell: input["cell"],
+              machine: input["machine"],
+              dwell: input["dwell"],
+              okuma: input["okuma"],
               start: input["start"],
             },
             successStatus: 200,

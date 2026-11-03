@@ -18,6 +18,10 @@ const limitsFor = async (name: string | undefined, context: ActionContext): Prom
   return { ...base, ...(profile?.maxSpindleSpeed ? { maxRpm: profile.maxSpindleSpeed } : {}), ...(profile?.maxFeedRate ? { maxFeed: profile.maxFeedRate } : {}) }
 }
 
+const r3 = (x: number): number => Math.round(x * 1000) / 1000
+
+const VERIFY_NC_BASIS = "The program is replayed on a tri-dexel stock at the declared lattice cell; every figure carries its declared error and a deviation under tolerance plus that error is not reported. A clean replay proves the modelled tools, stock and part only: it is not controller acceptance and not a collision check of the machine, vise or table"
+
 const head = (text: string, lines: number): string => text.split("\n").slice(0, lines).join("\n")
 
 export const CAM_BREADTH_ACTIONS: ReadonlyArray<ActionSpec> = [
@@ -99,6 +103,55 @@ export const CAM_BREADTH_ACTIONS: ReadonlyArray<ActionSpec> = [
         out.program = { lines: text.split("\n").length, programHash: cam.kernel.sha256(text), preview: head(text, 60) }
       }
       return out
+    }
+  }),
+  defineWireAction({
+    id: "cam.verify_nc", kind: "read", parameters: CAM_ACTION_INPUTS["cam.verify_nc"],
+    run: async (input, context) => {
+      let nc = input.gcode
+      if (nc === undefined) {
+        if (input.operationId === undefined) return { ok: false, error: "Send gcode or operationId." }
+        if (context.handlers.operationProgram === undefined) return { ok: false, error: "Stored programs are not available in this host: send the program text as gcode." }
+        const stored = await context.handlers.operationProgram(context.projectId, input.operationId)
+        if (!stored.ok) return stored
+        nc = stored.gcode
+      }
+      const s = input.stock
+      if (!(s.maxX > s.minX && s.maxY > s.minY && s.maxZ > s.minZ)) return { ok: false, error: "The stock block needs maxX > minX, maxY > minY and maxZ > minZ." }
+      const preset = input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined
+      if (input.machine !== undefined && preset === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}': use cam materials` }
+      const tools: Array<{ number: number; cutter: Record<string, unknown> }> = []
+      for (const t of input.tools) {
+        const kind = t.kind ?? "flat"
+        const cutter: cam.kernel.Cutter = {
+          id: `t${t.number}`, name: `T${t.number} ${kind} Ø${t.diameter}`, kind, diameter: t.diameter, flutes: t.flutes, material: "carbide", coating: "none",
+          fluteLength: t.fluteLength ?? 3 * t.diameter, shankDiameter: t.shankDiameter ?? t.diameter, stickout: t.stickout ?? Math.max(10, 4 * t.diameter + 10),
+          ...(t.cornerRadius !== undefined ? { cornerRadius: t.cornerRadius } : {}), ...(t.angle !== undefined ? { angle: t.angle } : {}),
+          ...(t.holderDiameter !== undefined && t.holderLength !== undefined ? { holder: { diameter: t.holderDiameter, length: t.holderLength } } : {})
+        }
+        const issues = cam.kernel.cutterIssues(cutter)
+        if (issues.length > 0) return { ok: false, error: `T${t.number}: ${issues.join("; ")}` }
+        tools.push({ number: t.number, cutter: cutter as unknown as Record<string, unknown> })
+      }
+      const machine = preset === undefined ? undefined : {
+        ...(preset.travel !== undefined ? { travel: preset.travel } : {}),
+        ...(preset.fiveAxis !== undefined ? { fiveAxis: { layout: preset.fiveAxis.layout, pivot: preset.fiveAxis.pivot } } : {})
+      }
+      const outcome = await runKernelJob("cam-verify-nc", {
+        nc, stock: { min: { x: s.minX, y: s.minY, z: s.minZ }, max: { x: s.maxX, y: s.maxY, z: s.maxZ } },
+        tools: tools as never, ...(machine !== undefined && Object.keys(machine).length > 0 ? { machine } : {}),
+        ...(input.tolerance !== undefined ? { tolerance: input.tolerance } : {}), ...(input.allowance !== undefined ? { allowance: input.allowance } : {}), ...(input.cell !== undefined ? { cell: input.cell } : {}),
+        ...(input.part.elements !== undefined ? { elements: input.part.elements as never } : { part: input.part.meshes! as never }),
+        ...(input.origin !== undefined ? { origin: input.origin } : {})
+      }, context.signal !== undefined ? { signal: context.signal } : {})
+      if ("error" in outcome) return { ok: false, error: outcome.error }
+      const dev = (d: cam.kernel.VerifyNcResult["gouge"]) => ({ depthMm: r3(d.depth), volumeMm3: r3(d.volume), rays: d.rays, ...(d.at !== undefined ? { at: d.at } : {}) })
+      return {
+        ok: true, verdict: outcome.verdict, complete: outcome.complete, reasons: [...outcome.reasons],
+        findings: outcome.findings.slice(0, 30).map((f) => ({ kind: f.kind, message: f.message, ...(f.line !== undefined ? { line: f.line } : {}), ...(f.point !== undefined ? { point: f.point } : {}), ...(f.depth !== undefined ? { depthMm: r3(f.depth) } : {}) })),
+        gouge: dev(outcome.gouge), left: dev(outcome.left), errorBoundMm: r3(outcome.errorBound), thresholdMm: r3(outcome.threshold), cellMm: r3(outcome.cell),
+        moves: outcome.moves, feedMoves: outcome.feedMoves, warnings: [...outcome.warnings], basis: VERIFY_NC_BASIS
+      }
     }
   }),
   defineWireAction({

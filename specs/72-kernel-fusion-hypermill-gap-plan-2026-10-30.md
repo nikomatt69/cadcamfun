@@ -405,3 +405,13 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   regressions (a sphere 1e-6 mm inside a coaxial cylinder read as disjoint: empty intersection, whole-cylinder subtraction, no warning; the circle-seed vertex
   filter applied to mesh-seeded curves: aligned seed 78 fell back to the displacement). Sweeps: aligned 1-240 and generic 61-200, 0 refused, 0 failed, 0 displaced
   after the fix. Open: the 11 gate failures, NURBS x NURBS marching inside the Boolean, singular-point tracing.
+- 2026-11-03 (step 0.6 reaches HTTP and the assistant): `verifyNc` is no longer kernel-only. `POST /api/toolpaths/verify-nc` (group `toolpathGenerator`, kernel job
+  `cam-verify-nc`, not cached: the input is the program) takes the NC bytes, the part as closed meshes, the stock box and the tools in the spindle and answers with
+  the findings (gouge with the first NC line, rapid in stock, travel, unknown tool), the deviations with their declared error, and a `verdict` (`faults` when a
+  gouge, a rapid through material or a travel violation exists; `incomplete` when nothing was found but the replay did not see every move; `clean` otherwise; the
+  field is now part of `VerifyNcResult`). A mesh that points past its vertices and a flat stock are 400s with the reason. The assistant's `cam verify_nc` action takes
+  the program as text or as a saved operation, the part inline as CAD elements or meshes with `origin` (the work zero) and the tools as `{number, diameter, flutes,
+  kind, holder}`; elements are meshed inside the worker. Tests: `apps/sidecar/test/cam-verify-nc.test.ts` (6, through HTTP with auth), `cam.verify_nc` in
+  `packages/ai/test/cam-breadth-actions.test.ts` (5, through the catalogue seam). The `cam` tool description is 4 818 characters (budget raised from 4 550 to 4 850;
+  the detail is in the cam-post skill). **Open:** no desktop panel yet (the CAM page verifies only its own programs); foreign NC with tool length compensation
+  per tool (the replay reads the NC tip position); the part must be closed; `convertNc` does not feed it.

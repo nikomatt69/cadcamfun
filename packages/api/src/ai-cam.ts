@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
 import { CamMachineConfig } from "./cam-machine-config.ts"
-import { CamLatheInput, CamPostTestInput, CamProcessInput } from "./ai-cam-breadth.ts"
+import { CamLatheInput, CamPostTestInput, CamProcessInput, CamVerifyNcActionInput } from "./ai-cam-breadth.ts"
 import { CamExportInput } from "./ai-export.ts"
 import { CamJobInput } from "./ai-cam-job.ts"
 
@@ -176,6 +176,8 @@ export const CAM_ACTION_INPUTS = {
   "cam.lathe": CamLatheInput,
   "cam.process": CamProcessInput,
   "cam.post_test": CamPostTestInput,
+  /** NC the kernel did not write, replayed against part, stock and tools on the tri-dexel stock (spec 72 step 0.6). */
+  "cam.verify_nc": CamVerifyNcActionInput,
   "cam_edit.turn": CamTurningOperationInput,
   "cam.manufacture": CamManufactureInput,
   /** A multi-setup job run in process: plan or run every setup, read claims, bounds and failure reasons (skill cam-five-axis). */

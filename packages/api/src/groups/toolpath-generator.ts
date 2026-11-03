@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, InternalError } from "../errors.ts"
 import { CamKernelRequest, CamKernelResult, CamProgressTarget } from "../cam-kernel.ts"
+import { CamVerifyNcRequest, CamVerifyNcResult } from "../cam-verify-nc.ts"
 
 const g = cam.generator
 const v = cam.verify
@@ -15,6 +16,8 @@ export const GenerateRequestWithProgress = Schema.Struct({ ...g.GenerateRequestS
  * v6 runs the same logic in `@cadcamfun/core` behind these three routes so the UI, the AI tools and plugins
  * share one implementation. Bodies are the core Schemas, so a field added there is typed on both sides.
  * `verify` replays G-code or IR against a stock model (removal, collisions, gouges) for the UI and the AI tools.
+ * `verifyNc` replays NC the kernel did not write (any CAM system, any post) against the part, the stock and the tools in the
+ * spindle on the tri-dexel stock: gouges with their first NC line, leftover, rapids through material, machine travel.
  */
 export class ToolpathGeneratorGroup extends HttpApiGroup.make("toolpathGenerator")
   .add(HttpApiEndpoint.post("manufacture", "/api/toolpaths/manufacture", {
@@ -32,6 +35,9 @@ export class ToolpathGeneratorGroup extends HttpApiGroup.make("toolpathGenerator
     }),
     HttpApiEndpoint.post("verify", "/api/toolpaths/verify", {
       payload: v.VerifyRequestSchema, success: v.VerifyResponseSchema, error: [BadRequest, InternalError]
+    }),
+    HttpApiEndpoint.post("verifyNc", "/api/toolpaths/verify-nc", {
+      payload: CamVerifyNcRequest, success: CamVerifyNcResult, error: [BadRequest, InternalError]
     })
   )
 {}
