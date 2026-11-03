@@ -4581,6 +4581,7 @@ export type AiSessionMessagesOutput = {
       output: string
       truncated: boolean
     }>
+    usage?: { inputTokens: number; outputTokens: number }
   }>
   before: string | null
 }

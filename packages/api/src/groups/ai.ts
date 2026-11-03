@@ -303,7 +303,9 @@ export const AiSessionMessage = Schema.Struct({
   agent: Schema.NullOr(Schema.String), model: Schema.NullOr(Schema.String), error: Schema.NullOr(Schema.String),
   /** Some text or tool evidence was cut to the history's bounds. */
   truncated: Schema.Boolean,
-  tools: Schema.Array(AiSessionTool)
+  tools: Schema.Array(AiSessionTool),
+  /** Tokens the model reported for this message (the sum of its finished steps); absent when the host kept none. */
+  usage: Schema.optionalKey(Schema.Struct({ inputTokens: Schema.Number, outputTokens: Schema.Number }))
 })
 export type AiSessionMessage = typeof AiSessionMessage.Type
 /**

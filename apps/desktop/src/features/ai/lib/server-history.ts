@@ -11,5 +11,7 @@ export const serverMessages = (messages: ReadonlyArray<AiSessionMessage>, sessio
         callId: tool.callId, tool: tool.tool, ok: tool.status === "completed", output: tool.output })
     }
     return { id: message.id, role: message.role, text: message.text, createdAt: message.createdAt ?? "1970-01-01T00:00:00.000Z",
-      status: message.error ? "error" : "done", events, ...(message.error ? { error: message.error } : {}) }
+      status: message.error ? "error" : "done", events, ...(message.error ? { error: message.error } : {}),
+      // What the model reported, so the cost of a reopened conversation adds up as the live one did.
+      ...(message.usage !== undefined ? { usage: message.usage } : {}) }
   })

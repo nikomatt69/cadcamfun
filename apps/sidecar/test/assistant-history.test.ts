@@ -29,6 +29,15 @@ describe("history rows", () => {
     expect(historyMessage(user("m1", "Widen the plate")).model).toBe("minimax/m1")
   })
 
+  test("an assistant message carries the tokens of its finished steps; a user message and a message without steps carry none", () => {
+    const step = (input: unknown, output: unknown): HostHistoryMessage["parts"][number] => ({ type: "step-finish", tokens: { input, output, reasoning: 9 } })
+    const row = historyMessage(assistant("m3", "Done.", [step(1200, 80), { type: "step-start" }, step(300, 40.5), step("x", -3)]))
+    // Two finished steps add up as the live stream adds them; a malformed count is zero, never NaN or negative.
+    expect(row.usage).toEqual({ inputTokens: 1500, outputTokens: 120.5 })
+    expect(historyMessage(assistant("m4", "No steps.")).usage).toBeUndefined()
+    expect(historyMessage({ ...user("m5", "Hi"), parts: [{ type: "text", text: "Hi" }, step(5, 5)] }).usage).toBeUndefined()
+  })
+
   test("long text, large output and oversized arguments are bounded and flagged", () => {
     const row = historyMessage(assistant("m", "x".repeat(HISTORY_TEXT_LIMIT + 10), [
       { type: "tool", tool: "t", callID: "c", state: { status: "completed", input: { blob: "y".repeat(HISTORY_TOOL_INPUT_LIMIT) }, output: "z".repeat(HISTORY_TOOL_OUTPUT_LIMIT + 1) } },

@@ -81,11 +81,26 @@ const modelOf = (info: HostHistoryMessage["info"]): string | null => {
   return model ? (provider ? `${provider}/${model}` : model) : null
 }
 
+/** The tokens a message used: the sum over its finished steps, as the live stream adds them up; undefined when no step reported any. */
+const usageOf = (message: HostHistoryMessage): AiSessionMessage["usage"] => {
+  const count = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0
+  const steps = message.parts.filter((part) => part.type === "step-finish")
+  if (steps.length === 0) return undefined
+  let inputTokens = 0, outputTokens = 0
+  for (const step of steps) {
+    const tokens = record(step["tokens"])
+    inputTokens += count(tokens?.["input"])
+    outputTokens += count(tokens?.["output"])
+  }
+  return { inputTokens, outputTokens }
+}
+
 /** One host message as a bounded history row. */
 export const historyMessage = (message: HostHistoryMessage): AiSessionMessage => {
   const text = cut(message.parts.filter((part) => part.type === "text" && part["synthetic"] !== true).map((part) => part.text ?? "").join(""), HISTORY_TEXT_LIMIT)
   const tools = message.parts.flatMap((part) => { const tool = toolOf(part); return tool ? [tool] : [] })
   const error = message.info.error?.data?.message ?? message.info.error?.name ?? null
+  const usage = message.info.role === "user" ? undefined : usageOf(message)
   return {
     id: message.info.id,
     role: message.info.role === "user" ? "user" : "assistant",
@@ -96,6 +111,7 @@ export const historyMessage = (message: HostHistoryMessage): AiSessionMessage =>
     error,
     truncated: text.truncated || tools.some((tool) => tool.truncated),
     tools,
+    ...(usage !== undefined ? { usage } : {}),
   }
 }
 

@@ -10195,6 +10195,46 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "truncated": {
                             "type": "boolean",
                           },
+                          "usage": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "inputTokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "outputTokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            },
+                            "required": [
+                              "inputTokens",
+                              "outputTokens",
+                            ],
+                            "type": "object",
+                          },
                         },
                         "required": [
                           "id",

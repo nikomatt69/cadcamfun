@@ -14075,6 +14075,46 @@
                               ],
                               "additionalProperties": false
                             }
+                          },
+                          "usage": {
+                            "type": "object",
+                            "properties": {
+                              "inputTokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "outputTokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "inputTokens",
+                              "outputTokens"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
