@@ -90,27 +90,32 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
   }
 
   /** Generates one element's toolpath through the sidecar: its own tool / material win when both are assigned. */
-  const generateToolpathForElement = async (elementId: string, settings: ToolpathSettings): Promise<void> => {
+  const generateToolpathForElement = async (elementId: string, settings: ToolpathSettings): Promise<boolean> => {
     const element = elements.elements.find(candidate => candidate["id"] === elementId)
-    if (element === undefined) { toast.error(t("cam.multi.elementMissing")); return }
+    if (element === undefined) { toast.error(t("cam.multi.elementMissing")); return false }
     const assignment = assignmentProblem(toolOf(elementId), materialOf(elementId)) === undefined ? assignmentOf(elementId) : undefined
     const input = { element, settings: store.getToolpathByElementId(elementId)?.toolpathSettings ?? settings, sources: job.sources(), ...(assignment ? { assignment } : {}) }
     try {
       const response = await generateForElement(app, input)
       storeGCode(elementId, response.gcode, effectiveSettings(input), { distance: response.stats.cutLength + response.stats.rapidLength, time: response.stats.estimatedSeconds })
       for (const warning of response.warnings) toast(warning)
+      return true
     } catch (cause) {
       toast.error(`${nameOf(elementId)}: ${cause instanceof Error ? cause.message : String(cause)}`)
+      return false
     }
   }
 
   const generateAllToolpaths = async (): Promise<void> => {
     setIsGeneratingAll(true)
     try {
+      // A toolpath that fails is reported by its own toast and does not stop the next ones; the summary only claims success when none failed.
+      let failed = 0
       for (const toolpath of [...store.toolpaths]) {
-        if (!toolpath.gcode) await generateToolpathForElement(toolpath.elementId, toolpath.toolpathSettings)
+        if (!toolpath.gcode && !(await generateToolpathForElement(toolpath.elementId, toolpath.toolpathSettings))) failed++
       }
-      toast.success(t("cam.multi.allGenerated"))
+      if (failed === 0) toast.success(t("cam.multi.allGenerated"))
+      else toast.error(t("cam.multi.failed"))
     } catch (error) {
       toast.error(t("cam.multi.failed"))
       console.error(error)
