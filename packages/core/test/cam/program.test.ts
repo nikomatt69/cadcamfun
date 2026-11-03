@@ -116,6 +116,12 @@ describe("generating a setup: one program, one emit", () => {
     expect(g.warnings.join(" ")).toMatch(/Op b is skipped/)
   })
 
+  test("an operation whose geometry cannot be read fails alone: the others still post and the failure is named", () => {
+    const g = generateSetup(setup([op("a", t6), op("b", t3), op("c", t6)]), (o) => { if (o.id === "b") throw new RangeError("Op b: no element for gone"); return geometryOf(o) })
+    expect(g.programs[0]!.operationIds).toEqual(["a", "c"])
+    expect(g.warnings.join(" ")).toMatch(/Op b produced nothing: Op b: no element for gone/)
+  })
+
   test("the same setup gives the same bytes", () => {
     const s = setup([op("a", t6), op("b", t3)])
     expect(generateSetup(s, geometryOf).programs[0]!.gcode).toBe(generateSetup(s, geometryOf).programs[0]!.gcode)

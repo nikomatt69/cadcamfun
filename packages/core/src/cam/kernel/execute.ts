@@ -552,7 +552,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
 
-  operations.forEach((op, opIndex) => {
+  const runOperation = (op: OperationSpec, opIndex: number): void => {
     checkpoint({ stage: "operations", operation: { id: op.id, index: opIndex, count: operations.length } })
     const tool = toolOf(op.tool)
     const cut = cutOf(op, tool)
@@ -574,7 +574,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     const warnings: string[] = []
     const overridden: string[] = []
     const fail = (tag: CamIssue["tag"], message: string, data?: CuttingData): void => {
-      issues.push(issue(tag, "generate", message, { operationId: op.id }))
+      // An operation that fails alone is a warning of the job, not a reason to refuse the operations that worked: the "operations" claim
+      // below fails with its id, so the program is never released as verified.
+      issues.push(issue(tag, "generate", message, { operationId: op.id, severity: "warning" }))
       outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: op.strategy, toolId: tool.id, cut, status: "failed", ...(data ? { cutting: data } : {}), parameters: {}, overridden, warnings, startZ: start, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
     }
     if (!finishing && op.strategy !== "surface" && start <= opBottom + 1e-4) {
@@ -836,6 +838,22 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       parameters: { ...common, stepover, ...(allowance !== undefined ? { allowance } : {}), ...(op.strategy === "multiaxis" ? { mode: op.mode ?? "parallel", skippedSamples: generated.skippedSamples ?? 0 } : {}) }, overridden, warnings, startZ: start,
       cutLength: 0, timeSeconds: estimateTime(marked, machine.rapidFeed ?? 10000), removedVolume: 0
     })
+  }
+  // One operation that throws fails alone: whatever it half-wrote is rolled back, the failure is reported by id, and the operations that
+  // work keep their toolpaths (a job whose every operation fails still has no NC and stays blocked).
+  operations.forEach((op, opIndex) => {
+    const before = { toolpaths: toolpaths.length, opOfToolpath: opOfToolpath.length, outcomes: outcomes.length }
+    try {
+      runOperation(op, opIndex)
+    } catch (error) {
+      if (error instanceof Cancelled) throw error
+      toolpaths.length = before.toolpaths
+      opOfToolpath.length = before.opOfToolpath
+      outcomes.length = before.outcomes
+      const tool = tools.find((t) => t.id === op.tool)
+      issues.push(issue("GenerationFailed", "generate", `${op.id}: ${error instanceof Error ? error.message : String(error)}`, { operationId: op.id, severity: "warning" }))
+      outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: op.strategy, toolId: op.tool, cut: tool !== undefined ? cutOf(op, tool) : "rough-side", status: "failed", parameters: {}, overridden: [], warnings: [], startZ: 0, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
+    }
   })
 
   // ------------------------------------------------------------ post
@@ -849,10 +867,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     if (t.number !== undefined) numbers[tp.toolId] = t.number
     else { while (taken.has(next)) next++; numbers[tp.toolId] = next; taken.add(next) }
   }
-  const program: Program = makeProgram(job.name, toolpaths, {
+  const programOptions = {
     ...(job.workOffset !== undefined ? { workOffset: job.workOffset } : {}),
     metadata: { ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? { setup: `Manual ${job.setupOrientation} setup - refixture and touch off; workholding unverified` } : {}), material: material.name, machine: machine.name, stock: `${width.toFixed(2)} x ${depthY.toFixed(2)} x ${(sMax.z - sMin.z).toFixed(2)} mm` }
-  })
+  }
+  let program: Program = makeProgram(job.name, toolpaths, programOptions)
   // `prepare` already refused a bad definition, so this one compiles.
   const written = job.post?.definition === undefined ? undefined : compileDefinition(job.post.definition)
   const post = written?.ok === true ? written.post : getPost(machine.post) ?? genericPost
@@ -871,11 +890,34 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     else tcpKinematics = fiveAxisKinematic({ layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) }, pivot: five.pivot, tcp: "program" })
   }
   if (tcpRefusal !== undefined) issues.push(issue("UnsupportedCapability", "post", `tcp: true refused: ${tcpRefusal}`))
+  const emitProgram = (p: Program): string => post.emit(p, { tcp: false, ...job.post?.options, ...(wantsTcp && tcpKinematics !== undefined ? { kinematics: tcpKinematics } : {}), toolNumbers: numbers, retractBeforeToolChange: true })
   try {
     // The kernel writes machine coordinates (indexed setups): no tip-control word unless the caller asks for one.
-    nc = toolpaths.length === 0 || tcpRefusal !== undefined ? "" : post.emit(program, { tcp: false, ...job.post?.options, ...(wantsTcp && tcpKinematics !== undefined ? { kinematics: tcpKinematics } : {}), toolNumbers: numbers, retractBeforeToolChange: true })
+    nc = toolpaths.length === 0 || tcpRefusal !== undefined ? "" : emitProgram(program)
   } catch (error) {
-    issues.push(issue("GenerationFailed", "post", `Post ${post.id}: ${error instanceof Error ? error.message : String(error)}`))
+    // One toolpath the post cannot write (a canned cycle it lacks, a word it refuses) must not cost the program of the others: write each
+    // alone, drop the ones that fail with their reason and the operation's id, and write the rest again.
+    const culprits: Array<{ readonly index: number; readonly reason: string }> = []
+    toolpaths.forEach((tp, index) => {
+      try { emitProgram(makeProgram(job.name, [tp], programOptions)) } catch (cause) { culprits.push({ index, reason: cause instanceof Error ? cause.message : String(cause) }) }
+    })
+    if (culprits.length === 0 || culprits.length === toolpaths.length) {
+      issues.push(issue("GenerationFailed", "post", `Post ${post.id}: ${error instanceof Error ? error.message : String(error)}`))
+    } else {
+      for (const { index, reason } of [...culprits].reverse()) {
+        const at = opOfToolpath[index]!
+        const failed = outcomes[at]!
+        issues.push(issue("GenerationFailed", "post", `${failed.id}: post ${post.id} cannot write it: ${reason}`, { operationId: failed.id, severity: "warning" }))
+        outcomes[at] = { ...failed, status: "failed", cutLength: 0, timeSeconds: 0, removedVolume: 0 }
+        toolpaths.splice(index, 1)
+        opOfToolpath.splice(index, 1)
+      }
+      for (const id of Object.keys(numbers)) if (!toolpaths.some((tp) => tp.toolId === id)) delete numbers[id]
+      program = makeProgram(job.name, toolpaths, programOptions)
+      try { nc = emitProgram(program) } catch (cause) {
+        issues.push(issue("GenerationFailed", "post", `Post ${post.id}: ${cause instanceof Error ? cause.message : String(cause)}`))
+      }
+    }
   }
 
   // ------------------------------------------------------------ replay of the emitted NC

@@ -4,7 +4,7 @@
  * G43 H<n> M3 S...`) between toolpaths; nothing here concatenates text.
  */
 import { analyseGcode } from "../generator/analysis.ts"
-import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GeometryInput, type GcodeStats } from "../generator/index.ts"
+import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GenerateOutcome, type GeometryInput, type GcodeStats } from "../generator/index.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { getPost } from "../post/index.ts"
 import type { Operation } from "./op.ts"
@@ -76,8 +76,16 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
         toolDiameter: op.tool.diameter, flutes: op.tool.flutes, toolNumber: pocket, workOffset: setup.workOffset,
         ...(op.fromPreviousStock && op.params.useRestMachining && before !== undefined ? { restToolDiameter: before.tool.diameter } : {})
       }
-      const outcome = generateToolpath(decodeGenerateRequest({ settings, geometry: geometryOf(op), evidence: false, ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}) }))
-      if (outcome.error !== undefined) { programWarnings.push(`${op.name} produced nothing: ${outcome.error}`); continue }
+      // One operation that cannot be generated (an element that is gone, settings the generator refuses, a fault inside it) fails alone:
+      // the operations that work still make their toolpaths, and the failure is reported by name.
+      const outcome = ((): GenerateOutcome | { readonly error: string; readonly response?: undefined } => {
+        try {
+          return generateToolpath(decodeGenerateRequest({ settings, geometry: geometryOf(op), evidence: false, ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}) }))
+        } catch (cause) {
+          return { error: cause instanceof Error ? cause.message : String(cause) }
+        }
+      })()
+      if (outcome.error !== undefined || outcome.response === undefined) { programWarnings.push(`${op.name} produced nothing: ${outcome.error ?? "no result"}`); continue }
       programWarnings.push(...outcome.response.warnings.map((w) => `${op.name}: ${w}`))
       const moves: Move[] = outcome.response.program.toolpaths.flatMap((t) => t.moves)
       toolpaths.push({ id: op.id, name: op.name, toolId: op.tool.id, spindleRpm: Math.min(op.params.rpm, op.tool.maxRpm), coolant: op.params.coolant ? "flood" : "off", moves, operation: { id: op.id, name: op.name } })
