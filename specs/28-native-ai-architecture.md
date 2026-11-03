@@ -1,6 +1,6 @@
 # 28 - Native AI architecture for precise CAD/CAM
 
-Status: **specified; implementation pending**. Approved design publication, 2026-10-12. Owners: WP8, with explicitly scoped WP0/WP1/WP2/WP3/WP4/WP6/WP9/WP11/WP13 work in the controlling RM specifications. No runtime change or migration is shipped by this document.
+Status (corrected 2026-11-03): **partly built**. Built: the action seam, structured output, host isolation, role restrictions, mutation receipts for drawings, CAM setups and components (`commitMutation`), expected-revision writes (`baseUpdatedAt`) on drawings, toolpaths, components, materials, tools, machine configurations and saved setups. Open: `start_session` / `settle_session`, durable lifecycle, versioned design intent, library write actions (RM-05, RM-06, RM-07). Earlier status: Status: **specified; implementation pending**. Approved design publication, 2026-10-12. Owners: WP8, with explicitly scoped WP0/WP1/WP2/WP3/WP4/WP6/WP9/WP11/WP13 work in the controlling RM specifications. No runtime change or migration is shipped by this document.
 
 ## 1. Authority and objective
 
