@@ -67,3 +67,53 @@ one global reduced-motion rule for ambient loops (spinners keep turning).
   the stageshow test only; they inherit the dark/narrow/WKWebView gaps above and were not filmed.
 - Icon-size consistency and hover shapes were not re-audited across ~70 CAD and ~100 CAM files.
 - Gradient flattening was checked by grep and by eye on the dashboard, not on every screen it touches.
+
+## Feature pass 2026-11-03 (every component and page under `src/features`)
+
+Scope: all 232 `.tsx` and `.css` files under `features/` plus the shared CSS they use (`styles/*.css`), read
+against `craft.md` by three agents on disjoint features, then re-read in a second pass; follow-ups closed the
+portalled dialogs, the CAM palette and the shared layer. Rule for the whole pass: tune values, never change
+markup, classes, props or behaviour. About 60 commits, `style(desktop): stageshow ...`.
+
+### What changed
+
+- Spacing and type: 12px insets on words, 12/8px row padding, 4/8/12 scale, nothing under 11px, sentence case in
+  place of uppercase and tracking, tabular numerals on numbers, 28px controls, fixed boxes `flex: none`.
+- Icons: unicode glyphs and emoji in rows replaced by the app's lucide set, one size per area; the CAM strategy
+  and cycle glyphs (the product's own icon file) share one 24 grid, stroke 2, `currentColor`.
+- Colour and surfaces: legacy Tailwind palettes mapped to `--ent-*` / `--panel-*` tokens (also inside portalled
+  dialogs now), decorative gradients, glows, blur and translucent overlaps made opaque, status colours only for status.
+- Motion: entrance animations, scale hovers and presses removed, ambient loops respect reduced motion.
+- Fields: more numeric inputs on `NumberField`; icon-led search fields keep their `pl-*` padding under the page-wide
+  control rule; labels and long names no longer break mid-word.
+- Text: the `ToolRow` tool-view table now goes through `t()` (`ai.toolView.*`, 12 languages).
+
+### Gold used
+
+`static-card` / `hero-demo` framing for the scenes, `loading` for skeleton rows, `ai-chat` / `ai-cards` for the
+assistant thread. The real screens are not stage illustrations, so only the craft rules (restraint, type, spacing,
+icons, colour) apply to them; framing and motion rules apply to the scenes.
+
+### Checked
+
+- Typecheck clean; full `apps/desktop/test` (175 files, `--timeout 60000`) and `apps/desktop/src` green.
+- Headless Chromium on the Vite dev server (sidecar "Fake API"): the seven page scenes light and dark; CAD and CAM
+  dark 1280; one portalled dialog (Import Drawing) light and dark; every static route dark 1280 and light 390, and
+  ten main routes light 1280 and dark 390, with automated checks for icon/text overlap, buttons wrapping, mid-word
+  breaks, horizontal overflow and page errors. Defects found that way were fixed (search lens, wrapping labels).
+
+### Not checked
+
+- The running Tauri app (WKWebView): nothing here was seen in it.
+- Not every route in every theme/width combination; no real data (the fake sidecar returns empty or error states).
+- Dialogs other than Import Drawing; hover, focus and pressed states by eye.
+- Non-English rendering of the new `ai.toolView.*` rows (plural forms were spot-checked in code only).
+
+### Left on purpose
+
+- About 20 hand-drawn CAM strategy/cycle glyphs (`StrategyPalette`, `MachineCycleIcons`): domain shapes with no
+  equivalent in any icon set; they are the product's own icon file, made consistent rather than replaced.
+- About 370 English literals in `.ts` data files (property field labels, custom-element templates, predefined
+  libraries, manuals catalogue, assistant tool and suggestion text): not component code; they need their own
+  translation pass.
+- `hi/ai.json` still has older keys in English.
