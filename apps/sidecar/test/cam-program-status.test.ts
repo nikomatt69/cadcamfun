@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { CamProgramStatus, CamRegenerateResult } from "@cadcamfun/api"
+import { buildRecipe } from "@cadcamfun/core"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
 
@@ -145,4 +146,28 @@ test("accepting a regeneration keeps the old program as a restore point, replace
   const again = Schema.decodeUnknownSync(CamRegenerateResult)((await post({})).body)
   if (again.outcome.status !== "ok") throw new Error("expected a regenerated artifact")
   expect(again.outcome.diff.same).toBe(true)
+})
+
+test("a hole resized by its fastener is matched by geometry in the regeneration diff, with the confidence", async () => {
+  const history = (fastener: string) => buildRecipe("mounting_plate", { width: 120, depth: 80, thickness: 12, fastener, counterbore: true } as never).history
+  const part = (fastener: string) => ({ id: "mount", type: "parametric", name: "Mount", x: 0, y: 0, z: 0, layerId: "default", history: history(fastener) })
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Match regeneration" } })).body.id
+  const drawing = (await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Mount", data: { elements: [part("M5")] } } })).body.id
+  const handlers = await app.toolHandlers()
+  const saved = await handlers.manufactureOperation!(project, { material: "6061" }) as { ok: boolean; operationId: string }
+  expect(saved, JSON.stringify(saved)).toMatchObject({ ok: true })
+  await app.call(`/api/drawings/${drawing}`, { method: "PUT", json: { data: { elements: [part("M6")] } } })
+  const result = Schema.decodeUnknownSync(CamRegenerateResult)((await app.call(`/api/toolpaths/${saved.operationId}/regenerate`, { method: "POST", json: {} })).body)
+  if (result.outcome.status !== "ok") throw new Error(JSON.stringify(result.outcome.issues))
+  const { operations } = result.outcome.diff
+  expect(operations.added).toEqual([])
+  expect(operations.removed).toEqual([])
+  const pair = operations.matched.find((p) => p.by === "signature")
+  expect(pair?.before).toMatch(/^drill-/)
+  expect(pair?.confidence).toBeGreaterThanOrEqual(0.5)
+  expect(operations.changed.find((c) => c.from === pair?.before)).toMatchObject({ id: pair?.after })
+  // The assistant reads the same pairing.
+  const asked = await handlers.regenerateOperation!(project, saved.operationId, "program") as { ok: boolean; diff: { operations: { matched: Array<{ by: string }> } } }
+  expect(asked.ok).toBe(true)
+  expect(asked.diff.operations.matched.some((p) => p.by === "signature")).toBe(true)
 })

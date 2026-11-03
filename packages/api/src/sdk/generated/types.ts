@@ -8231,6 +8231,8 @@ export type ToolpathsRegenerateOutput = {
             changed: Array<{
               id: string
               name: string
+              from?: string
+              confidence?: number
               fields: Array<
                 "status" | "strategy" | "tool" | "cut" | "parameters" | "cutLength" | "time" | "removedVolume"
               >
@@ -8238,6 +8240,9 @@ export type ToolpathsRegenerateOutput = {
               removedVolume: { before: number; after: number }
               parameters: Array<string>
             }>
+            matched: Array<{ before: string; after: string; by: "id" | "signature"; confidence: number }>
+            droppedOverrides: Array<{ id: string; parameters: Array<string>; reason: string }>
+            carried: Array<{ before: string; after: string; parameters: { [x: string]: any } }>
           }
           tools: { added: Array<string>; removed: Array<string> }
           cycleTimeSeconds: { before: number; after: number; delta: number }

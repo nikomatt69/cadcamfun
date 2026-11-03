@@ -135,4 +135,12 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   claim that got worse) unless `force`, a blocked new program, a saved CAM page document (portable program: accepted from the CAM page). Needs write access (403 otherwise). After
   accepting, the status is `current` and the assistant's review is no longer stale. The assistant's `cam regenerate` stays a preview: storing goes through `cam_edit manufacture`.
   Test: `apps/sidecar/test/cam-program-status.test.ts` (5). **Open:** the desktop buttons and diff view (A6), `matchOperations` (A5), A7.
+- 2026-11-03 (build, A5): `cam.kernel.matchOperations(before, after, {minConfidence})`. Operations with the same id and strategy pair by id (confidence 1); the rest pair greedily by a geometric signature
+  (strategy, cut class, centre, extent and depth of the tool path; the pair is made only when the distance is inside a third of the feature's size, at least 4 mm, and the confidence is at
+  least 0.5). The overrides of a signature-paired operation are listed in `carried` with their values; the overrides of an operation with no pair are listed in `droppedOverrides` with the
+  reason, never carried. `programDiff` uses it: `operations.matched`, `carried`, `droppedOverrides`, and a changed operation names the id it had (`from`) and the confidence. Real runs: a
+  mounting plate M5 to M6 pairs the drill operation (`drill-drill-5.5-2` to `drill-drill-6.6-2`, 0.862) instead of reporting a removal and an addition; an operation moved 500 mm is not
+  paired and its override is reported dropped. Tests: `kernel/program-diff.test.ts` (10), `apps/sidecar/test/cam-program-status.test.ts` (6, HTTP and the assistant). **Open:** the carried overrides are
+  returned, not yet applied to the stored request on accept (the person's operation list is not stored per feature), the signature is bounds-based (two similar holes swapped can pair wrongly; the
+  confidence shows it), A7.
 

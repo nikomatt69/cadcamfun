@@ -90175,10 +90175,36 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                       "type": "array",
                                     },
+                                    "carried": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "after": {
+                                            "type": "string",
+                                          },
+                                          "before": {
+                                            "type": "string",
+                                          },
+                                          "parameters": {
+                                            "type": "object",
+                                          },
+                                        },
+                                        "required": [
+                                          "before",
+                                          "after",
+                                          "parameters",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": "array",
+                                    },
                                     "changed": {
                                       "items": {
                                         "additionalProperties": false,
                                         "properties": {
+                                          "confidence": {
+                                            "type": "number",
+                                          },
                                           "fields": {
                                             "items": {
                                               "enum": [
@@ -90194,6 +90220,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               "type": "string",
                                             },
                                             "type": "array",
+                                          },
+                                          "from": {
+                                            "type": "string",
                                           },
                                           "id": {
                                             "type": "string",
@@ -90252,6 +90281,63 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                       "type": "array",
                                     },
+                                    "droppedOverrides": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                          },
+                                          "parameters": {
+                                            "items": {
+                                              "type": "string",
+                                            },
+                                            "type": "array",
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "id",
+                                          "parameters",
+                                          "reason",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": "array",
+                                    },
+                                    "matched": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "after": {
+                                            "type": "string",
+                                          },
+                                          "before": {
+                                            "type": "string",
+                                          },
+                                          "by": {
+                                            "enum": [
+                                              "id",
+                                              "signature",
+                                            ],
+                                            "type": "string",
+                                          },
+                                          "confidence": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "before",
+                                          "after",
+                                          "by",
+                                          "confidence",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": "array",
+                                    },
                                     "removed": {
                                       "items": {
                                         "additionalProperties": false,
@@ -90276,6 +90362,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "added",
                                     "removed",
                                     "changed",
+                                    "matched",
+                                    "droppedOverrides",
+                                    "carried",
                                   ],
                                   "type": "object",
                                 },

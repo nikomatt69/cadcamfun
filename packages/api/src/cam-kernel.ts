@@ -168,10 +168,16 @@ export const CamProgramDiff = Schema.Struct({
     added: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
     removed: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
     changed: Schema.Array(Schema.Struct({
-      id: Schema.String, name: Schema.String,
+      id: Schema.String, name: Schema.String, from: Schema.optionalKey(Schema.String), confidence: Schema.optionalKey(Schema.Finite),
       fields: Schema.Array(Schema.Literals(["status", "strategy", "tool", "cut", "parameters", "cutLength", "time", "removedVolume"])),
       timeSeconds: beforeAfter, removedVolume: beforeAfter, parameters: strings
-    }))
+    })),
+    /** Operations paired by the geometry they machine (a moved or resized feature whose id changed), with the confidence of each pair. */
+    matched: Schema.Array(Schema.Struct({ before: Schema.String, after: Schema.String, by: Schema.Literals(["id", "signature"]), confidence: Schema.Finite })),
+    /** Overrides of the stored program that the new one does not carry, and why. */
+    droppedOverrides: Schema.Array(Schema.Struct({ id: Schema.String, parameters: strings, reason: Schema.String })),
+    /** Overrides to set on the new operations to keep what the person tuned on the paired ones. */
+    carried: Schema.Array(Schema.Struct({ before: Schema.String, after: Schema.String, parameters: Schema.Record(Schema.String, Schema.Unknown) }))
   }),
   tools: Schema.Struct({ added: strings, removed: strings }),
   cycleTimeSeconds: Schema.Struct({ before: Schema.Finite, after: Schema.Finite, delta: Schema.Finite }),

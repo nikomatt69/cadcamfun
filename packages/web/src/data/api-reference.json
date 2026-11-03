@@ -57342,6 +57342,12 @@
                                           "name": {
                                             "type": "string"
                                           },
+                                          "from": {
+                                            "type": "string"
+                                          },
+                                          "confidence": {
+                                            "type": "number"
+                                          },
                                           "fields": {
                                             "type": "array",
                                             "items": {
@@ -57407,12 +57413,95 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "matched": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "before": {
+                                            "type": "string"
+                                          },
+                                          "after": {
+                                            "type": "string"
+                                          },
+                                          "by": {
+                                            "type": "string",
+                                            "enum": [
+                                              "id",
+                                              "signature"
+                                            ]
+                                          },
+                                          "confidence": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "before",
+                                          "after",
+                                          "by",
+                                          "confidence"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "droppedOverrides": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "parameters": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "reason": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "parameters",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "carried": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "before": {
+                                            "type": "string"
+                                          },
+                                          "after": {
+                                            "type": "string"
+                                          },
+                                          "parameters": {
+                                            "type": "object"
+                                          }
+                                        },
+                                        "required": [
+                                          "before",
+                                          "after",
+                                          "parameters"
+                                        ],
+                                        "additionalProperties": false
+                                      }
                                     }
                                   },
                                   "required": [
                                     "added",
                                     "removed",
-                                    "changed"
+                                    "changed",
+                                    "matched",
+                                    "droppedOverrides",
+                                    "carried"
                                   ],
                                   "additionalProperties": false
                                 },
