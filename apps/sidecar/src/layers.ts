@@ -86,6 +86,7 @@ import { WorkspaceHandlers } from "./http/workspace.ts"
 import { LiveEvents } from "./services/live-events.ts"
 import { AssistantTurns } from "./services/assistant-turns.ts"
 import { MetricsRouteLive, httpMetrics } from "./observability.ts"
+import { idempotency } from "./idempotency.ts"
 
 /**
  * Route handlers by domain. A new route family goes into the domain it belongs to, and its group into
@@ -205,6 +206,8 @@ export const ApiRoutes = Layer.mergeAll(
   // The request metrics. Effect's HTTP server already creates the request span above this
   // middleware and records the matched route on it, so the metrics read the route from there.
   Layer.provide(HttpRouter.middleware(httpMetrics, { global: true })),
+  // `Idempotency-Key`: a retried write gets its stored answer (no-op without the header). Needs `KvStore`, from `Services`.
+  Layer.provide(HttpRouter.middleware(idempotency, { global: true })),
   Layer.provide(Handlers),
   Layer.provide(AuthorizationLive),
   Layer.provide(Services)

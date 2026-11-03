@@ -57,4 +57,5 @@ Gate: coverage rises per family; `--strict` is green only when 184/184. Handler 
 - 2026-11-03: step 3a done: organisation members, invite, projects (coverage 135/184). Open in step 3: conversations, invitation accept, `conversation/*`.
 - 2026-11-03: step 3 done: conversations, messages, read, invitation accept (coverage 141/184). Next: step 4 (auth leftovers).
 - 2026-11-03: the contract is complete for what v6 needs: 143 covered + 41 accepted-as-not-ported (`scripts/accepted-gaps.ts`), `coverage --strict` green. Open in this step: the revision/receipt consolidation ("Native AI consistency amendment") only.
+- 2026-11-03: consolidation: expected-revision writes on every document PUT, `Idempotency-Key` middleware (idempotent receipts), saved setups through `commitMutation`. Still open here: derived-artifact invalidation and client adoption of the header.
 
