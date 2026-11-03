@@ -16,7 +16,7 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
   list(userId: string): Effect.Effect<ReadonlyArray<typeof OrganizationSummary.Type>, DatabaseError>
   create(userId: string, input: Input): Effect.Effect<typeof OrganizationRow.Type, DatabaseError>
   get(userId: string, id: string): Effect.Effect<typeof OrganizationDetails.Type | undefined, DatabaseError | Forbidden>
-  update(userId: string, id: string, input: Input): Effect.Effect<typeof OrganizationRow.Type | undefined, DatabaseError | Forbidden>
+  update(userId: string, id: string, input: Input, base?: string): Effect.Effect<typeof OrganizationRow.Type | "conflict" | undefined, DatabaseError | Forbidden>
   remove(userId: string, id: string): Effect.Effect<void, DatabaseError | Forbidden>
   /** The user's role in the organisation, `undefined` when they are no member. */
   membership(userId: string, organizationId: string): Effect.Effect<Role | undefined, DatabaseError>
@@ -142,16 +142,22 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
             projectCount: projects?.n ?? 0, members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })) })
         })
       }),
-      update: Effect.fn("OrganizationRepo.update")(function*(userId, id, input) {
+      update: Effect.fn("OrganizationRepo.update")(function*(userId, id, input, base) {
         if ((yield* role(userId, id)) === "MEMBER") {
           return yield* new Forbidden({ message: "You do not have permission to update this organization" })
         }
         const updated = yield* query("organizations.update", async (db) => {
-          const [found] = await db.update(O).set({ name: input.name, description: input.description, updatedAt: new Date() })
-            .where(eq(O.id, id)).returning()
-          return found ? row(found) : undefined
+          // With `base` the check and the write are one transaction: nobody's save is overwritten.
+          const outcome = db.transaction((tx) => {
+            const current = tx.select().from(O).where(eq(O.id, id)).get()
+            if (!current) return undefined
+            if (base !== undefined && current.updatedAt.toISOString() !== base) return "conflict" as const
+            return tx.update(O).set({ name: input.name, description: input.description, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) })
+              .where(eq(O.id, id)).returning().get()
+          })
+          return outcome === undefined ? undefined : outcome === "conflict" ? outcome : row(outcome)
         })
-        if (updated) yield* changed(userId, id)
+        if (updated && updated !== "conflict") yield* changed(userId, id)
         return updated
       }),
       remove: Effect.fn("OrganizationRepo.remove")(function*(userId, id) {

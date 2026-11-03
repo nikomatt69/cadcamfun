@@ -283,7 +283,7 @@ export function ProfileSettings(): JSX.Element {
         <button
           type="button"
           onClick={() => setIsEditing(!isEditing())}
-          class={`h-7 rounded-[5px] px-3 text-xs font-medium transition-colors duration-150 ease-out ${
+          class={`h-7 shrink-0 whitespace-nowrap rounded-[5px] px-3 text-xs font-medium transition-colors duration-150 ease-out ${
             isEditing()
               ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800"
               : "bg-blue-600 text-white hover:bg-blue-700"

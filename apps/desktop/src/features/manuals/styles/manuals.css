@@ -18,7 +18,8 @@
 .manuals-search-row { display: flex; align-items: center; gap: 12px; }
 .manuals-search { position: relative; flex: 1; min-width: 0; }
 .manuals-search > svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: var(--manual-muted); pointer-events: none; }
-.manuals-search input { padding-left: 36px; padding-right: 32px; }
+/* Beats the page-wide control padding (0,5,1) so the field text clears the lens and the clear button. */
+.workspace-page .manuals-search input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]) { padding-left: 36px; padding-right: 32px; }
 .manuals-search input::-webkit-search-cancel-button { display: none; }
 .manuals-search button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 4px; color: var(--manual-muted); }
 .manuals-result-count { margin: 12px 0; color: var(--manual-muted); font-size: 11px; font-variant-numeric: tabular-nums; }

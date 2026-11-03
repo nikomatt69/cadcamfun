@@ -62,7 +62,7 @@ State 2026-10-29 evening: **0.1 done, 0.3 done, 0.2 partly** (see below). Baseli
 | # | Item | Gate |
 | --- | --- | --- |
 | 0.1 | Bring the AI tool prompts back under the ceiling (501 characters over): shorten wording, remove duplication; remove no action or rule. **Done 2026-10-29**: redundant phrases cut in 10 prompt files (`confirm` parameter glosses repeated from the action text, duplicated pointers, example lists); a concurrent session's `tabs` text in `cam_edit.txt` then took the total to 32 822, a further cut in `library_edit.txt` restored it | `tool-prompts.test.ts` and `prompt-corpus.test.ts` green (19 pass) with the ceiling unchanged |
-| 0.2 | Correct the remaining stale headers of 67 §2 (specs 26–29); roadmap and task board are already corrected | each header says what the tree says |
+| 0.2 | **Done 2026-11-03**: the headers of specs 26–29 now state what the tree has and what is open (the earlier text is kept after the correction). Roadmap and task board were already corrected | each header says what the tree says |
 | 0.3 | **Done 2026-10-29** (67 §5). Record a baseline: `bun check -p` for `core`, `ai`, `api`, `sidecar`, `desktop`; tests of `packages/ai` and `packages/core` per file under 110 s; the full `bun run corpus` once | one dated line in 67 with the red/green list and the corpus result |
 
 ### 3.1 The first items, in order

@@ -366,6 +366,11 @@ html.dark .workspace-page select { color-scheme: dark; }
 
 .workspace-filter-reset:hover:not(:disabled) { color: var(--wp-accent); }
 
+/* A field led by an icon asks for its own left padding (pl-8/9/10); the page-wide control padding above is more specific and would put the text under the icon. */
+.workspace-page input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"])[class~="pl-8"] { padding-left: 2rem; }
+.workspace-page input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"])[class~="pl-9"] { padding-left: 2.25rem; }
+.workspace-page input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"])[class~="pl-10"] { padding-left: 2.5rem; }
+
 .workspace-page :is(input, select, textarea)::placeholder {
   color: var(--wp-text-faint);
 }

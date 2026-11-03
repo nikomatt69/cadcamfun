@@ -1,6 +1,6 @@
 # 26 — Tool consolidation: fewer tools, more actions
 
-Status: **specified; implementation pending** across WP8 (`packages/ai`), WP4 (`apps/sidecar`), WP6 (`apps/desktop`). Source inspection on 2026-10-12 confirms the per-verb registry remains; the former implemented label is not supported by the current tree. Extends `08-ai.md` §3, `16-cadcam-agent-blueprint.md`, `22-gaps-and-fixes.md` §3. No new dependency or change to host isolation for consolidation itself.
+Status (corrected 2026-11-03 against the tree): **partly built**. The action seam exists (`packages/ai/src/tools/action.ts` over `packages/ai/src/actions/*`, 16 tool prompts in `tools/prompts/`, four-tool families `cad`/`cad_edit`, `cam`/`cam_edit`/`cam_verify`, `library`/`library_edit`, `vcs`/`vcs_edit`, `memory`/`memory_edit`, `mods`/`mods_edit`, `parts`, `research`, `agent`); RM-01 stays `in progress` for its integration checks (`roadmap/01-action-catalogue.md`). Earlier status line follows, kept as history: Status: **specified; implementation pending** across WP8 (`packages/ai`), WP4 (`apps/sidecar`), WP6 (`apps/desktop`). Source inspection on 2026-10-12 confirms the per-verb registry remains; the former implemented label is not supported by the current tree. Extends `08-ai.md` §3, `16-cadcam-agent-blueprint.md`, `22-gaps-and-fixes.md` §3. No new dependency or change to host isolation for consolidation itself.
 
 ## Current contract amendments
 
