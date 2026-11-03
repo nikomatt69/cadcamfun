@@ -3,6 +3,31 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.74 (November 2026)
+
+## Desktop
+
+- Stageshow cad viewport overlays, uniform 28px toolbar, token-based JSON editor and vector inputs
+- Stageshow library resource detail and sidebar
+- Stageshow assistant styles, manuals and plugin settings dialog
+- Stageshow toolpath form, library modal and detail screen
+- Stageshow cam modals, status bar and generator sections
+- Stageshow cad browser parts and optional/deferred NumberField
+- Stageshow 28px page buttons, status-only strip tones, calm thinking dots, library value fixes
+- Stageshow migrate portalled dialogs from the Tailwind palette to --ent/--panel tokens
+- Stageshow make --ent/--panel tokens available inside portalled dialogs
+- Neutral group bars in the CAM capabilities overview
+- Count the phone-written answer in the transcript messages, not the screen-reader announcement
+- Stageshow strategy palette and cycle glyphs on one stroke, neutral palette/overview, opaque CAM visualizer chrome, 11px sidebar type
+- Git profile form keeps its submit button disabled after saving instead of removing it
+- Restore the custom tolerance input and its refusal message
+- Stageshow fixes after review: keep the running tool prefix and tip bullets, mark illustration strings i18n-ok
+- Keep toolbar shortcut hints out of the untranslated-literals baseline
+- Stageshow refine workshop scenes (full read pass)
+- Stageshow refine plugins (full read pass)
+- Stageshow refine mcp (full read pass)
+- Stageshow refine library (full read pass)
+
 ## v0.1.73 (November 2026)
 
 - No notable changes
