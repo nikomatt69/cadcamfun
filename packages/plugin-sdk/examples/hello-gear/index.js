@@ -6437,35 +6437,34 @@ var K = new Uint32Array([
 
 // packages/core/src/cad/brep/lineage-record.ts
 var STEPS = new WeakMap;
+// packages/core/src/cad/brep/naming.ts
+var UNIQUE = new WeakMap;
 
+// packages/core/src/cad/brep/naming-keys.ts
+var CACHE = new WeakMap;
+// packages/core/src/cad/brep/primitives.ts
+var TAU5 = Math.PI * 2;
+// packages/core/src/cad/brep/sweep.ts
+var TAU6 = Math.PI * 2;
+var CORNER_TURN2 = 10 * Math.PI / 180;
+// packages/core/src/cad/brep/tolerance.ts
+var LOOSE_TOLERANCE = 10 * MODEL_TOL;
+
+// packages/core/src/cad/brep/step.ts
+var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/predicates.ts
 var EPS2 = 2 ** -53;
 var ERR_O2D = (3 + 16 * EPS2) * EPS2;
 var ERR_O3D = (7 + 56 * EPS2) * EPS2;
 var ERR_INCIRCLE = (10 + 96 * EPS2) * EPS2;
 var SPLITTER = 2 ** 27 + 1;
-
 // packages/core/src/cad/brep/contact.ts
-var TAU5 = Math.PI * 2;
-
-// packages/core/src/cad/brep/primitives.ts
-var TAU6 = Math.PI * 2;
-
-// packages/core/src/cad/brep/tolerance.ts
-var LOOSE_TOLERANCE = 10 * MODEL_TOL;
+var TAU7 = Math.PI * 2;
 
 // packages/core/src/cad/brep/boolean.ts
-var TAU7 = Math.PI * 2;
+var TAU8 = Math.PI * 2;
 var VOLUMES = new WeakMap;
 var SETS = new WeakMap;
-
-// packages/core/src/cad/thread-brep.ts
-var TAN302 = Math.tan(Math.PI / 6);
-// packages/core/src/cad/brep/sweep.ts
-var TAU8 = Math.PI * 2;
-var CORNER_TURN2 = 10 * Math.PI / 180;
-// packages/core/src/cad/brep/step.ts
-var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/features.ts
 var TAU9 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;
@@ -6478,8 +6477,6 @@ var TANGENT = Math.cos(0.5 * Math.PI / 180);
 // packages/core/src/cad/brep/fillet-edit.ts
 var TAU12 = 2 * Math.PI;
 var MAX_ARC = Math.PI - 0.001;
-// packages/core/src/cad/brep/naming.ts
-var UNIQUE = new WeakMap;
 // packages/core/src/cad/brep/shell.ts
 var CROSS = 1 + 0.000001;
 // packages/core/src/cad/brep/export-mesh.ts
@@ -6495,8 +6492,9 @@ var CRC_TABLE = (() => {
 })();
 // packages/core/src/cad/brep/iges.ts
 var TAU13 = Math.PI * 2;
-// packages/core/src/cad/brep/naming-keys.ts
-var CACHE = new WeakMap;
+// packages/core/src/cad/thread-brep.ts
+var TAN302 = Math.tan(Math.PI / 6);
+
 // packages/core/src/cad/history-brep.ts
 var BASE_TAGS = new WeakMap;
 
@@ -7563,7 +7561,7 @@ var INDEX = (() => {
 })();
 
 // packages/core/src/cad/scene-automation.ts
-var SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"]);
+var SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "capsule", "washer", "nut", "bolt", "screw", "gear", "spring", "ellipsoid", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"]);
 var CONTAINERS2 = new Set(["component", "group", "assembly"]);
 // packages/core/src/cam/brep-part.ts
 var cache = new WeakMap;
@@ -7574,6 +7572,31 @@ var MAX_GAP3 = Math.PI / 3;
 
 // packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
+// packages/core/src/sim-fea/materials.ts
+var m2 = (x) => x;
+var MATERIALS2 = [
+  m2({ id: "steel-s235", name: "Structural steel S235", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 235, ultimateMPa: 360, conductivity: 50, specificHeat: 490, expansion: 0.000012, maxServiceC: 400, enduranceMPa: 160 }),
+  m2({ id: "steel-c45", name: "Carbon steel C45", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 490, ultimateMPa: 700, conductivity: 46, specificHeat: 470, expansion: 0.0000115, maxServiceC: 400, enduranceMPa: 300 }),
+  m2({ id: "steel-42crmo4", name: "Alloy steel 42CrMo4 (QT)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.29, density: 7850, yieldMPa: 800, ultimateMPa: 1000, conductivity: 42, specificHeat: 460, expansion: 0.0000123, maxServiceC: 450, enduranceMPa: 480 }),
+  m2({ id: "steel-tool-d2", name: "Tool steel D2 (hardened)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.28, density: 7700, yieldMPa: 1500, ultimateMPa: 1900, conductivity: 20, specificHeat: 460, expansion: 0.0000104, maxServiceC: 400 }),
+  m2({ id: "stainless-304", name: "Stainless steel 304", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.29, density: 8000, yieldMPa: 215, ultimateMPa: 505, conductivity: 16, specificHeat: 500, expansion: 0.0000173, maxServiceC: 800, enduranceMPa: 240 }),
+  m2({ id: "stainless-316l", name: "Stainless steel 316L", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.3, density: 8000, yieldMPa: 205, ultimateMPa: 515, conductivity: 16, specificHeat: 500, expansion: 0.000016, maxServiceC: 800, enduranceMPa: 240 }),
+  m2({ id: "stainless-17-4ph", name: "Stainless steel 17-4PH (H1025)", family: "stainless", ductility: "ductile", youngGPa: 197, poisson: 0.27, density: 7800, yieldMPa: 1000, ultimateMPa: 1070, conductivity: 18, specificHeat: 460, expansion: 0.0000108, maxServiceC: 315 }),
+  m2({ id: "aluminium-6061-t6", name: "Aluminium 6061-T6", family: "aluminium", ductility: "ductile", youngGPa: 68.9, poisson: 0.33, density: 2700, yieldMPa: 276, ultimateMPa: 310, conductivity: 167, specificHeat: 896, expansion: 0.0000236, maxServiceC: 150, enduranceMPa: 96 }),
+  m2({ id: "aluminium-7075-t6", name: "Aluminium 7075-T6", family: "aluminium", ductility: "ductile", youngGPa: 71.7, poisson: 0.33, density: 2810, yieldMPa: 503, ultimateMPa: 572, conductivity: 130, specificHeat: 960, expansion: 0.0000234, maxServiceC: 120, enduranceMPa: 159 }),
+  m2({ id: "aluminium-5083", name: "Aluminium 5083-H111", family: "aluminium", ductility: "ductile", youngGPa: 70.3, poisson: 0.33, density: 2660, yieldMPa: 145, ultimateMPa: 290, conductivity: 117, specificHeat: 900, expansion: 0.0000238, maxServiceC: 100 }),
+  m2({ id: "titanium-ti6al4v", name: "Titanium Ti-6Al-4V", family: "titanium", ductility: "ductile", youngGPa: 113.8, poisson: 0.342, density: 4430, yieldMPa: 880, ultimateMPa: 950, conductivity: 6.7, specificHeat: 526, expansion: 0.0000086, maxServiceC: 350, enduranceMPa: 510 }),
+  m2({ id: "copper-c11000", name: "Copper C11000 (ETP)", family: "copper", ductility: "ductile", youngGPa: 117, poisson: 0.34, density: 8940, yieldMPa: 70, ultimateMPa: 220, conductivity: 388, specificHeat: 385, expansion: 0.000017, maxServiceC: 200 }),
+  m2({ id: "brass-c360", name: "Brass C36000 (free-cutting)", family: "copper", ductility: "ductile", youngGPa: 97, poisson: 0.31, density: 8500, yieldMPa: 310, ultimateMPa: 385, conductivity: 115, specificHeat: 380, expansion: 0.0000205, maxServiceC: 200 }),
+  m2({ id: "inconel-718", name: "Inconel 718", family: "nickel", ductility: "ductile", youngGPa: 200, poisson: 0.29, density: 8190, yieldMPa: 1030, ultimateMPa: 1240, conductivity: 11.4, specificHeat: 435, expansion: 0.000013, maxServiceC: 650, enduranceMPa: 480 }),
+  m2({ id: "cast-iron-gg25", name: "Grey cast iron EN-GJL-250", family: "cast-iron", ductility: "brittle", youngGPa: 110, poisson: 0.26, density: 7200, yieldMPa: 250, ultimateMPa: 250, compressiveMPa: 850, conductivity: 46, specificHeat: 500, expansion: 0.000011, maxServiceC: 350 }),
+  m2({ id: "cast-iron-gjs400", name: "Ductile iron EN-GJS-400-15", family: "cast-iron", ductility: "ductile", youngGPa: 169, poisson: 0.275, density: 7100, yieldMPa: 250, ultimateMPa: 400, conductivity: 36, specificHeat: 500, expansion: 0.0000115, maxServiceC: 350 }),
+  m2({ id: "magnesium-az31b", name: "Magnesium AZ31B", family: "magnesium", ductility: "ductile", youngGPa: 45, poisson: 0.35, density: 1770, yieldMPa: 200, ultimateMPa: 260, conductivity: 96, specificHeat: 1000, expansion: 0.000026, maxServiceC: 120 }),
+  m2({ id: "pla", name: "PLA (printed)", family: "polymer", ductility: "brittle", youngGPa: 3.5, poisson: 0.36, density: 1240, yieldMPa: 50, ultimateMPa: 50, compressiveMPa: 80, conductivity: 0.13, specificHeat: 1800, expansion: 0.000068, maxServiceC: 55 }),
+  m2({ id: "abs", name: "ABS", family: "polymer", ductility: "ductile", youngGPa: 2.3, poisson: 0.35, density: 1050, yieldMPa: 40, ultimateMPa: 44, conductivity: 0.17, specificHeat: 1400, expansion: 0.00009, maxServiceC: 85 }),
+  m2({ id: "petg", name: "PETG", family: "polymer", ductility: "ductile", youngGPa: 2.1, poisson: 0.38, density: 1270, yieldMPa: 50, ultimateMPa: 53, conductivity: 0.2, specificHeat: 1200, expansion: 0.00006, maxServiceC: 70 }),
+  m2({ id: "nylon-pa12", name: "Nylon PA12", family: "polymer", ductility: "ductile", youngGPa: 1.7, poisson: 0.4, density: 1010, yieldMPa: 45, ultimateMPa: 48, conductivity: 0.23, specificHeat: 1700, expansion: 0.0001, maxServiceC: 90 })
+];
 // packages/core/src/cam/macro.ts
 var COMPARISONS = ["eq", "ne", "lt", "le", "gt", "ge"];
 var VarRefSchema = Union2([
@@ -8894,6 +8917,34 @@ var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow
 // packages/core/src/pmi/pmi.ts
 var KINDS = new Set(["dimensional-size", "dimensional-location", "geometric-tolerance", "datum", "datum-target", "surface-texture", "note"]);
 var REF_KINDS = new Set(["face", "edge", "vertex"]);
+// packages/core/src/cam/kernel/associativity.ts
+var DISPLAY_FIELDS = new Set([
+  "name",
+  "label",
+  "description",
+  "layer",
+  "color",
+  "colour",
+  "visible",
+  "hidden",
+  "locked",
+  "selected",
+  "opacity",
+  "metadata",
+  "tags",
+  "comment",
+  "notes",
+  "createdAt",
+  "updatedAt",
+  "appearance",
+  "expanded",
+  "groupName",
+  "lineWidth",
+  "lineType",
+  "wireframe"
+]);
+var FEATURE_DISPLAY_FIELDS = new Set(["name", "group", "appearance"]);
+var PLACEMENT_FIELDS = new Set(["x", "y", "z", "x1", "y1", "z1", "x2", "y2", "z2", "translateX", "translateY", "translateZ"]);
 // packages/core/src/cam/kernel/machines.ts
 var kernMicroHd = (taper) => ({
   id: `kern-micro-hd-${taper}`,
@@ -9503,6 +9554,8 @@ var PrintRequirementSchema = Struct({
   flow: optionalKey2(Finite.check(isBetween({ minimum: 50, maximum: 150 }))),
   relativeExtrusion: optionalKey2(Boolean3)
 });
+// packages/core/src/cam/kernel/verify-nc.ts
+var FAULT_KINDS = new Set(["gouge", "rapid-in-stock", "travel"]);
 // packages/core/src/cam/kernel/engagement.ts
 var TAU16 = Math.PI * 2;
 // packages/core/src/cam/program/op.ts
@@ -9557,31 +9610,6 @@ var COLOR = Object.fromEntries(LAYERS.map((l) => [l.id, l.color]));
 var PT_PER_MM = 72 / 25.4;
 // packages/core/src/preview/companion.ts
 var FEATURE_STRUCTURE = new Set(["id", "type", "sketch", "plane", "from", "entities", "constraints", "shapes", "history", "profiles"]);
-// packages/core/src/sim-fea/materials.ts
-var m2 = (x) => x;
-var MATERIALS2 = [
-  m2({ id: "steel-s235", name: "Structural steel S235", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 235, ultimateMPa: 360, conductivity: 50, specificHeat: 490, expansion: 0.000012, maxServiceC: 400, enduranceMPa: 160 }),
-  m2({ id: "steel-c45", name: "Carbon steel C45", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.3, density: 7850, yieldMPa: 490, ultimateMPa: 700, conductivity: 46, specificHeat: 470, expansion: 0.0000115, maxServiceC: 400, enduranceMPa: 300 }),
-  m2({ id: "steel-42crmo4", name: "Alloy steel 42CrMo4 (QT)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.29, density: 7850, yieldMPa: 800, ultimateMPa: 1000, conductivity: 42, specificHeat: 460, expansion: 0.0000123, maxServiceC: 450, enduranceMPa: 480 }),
-  m2({ id: "steel-tool-d2", name: "Tool steel D2 (hardened)", family: "steel", ductility: "ductile", youngGPa: 210, poisson: 0.28, density: 7700, yieldMPa: 1500, ultimateMPa: 1900, conductivity: 20, specificHeat: 460, expansion: 0.0000104, maxServiceC: 400 }),
-  m2({ id: "stainless-304", name: "Stainless steel 304", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.29, density: 8000, yieldMPa: 215, ultimateMPa: 505, conductivity: 16, specificHeat: 500, expansion: 0.0000173, maxServiceC: 800, enduranceMPa: 240 }),
-  m2({ id: "stainless-316l", name: "Stainless steel 316L", family: "stainless", ductility: "ductile", youngGPa: 193, poisson: 0.3, density: 8000, yieldMPa: 205, ultimateMPa: 515, conductivity: 16, specificHeat: 500, expansion: 0.000016, maxServiceC: 800, enduranceMPa: 240 }),
-  m2({ id: "stainless-17-4ph", name: "Stainless steel 17-4PH (H1025)", family: "stainless", ductility: "ductile", youngGPa: 197, poisson: 0.27, density: 7800, yieldMPa: 1000, ultimateMPa: 1070, conductivity: 18, specificHeat: 460, expansion: 0.0000108, maxServiceC: 315 }),
-  m2({ id: "aluminium-6061-t6", name: "Aluminium 6061-T6", family: "aluminium", ductility: "ductile", youngGPa: 68.9, poisson: 0.33, density: 2700, yieldMPa: 276, ultimateMPa: 310, conductivity: 167, specificHeat: 896, expansion: 0.0000236, maxServiceC: 150, enduranceMPa: 96 }),
-  m2({ id: "aluminium-7075-t6", name: "Aluminium 7075-T6", family: "aluminium", ductility: "ductile", youngGPa: 71.7, poisson: 0.33, density: 2810, yieldMPa: 503, ultimateMPa: 572, conductivity: 130, specificHeat: 960, expansion: 0.0000234, maxServiceC: 120, enduranceMPa: 159 }),
-  m2({ id: "aluminium-5083", name: "Aluminium 5083-H111", family: "aluminium", ductility: "ductile", youngGPa: 70.3, poisson: 0.33, density: 2660, yieldMPa: 145, ultimateMPa: 290, conductivity: 117, specificHeat: 900, expansion: 0.0000238, maxServiceC: 100 }),
-  m2({ id: "titanium-ti6al4v", name: "Titanium Ti-6Al-4V", family: "titanium", ductility: "ductile", youngGPa: 113.8, poisson: 0.342, density: 4430, yieldMPa: 880, ultimateMPa: 950, conductivity: 6.7, specificHeat: 526, expansion: 0.0000086, maxServiceC: 350, enduranceMPa: 510 }),
-  m2({ id: "copper-c11000", name: "Copper C11000 (ETP)", family: "copper", ductility: "ductile", youngGPa: 117, poisson: 0.34, density: 8940, yieldMPa: 70, ultimateMPa: 220, conductivity: 388, specificHeat: 385, expansion: 0.000017, maxServiceC: 200 }),
-  m2({ id: "brass-c360", name: "Brass C36000 (free-cutting)", family: "copper", ductility: "ductile", youngGPa: 97, poisson: 0.31, density: 8500, yieldMPa: 310, ultimateMPa: 385, conductivity: 115, specificHeat: 380, expansion: 0.0000205, maxServiceC: 200 }),
-  m2({ id: "inconel-718", name: "Inconel 718", family: "nickel", ductility: "ductile", youngGPa: 200, poisson: 0.29, density: 8190, yieldMPa: 1030, ultimateMPa: 1240, conductivity: 11.4, specificHeat: 435, expansion: 0.000013, maxServiceC: 650, enduranceMPa: 480 }),
-  m2({ id: "cast-iron-gg25", name: "Grey cast iron EN-GJL-250", family: "cast-iron", ductility: "brittle", youngGPa: 110, poisson: 0.26, density: 7200, yieldMPa: 250, ultimateMPa: 250, compressiveMPa: 850, conductivity: 46, specificHeat: 500, expansion: 0.000011, maxServiceC: 350 }),
-  m2({ id: "cast-iron-gjs400", name: "Ductile iron EN-GJS-400-15", family: "cast-iron", ductility: "ductile", youngGPa: 169, poisson: 0.275, density: 7100, yieldMPa: 250, ultimateMPa: 400, conductivity: 36, specificHeat: 500, expansion: 0.0000115, maxServiceC: 350 }),
-  m2({ id: "magnesium-az31b", name: "Magnesium AZ31B", family: "magnesium", ductility: "ductile", youngGPa: 45, poisson: 0.35, density: 1770, yieldMPa: 200, ultimateMPa: 260, conductivity: 96, specificHeat: 1000, expansion: 0.000026, maxServiceC: 120 }),
-  m2({ id: "pla", name: "PLA (printed)", family: "polymer", ductility: "brittle", youngGPa: 3.5, poisson: 0.36, density: 1240, yieldMPa: 50, ultimateMPa: 50, compressiveMPa: 80, conductivity: 0.13, specificHeat: 1800, expansion: 0.000068, maxServiceC: 55 }),
-  m2({ id: "abs", name: "ABS", family: "polymer", ductility: "ductile", youngGPa: 2.3, poisson: 0.35, density: 1050, yieldMPa: 40, ultimateMPa: 44, conductivity: 0.17, specificHeat: 1400, expansion: 0.00009, maxServiceC: 85 }),
-  m2({ id: "petg", name: "PETG", family: "polymer", ductility: "ductile", youngGPa: 2.1, poisson: 0.38, density: 1270, yieldMPa: 50, ultimateMPa: 53, conductivity: 0.2, specificHeat: 1200, expansion: 0.00006, maxServiceC: 70 }),
-  m2({ id: "nylon-pa12", name: "Nylon PA12", family: "polymer", ductility: "ductile", youngGPa: 1.7, poisson: 0.4, density: 1010, yieldMPa: 45, ultimateMPa: 48, conductivity: 0.23, specificHeat: 1700, expansion: 0.0001, maxServiceC: 90 })
-];
 // packages/core/src/sim-fea/element.ts
 var TET10_EDGES = [[0, 1], [1, 2], [0, 2], [0, 3], [1, 3], [2, 3]];
 var tet10Shape = (L, out) => {
