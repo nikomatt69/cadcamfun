@@ -445,3 +445,9 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   part (15 in all): every overcut is found. A first version injected into arc end points and found none: the arc's centre words no longer matched, the replay reads an arc by its centre, so the injection
   point must be a straight vertex (recorded in the test). This is evidence for the verifier on kernel output, not a fault set over `runJob`'s own claims (an overcut cannot be injected into a job from outside);
   the nightly corpus gate of step 0.4 remains open.
+- 2026-11-03 (finding, planner): the kernel's program for a 100 x 60 x 10 plate with a 60 x 40 x 6 rectangular pocket (the sidecar island fixture without the island) is `preview`, not `verified-program`: five
+  operations with one 16 mm flat end mill for the pocket, and the kernel's own `material-removed` claim fails with "244.5 mm³ left, up to 6.000 mm". The independent tri-dexel replay agrees (no gouge; 314 mm³ left,
+  deepest 6.8 mm along the best ray) and the amount matches the four sharp corners a 16 mm cutter cannot reach (4 x (1 - pi/4) x 8² x 6 mm). The planner has no corner clean-up with a smaller tool after
+  the pocket roughing and finishing, so a pocket with sharp corners can never reach `verified-program`; hyperMILL and Fusion add a rest-machining pass with a smaller tool. The pieces exist (rest machining from
+  the carried stock, spec 53 V6, `cam.rest-machining` L1); the planner step does not. Open: choose the smallest tool the corner radius allows from the crib, add a rest operation after `finish-pocket`, gate on the
+  replayed leftover. Not started.
