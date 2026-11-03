@@ -106,6 +106,18 @@ export const OrganizationsHandlers = HttpApiBuilder.group(Api, "organizations", 
         ? { message: "Invitation updated and sent" as const, invitation, inviteUrl }
         : { message: "Invitation created and sent" as const, invitation, inviteUrl }
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to send invitation"))))
+    .handle("acceptInvitation", ({ params }) => Effect.gen(function*() {
+      const user = yield* CurrentUser
+      const outcome = yield* repo.acceptInvitation(user.id, params.token)
+      switch (outcome._tag) {
+        case "no-user": return yield* new NotFound({ message: "User not found" })
+        case "not-found": return yield* new NotFound({ message: "Invitation not found or has already been used" })
+        case "expired": return yield* new BadRequest({ message: "Invitation has expired" })
+        case "wrong-user": return yield* new Forbidden({ message: "You are not authorized to accept this invitation" })
+        case "already-member": return yield* new BadRequest({ message: "You are already a member of this organization" })
+        case "joined": return { message: "Invitation accepted successfully", organization: outcome.organization }
+      }
+    }).pipe(Effect.catchTag("DatabaseError", fail("Failed to accept invitation"))))
     .handle("projects", ({ params }) => Effect.gen(function*() {
       yield* roleOf(params.id, "You are not a member of this organization")
       return yield* projects.listForOrganization(params.id)

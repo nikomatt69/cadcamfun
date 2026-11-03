@@ -18,6 +18,7 @@ import { PluginsGroup } from "./groups/plugins.ts"
 import { FilesGroup } from "./groups/files.ts"
 import { OrganizationsGroup } from "./groups/organizations.ts"
 import { NotificationsGroup } from "./groups/notifications.ts"
+import { ConversationsGroup } from "./groups/conversations.ts"
 import { AuthGroup } from "./groups/auth.ts"
 import { WaitlistGroup } from "./groups/waitlist.ts"
 import { AnalyticsGroup } from "./groups/analytics.ts"
@@ -59,6 +60,7 @@ export * from "./groups/plugins.ts"
 export * from "./groups/files.ts"
 export * from "./groups/organizations.ts"
 export * from "./groups/notifications.ts"
+export * from "./groups/conversations.ts"
 export * from "./groups/auth.ts"
 export * from "./groups/waitlist.ts"
 export * from "./groups/analytics.ts"
@@ -105,6 +107,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(FilesGroup.middleware(Authorization))
   .add(OrganizationsGroup.middleware(Authorization))
   .add(NotificationsGroup.middleware(Authorization))
+  .add(ConversationsGroup.middleware(Authorization))
   .add(ProjectsGroup.middleware(Authorization))
   .add(MaterialsGroup.middleware(Authorization))
   .add(MaterialsStorageGroup.middleware(Authorization))

@@ -59,6 +59,11 @@ export class OrganizationsGroup extends HttpApiGroup.make("organizations")
       success: InvitationSaved.pipe(Schema.annotate({ httpApiStatus: 201 })),
       error: [BadRequest, Forbidden, NotFound, InternalError]
     }),
+    HttpApiEndpoint.post("acceptInvitation", "/api/invitations/:token/accept", {
+      params: { token: Schema.String },
+      success: Schema.Struct({ message: Schema.String, organization: Schema.Struct({ id: Schema.String, name: Schema.String }) }),
+      error: [BadRequest, Forbidden, NotFound, InternalError]
+    }),
     HttpApiEndpoint.get("projects", "/api/organizations/:id/projects", { params: id, success: Schema.Array(ProjectWithRelations), error: [BadRequest, Forbidden, InternalError] }),
     HttpApiEndpoint.post("createProject", "/api/organizations/:id/projects", {
       params: id, payload: Schema.Struct({ name: CreateProjectBody.fields.name, description: CreateProjectBody.fields.description }),

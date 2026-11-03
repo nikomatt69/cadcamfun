@@ -35,6 +35,8 @@ import { MaterialRepo } from "./repos/material-repo.ts"
 import { ProjectRepo } from "./repos/project-repo.ts"
 import { LocalProfile } from "./services/local-profile.ts"
 import { OrganizationsHandlers } from "./http/organizations.ts"
+import { ConversationsHandlers } from "./http/conversations.ts"
+import { ConversationRepo } from "./repos/conversation-repo.ts"
 import { NotificationsHandlers } from "./http/notifications.ts"
 import { ProductionCostsHandlers } from "./http/production-costs.ts"
 import { ProductionCostRepo } from "./repos/production-cost-repo.ts"
@@ -89,7 +91,7 @@ import { MetricsRouteLive, httpMetrics } from "./observability.ts"
  * `ServedApi` below; `Handlers` is only the union of the domains.
  */
 const PlatformHandlers = Layer.mergeAll(HealthHandlers, SystemHandlers, EventsHandlers, MiscHandlers, KvHandlers, FilesHandlers, WorkspaceHandlers)
-const AccountHandlers = Layer.mergeAll(AuthHandlers, UserHandlers, OrganizationsHandlers, NotificationsHandlers, BillingHandlers, WaitlistHandlers)
+const AccountHandlers = Layer.mergeAll(AuthHandlers, UserHandlers, OrganizationsHandlers, ConversationsHandlers, NotificationsHandlers, BillingHandlers, WaitlistHandlers)
 const ProjectHandlers = Layer.mergeAll(ProjectsHandlers, AnalyticsHandlers, ProductionCostsHandlers)
 const ResourceHandlers = Layer.mergeAll(MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, LibraryHandlers)
 const CadHandlers = Layer.mergeAll(DrawingsHandlers, PmiHandlers, ComponentsHandlers, CadExactHandlers)
@@ -146,7 +148,7 @@ const CloudServices = CloudSync.layer.pipe(
 /** One identity service for the whole app: it is built once, however many layers need it. */
 const IdentityLive = Identity.layer.pipe(Layer.provide(AuthRepo.layer))
 
-const AccountServices = Layer.mergeAll(AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, IdentityLive, UserRepo.layer, OrganizationRepo.layer, NotificationRepo.layer, BillingRepo.layer, PaymentProvider.layer)
+const AccountServices = Layer.mergeAll(AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, IdentityLive, UserRepo.layer, OrganizationRepo.layer, ConversationRepo.layer, NotificationRepo.layer, BillingRepo.layer, PaymentProvider.layer)
 const ProjectServices = Layer.mergeAll(ProjectRepo.layer, AnalyticsRepo.layer, ProductionCostRepo.layer, CostService.layer)
 const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer)
 const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
@@ -175,7 +177,7 @@ export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
   Api.groups.drawings, Api.groups.pmi, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.camSetup, Api.groups.projectToolpaths, Api.groups.library,
-  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace, Api.groups.cloud
+  Api.groups.organizations, Api.groups.conversations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace, Api.groups.cloud
 ) {}
 
 /**

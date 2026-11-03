@@ -29,6 +29,11 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
   /** The user with this e-mail is a member already. */
   isMemberByEmail(organizationId: string, email: string): Effect.Effect<boolean, DatabaseError>
   name(organizationId: string): Effect.Effect<string | undefined, DatabaseError>
+  /** Joins the organisation the invitation (by token) is for; the invitation is used up in the same transaction. */
+  acceptInvitation(userId: string, token: string): Effect.Effect<
+    { _tag: "joined"; organization: { id: string; name: string } } | { _tag: "no-user" | "not-found" | "expired" | "wrong-user" | "already-member" },
+    DatabaseError
+  >
   /** One open invitation per e-mail and organisation: a repeated invite renews role, token and expiry. */
   invite(organizationId: string, email: string, role: Role, token: string, expiresAt: Date): Effect.Effect<{ id: string; email: string; role: Role; expiresAt: string; renewed: boolean }, DatabaseError>
 }>()("cadcamfun/OrganizationRepo") {
@@ -81,6 +86,19 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
         (await db.select({ id: M.id }).from(M).innerJoin(U, eq(M.userId, U.id)).where(and(eq(M.organizationId, organizationId), eq(U.email, email))).limit(1)).length > 0),
       name: (organizationId) => query("organizations.name", async (db) =>
         (await db.select({ name: O.name }).from(O).where(eq(O.id, organizationId)).limit(1))[0]?.name),
+      acceptInvitation: (userId, token) => query("organizations.acceptInvitation", (db) => db.transaction((tx) => {
+        const user = tx.select({ email: U.email }).from(U).where(eq(U.id, userId)).get()
+        if (!user) return { _tag: "no-user" as const }
+        const invitation = tx.select().from(I).where(eq(I.token, token)).get()
+        if (!invitation) return { _tag: "not-found" as const }
+        if (Date.now() > invitation.expiresAt.getTime()) return { _tag: "expired" as const }
+        if (user.email?.toLowerCase() !== invitation.email.toLowerCase()) return { _tag: "wrong-user" as const }
+        if (tx.select({ id: M.id }).from(M).where(and(eq(M.userId, userId), eq(M.organizationId, invitation.organizationId))).get()) return { _tag: "already-member" as const }
+        tx.insert(M).values({ userId, organizationId: invitation.organizationId, role: invitation.role }).run()
+        tx.delete(I).where(eq(I.id, invitation.id)).run()
+        const organization = tx.select({ id: O.id, name: O.name }).from(O).where(eq(O.id, invitation.organizationId)).get()
+        return { _tag: "joined" as const, organization: organization ?? { id: invitation.organizationId, name: "" } }
+      })).pipe(Effect.tap((outcome) => outcome._tag === "joined" ? changed(userId, outcome.organization.id) : Effect.void)),
       invite: (organizationId, email, role, token, expiresAt) => query("organizations.invite", (db) => db.transaction((tx) => {
         const existing = tx.select().from(I).where(and(eq(I.organizationId, organizationId), eq(I.email, email))).get()
         const saved = existing

@@ -125,3 +125,37 @@ describe("/api/organizations/:id/projects", () => {
     expect(JSON.stringify(notes)).toContain("Gearbox")
   })
 })
+
+describe("/api/invitations/:token/accept", () => {
+  const accept = (token: string, headers?: Record<string, string>) => app.call(`/api/invitations/${token}/accept`, { method: "POST", ...(headers ? { headers } : {}) })
+  const tokenOf = (url: string) => url.replace("/invitations/", "")
+
+  test("the invited account joins with the invited role and the invitation is used up", async () => {
+    const invited = await person("guest@example.com", "Gina Guest")
+    const sent = await app.call(`/api/organizations/${orgId}/invite`, { method: "POST", json: { email: "guest@example.com", role: "MANAGER" } })
+    const token = tokenOf(sent.body.inviteUrl)
+
+    expect((await accept("nope", invited.headers)).body.message).toBe("Invitation not found or has already been used")
+    expect((await accept(token, stranger.headers)).body.message).toBe("You are not authorized to accept this invitation")
+    const joined = await accept(token, invited.headers)
+    expect(joined.status).toBe(200)
+    expect(joined.body).toEqual({ message: "Invitation accepted successfully", organization: { id: orgId, name: "Shop" } })
+    expect((await members()).find((m: { userId: string }) => m.userId === invited.id)).toMatchObject({ role: "MANAGER" })
+    expect((await accept(token, invited.headers)).status).toBe(404)
+    expect((await app.call("/api/organizations", { headers: invited.headers })).body.map((o: { id: string }) => o.id)).toContain(orgId)
+  })
+
+  test("an expired invitation is refused, and so is one for an account that is a member already", async () => {
+    const late = await person("late@example.com", "Lena Late")
+    const sent = await app.call(`/api/organizations/${orgId}/invite`, { method: "POST", json: { email: "late@example.com" } })
+    const database = await app.database()
+    await app.Effect.runPromise(database.query("test.expire", (db) => db.update(schema.organizationInvitationTable).set({ expiresAt: new Date(Date.now() - 1000) })))
+    expect((await accept(tokenOf(sent.body.inviteUrl), late.headers)).body.message).toBe("Invitation has expired")
+
+    // Seed a fresh invitation for an account that joined through another door.
+    await app.Effect.runPromise(database.query("test.member", (db) => db.insert(schema.userOrganizationTable).values({ userId: late.id, organizationId: orgId, role: "MEMBER" })))
+    await app.Effect.runPromise(database.query("test.invitation", (db) => db.insert(schema.organizationInvitationTable)
+      .values({ email: "late@example.com", role: "MEMBER", token: "dup-token", organizationId: orgId, expiresAt: new Date(Date.now() + 60_000) })))
+    expect((await accept("dup-token", late.headers)).body.message).toBe("You are already a member of this organization")
+  })
+})
