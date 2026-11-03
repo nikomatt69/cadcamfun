@@ -255,7 +255,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {(entry) => (
             <button
               type="button"
-              class={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-r border-[color:var(--workspace-border)] transition-colors ${
+              class={`flex items-center gap-1.5 px-3 py-1.5 text-xs leading-[18px] font-medium border-r border-[color:var(--workspace-border)] transition-colors ${
                 tab() === entry.id
                   ? "bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)] border-b-2 border-b-[color:var(--ent-accent)]"
                   : "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)]"

@@ -328,7 +328,7 @@
 
 /* CAM ribbon (Fusion/Hypermill-style tabbed top bar) */
 .cam-ribbon { flex-shrink: 0; min-width: 0; background: var(--workspace-panel); border-bottom: 1px solid var(--workspace-border); }
-.cam-ribbon button[type="button"] { font-size: 12px; line-height: 18px; white-space: nowrap; }
+.cam-ribbon button[type="button"] { white-space: nowrap; }
 .cam-ribbon[data-compact="true"] .cam-ribbon__group-children { flex-wrap: wrap; }
 @media (max-width: 980px) {
   .cam-ribbon > :nth-child(2) { overflow-x: auto; }
