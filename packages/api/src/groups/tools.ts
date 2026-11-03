@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
-import { LibraryVersion } from "./materials.ts"
+import { LibraryRestoreBody, LibraryVersion } from "./materials.ts"
 
 const UserRef = Schema.Struct({ id: Schema.String, name: Schema.NullOr(Schema.String), email: Schema.NullOr(Schema.String) })
 const OrgRef = Schema.Struct({ id: Schema.String, name: Schema.String })
@@ -89,6 +89,7 @@ export class ToolsGroup extends HttpApiGroup.make("tools")
       params: id, payload: ToolUpdateBody, success: ToolRow, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.get("history", "/api/tools/:id/versions", { params: id, success: Schema.Array(LibraryVersion), error: [BadRequest, NotFound, InternalError] }),
+    HttpApiEndpoint.post("restore", "/api/tools/:id/versions/restore", { params: id, payload: LibraryRestoreBody, success: ToolRow, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError] }),
     HttpApiEndpoint.delete("remove", "/api/tools/:id", {
       params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError]
     })

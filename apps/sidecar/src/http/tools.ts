@@ -55,6 +55,21 @@ export const ToolsHandlers = HttpApiBuilder.group(Api, "tools", Effect.fn(functi
         if (!(yield* repo.find(user.id, params.id))) return yield* new NotFound({ message: "Tool not found or access denied" })
         return yield* repo.history(params.id)
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch tool versions"))))
+    .handle("restore", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const found = yield* repo.find(user.id, params.id)
+        if (!found) return yield* new NotFound({ message: "Tool not found or access denied" })
+        if (!found.canWrite) return yield* new Forbidden({ message: "You do not have permission to modify this tool" })
+        if (!payload.versionId) return yield* new BadRequest({ message: "Version ID is required" })
+        const version = (yield* repo.history(params.id)).find((v) => v.id === payload.versionId)
+        if (!version) return yield* new NotFound({ message: "Version not found" })
+        // Every cutter field the snapshot holds goes back; the row's identity, owner and timestamps stay.
+        const { id: _id, ownerId: _owner, organizationId: _org, createdAt: _created, updatedAt: _updated, version: _version, ...values } = version.data as Record<string, unknown>
+        const restored = payload.baseUpdatedAt === undefined ? yield* repo.update(params.id, values, user.id) : yield* repo.updateIfCurrent(params.id, values, payload.baseUpdatedAt, user.id)
+        if (restored === "conflict") return yield* new Conflict({ message: "The tool was saved elsewhere since it was read. Nothing was restored." })
+        return restored
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to restore tool version"))))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser

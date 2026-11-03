@@ -358,6 +358,8 @@ import type {
   MaterialsUpdateOutput,
   MaterialsHistoryInput,
   MaterialsHistoryOutput,
+  MaterialsRestoreInput,
+  MaterialsRestoreOutput,
   MaterialsRemoveInput,
   MaterialsRemoveOutput,
   MaterialsStorageSaveInput,
@@ -380,6 +382,8 @@ import type {
   ToolsUpdateOutput,
   ToolsHistoryInput,
   ToolsHistoryOutput,
+  ToolsRestoreInput,
+  ToolsRestoreOutput,
   ToolsRemoveInput,
   ToolsRemoveOutput,
   ToolsStorageSaveInput,
@@ -406,6 +410,8 @@ import type {
   MachineConfigsUpdateOutput,
   MachineConfigsHistoryInput,
   MachineConfigsHistoryOutput,
+  MachineConfigsRestoreInput,
+  MachineConfigsRestoreOutput,
   MachineConfigsRemoveInput,
   MachineConfigsRemoveOutput,
   MachineConfigsCloneInput,
@@ -3355,6 +3361,18 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      restore: (input: MaterialsRestoreInput, requestOptions?: RequestOptions) =>
+        request<MaterialsRestoreOutput>(
+          {
+            method: "POST",
+            path: `/api/materials/${encodeURIComponent(input.id)}/versions/restore`,
+            body: { versionId: input["versionId"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       remove: (input: MaterialsRemoveInput, requestOptions?: RequestOptions) =>
         request<MaterialsRemoveOutput>(
           {
@@ -3534,6 +3552,18 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      restore: (input: ToolsRestoreInput, requestOptions?: RequestOptions) =>
+        request<ToolsRestoreOutput>(
+          {
+            method: "POST",
+            path: `/api/tools/${encodeURIComponent(input.id)}/versions/restore`,
+            body: { versionId: input["versionId"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       remove: (input: ToolsRemoveInput, requestOptions?: RequestOptions) =>
         request<ToolsRemoveOutput>(
           {
@@ -3693,6 +3723,18 @@ export function make(options: ClientOptions) {
             path: `/api/machine-configs/${encodeURIComponent(input.id)}/versions`,
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      restore: (input: MachineConfigsRestoreInput, requestOptions?: RequestOptions) =>
+        request<MachineConfigsRestoreOutput>(
+          {
+            method: "POST",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/versions/restore`,
+            body: { versionId: input["versionId"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 409, 401],
             empty: false,
           },
           requestOptions,

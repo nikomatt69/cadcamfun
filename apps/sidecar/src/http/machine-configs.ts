@@ -91,6 +91,20 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
         yield* guarded(params.id)
         return okAuth(yield* repo.history(params.id))
       }).pipe(Effect.catchTag("DatabaseError", internal)))
+    .handle("restore", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const f = yield* guarded(params.id)
+        if (!f.permission.isOwner) return yield* envErr(EnvForbidden, "Only the owner can restore this machine configuration")
+        const body = (isObj(payload) ? payload : {}) as { versionId?: string; baseUpdatedAt?: string }
+        if (!body.versionId) return yield* envErr(EnvBadRequest, "Version ID is required")
+        const version = (yield* repo.history(params.id)).find((v) => v.id === body.versionId)
+        if (!version) return yield* envErr(EnvNotFound, "Version not found")
+        const old = version.data as { name: string; description: string | null; type: string; config: unknown; isPublic: boolean }
+        const values = { name: old.name, description: old.description, type: old.type, config: old.config, isPublic: old.isPublic }
+        const restored = typeof body.baseUpdatedAt === "string" ? yield* repo.updateIfCurrent(params.id, values, body.baseUpdatedAt, f.row.ownerId) : yield* repo.update(params.id, values, f.row.ownerId)
+        if (restored === "conflict") return yield* envErr(EnvConflict, "The machine configuration was saved elsewhere since it was read. Nothing was restored.")
+        return okAuth({ ...restored.view, isOwner: true, usageCount: restored.usageCount }, "Machine configuration restored successfully")
+      }).pipe(Effect.catchTag("DatabaseError", internal)))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {
         const f = yield* guarded(params.id)

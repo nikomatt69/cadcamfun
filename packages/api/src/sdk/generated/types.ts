@@ -1092,6 +1092,11 @@ export type MaterialsUpdatePayload = {
   readonly baseUpdatedAt?: string | undefined
 }
 
+export type MaterialsRestorePayload = {
+  readonly versionId?: string | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
+
 export type ToolsCreatePayload = {
   readonly name?: string | undefined
   readonly type?: string | undefined
@@ -1134,6 +1139,16 @@ export type ToolsUpdatePayload = {
   readonly notes?: string | null | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
+
+export type ToolsRestorePayload = {
+  readonly versionId?: string | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
+
+export type MachineConfigsRestorePayload = {
+  readonly versionId?: string | undefined
   readonly baseUpdatedAt?: string | undefined
 }
 
@@ -6744,6 +6759,25 @@ export type MaterialsHistoryOutput = Array<{
   createdAt: string
 }>
 
+export type MaterialsRestoreInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly versionId?: MaterialsRestorePayload["versionId"]
+  readonly baseUpdatedAt?: MaterialsRestorePayload["baseUpdatedAt"]
+}
+
+export type MaterialsRestoreOutput = {
+  id: string
+  version: number
+  name: string
+  description: string | null
+  properties: unknown
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  ownerId: string | null
+  organizationId: string | null
+}
+
 export type MaterialsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
 export type MaterialsRemoveOutput = { message: string }
@@ -6986,6 +7020,39 @@ export type ToolsHistoryOutput = Array<{
   createdAt: string
 }>
 
+export type ToolsRestoreInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly versionId?: ToolsRestorePayload["versionId"]
+  readonly baseUpdatedAt?: ToolsRestorePayload["baseUpdatedAt"]
+}
+
+export type ToolsRestoreOutput = {
+  id: string
+  version: number
+  name: string
+  type: string
+  diameter: number
+  material: string
+  numberOfFlutes: number | null
+  maxRPM: number | null
+  coolantType: string | null
+  cuttingLength: number | null
+  totalLength: number | null
+  shankDiameter: number | null
+  cornerRadius?: number | null
+  tipAngle?: number | null
+  threadPitch?: number | null
+  holderDiameter?: number | null
+  holderLength?: number | null
+  stickout?: number | null
+  notes: string | null
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  ownerId: string | null
+  organizationId: string | null
+}
+
 export type ToolsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
 export type ToolsRemoveOutput = { message: string }
@@ -7103,6 +7170,14 @@ export type MachineConfigsHistoryOutput = {
   data: Array<{ id: string; version: number; data: unknown; changedBy: string | null; createdAt: string }> | null
   message?: string | undefined
 }
+
+export type MachineConfigsRestoreInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly versionId?: MachineConfigsRestorePayload["versionId"]
+  readonly baseUpdatedAt?: MachineConfigsRestorePayload["baseUpdatedAt"]
+}
+
+export type MachineConfigsRestoreOutput = { success: true; data: unknown | null; message?: string | undefined }
 
 export type MachineConfigsRemoveInput = { readonly id: { readonly id: string }["id"] }
 

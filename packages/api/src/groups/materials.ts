@@ -44,6 +44,9 @@ export const LibraryVersion = Schema.Struct({
   id: Schema.String, version: Schema.Number, data: Schema.Unknown, changedBy: Schema.NullOr(Schema.String), createdAt: Schema.String
 })
 
+/** Restoring a version: the row takes the values that version held; the current row becomes a version itself. */
+export const LibraryRestoreBody = Schema.Struct({ versionId: Schema.optional(Schema.String), baseUpdatedAt: Schema.optional(Schema.String) })
+
 const Message = Schema.Struct({ message: Schema.String })
 const id = { id: Schema.String }
 
@@ -67,6 +70,7 @@ export class MaterialsGroup extends HttpApiGroup.make("materials")
       error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.get("history", "/api/materials/:id/versions", { params: id, success: Schema.Array(LibraryVersion), error: [BadRequest, NotFound, InternalError] }),
+    HttpApiEndpoint.post("restore", "/api/materials/:id/versions/restore", { params: id, payload: LibraryRestoreBody, success: MaterialRow, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError] }),
     HttpApiEndpoint.delete("remove", "/api/materials/:id", {
       params: id,
       success: Message,
