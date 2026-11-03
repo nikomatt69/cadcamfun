@@ -14,7 +14,7 @@ import { DividedRows, IconBadge, SheetSection, TILE_INSET, type Tone } from "@/c
  * text size, and its text wraps instead of truncating once Dynamic Type grows.
  */
 
-/** A titled group: small-caps heading, one grouped card of rows, an optional footnote under it. */
+/** A titled group: sentence-case heading, one grouped card of rows, an optional footnote under it. */
 export function SettingsSection({ title, footer, children }: PropsWithChildren<{ title: string; footer?: string }>) {
   return (
     <SheetSection title={title} footer={footer}>
@@ -59,7 +59,7 @@ export function NavRow({ icon: Icon, title, description, value, trailing, tone =
   const color = destructive ? palette.danger : palette.accent
   const body = (
     <>
-      <IconBadge tone={destructive ? "danger" : tone} active={active || destructive}><Icon size={18} color={active || destructive ? color : palette.muted} strokeWidth={2.1} /></IconBadge>
+      <IconBadge tone={destructive ? "danger" : tone} active={active || destructive}><Icon size={18} color={active || destructive ? color : palette.muted} strokeWidth={2} /></IconBadge>
       <RowText title={title} description={description} destructive={destructive} wrap={wrap} />
       {trailing ? <View style={{ flexShrink: 0, maxWidth: "42%" }}>{trailing}</View> : (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, maxWidth: "42%" }}>
@@ -114,7 +114,7 @@ export function SwitchRow({ icon: Icon, title, description, value, onValueChange
       disabledOpacity={busy ? 0.6 : 0.45}
       style={ROW}
     >
-      <IconBadge tone="accent" active={value && !disabled}><Icon size={18} color={value && !disabled ? palette.accent : palette.muted} strokeWidth={2.1} /></IconBadge>
+      <IconBadge tone="accent" active={value && !disabled}><Icon size={18} color={value && !disabled ? palette.accent : palette.muted} strokeWidth={2} /></IconBadge>
       <RowText title={title} description={description} wrap={fontScale > 1} />
       <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Switch value={value} disabled={disabled || busy} trackColor={{ true: palette.accent }} />

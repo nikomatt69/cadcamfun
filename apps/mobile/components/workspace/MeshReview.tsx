@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react"
 import { AccessibilityInfo, FlatList, Text, View, useWindowDimensions } from "react-native"
-import { Box, Check, Sparkles } from "lucide-react-native"
+import { Box, Check, MessageSquareText } from "lucide-react-native"
 import type { MeshPart, MeshPreview, PreviewFeatureTree, PreviewParameter } from "@cadcamfun/api"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { useTheme } from "@/lib/theme"
@@ -109,7 +109,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
     />
     </View>
     <View style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: palette.border, backgroundColor: palette.background }}>
-      <ActionButton label={actionLabel} icon={<Sparkles size={18} color={palette.onAccent} />} disabled={!mesh} onPress={onAction} />
+      <ActionButton label={actionLabel} icon={<MessageSquareText size={18} color={palette.onAccent} />} disabled={!mesh} onPress={onAction} />
     </View>
   </SafeAreaView>
 }

@@ -7,7 +7,7 @@ import { PressableScale } from "@/components/ui/PressableScale"
 import type { ChatRow } from "@/lib/chat-log"
 import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
 import { layout } from "@/lib/layout"
-import { caps, mono, type as typeStyle } from "@/lib/typography"
+import { eyebrow, mono, type as typeStyle } from "@/lib/typography"
 import { toolIdentity, type ToolIconKey } from "@/lib/tool-identity"
 import { clipText } from "@/lib/transcript-rows"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
@@ -130,10 +130,10 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
         style={{ minHeight: 58, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 }}
       >
         <View style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 11, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(statusColor, 0.12) }}>
-          <Icon size={17} color={statusColor} strokeWidth={2.1} />
+          <Icon size={17} color={statusColor} strokeWidth={2} />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text numberOfLines={fontScale > 1.3 ? undefined : 1} style={{ color: palette.muted, ...caps(11, { weight: "700" }) }}>{row.agent ? `${identity.category} · ${row.agent}` : identity.category}</Text>
+          <Text numberOfLines={fontScale > 1.3 ? undefined : 1} style={{ color: palette.muted, ...eyebrow(11, { weight: "700" }) }}>{row.agent ? `${identity.category} · ${row.agent}` : identity.category}</Text>
           <Text style={{ color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>{identity.title}</Text>
         </View>
         {row.ok === null ? <ActivityIndicator size="small" color={statusColor} /> : row.ok ? <Check size={16} color={statusColor} /> : <X size={16} color={statusColor} />}
@@ -152,7 +152,7 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
           ) : null}
           {row.input !== undefined ? (
             <View style={{ gap: 6 }}>
-              <Text accessibilityRole="header" style={{ color: palette.muted, ...caps(11, { weight: "700" }) }}>Input</Text>
+              <Text accessibilityRole="header" style={{ color: palette.muted, ...eyebrow(11, { weight: "700" }) }}>Input</Text>
               <CodeBlock text={stringify(row.input)} color={palette.soft} />
             </View>
           ) : null}
@@ -160,7 +160,7 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
             <View style={{ gap: 6 }}>
               {copyError ? <ErrorBanner message={copyError} /> : null}
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-                <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.muted, ...caps(11, { weight: "700" }) }}>Output</Text>
+                <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.muted, ...eyebrow(11, { weight: "700" }) }}>Output</Text>
                 <PressableScale onPress={() => void copyOutput()} subtle accessibilityRole="button" accessibilityLabel={copied ? "Tool output copied" : "Copy tool output"} style={{ minHeight: layout.touchTarget, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }}>
                   <Copy size={12} color={palette.muted} />
                   <Text style={{ color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>{copied ? "Copied" : "Copy"}</Text>

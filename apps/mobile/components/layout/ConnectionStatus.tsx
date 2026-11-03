@@ -26,8 +26,6 @@ export function ConnectionStatus({ connectivity, label }: { connectivity: Connec
         maxWidth: "100%",
         borderRadius: 999,
         borderCurve: "continuous",
-        borderWidth: 1,
-        borderColor: hexToRgba(color, 0.28),
         backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
         paddingHorizontal: 12,
         paddingVertical: 8,

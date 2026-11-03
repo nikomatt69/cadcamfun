@@ -74,7 +74,7 @@ export default function CostsScreen() {
       <Dock
         gutter={gutter}
         search={{ value: search, onChange: setSearch, placeholder: "Name or organization" }}
-        action={{ label: kind === "estimates" ? "Calculate" : "Add", icon: kind === "estimates" ? <Calculator size={17} color={palette.onAccent} strokeWidth={2.4} /> : <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />, onPress: () => kind === "estimates" ? setCalculator(true) : setEditor({ kind }) }}
+        action={{ label: kind === "estimates" ? "Calculate" : "Add", icon: kind === "estimates" ? <Calculator size={17} color={palette.onAccent} strokeWidth={2} /> : <Plus size={18} color={palette.onAccent} strokeWidth={2} />, onPress: () => kind === "estimates" ? setCalculator(true) : setEditor({ kind }) }}
       />
     </KeyboardAvoidingView>
     {calculator ? <CostCalculator key={`calculator:${client ? "connected" : "offline"}`} projectId={projectId} toolpathId={toolpathId} onClose={() => setCalculator(false)} onSaved={saved} /> : null}

@@ -70,7 +70,7 @@ function ErrorRow({ message, recovery, actions }: { message: string; recovery?: 
   const { palette } = useTheme()
   const lastPrompt = recovery?.lastPrompt
   return (
-    <View accessibilityRole="alert" style={{ marginHorizontal: layout.gutter, marginVertical: 8, padding: 14, gap: 10, borderRadius: 14, borderCurve: "continuous", borderWidth: 1, borderColor: hexToRgba(palette.danger, 0.2), backgroundColor: hexToRgba(palette.danger, 0.08) }}>
+    <View accessibilityRole="alert" style={{ marginHorizontal: layout.gutter, marginVertical: 8, padding: 14, gap: 10, borderRadius: 14, borderCurve: "continuous", backgroundColor: hexToRgba(palette.danger, 0.08) }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
         <CircleAlert size={18} color={palette.danger} style={{ marginTop: 1 }} />
         <Text selectable style={{ flex: 1, minWidth: 0, color: palette.ink, ...typeStyle(14) }}>{message}</Text>

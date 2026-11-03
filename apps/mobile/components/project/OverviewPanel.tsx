@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { RefreshControl, Text, View } from "react-native"
 import { useRouter } from "expo-router"
-import { Boxes, Calculator, CheckCircle2, DraftingCompass, GitBranch, Library, Plus, Route, Sparkles } from "lucide-react-native"
+import { Boxes, Calculator, CheckCircle2, DraftingCompass, GitBranch, Library, Plus, MessageSquareText, Route } from "lucide-react-native"
 import type { CompanionClient } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
 import { useServer } from "@/lib/server"
@@ -17,7 +17,7 @@ import { Pill } from "@/components/ui/Pill"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { haptic } from "@/lib/haptics"
 import { FlatRow, RowSeparator, SectionTitle } from "./rows"
-import { caps, mono, type } from "@/lib/typography"
+import { eyebrow, mono, type } from "@/lib/typography"
 import { CloudDeliveryPanel } from "./cloud-delivery-panel"
 
 const WORKSPACE = [
@@ -52,7 +52,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <IconTile><GitBranch size={22} color={palette.accent} /></IconTile>
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-          <Text style={{ color: palette.muted, ...caps(11) }}>Working branch</Text>
+          <Text style={{ color: palette.muted, ...eyebrow(11) }}>Working branch</Text>
           <Text selectable numberOfLines={2} ellipsizeMode="middle" style={{ color: palette.ink, ...type(21, { weight: "700" }) }}>{vcs?.branch ?? "Unavailable"}</Text>
         </View>
       </View>
@@ -81,7 +81,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
     </View>
 
     <View>
-      <SectionTitle accessory={<ActionButton label="New" size="small" variant="secondary" icon={<Plus size={15} color={palette.ink} strokeWidth={2.4} />} onPress={() => { haptic("selection"); onCreateBranch() }} />}>Branches</SectionTitle>
+      <SectionTitle accessory={<ActionButton label="New" size="small" variant="secondary" icon={<Plus size={15} color={palette.ink} strokeWidth={2} />} onPress={() => { haptic("selection"); onCreateBranch() }} />}>Branches</SectionTitle>
       {branchList.map(([name, oid], index) => <View key={name}>
         {index ? <RowSeparator /> : null}
         <FlatRow mono title={name} meta={shortOid(oid)} metaMono leading={<GitBranch size={18} color={name === vcs?.branch ? palette.accent : palette.muted} strokeWidth={2} />}
@@ -94,7 +94,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
 
     <View>
       <SectionTitle>Assistant</SectionTitle>
-      <FlatRow leading={<Sparkles size={19} color={palette.accent} strokeWidth={2} />} title="Desktop assistant"
+      <FlatRow leading={<MessageSquareText size={19} color={palette.accent} strokeWidth={2} />} title="Desktop assistant"
         subtitle={ai?.configured ? "Ready to help with this project" : ai ? "Add a model key on your Mac to get started" : connectivity === "online" ? "Checking desktop configuration…" : "Reconnect to the desktop to use the assistant"}
         trailing={<Pill tone={ai?.configured ? "success" : "neutral"}>{ai?.configured ? "Ready" : ai || connectivity === "online" ? "Setup" : "Offline"}</Pill>} />
     </View>

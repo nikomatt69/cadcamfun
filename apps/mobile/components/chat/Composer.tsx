@@ -171,8 +171,6 @@ export function Composer({
             marginBottom: 8,
             borderRadius: 14,
             borderCurve: "continuous",
-            borderWidth: 1,
-            borderColor: hexToRgba(palette.danger, 0.22),
             backgroundColor: hexToRgba(palette.danger, 0.08),
             paddingLeft: 12,
             paddingRight: 6,
@@ -182,7 +180,7 @@ export function Composer({
             gap: 8,
           }}
         >
-          <CircleAlert size={13} color={palette.danger} strokeWidth={2.4} />
+          <CircleAlert size={13} color={palette.danger} strokeWidth={2} />
           <Text numberOfLines={stacked ? undefined : 2} style={{ flex: 1, color: palette.danger, ...typeStyle(11.5, { weight: "600" }), lineHeight: 16 }}>{error}</Text>
           {onRetryError ? (
             <Pressable
@@ -211,7 +209,7 @@ export function Composer({
               hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}
               style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1 })}
             >
-              <X size={14} color={palette.danger} strokeWidth={2.2} />
+              <X size={14} color={palette.danger} strokeWidth={2} />
             </Pressable>
           ) : null}
         </Animated.View>
@@ -229,8 +227,6 @@ export function Composer({
           style={{
             marginBottom: 8,
             borderRadius: 999,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: hexToRgba(palette.warning, 0.22),
             backgroundColor: hexToRgba(palette.warning, 0.1),
             paddingHorizontal: 12,
             paddingVertical: 5,
@@ -239,7 +235,7 @@ export function Composer({
             gap: 6,
           }}
         >
-          <CloudOff size={12} color={palette.warning} strokeWidth={2.2} />
+          <CloudOff size={12} color={palette.warning} strokeWidth={2} />
           <Text numberOfLines={stacked ? undefined : 1} style={{ flex: 1, color: palette.warning, ...typeStyle(11.5, { weight: "600" }) }}>{savedMessagesLabel(savedCount)}</Text>
         </Animated.View>
       ) : null}
@@ -501,7 +497,7 @@ export function Composer({
                         ]}
                       >
                         {/* Two arrows crossfade so the glyph changes colour in step with the fill. */}
-                        <ArrowUp size={18} color={palette.muted} strokeWidth={2.2} />
+                        <ArrowUp size={18} color={palette.muted} strokeWidth={2} />
                         <Animated.View
                           pointerEvents="none"
                           style={{
@@ -518,7 +514,7 @@ export function Composer({
                             transitionTimingFunction: "ease-out",
                           }}
                         >
-                          <ArrowUp size={18} color={palette.background} strokeWidth={2.2} />
+                          <ArrowUp size={18} color={palette.background} strokeWidth={2} />
                         </Animated.View>
                       </Animated.View>
                     </Pressable>

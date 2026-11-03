@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { ScrollView, Text, View } from "react-native"
-import { Brain, Cpu, Search, Sparkles } from "lucide-react-native"
+import { Brain, Cpu, Search, Waypoints } from "lucide-react-native"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
@@ -67,7 +67,7 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
         <SurfaceCard inset={false}>
           <View style={{ gap: 4, padding: 16, paddingBottom: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Brain size={16} color={palette.accent} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+              <Brain size={16} color={palette.accent} strokeWidth={2} style={{ flexShrink: 0 }} />
               <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>Thinking effort · {selected.name}</Text>
             </View>
             <Text style={{ color: draft ? palette.accentStrong : palette.muted, ...typeStyle(12, { leadingScale: 1.05 }) }}>
@@ -95,7 +95,7 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
 
       <View style={pad}>
         <DividedRows inset={TILE_INSET}>
-          <ChoiceRow icon={Sparkles} title="Automatic"
+          <ChoiceRow icon={Waypoints} title="Automatic"
             description="Let the desktop choose from its connected providers" selected={!current} onPress={() => apply(undefined)} />
         </DividedRows>
       </View>

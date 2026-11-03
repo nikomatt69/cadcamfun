@@ -4,7 +4,7 @@ import { Check, Copy, Share2, Square, SquareCheck } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import type { Palette } from "@/lib/palette"
 import { haptic } from "@/lib/haptics"
-import { caps, mono, type as typeStyle } from "@/lib/typography"
+import { eyebrow, mono, type as typeStyle } from "@/lib/typography"
 import { toast } from "@/components/ui/ToastHost"
 import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
 import { codeLineCount, inlineText, parseMarkdown, type Align, type Block, type Inline, type ListItem } from "@/lib/markdown"
@@ -115,7 +115,7 @@ const CodeFence = memo(function CodeFence({ block, selectable }: { block: Extrac
   return (
     <View style={{ borderRadius: 14, borderCurve: "continuous", overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: palette.border, backgroundColor: hexToRgba(palette.ink, isDark ? 0.07 : 0.045) }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, paddingLeft: 12, paddingRight: 4, minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border }}>
-        <Text numberOfLines={1} style={{ flexShrink: 1, color: palette.accent, ...caps(10, { weight: "700" }) }}>{label}</Text>
+        <Text numberOfLines={1} style={{ flexShrink: 1, color: palette.accent, ...eyebrow(10, { weight: "700" }) }}>{label}</Text>
         <Text style={{ flex: 1, color: palette.muted, ...typeStyle(11), fontVariant: ["tabular-nums"] }}>{lines} {lines === 1 ? "line" : "lines"}</Text>
         <Pressable onPress={() => void onCopy()} hitSlop={{ top: 2, bottom: 2 }} accessibilityRole="button" accessibilityLabel={copied ? "Code copied" : `Copy ${label} code`}
           style={({ pressed }) => ({ minHeight: 36, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, borderRadius: 18, borderCurve: "continuous", backgroundColor: copied ? hexToRgba(palette.success, 0.16) : hexToRgba(palette.ink, pressed ? 0.12 : 0.07) })}>

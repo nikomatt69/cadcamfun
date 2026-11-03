@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native"
+import { AccessibilityInfo, ActivityIndicator, Pressable, Text, View } from "react-native"
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated"
 import { ArrowRight, ChevronLeft, ChevronRight, HelpCircle, Shield } from "lucide-react-native"
 import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
@@ -75,7 +75,7 @@ function PagerButton({ direction, label, onPress }: { direction: "previous" | "n
       hitSlop={4}
       style={({ pressed }) => ({ width: 36, height: 36, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}
     >
-      <Icon size={16} color={palette.muted} strokeWidth={2.2} />
+      <Icon size={16} color={palette.muted} strokeWidth={2} />
     </Pressable>
   )
 }
@@ -153,8 +153,6 @@ export function ApprovalDock({ approvals, gutter, onDecide, onSkip, onShow }: {
         style={{
           borderRadius: 18,
           borderCurve: "continuous",
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: hexToRgba(tint, isDark ? 0.34 : 0.28),
           backgroundColor: hexToRgba(tint, isDark ? 0.12 : 0.07),
           paddingHorizontal: 14,
           paddingVertical: 12,
@@ -162,8 +160,8 @@ export function ApprovalDock({ approvals, gutter, onDecide, onSkip, onShow }: {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ width: 28, height: 28, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 10, borderCurve: "continuous", borderWidth: 1, borderColor: hexToRgba(tint, 0.26), backgroundColor: hexToRgba(tint, 0.12) }}>
-            {permission ? <Shield size={14} color={tint} strokeWidth={2.1} /> : <HelpCircle size={14} color={tint} strokeWidth={2.1} />}
+          <View style={{ width: 28, height: 28, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 10, borderCurve: "continuous", backgroundColor: hexToRgba(tint, 0.12) }}>
+            {permission ? <Shield size={14} color={tint} strokeWidth={2} /> : <HelpCircle size={14} color={tint} strokeWidth={2} />}
           </View>
           <View accessible accessibilityRole="header" accessibilityLabel={`${approvalEyebrow(approval)}. ${approval.title}${position ? `. ${position}` : ""}`} style={{ flex: 1, minWidth: 0 }}>
             <Text maxFontSizeMultiplier={1.4} style={{ color: tint, ...typeStyle(11, { weight: "700", trackingBoost: 0.4 }) }}>{approvalEyebrow(approval)}</Text>
@@ -238,7 +236,7 @@ function QuestionActions({ approval, busy, idle, stacked, onSkip, onShow }: {
         hint="Scrolls to the question in the conversation"
         disabled={!idle}
         onPress={onShow}
-        icon={<ArrowRight size={14} color={palette.onAccent} strokeWidth={2.4} />}
+        icon={<ArrowRight size={14} color={palette.onAccent} strokeWidth={2} />}
       />
     </View>
   )

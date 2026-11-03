@@ -173,7 +173,7 @@ export function CameraSheet({ open, onClose, onCapture }: {
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 28, paddingTop: topInset + 44, paddingBottom: bottomInset }}>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: 72, height: 72, borderRadius: 22, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(ON_CAMERA, 0.12) }}>
-              {needsSettings ? <CameraOff size={30} color={ON_CAMERA} strokeWidth={1.8} /> : <Camera size={30} color={ON_CAMERA} strokeWidth={1.8} />}
+              {needsSettings ? <CameraOff size={30} color={ON_CAMERA} strokeWidth={2} /> : <Camera size={30} color={ON_CAMERA} strokeWidth={2} />}
             </View>
             <Text accessibilityRole="header" style={{ color: ON_CAMERA, textAlign: "center", ...typeStyle(20, { weight: "700" }) }}>{needsSettings ? "Camera access is off" : "Allow the camera"}</Text>
             <Text style={{ maxWidth: 340, color: hexToRgba(ON_CAMERA, 0.72), textAlign: "center", ...typeStyle(15, { leadingScale: 1.05 }) }}>

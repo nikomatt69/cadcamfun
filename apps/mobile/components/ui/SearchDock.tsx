@@ -59,7 +59,7 @@ export function SearchDock({ gutter, actionLabel, onAction, actionLoading = fals
           />
           {value.length > 0 ? (
             <Pressable onPress={() => { haptic("selection"); onChangeText("") }} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={6} style={({ pressed }) => ({ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
-              <X size={16} color={palette.muted} strokeWidth={2.4} />
+              <X size={16} color={palette.muted} strokeWidth={2} />
             </Pressable>
           ) : null}
         </View>
@@ -94,7 +94,7 @@ export function SearchDock({ gutter, actionLabel, onAction, actionLoading = fals
             press.style,
           ]}
         >
-          {actionLoading ? <ActivityIndicator size="small" color={palette.onAccent} /> : <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />}
+          {actionLoading ? <ActivityIndicator size="small" color={palette.onAccent} /> : <Plus size={18} color={palette.onAccent} strokeWidth={2} />}
           <Text style={{ color: palette.onAccent, ...typeStyle(16, { weight: "600" }) }}>{actionLabel}</Text>
         </Animated.View>
       </Pressable>

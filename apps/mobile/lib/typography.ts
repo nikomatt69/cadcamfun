@@ -70,7 +70,7 @@ export type TypeOptions = {
   weight?: TextStyle["fontWeight"]
   /** Multiplies the derived leading — `0.92` for dense rows, `1.1` for long-form reading. */
   leadingScale?: number
-  /** Extra tracking on top of the size-derived value. Use for all-caps labels. */
+  /** Extra tracking on top of the size-derived value. Use sparingly. */
   trackingBoost?: number
 }
 
@@ -89,14 +89,11 @@ export function type(fontSize: number, options: TypeOptions = {}): TextStyle {
 }
 
 /**
- * All-caps eyebrow/section labels. Capitals have no ascender/descender variety to separate
- * them, so they need markedly more tracking than the size curve alone gives.
+ * Eyebrow/section labels: sentence case, one weight step up from the body and a muted ink.
+ * Hierarchy comes from size, weight and the air around the label, not from capitals.
  */
-export function caps(fontSize = 11, options: TypeOptions = {}): TextStyle {
-  return {
-    ...type(fontSize, { weight: "600", ...options, trackingBoost: (options.trackingBoost ?? 0) + 0.8 }),
-    textTransform: "uppercase",
-  }
+export function eyebrow(fontSize = 12, options: TypeOptions = {}): TextStyle {
+  return type(Math.max(fontSize, 12), { weight: "600", ...options })
 }
 
 /** Monospaced code/commit text. Slightly looser leading — code is scanned line by line. */

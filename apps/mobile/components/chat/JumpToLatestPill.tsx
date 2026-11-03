@@ -39,7 +39,7 @@ export function JumpToLatestPill({ visible, count, onPress }: { visible: boolean
             boxShadow: `0 6px 16px ${hexToRgba(palette.overlay, 0.22)}`,
           }}
         >
-          <ArrowDown size={14} color={palette.background} strokeWidth={2.6} />
+          <ArrowDown size={14} color={palette.background} strokeWidth={2} />
           <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={{ color: palette.background, ...typeStyle(13, { weight: "600" }) }}>Latest messages</Text>
           {count > 0 ? (
             <View style={{ minWidth: 22, height: 20, borderRadius: 999, paddingHorizontal: 6, alignItems: "center", justifyContent: "center", backgroundColor: palette.background }}>

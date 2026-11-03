@@ -6,7 +6,7 @@ import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
 import { hexToRgba, useTheme, type Palette } from "@/lib/theme"
-import { caps, type } from "@/lib/typography"
+import { eyebrow, type } from "@/lib/typography"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 
@@ -48,13 +48,13 @@ export function DividedRows({ children, inset = 16 }: PropsWithChildren<{ inset?
 /** The hairline inset that lines up with the text of a row that has a 40pt icon tile. */
 export const TILE_INSET = 16 + 40 + 12
 
-/** A sheet section: a small-caps header over its content, 8pt apart, with an optional quiet footnote. */
+/** A sheet section: a sentence-case header over its content, 8pt apart, with an optional quiet footnote. */
 export function SheetSection({ title, accessory, footer, children }: PropsWithChildren<{ title: string; accessory?: ReactNode; footer?: string }>) {
   const { palette } = useTheme()
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.muted, paddingHorizontal: 4, ...caps(11) }}>{title}</Text>
+        <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.muted, paddingHorizontal: 4, ...eyebrow(11) }}>{title}</Text>
         {accessory}
       </View>
       {children}
@@ -133,12 +133,12 @@ export function ChoiceRow({ icon: Icon, title, description, selected, tone = "ac
       disabledOpacity={busy ? 0.6 : 0.45}
       style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 12 }}
     >
-      <IconBadge tone={destructive ? "danger" : tone} active={lit}><Icon size={18} color={lit ? color : palette.muted} strokeWidth={2.1} /></IconBadge>
+      <IconBadge tone={destructive ? "danger" : tone} active={lit}><Icon size={18} color={lit ? color : palette.muted} strokeWidth={2} /></IconBadge>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text style={{ color: destructive ? palette.danger : palette.ink, ...type(15, { weight: "600" }) }} numberOfLines={wrap ? undefined : 1}>{title}</Text>
         {description ? <Text style={{ color: palette.soft, ...type(13, { leadingScale: 1.05 }) }} numberOfLines={wrap ? undefined : 2}>{description}</Text> : null}
       </View>
-      {trailing ? <View style={{ flexShrink: 0, maxWidth: "40%" }}>{trailing}</View> : selected ? <Check size={18} color={color} strokeWidth={2.4} /> : null}
+      {trailing ? <View style={{ flexShrink: 0, maxWidth: "40%" }}>{trailing}</View> : selected ? <Check size={18} color={color} strokeWidth={2} /> : null}
     </PressableScale>
   )
 }
@@ -166,7 +166,7 @@ export function ToggleRow({ icon: Icon, title, description, value, onValueChange
       accessibilityState={{ checked: value }}
       style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 12 }}
     >
-      <IconBadge tone="accent" active={value}><Icon size={18} color={value ? palette.accent : palette.muted} strokeWidth={2.1} /></IconBadge>
+      <IconBadge tone="accent" active={value}><Icon size={18} color={value ? palette.accent : palette.muted} strokeWidth={2} /></IconBadge>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text style={{ color: palette.ink, ...type(15, { weight: "600" }) }} numberOfLines={wrap ? undefined : 1}>{title}</Text>
         {description ? <Text style={{ color: palette.soft, ...type(13, { leadingScale: 1.05 }) }} numberOfLines={wrap ? undefined : 3}>{description}</Text> : null}
@@ -259,7 +259,7 @@ export function CollapsibleSection({ title, count, defaultOpen = true, children 
         accessibilityHint={open ? "Collapses the list" : "Expands the list"}
         style={({ pressed }) => ({ minHeight: layout.touchTarget, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, opacity: pressed ? 0.7 : 1 })}
       >
-        <Text style={{ flexShrink: 1, color: palette.muted, ...caps(11) }}>{title}</Text>
+        <Text style={{ flexShrink: 1, color: palette.muted, ...eyebrow(11) }}>{title}</Text>
         {count !== undefined ? <InfoChip label={String(count)} /> : null}
         <View style={{ flex: 1 }} />
         <Animated.View style={chevron}><ChevronDown size={18} color={palette.muted} strokeWidth={2} /></Animated.View>

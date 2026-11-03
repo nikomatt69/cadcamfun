@@ -171,7 +171,7 @@ export default function ResourceScreen() {
             <SwitchRow icon={Globe2} title="Public" description="Visible to every user of the desktop" value={isPublic} onValueChange={setIsPublic} />
           </SettingsSection>
 
-          <ActionButton label={creating ? `Create ${NOUN[kind].toLowerCase()}` : "Save changes"} icon={creating ? <Icon size={17} color={palette.onAccent} strokeWidth={2.2} /> : undefined} loading={busy} disabled={name.trim() === ""} onPress={save} />
+          <ActionButton label={creating ? `Create ${NOUN[kind].toLowerCase()}` : "Save changes"} icon={creating ? <Icon size={17} color={palette.onAccent} strokeWidth={2} /> : undefined} loading={busy} disabled={name.trim() === ""} onPress={save} />
 
           {!creating ? (
             <SheetSection title="Actions">

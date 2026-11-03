@@ -91,7 +91,7 @@ export default function OrganizationsScreen() {
         <Dock
           gutter={gutter}
           {...(total > 0 ? { search: { value: search, onChange: setSearch, placeholder: "Search organizations" } } : {})}
-          action={{ label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />, onPress: () => void create(), loading: busy }}
+          action={{ label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2} />, onPress: () => void create(), loading: busy }}
         />
       </KeyboardAvoidingView>
     </ScreenFrame>

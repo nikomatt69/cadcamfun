@@ -1,5 +1,5 @@
 import { memo, useState } from "react"
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Text, View } from "react-native"
 import { Brain } from "lucide-react-native"
 import type { ChatRow } from "@/lib/chat-log"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -22,7 +22,7 @@ export const ReasoningRow = memo(function ReasoningRow({ row, live }: { row: Ext
   const count = words(row.text)
   const title = live ? "Thinking…" : `Reasoning · ${count.toLocaleString("en")} ${count === 1 ? "word" : "words"}`
   return (
-    <View style={{ marginHorizontal: 16, marginVertical: 4, borderRadius: 14, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: hexToRgba(palette.ink, isDark ? 0.12 : 0.08), backgroundColor: hexToRgba(palette.ink, isDark ? 0.035 : 0.02), overflow: "hidden" }}>
+    <View style={{ marginHorizontal: 16, marginVertical: 4, borderRadius: 14, borderCurve: "continuous", backgroundColor: hexToRgba(palette.ink, isDark ? 0.06 : 0.04), overflow: "hidden" }}>
       <PressableScale
         subtle
         tint

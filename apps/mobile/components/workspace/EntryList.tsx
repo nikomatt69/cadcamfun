@@ -116,7 +116,7 @@ export function EntryList({ client, projectId, revision, load, emptyTitle, empty
       <Dock
         gutter={gutter}
         {...(total > 0 || searching ? { search: { value: query, onChange: setQuery, placeholder: searchPlaceholder } } : {})}
-        {...(manage ? { action: { label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />, onPress: () => void create(), loading: busy } } : {})}
+        {...(manage ? { action: { label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2} />, onPress: () => void create(), loading: busy } } : {})}
       />
 
       <BottomSheet open={actionsFor !== null} onClose={() => setActionsFor(null)} title={actionsFor?.name ?? "Item"} padded>

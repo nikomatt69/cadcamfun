@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { KeyboardAvoidingView, Platform, Text, View, useWindowDimensions } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
-import { Sparkles } from "lucide-react-native"
+import { MessageSquareText } from "lucide-react-native"
 import type { LiveEvent } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
@@ -211,7 +211,7 @@ export default function ProjectScreen() {
       backLabel="Back to projects"
       right={
         <IconCircleButton tone="warm" accessibilityLabel="Ask the assistant" accessibilityHint="Works on this project in the Assistant tab" onPress={openAssistant}>
-          <Sparkles size={19} color={palette.accent} strokeWidth={2.2} />
+          <MessageSquareText size={19} color={palette.accent} strokeWidth={2} />
         </IconCircleButton>
       }
     >

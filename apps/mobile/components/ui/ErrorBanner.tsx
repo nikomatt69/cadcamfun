@@ -24,13 +24,11 @@ export function ErrorBanner({ message, actionLabel, onAction }: { message: strin
         padding: 16,
         borderRadius: layout.controlRadius,
         borderCurve: "continuous",
-        borderWidth: 1,
-        borderColor: hexToRgba(palette.danger, 0.22),
         backgroundColor: hexToRgba(palette.danger, 0.08),
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-        <AlertTriangle size={16} color={palette.danger} strokeWidth={2.1} style={{ marginTop: 2 }} />
+        <AlertTriangle size={16} color={palette.danger} strokeWidth={2} style={{ marginTop: 2 }} />
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <Text style={{ color: palette.danger, ...type(13, { weight: "600" }) }}>Needs attention</Text>
           <Text selectable accessibilityRole="alert" style={{ color: palette.soft, ...type(14) }}>

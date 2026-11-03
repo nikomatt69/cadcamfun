@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect, useRouter } from "expo-router"
-import { Bot, CircleGauge, CloudOff, GitPullRequest, Route, Sparkles } from "lucide-react-native"
+import { Bot, CircleGauge, CloudOff, GitPullRequest, MessageSquareText, Route } from "lucide-react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
 import { useServer } from "@/lib/server"
@@ -31,7 +31,7 @@ import { AssistantSkeleton } from "@/components/chat/AssistantSkeleton"
 import { dockVisible, itemIndex, pendingApprovals } from "@/lib/approval-dock"
 import { isHydrating, linkNotice, startsTurn, statusLabel, turnEndAnnouncement } from "@/lib/assistant-view"
 import { hexToRgba } from "@/lib/theme"
-import { caps, type } from "@/lib/typography"
+import { eyebrow, type } from "@/lib/typography"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -724,7 +724,7 @@ export default function AssistantScreen() {
         >
           {projects.error ? <ErrorBanner message={projects.error} actionLabel="Retry" onAction={() => void projects.reload()} /> : null}
           {!projectId ? (
-            <EmptyState title="What are we working on?" description="Choose a workspace to review designs, inspect manufacturing paths or prepare your next change." icon={<Sparkles size={26} color={palette.accent} />} action={<ActionButton label="Choose a project" onPress={() => setPickerOpen(true)} />} />
+            <EmptyState title="What are we working on?" description="Choose a workspace to review designs, inspect manufacturing paths or prepare your next change." icon={<MessageSquareText size={26} color={palette.accent} />} action={<ActionButton label="Choose a project" onPress={() => setPickerOpen(true)} />} />
           ) : (
             <View style={{ alignItems: "center", gap: 18 }}>
               <BrandMark size={56} wordmark={false} />
@@ -895,7 +895,7 @@ export default function AssistantScreen() {
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7 }}>
                     {agent.id === "build" || agent.id === "plan" ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: agent.id === "build" ? "#2f7bff" : "#e9b949" }} /> : null}
                     <Text style={{ flexShrink: 1, color: palette.ink, ...type(16, { weight: "600" }) }}>{agent.title}</Text>
-                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, ...caps(11, { weight: "700" }) }}>{agent.edits ? "Can edit" : "Read only"}</Text>
+                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, ...eyebrow(11, { weight: "700" }) }}>{agent.edits ? "Can edit" : "Read only"}</Text>
                   </View>
                   <Text selectable style={{ color: palette.soft, ...type(13) }}>{agent.description}</Text>
                   {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, ...type(12) }}>{agent.tools.length} scoped tools</Text> : null}
@@ -950,7 +950,7 @@ function LinkStrip({ text, gutter, offline = false }: { text: string; gutter: nu
           backgroundColor: offline ? hexToRgba(palette.warning, isDark ? 0.12 : 0.08) : hexToRgba(palette.ink, isDark ? 0.04 : 0.03),
         }}
       >
-        {offline ? <CloudOff size={13} color={color} strokeWidth={2.2} /> : <ActivityIndicator size="small" color={color} style={{ transform: [{ scale: 0.7 }] }} />}
+        {offline ? <CloudOff size={13} color={color} strokeWidth={2} /> : <ActivityIndicator size="small" color={color} style={{ transform: [{ scale: 0.7 }] }} />}
         <Text maxFontSizeMultiplier={1.5} style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, ...type(13, { weight: "500" }) }}>{text}</Text>
       </View>
     </Animated.View>

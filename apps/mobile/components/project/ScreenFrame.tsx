@@ -48,12 +48,12 @@ export function ScreenFrame({ title, subtitle, right, sheet = false, backLabel =
           {...(subtitle ? { subtitle } : {})}
           left={sheet ? undefined : (
             <IconCircleButton accessibilityLabel={backLabel} onPress={close}>
-              <ChevronLeft size={21} color={palette.ink} strokeWidth={2.2} />
+              <ChevronLeft size={21} color={palette.ink} strokeWidth={2} />
             </IconCircleButton>
           )}
           right={sheet ? (
             <IconCircleButton accessibilityLabel={dismissLabel} accessibilityHint="Closes this screen" onPress={close}>
-              <X size={19} color={palette.ink} strokeWidth={2.2} />
+              <X size={19} color={palette.ink} strokeWidth={2} />
             </IconCircleButton>
           ) : right}
         />

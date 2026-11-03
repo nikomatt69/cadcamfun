@@ -3,7 +3,7 @@ import { Alert, Platform, Text, View } from "react-native"
 import Constants from "expo-constants"
 import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { Accessibility, AppWindow, Ban, BarChart3, BellRing, Building2, Calculator, ClipboardCopy, EyeOff, Fingerprint, Inbox, UserRound, Layers3, ListChecks, Lock, MonitorSmartphone, MousePointerClick, Network, Palette, ShieldCheck, Sparkles, Timer, Unplug, Vibrate, type LucideIcon } from "lucide-react-native"
+import { Accessibility, AppWindow, BookOpen, Ban, BarChart3, BellRing, Building2, Calculator, ClipboardCopy, EyeOff, Fingerprint, Inbox, UserRound, Layers3, ListChecks, Lock, MonitorSmartphone, MousePointerClick, Network, Palette, ShieldCheck, Timer, Unplug, Vibrate, type LucideIcon } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -162,7 +162,7 @@ export default function SettingsScreen() {
         <SettingsSection title="Appearance" footer="System follows the appearance selected in iOS Settings.">
           <View style={{ padding: 16, gap: 14 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <IconBadge tone="accent"><Palette size={18} color={palette.muted} strokeWidth={2.1} /></IconBadge>
+              <IconBadge tone="accent"><Palette size={18} color={palette.muted} strokeWidth={2} /></IconBadge>
               <Text style={{ flex: 1, color: palette.ink, ...type(15, { weight: "600" }) }}>Theme</Text>
               <Text style={{ color: palette.muted, ...type(14) }}>{colorScheme === "dark" ? "Dark" : "Light"}</Text>
             </View>
@@ -194,7 +194,7 @@ export default function SettingsScreen() {
         ) : null}
 
         <SettingsSection title="Assistant defaults" footer="Used by projects you have not configured yet. Each project keeps its own choices from the assistant controls.">
-          <SwitchRow icon={Sparkles} title="Project context" description="Include the desktop workspace, project rules and memory" value={assistantDefaults.includeContext} onValueChange={(includeContext) => setAssistantDefaults({ includeContext })} />
+          <SwitchRow icon={BookOpen} title="Project context" description="Include the desktop workspace, project rules and memory" value={assistantDefaults.includeContext} onValueChange={(includeContext) => setAssistantDefaults({ includeContext })} />
         </SettingsSection>
 
         <SheetSection title="Default permissions">

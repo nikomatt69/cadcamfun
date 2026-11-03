@@ -133,7 +133,7 @@ export function AppLockCoordinator() {
         footer={(
           <>
             {error ? <ErrorBanner message={error} /> : null}
-            <CapsuleButton label={checking ? "Unlocking…" : `Unlock with ${label}`} icon={<Lock size={17} color={palette.onAccent} strokeWidth={2.2} />} loading={checking} onPress={() => void unlock()} />
+            <CapsuleButton label={checking ? "Unlocking…" : `Unlock with ${label}`} icon={<Lock size={17} color={palette.onAccent} strokeWidth={2} />} loading={checking} onPress={() => void unlock()} />
             {needsReset ? <CapsuleButton variant="glass" label="Unpair this phone" hint="Removes the saved pairing so you can pair again" onPress={resetPairing} /> : null}
           </>
         )}

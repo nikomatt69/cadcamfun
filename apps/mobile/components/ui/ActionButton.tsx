@@ -47,9 +47,9 @@ export function buttonTone(variant: ActionButtonVariant, palette: Palette): Butt
     case "ghost":
       return { backgroundColor: "transparent", borderColor: palette.border, textColor: palette.ink, borderWidth: 1 }
     case "danger":
-      return { backgroundColor: hexToRgba(palette.danger, 0.1), borderColor: hexToRgba(palette.danger, 0.22), textColor: palette.danger, borderWidth: 1 }
+      return { backgroundColor: hexToRgba(palette.danger, 0.1), borderColor: "transparent", textColor: palette.danger, borderWidth: 0 }
     case "tinted":
-      return { backgroundColor: hexToRgba(palette.accent, 0.12), borderColor: hexToRgba(palette.accent, 0.24), textColor: palette.accentStrong, borderWidth: 1 }
+      return { backgroundColor: hexToRgba(palette.accent, 0.12), borderColor: "transparent", textColor: palette.accentStrong, borderWidth: 0 }
     default:
       return { backgroundColor: palette.accent, borderColor: "transparent", textColor: palette.onAccent, borderWidth: 0 }
   }
@@ -63,7 +63,7 @@ const SIZES: Record<ActionButtonSize, { minHeight: number; paddingHorizontal: nu
 
 /**
  * Rounded action button. Primary is a solid accent fill with contrasting text; the other variants sit on
- * raised surface or a tinted wash with a hairline border. All colors derive from the active palette.
+ * raised surface or a tinted wash (secondary and ghost keep a hairline). All colors derive from the active palette.
  *
  * Loading keeps the label laid out (invisible) under a centred spinner, so the button never changes width and
  * the row around it never jumps. Pressed state dims to 0.88 (the lowest opacity that keeps the primary label

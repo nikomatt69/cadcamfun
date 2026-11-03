@@ -4,7 +4,7 @@ import { Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 
 import { cn } from "@/lib/cn"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { toneWash, type Tone } from "@/lib/tones"
-import { caps, type } from "@/lib/typography"
+import { eyebrow as eyebrowStyle, type } from "@/lib/typography"
 import { PressableScale } from "./PressableScale"
 
 type SurfaceCardProps = PropsWithChildren<{
@@ -52,7 +52,7 @@ export function SurfaceCard({
 
   const body = (
     <>
-      {eyebrow ? <Text selectable={!onPress} style={{ color: wash ? washed?.accent : palette.accent, ...caps(12) }}>{eyebrow}</Text> : null}
+      {eyebrow ? <Text selectable={!onPress} style={{ color: wash ? washed?.accent : palette.accent, ...eyebrowStyle(12) }}>{eyebrow}</Text> : null}
       {title ? (
         <Text selectable={!onPress} accessibilityRole="header" style={{ marginTop: eyebrow ? 4 : 0, color: palette.ink, ...type(compact ? 18 : 19, { weight: "600" }) }}>
           {title}

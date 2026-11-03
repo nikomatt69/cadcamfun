@@ -5,7 +5,7 @@ import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme, hexToRgba } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
-import { type, caps } from "@/lib/typography"
+import { type, eyebrow } from "@/lib/typography"
 import { relativeTime } from "@/lib/format"
 import {
   ANALYTICS_METRICS, ANALYTICS_PRESETS, activityPhrase, barHeights, downsample, metricSeries, metricValue, presetRange, summaryCounters, trendLabel,
@@ -77,7 +77,7 @@ export default function AnalyticsScreen() {
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {dashboardTiles.map((tile) => (
             <SurfaceCard key={tile.id} style={{ flexBasis: "47%", flexGrow: 1 }} accessibilityLabel={`${tile.label}: ${tile.value}, ${trendLabel(tile.trend)}`}>
-              <Text style={{ color: palette.muted, ...caps(11) }}>{tile.label.toUpperCase()}</Text>
+              <Text style={{ color: palette.muted, ...eyebrow(11) }}>{tile.label}</Text>
               <Text style={{ marginTop: 6, color: palette.ink, fontVariant: ["tabular-nums"], ...type(28, { weight: "700" }) }}>{tile.value}</Text>
               <Text style={{ marginTop: 2, color: tile.trend < 0 ? palette.danger : tile.trend > 0 ? palette.success : palette.muted, fontVariant: ["tabular-nums"], ...type(13, { weight: "600" }) }}>{trendLabel(tile.trend)}</Text>
               {tile.note ? <Text numberOfLines={1} style={{ marginTop: 4, color: palette.soft, ...type(13) }}>{tile.note}</Text> : null}

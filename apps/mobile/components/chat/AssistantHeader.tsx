@@ -71,7 +71,7 @@ export function AssistantHeader({ gutter, project, detail, hasProject, onChooseP
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 12 }}>
       <ChromeButton label="Back" hint="Back to the conversations of this project" onPress={onBack}>
-        <ArrowLeft size={18} color={palette.ink} strokeWidth={2.2} />
+        <ArrowLeft size={18} color={palette.ink} strokeWidth={2} />
       </ChromeButton>
 
       <Pressable
@@ -89,10 +89,10 @@ export function AssistantHeader({ gutter, project, detail, hasProject, onChooseP
       </Pressable>
 
       <ChromeButton label="New conversation" hint="Starts a fresh conversation in this project" disabled={!hasProject} onPress={onNew}>
-        <Plus size={19} color={palette.ink} strokeWidth={2.2} />
+        <Plus size={19} color={palette.ink} strokeWidth={2} />
       </ChromeButton>
       <ChromeButton label="Conversation actions" hint="Agent, model, project, controls and the conversation itself" disabled={!hasProject} onPress={onMore}>
-        <Ellipsis size={18} color={palette.ink} strokeWidth={2.2} />
+        <Ellipsis size={18} color={palette.ink} strokeWidth={2} />
       </ChromeButton>
     </View>
   )

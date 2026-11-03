@@ -128,7 +128,7 @@ export default function ConversationsScreen() {
         {...(projectName ? { subtitle: projectName } : {})}
         left={
           <IconCircleButton accessibilityLabel={projectName ? `Project: ${projectName}` : "Choose a project"} accessibilityHint="Choose the project the assistant works in" onPress={() => { haptic("selection"); setPickerOpen(true) }}>
-            <FolderOpen size={19} color={palette.ink} strokeWidth={2.1} />
+            <FolderOpen size={19} color={palette.ink} strokeWidth={2} />
           </IconCircleButton>
         }
         right={projectId ? (
@@ -138,7 +138,7 @@ export default function ConversationsScreen() {
              accessibilityHint="Filters conversations by status, date or tag"
             onPress={() => { haptic("selection"); setFilterOpen(true) }}
           >
-            <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={filter === "all" && activeTagFilter === null ? "none" : palette.ink} />
+            <Funnel size={18} color={palette.ink} strokeWidth={2} fill={filter === "all" && activeTagFilter === null ? "none" : palette.ink} />
           </IconCircleButton>
         ) : undefined}
       />
@@ -228,7 +228,7 @@ export default function ConversationsScreen() {
               subtitle={item.description}
               selected={item.id === filter}
               showChevron={false}
-              trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+              trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2} /> : undefined}
               onPress={() => { if (item.id !== filter) haptic("selection"); setFilter(item.id); setFilterOpen(false) }}
             />
           ))}

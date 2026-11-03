@@ -71,13 +71,13 @@ export function PairingStory() {
         {bar("34%", 0.08)}
 
         <Animated.View style={[{ flexDirection: "row", alignItems: "center", gap: 12 }, rowAStyle]}>
-          {tile(<Folder size={17} color={palette.accent} fill={palette.accent} strokeWidth={1.6} />)}
+          {tile(<Folder size={17} color={palette.accent} fill={palette.accent} strokeWidth={2} />)}
           <Text numberOfLines={1} style={{ flex: 1, color: palette.ink, ...type(15, { weight: "600" }) }}>Gripper assembly</Text>
           <Text style={{ color: palette.muted, ...type(13) }}>Just now</Text>
         </Animated.View>
 
         <Animated.View style={[{ flexDirection: "row", alignItems: "center", gap: 12 }, rowBStyle]}>
-          {tile(<Wrench size={17} color={palette.accent} fill={palette.accent} strokeWidth={1.6} />)}
+          {tile(<Wrench size={17} color={palette.accent} fill={palette.accent} strokeWidth={2} />)}
           <Text numberOfLines={1} style={{ flex: 1, color: palette.ink, ...type(15, { weight: "600" }) }}>Finishing pass</Text>
           <Text style={{ color: palette.success, ...type(13, { weight: "600" }) }}>Ready</Text>
         </Animated.View>

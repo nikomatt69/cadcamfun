@@ -23,7 +23,7 @@ import { useContentLayout } from "@/components/layout/use-content-layout"
 import { conflictSummary, conflictsOf, type VcsConflict } from "@/lib/vcs-conflicts"
 import { errorMessage } from "@/lib/throttle"
 import { Divider } from "@/components/ui/SectionHeader"
-import { caps, mono, type } from "@/lib/typography"
+import { eyebrow, mono, type } from "@/lib/typography"
 
 const STATE_TONE: Record<string, PillTone> = { open: "accent", merged: "success", closed: "neutral" }
 const STATE_LABEL: Record<string, string> = { open: "Open", merged: "Merged", closed: "Closed" }
@@ -158,7 +158,7 @@ export default function PullRequestScreen() {
               {conflicts.length > 0 ? (
                 <SurfaceCard inset={false}>
                   <View style={{ padding: 16, gap: 10 }}>
-                    <Text accessibilityRole="header" style={{ color: palette.danger, ...caps(12, { weight: "700" }) }}>
+                    <Text accessibilityRole="header" style={{ color: palette.danger, ...eyebrow(12, { weight: "700" }) }}>
                       Merge conflicts
                     </Text>
                     <Text style={{ color: palette.soft, ...type(14) }}>
@@ -180,7 +180,7 @@ export default function PullRequestScreen() {
               {(pull.data?.reviews ?? []).length > 0 ? (
                 <SurfaceCard inset={false}>
                   <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
-                    <Text accessibilityRole="header" style={{ color: palette.muted, ...caps(12) }}>
+                    <Text accessibilityRole="header" style={{ color: palette.muted, ...eyebrow(12) }}>
                       Reviews
                     </Text>
                   </View>
@@ -246,7 +246,7 @@ export default function PullRequestScreen() {
 
               {/* Changes */}
               <View style={{ gap: 8 }}>
-                <Text accessibilityRole="header" style={{ color: palette.muted, paddingHorizontal: 4, ...caps(12) }}>
+                <Text accessibilityRole="header" style={{ color: palette.muted, paddingHorizontal: 4, ...eyebrow(12) }}>
                   Changes
                 </Text>
                 {pull.data && pull.data.changes.length > 0 ? (

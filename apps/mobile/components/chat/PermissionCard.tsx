@@ -45,8 +45,8 @@ export const PermissionCard = memo(function PermissionCard({ row, onReply }: {
     accessibilityLiveRegion={row.answered ? undefined : "polite"}
     style={{ marginHorizontal: 16, marginVertical: 8, padding: 16, gap: layout.gap, overflow: "hidden", borderRadius: 16, borderCurve: "continuous", borderWidth: 1, borderColor: row.answered ? palette.border : hexToRgba(palette.warning, isDark ? 0.35 : 0.3), backgroundColor: isDark ? palette.panel : palette.surface }}>
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-      <View style={{ width: 44, height: 44, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 12, borderCurve: "continuous", borderWidth: 1, borderColor: hexToRgba(tone, 0.2), backgroundColor: hexToRgba(tone, 0.1) }}>
-        <Icon size={18} color={tone} strokeWidth={2.1} />
+      <View style={{ width: 44, height: 44, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(tone, 0.1) }}>
+        <Icon size={18} color={tone} strokeWidth={2} />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <Text style={{ color: row.answered ? palette.success : palette.muted, ...typeStyle(12, { weight: "600" }) }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>

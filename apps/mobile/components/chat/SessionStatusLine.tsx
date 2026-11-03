@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native"
 import Animated, { Easing, FadeIn, FadeOut, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated"
-import { Sparkles } from "lucide-react-native"
+import { LoaderCircle } from "lucide-react-native"
 import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
 import { haptic } from "@/lib/haptics"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -39,7 +39,7 @@ export function SessionStatusLine({ label, stopping = false, onPress }: {
   const pill = (
     <>
       <Animated.View style={[{ flexShrink: 0 }, spin]}>
-        <Sparkles size={13} color={color} strokeWidth={2.2} />
+        <LoaderCircle size={13} color={color} strokeWidth={2} />
       </Animated.View>
       <Text numberOfLines={2} maxFontSizeMultiplier={1.5} style={{ flexShrink: 1, color, fontVariant: ["tabular-nums"], ...typeStyle(13, { weight: "500" }) }}>
         {label}

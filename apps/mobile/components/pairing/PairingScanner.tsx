@@ -115,7 +115,7 @@ export function PairingScanner({ busy, desktop, error, connectedTo, onScanned, o
           <View style={{ width: 44, height: 44, alignItems: "flex-start", justifyContent: "center" }}>
             {granted ? (
               <GlassChromeButton over="camera" label={torch ? "Turn the torch off" : "Turn the torch on"} hint="Lights the code in a dark room" selected={torch} onPress={() => setTorch((on) => !on)}>
-                {torch ? <FlashlightOff size={18} color={CAMERA.ink} strokeWidth={2.1} /> : <Flashlight size={18} color={CAMERA.ink} strokeWidth={2.1} />}
+                {torch ? <FlashlightOff size={18} color={CAMERA.ink} strokeWidth={2} /> : <Flashlight size={18} color={CAMERA.ink} strokeWidth={2} />}
               </GlassChromeButton>
             ) : null}
           </View>
@@ -124,7 +124,7 @@ export function PairingScanner({ busy, desktop, error, connectedTo, onScanned, o
           </View>
           <View style={{ width: 44, height: 44, alignItems: "flex-end", justifyContent: "center" }}>
             <GlassChromeButton over="camera" label="Close scanner" hint="Returns to the pairing screen" onPress={onClose}>
-              <X size={19} color={CAMERA.ink} strokeWidth={2.2} />
+              <X size={19} color={CAMERA.ink} strokeWidth={2} />
             </GlassChromeButton>
           </View>
         </View>
@@ -140,7 +140,7 @@ export function PairingScanner({ busy, desktop, error, connectedTo, onScanned, o
             ) : (
               <>
                 <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: 72, height: 72, borderRadius: 22, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(CAMERA.ink, 0.12) }}>
-                  {blocked ? <CameraOff size={30} color={CAMERA.ink} strokeWidth={1.8} /> : <Camera size={30} color={CAMERA.ink} strokeWidth={1.8} />}
+                  {blocked ? <CameraOff size={30} color={CAMERA.ink} strokeWidth={2} /> : <Camera size={30} color={CAMERA.ink} strokeWidth={2} />}
                 </View>
                 <Text accessibilityRole="header" style={{ color: CAMERA.ink, textAlign: "center", ...typeStyle(20, { weight: "700" }) }}>{blocked ? "Camera access is off" : "Allow the camera"}</Text>
                 <Text style={{ maxWidth: 340, color: hexToRgba(CAMERA.ink, 0.72), textAlign: "center", ...typeStyle(15, { leadingScale: 1.05 }) }}>
@@ -167,7 +167,7 @@ export function PairingScanner({ busy, desktop, error, connectedTo, onScanned, o
                   over="camera"
                   tone={connectedTo ? "success" : failed ? "danger" : busy ? "warning" : "muted"}
                   busy={busy && !connectedTo}
-                  icon={connectedTo ? <Check size={14} color={CAMERA.success} strokeWidth={2.6} /> : undefined}
+                  icon={connectedTo ? <Check size={14} color={CAMERA.success} strokeWidth={2} /> : undefined}
                   label={hint}
                 />
               </View>

@@ -40,7 +40,7 @@ export default function ToolpathScreen() {
   const previewData = useRetained(preview.data, scope)
 
   return (
-    <ScreenFrame title={reviewData?.name || name} right={<IconCircleButton tone="warm" accessibilityLabel="Calculate production cost" accessibilityHint="Opens the cost calculator for this toolpath" onPress={() => router.push({ pathname: "/settings/costs", params: { projectId: id, toolpathId } })}><Calculator size={19} color={palette.accent} strokeWidth={2.2} /></IconCircleButton>}>
+    <ScreenFrame title={reviewData?.name || name} right={<IconCircleButton tone="warm" accessibilityLabel="Calculate production cost" accessibilityHint="Opens the cost calculator for this toolpath" onPress={() => router.push({ pathname: "/settings/costs", params: { projectId: id, toolpathId } })}><Calculator size={19} color={palette.accent} strokeWidth={2} /></IconCircleButton>}>
       <ToolpathReview
         review={reviewData}
         preview={previewData}

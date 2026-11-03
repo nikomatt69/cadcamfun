@@ -58,7 +58,7 @@ export function ActivityDock({ gutter, value, onChangeText, placeholder, action 
           />
           {value.length > 0 ? (
             <Pressable onPress={() => { haptic("selection"); onChangeText("") }} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={6} style={({ pressed }) => ({ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
-              <X size={16} color={palette.muted} strokeWidth={2.4} />
+              <X size={16} color={palette.muted} strokeWidth={2} />
             </Pressable>
           ) : null}
         </View>

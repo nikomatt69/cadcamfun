@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Alert, KeyboardAvoidingView, Platform, RefreshControl, Text, View, useWindowDimensions } from "react-native"
 import { FlashList } from "@shopify/flash-list"
 import { useRouter } from "expo-router"
-import { ArrowRight, Bell, BellOff, Box, CheckCheck, CircleCheck, CircleX, CloudOff, Funnel, FolderPlus, GitMerge, GitPullRequest, Mail, MessageSquare, MessageSquareText, Search, Sparkles, Trash2, Undo2, UserPlus, type LucideIcon } from "lucide-react-native"
+import { ArrowRight, Bell, Bot, BellOff, Box, CheckCheck, CircleCheck, CircleX, CloudOff, Funnel, FolderPlus, GitMerge, GitPullRequest, Mail, MessageSquare, MessageSquareText, Search, Trash2, Undo2, UserPlus, type LucideIcon } from "lucide-react-native"
 import type { NotificationRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { pairingIdentity } from "@/lib/pairing"
@@ -39,7 +39,7 @@ const CATEGORY_ICON: Record<string, LucideIcon> = {
   PR_OPENED: GitPullRequest,
   PR_MERGED: GitMerge,
   PR_REVIEWED: MessageSquareText,
-  AI_COMMITTED: Sparkles,
+  AI_COMMITTED: Bot,
   WORKFLOW_FAILED: CircleX,
   WORKFLOW_PASSED: CircleCheck,
   PROJECT_CREATED: FolderPlus,
@@ -203,7 +203,7 @@ export default function ActivityScreen() {
           accessibilityHint="Shows unread updates or one kind of update"
           onPress={() => { haptic("selection"); setFilterOpen(true) }}
         >
-          <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={filter === "all" ? "none" : palette.ink} />
+          <Funnel size={18} color={palette.ink} strokeWidth={2} fill={filter === "all" ? "none" : palette.ink} />
         </IconCircleButton>
       )}
     >
@@ -258,7 +258,7 @@ export default function ActivityScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="Search updates"
-          action={unreadCount > 0 ? { label: "Read all", icon: <CheckCheck size={18} color={palette.onAccent} strokeWidth={2.4} />, loading: marking, hint: "Marks every update as read, on the desktop too", onPress: () => void markAll() } : undefined}
+          action={unreadCount > 0 ? { label: "Read all", icon: <CheckCheck size={18} color={palette.onAccent} strokeWidth={2} />, loading: marking, hint: "Marks every update as read, on the desktop too", onPress: () => void markAll() } : undefined}
         />
       </KeyboardAvoidingView>
 

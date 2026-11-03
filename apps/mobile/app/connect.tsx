@@ -8,7 +8,7 @@ import { desktopLabel, parsePairingLink, type Pairing } from "@/lib/pairing"
 import { hasErrors, looksLikePairingLink, manualPairingLink, validateManualFields, type ManualErrors } from "@/lib/pairing-form"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
-import { caps, type } from "@/lib/typography"
+import { eyebrow, type } from "@/lib/typography"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
@@ -128,13 +128,13 @@ export default function ConnectScreen() {
       footer={(
         <>
           {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
-          <CapsuleButton label={busy ? "Connecting to your workspace…" : "Scan pairing code"} icon={<ScanLine size={19} color={palette.onAccent} strokeWidth={2.2} />} loading={busy} hint="Opens the camera to read a workspace pairing QR code" onPress={openScanner} />
+          <CapsuleButton label={busy ? "Connecting to your workspace…" : "Scan pairing code"} icon={<ScanLine size={19} color={palette.onAccent} strokeWidth={2} />} loading={busy} hint="Opens the camera to read a workspace pairing QR code" onPress={openScanner} />
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <CapsuleButton variant="glass" label="Paste link" icon={<Link2 size={17} color={palette.ink} strokeWidth={2.2} />} disabled={busy} hint="Pairs with the link copied on your Mac" onPress={() => void paste()} />
+              <CapsuleButton variant="glass" label="Paste link" icon={<Link2 size={17} color={palette.ink} strokeWidth={2} />} disabled={busy} hint="Pairs with the link copied on your Mac" onPress={() => void paste()} />
             </View>
             <View style={{ flex: 1 }}>
-              <CapsuleButton variant="glass" label="Enter details" icon={<Keyboard size={17} color={palette.ink} strokeWidth={2.2} />} disabled={busy} hint="Type the address, token and fingerprint" onPress={openManual} />
+              <CapsuleButton variant="glass" label="Enter details" icon={<Keyboard size={17} color={palette.ink} strokeWidth={2} />} disabled={busy} hint="Type the address, token and fingerprint" onPress={openManual} />
             </View>
           </View>
         </>
@@ -145,7 +145,7 @@ export default function ConnectScreen() {
         <PairingStory />
       </View>
       <View style={{ gap: 10 }}>
-        <Text style={{ color: palette.accent, textAlign: "center", ...caps(12, { weight: "700" }) }}>Your work. With you.</Text>
+        <Text style={{ color: palette.accent, textAlign: "center", ...eyebrow(12, { weight: "700" }) }}>Your work. With you.</Text>
         <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(30, { weight: "700" }) }}>Connect your workspace</Text>
         <Text style={{ color: palette.soft, textAlign: "center", ...type(16, { leadingScale: 1.05 }) }}>Review designs, check toolpaths and work with your assistant, wherever you are.</Text>
       </View>
@@ -156,7 +156,7 @@ export default function ConnectScreen() {
         <DividedRows inset={TILE_INSET}>
           {STEPS.map(({ icon: Icon, title, detail }, index) => (
             <View key={title} accessible accessibilityLabel={`Step ${index + 1}. ${title}. ${detail}`} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 12 }}>
-              <IconBadge tone="accent" active={index === 0}><Icon size={18} color={index === 0 ? palette.accent : palette.muted} strokeWidth={2.1} /></IconBadge>
+              <IconBadge tone="accent" active={index === 0}><Icon size={18} color={index === 0 ? palette.accent : palette.muted} strokeWidth={2} /></IconBadge>
               <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                 <Text style={{ color: palette.ink, ...type(15, { weight: "600" }) }}>{title}</Text>
                 <Text style={{ color: palette.soft, ...type(13, { leadingScale: 1.05 }) }}>{detail}</Text>

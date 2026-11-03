@@ -47,7 +47,7 @@ export default function AppLayout() {
           <NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="assistant" disableAutomaticContentInsets>
-          <NativeTabs.Trigger.Icon sf={{ default: "sparkles", selected: "sparkles" }} md="auto_awesome" />
+          <NativeTabs.Trigger.Icon sf={{ default: "bubble.left.and.bubble.right", selected: "bubble.left.and.bubble.right.fill" }} md="chat" />
           <NativeTabs.Trigger.Label>Assistant</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="activity">

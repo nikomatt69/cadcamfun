@@ -5,7 +5,7 @@ import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
-import { type, caps } from "@/lib/typography"
+import { type, eyebrow } from "@/lib/typography"
 import { initials, itemSubtitle, profileFacts, PROFILE_TABS, type ProfileListKind } from "@/lib/profile"
 import { ScreenFrame } from "@/components/manage/ScreenFrame"
 import { PageScroll } from "@/components/layout/page-scroll"
@@ -79,7 +79,7 @@ export default function ProfileScreen() {
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {counters.map((counter) => (
             <SurfaceCard key={counter.id} style={{ flexBasis: "47%", flexGrow: 1 }} accessibilityLabel={`${counter.label}: ${counter.value}`}>
-              <Text style={{ color: palette.muted, ...caps(11) }}>{counter.label.toUpperCase()}</Text>
+              <Text style={{ color: palette.muted, ...eyebrow(11) }}>{counter.label}</Text>
               <Text style={{ marginTop: 6, color: palette.ink, fontVariant: ["tabular-nums"], ...type(28, { weight: "700" }) }}>{counter.value}</Text>
             </SurfaceCard>
           ))}

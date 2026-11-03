@@ -40,7 +40,7 @@ export function ScreenFrame({ title, subtitle, backLabel, right, children }: {
           subtitle={subtitle}
           left={backLabel ? (
             <IconCircleButton accessibilityLabel={backLabel} onPress={back}>
-              <ChevronLeft size={21} color={palette.ink} strokeWidth={2.2} />
+              <ChevronLeft size={21} color={palette.ink} strokeWidth={2} />
             </IconCircleButton>
           ) : undefined}
           right={right}

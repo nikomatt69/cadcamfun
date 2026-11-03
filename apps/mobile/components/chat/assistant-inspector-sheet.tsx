@@ -153,7 +153,7 @@ export function AssistantInspectorSheet({ open, onClose, client, sessionId, pref
       <CollapsibleSection title="Agent tools" count={tools.length} defaultOpen={tools.length > 0 && tools.length <= 6}>
         {groups.length ? groups.map((group) => <SheetSection key={group.label} title={group.label}>
           <DividedRows inset={TILE_INSET}>
-            {group.tools.map((tool) => <ListRow key={tool.id} leading={<IconBadge><Wrench size={16} color={palette.muted} strokeWidth={2.1} /></IconBadge>} title={toolTitle(tool.id)} subtitle={tool.description} showChevron={false} accessibilityLabel={`${toolTitle(tool.id)}. ${tool.description}`} />)}
+            {group.tools.map((tool) => <ListRow key={tool.id} leading={<IconBadge><Wrench size={16} color={palette.muted} strokeWidth={2} /></IconBadge>} title={toolTitle(tool.id)} subtitle={tool.description} showChevron={false} accessibilityLabel={`${toolTitle(tool.id)}. ${tool.description}`} />)}
           </DividedRows>
         </SheetSection>) : <Text style={{ color: palette.muted, paddingHorizontal: 4, ...typeStyle(13) }}>The desktop has not listed any tools.</Text>}
       </CollapsibleSection>

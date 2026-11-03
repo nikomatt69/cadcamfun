@@ -54,7 +54,7 @@ export function ActionsPanel({ client, projectId, refreshKey, onDispatch, dispat
       <Dock
         gutter={gutter}
         {...(total > 0 ? { search: { value: query, onChange: setQuery, placeholder: "Search runs" } } : {})}
-        action={{ label: total > 0 ? "Run" : "Run workflows", icon: <Play size={16} color={palette.onAccent} strokeWidth={2.4} fill={palette.onAccent} />, onPress: onDispatch, loading: dispatching }}
+        action={{ label: total > 0 ? "Run" : "Run workflows", icon: <Play size={16} color={palette.onAccent} strokeWidth={2} fill={palette.onAccent} />, onPress: onDispatch, loading: dispatching }}
       />
     </>
   )

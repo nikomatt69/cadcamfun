@@ -62,7 +62,7 @@ export function ListRow({
   const end = trailing ? (
     <View style={{ flexShrink: 0, maxWidth: "42%" }}>{trailing}</View>
   ) : selected === true && selectionMark === "check" ? (
-    <Check size={18} color={palette.accent} strokeWidth={2.4} />
+    <Check size={18} color={palette.accent} strokeWidth={2} />
   ) : null
   const chevron = !trailing && selected !== true && (showChevron ?? Boolean(onPress))
     ? <ChevronRight size={16} color={palette.muted} strokeWidth={2} />

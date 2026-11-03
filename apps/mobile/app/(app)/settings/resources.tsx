@@ -96,7 +96,7 @@ export default function ResourcesScreen() {
         <Dock
           gutter={gutter}
           search={{ value: search, onChange: setSearch, placeholder: `Search ${current.label.toLowerCase()}` }}
-          action={{ label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />, onPress: create }}
+          action={{ label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2} />, onPress: create }}
         />
       </KeyboardAvoidingView>
     </ScreenFrame>

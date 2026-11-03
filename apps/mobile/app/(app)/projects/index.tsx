@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { useRouter } from "expo-router"
-import { ArrowRight, Check, Folder, FolderOpen, Funnel, Pencil, Search, Sparkles, Tag, Trash2 } from "lucide-react-native"
+import { ArrowRight, Check, Folder, FolderOpen, Funnel, MessageSquareText, Pencil, Search, Tag, Trash2 } from "lucide-react-native"
 import { assignedTags, matchesTag, tagScope, tagTarget } from "@/lib/list-tags"
 import { useListTags } from "@/lib/use-list-tags"
 import { TagBadges, TagFilter, TagSheet } from "@/components/ui/ListTags"
@@ -167,7 +167,7 @@ export default function ProjectsScreen() {
                  accessibilityHint="Sorts by date or name and filters by date or tag"
                 onPress={() => { haptic("selection"); setOptionsOpen(true) }}
               >
-                <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={customised ? palette.ink : "none"} />
+                <Funnel size={18} color={palette.ink} strokeWidth={2} fill={customised ? palette.ink : "none"} />
               </IconCircleButton>
             }
           />
@@ -205,7 +205,7 @@ export default function ProjectsScreen() {
           <DividedRows>
             {PROJECT_SORTS.map((item) => (
               <ListRow key={item.id} title={item.label} subtitle={item.description} selected={item.id === sort} showChevron={false}
-                trailing={item.id === sort ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+                trailing={item.id === sort ? <Check size={18} color={palette.ink} strokeWidth={2} /> : undefined}
                 onPress={() => { if (item.id !== sort) haptic("selection"); setSort(item.id) }} />
             ))}
           </DividedRows>
@@ -214,7 +214,7 @@ export default function ProjectsScreen() {
           <DividedRows>
             {PROJECT_FILTERS.map((item) => (
               <ListRow key={item.id} title={item.label} subtitle={item.description} selected={item.id === filter} showChevron={false}
-                trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+                trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2} /> : undefined}
                 onPress={() => { if (item.id !== filter) haptic("selection"); setFilter(item.id) }} />
             ))}
           </DividedRows>
@@ -226,7 +226,7 @@ export default function ProjectsScreen() {
         {actionsFor ? (
           <DividedRows>
             <ChoiceRow icon={ArrowRight} title="Open project" description="History, pull requests and the workspace" onPress={() => { const target = actionsFor; afterSheet(() => open(target)) }} />
-            <ChoiceRow icon={Sparkles} title="Ask the assistant" description="Work on this project in the Assistant tab" onPress={() => { const target = actionsFor; setActionsFor(null); askAssistant(target) }} />
+            <ChoiceRow icon={MessageSquareText} title="Ask the assistant" description="Work on this project in the Assistant tab" onPress={() => { const target = actionsFor; setActionsFor(null); askAssistant(target) }} />
             <ChoiceRow icon={Pencil} title="Rename" description="Change the name on the desktop too" onPress={() => { const target = actionsFor; afterSheet(() => void rename(target)) }} />
             <ChoiceRow icon={Tag} title="Tags" description="Set colors and labels for this project" onPress={() => { setTaggingTarget(tagTarget("project", actionsFor.id)); afterSheet(() => setTagsOpen(true)) }} />
             <ChoiceRow icon={Trash2} destructive title="Delete" description="Removes the project from the desktop" onPress={() => { const target = actionsFor; afterSheet(() => void remove(target)) }} />

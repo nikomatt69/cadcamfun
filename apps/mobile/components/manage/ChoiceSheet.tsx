@@ -52,7 +52,7 @@ export function ChoiceSheet({ open, onClose, title, groups, footer }: {
                   trailing={option.count !== undefined || selected ? (
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                       {option.count !== undefined ? <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(13) }}>{option.count}</Text> : null}
-                      <View style={{ width: 18 }}>{selected ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : null}</View>
+                      <View style={{ width: 18 }}>{selected ? <Check size={18} color={palette.ink} strokeWidth={2} /> : null}</View>
                     </View>
                   ) : undefined}
                   onPress={() => {
