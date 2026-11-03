@@ -348,9 +348,9 @@ html.dark .workspace-page {
 .workspace-page :is(.workspace-button--secondary, .workspace-button--primary) {
   justify-content: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: 28px;
   height: auto;
-  padding: 6px 10px;
+  padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;

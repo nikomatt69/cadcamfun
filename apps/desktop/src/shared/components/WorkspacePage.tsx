@@ -35,8 +35,8 @@ const enter = (y: number, delay: number) =>
  * The shared control set. Every page composes these instead of declaring its own
  * button / field / card strings, so a correction lands everywhere at once.
  */
-export const TOOLBAR_BUTTON = "workspace-button--secondary workstation-toolbar-button inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
-export const TOOLBAR_PRIMARY = "workspace-button--primary inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-transparent bg-blue-600 px-2.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700 disabled:opacity-45"
+export const TOOLBAR_BUTTON = "workspace-button--secondary workstation-toolbar-button inline-flex h-7 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
+export const TOOLBAR_PRIMARY = "workspace-button--primary inline-flex h-7 items-center gap-1.5 rounded-[5px] border border-transparent bg-blue-600 px-2.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700 disabled:opacity-45"
 export const FIELD = "w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
 export const INPUT = "w-full rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-[13px] leading-5 text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
 export const LABEL = "mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300"
@@ -47,9 +47,9 @@ export const CARD = "workspace-card ui-card ui-card-default group flex flex-col 
 export const PANEL = "workspace-panel ui-card ui-card-default"
 export const RAIL_LABEL = "mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400"
 export const BADGE = "workspace-badge"
-export const DANGER_BUTTON = "inline-flex h-[30px] items-center justify-center rounded-[5px] border border-transparent bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-45"
-export const CANCEL_BUTTON = "workspace-button--secondary inline-flex h-[30px] items-center justify-center rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-export const SUBMIT_BUTTON = "workspace-button--primary inline-flex h-[30px] items-center justify-center rounded-[5px] border border-transparent bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-45"
+export const DANGER_BUTTON = "inline-flex h-7 items-center justify-center rounded-[5px] border border-transparent bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-45"
+export const CANCEL_BUTTON = "workspace-button--secondary inline-flex h-7 items-center justify-center rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+export const SUBMIT_BUTTON = "workspace-button--primary inline-flex h-7 items-center justify-center rounded-[5px] border border-transparent bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-45"
 
 export interface WorkspaceTabItem<T extends string = string> {
   readonly id: T

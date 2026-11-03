@@ -57,7 +57,10 @@ html.dark body { background-image: none !important; background-color: #111418; }
 .ui-card::before { display: none; }
 .ui-card-holographic, .ui-card-gradient { background-image: none !important; }
 .ui-card-interactive:hover, .ui-card:hover, .ui-btn:hover, .ui-icon-btn:hover { transform: none !important; }
-.ui-glow, .ui-dots { display: none; }
+.ui-glow { display: none; }
+/* The thinking dots mark a real wait (the assistant is running), so they stay: a calm opacity fade in place of the bounce. */
+@keyframes ui-dot-fade { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+.ui-dots > span { width: 6px; height: 6px; animation-name: ui-dot-fade; }
 .ui-status-dot-pulse { animation: none; }
 /* Removing the gradient must keep a solid backdrop for the white label. */
 .ui-btn-primary {

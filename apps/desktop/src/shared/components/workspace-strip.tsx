@@ -16,14 +16,18 @@ import { describeSave } from "../../features/projects/lib/save-status.ts"
 const HIDE = { md: "hidden md:flex", lg: "hidden lg:flex", xl: "hidden xl:flex", "2xl": "hidden 2xl:flex" } as const
 export type HideBelow = keyof typeof HIDE
 
+/**
+ * Colour means status here: green is ok, amber needs attention, red is an error, blue is work in progress (the accent).
+ * `cyan` and `purple` stay accepted so callers compile, but they were decoration and now read as the neutral value ink.
+ */
 const TONES = {
   neutral: "text-gray-200",
   blue: "text-blue-300",
   green: "text-green-300",
   amber: "text-amber-300",
   red: "text-red-400",
-  cyan: "text-cyan-300",
-  purple: "text-purple-300",
+  cyan: "text-gray-200",
+  purple: "text-gray-200",
   muted: "text-gray-500"
 } as const
 export type Tone = keyof typeof TONES
@@ -132,9 +136,9 @@ export function ShellSegs(): JSX.Element {
   return (
     <>
       <SaveSeg />
-      <Seg label={t("cam.units")} value={UNIT_TABLE[settings().units].label} tone="amber" testId="status-units" />
-      <Seg label={t("status.tolerance")} value={formatLength(settings().tolerance, settings().units, settings().decimals)} tone="cyan" title={t("status.toleranceTitle")} testId="status-tolerance" />
-      <Seg label={t("status.snap")} value={settings().snapEnabled ? t("shell.snapOn") : t("status.snapOff")} tone={settings().snapEnabled ? "green" : "muted"} hideBelow="md" testId="status-snap" />
+      <Seg label={t("cam.units")} value={UNIT_TABLE[settings().units].label} testId="status-units" />
+      <Seg label={t("status.tolerance")} value={formatLength(settings().tolerance, settings().units, settings().decimals)} title={t("status.toleranceTitle")} testId="status-tolerance" />
+      <Seg label={t("status.snap")} value={settings().snapEnabled ? t("shell.snapOn") : t("status.snapOff")} tone={settings().snapEnabled ? "neutral" : "muted"} hideBelow="md" testId="status-snap" />
       <Seg label={t("status.sidecar")} value={t(sidecarKey(app.sidecar()))} tone={ready() ? "green" : "red"} testId="status-sidecar" />
     </>
   )
