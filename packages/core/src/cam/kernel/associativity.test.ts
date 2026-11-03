@@ -70,6 +70,11 @@ describe("programStatus: current, stale with a class, unknown with a reason", ()
     // Settings that were not given are not compared.
     expect(status([plate, boss], [plate, boss])).toMatchObject({ status: "current" })
   })
+  test("the stock block is not the part: moving it is not a model change", () => {
+    const stock = { id: "stock", type: "workpiece", x: 0, y: 0, z: 0, width: 50, height: 50, depth: 10 }
+    expect(status([plate, stock], [plate, { ...stock, width: 60 }])).toEqual({ status: "current", displayOnly: [] })
+    expect(status([plate, boss], [plate, boss, stock])).toEqual({ status: "current", displayOnly: [] })
+  })
   test("a legacy program, a request without elements and unreadable input are unknown with the reason, never current", () => {
     expect(programStatus({}, { elements: [plate] })).toMatchObject({ status: "unknown" })
     expect(programStatus({ request: { schemaVersion: 1 } }, { elements: [plate] })).toMatchObject({ status: "unknown", reason: expect.stringContaining("embed") })

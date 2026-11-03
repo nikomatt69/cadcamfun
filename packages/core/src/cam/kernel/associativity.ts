@@ -151,15 +151,20 @@ const delta = (from: Vec, to: Vec): Vec => ({ x: to.x - from.x, y: to.y - from.y
 export const programStatus = (stored: { readonly request?: unknown }, current: CurrentPart): ProgramStatus => {
   const request = stored.request
   if (!isRecord(request)) return { status: "unknown", reason: "the program has no stored request: only a program the CAM kernel generated from the drawing can be compared with it" }
-  const kept = request["elements"]
-  if (!Array.isArray(kept) || kept.length === 0 || !kept.every(isRecord)) {
+  const keptAll = request["elements"]
+  if (!Array.isArray(keptAll) || keptAll.length === 0 || !keptAll.every(isRecord)) {
     return { status: "unknown", reason: "the stored request does not embed the elements it was made from, so there is nothing to compare the drawing with" }
   }
   if (!Array.isArray(current.elements) || !current.elements.every(isRecord)) return { status: "unknown", reason: "the drawing's elements could not be read" }
+  // The stock block is not the part: moving or resizing it is a stock change (a setting), never a model change.
+  const isPart = (e: Fields): boolean => e["type"] !== "workpiece"
+  const kept = (keptAll as ReadonlyArray<Fields>).filter(isPart)
+  const currentElements = current.elements.filter(isPart)
+  if (kept.length === 0) return { status: "unknown", reason: "the stored request holds no part element, only stock" }
   let before: PartFingerprint, after: PartFingerprint
   try {
     before = partFingerprint(kept)
-    after = partFingerprint(current.elements)
+    after = partFingerprint(currentElements)
   } catch (cause) {
     return { status: "unknown", reason: `the elements cannot be fingerprinted: ${cause instanceof Error ? cause.message : String(cause)}` }
   }
@@ -181,13 +186,13 @@ export const programStatus = (stored: { readonly request?: unknown }, current: C
   let move: Vec | undefined
   if (added.length > 0 || removed.length > 0) {
     cls = "topology"
-    if (added.length > 0) reasons.push(`${added.length} element${added.length === 1 ? "" : "s"} added to the drawing`)
+    if (added.length > 0) reasons.push(`${added.length} element${added.length === 1 ? "" : "s"} in the drawing that the program was not made from (a program made from a selection does not use them)`)
     if (removed.length > 0) reasons.push(`${removed.length} element${removed.length === 1 ? "" : "s"} removed from the drawing`)
     if (changed.length > 0) reasons.push(`${changed.length} element${changed.length === 1 ? "" : "s"} changed`)
   } else if (changed.length > 0) {
     // Rigid: every element moved, none changed shape, and all by one translation.
     const byKey = (list: ReadonlyArray<Fields>): Map<string, Fields> => new Map(list.map((e, i) => [keyOf(e, i), e] as const))
-    const oldBy = byKey(kept as ReadonlyArray<Fields>), newBy = byKey(current.elements)
+    const oldBy = byKey(kept), newBy = byKey(currentElements)
     let shift: Vec | undefined
     let rigid = changed.length === Object.keys(after.elements).length
     for (const id of changed) {
@@ -217,7 +222,7 @@ export const programStatus = (stored: { readonly request?: unknown }, current: C
   if (cls === undefined) {
     // The fingerprint is the same: list what changed only in display fields.
     const raw = (list: ReadonlyArray<Fields>): Map<string, string> => new Map(list.map((e, i) => [keyOf(e, i), digest(e)] as const))
-    const rawBefore = raw(kept as ReadonlyArray<Fields>), rawAfter = raw(current.elements)
+    const rawBefore = raw(kept), rawAfter = raw(currentElements)
     const displayOnly = [...rawAfter].filter(([id, d]) => rawBefore.get(id) !== undefined && rawBefore.get(id) !== d).map(([id]) => id).sort()
     return { status: "current", displayOnly }
   }
