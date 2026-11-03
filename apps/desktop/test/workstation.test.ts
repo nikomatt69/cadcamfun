@@ -16,8 +16,8 @@ test("CAD and CAM use the same quick navigation component", async () => {
 test("workstation tabs share glass selection and preserve narrow-window stage space", async () => {
   const css = await source("styles/workstation.css")
   expect(css).toContain(".workstation-workspace-tabs) button[aria-pressed=\"true\"]")
-  expect(css).toContain("border-bottom-color: #007acc")
-  expect(css).toContain("border-radius: 5px 5px 0 0")
+  expect(css).toContain("border-bottom-color: var(--ent-accent)")
+  expect(css).toContain("border-radius: var(--ent-control-radius) var(--ent-control-radius) 0 0")
   expect(css).toContain("min-width: 320px")
   expect(css).toContain(".workstation-row-actions:focus-within button")
 })

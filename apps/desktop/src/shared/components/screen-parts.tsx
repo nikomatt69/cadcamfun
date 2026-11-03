@@ -26,13 +26,13 @@ export interface ScreenHeaderProps {
  */
 export function ScreenHeader(props: ScreenHeaderProps): JSX.Element {
   return (
-    <header class="flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-gray-200 px-6 py-5 dark:border-gray-700">
+    <header class="flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-[color:var(--ent-line)] px-6 py-4">
       <div class="min-w-0">
-        <h1 class="text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-gray-900 dark:text-gray-50">
+        <h1 class="text-[15px] font-semibold leading-[21px] tracking-[-0.008em] text-[color:var(--ent-text)]">
           {props.title}
         </h1>
         <Show when={props.subtitle !== undefined}>
-          <p class="mt-1 max-w-prose text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          <p class="mt-1 max-w-prose text-xs leading-[17px] text-[color:var(--ent-text-muted)]">
             {props.subtitle}
           </p>
         </Show>
@@ -91,7 +91,7 @@ export function EmptyState(props: {
       >
         <div class="empty-state__preview">{props.scene}</div>
       </Show>
-      <p class="px-6 py-6 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">{props.label}</p>
+      <p class="px-6 py-6 text-center text-xs leading-[17px] text-[color:var(--ent-text-muted)]">{props.label}</p>
       <Show when={props.action !== undefined}><div class="empty-state__action">{props.action}</div></Show>
     </div>
   )

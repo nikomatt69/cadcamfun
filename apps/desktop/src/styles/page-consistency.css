@@ -1,7 +1,7 @@
 /* ==========================================================================
    Page consistency — the shell's page surface follows the workstation panel
-   language: flat 1 px borders, a 5 px radius scale, 12 px type and the single
-   blue accent. Kept separate from `reference-shell.css` because it also
+   language: flat 1 px borders, a 5 px control radius and 8 px surfaces, 28 px
+   controls, 12 px type and the single blue accent. Kept separate from `reference-shell.css` because it also
    normalizes the bespoke controls the ported pages still carry.
    ========================================================================== */
 
@@ -17,11 +17,11 @@
 
 :is(.reference-page-container, .reference-standalone-container) {
   min-width: 0;
-  --ui-radius-sm: 5px;
-  --ui-radius-md: 5px;
-  --ui-radius-lg: 5px;
-  --ui-radius-xl: 5px;
-  --ui-radius-2xl: 5px;
+  --ui-radius-sm: var(--ent-control-radius);
+  --ui-radius-md: var(--ent-control-radius);
+  --ui-radius-lg: var(--ent-radius);
+  --ui-radius-xl: var(--ent-radius);
+  --ui-radius-2xl: var(--ent-radius);
 }
 
 .reference-page-container {
@@ -32,7 +32,7 @@
 }
 
 .reference-page-container :is(.form-input, .form-select, .btn) {
-  min-height: 30px;
+  min-height: var(--ent-control-h);
   padding: 4px 8px;
   font-size: 12px;
   line-height: 18px;
@@ -58,7 +58,7 @@
   padding: 4px;
   overflow-x: auto;
   border: 1px solid var(--page-border);
-  border-radius: 5px;
+  border-radius: var(--ent-radius);
   background: var(--page-subtle);
   scrollbar-width: none;
 }
@@ -75,11 +75,11 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 28px;
+  min-height: var(--ent-control-h);
   padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: 2px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--ent-control-radius);
   background: transparent;
   color: var(--shell-muted);
   font-size: 12px;
@@ -87,7 +87,7 @@
   line-height: 18px;
   white-space: nowrap;
   box-shadow: none;
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background-color 120ms var(--ent-ease), color 120ms var(--ent-ease), border-color 120ms var(--ent-ease);
 }
 
 .reference-page-container nav > button[aria-pressed="true"],
@@ -110,7 +110,7 @@
   .reference-page-container .ui-tabs-list > button:hover {
     border-color: transparent;
     border-bottom-color: var(--page-border-strong);
-    border-radius: 4px;
+    border-radius: var(--ent-control-radius);
     background: var(--shell-hover);
     color: var(--shell-text);
     backdrop-filter: none;
@@ -129,7 +129,7 @@
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(.ui-card, .card, .glass-panel) {
-  border-radius: 5px;
+  border-radius: var(--ent-radius);
   border-color: var(--page-border);
   box-shadow: none;
   backdrop-filter: none;
@@ -144,7 +144,7 @@
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(button, .btn, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
-  border-radius: 5px;
+  border-radius: var(--ent-control-radius);
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(.btn, .ui-button) {

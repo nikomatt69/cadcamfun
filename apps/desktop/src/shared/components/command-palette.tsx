@@ -132,7 +132,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
 
   return (
     <div
-      class="ui-palette-scrim fixed inset-0 z-[1060] flex items-start justify-center bg-black/40 pt-24"
+      class="ui-palette-scrim fixed inset-0 z-[1060] flex items-start justify-center bg-[color:var(--ent-scrim)] pt-24"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) props.onClose()
@@ -140,18 +140,18 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
     >
       <div
         ref={(element) => { dialog = element }}
-        class="ui-palette-panel card w-full max-w-xl"
+        class="ui-palette-panel ent-float overflow-hidden w-full max-w-xl"
         role="dialog"
         aria-modal="true"
         aria-label={t("palette.title")}
         tabIndex={-1}
         onKeyDown={onDialogKeyDown}
       >
-        <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-          <Search size={16} aria-hidden="true" class="text-gray-500" />
+        <div class="flex items-center gap-2 border-b border-[color:var(--ent-line)] px-3 py-2">
+          <Search size={16} aria-hidden="true" class="text-[color:var(--ent-text-faint)]" />
           <input
             id={inputId}
-            class="w-full bg-transparent text-sm outline-none"
+            class="w-full bg-transparent text-[13px] text-[color:var(--ent-text)] outline-none placeholder:text-[color:var(--ent-text-faint)]"
             type="text"
             role="combobox"
             aria-expanded={results().length > 0}
@@ -170,7 +170,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
           />
           <button
             type="button"
-            class="rounded p-1 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700"
+            class="rounded-[5px] p-1 text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ent-accent)]"
             aria-label={t("common.close")}
             onClick={() => props.onClose()}
           >
@@ -180,7 +180,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
 
         <Show
           when={results().length > 0}
-          fallback={<p class="px-3 py-6 text-center text-sm text-gray-500">{t("palette.empty")}</p>}
+          fallback={<p class="px-3 py-6 text-center text-xs text-[color:var(--ent-text-muted)]">{t("palette.empty")}</p>}
         >
           <ul id={`${inputId}-list`} role="listbox" aria-label={t("palette.title")} class="max-h-80 overflow-y-auto py-1">
             <For each={results()}>
@@ -191,20 +191,20 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
                     id={`${inputId}-opt-${index()}`}
                     role="option"
                     aria-selected={index() === highlight()}
-                    class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm"
+                    class="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-xs text-[color:var(--ent-text)]"
                     classList={{
-                      "bg-blue-50 dark:bg-blue-900/40": index() === highlight(),
-                      "hover:bg-gray-100 dark:hover:bg-gray-700": index() !== highlight()
+                      "bg-[color:var(--ent-accent-soft)]": index() === highlight(),
+                      "hover:bg-[color:var(--ent-hover)]": index() !== highlight()
                     }}
                     onMouseEnter={() => setHighlight(index())}
                     onClick={() => runAt(index())}
                   >
                     <span>
-                      <span class="mr-2 text-xs uppercase text-gray-500">{command.group}</span>
+                      <span class="mr-2 text-[11px] text-[color:var(--ent-text-faint)]">{command.group}</span>
                       {command.label}
                     </span>
                     <Show when={command.keys !== undefined}>
-                      <kbd class="text-xs text-gray-500">{command.keys}</kbd>
+                      <kbd class="text-[11px] text-[color:var(--ent-text-faint)]">{command.keys}</kbd>
                     </Show>
                   </button>
                 </li>
@@ -213,7 +213,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
           </ul>
         </Show>
 
-        <p class="border-t border-gray-200 px-3 py-2 text-xs text-gray-500 dark:border-gray-700">
+        <p class="border-t border-[color:var(--ent-line)] px-3 py-2 text-[11px] text-[color:var(--ent-text-faint)]">
           {t("palette.hint")}
         </p>
       </div>

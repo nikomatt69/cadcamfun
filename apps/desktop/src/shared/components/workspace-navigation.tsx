@@ -78,31 +78,31 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
     const hasChildren = () => (entry.item.children?.length ?? 0) > 0
     const isExpanded = () => hasChildren() && !!expanded()[entry.item.id]
     return (
-      <div class="rounded-xl">
+      <div>
         <button type="button"
           aria-expanded={hasChildren() ? isExpanded() : undefined}
-          class={`group flex rounded-xl items-center justify-center px-1 py-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${entry.item.current ? "text-blue-700 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"} ${entry.item.current ? "bg-gray-100 dark:bg-blue-900/20" : "hover:bg-gray-100 dark:hover:bg-gray-800/60"}`}
+          class={`group flex items-center justify-center px-1 py-1 text-xs font-medium rounded-[5px] cursor-pointer transition-colors ${entry.item.current ? "text-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-hover)]"}`}
           onClick={() => {
             if (hasChildren()) setExpanded((previous) => ({ ...previous, [entry.item.id]: !previous[entry.item.id] }))
             else if (entry.item.href !== "#") go(entry.item.href)
           }}
         >
-          <div class="flex rounded-xl items-center">
-            <span class={`${entry.item.current ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"} mr-3`}>{entry.item.icon}</span>
+          <div class="flex items-center">
+            <span class={`${entry.item.current ? "text-[color:var(--ent-accent)]" : "text-[color:var(--ent-text-faint)]"} mr-3`}>{entry.item.icon}</span>
             <Show when={props.isOpen}><span>{entry.item.name}</span></Show>
           </div>
           <Show when={props.isOpen && hasChildren()}>
-            <div class="rounded-xl ml-2"><Show when={isExpanded()} fallback={<ChevronDown size={16} />}><ChevronUp size={16} /></Show></div>
+            <div class="ml-2"><Show when={isExpanded()} fallback={<ChevronDown size={16} />}><ChevronUp size={16} /></Show></div>
           </Show>
         </button>
         <Show when={props.isOpen && isExpanded()}>
-          <div class="ml-3 rounded-xl space-y-1">
+          <div class="ml-3 space-y-1">
             <For each={entry.item.children}>{(child) =>
                <button type="button"
-                class={`group flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer ${child.current ? "text-blue-700 dark:text-blue-400 bg-gray-100 dark:bg-blue-900/20" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/60"}`}
+                class={`group flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-[5px] cursor-pointer ${child.current ? "text-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-hover)]"}`}
                 onClick={() => go(child.href)}
               >
-                <span class="mr-3 text-gray-500 dark:text-gray-400">{child.icon}</span>
+                <span class="mr-3 text-[color:var(--ent-text-faint)]">{child.icon}</span>
                 <span>{child.name}</span>
                </button>}
             </For>
@@ -114,15 +114,15 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
 
 
   return (
-      <div class="workstation-navigation border-t border-gray-200 dark:border-gray-700">
+      <div class="workstation-navigation border-t border-[color:var(--ent-line)]">
         <button type="button"
           onClick={() => setDropdown(!dropdown())}
           aria-label={t("cad.quickNavigation")}
           aria-expanded={dropdown()}
-          class="btn btn-outline flex min-h-8 w-full items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium"
+          class="btn btn-outline flex w-full items-center justify-center gap-2 px-3 text-xs font-medium"
         >
           <span>{props.isOpen ? t("cad.quickNavigation") : ""}</span>
-          <Motion.svg class={`w-4 h-4 text-gray-500 ${props.isOpen ? "ml-2" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" animate={{ rotate: dropdown() ? 180 : 0 }} transition={{ duration: 0.3 }}>
+          <Motion.svg class={`w-4 h-4 text-[color:var(--ent-text-faint)] ${props.isOpen ? "ml-2" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" animate={{ rotate: dropdown() ? 180 : 0 }} transition={{ duration: 0.3 }}>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </Motion.svg>
         </button>

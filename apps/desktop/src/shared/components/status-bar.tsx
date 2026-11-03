@@ -41,7 +41,7 @@ export interface ActivityBarProps {
 export function ActivityBar(props: ActivityBarProps): JSX.Element {
   return (
     <nav
-      class="flex w-16 shrink-0 flex-col items-center gap-1 border-r rounded-b-lg border-gray-200 bg-white py-2 dark:border-gray-700 dark:bg-gray-800"
+      class="flex w-16 shrink-0 flex-col items-center gap-1 border-r rounded-b-lg border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] py-2"
       aria-label={t("activity.label")}
     >
       <For each={ACTIVITIES}>
@@ -51,10 +51,10 @@ export function ActivityBar(props: ActivityBarProps): JSX.Element {
           return (
             <button
               type="button"
-              class="flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              class="flex w-14 flex-col items-center gap-0.5 rounded-[5px] px-1 py-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ent-accent)]"
               classList={{
-                "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300": selected(),
-                "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700": !selected()
+                "bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]": selected(),
+                "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-hover)]": !selected()
               }}
               aria-current={selected() ? "page" : undefined}
               title={t(activity.labelKey as Key)}
@@ -104,7 +104,7 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
   }
   return (
     <footer
-      class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t rounded-b-lg border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+      class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t rounded-b-lg border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 text-xs text-[color:var(--ent-text-muted)]"
       aria-label={t("status.label")}
     >
       <span>

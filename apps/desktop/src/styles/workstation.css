@@ -1,16 +1,9 @@
+/* `--workspace-panel` and `--workspace-border` come from the shared tokens (ui.css); only the control corner is set here. */
 .cad-workspace,
 .cam-workspace {
-  --workspace-panel: #fff;
-  --workspace-border: #d5dde5;
-  --workstation-radius: 5px;
+  --workstation-radius: var(--ent-control-radius);
   font-size: 12px;
   line-height: 1.4;
-}
-
-html.dark .cad-workspace,
-html.dark .cam-workspace {
-  --workspace-panel: #1b232c;
-  --workspace-border: #35414d;
 }
 
 :is(.cad-workspace, .cam-workspace) .workstation-toolbar {
@@ -45,10 +38,10 @@ html.dark .cam-workspace {
 
 .workstation-toolbar :is(button, a, label.btn) {
   flex-shrink: 0;
-  min-height: 30px;
-  height: 30px;
+  min-height: var(--ent-control-h);
+  height: var(--ent-control-h);
   box-sizing: border-box;
-  padding: 5px 8px;
+  padding: 4px 8px;
   margin-left: 0;
   margin-right: 0;
   border-radius: var(--workstation-radius);
@@ -56,7 +49,7 @@ html.dark .cam-workspace {
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms var(--ent-ease), color 120ms var(--ent-ease);
 }
 
 .workstation-toolbar .text-sm { font-size: 12px; }
@@ -137,55 +130,32 @@ html.dark .cam-workspace {
 :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button {
   min-width: 0;
   padding: 7px 6px;
-  border-radius: 5px 5px 0 0;
+  border-radius: var(--ent-control-radius) var(--ent-control-radius) 0 0;
   box-shadow: none;
   font-size: 12px;
   line-height: 16px;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms var(--ent-ease), color 120ms var(--ent-ease);
   border: 1px solid transparent;
   border-bottom: 2px solid transparent;
-  color: #6b7280;
+  color: var(--ent-text-muted);
   background: transparent;
-  backdrop-filter: blur(8px);
 }
 
+/* The active tab: the accent underline on a soft accent fill, in light and dark alike. */
 :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"] {
-  color: #007acc;
-  background: rgba(239, 246, 255, 0.8);
-  border-bottom-color: #007acc;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 3px rgba(30, 45, 60, 0.08);
+  color: var(--ent-accent);
+  background: var(--ent-accent-soft);
+  border-bottom-color: var(--ent-accent);
 }
-html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"] {
-  color: #60a5fa;
-  background: rgba(30, 58, 138, 0.3);
-  border-bottom-color: #60a5fa;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]) { color: #9ca3af; }
 :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):focus-visible {
-  background: rgba(75, 85, 99, 0.12);
-  border-color: rgba(107, 114, 128, 0.45);
-  border-radius: 5px 5px 0 0;
+  background: var(--ent-hover);
+  border-color: var(--ent-line-strong);
 }
 @media (hover: hover) and (pointer: fine) {
-  :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"]:hover {
-    border-radius: 5px 5px 0 0;
-    border-color: rgba(148, 163, 184, 0.35);
-    border-bottom-color: #007acc;
-    background: rgba(239, 246, 255, 0.8);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-  }
-  html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"]:hover {
-    background: rgba(30, 58, 138, 0.3);
-    border-bottom-color: #60a5fa;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 30px rgba(0, 0, 0, 0.4);
-  }
   :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):hover {
-    background: rgba(75, 85, 99, 0.12);
-    border-color: rgba(107, 114, 128, 0.45);
-    border-radius: 5px 5px 0 0;
+    background: var(--ent-hover);
+    border-color: var(--ent-line);
+    color: var(--ent-text);
   }
 }
 
@@ -260,7 +230,7 @@ html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace
 .workstation-browser-row--cad > .workstation-row-actions { grid-column: 4; grid-row: 1 / span 2; }
 
 :is(.cad-workspace, .cam-workspace) :is(button, a, input, select, textarea, [role="button"]):focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--ent-accent);
   outline-offset: 2px;
 }
 
@@ -391,7 +361,7 @@ html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace
 @container (min-width: 640px) { .machine-cycles-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 
 /* The tool window stays inside the canvas; only its content scrolls. */
-.cad-floating-toolbar { display: flex; flex-direction: column; width: min(340px, calc(100% - 16px)); max-height: min(440px, calc(100% - 16px)); min-width: 0; overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 8px; background: var(--workspace-panel); color: inherit; box-shadow: 0 4px 16px #0002; }
+.cad-floating-toolbar { display: flex; flex-direction: column; width: min(340px, calc(100% - 16px)); max-height: min(440px, calc(100% - 16px)); min-width: 0; overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 8px; background: var(--workspace-panel); color: inherit; box-shadow: var(--ent-shadow-float); }
 .cad-floating-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; min-height: 32px; padding: 4px 8px; border-bottom: 1px solid var(--workspace-border); touch-action: none; user-select: none; }
 .cad-floating-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .cad-floating-tabs { display: flex; gap: 4px; padding: 6px; flex-shrink: 0; border-bottom: 1px solid var(--workspace-border); }

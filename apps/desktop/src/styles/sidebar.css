@@ -118,7 +118,7 @@
 
 .sidebar-layer-add { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; padding: 8px 0; }
 
-.sidebar-element-form.panel { border: 1px solid var(--panel-border-strong); border-radius: 6px; background: var(--panel-bg); box-shadow: 0 8px 30px #0002; }
+.sidebar-element-form.panel { border: 1px solid var(--panel-border-strong); border-radius: 6px; background: var(--panel-bg); box-shadow: var(--ent-shadow-float); }
 .sidebar-element-form .panel-input { height: 28px; }
 .sidebar-browser .workstation-browser-row--cam { display: grid; grid-template-columns: 14px 16px minmax(0, 1fr) auto; gap: 2px 5px; }
 .sidebar-browser .workstation-browser-row--cam > button { grid-column: 1; grid-row: 1 / span 3; margin: 0; }

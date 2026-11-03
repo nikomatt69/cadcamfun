@@ -5,42 +5,16 @@
    ======================================================================== */
 
 
-:root {
-  --ui-radius-sm: 0.375rem;
-  --ui-radius-md: 0.5rem;
-  --ui-radius-lg: 0.75rem;
-  --ui-radius-xl: 1rem;
-  --ui-radius-2xl: 1.25rem;
-  --ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --ui-shadow-md: 0 2px 6px rgba(15, 23, 42, 0.08);
-  --ui-shadow-lg: 0 8px 20px rgba(15, 23, 42, 0.12);
-  --ui-ring: 0 0 0 2px rgba(37, 99, 235, 0.35);
-  /* No overshoot: every curve decelerates and settles. */
-  --ui-spring: cubic-bezier(0.2, 0, 0, 1);
-  --ui-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --ui-press-duration: 60ms;
-  --ui-release-duration: 120ms;
-}
+/* The shared radius, shadow, ring and easing tokens are declared once, in `ui.css` (`:root`); this file no longer redeclares them. */
 
-/* ---- Dark shell: slate, not purple ---- */
-.dark .reference-shell {
-  --shell-chrome: #181c22;
-  --shell-border: #2a303a;
-  --shell-button: #1e232b;
-  --shell-hover: #232933;
-  --shell-active: #1c2a44;
-  --shell-active-border: #2c4270;
-  --shell-popover: #1e232b;
-  --shell-page: #111418;
-  background: #111418;
-}
-.dark .reference-avatar { background: #1e293b; }
-html.dark body { background-image: none !important; background-color: #111418; }
+/* ---- Dark shell: slate, not purple (the `--shell-*` palette is aliased to `--ent-*` in reference-shell.css) ---- */
+html.dark body { background-image: none !important; background-color: var(--ent-page); }
 
 /* ---- Chrome ---- */
 .reference-navbar { box-shadow: 0 1px 0 var(--shell-border); }
 .reference-icon-button { box-shadow: none; }
-.reference-popover { box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14); }
+.reference-popover { box-shadow: var(--ent-shadow-float); }
+.dark .reference-shell .reference-popover { border-color: var(--shell-border-strong); }
 /* Press feedback is deliberately kept, not removed: it is the cheapest and most
    reliable "the interface heard me" signal (Apple: respond on pointer-down; Emil:
    scale on :active). What this pass calms down is the amount — 3% of travel, fast
@@ -53,22 +27,15 @@ html.dark body { background-image: none !important; background-color: #111418; }
   transition-timing-function: var(--ui-ease-out);
 }
 
-/* ---- Cards and controls: no shimmer, holographic tint, glow, lift or pulse ---- */
+/* ---- Cards and controls: no shimmer, holographic tint, glow, lift or pulse ----
+   (`ui.css` already draws cards and buttons flat; these are the remaining decorative effects.) */
 .ui-card::before { display: none; }
-.ui-card-holographic, .ui-card-gradient { background-image: none !important; }
 .ui-card-interactive:hover, .ui-card:hover, .ui-btn:hover, .ui-icon-btn:hover { transform: none !important; }
 .ui-glow { display: none; }
 /* The thinking dots mark a real wait (the assistant is running), so they stay: a calm opacity fade in place of the bounce. */
 @keyframes ui-dot-fade { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-.ui-dots > span { width: 6px; height: 6px; animation-name: ui-dot-fade; }
+.ui-dots > span { animation-name: ui-dot-fade; }
 .ui-status-dot-pulse { animation: none; }
-/* Removing the gradient must keep a solid backdrop for the white label. */
-.ui-btn-primary {
-  --ui-btn-bg: #205bc2;
-  --ui-btn-fg: #fff;
-  background-color: #205bc2;
-  background-image: none !important;
-}
 
 /* ---- Dashboard hero: the glow behind the card is dropped, the rest stays ---- */
 .dashboard-hero-glow { display: none !important; }

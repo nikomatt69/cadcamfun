@@ -35,21 +35,26 @@ const enter = (y: number, delay: number) =>
  * The shared control set. Every page composes these instead of declaring its own
  * button / field / card strings, so a correction lands everywhere at once.
  */
-export const TOOLBAR_BUTTON = "workspace-button--secondary workstation-toolbar-button inline-flex h-7 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
-export const TOOLBAR_PRIMARY = "workspace-button--primary inline-flex h-7 items-center gap-1.5 rounded-[5px] border border-transparent bg-blue-600 px-2.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700 disabled:opacity-45"
-export const FIELD = "w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
-export const INPUT = "w-full rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-[13px] leading-5 text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
-export const LABEL = "mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300"
-export const ICON_BUTTON = "inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+const CONTROL = "inline-flex h-7 items-center rounded-[5px] border text-xs font-medium transition-colors duration-150 disabled:opacity-45"
+const SECONDARY = "border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)] hover:text-[color:var(--ent-text)]"
+const PRIMARY = "border-transparent bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]"
+const FIELD_BASE = "w-full min-h-7 rounded-[5px] border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-2.5 py-1 text-xs leading-[18px] text-[color:var(--ent-text)] outline-none transition-colors placeholder:text-[color:var(--ent-text-faint)] focus:border-[color:var(--ent-accent)] focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ent-accent)_22%,transparent)] disabled:bg-[color:var(--ent-surface-subtle)] disabled:text-[color:var(--ent-text-faint)]"
+export const TOOLBAR_BUTTON = `workspace-button--secondary workstation-toolbar-button ${CONTROL} gap-1.5 px-2.5 ${SECONDARY}`
+export const TOOLBAR_PRIMARY = `workspace-button--primary ${CONTROL} gap-1.5 px-2.5 ${PRIMARY}`
+export const FIELD = FIELD_BASE
+/** The same field as `FIELD`: one control height across the app (the larger variant was a second size nobody needed). */
+export const INPUT = FIELD_BASE
+export const LABEL = "mb-1 block text-[11px] font-medium text-[color:var(--ent-text-muted)]"
+export const ICON_BUTTON = "inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-[color:var(--ent-text-muted)] transition-colors duration-150 hover:bg-[color:var(--ent-surface-inset)] hover:text-[color:var(--ent-text)] disabled:opacity-40"
 /** Card surface — flat and bordered; workspace tokens own the radius. */
 export const CARD = "workspace-card ui-card ui-card-default group flex flex-col overflow-hidden !p-0 transition-colors duration-150"
 /** Panel surface — uses the same workspace tokens as the toolbar and cards. */
 export const PANEL = "workspace-panel ui-card ui-card-default"
-export const RAIL_LABEL = "mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400"
+export const RAIL_LABEL = "mb-1 block text-[11px] font-medium text-[color:var(--ent-text-muted)]"
 export const BADGE = "workspace-badge"
-export const DANGER_BUTTON = "inline-flex h-7 items-center justify-center rounded-[5px] border border-transparent bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-45"
-export const CANCEL_BUTTON = "workspace-button--secondary inline-flex h-7 items-center justify-center rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-export const SUBMIT_BUTTON = "workspace-button--primary inline-flex h-7 items-center justify-center rounded-[5px] border border-transparent bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-45"
+export const DANGER_BUTTON = `${CONTROL} justify-center px-3 border-transparent bg-[color:var(--ent-bad-solid)] text-[color:var(--ent-action-text)] hover:brightness-95`
+export const CANCEL_BUTTON = `workspace-button--secondary ${CONTROL} justify-center px-3 ${SECONDARY}`
+export const SUBMIT_BUTTON = `workspace-button--primary ${CONTROL} justify-center px-3 ${PRIMARY}`
 
 export interface WorkspaceTabItem<T extends string = string> {
   readonly id: T
@@ -196,8 +201,8 @@ export function StageEmpty(props: {
       >
         <div class="workspace-empty__preview">{props.scene}</div>
       </Show>
-      <h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{props.title}</h3>
-      <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{props.hint}</p>
+      <h3 class="mb-1 text-[13px] font-semibold text-[color:var(--ent-text)]">{props.title}</h3>
+      <p class="mb-4 text-xs text-[color:var(--ent-text-muted)]">{props.hint}</p>
       <Show when={props.children !== undefined}><div class="workspace-empty__actions">{props.children}</div></Show>
     </div>
   )
@@ -206,8 +211,8 @@ export function StageEmpty(props: {
 /** The neutral banner at the top of a card, with the icon tile and optional corner badges. */
 export function CardBanner(props: { readonly icon: JSX.Element; readonly badge?: string; readonly leftBadge?: string }): JSX.Element {
   return (
-    <div class="relative flex h-[72px] items-center justify-center border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
-      <div class="flex h-9 w-9 items-center justify-center rounded-[5px] border border-slate-200 bg-white text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300">
+    <div class="relative flex h-[72px] items-center justify-center border-b border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)]">
+      <div class="flex h-9 w-9 items-center justify-center rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] text-[color:var(--ent-accent)]">
         {props.icon}
       </div>
       <Show when={props.badge}><span class={`absolute right-2 top-2 ${BADGE}`}>{props.badge}</span></Show>
@@ -239,8 +244,8 @@ export function WorkspaceDetail(props: WorkspaceDetailProps): JSX.Element {
               <ArrowLeft size={16} aria-hidden="true" />
             </A>
             <div class="min-w-0">
-              <h1 class="truncate text-sm font-semibold text-slate-900 dark:text-white">{props.title}</h1>
-              <Show when={props.subtitle}><p class="text-[11px] text-slate-500 dark:text-slate-400">{props.subtitle}</p></Show>
+              <h1 class="ent-header__title truncate">{props.title}</h1>
+              <Show when={props.subtitle}><p class="ent-header__description truncate">{props.subtitle}</p></Show>
             </div>
           </div>
           <Show when={props.actions !== undefined}><div class="workspace-page__actions">{props.actions}</div></Show>

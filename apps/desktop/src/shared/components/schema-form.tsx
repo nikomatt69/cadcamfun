@@ -153,7 +153,7 @@ export function SchemaForm<S extends { readonly Type: unknown }>(props: SchemaFo
               fallback={
                 <div class="flex flex-col gap-1">
                   <span class="form-label">{field.label}</span>
-                  <p class="text-xs text-gray-500">{t("form.unknownField")}</p>
+                  <p class="text-xs text-[color:var(--ent-text-muted)]">{t("form.unknownField")}</p>
                 </div>
               }
             >

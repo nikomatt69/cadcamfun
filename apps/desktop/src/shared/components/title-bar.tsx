@@ -154,7 +154,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
 
   return (
     <header
-      class={`reference-native-titlebar flex shrink-0 items-center gap-1 border-b border-gray-200 bg-white pl-20 pr-2 dark:border-gray-700 dark:bg-gray-800 ${compact() ? "reference-native-titlebar--compact h-8" : "h-11"}`}
+      class={`reference-native-titlebar flex shrink-0 items-center gap-1 border-b border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] pl-20 pr-2 ${compact() ? "reference-native-titlebar--compact h-8" : "h-11"}`}
       data-tauri-drag-region
     >
       <Show when={withMenus()} fallback={
@@ -173,7 +173,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                   <button
                     type="button"
                     ref={(element) => { trigger = element }}
-                    class={`flex items-center gap-1 rounded px-2 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700 ${compact() ? "py-0.5 text-xs" : "py-1 text-sm"}`}
+                    class={`flex items-center gap-1 rounded-[5px] px-2 text-xs text-[color:var(--ent-text)] hover:bg-[color:var(--ent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ent-accent)] ${compact() ? "py-0.5" : "py-1"}`}
                     aria-haspopup="menu"
                     aria-expanded={open() === menu.id}
                     onClick={() => {
@@ -194,7 +194,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                       // Opening moves focus to the first item so the arrow keys
                       // work immediately, whichever way the menu was opened.
                       ref={(element) => queueMicrotask(() => element.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus())}
-                      class="absolute left-0 top-full z-50 mt-1 min-w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                      class="ent-float overflow-hidden absolute left-0 top-full z-50 mt-1 min-w-56 py-1"
                       role="menu"
                       aria-label={t(menu.labelKey)}
                       onKeyDown={(event) => {
@@ -221,7 +221,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                             <button
                               type="button"
                               role="menuitem"
-                              class="flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-gray-700"
+                              class="flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-xs hover:bg-[color:var(--ent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--ent-accent)]"
                               onClick={() => {
                                 setOpen(undefined)
                                 openTrigger = undefined
@@ -232,7 +232,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                             >
                               <span>{t(item.labelKey)}</span>
                               <Show when={acceleratorOf(item) !== undefined}>
-                                <kbd class="text-xs text-gray-500">{acceleratorOf(item)}</kbd>
+                                <kbd class="text-[11px] text-[color:var(--ent-text-faint)]">{acceleratorOf(item)}</kbd>
                               </Show>
                             </button>
                           </li>
@@ -254,7 +254,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
       <Show when={!compact()}>
         <button
           type="button"
-          class="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:hover:bg-gray-700"
+          class="ml-auto flex h-7 items-center gap-2 rounded-[5px] border border-[color:var(--ent-line-strong)] px-2 text-xs text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ent-accent)]"
           aria-label={t("settings.shortcut.palette")}
           aria-keyshortcuts={paletteChord() === undefined ? undefined : "Meta+K Control+K"}
           onClick={() => props.onOpenPalette()}

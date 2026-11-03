@@ -27,19 +27,19 @@ export function BootScreen(props: BootScreenProps): JSX.Element {
 
   return (
     <main
-      class="flex h-screen w-screen items-center justify-center bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
+      class="flex h-screen w-screen items-center justify-center bg-[color:var(--ent-page)] text-[color:var(--ent-text)]"
       aria-busy={!failed()}
       aria-live="polite"
     >
-      <div class="card w-full max-w-md p-6 text-center">
-        <h1 class="text-2xl font-semibold">{t("boot.splashTitle")}</h1>
-        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{t("app.tagline")}</p>
+      <div class="ent-float overflow-hidden w-full max-w-md p-6 text-center">
+        <h1 class="text-xl font-semibold">{t("boot.splashTitle")}</h1>
+        <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">{t("app.tagline")}</p>
 
         <Show
           when={!failed()}
           fallback={
             <div class="mt-6 flex flex-col gap-3">
-              <p class="flex items-start gap-2 text-left text-sm text-red-700 dark:text-red-300" role="alert">
+              <p class="flex items-start gap-2 text-left text-xs text-[color:var(--ent-bad)]" role="alert">
                 <Triangle size={18} aria-hidden="true" class="shrink-0" />
                 <span>
                   <strong class="block">{t("boot.failedTitle")}</strong>
@@ -47,7 +47,7 @@ export function BootScreen(props: BootScreenProps): JSX.Element {
                   <span class="mt-1 block font-mono text-xs opacity-80">{reason()}</span>
                 </span>
               </p>
-              <p class="text-xs text-gray-500">{t("boot.elapsed", { seconds: props.elapsedSeconds })}</p>
+              <p class="text-xs text-[color:var(--ent-text-faint)]">{t("boot.elapsed", { seconds: props.elapsedSeconds })}</p>
               <div class="flex justify-center gap-2">
                 <button type="button" class="btn btn-primary" onClick={() => props.onRetry()}>
                   {t("boot.retry")}
@@ -64,7 +64,7 @@ export function BootScreen(props: BootScreenProps): JSX.Element {
                 </Show>
               </div>
               <Show when={props.logsDir !== undefined}>
-                <p class="font-mono text-xs text-gray-500">{props.logsDir}</p>
+                <p class="font-mono text-xs text-[color:var(--ent-text-faint)]">{props.logsDir}</p>
               </Show>
             </div>
           }
@@ -84,11 +84,11 @@ export function BootScreen(props: BootScreenProps): JSX.Element {
                 decoding="async"
               />
             </span>
-            <p class="text-sm">
+            <p class="text-xs">
               {props.state._tag === "starting" ? t("boot.connecting") : t("boot.checking")}
             </p>
-            <p class="text-xs text-gray-500">{t("boot.waiting")}</p>
-            <p class="text-xs text-gray-500">{t("boot.elapsed", { seconds: props.elapsedSeconds })}</p>
+            <p class="text-xs text-[color:var(--ent-text-faint)]">{t("boot.waiting")}</p>
+            <p class="text-xs text-[color:var(--ent-text-faint)]">{t("boot.elapsed", { seconds: props.elapsedSeconds })}</p>
           </div>
         </Show>
       </div>

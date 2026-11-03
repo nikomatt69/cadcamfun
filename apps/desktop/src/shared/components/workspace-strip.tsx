@@ -21,14 +21,14 @@ export type HideBelow = keyof typeof HIDE
  * `cyan` and `purple` stay accepted so callers compile, but they were decoration and now read as the neutral value ink.
  */
 const TONES = {
-  neutral: "text-gray-200",
-  blue: "text-blue-300",
-  green: "text-green-300",
-  amber: "text-amber-300",
-  red: "text-red-400",
-  cyan: "text-gray-200",
-  purple: "text-gray-200",
-  muted: "text-gray-500"
+  neutral: "text-[color:var(--ent-text)]",
+  blue: "text-[color:var(--ent-accent)]",
+  green: "text-[color:var(--ent-ok)]",
+  amber: "text-[color:var(--ent-warn)]",
+  red: "text-[color:var(--ent-bad)]",
+  cyan: "text-[color:var(--ent-text)]",
+  purple: "text-[color:var(--ent-text)]",
+  muted: "text-[color:var(--ent-text-faint)]"
 } as const
 export type Tone = keyof typeof TONES
 
@@ -49,7 +49,7 @@ export function Seg(props: SegProps): JSX.Element {
   const cls = (): string => `${props.hideBelow ? HIDE[props.hideBelow] : "flex"} shrink-0 items-center gap-1`
   const body = (): JSX.Element => (
     <>
-      <Show when={props.label}><span class="text-gray-500">{props.label}</span></Show>
+      <Show when={props.label}><span class="text-[color:var(--ent-text-faint)]">{props.label}</span></Show>
       <span class={`${TONES[props.tone ?? "neutral"]} font-medium`}>{props.value}</span>
     </>
   )
@@ -60,7 +60,7 @@ export function Seg(props: SegProps): JSX.Element {
     >
       <button
         type="button"
-        class={`${cls()} rounded px-1 hover:bg-white/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-400 ${props.pressed === false ? "opacity-50" : ""}`}
+        class={`${cls()} rounded-[4px] px-1 hover:bg-[color:var(--ent-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--ent-accent)] ${props.pressed === false ? "opacity-50" : ""}`}
         title={props.title}
         aria-pressed={props.pressed}
         data-testid={props.testId}
@@ -73,7 +73,7 @@ export function Seg(props: SegProps): JSX.Element {
 }
 
 /** Thin divider between groups. */
-export const Sep = (): JSX.Element => <span class="h-3 w-px shrink-0 bg-gray-700" aria-hidden="true" />
+export const Sep = (): JSX.Element => <span class="h-3 w-px shrink-0 bg-[color:var(--ent-line)]" aria-hidden="true" />
 
 /**
  * The strip itself: `left` and `center` flow from the start, `right` is pushed to the end.
@@ -89,7 +89,7 @@ export function Strip(props: { readonly left: JSX.Element; readonly right?: JSX.
       role="status"
       aria-label={props.label}
       data-testid={props.testId}
-      class="flex h-6 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap rounded-b-lg border-t border-gray-700 bg-[#1b1b1d] px-3 text-[11px] leading-none text-gray-300"
+      class="flex h-7 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap rounded-b-lg border-t border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 text-[11px] leading-none text-[color:var(--ent-text-muted)]"
     >
       <div class="flex min-w-0 items-center gap-3 overflow-hidden">{props.left}</div>
       <Show when={props.right}><div class="ml-auto flex shrink-0 items-center gap-3">{props.right}</div></Show>
@@ -97,14 +97,12 @@ export function Strip(props: { readonly left: JSX.Element; readonly right?: JSX.
   )
 }
 
-const LIGHT_TONES = {
-  green: "text-green-700 dark:text-green-300", amber: "text-amber-700 dark:text-amber-300", blue: "text-blue-700 dark:text-blue-300",
-  red: "text-red-700 dark:text-red-400", muted: "text-gray-500"
-} as const
+/** The strip and the shell footer are now the same light surface, so they share one tone set. */
+const LIGHT_TONES = TONES
 
 /**
  * Whether the open project's drawing and CAM program are saved, with the time of the last save; a click saves now.
- * `light` is for the shell's footer (light surface); the workspace strips are dark.
+ * `light` is for the shell's footer; both surfaces now share the same quiet palette.
  */
 export function SaveSeg(props: { readonly light?: boolean } = {}): JSX.Element {
   const app = useApp()
@@ -119,7 +117,7 @@ export function SaveSeg(props: { readonly light?: boolean } = {}): JSX.Element {
             {...(shown().saveable ? { onClick: () => { void session.saveInteractive() } } : {})} />}
         >
           <Show when={shown().saveable} fallback={<span class={LIGHT_TONES[shown().tone]} title={shown().title} data-testid="status-save">{shown().text}</span>}>
-            <button type="button" class={`rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700 ${LIGHT_TONES[shown().tone]}`} title={shown().title} data-testid="status-save"
+            <button type="button" class={`rounded-[4px] px-1 hover:bg-[color:var(--ent-hover)] ${LIGHT_TONES[shown().tone]}`} title={shown().title} data-testid="status-save"
               onClick={() => { void session.saveInteractive() }}>{shown().text}</button>
           </Show>
         </Show>

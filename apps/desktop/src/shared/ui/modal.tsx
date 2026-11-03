@@ -95,7 +95,7 @@ export function Modal(props: ModalProps): JSX.Element {
     <Show when={props.open}>
       <Portal>
         <Motion.div
-          class={props.variant === "workspace" ? "ui-modal-scrim--workspace fixed inset-0 bg-gray-600/50 dark:bg-black/60 flex items-center justify-center z-[1000] p-4" : "ui-modal-scrim"}
+          class={props.variant === "workspace" ? "ui-modal-scrim--workspace fixed inset-0 bg-[color:var(--ent-scrim)] flex items-center justify-center z-[1000] p-4" : "ui-modal-scrim"}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -104,7 +104,7 @@ export function Modal(props: ModalProps): JSX.Element {
         >
           <Motion.div
             ref={onDialogRef}
-            class={props.variant === "workspace" ? "bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] rounded-lg shadow-xl max-w-md w-full border border-[color:var(--ent-line)] max-h-[calc(100dvh-2rem)] overflow-y-auto" : sizeClass(size())}
+            class={props.variant === "workspace" ? "ent-float max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto" : sizeClass(size())}
             style={props.variant === "workspace" ? { "font-family": '"CADCAM Rounded", sans-serif', "font-size": "12px", "line-height": "1.4" } : undefined}
             // Entry: scale 0.98 + y 12, never scale(0) (Emil). Exit mirrors
             // entry so the modal returns where it came from.
@@ -119,18 +119,18 @@ export function Modal(props: ModalProps): JSX.Element {
             onClick={(event) => event.stopPropagation()}
           >
             <Show when={props.title !== undefined}>
-              <header class={props.variant === "workspace" ? "px-6 py-4 border-b border-[color:var(--ent-line)] flex justify-between items-center" : "ui-modal-header"}>
-                <h3 class={props.variant === "workspace" ? "text-lg font-medium text-[color:var(--ent-text)]" : "ui-modal-title"}>{props.title}</h3>
+              <header class={props.variant === "workspace" ? "px-6 py-3 border-b border-[color:var(--ent-line)] flex justify-between items-center gap-3" : "ui-modal-header"}>
+                <h3 class={props.variant === "workspace" ? "text-sm font-semibold text-[color:var(--ent-text)]" : "ui-modal-title"}>{props.title}</h3>
                 <Show when={props.closable !== false}>
-                  <button type="button" class={props.variant === "workspace" ? "text-[color:var(--ent-text-faint)] hover:text-[color:var(--ent-text-muted)] transition-colors" : "ui-modal-close"} aria-label={t("common.close")} onClick={() => props.onClose()}>
-                    <X size={18} aria-hidden="true" />
+                  <button type="button" class={props.variant === "workspace" ? "flex h-7 w-7 items-center justify-center rounded-[5px] text-[color:var(--ent-text-faint)] transition-colors hover:bg-[color:var(--ent-surface-inset)] hover:text-[color:var(--ent-text)]" : "ui-modal-close"} aria-label={t("common.close")} onClick={() => props.onClose()}>
+                    <X size={16} aria-hidden="true" />
                   </button>
                 </Show>
               </header>
             </Show>
             <div class={props.variant === "workspace" ? "" : "ui-modal-body"}>{props.children}</div>
             <Show when={props.footer !== undefined}>
-              <footer class={props.variant === "workspace" ? "px-6 py-4 border-t border-[color:var(--ent-line)] flex justify-end items-center gap-2" : "ui-modal-footer"}>
+              <footer class={props.variant === "workspace" ? "px-6 py-3 border-t border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] flex justify-end items-center gap-2" : "ui-modal-footer"}>
                 {props.footer}
               </footer>
             </Show>
@@ -232,7 +232,7 @@ export function Sheet(props: SheetProps): JSX.Element {
             <header class="ui-sheet-header">
               <h3 class="ui-sheet-title">{props.title}</h3>
               <button type="button" class="ui-sheet-close" aria-label={t("common.close")} onClick={() => props.onClose()}>
-                <X size={18} aria-hidden="true" />
+                <X size={16} aria-hidden="true" />
               </button>
             </header>
           </Show>

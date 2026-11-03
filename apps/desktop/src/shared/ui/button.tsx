@@ -57,7 +57,7 @@ export function Button(props: ButtonProps): JSX.Element {
 }
 
 /** IconButton — square hit area for tool palettes and card headers.
- *  Smaller press (0.92) since the surface is smaller; press still 80ms/160ms asymmetric. */
+ *  Square at the control height (24 / 28 / 32 px); the press is the shared 3% scale-down. */
 export function IconButton(
   props: ParentProps<JSX.HTMLAttributes<HTMLButtonElement> & { readonly active?: boolean; readonly size?: ButtonSize }>
 ): JSX.Element {
@@ -66,7 +66,7 @@ export function IconButton(
   return (
     <button
       type="button"
-      class={["ui-icon-btn", sizeClass(size()), own.active === true ? "ui-icon-btn-active" : "", own.class ?? ""].filter(Boolean).join(" ")}
+      class={["ui-icon-btn", `ui-icon-btn-${size()}`, own.active === true ? "ui-icon-btn-active" : "", own.class ?? ""].filter(Boolean).join(" ")}
       aria-pressed={own.active}
       {...rest}
     >
