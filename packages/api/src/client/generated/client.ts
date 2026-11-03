@@ -1764,11 +1764,12 @@ type Endpoint14_3Input = {
   readonly id: Endpoint14_3Request["params"]["id"]
   readonly name: Endpoint14_3Request["payload"]["name"]
   readonly description?: Endpoint14_3Request["payload"]["description"]
+  readonly baseUpdatedAt?: Endpoint14_3Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint14_3 = (raw: RawClient["organizations"]) => (input: Endpoint14_3Input) =>
   raw["update"]({
     params: { id: input["id"] },
-    payload: { name: input["name"], description: input["description"] },
+    payload: { name: input["name"], description: input["description"], baseUpdatedAt: input["baseUpdatedAt"] },
   }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint14_4Request = Parameters<RawClient["organizations"]["remove"]>[0]
@@ -2005,6 +2006,7 @@ type Endpoint17_3Input = {
   readonly description?: Endpoint17_3Request["payload"]["description"]
   readonly organizationId?: Endpoint17_3Request["payload"]["organizationId"]
   readonly isPublic?: Endpoint17_3Request["payload"]["isPublic"]
+  readonly baseUpdatedAt?: Endpoint17_3Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint17_3 = (raw: RawClient["projects"]) => (input: Endpoint17_3Input) =>
   raw["update"]({
@@ -2014,6 +2016,7 @@ const Endpoint17_3 = (raw: RawClient["projects"]) => (input: Endpoint17_3Input) 
       description: input["description"],
       organizationId: input["organizationId"],
       isPublic: input["isPublic"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

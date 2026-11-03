@@ -41618,6 +41618,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "description": {
                     "anyOf": [
                       {
@@ -41720,6 +41730,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "Forbidden",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {
@@ -58583,6 +58603,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "description": {
                     "anyOf": [
                       {
@@ -58845,6 +58875,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {

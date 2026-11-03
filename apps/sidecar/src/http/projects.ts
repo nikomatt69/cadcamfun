@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -50,7 +50,13 @@ export const ProjectsHandlers = HttpApiBuilder.group(Api, "projects", Effect.fn(
           !(yield* repo.isMember(user.id, payload.organizationId))) {
           return yield* new Forbidden({ message: "You do not have access to the specified organization" })
         }
-        return yield* repo.update(params.id, { ...payload, name: payload.name })
+        const { baseUpdatedAt, ...fields } = payload
+        // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
+        if (baseUpdatedAt === undefined) return yield* repo.update(params.id, { ...fields, name: payload.name })
+        const updated = yield* repo.updateIfCurrent(params.id, { ...fields, name: payload.name }, baseUpdatedAt)
+        if (updated === undefined) return yield* new NotFound({ message: "Project not found or access denied" })
+        if (updated === "conflict") return yield* new Conflict({ message: "The project was saved elsewhere since it was read. Nothing was overwritten." })
+        return updated
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update project"))))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {

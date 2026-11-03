@@ -67,6 +67,8 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
   listForOrganization(organizationId: string): Effect.Effect<ProjectWithRelations[], DatabaseError>
   create(userId: string, input: ProjectInput): Effect.Effect<ProjectRow, DatabaseError>
   update(id: string, patch: { name: string; description?: string | null | undefined; organizationId?: string | null | undefined }): Effect.Effect<ProjectWithRelations, DatabaseError>
+  /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
+  updateIfCurrent(id: string, patch: { name: string; description?: string | null | undefined; organizationId?: string | null | undefined }, base: string): Effect.Effect<ProjectWithRelations | "conflict" | undefined, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/ProjectRepo") {
   static readonly layer = Layer.effect(
@@ -125,6 +127,23 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
             }).where(eq(T.id, id)).returning()
             return (await hydrate(db, [row!]))[0]!
           }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId, row.organizationId))),
+        updateIfCurrent: (id, patch, base) =>
+          query("projects.updateIfCurrent", async (db) => {
+            const outcome = db.transaction((tx) => {
+              const current = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!current) return "gone" as const
+              if (current.updatedAt.toISOString() !== base) return "conflict" as const
+              return tx.update(T).set({
+                name: patch.name,
+                description: patch.description ?? null,
+                organizationId: patch.organizationId ?? current.organizationId ?? null,
+                updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1))
+              }).where(eq(T.id, id)).returning().get()
+            })
+            if (outcome === "gone") return undefined
+            if (outcome === "conflict") return outcome
+            return (await hydrate(db, [outcome]))[0]
+          }).pipe(Effect.tap((row) => row !== undefined && row !== "conflict" ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
         remove: (id) =>
           query("projects.remove", async (db) => {
             // Activity and AI-analysis rows point at items by plain id (no foreign key), so cascades miss them.

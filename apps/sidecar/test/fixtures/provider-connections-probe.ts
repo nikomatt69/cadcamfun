@@ -136,3 +136,7 @@ try {
     }
   } finally { rmSync(dataDir, { recursive: true, force: true }) }
 }
+
+// The embedded host keeps background loops (workspace sync, delegation reconcile) alive after `dispose()`; this file is a
+// throw-away subprocess whose verdict is already printed, so it ends here instead of waiting for them.
+process.exit(0)

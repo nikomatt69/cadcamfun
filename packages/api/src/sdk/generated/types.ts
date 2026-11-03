@@ -1024,7 +1024,11 @@ export type FilesUploadPayload = {
 
 export type OrganizationsCreatePayload = { readonly name: string; readonly description?: string | null | undefined }
 
-export type OrganizationsUpdatePayload = { readonly name: string; readonly description?: string | null | undefined }
+export type OrganizationsUpdatePayload = {
+  readonly name: string
+  readonly description?: string | null | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
 
 export type OrganizationsSetMemberRolePayload = {
   readonly memberId?: string | undefined
@@ -1068,6 +1072,7 @@ export type ProjectsUpdatePayload = {
   readonly description?: string | null | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type MaterialsCreatePayload = {
@@ -6230,6 +6235,7 @@ export type OrganizationsUpdateInput = {
   readonly id: { readonly id: string }["id"]
   readonly name: OrganizationsUpdatePayload["name"]
   readonly description?: OrganizationsUpdatePayload["description"]
+  readonly baseUpdatedAt?: OrganizationsUpdatePayload["baseUpdatedAt"]
 }
 
 export type OrganizationsUpdateOutput = {
@@ -6615,6 +6621,7 @@ export type ProjectsUpdateInput = {
   readonly description?: ProjectsUpdatePayload["description"]
   readonly organizationId?: ProjectsUpdatePayload["organizationId"]
   readonly isPublic?: ProjectsUpdatePayload["isPublic"]
+  readonly baseUpdatedAt?: ProjectsUpdatePayload["baseUpdatedAt"]
 }
 
 export type ProjectsUpdateOutput = {

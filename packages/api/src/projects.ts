@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, Forbidden, InternalError, NotFound } from "./errors.ts"
+import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "./errors.ts"
 
 // ---- Shapes identical to `.reference/src/pages/api/projects/*` (JSON dates are ISO strings) ----
 
@@ -33,7 +33,8 @@ export const CreateProjectBody = Schema.Struct({
   organizationId: Schema.optional(Schema.NullOr(Schema.String)),
   isPublic: Schema.optional(Schema.Boolean)
 })
-export const UpdateProjectBody = CreateProjectBody
+/** An editor that holds a copy sends the `updatedAt` it read: the write happens only while it is still current (409 otherwise). */
+export const UpdateProjectBody = Schema.Struct({ ...CreateProjectBody.fields, baseUpdatedAt: Schema.optional(Schema.String) })
 
 const Message = Schema.Struct({ message: Schema.String })
 const id = { id: Schema.String }
@@ -51,7 +52,7 @@ export class ProjectsGroup extends HttpApiGroup.make("projects")
       params: id,
       payload: UpdateProjectBody,
       success: ProjectWithRelations,
-      error: [BadRequest, Forbidden, NotFound, InternalError]
+      error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/projects/:id", {
       params: id,

@@ -1,11 +1,13 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 import { CreateProjectBody, ProjectRow, ProjectWithRelations } from "../projects.ts"
 
 const nullable = Schema.NullOr(Schema.String)
 export const OrganizationRole = Schema.Literals(["ADMIN", "MANAGER", "MEMBER"])
 export const OrganizationBody = Schema.Struct({ name: Schema.String, description: Schema.optional(nullable) })
+/** An editor that holds a copy sends the `updatedAt` it read: the write happens only while it is still current (409 otherwise). */
+export const OrganizationUpdateBody = Schema.Struct({ name: Schema.String, description: Schema.optional(nullable), baseUpdatedAt: Schema.optional(Schema.String) })
 export const OrganizationRow = Schema.Struct({
   id: Schema.String, name: Schema.String, description: nullable, createdAt: Schema.String, updatedAt: Schema.String
 })
@@ -43,7 +45,7 @@ export class OrganizationsGroup extends HttpApiGroup.make("organizations")
     HttpApiEndpoint.get("list", "/api/organizations", { success: Schema.Array(OrganizationSummary), error: InternalError }),
     HttpApiEndpoint.post("create", "/api/organizations", { payload: OrganizationBody, success: OrganizationRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("get", "/api/organizations/:id", { params: id, success: OrganizationDetails, error: [BadRequest, Forbidden, NotFound, InternalError] }),
-    HttpApiEndpoint.put("update", "/api/organizations/:id", { params: id, payload: OrganizationBody, success: OrganizationRow, error: [BadRequest, Forbidden, InternalError] }),
+    HttpApiEndpoint.put("update", "/api/organizations/:id", { params: id, payload: OrganizationUpdateBody, success: OrganizationRow, error: [BadRequest, Forbidden, Conflict, InternalError] }),
     HttpApiEndpoint.delete("remove", "/api/organizations/:id", { params: id, success: Schema.Struct({ message: Schema.String }), error: [BadRequest, Forbidden, InternalError] }),
     HttpApiEndpoint.get("members", "/api/organizations/:id/members", {
       params: id, query: { search: Schema.optional(Schema.String) }, success: Schema.Array(OrganizationMembership), error: [BadRequest, Forbidden, InternalError]

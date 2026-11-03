@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { randomBytes } from "node:crypto"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -42,8 +42,10 @@ export const OrganizationsHandlers = HttpApiBuilder.group(Api, "organizations", 
     .handle("update", ({ params, payload }) => Effect.gen(function*() {
       const user = yield* CurrentUser
       if (!payload.name) return yield* new BadRequest({ message: "Organization name is required" })
-      const organization = yield* repo.update(user.id, params.id, payload)
+      const { baseUpdatedAt, ...fields } = payload
+      const organization = yield* repo.update(user.id, params.id, fields, baseUpdatedAt)
       if (!organization) return yield* new InternalError({ message: "Failed to update organization" })
+      if (organization === "conflict") return yield* new Conflict({ message: "The organization was saved elsewhere since it was read. Nothing was overwritten." })
       return organization
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update organization"))))
     .handle("remove", ({ params }) => Effect.gen(function*() {
