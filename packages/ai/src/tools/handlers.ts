@@ -80,6 +80,11 @@ export interface ToolHandlersShape {
     | { readonly ok: true; readonly preview: cam.verify.VerifyResponse["preview"]; readonly floor: number; readonly programHash: string }
     | { readonly ok: false; readonly error: string }
   >
+  /** The printable setup sheet (HTML) of a program the CAM kernel generated: tools, operations, totals, setup, claims. */
+  operationSetupSheet?(projectId: string, operationId: string): Promise<
+    | { readonly ok: true; readonly html: string; readonly release: string; readonly warnings: ReadonlyArray<string> }
+    | { readonly ok: false; readonly error: string }
+  >
   cadStoreBodies?(projectId: string, bodies: ReadonlyArray<{ readonly brep: cad.brep.Brep; readonly name: string; readonly kind: "solid" | "surface" }>): Promise<unknown>
   cadOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
   cadHole?(projectId: string, input: CadHoleInput): Promise<unknown>

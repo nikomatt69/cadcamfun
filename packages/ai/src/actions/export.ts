@@ -22,7 +22,8 @@ const FORMATS: Readonly<Record<string, { readonly extension: string; readonly mi
   obj: { extension: "obj", mime: "model/obj" },
   "3mf": { extension: "3mf", mime: "model/3mf" },
   step: { extension: "step", mime: "model/step" },
-  iges: { extension: "igs", mime: "model/iges" }
+  iges: { extension: "igs", mime: "model/iges" },
+  html: { extension: "html", mime: "text/html" }
 }
 
 const MIME_TEXT = "text/plain"
@@ -103,5 +104,14 @@ const runCamStock = async (input: CamExportInput, context: ActionContext): Promi
   }
 }
 
+const runCamSetupSheet = async (input: CamExportInput, context: ActionContext): Promise<unknown> => {
+  if (context.handlers.operationSetupSheet === undefined) return fail("Setup sheets are unavailable in this host.")
+  const sheet = await context.handlers.operationSetupSheet(context.projectId, input.operationId)
+  if (!sheet.ok) return fail(sheet.error)
+  const saved = await store(context, stemOf(input.name, `setup-sheet-${input.operationId.slice(0, 8)}`), "html", new TextEncoder().encode(sheet.html))
+  if (!saved.ok) return saved
+  return { ok: true, format: "html", file: saved.file, operationId: input.operationId, release: sheet.release, warnings: sheet.warnings }
+}
+
 export const runCamExport = (input: CamExportInput, context: ActionContext): Promise<unknown> =>
-  input.kind === "program" ? runCamProgram(input, context) : runCamStock(input, context)
+  input.kind === "program" ? runCamProgram(input, context) : input.kind === "stock" ? runCamStock(input, context) : runCamSetupSheet(input, context)

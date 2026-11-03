@@ -150,10 +150,25 @@ describe("export through the bridge", () => {
     expect(mesh.body.result.bodies[0].volumeMm3).toBeGreaterThan(0)
     expect(mesh.body.result.bodies[0].volumeMm3).toBeLessThan(126 * 86 * 14)
 
+    // A hand-made operation has no kernel evidence, so there is no setup sheet: a refusal that says why, not an empty file.
+    expect((await invoke("cam_edit", { action: "export", kind: "setup_sheet", operationId })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("CAM kernel generated") })
+
     // Changing the operation invalidates the program and with it the verification: the stock export refuses.
     await invoke("cam_edit", { action: "update", operationId, params: { depth: 8 } })
     expect((await invoke("cam_edit", { action: "export", kind: "stock", operationId })).body.result).toMatchObject({ ok: false })
   })
+
+  test("a program the CAM kernel manufactured has a setup sheet, written as an HTML file", async () => {
+    const { invoke } = await setup("write")
+    const made = await invoke("cam_edit", { action: "manufacture", material: "6061" })
+    expect(made.body.result, JSON.stringify(made.body.result).slice(0, 300)).toMatchObject({ ok: true })
+    const operationId = made.body.result.operationId as string
+    const sheet = await invoke("cam_edit", { action: "export", kind: "setup_sheet", operationId, name: "plate-sheet" })
+    expect(sheet.body.result).toMatchObject({ ok: true, format: "html", file: { name: "plate-sheet.html", mime: "text/html" }, release: expect.any(String) })
+    const html = readFileSync(join(app.dataDir, "storage", sheet.body.result.file.key), "utf8")
+    expect(html).toContain("<html")
+    expect(html).toContain("Setup")
+  }, 60_000)
 
   test("fasten inserts the screws, washers and nuts the shared holes need, once, and the assembly exports with them", async () => {
     const { model } = await import("@cadcamfun/core")

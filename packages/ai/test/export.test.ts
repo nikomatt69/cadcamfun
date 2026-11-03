@@ -187,6 +187,17 @@ describe("cam_edit.export", () => {
     expect(r["warnings"][0]).toContain("height field")
   })
 
+  test("the setup sheet is stored as an HTML file and its release is reported", async () => {
+    const { files, handlers } = host()
+    const h = { ...handlers, operationSetupSheet: async () => ({ ok: true as const, html: "<html><body>Setup sheet</body></html>", release: "preview", warnings: ["nc-replay: unresolved"] }) } as ToolHandlersShape
+    const r = await call("cam_edit.export", { kind: "setup_sheet", operationId: "op1", name: "sheet" }, h)
+    expect(r).toMatchObject({ ok: true, format: "html", release: "preview", warnings: ["nc-replay: unresolved"], file: { name: "sheet.html", mime: "text/html" } })
+    expect(new TextDecoder().decode(files.get(r["file"].key)!)).toContain("Setup sheet")
+    const refused = { ...handlers, operationSetupSheet: async () => ({ ok: false as const, error: "Only a program the CAM kernel generated has a setup sheet." }) } as ToolHandlersShape
+    expect(await call("cam_edit.export", { kind: "setup_sheet", operationId: "op1" }, refused)).toMatchObject({ ok: false })
+    expect(await call("cam_edit.export", { kind: "setup_sheet", operationId: "op1" }, handlers)).toMatchObject({ ok: false, error: expect.stringContaining("unavailable") })
+  })
+
   test("a stale or missing verification is a refusal, not an empty file", async () => {
     const { files, handlers } = host()
     const h = { ...handlers, operationStock: async () => ({ ok: false as const, error: "The stored program changed since it was verified." }) } as ToolHandlersShape

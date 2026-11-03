@@ -143,6 +143,19 @@ const toolHandlers = Effect.gen(function*() {
   const sceneJob = async <O extends keyof CadSceneResult>(input: Extract<CadSceneInput, { readonly op: O }>): Promise<CadSceneResult[O]> =>
     (await runOwnedKernelJob("cad-scene", input)) as CadSceneResult[O]
   /** Runs the kernel in its worker, announcing the run on the project's live stream (desktop and phone follow the same progress). */
+  /** The setup sheet data of the kernel program stored under an operation (the same for the read action and the HTML export). */
+  const setupSheetOf = async (projectId: string, operationId: string): Promise<{ ok: true; sheet: Exclude<ReturnType<typeof cam.kernel.setupSheetData>, string> } | { ok: false; error: string }> => {
+    const loaded = await load(projectId)
+    const stored = await run(toolpaths.find(acting().id, operationId))
+    if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
+    const artifactData = record(stored.row.data)["kernelArtifact"]
+    if (artifactData === undefined) return { ok: false, error: "Only a program the CAM kernel generated has a setup sheet; this operation has none." }
+    try {
+      const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(artifactData)
+      const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name, titleBlock: sheets.completeTitleBlock(loaded.data["titleBlock"], { name: loaded.name, ...(acting().name ? { author: acting().name! } : {}) }) })
+      return typeof sheet === "string" ? { ok: false, error: sheet } : { ok: true, sheet }
+    } catch (error) { return { ok: false, error: `The stored program does not match the contract: ${error instanceof Error ? error.message : String(error)}` } }
+  }
   const manufactureRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-manufacture">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
     const report = camProgressReporter(liveEvents, projectId, runId)
@@ -486,22 +499,20 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: passed, status: passed ? "pass" : "failed", revision, mutated: false, operations: results, note: "Schema, DFM and generation checks only. Generate, analyze and verify each saved operation before acceptance." }
     },
     setupSheetOperation: async (projectId, operationId) => {
-      const loaded = await load(projectId)
-      const stored = await run(toolpaths.find(acting().id, operationId))
-      if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
-      const artifactData = record(stored.row.data)["kernelArtifact"]
-      if (artifactData === undefined) return { ok: false, error: "Only a program the CAM kernel generated has a setup sheet; this operation has none." }
-      try {
-        const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(artifactData)
-        const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name, titleBlock: sheets.completeTitleBlock(loaded.data["titleBlock"], { name: loaded.name, ...(acting().name ? { author: acting().name! } : {}) }) })
-        if (typeof sheet === "string") return { ok: false, error: sheet }
-        return {
-          ok: true, operationId, release: sheet.release, ...(sheet.titleBlock !== undefined ? { titleBlock: sheet.titleBlock } : {}),
-          tools: sheet.tools.slice(0, 40), toolsTotal: sheet.tools.length, operations: sheet.operations.slice(0, 60), operationsTotal: sheet.operations.length,
-          totals: sheet.totals, setup: { ...sheet.setup, material: sheet.material, machine: sheet.machine },
-          claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length
-        }
-      } catch (error) { return { ok: false, error: `The stored program does not match the contract: ${error instanceof Error ? error.message : String(error)}` } }
+      const made = await setupSheetOf(projectId, operationId)
+      if (!made.ok) return made
+      const sheet = made.sheet
+      return {
+        ok: true, operationId, release: sheet.release, ...(sheet.titleBlock !== undefined ? { titleBlock: sheet.titleBlock } : {}),
+        tools: sheet.tools.slice(0, 40), toolsTotal: sheet.tools.length, operations: sheet.operations.slice(0, 60), operationsTotal: sheet.operations.length,
+        totals: sheet.totals, setup: { ...sheet.setup, material: sheet.material, machine: sheet.machine },
+        claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length
+      }
+    },
+    operationSetupSheet: async (projectId, operationId) => {
+      const made = await setupSheetOf(projectId, operationId)
+      if (!made.ok) return made
+      return { ok: true as const, html: cam.kernel.setupSheetHtml(made.sheet), release: made.sheet.release, warnings: made.sheet.claims.filter((c) => c.status !== "passed").map((c) => `${c.id}: ${c.status}`) }
     },
     regenerateOperation: async (projectId, operationId, scope, signal) => {
       const loaded = await load(projectId)

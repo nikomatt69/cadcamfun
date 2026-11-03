@@ -33,7 +33,7 @@ export const CadExportInput = Schema.Struct({
 export type CadExportInput = typeof CadExportInput.Type
 
 export const CamExportInput = Schema.Struct({
-  kind: Schema.Literals(["program", "stock"]),
+  kind: Schema.Literals(["program", "stock", "setup_sheet"]),
   operationId: nonEmpty,
   /** stock: stl (default), stl_ascii, obj or 3mf. Ignored for a program. */
   format: optional(Schema.Literals(CAM_STOCK_EXPORT_FORMATS)),
@@ -41,7 +41,7 @@ export const CamExportInput = Schema.Struct({
   extension: optional(Schema.Literals(NC_EXTENSIONS)),
   name: optional(fileStem),
   unit: optional(unit)
-}).annotate({ description: "Write a stored NC program, or the stock its verification leaves, as a file in the project's export folder." })
+}).annotate({ description: "Write a stored NC program, the stock its verification leaves, or its setup sheet (HTML) as a file in the project's export folder." })
 export type CamExportInput = typeof CamExportInput.Type
 
 /** What the host stores for one export: `key` is relative to the project's export folder, never an absolute path. */
