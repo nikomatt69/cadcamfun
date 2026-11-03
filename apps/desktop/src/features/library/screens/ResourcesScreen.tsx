@@ -20,12 +20,20 @@ import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 import { Modal, formatDate } from "../../toolpaths/components/shared.tsx"
+import { NumberField } from "../../../shared/components/panel/ui.tsx"
 import { ResourceGeneratorDialog } from "../components/ResourceGeneratorDialog.tsx"
 import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-generation.ts"
 import { useAiStore } from "../../ai/index.ts"
 import { cam } from "@cadcamfun/core"
 import { actionKey } from "../../ai/lib/editor-sync.ts"
 import { CARD, CardBanner, FIELD, ICON_BUTTON, INPUT, LABEL, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+
+/** Dialog controls are portalled out of the page, so they use the --ent tokens instead of the Tailwind palette. */
+const DLG_INPUT = "w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-sm text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
+const DLG_LABEL = "mb-1 block text-sm font-medium text-[color:var(--ent-text)]"
+const DLG_CANCEL = "rounded-md border border-[color:var(--ent-line-strong)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
+const DLG_PRIMARY = "rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
+const DLG_DANGER = "rounded-md bg-[color:var(--ent-bad)] px-4 py-2 text-sm font-medium text-[color:var(--ent-surface)] hover:opacity-90 disabled:opacity-50"
 
 export type { ResourceKind }
 type Row = Readonly<Record<string, unknown>>
@@ -137,6 +145,11 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [createOpen, setCreateOpen] = createSignal(false)
+  // The create form's numbers are typed through NumberField (comma decimals, expressions), so they live in signals, not FormData.
+  const [density, setDensity] = createSignal(2700)
+  const [diameter, setDiameter] = createSignal(6)
+  const [flutes, setFlutes] = createSignal(3)
+  const openCreate = (): void => { setDensity(2700); setDiameter(6); setFlutes(3); setCreateOpen(true) }
   const [generateOpen, setGenerateOpen] = createSignal(false)
   const [deleting, setDeleting] = createSignal<Row>()
 
@@ -257,8 +270,8 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     const name = str(form.get("name")).trim()
     const description = str(form.get("description")) === "" ? null : str(form.get("description"))
     const isPublic = form.has("isPublic")
-    if (kind === "materials") return app.client.materials.create({ payload: { name, description, isPublic, properties: { density: Number(form.get("density")) || 0, color: str(form.get("color")) || "#cccccc" } } })
-    if (kind === "tools") return app.client.tools.create({ payload: { name, notes: description, isPublic, type: str(form.get("type")), diameter: Number(form.get("diameter")) || 0, material: str(form.get("material")), numberOfFlutes: Number(form.get("numberOfFlutes")) || null } })
+    if (kind === "materials") return app.client.materials.create({ payload: { name, description, isPublic, properties: { density: density(), color: str(form.get("color")) || "#cccccc" } } })
+    if (kind === "tools") return app.client.tools.create({ payload: { name, notes: description, isPublic, type: str(form.get("type")), diameter: diameter(), material: str(form.get("material")), numberOfFlutes: flutes() || null } })
     if (kind === "machines") {
       return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || "mill", config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || "grbl" } } })
     }
@@ -294,7 +307,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       description={t("library.description", { type: lower })}
       actions={<>
             <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><MessageSquareText size={16} aria-hidden="true" />{t("cam.explorer.generate")}</button>
-            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />{t("ai.sessions.new")} {meta.singular}</button>
+            <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("ai.sessions.new")} {meta.singular}</button>
       </>}
       rail={<>
               <label class="block">
@@ -349,63 +362,63 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       <Modal open={createOpen()} title={t("library.detail.createTitle", { name: meta.singular })} onClose={() => setCreateOpen(false)}>
         <form class="space-y-4" onSubmit={(event) => { event.preventDefault(); void create(new FormData(event.currentTarget)) }}>
           <div>
-            <label for="resource-name" class={LABEL}>{meta.singular} {t("library.field.name")}</label>
-            <input id="resource-name" name="name" type="text" class={INPUT} required />
+            <label for="resource-name" class={DLG_LABEL}>{meta.singular} {t("library.field.name")}</label>
+            <input id="resource-name" name="name" type="text" class={DLG_INPUT} required />
           </div>
           <div>
-            <label for="resource-description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
-            <textarea id="resource-description" name="description" rows={2} class={INPUT} />
+            <label for="resource-description" class={DLG_LABEL}>{t("org.modal.descriptionLabel")}</label>
+            <textarea id="resource-description" name="description" rows={2} class={DLG_INPUT} />
           </div>
           <Show when={props.kind === "materials"}>
             <div class="grid grid-cols-2 gap-3">
-              <div><label for="resource-density" class={LABEL}>{t("library.field.density")}</label><input id="resource-density" name="density" type="number" step="any" min="0" class={INPUT} value="2700" /></div>
-              <div><label for="resource-color" class={LABEL}>{t("library.color")}</label><input id="resource-color" name="color" type="color" class={`${INPUT} h-[38px] p-1`} value="#cccccc" /></div>
+              <div><label for="resource-density" class={DLG_LABEL}>{t("library.field.density")}</label><NumberField id="resource-density" name="density" class={DLG_INPUT} value={density()} accept={(value) => value >= 0} onValue={setDensity} /></div>
+              <div><label for="resource-color" class={DLG_LABEL}>{t("library.color")}</label><input id="resource-color" name="color" type="color" class={`${DLG_INPUT} h-[38px] p-1`} value="#cccccc" /></div>
             </div>
           </Show>
           <Show when={props.kind === "tools"}>
             <div class="grid grid-cols-2 gap-3">
-              <div><label for="resource-tool-type" class={LABEL}>{t("library.type")}</label><input id="resource-tool-type" name="type" type="text" class={INPUT} required value="endmill" /></div>
-              <div><label for="resource-tool-material" class={LABEL}>{t("library.material")}</label><input id="resource-tool-material" name="material" type="text" class={INPUT} required value="carbide" /></div>
-              <div><label for="resource-diameter" class={LABEL}>{t("library.diameter")}</label><input id="resource-diameter" name="diameter" type="number" step="any" min="0.01" class={INPUT} required value="6" /></div>
-              <div><label for="resource-flutes" class={LABEL}>{t("library.tool.flutes")}</label><input id="resource-flutes" name="numberOfFlutes" type="number" min="1" class={INPUT} value="3" /></div>
+              <div><label for="resource-tool-type" class={DLG_LABEL}>{t("library.type")}</label><input id="resource-tool-type" name="type" type="text" class={DLG_INPUT} required value="endmill" /></div>
+              <div><label for="resource-tool-material" class={DLG_LABEL}>{t("library.material")}</label><input id="resource-tool-material" name="material" type="text" class={DLG_INPUT} required value="carbide" /></div>
+              <div><label for="resource-diameter" class={DLG_LABEL}>{t("library.diameter")}</label><NumberField id="resource-diameter" name="diameter" class={DLG_INPUT} value={diameter()} accept={(value) => value >= 0.01} onValue={setDiameter} /></div>
+              <div><label for="resource-flutes" class={DLG_LABEL}>{t("library.tool.flutes")}</label><NumberField id="resource-flutes" name="numberOfFlutes" int class={DLG_INPUT} value={flutes()} accept={(value) => value >= 1} onValue={setFlutes} /></div>
             </div>
           </Show>
           <Show when={props.kind === "machines"}>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label for="resource-machine-type" class={LABEL}>{t("pages.machine.type")}</label>
-                <select id="resource-machine-type" name="type" class={INPUT}><For each={Object.keys(MACHINE_TYPES())}>{(value) => <option value={value}>{MACHINE_TYPES()[value]}</option>}</For></select>
+                <label for="resource-machine-type" class={DLG_LABEL}>{t("pages.machine.type")}</label>
+                <select id="resource-machine-type" name="type" class={DLG_INPUT}><For each={Object.keys(MACHINE_TYPES())}>{(value) => <option value={value}>{MACHINE_TYPES()[value]}</option>}</For></select>
               </div>
-              <div><label for="resource-controller" class={LABEL}>{t("library.field.controller")}</label><input id="resource-controller" name="controller" type="text" class={INPUT} value="grbl" /></div>
+              <div><label for="resource-controller" class={DLG_LABEL}>{t("library.field.controller")}</label><input id="resource-controller" name="controller" type="text" class={DLG_INPUT} value="grbl" /></div>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{t("library.detail.volumeDefaults")}</p>
+            <p class="text-xs text-[color:var(--ent-text-muted)]">{t("library.detail.volumeDefaults")}</p>
           </Show>
           <Show when={props.kind === "components"}>
             <div>
-              <label for="resource-project" class={LABEL}>{t("cam.save.project")}</label>
-              <select id="resource-project" name="projectId" class={INPUT} required>
+              <label for="resource-project" class={DLG_LABEL}>{t("cam.save.project")}</label>
+              <select id="resource-project" name="projectId" class={DLG_INPUT} required>
                 <option value="">{t("legacy.selectProject")}</option>
                 <For each={projects()}>{(project) => <option value={project.id} selected={project.id === projectId()}>{project.name}</option>}</For>
               </select>
             </div>
-            <div><label for="resource-component-type" class={LABEL}>{t("library.detail.typeOptional")}</label><input id="resource-component-type" name="type" type="text" class={INPUT} placeholder={t("library.detail.typeExample")} /></div>
+            <div><label for="resource-component-type" class={DLG_LABEL}>{t("library.detail.typeOptional")}</label><input id="resource-component-type" name="type" type="text" class={DLG_INPUT} placeholder={t("library.detail.typeExample")} /></div>
           </Show>
           <div class="flex items-center">
-            <input id="resource-public" name="isPublic" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" />
-            <label for="resource-public" class="ml-2 block text-sm text-slate-900 dark:text-slate-300">{t("library.detail.makeKindPublic", { name: meta.singular })}</label>
+            <input id="resource-public" name="isPublic" type="checkbox" class="h-4 w-4 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" />
+            <label for="resource-public" class="ml-2 block text-sm text-[color:var(--ent-text)]">{t("library.detail.makeKindPublic", { name: meta.singular })}</label>
           </div>
-          <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-            <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={() => setCreateOpen(false)}>{t("common.cancel")}</button>
-            <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy()}>{busy() ? t("mcp.form.saving") : t("keys.group.create")}</button>
+          <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
+            <button type="button" class={DLG_CANCEL} onClick={() => setCreateOpen(false)}>{t("common.cancel")}</button>
+            <button type="submit" class={DLG_PRIMARY} disabled={busy()}>{busy() ? t("mcp.form.saving") : t("keys.group.create")}</button>
           </div>
         </form>
       </Modal>
 
       <Modal open={deleting() !== undefined} title={t("library.detail.deleteTitle", { name: meta.singular })} onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-slate-700 dark:text-slate-300">{t("library.detail.deleteConfirm", { name: meta.singular })}</p>
+        <p class="text-sm text-[color:var(--ent-text)]">{t("library.detail.deleteConfirm", { name: meta.singular })}</p>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-700" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
-          <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
+          <button type="button" class={DLG_CANCEL} onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
+          <button type="button" class={DLG_DANGER} disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
         </div>
       </Modal>
 
@@ -429,7 +442,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                       hint={hasFilters() ? t("library.detail.noMatch", { name: lower }) : t("library.detail.createFirst", { name: meta.singular })}
                     >
                         <Show when={hasFilters()} fallback={<>
-                          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>{t("keys.group.create")} {meta.singular}</button>
+                          <button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("keys.group.create")} {meta.singular}</button>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><MessageSquareText size={16} aria-hidden="true" />{t("library.detail.generateAi")}</button>
                         </>}>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("library.reset")}</button>

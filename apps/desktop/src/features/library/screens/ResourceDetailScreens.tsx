@@ -519,19 +519,30 @@ function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfi
     apply(draft)
     props.onPatchConfig("__config", draft)
   }
-  const number = (id: string, label: string, value: number | undefined, unit: string, apply: (value: number) => void): JSX.Element => (
+  // The figure is read through an accessor so the field follows the profile without being rebuilt at every keystroke.
+  const number = (id: string, label: string, value: () => number | undefined, unit: string, apply: (value: number) => void): JSX.Element => (
     <div>
       <label for={id} class={LABEL}>{label}{unit ? ` (${unit})` : ""}</label>
-      <input id={id} class={INPUT} type="number" value={value === undefined ? "" : String(value)} onInput={(e) => {
-        const parsed = Number(e.currentTarget.value)
-        if (Number.isFinite(parsed) && e.currentTarget.value.trim() !== "") apply(parsed)
-      }} />
+      <NumberField id={id} class={INPUT} value={value()} onChange={apply} />
     </div>
   )
+  /** Writes one axis of the work volume; an emptied axis is removed, and the volume with it when no axis is left. */
+  const setVolume = (axis: "x" | "y" | "z", value: number | undefined): void => {
+    patch((draft) => {
+      const volume = { ...((draft["workVolume"] ?? {}) as Record<string, unknown>) }
+      if (value !== undefined) volume[axis] = value
+      else delete volume[axis]
+      if (Object.keys(volume).length === 0) delete draft["workVolume"]
+      else draft["workVolume"] = volume
+    })
+  }
   const profileNumber = (id: string, label: string, group: "spindle" | "feed" | "table" | "accuracy", key: string, unit: string): JSX.Element => {
-    const current = profile()
-    const groupValue = (current[group] ?? {}) as Record<string, unknown>
-    return number(id, label, typeof groupValue[key] === "number" ? groupValue[key] : undefined, unit, (value) =>
+    const figure = (): number | undefined => {
+      const groupValue = (profile()[group] ?? {}) as Record<string, unknown>
+      const found = groupValue[key]
+      return typeof found === "number" ? found : undefined
+    }
+    return number(id, label, figure, unit, (value) =>
       patch((draft) => {
         const section = { ...((draft[group] ?? {}) as Record<string, unknown>) }
         section[key] = value
@@ -588,16 +599,14 @@ function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfi
         {(["x", "y", "z"] as const).map((axis) => (
           <div>
             <label for={`res-work-${axis}`} class={LABEL}>{axis.toUpperCase()}</label>
-            <input id={`res-work-${axis}`} class={INPUT} type="number" value={profile().workVolume?.[axis] ?? ""} onInput={(e) => {
-              const parsed = Number(e.currentTarget.value)
-              patch((draft) => {
-                const volume = { ...((draft["workVolume"] ?? {}) as Record<string, unknown>) }
-                if (Number.isFinite(parsed) && e.currentTarget.value.trim() !== "") volume[axis] = parsed
-                else delete volume[axis]
-                if (Object.keys(volume).length === 0) delete draft["workVolume"]
-                else draft["workVolume"] = volume
-              })
-            }} />
+            <NumberField
+              id={`res-work-${axis}`}
+              class={INPUT}
+              optional
+              value={profile().workVolume?.[axis]}
+              onChange={(parsed) => setVolume(axis, parsed)}
+              onClear={() => setVolume(axis, undefined)}
+            />
           </div>
         ))}
       </div>

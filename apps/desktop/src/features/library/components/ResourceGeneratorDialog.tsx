@@ -24,8 +24,8 @@ import {
 } from "../lib/resource-generation.ts"
 import { t, type Key } from "../../../i18n/index.ts"
 
-const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-const LABEL = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+const INPUT = "w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-sm text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
+const LABEL = "mb-1 block text-sm font-medium text-[color:var(--ent-text)]"
 
 /** The assistant is optional at render time (the page also mounts without the AI provider, e.g. in isolation). */
 const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
@@ -80,12 +80,12 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
 
   return (
     <Modal open={props.open} title={t("library.generate.title", { name: t(`library.kind.${props.kind}.many` as Key) })} onClose={props.onClose} wide>
-      <p class="text-sm text-slate-600 dark:text-slate-400">
+      <p class="text-sm text-[color:var(--ent-text-muted)]">
         {t("library.generate.intro", { name: t(`library.kind.${props.kind}.lower` as Key) })}
       </p>
 
       <Show when={props.kind === "components" && (props.projectName === undefined || props.projectName === "")}>
-        <p class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200" role="alert" data-testid="generate-no-project">
+        <p class="rounded-md border border-[color:var(--ent-warn)] bg-[color:var(--ent-warn-soft)] px-3 py-2 text-xs text-[color:var(--ent-warn)]" role="alert" data-testid="generate-no-project">
           {t("library.generate.noProject")}
         </p>
       </Show>
@@ -102,11 +102,11 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
           value={request()}
           onInput={(event) => setRequest(event.currentTarget.value)}
         />
-        <div class="mt-2 flex flex-wrap gap-1.5">
+        <div class="mt-2 flex flex-wrap gap-2">
           <For each={spec.examples}>{(example, index) => (
             <button
               type="button"
-              class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-300"
+              class="rounded-full border border-[color:var(--ent-line-strong)] px-3 py-1 text-xs text-[color:var(--ent-text-muted)] transition-colors hover:border-[color:var(--ent-accent)] hover:text-[color:var(--ent-accent)]"
               onClick={() => setRequest(t(`library.generate.ex.${props.kind}.${index()}` as Key))}
             >
               {t(`library.generate.ex.${props.kind}.${index()}` as Key)}
@@ -120,30 +120,30 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
           <label for="generate-quantity" class={LABEL}>{t("library.generate.howMany")}</label>
           <NumberField id="generate-quantity" name="quantity" int min={String(MIN_GENERATION_COUNT)} max={String(MAX_GENERATION_COUNT)} class={INPUT} value={quantity()} accept={(value) => value >= MIN_GENERATION_COUNT} onValue={(value) => setQuantity(generationCount(value))} />
         </div>
-        <div class="flex flex-col justify-end gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+        <div class="flex flex-col justify-end gap-2 text-sm text-[color:var(--ent-text)]">
           <label class="inline-flex items-center gap-2">
-            <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" checked={makePublic()} onChange={(event) => setMakePublic(event.currentTarget.checked)} />
+            <input type="checkbox" class="h-4 w-4 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" checked={makePublic()} onChange={(event) => setMakePublic(event.currentTarget.checked)} />
             {t("library.generate.makePublic", { name: t(`library.kind.${props.kind}.lower` as Key), visibility: t("save.publicProject") })}
           </label>
           <Show when={props.kind !== "components"}>
             <label class="inline-flex items-center gap-2">
-              <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" checked={setDefault()} onChange={(event) => setSetDefault(event.currentTarget.checked)} />
+              <input type="checkbox" class="h-4 w-4 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" checked={setDefault()} onChange={(event) => setSetDefault(event.currentTarget.checked)} />
               {t("library.generate.setDefault")}
             </label>
           </Show>
         </div>
       </div>
 
-      <div class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
-        <button type="button" class="flex w-full items-center justify-between gap-3 rounded text-left text-sm font-medium text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()} aria-controls={showParameters() ? parametersId : undefined}>
+      <div class="rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] px-3 py-2">
+        <button type="button" class="flex w-full items-center justify-between gap-3 rounded text-left text-sm font-medium text-[color:var(--ent-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ent-accent)]" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()} aria-controls={showParameters() ? parametersId : undefined}>
           <span>{t("library.generate.parameters", { count: spec.parameters.length })}</span>
-          <span class="text-slate-400">{showParameters() ? t("update.hide") : t("cad.createComponent.show")}</span>
+          <span class="text-[color:var(--ent-text-faint)]">{showParameters() ? t("update.hide") : t("cad.createComponent.show")}</span>
         </button>
         <Show when={showParameters()}>
           <ul id={parametersId} class="mt-2 space-y-1">
             <For each={spec.parameters}>{(parameter) => (
-              <li class="flex gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <code class="font-mono text-blue-600 dark:text-blue-400">{parameter.name}</code>
+              <li class="flex gap-2 text-xs text-[color:var(--ent-text-muted)]">
+                <code class="font-mono text-[color:var(--ent-accent)]">{parameter.name}</code>
                 <span>{t(`library.generate.hint.${props.kind}.${parameter.name}` as Key)}</span>
               </li>
             )}</For>
@@ -151,13 +151,13 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
         </Show>
       </div>
 
-      <p class="text-xs text-slate-500 dark:text-slate-400">{t(`library.generate.note.${props.kind}` as Key)}</p>
+      <p class="text-xs text-[color:var(--ent-text-muted)]">{t(`library.generate.note.${props.kind}` as Key)}</p>
 
-      <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-        <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={props.onClose}>{t("common.cancel")}</button>
+      <div class="flex flex-wrap justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
+        <button type="button" class="rounded-md border border-[color:var(--ent-line-strong)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]" onClick={props.onClose}>{t("common.cancel")}</button>
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
           data-testid="generate-submit"
           disabled={request().trim() === ""}
           onClick={submit}

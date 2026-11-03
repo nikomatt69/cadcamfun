@@ -68,6 +68,7 @@
 .sidebar-tool:hover { background: var(--panel-bg-inset); border-color: var(--panel-border-strong); color: var(--panel-text); }
 .sidebar-tool--selected { background: var(--panel-accent-soft); border-color: var(--panel-accent); color: var(--panel-accent); }
 .sidebar-tool svg { width: 16px; height: 16px; flex: none; }
+.sidebar-tool > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-layer-list { padding: 4px; }
 .sidebar-layer { border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
 .sidebar-layer:hover { background: var(--panel-bg-subtle); }
