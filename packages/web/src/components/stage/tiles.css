@@ -99,3 +99,5 @@
 
 /* Post */
 .tile-code { font-size: 11px; padding: 8px 4px; }
+
+.tile-list { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; height: 100%; background: var(--ss-surface); }

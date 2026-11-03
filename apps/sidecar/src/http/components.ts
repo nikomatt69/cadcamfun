@@ -1,10 +1,12 @@
-import { Api, BadRequest, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, Forbidden, InternalError, NotFound, envErr, normalizeComponentData, ok, validateComponentData } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, Forbidden, InternalError, NotFound, envErr, normalizeComponentData, ok, validateComponentData } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ComponentRepo, type ComponentPatch } from "../repos/component-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { NotificationService } from "../services/notifications.ts"
 import { StorageService } from "../services/storage.ts"
+import { filterComponentLibrary } from "../repos/components-library.ts"
+import { analyzeComponentData } from "../repos/component-analysis.ts"
 import { type EntityExportIO, exportEntities, exportMeta, internal } from "./entity-io.ts"
 import type { ComponentDetail } from "@cadcamfun/api"
 
@@ -69,6 +71,17 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
   const trimmed = (content: string | undefined) => (content ?? "").trim() === "" ? undefined : content
 
   return handlers
+    // Legacy demanded an `id` query parameter this route never had and so always answered 400; the catalogue is served without it.
+    .handle("library", ({ query }) => Effect.sync(() => ok(filterComponentLibrary(query))))
+    .handle("analysis", ({ params }) =>
+      Effect.gen(function*() {
+        const { user, component } = yield* envReadable(params.id)
+        const referencing = yield* components.referencing(user.id, params.id)
+        const byProject = new Map<string, { id: string; name: string; usageCount: number }>()
+        for (const r of referencing) byProject.set(r.projectId, { id: r.projectId, name: r.projectName, usageCount: (byProject.get(r.projectId)?.usageCount ?? 0) + 1 })
+        const last = referencing.length ? new Date(Math.max(...referencing.map((r) => r.updatedAt.getTime()))) : new Date()
+        return ok({ ...analyzeComponentData(component.data, component.type), usage: { references: referencing.length, lastUsed: last.toISOString().split("T")[0]!, projects: [...byProject.values()] } })
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to analyze component"))))
     .handle("list", ({ query }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
@@ -118,7 +131,9 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
         if (payload.thumbnail !== undefined) patch.thumbnail = payload.thumbnail
         if (payload.data) patch.data = normalizeComponentData(payload.data as Record<string, unknown>)
         if (Object.keys(patch).length === 0) return yield* new BadRequest({ message: "No fields provided for update" })
-        const updated = yield* components.update(params.id, patch)
+        // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
+        const updated = payload.baseUpdatedAt === undefined ? yield* components.update(params.id, patch) : yield* components.updateIfCurrent(params.id, payload.baseUpdatedAt, patch)
+        if (updated === "conflict") return yield* new Conflict({ message: "The component was saved elsewhere since it was read. Nothing was overwritten." })
         return { ...updated, message: "Component updated successfully" }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update component"))))
     .handle("remove", ({ params }) =>
@@ -174,7 +189,8 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
           const validation = validateComponentData(version.data)
           if (!validation.valid) return yield* new BadRequest({ message: `Invalid version data: ${validation.errors?.join(", ")}` })
         }
-        const restored = yield* components.restoreVersion(componentId, payload.versionId, user.id, (data) => normalizeComponentData(data as Record<string, unknown>))
+        const restored = yield* components.restoreVersion(componentId, payload.versionId, user.id, (data) => normalizeComponentData(data as Record<string, unknown>), payload.baseUpdatedAt)
+        if (restored === "conflict") return yield* new Conflict({ message: "The component was saved elsewhere since it was read. Nothing was restored." })
         if (!restored) return yield* new NotFound({ message: "Version not found" })
         return { ...restored, message: "Version restored successfully" }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to restore component version"))))

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, Envelope, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, Envelope, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const NullStr = Schema.NullOr(Schema.String)
 
@@ -33,6 +33,12 @@ export const ComponentBody = Schema.Struct({
   thumbnail: Schema.optional(NullStr)
 })
 
+/**
+ * An editor that holds a copy sends the `updatedAt` it read as `baseUpdatedAt`: the write happens only if nobody saved since
+ * (409 otherwise), and the check and the write are one transaction. Without it the write is unconditional, as in legacy.
+ */
+export const ComponentUpdateBody = Schema.Struct({ ...ComponentBody.fields, baseUpdatedAt: Schema.optional(Schema.String) })
+
 /** Legacy PUT answers with the row spread plus a `message`. */
 export const ComponentUpdated = Schema.Struct({ ...ComponentRow.fields, message: Schema.String })
 
@@ -50,7 +56,7 @@ export const ComponentVersionDetail = Schema.Struct({ ...ComponentVersionRow.fie
 export const ComponentVersionBody = Schema.Struct({ data: Schema.optional(Schema.Unknown), changeMessage: Schema.optional(Schema.String) })
 export const ComponentVersionCreated = Schema.Struct({ ...ComponentVersionRow.fields, message: Schema.String })
 /** Legacy bodies also carry the component `id`; the path already names it, so it is not part of the payload (extra keys are ignored). */
-export const ComponentRestoreBody = Schema.Struct({ versionId: Schema.optional(Schema.String) })
+export const ComponentRestoreBody = Schema.Struct({ versionId: Schema.optional(Schema.String), baseUpdatedAt: Schema.optional(Schema.String) })
 
 export const ComponentCommentRow = Schema.Struct({
   id: Schema.String,
@@ -89,6 +95,18 @@ export const ComponentRelationships = Schema.Struct({
   relationships: Schema.Array(Schema.Struct({ sourceId: Schema.String, targetId: Schema.String, type: Schema.Literal("references") }))
 })
 
+/** Structural report of a component. The times and the memory figure are estimates from the JSON size, not measurements. */
+export const ComponentAnalysis = Schema.Struct({
+  complexity: Schema.Struct({ score: Schema.Number, factors: Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.Number, benchmark: Schema.Number })) }),
+  performance: Schema.Struct({ score: Schema.Number, metrics: Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.Number, unit: Schema.String, benchmark: Schema.Number })) }),
+  compatibility: Schema.Struct({ score: Schema.Number, platforms: Schema.Array(Schema.Struct({ name: Schema.String, compatible: Schema.Boolean })) }),
+  usage: Schema.Struct({
+    references: Schema.Number,
+    lastUsed: Schema.String,
+    projects: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, usageCount: Schema.Number }))
+  })
+})
+
 const id = { id: Schema.String }
 const versionParams = { id: Schema.String, versionId: Schema.String }
 const commentParams = { id: Schema.String, commentId: Schema.String }
@@ -109,12 +127,18 @@ export class ComponentsGroup extends HttpApiGroup.make("components")
     HttpApiEndpoint.get("relationships", "/api/components/:id/relationships", { params: id, success: Envelope(ComponentRelationships), error: envErrors }),
     HttpApiEndpoint.get("get", "/api/components/:id", { params: id, success: ComponentDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/components/:id", {
-      params: id, payload: ComponentBody, success: ComponentUpdated, error: [BadRequest, Forbidden, NotFound, InternalError]
+      params: id, payload: ComponentUpdateBody, success: ComponentUpdated, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/components/:id", { params: id, success: Message, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.get("listForProject", "/api/projects/:id/components", { params: id, success: Schema.Array(ComponentRow), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createForProject", "/api/projects/:id/components", {
       params: id, payload: ComponentBody, success: ComponentRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
+    }),
+    HttpApiEndpoint.get("analysis", "/api/components/:id/analysis", { params: id, success: Envelope(ComponentAnalysis), error: envErrors }),
+    // The shipped catalogue of CAD parts. Items come in two shapes (library entries and component data), so they stay `Unknown`.
+    HttpApiEndpoint.get("library", "/api/components/library", {
+      query: { type: Schema.optional(Schema.String), category: Schema.optional(Schema.String), search: Schema.optional(Schema.String) },
+      success: Envelope(Schema.Array(Schema.Unknown)), error: [EnvInternal]
     }),
     // Object storage of a component's data (envelope bodies; the POST body is the raw component data).
     HttpApiEndpoint.post("saveStorage", "/api/components/:id/storage", { params: id, payload: Schema.Unknown, success: Envelope(Schema.Unknown), error: storageErrors }),
@@ -134,7 +158,7 @@ export class ComponentsGroup extends HttpApiGroup.make("components")
       params: id, payload: ComponentVersionBody, success: ComponentVersionCreated.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
     }),
     HttpApiEndpoint.post("restoreVersion", "/api/components/:id/versions/restore", {
-      params: id, payload: ComponentRestoreBody, success: ComponentUpdated, error: [BadRequest, NotFound, InternalError]
+      params: id, payload: ComponentRestoreBody, success: ComponentUpdated, error: [BadRequest, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.get("getVersion", "/api/components/:id/versions/:versionId", { params: versionParams, success: Envelope(ComponentVersionDetail), error: envErrors }),
     // Comments: envelope bodies.

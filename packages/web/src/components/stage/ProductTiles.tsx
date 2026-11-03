@@ -1,4 +1,4 @@
-import { Bar, Code, Icon, Stage, Stream, Text, Window } from "../../stageshow/kit"
+import { Avatar, Bar, Code, Icon, Row, Stage, Stream, Text, Window } from "../../stageshow/kit"
 import { PartView } from "./PartView"
 import { useSiteTheme } from "./useSiteTheme"
 import "./workbench.css"
@@ -110,9 +110,123 @@ function PostTile() {
   )
 }
 
+function CadTile() {
+  return (
+    <Tile name="cad">
+      {() => (
+        <>
+          <Window title="Bracket" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="wb-view">
+              <PartView />
+            </div>
+          </Window>
+          <div className="tile-card tile-card--cad">
+            <Text className="tile-card__label">Extrude</Text>
+            <Text className="tile-card__value">12 mm</Text>
+            <Bar w={56} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+const API_LINES = [
+  "POST /api/toolpaths",
+  '{ "operation": "pocket",',
+  '  "depth": 4 }',
+  "",
+  { text: "200 OK", kind: "add" as const },
+  '{ "cycle": "04:12" }',
+]
+
+function ApiTile() {
+  return (
+    <Tile name="api">
+      {() => (
+        <>
+          <Window chrome="terminal" title="HttpApi" className="tile-window">
+            <Code lines={API_LINES} className="tile-code" />
+          </Window>
+          <div className="tile-card tile-card--api">
+            <Text className="tile-card__label">Contract</Text>
+            <Text className="tile-card__value">api</Text>
+            <Bar w={48} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function HistoryTile() {
+  const rows = [
+    { name: "Add pocket 1", meta: "now", selected: true },
+    { name: "Round top edges", meta: "2 h" },
+  ]
+  return (
+    <Tile name="history">
+      {() => (
+        <>
+          <Window title="History" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-list">
+              {rows.map((r) => (
+                <Row key={r.name} pad={8} selected={r.selected} lead={<Avatar name="Niko" tone={r.selected ? "accent" : "person"} size={20} />} title={<Text>{r.name}</Text>} meta={<Text>{r.meta}</Text>} />
+              ))}
+              {[96, 76, 88].map((w, i) => (
+                <Row key={i} pad={8} lead={<Bar w={20} h={20} r={10} tone={2} />} title={<Bar w={w} tone={3} />} meta={<Bar w={24} tone={2} />} />
+              ))}
+            </div>
+          </Window>
+          <div className="tile-card tile-card--history">
+            <Text className="tile-card__label">Branch</Text>
+            <Text className="tile-card__value">main</Text>
+            <Bar w={40} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function ArchTile() {
+  const layers = ["core", "api", "sidecar", "desktop"]
+  return (
+    <Tile name="arch">
+      {() => (
+        <>
+          <Window title="Workspace" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-list">
+              {layers.map((name, i) => (
+                <Row key={name} pad={8} selected={i === 2} lead={<Bar w={20} h={20} r={6} tone={i === 2 ? 4 : 2} />} title={<Text>{name}</Text>} meta={<Icon name="chevron-right" size={12} />} />
+              ))}
+              <Row pad={8} lead={<Bar w={20} h={20} r={6} tone={2} />} title={<Bar w={70} tone={3} />} />
+            </div>
+          </Window>
+          <div className="tile-card tile-card--arch">
+            <Text className="tile-card__label">Imports</Text>
+            <Text className="tile-card__value">inward only</Text>
+            <Bar w={64} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+export type TopicKind = "cam" | "ai" | "post" | "cad" | "api" | "history" | "arch"
+
 /** One tile on its own, for a docs page or a form that wants a picture of the thing it describes. */
-export function TopicTile({ kind }: { kind: "cam" | "ai" | "post" }) {
-  return kind === "cam" ? <CamTile /> : kind === "ai" ? <AssistantTile /> : <PostTile />
+export function TopicTile({ kind }: { kind: TopicKind }) {
+  switch (kind) {
+    case "cam": return <CamTile />
+    case "ai": return <AssistantTile />
+    case "post": return <PostTile />
+    case "cad": return <CadTile />
+    case "api": return <ApiTile />
+    case "history": return <HistoryTile />
+    default: return <ArchTile />
+  }
 }
 
 export default function ProductTiles({ titles }: { titles: [string, string, string] }) {

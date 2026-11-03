@@ -1158,6 +1158,7 @@ export type ComponentsUpdatePayload = {
   readonly type?: string | null | undefined
   readonly isPublic?: boolean | undefined
   readonly thumbnail?: string | null | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ComponentsCreateForProjectPayload = {
@@ -1174,7 +1175,10 @@ export type ComponentsCreateVersionPayload = {
   readonly changeMessage?: string | undefined
 }
 
-export type ComponentsRestoreVersionPayload = { readonly versionId?: string | undefined }
+export type ComponentsRestoreVersionPayload = {
+  readonly versionId?: string | undefined
+  readonly baseUpdatedAt?: string | undefined
+}
 
 export type ComponentsAddCommentPayload = { readonly content?: string | undefined }
 
@@ -6921,6 +6925,7 @@ export type ComponentsUpdateInput = {
   readonly type?: ComponentsUpdatePayload["type"]
   readonly isPublic?: ComponentsUpdatePayload["isPublic"]
   readonly thumbnail?: ComponentsUpdatePayload["thumbnail"]
+  readonly baseUpdatedAt?: ComponentsUpdatePayload["baseUpdatedAt"]
 }
 
 export type ComponentsUpdateOutput = {
@@ -6978,6 +6983,39 @@ export type ComponentsCreateForProjectOutput = {
   updatedAt: string
   projectId: string
 }
+
+export type ComponentsAnalysisInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsAnalysisOutput = {
+  success: true
+  message: string
+  data: {
+    complexity: { score: number; factors: Array<{ name: string; value: number; benchmark: number }> }
+    performance: { score: number; metrics: Array<{ name: string; value: number; unit: string; benchmark: number }> }
+    compatibility: { score: number; platforms: Array<{ name: string; compatible: boolean }> }
+    usage: { references: number; lastUsed: string; projects: Array<{ id: string; name: string; usageCount: number }> }
+  } | null
+}
+
+export type ComponentsLibraryInput = {
+  readonly type?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["type"]
+  readonly category?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["category"]
+  readonly search?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["search"]
+}
+
+export type ComponentsLibraryOutput = { success: true; message: string; data: Array<unknown> | null }
 
 export type ComponentsSaveStorageInput = { readonly id: { readonly id: string }["id"]; readonly payload: unknown }
 
@@ -7042,6 +7080,7 @@ export type ComponentsCreateVersionOutput = {
 export type ComponentsRestoreVersionInput = {
   readonly id: { readonly id: string }["id"]
   readonly versionId?: ComponentsRestoreVersionPayload["versionId"]
+  readonly baseUpdatedAt?: ComponentsRestoreVersionPayload["baseUpdatedAt"]
 }
 
 export type ComponentsRestoreVersionOutput = {

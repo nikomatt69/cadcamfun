@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
+import HeroWorkbench from "../../components/stage/HeroWorkbench"
 import { text } from "../../i18n/catalog"
 
 const locale = Astro.locals.locale ?? "en"
@@ -36,6 +37,7 @@ export const prerender = false
         <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">{text(locale, "Sign out")}</button>
       </div>
       <p id="studio-who" class="mt-4 text-[15px] text-terminal-muted"></p>
+      <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
 
       <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Workspace")}</h2>
       <div id="studio-counts" class="mt-4 grid gap-3 sm:grid-cols-4"></div>

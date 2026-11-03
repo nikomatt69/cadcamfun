@@ -1,0 +1,12 @@
+.qt .ss-stage { overflow: hidden; background: transparent; background-image: none; }
+.qt .qt-window {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 488px;
+  height: 214px;
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+  font-size: 13px;
+}
+.qt .ss-stage[data-layout="compact"] .qt-window { left: 8px; width: 342px; }
