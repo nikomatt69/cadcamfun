@@ -217,7 +217,7 @@ export const createEventApplier = (ctx: EventContext): EventApplier => {
     if (event.type === "done") {
       void ctx.refreshControls()
       const id = idForEvent
-      ctx.patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage, finishedAt: new Date().toISOString() }))
+      ctx.patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage, ...(event.recovered === true ? { recovered: true } : {}), finishedAt: new Date().toISOString() }))
       ctx.setStats((s) => ({
         ...s,
         exchanges: s.exchanges + 1,

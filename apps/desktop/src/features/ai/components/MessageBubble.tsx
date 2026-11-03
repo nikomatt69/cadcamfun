@@ -168,6 +168,9 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             {turnFooter().join(" · ")}
           </p>
         </Show>
+        <Show when={!isUser() && props.message.status === "done" && props.message.recovered === true}>
+          <p class="assistant-meta-text mt-1" data-testid="ai-recovered-note" role="note">{t("ai.recovered.note")}</p>
+        </Show>
         <Show when={props.message.status === "streaming" && segments().length === 0}>
           <span class="inline-block text-sm motion-safe:animate-pulse" aria-hidden="true">▍</span>
         </Show>

@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "目標を読み取りました",
   "ai.toolView.goalUpdate.pending": "目標を更新中…",
   "ai.toolView.goalUpdate.title": "目標 {status}",
-  "ai.toolView.goalUpdate.default": "目標を更新しました"
+  "ai.toolView.goalUpdate.default": "目標を更新しました",
+  "ai.recovered.note": "接続が切れたあとにこの回答を復元しました。図面は保存済みの内容から読み込み直しています。続ける前に結果を確認してください。"
 }

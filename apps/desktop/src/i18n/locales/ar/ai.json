@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "تمت قراءة الهدف",
   "ai.toolView.goalUpdate.pending": "جارٍ تحديث الهدف…",
   "ai.toolView.goalUpdate.title": "الهدف {status}",
-  "ai.toolView.goalUpdate.default": "تم تحديث الهدف"
+  "ai.toolView.goalUpdate.default": "تم تحديث الهدف",
+  "ai.recovered.note": "تمت استعادة هذه الإجابة بعد انقطاع الاتصال. أُعيد تحميل الرسم من المحفوظ؛ تحقق من النتيجة قبل المتابعة."
 }

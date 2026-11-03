@@ -125,6 +125,19 @@ describe("what a streamed event does to the conversation", () => {
     expect(h.plan()[0]?.content).toBe("rough it")
   })
 
+  test("an answer rebuilt from the host after a dropped stream is marked recovered; a normal one is not (RM-10)", () => {
+    const recovered = harness()
+    const recoveringApplier = createEventApplier(recovered.ctx)
+    recoveringApplier.apply(event({ type: "delta", sessionId: "s1", text: "Rebuilt" }), owner)
+    recoveringApplier.apply(event({ type: "done", sessionId: "s1", text: "Rebuilt answer", recovered: true }), owner)
+    expect(recovered.messages()[0]).toMatchObject({ status: "done", text: "Rebuilt answer", recovered: true })
+    const normal = harness()
+    const liveApplier = createEventApplier(normal.ctx)
+    liveApplier.apply(event({ type: "delta", sessionId: "s1", text: "Live" }), owner)
+    liveApplier.apply(event({ type: "done", sessionId: "s1", text: "Live answer" }), owner)
+    expect(normal.messages()[0]?.recovered).toBeUndefined()
+  })
+
   test("the end of the turn closes the answer and counts the exchange", () => {
     const h = harness()
     const applier = createEventApplier(h.ctx)

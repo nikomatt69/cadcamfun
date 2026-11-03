@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "Goal read",
   "ai.toolView.goalUpdate.pending": "Updating the goal...",
   "ai.toolView.goalUpdate.title": "Goal {status}",
-  "ai.toolView.goalUpdate.default": "Goal updated"
+  "ai.toolView.goalUpdate.default": "Goal updated",
+  "ai.recovered.note": "This answer was recovered after the connection dropped. The drawing was reloaded from what was saved; check the result before continuing."
 }

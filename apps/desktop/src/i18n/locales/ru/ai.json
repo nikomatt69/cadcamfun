@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "Цель прочитана",
   "ai.toolView.goalUpdate.pending": "Обновление цели…",
   "ai.toolView.goalUpdate.title": "Цель: {status}",
-  "ai.toolView.goalUpdate.default": "Цель обновлена"
+  "ai.toolView.goalUpdate.default": "Цель обновлена",
+  "ai.recovered.note": "Этот ответ восстановлен после обрыва соединения. Чертёж перезагружен из сохранённых данных; проверьте результат, прежде чем продолжать."
 }

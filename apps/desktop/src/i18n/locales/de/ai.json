@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "Ziel gelesen",
   "ai.toolView.goalUpdate.pending": "Ziel wird aktualisiert…",
   "ai.toolView.goalUpdate.title": "Ziel {status}",
-  "ai.toolView.goalUpdate.default": "Ziel aktualisiert"
+  "ai.toolView.goalUpdate.default": "Ziel aktualisiert",
+  "ai.recovered.note": "Diese Antwort wurde nach einem Verbindungsabbruch wiederhergestellt. Die Zeichnung wurde aus dem Gespeicherten neu geladen; prüfen Sie das Ergebnis, bevor Sie weitermachen."
 }

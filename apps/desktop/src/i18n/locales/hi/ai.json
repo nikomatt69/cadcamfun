@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "लक्ष्य पढ़ा गया",
   "ai.toolView.goalUpdate.pending": "लक्ष्य अपडेट हो रहा है…",
   "ai.toolView.goalUpdate.title": "लक्ष्य {status}",
-  "ai.toolView.goalUpdate.default": "लक्ष्य अपडेट किया गया"
+  "ai.toolView.goalUpdate.default": "लक्ष्य अपडेट किया गया",
+  "ai.recovered.note": "कनेक्शन टूटने के बाद यह उत्तर वापस लाया गया। ड्राइंग को सहेजी गई सामग्री से दोबारा लोड किया गया है; आगे बढ़ने से पहले परिणाम जाँच लें।"
 }

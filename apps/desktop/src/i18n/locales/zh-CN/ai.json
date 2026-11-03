@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "已读取目标",
   "ai.toolView.goalUpdate.pending": "正在更新目标…",
   "ai.toolView.goalUpdate.title": "目标 {status}",
-  "ai.toolView.goalUpdate.default": "目标已更新"
+  "ai.toolView.goalUpdate.default": "目标已更新",
+  "ai.recovered.note": "连接中断后已恢复此回答。图纸已根据已保存的内容重新加载；继续之前请检查结果。"
 }

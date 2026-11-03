@@ -9,7 +9,7 @@
 import { Context, Effect, Layer, Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import type { Client } from "../../../shared/state/client.ts"
-import type { CamKernelRequest, CamKernelResult } from "@cadcamfun/api"
+import type { CamKernelRequest, CamKernelResult, CamVerifyNcRequest, CamVerifyNcResult } from "@cadcamfun/api"
 
 export type GenerateRequest = Parameters<Client["toolpathGenerator"]["generate"]>[0]["payload"]
 export type SuggestRequest = Parameters<Client["toolpathGenerator"]["suggest"]>[0]["payload"]
@@ -40,6 +40,8 @@ export interface ToolpathGeneratorService {
   readonly parse: (gcode: string, name?: string) => Effect.Effect<ParseResponse, ToolpathGeneratorError>
   /** Replays G-code against the stock: removal, collisions, gouges. */
   readonly verify: (request: VerifyRequest) => Effect.Effect<VerifyResponse, ToolpathGeneratorError>
+  /** Replays NC text (any author) on the tri-dexel stock against the part: gouges with their NC line, rapids through material, travel. */
+  readonly verifyNc: (request: CamVerifyNcRequest) => Effect.Effect<CamVerifyNcResult, ToolpathGeneratorError>
 }
 
 export const makeToolpathGenerator = (client: Client): ToolpathGeneratorService => ({
@@ -47,7 +49,8 @@ export const makeToolpathGenerator = (client: Client): ToolpathGeneratorService 
   generate: (payload) => client.toolpathGenerator.generate({ payload }).pipe(Effect.mapError(failure)),
   suggest: (payload) => client.toolpathGenerator.suggest({ payload }).pipe(Effect.mapError(failure)),
   parse: (gcode, name) => client.toolpathGenerator.parse({ payload: { gcode, name: name ?? "Program" } }).pipe(Effect.mapError(failure)),
-  verify: (payload) => client.toolpathGenerator.verify({ payload }).pipe(Effect.mapError(failure))
+  verify: (payload) => client.toolpathGenerator.verify({ payload }).pipe(Effect.mapError(failure)),
+  verifyNc: (payload) => client.toolpathGenerator.verifyNc({ payload }).pipe(Effect.mapError(failure))
 })
 
 export class ToolpathGenerator extends Context.Service<ToolpathGenerator, ToolpathGeneratorService>()("cadcamfun/ToolpathGenerator") {

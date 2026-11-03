@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "Meta lida",
   "ai.toolView.goalUpdate.pending": "Atualizando a meta…",
   "ai.toolView.goalUpdate.title": "Meta {status}",
-  "ai.toolView.goalUpdate.default": "Meta atualizada"
+  "ai.toolView.goalUpdate.default": "Meta atualizada",
+  "ai.recovered.note": "Esta resposta foi recuperada depois de a ligação cair. O desenho foi recarregado a partir do que estava guardado; verifique o resultado antes de continuar."
 }

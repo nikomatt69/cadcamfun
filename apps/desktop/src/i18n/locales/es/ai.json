@@ -799,5 +799,6 @@
   "ai.toolView.goalGet.title": "Objetivo leído",
   "ai.toolView.goalUpdate.pending": "Actualizando el objetivo…",
   "ai.toolView.goalUpdate.title": "Objetivo {status}",
-  "ai.toolView.goalUpdate.default": "Objetivo actualizado"
+  "ai.toolView.goalUpdate.default": "Objetivo actualizado",
+  "ai.recovered.note": "Esta respuesta se recuperó tras cortarse la conexión. El dibujo se recargó desde lo guardado; revisa el resultado antes de continuar."
 }

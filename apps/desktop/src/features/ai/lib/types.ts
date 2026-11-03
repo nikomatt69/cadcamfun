@@ -97,6 +97,8 @@ export interface AiMessage {
   readonly events: ReadonlyArray<AiEvent>
   readonly status: AiMessageStatus
   readonly usage?: AiUsage
+  /** The answer was rebuilt from the host after the stream dropped: its tool results never reached the editor. */
+  readonly recovered?: boolean
   readonly error?: string
   /** Names of the files sent with a user message. */
   readonly attachments?: ReadonlyArray<string>
