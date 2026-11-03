@@ -2070,6 +2070,7 @@ type Endpoint18_3Input = {
   readonly properties?: Endpoint18_3Request["payload"]["properties"]
   readonly organizationId?: Endpoint18_3Request["payload"]["organizationId"]
   readonly isPublic?: Endpoint18_3Request["payload"]["isPublic"]
+  readonly baseUpdatedAt?: Endpoint18_3Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint18_3 = (raw: RawClient["materials"]) => (input: Endpoint18_3Input) =>
   raw["update"]({
@@ -2080,6 +2081,7 @@ const Endpoint18_3 = (raw: RawClient["materials"]) => (input: Endpoint18_3Input)
       properties: input["properties"],
       organizationId: input["organizationId"],
       isPublic: input["isPublic"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -2233,6 +2235,7 @@ type Endpoint20_3Input = {
   readonly notes?: Endpoint20_3Request["payload"]["notes"]
   readonly organizationId?: Endpoint20_3Request["payload"]["organizationId"]
   readonly isPublic?: Endpoint20_3Request["payload"]["isPublic"]
+  readonly baseUpdatedAt?: Endpoint20_3Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint20_3 = (raw: RawClient["tools"]) => (input: Endpoint20_3Input) =>
   raw["update"]({
@@ -2257,6 +2260,7 @@ const Endpoint20_3 = (raw: RawClient["tools"]) => (input: Endpoint20_3Input) =>
       notes: input["notes"],
       organizationId: input["organizationId"],
       isPublic: input["isPublic"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

@@ -28,13 +28,17 @@ const orgsUsing = async (db: Db, id: string): Promise<ReadonlyArray<string>> =>
 export type MachineConfigView = ReturnType<typeof serialize> & { owner: ReturnType<typeof owner> | null }
 export interface Permission { hasAccess: boolean; isOwner: boolean; reason?: string }
 
+export type MachineConfigUpdate = { name: string; description: string | null; type: string; config: unknown; isPublic: boolean }
+
 export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
   list(userId: string, f: { type?: string | undefined; search?: string | undefined; page: number; limit: number }):
     Effect.Effect<{ rows: Array<MachineConfigView & { isOwner: boolean; usageCount: number }>; total: number }, DatabaseError>
   /** Row + owner + permission (owner, public, or a toolpath of a project the user can reach). */
   find(userId: string, id: string): Effect.Effect<{ row: Row; view: MachineConfigView; permission: Permission; usageCount: number } | undefined, DatabaseError>
   create(userId: string, d: { name: string; description?: string | null | undefined; type: string; config: unknown; isPublic: boolean }): Effect.Effect<MachineConfigView, DatabaseError>
-  update(id: string, d: { name: string; description: string | null; type: string; config: unknown; isPublic: boolean }): Effect.Effect<{ view: MachineConfigView; usageCount: number }, DatabaseError>
+  update(id: string, d: MachineConfigUpdate): Effect.Effect<{ view: MachineConfigView; usageCount: number }, DatabaseError>
+  /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
+  updateIfCurrent(id: string, d: MachineConfigUpdate, base: string): Effect.Effect<{ view: MachineConfigView; usageCount: number } | "conflict", DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
   usage(id: string): Effect.Effect<number, DatabaseError>
   /** Plain lookup for the storage routes (owner / public rule is applied by the handler). */
@@ -51,6 +55,20 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
       const announce = (ownerId: string, orgs: ReadonlyArray<string>) =>
         Effect.andThen(events.resourcesChanged(ownerId), Effect.forEach(orgs, (org) => events.resourcesChanged(ownerId, org), { discard: true }))
       const T = schema.machineConfigTable
+      /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
+      const write = (id: string, d: MachineConfigUpdate, base: string | undefined) =>
+      query("machineConfigs.update", async (db) => {
+        const row = commitMutation(db, "machineConfigs.update", (tx) => {
+          const previous = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!previous) throw new Error("Machine configuration no longer exists")
+          if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: undefined, resourceId: id, changed: false }
+          const saved = tx.update(T).set({ ...d, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
+          if (!saved) throw new Error("Machine configuration disappeared during update")
+          return { result: saved as typeof saved | undefined, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: saved.updatedAt.toISOString() }
+        })
+        if (row === undefined) return "conflict" as const
+        return { view: { ...serialize(row), owner: await ownerOf(db, row.ownerId) }, usageCount: await usageOf(db, id), orgs: await orgsUsing(db, id) }
+      }).pipe(Effect.tap((row) => row !== "conflict" && row.view.ownerId ? announce(row.view.ownerId, row.orgs) : Effect.void), Effect.map((row) => row === "conflict" ? row : { view: row.view, usageCount: row.usageCount }))
       return MachineConfigRepo.of({
         list: (userId, f) =>
           query("machineConfigs.list", async (db) => {
@@ -95,17 +113,8 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
             })
             return { ...serialize(row), owner: await ownerOf(db, userId) }
           }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
-        update: (id, d) =>
-          query("machineConfigs.update", async (db) => {
-            const row = commitMutation(db, "machineConfigs.update", (tx) => {
-              const previous = tx.select().from(T).where(eq(T.id, id)).get()
-              if (!previous) throw new Error("Machine configuration no longer exists")
-              const saved = tx.update(T).set({ ...d, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
-              if (!saved) throw new Error("Machine configuration disappeared during update")
-              return { result: saved, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: saved.updatedAt.toISOString() }
-            })
-            return { view: { ...serialize(row), owner: await ownerOf(db, row.ownerId) }, usageCount: await usageOf(db, id), orgs: await orgsUsing(db, id) }
-          }).pipe(Effect.tap((row) => row.view.ownerId ? announce(row.view.ownerId, row.orgs) : Effect.void), Effect.map(({ view, usageCount }) => ({ view, usageCount }))),
+        update: (id, d) => write(id, d, undefined).pipe(Effect.map((row) => row as { view: MachineConfigView; usageCount: number })),
+        updateIfCurrent: (id, d, base) => write(id, d, base),
         remove: (id) => query("machineConfigs.remove", async (db) => {
           const orgs = await orgsUsing(db, id)
           const row = commitMutation(db, "machineConfigs.remove", (tx) => {

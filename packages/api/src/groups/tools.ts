@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const UserRef = Schema.Struct({ id: Schema.String, name: Schema.NullOr(Schema.String), email: Schema.NullOr(Schema.String) })
 const OrgRef = Schema.Struct({ id: Schema.String, name: Schema.String })
@@ -60,6 +60,9 @@ export const ToolBody = Schema.Struct({
   isPublic: opt(Schema.Boolean)
 })
 
+/** An editor that holds a copy sends the `updatedAt` it read: the write happens only while it is still current (409 otherwise). */
+export const ToolUpdateBody = Schema.Struct({ ...ToolBody.fields, baseUpdatedAt: opt(Schema.String) })
+
 const Message = Schema.Struct({ message: Schema.String })
 const id = { id: Schema.String }
 
@@ -80,7 +83,7 @@ export class ToolsGroup extends HttpApiGroup.make("tools")
     }),
     HttpApiEndpoint.get("get", "/api/tools/:id", { params: id, success: ToolDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/tools/:id", {
-      params: id, payload: ToolBody, success: ToolRow, error: [BadRequest, Forbidden, NotFound, InternalError]
+      params: id, payload: ToolUpdateBody, success: ToolRow, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/tools/:id", {
       params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError]

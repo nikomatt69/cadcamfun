@@ -545,6 +545,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
         "type": "object",
       },
+      "EnvConflictEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "_tag": {
+            "enum": [
+              "EnvConflict",
+            ],
+            "type": "string",
+          },
+          "errors": {
+            "anyOf": [
+              {},
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "message": {
+            "type": "string",
+          },
+          "success": {
+            "enum": [
+              false,
+            ],
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "_tag",
+          "success",
+          "message",
+          "errors",
+        ],
+        "type": "object",
+      },
       "EnvForbiddenEncoded": {
         "additionalProperties": false,
         "properties": {
@@ -36473,6 +36508,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
             "description": "EnvMethodNotAllowed",
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvConflictEncoded",
+                },
+              },
+            },
+            "description": "EnvConflict",
+          },
           "500": {
             "content": {
               "application/json": {
@@ -37898,6 +37943,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "description": {
                     "anyOf": [
                       {
@@ -38077,6 +38132,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {
@@ -88645,6 +88710,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "coolantType": {
                     "anyOf": [
                       {
@@ -89474,6 +89549,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {

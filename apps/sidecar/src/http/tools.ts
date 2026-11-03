@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ToolRepo } from "../repos/tool-repo.ts"
@@ -43,7 +43,11 @@ export const ToolsHandlers = HttpApiBuilder.group(Api, "tools", Effect.fn(functi
         const found = yield* repo.find(user.id, params.id)
         if (!found) return yield* new NotFound({ message: "Tool not found or access denied" })
         if (!found.canWrite) return yield* new Forbidden({ message: "You do not have permission to modify this tool" })
-        return yield* repo.update(params.id, payload)
+        const { baseUpdatedAt, ...fields } = payload
+        // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
+        const updated = baseUpdatedAt === undefined ? yield* repo.update(params.id, fields) : yield* repo.updateIfCurrent(params.id, fields, baseUpdatedAt)
+        if (updated === "conflict") return yield* new Conflict({ message: "The tool was saved elsewhere since it was read. Nothing was overwritten." })
+        return updated
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update tool"))))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const UserRef = Schema.Struct({ id: Schema.String, name: Schema.NullOr(Schema.String), email: Schema.NullOr(Schema.String) })
 const OrgRef = Schema.Struct({ id: Schema.String, name: Schema.String })
@@ -34,6 +34,9 @@ export const MaterialBody = Schema.Struct({
   isPublic: Schema.optional(Schema.Boolean)
 })
 
+/** An editor that holds a copy sends the `updatedAt` it read: the write happens only while it is still current (409 otherwise). */
+export const MaterialUpdateBody = Schema.Struct({ ...MaterialBody.fields, baseUpdatedAt: Schema.optional(Schema.String) })
+
 const Message = Schema.Struct({ message: Schema.String })
 const id = { id: Schema.String }
 
@@ -52,9 +55,9 @@ export class MaterialsGroup extends HttpApiGroup.make("materials")
     HttpApiEndpoint.get("get", "/api/materials/:id", { params: id, success: MaterialDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/materials/:id", {
       params: id,
-      payload: MaterialBody,
+      payload: MaterialUpdateBody,
       success: MaterialRow,
-      error: [BadRequest, Forbidden, NotFound, InternalError]
+      error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/materials/:id", {
       params: id,

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, EnvelopeOpt } from "../errors.ts"
+import { EnvBadRequest, EnvConflict, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, EnvelopeOpt } from "../errors.ts"
 import { MachineConfigParams } from "../cam-machine-config.ts"
 
 export { MachineConfigParams }
@@ -33,7 +33,7 @@ export class MachineConfigsGroup extends HttpApiGroup.make("machineConfigs")
     }),
     HttpApiEndpoint.get("get", "/api/machine-configs/:id", { params: id, success: EnvelopeOpt(Schema.Unknown), error: errors }),
     HttpApiEndpoint.put("update", "/api/machine-configs/:id", {
-      params: id, payload: Schema.Unknown, success: EnvelopeOpt(Schema.Unknown), error: errors
+      params: id, payload: Schema.Unknown, success: EnvelopeOpt(Schema.Unknown), error: [...errors, EnvConflict]
     }),
     HttpApiEndpoint.delete("remove", "/api/machine-configs/:id", { params: id, success: EnvelopeOpt(Schema.Unknown), error: errors }),
     HttpApiEndpoint.post("clone", "/api/machine-configs/:id/clone", {

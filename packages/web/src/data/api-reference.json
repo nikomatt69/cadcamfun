@@ -41176,6 +41176,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
           "500": {
             "description": "InternalError",
             "content": {
@@ -41249,6 +41259,16 @@
                     "anyOf": [
                       {
                         "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
                       },
                       {
                         "type": "null"
@@ -44182,6 +44202,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
           "500": {
             "description": "InternalError",
             "content": {
@@ -44625,6 +44655,16 @@
                     "anyOf": [
                       {
                         "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
                       },
                       {
                         "type": "null"
@@ -46191,6 +46231,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "EnvConflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvConflictEncoded"
                 }
               }
             }
@@ -92866,6 +92916,41 @@
             "type": "string",
             "enum": [
               "EnvInternal"
+            ]
+          },
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "_tag",
+          "success",
+          "message",
+          "errors"
+        ],
+        "additionalProperties": false
+      },
+      "EnvConflictEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "EnvConflict"
             ]
           },
           "success": {

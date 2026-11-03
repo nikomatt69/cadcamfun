@@ -294,6 +294,15 @@ export type EnvInternal = {
 export const isEnvInternal = (value: unknown): value is EnvInternal =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "EnvInternal"
 
+export type EnvConflict = {
+  readonly _tag: "EnvConflict"
+  readonly success: false
+  readonly message: string
+  readonly errors: unknown | null
+}
+export const isEnvConflict = (value: unknown): value is EnvConflict =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "EnvConflict"
+
 export type AuthIdentityPollPayload = { readonly id: string }
 
 export type AuthIdentityCancelPayload = { readonly id: string }
@@ -1075,6 +1084,7 @@ export type MaterialsUpdatePayload = {
   readonly properties?: unknown | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ToolsCreatePayload = {
@@ -1119,6 +1129,7 @@ export type ToolsUpdatePayload = {
   readonly notes?: string | null | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type DrawingsUpdatePayload = {
@@ -6281,6 +6292,7 @@ export type MaterialsUpdateInput = {
   readonly properties?: MaterialsUpdatePayload["properties"]
   readonly organizationId?: MaterialsUpdatePayload["organizationId"]
   readonly isPublic?: MaterialsUpdatePayload["isPublic"]
+  readonly baseUpdatedAt?: MaterialsUpdatePayload["baseUpdatedAt"]
 }
 
 export type MaterialsUpdateOutput = {
@@ -6494,6 +6506,7 @@ export type ToolsUpdateInput = {
   readonly notes?: ToolsUpdatePayload["notes"]
   readonly organizationId?: ToolsUpdatePayload["organizationId"]
   readonly isPublic?: ToolsUpdatePayload["isPublic"]
+  readonly baseUpdatedAt?: ToolsUpdatePayload["baseUpdatedAt"]
 }
 
 export type ToolsUpdateOutput = {

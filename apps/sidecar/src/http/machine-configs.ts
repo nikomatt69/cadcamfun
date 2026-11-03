@@ -1,4 +1,4 @@
-import { Api, CreateMachineConfig, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, envErr, okAuth } from "@cadcamfun/api"
+import { Api, CreateMachineConfig, CurrentUser, EnvBadRequest, EnvConflict, EnvForbidden, EnvInternal, EnvNotFound, envErr, okAuth } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -57,7 +57,7 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
       Effect.gen(function*() {
         const f = yield* guarded(params.id)
         if (!f.permission.isOwner) return yield* envErr(EnvForbidden, "Only the owner can update this machine configuration")
-        const body = (isObj(payload) ? payload : {}) as { name?: string; description?: string | null; type?: string; config?: Record<string, unknown>; isPublic?: boolean }
+        const body = (isObj(payload) ? payload : {}) as { name?: string; description?: string | null; type?: string; config?: Record<string, unknown>; isPublic?: boolean; baseUpdatedAt?: string }
         if (!body.name) return yield* envErr(EnvBadRequest, "Machine configuration name is required")
         if (body.type && !MACHINE_TYPES.includes(body.type)) {
           return yield* envErr(EnvBadRequest, "Valid machine type is required (mill, lathe, printer, or laser)")
@@ -72,14 +72,18 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
             return yield* envErr(EnvBadRequest, "Work volume dimensions (x, y, z) are required in the configuration")
           }
         }
-        const updated = yield* repo.update(params.id, {
+        const fields = {
           name: body.name,
           description: body.description !== undefined ? body.description : f.row.description,
           // Legacy parity: shallow merge of the stored config with the body config.
           config: body.config ? { ...base, ...body.config } : f.row.config,
           type: body.type || f.row.type,
           isPublic: body.isPublic !== undefined ? body.isPublic : f.row.isPublic
-        })
+        }
+        // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
+        const expected = typeof body.baseUpdatedAt === "string" ? body.baseUpdatedAt : undefined
+        const updated = expected === undefined ? yield* repo.update(params.id, fields) : yield* repo.updateIfCurrent(params.id, fields, expected)
+        if (updated === "conflict") return yield* envErr(EnvConflict, "The machine configuration was saved elsewhere since it was read. Nothing was overwritten.")
         return okAuth({ ...updated.view, isOwner: true, usageCount: updated.usageCount }, "Machine configuration updated successfully")
       }).pipe(Effect.catchTag("DatabaseError", internal)))
     .handle("remove", ({ params }) =>

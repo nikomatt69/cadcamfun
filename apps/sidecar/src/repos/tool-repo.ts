@@ -28,6 +28,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
   importMany(userId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   create(userId: string, input: ToolInput & { name: string; type: string; diameter: number; material: string }): Effect.Effect<ToolRow, DatabaseError>
   update(id: string, input: ToolInput): Effect.Effect<ToolRow, DatabaseError>
+  /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
+  updateIfCurrent(id: string, input: ToolInput, base: string): Effect.Effect<ToolRow | "conflict", DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/ToolRepo") {
   static readonly layer = Layer.effect(
@@ -36,6 +38,35 @@ export class ToolRepo extends Context.Service<ToolRepo, {
       const { query } = yield* Database
       const events = yield* LiveEvents
       const T = schema.toolTable
+      /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
+      const write = (id: string, i: ToolInput, base: string | undefined) =>
+      query("tools.update", (db) => commitMutation(db, "tools.update", (tx) => {
+        const previous = tx.select().from(T).where(eq(T.id, id)).get()
+        if (!previous) throw new Error("Tool no longer exists")
+        if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: "conflict" as const, resourceId: id, changed: false }
+        // Same truthiness rules as the legacy spread: required text/number fields only when truthy, the rest when defined.
+        const row = tx.update(T).set({
+          ...(i.name && { name: i.name }), ...(i.type && { type: i.type }),
+          ...(i.diameter && { diameter: i.diameter }), ...(i.material && { material: i.material }),
+          ...(i.numberOfFlutes !== undefined && { numberOfFlutes: i.numberOfFlutes }),
+          ...(i.maxRPM !== undefined && { maxRPM: i.maxRPM }),
+          ...(i.coolantType !== undefined && { coolantType: i.coolantType }),
+          ...(i.cuttingLength !== undefined && { cuttingLength: i.cuttingLength }),
+          ...(i.totalLength !== undefined && { totalLength: i.totalLength }),
+          ...(i.shankDiameter !== undefined && { shankDiameter: i.shankDiameter }),
+          ...(i.cornerRadius !== undefined && { cornerRadius: i.cornerRadius }),
+          ...(i.tipAngle !== undefined && { tipAngle: i.tipAngle }),
+          ...(i.threadPitch !== undefined && { threadPitch: i.threadPitch }),
+          ...(i.holderDiameter !== undefined && { holderDiameter: i.holderDiameter }),
+          ...(i.holderLength !== undefined && { holderLength: i.holderLength }),
+          ...(i.stickout !== undefined && { stickout: i.stickout }),
+          ...(i.notes !== undefined && { notes: i.notes }),
+          ...(i.isPublic !== undefined && { isPublic: i.isPublic }),
+          updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+        }).where(eq(T.id, id)).returning().get()
+        if (!row) throw new Error("Tool disappeared during update")
+        return { result: toRow(row) as ToolRow | "conflict", resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+      })).pipe(Effect.tap((row) => row !== "conflict" && row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void))
       return ToolRepo.of({
         list: (userId, f) =>
           query("tools.list", async (db) => {
@@ -129,33 +160,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
             if (!row) throw new Error("Tool was not created")
             return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
           })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        update: (id, i) =>
-          query("tools.update", (db) => commitMutation(db, "tools.update", (tx) => {
-            const previous = tx.select().from(T).where(eq(T.id, id)).get()
-            if (!previous) throw new Error("Tool no longer exists")
-            // Same truthiness rules as the legacy spread: required text/number fields only when truthy, the rest when defined.
-            const row = tx.update(T).set({
-              ...(i.name && { name: i.name }), ...(i.type && { type: i.type }),
-              ...(i.diameter && { diameter: i.diameter }), ...(i.material && { material: i.material }),
-              ...(i.numberOfFlutes !== undefined && { numberOfFlutes: i.numberOfFlutes }),
-              ...(i.maxRPM !== undefined && { maxRPM: i.maxRPM }),
-              ...(i.coolantType !== undefined && { coolantType: i.coolantType }),
-              ...(i.cuttingLength !== undefined && { cuttingLength: i.cuttingLength }),
-              ...(i.totalLength !== undefined && { totalLength: i.totalLength }),
-              ...(i.shankDiameter !== undefined && { shankDiameter: i.shankDiameter }),
-              ...(i.cornerRadius !== undefined && { cornerRadius: i.cornerRadius }),
-              ...(i.tipAngle !== undefined && { tipAngle: i.tipAngle }),
-              ...(i.threadPitch !== undefined && { threadPitch: i.threadPitch }),
-              ...(i.holderDiameter !== undefined && { holderDiameter: i.holderDiameter }),
-              ...(i.holderLength !== undefined && { holderLength: i.holderLength }),
-              ...(i.stickout !== undefined && { stickout: i.stickout }),
-              ...(i.notes !== undefined && { notes: i.notes }),
-              ...(i.isPublic !== undefined && { isPublic: i.isPublic }),
-              updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
-            }).where(eq(T.id, id)).returning().get()
-            if (!row) throw new Error("Tool disappeared during update")
-            return { result: toRow(row), resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
-          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        update: (id, i) => write(id, i, undefined).pipe(Effect.map((row) => row as ToolRow)),
+        updateIfCurrent: (id, i, base) => write(id, i, base),
         remove: (id) => query("tools.remove", (db) => commitMutation(db, "tools.remove", (tx) => {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }

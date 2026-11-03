@@ -30,6 +30,8 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
   importMany(userId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   create(userId: string, input: MaterialInput & { name: string; properties: unknown }): Effect.Effect<MaterialRow, DatabaseError>
   update(id: string, input: MaterialInput): Effect.Effect<MaterialRow, DatabaseError>
+  /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
+  updateIfCurrent(id: string, input: MaterialInput, base: string): Effect.Effect<MaterialRow | "conflict", DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/MaterialRepo") {
   static readonly layer = Layer.effect(
@@ -38,6 +40,22 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
       const { query } = yield* Database
       const events = yield* LiveEvents
       const T = schema.materialTable
+      /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
+      const write = (id: string, input: MaterialInput, base: string | undefined) =>
+      query("materials.update", (db) => commitMutation(db, "materials.update", (tx) => {
+        const previous = tx.select().from(T).where(eq(T.id, id)).get()
+        if (!previous) throw new Error("Material no longer exists")
+        if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: "conflict" as const, resourceId: id, changed: false }
+        const row = tx.update(T).set({
+          ...(input.name && { name: input.name }),
+          ...(input.description !== undefined && { description: input.description }),
+          ...(input.properties ? { properties: input.properties } : {}),
+          ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
+          updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+        }).where(eq(T.id, id)).returning().get()
+        if (!row) throw new Error("Material disappeared during update")
+        return { result: toRow(row) as MaterialRow | "conflict", resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+      })).pipe(Effect.tap((row) => row !== "conflict" && row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void))
       return MaterialRepo.of({
         list: (userId, { search }) =>
           query("materials.list", async (db) => {
@@ -128,20 +146,8 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
             if (!row) throw new Error("Material was not created")
             return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
           })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        update: (id, input) =>
-          query("materials.update", (db) => commitMutation(db, "materials.update", (tx) => {
-            const previous = tx.select().from(T).where(eq(T.id, id)).get()
-            if (!previous) throw new Error("Material no longer exists")
-            const row = tx.update(T).set({
-              ...(input.name && { name: input.name }),
-              ...(input.description !== undefined && { description: input.description }),
-              ...(input.properties ? { properties: input.properties } : {}),
-              ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
-              updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
-            }).where(eq(T.id, id)).returning().get()
-            if (!row) throw new Error("Material disappeared during update")
-            return { result: toRow(row), resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
-          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        update: (id, input) => write(id, input, undefined).pipe(Effect.map((row) => row as MaterialRow)),
+        updateIfCurrent: (id, input, base) => write(id, input, base),
         remove: (id) => query("materials.remove", (db) => commitMutation(db, "materials.remove", (tx) => {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
