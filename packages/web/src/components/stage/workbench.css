@@ -19,10 +19,10 @@
   box-shadow: var(--ss-shadow-hero);
 }
 .wb .ss-stage[data-layout="compact"] .wb-window {
-  left: 16px;
+  left: 12px;
   top: 16px;
-  width: 400px;
-  height: 330px;
+  width: 334px;
+  height: 360px;
 }
 .wb .ss-stage[data-layout="compact"] .ss-window__side {
   display: none;

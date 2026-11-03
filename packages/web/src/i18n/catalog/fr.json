@@ -7759,5 +7759,10 @@
   "snapshot.": "instantané.",
   "store.": "magasin.",
   "tests.": "essais.",
-  "unconditionally.": "sans condition."
+  "unconditionally.": "sans condition.",
+  "In the app": "Dans l'app",
+  "From sketch to G-code in one window.": "De l'esquisse au G-code dans une seule fenêtre.",
+  "Toolpaths on the part": "Trajectoires d'outil sur la pièce",
+  "An assistant that edits the model": "Un assistant qui modifie le modèle",
+  "G-code from your post": "G-code issu de votre post-processeur"
 }

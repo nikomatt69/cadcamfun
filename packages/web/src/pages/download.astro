@@ -2,6 +2,8 @@
 import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
 import DownloadShot from "../components/stage/DownloadShot"
+import QuickstartTerminal from "../components/stage/QuickstartTerminal"
+import TopicTile from "../components/stage/TopicTile"
 import { text } from "../i18n/catalog"
 import { ui } from "../i18n/ui"
 
@@ -63,8 +65,8 @@ const labels = {
         <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
           {text(locale, "When the release cask is published, this installs the macOS app. It does not replace the Windows or Linux packages above.")}
         </p>
-        <div class="material mt-4 flex items-center justify-between gap-3 rounded-[var(--radius-card)] px-4 py-3">
-          <code class="overflow-x-auto font-mono text-[13px]">brew install --cask nikomatt69/tap/cadcamfun</code>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <div class="min-w-0 w-[520px] max-w-full"><QuickstartTerminal client:only="react" commands={["brew install --cask nikomatt69/tap/cadcamfun"]} title="Terminal" path="~" /></div>
           <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold">{labels.copy}</button>
         </div>
       </section>
@@ -74,6 +76,7 @@ const labels = {
         <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
           {text(locale, "Installed macOS and Windows copies check")} <code>latest.json</code> {text(locale, "on the latest GitHub release. Linux publishes")} <code>.deb</code> {text(locale, "and")} <code>.rpm</code> {text(locale, "only; there is no AppImage and no in-app Linux update. Checksums for a platform are the")} <code>SHA256SUMS</code> {text(locale, "file on that platform’s release.")}
         </p>
+        <div class="mt-6 max-w-[400px]"><TopicTile kind="update" client:only="react" /></div>
       </section>
 
       <section class="mt-14" aria-labelledby="companion-heading">
@@ -82,6 +85,7 @@ const labels = {
           {text(locale, "The phone app is not an App Store or TestFlight download. Build it from the repository and pair it with a desktop that is already running.")}
         </p>
         <a href="/docs/guides/companion-pairing" class="pressable mt-4 inline-flex text-[14px] font-semibold text-terminal-accent">{text(locale, "Companion pairing")}</a>
+        <div class="mt-6 max-w-[400px]"><TopicTile kind="pair" client:only="react" /></div>
       </section>
 
       <section class="mt-14" aria-labelledby="brand-heading">

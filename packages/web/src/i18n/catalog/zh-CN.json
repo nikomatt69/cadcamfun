@@ -7758,5 +7758,10 @@
   "snapshot.": "快照。",
   "store.": "店铺。",
   "tests.": "测试。",
-  "unconditionally.": "无条件地。"
+  "unconditionally.": "无条件地。",
+  "In the app": "应用内",
+  "From sketch to G-code in one window.": "在一个窗口中从草图到 G 代码。",
+  "Toolpaths on the part": "零件上的刀具路径",
+  "An assistant that edits the model": "能编辑模型的助手",
+  "G-code from your post": "由你的后处理器生成的 G 代码"
 }

@@ -1,0 +1,54 @@
+.dg .ss-stage { overflow: hidden; background: transparent; background-image: none; }
+.dg .dg-window {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 688px;
+  height: 200px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+.dg-layers .dg-window { height: 160px; }
+.dg-layers .ss-stage[data-layout="compact"] .dg-window { height: 280px; }
+.dg .ss-stage[data-layout="compact"] .dg-window { left: 8px; width: 342px; height: 280px; }
+
+.dg-chip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ss-text-strong);
+  background: var(--ss-canvas);
+  box-shadow: 0 0 0 1px var(--ss-line);
+}
+.dg-chip[data-active] { background: var(--ss-accent-soft); color: var(--ss-accent); }
+.dg-chip svg { position: absolute; right: 12px; top: 14px; }
+
+.dg .dg-window--map { height: 280px; }
+.dg .ss-stage[data-layout="compact"] .dg-window--map { height: 330px; }
+.dg-map .ss-stage { -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent 100%); mask-image: linear-gradient(to bottom, #000 84%, transparent 100%); }
+.dg-side { display: flex; flex-direction: column; gap: 2px; padding: 40px 8px 8px; }
+.dg-side__head { padding: 0 6px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ss-text); }
+.dg-apps { display: flex; gap: 12px; padding: 18px; height: 100%; background: var(--ss-surface); }
+.dg .ss-stage[data-layout="compact"] .dg-apps { flex-direction: column; gap: 8px; padding: 12px; }
+.dg .ss-stage[data-layout="compact"] .ss-window__side { width: 110px !important; }
+.dg-app {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--ss-canvas);
+  box-shadow: 0 0 0 1px var(--ss-line);
+}
+.dg-app[data-active] { background: var(--ss-accent-soft); }
+.dg-app__label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ss-text); }
+.dg-app__name { font-size: 15px; font-weight: 600; color: var(--ss-text-strong); }
+.dg-app__note { font-size: 11.5px; color: var(--ss-text); }

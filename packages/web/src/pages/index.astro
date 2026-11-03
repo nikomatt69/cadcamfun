@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar.astro"
 import Hero from "../components/Hero.astro"
 import Features from "../components/Features.astro"
 import ProductTiles from "../components/stage/ProductTiles"
+import { LayerDiagram } from "../components/stage/Diagrams"
 import InstallBlock from "../components/InstallBlock.astro"
 import { dependencyNote } from "../data/architecture"
 import { text } from "../i18n/catalog"
@@ -53,7 +54,8 @@ const docLinks = [
         <h2 id="boundary-heading" class="font-display mt-3 max-w-2xl text-[clamp(1.8rem,3vw,2.6rem)] font-bold tracking-[-0.035em]">
           {text(locale, "Imports point inward, from geometry to the window.")}
         </h2>
-        <div class="material mt-10 rounded-[var(--radius-card)] p-5 sm:p-8">
+        <div class="mt-10 max-w-[760px]"><LayerDiagram client:only="react" /></div>
+        <div class="material mt-6 rounded-[var(--radius-card)] p-5 sm:p-8">
           <ol class="grid gap-6 md:grid-cols-4 md:gap-0">
             {chain.map((layer, index) => (
               <li class="border-t border-terminal-border pt-4 first:border-t-0 first:pt-0 md:border-l md:border-t-0 md:pl-5 md:pt-0 md:first:border-l-0 md:first:pl-0">

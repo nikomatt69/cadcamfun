@@ -7759,5 +7759,10 @@
   "snapshot.": "スナップショット。",
   "store.": "店。",
   "tests.": "テスト。",
-  "unconditionally.": "無条件に。"
+  "unconditionally.": "無条件に。",
+  "In the app": "アプリ内",
+  "From sketch to G-code in one window.": "スケッチから G コードまで、ひとつのウィンドウで。",
+  "Toolpaths on the part": "部品上のツールパス",
+  "An assistant that edits the model": "モデルを編集するアシスタント",
+  "G-code from your post": "ポストから出力する G コード"
 }

@@ -7719,5 +7719,10 @@
   "snapshot.": "स्नैपशॉट.",
   "store.": "इकट्ठा करना।",
   "tests.": "परीक्षण.",
-  "unconditionally.": "बिना शर्त."
+  "unconditionally.": "बिना शर्त.",
+  "In the app": "ऐप में",
+  "From sketch to G-code in one window.": "एक ही विंडो में स्केच से G-कोड तक।",
+  "Toolpaths on the part": "पुर्ज़े पर टूलपाथ",
+  "An assistant that edits the model": "मॉडल को संपादित करने वाला सहायक",
+  "G-code from your post": "आपके पोस्ट से G-कोड"
 }

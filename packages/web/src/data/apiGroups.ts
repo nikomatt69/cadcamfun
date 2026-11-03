@@ -252,5 +252,33 @@ export const apiGroups: readonly ApiGroupCopy[] = [
     "title": "Waitlist",
     "summary": "Submit waitlist registration through the local application API.",
     "guide": "/docs/api"
+  },
+  {
+    "tag": "pmi",
+    "slug": "pmi",
+    "title": "PMI",
+    "summary": "Read and update the product and manufacturing information attached to a drawing.",
+    "guide": "/docs/cad"
+  },
+  {
+    "tag": "camSetup",
+    "slug": "cam-setups",
+    "title": "CAM setups",
+    "summary": "Plan, validate, and generate machining setups from a model.",
+    "guide": "/docs/setups"
+  },
+  {
+    "tag": "cloud",
+    "slug": "cloud",
+    "title": "Cloud",
+    "summary": "Connect to a remote workspace, pair devices, and publish, fetch, apply, or send project state.",
+    "guide": "/docs/sidecar"
+  },
+  {
+    "tag": "conversations",
+    "slug": "conversations",
+    "title": "Conversations",
+    "summary": "Organization conversations: list, create, rename, read, and send messages.",
+    "guide": "/docs/api"
   }
 ]

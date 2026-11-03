@@ -101,3 +101,34 @@
 .tile-code { font-size: 11px; padding: 8px 4px; }
 
 .tile-list { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; height: 100%; background: var(--ss-surface); }
+
+.tile-head, .tile-trow, .tile-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tile-head { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ss-text); }
+.tile-trow[data-on] { background: var(--ss-accent-soft); font-weight: 600; }
+.tile-setting { height: 38px; border-bottom: 1px solid var(--ss-line); border-radius: 0; color: var(--ss-text-strong); }
+.tile-settings { padding: 8px 12px; gap: 0; }
+
+.tile-pair { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; height: 100%; background: var(--ss-surface); }
+.tile-pair .tile-code { display: flex; gap: 6px; }
+.tile-digit {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-text-strong);
+  background: var(--ss-canvas);
+  box-shadow: 0 0 0 1px var(--ss-line);
+}

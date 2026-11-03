@@ -1,4 +1,4 @@
-import { Avatar, Bar, Code, Icon, Row, Stage, Stream, Text, Window } from "../../stageshow/kit"
+import { Avatar, Bar, Caret, Code, Icon, Prompt, Row, Segmented, Stage, Stream, Text, Toggle, Window } from "../../stageshow/kit"
 import { PartView } from "./PartView"
 import { useSiteTheme } from "./useSiteTheme"
 import "./workbench.css"
@@ -214,7 +214,131 @@ function ArchTile() {
   )
 }
 
-export type TopicKind = "cam" | "ai" | "post" | "cad" | "api" | "history" | "arch"
+function TermTile() {
+  return (
+    <Tile name="term">
+      {() => (
+        <>
+          <Window chrome="terminal" title="cadcamfun — zsh" className="tile-window">
+            <Prompt path="~/cadcamfun">bun install</Prompt>
+            <Prompt path="~/cadcamfun">bun test packages apps</Prompt>
+            <Prompt path="~/cadcamfun">bun run desktop:dev<Caret /></Prompt>
+          </Window>
+          <div className="tile-card tile-card--term">
+            <Text className="tile-card__label">Runtime</Text>
+            <Text className="tile-card__value">Bun</Text>
+            <Bar w={44} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function DbTile() {
+  const rows = [
+    ["Bracket", "12 drawings"],
+    ["Vise jaw", "4 drawings"],
+  ]
+  return (
+    <Tile name="db">
+      {() => (
+        <>
+          <Window title="cadcamfun.db" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-list">
+              <div className="tile-head"><Text>Project</Text><Text>Contents</Text></div>
+              {rows.map(([a, b], i) => (
+                <div key={a} className="tile-trow" data-on={i === 0 || undefined}><Text>{a}</Text><Text>{b}</Text></div>
+              ))}
+              {[[70, 52], [56, 44], [64, 48]].map(([a, b], i) => (
+                <div key={i} className="tile-trow"><Bar w={a} h={7} tone={2} /><Bar w={b} h={7} tone={2} /></div>
+              ))}
+            </div>
+          </Window>
+          <div className="tile-card tile-card--db">
+            <Text className="tile-card__label">Engine</Text>
+            <Text className="tile-card__value">SQLite</Text>
+            <Bar w={40} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function ConfigTile() {
+  return (
+    <Tile name="config">
+      {() => (
+        <>
+          <Window title="Settings" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-list tile-settings">
+              <div className="tile-setting"><Text>Units</Text><Segmented items={["mm", "in"]} value={0} /></div>
+              <div className="tile-setting"><Text>Autosave</Text><Toggle on /></div>
+              <div className="tile-setting"><Text>Snap to grid</Text><Toggle on={false} /></div>
+              <div className="tile-setting"><Bar w={80} h={7} tone={2} /><Bar w={34} h={14} r={7} tone={2} /></div>
+            </div>
+          </Window>
+          <div className="tile-card tile-card--config">
+            <Text className="tile-card__label">Stored</Text>
+            <Text className="tile-card__value">Locally</Text>
+            <Bar w={44} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function UpdateTile() {
+  return (
+    <Tile name="update">
+      {() => (
+        <>
+          <Window title="CADCAMFUN" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-list tile-settings">
+              <div className="tile-setting"><Text>Version 0.1.76</Text><Icon name="check" size={14} /></div>
+              <div className="tile-setting"><Text>Check for updates</Text><Toggle on /></div>
+              <div className="tile-setting"><Bar w={90} h={7} tone={2} /><Bar w={30} h={7} tone={2} /></div>
+            </div>
+          </Window>
+          <div className="tile-card tile-card--update">
+            <Text className="tile-card__label">latest.json</Text>
+            <Text className="tile-card__value">Up to date</Text>
+            <Bar w={52} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+function PairTile() {
+  return (
+    <Tile name="pair">
+      {() => (
+        <>
+          <Window title="Pair a phone" className="tile-window" body={{ className: "tile-body" }}>
+            <div className="tile-pair">
+              <div className="tile-code">
+                {["4", "8", "2", "9", "1", "7"].map((d, i) => (
+                  <span key={i} className="tile-digit"><Text>{d}</Text></span>
+                ))}
+              </div>
+            </div>
+          </Window>
+          <div className="tile-card tile-card--pair">
+            <Text className="tile-card__label">Companion</Text>
+            <Text className="tile-card__value">Paired</Text>
+            <Bar w={44} h={5} tone={2} />
+          </div>
+        </>
+      )}
+    </Tile>
+  )
+}
+
+export type TopicKind = "cam" | "ai" | "post" | "cad" | "api" | "history" | "arch" | "term" | "db" | "config" | "update" | "pair"
 
 /** One tile on its own, for a docs page or a form that wants a picture of the thing it describes. */
 export function TopicTile({ kind }: { kind: TopicKind }) {
@@ -225,6 +349,11 @@ export function TopicTile({ kind }: { kind: TopicKind }) {
     case "cad": return <CadTile />
     case "api": return <ApiTile />
     case "history": return <HistoryTile />
+    case "term": return <TermTile />
+    case "db": return <DbTile />
+    case "config": return <ConfigTile />
+    case "update": return <UpdateTile />
+    case "pair": return <PairTile />
     default: return <ArchTile />
   }
 }

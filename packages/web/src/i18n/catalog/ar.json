@@ -7759,5 +7759,10 @@
   "snapshot.": "لقطة.",
   "store.": "محل.",
   "tests.": "الاختبارات.",
-  "unconditionally.": "دون قيد أو شرط."
+  "unconditionally.": "دون قيد أو شرط.",
+  "In the app": "داخل التطبيق",
+  "From sketch to G-code in one window.": "من الرسم إلى G-code في نافذة واحدة.",
+  "Toolpaths on the part": "مسارات الأداة على القطعة",
+  "An assistant that edits the model": "مساعد يعدّل النموذج",
+  "G-code from your post": "G-code من المعالج اللاحق لديك"
 }

@@ -7759,5 +7759,10 @@
   "snapshot.": "снимок.",
   "store.": "магазин.",
   "tests.": "тесты.",
-  "unconditionally.": "безоговорочно."
+  "unconditionally.": "безоговорочно.",
+  "In the app": "В приложении",
+  "From sketch to G-code in one window.": "От эскиза до G-кода в одном окне.",
+  "Toolpaths on the part": "Траектории инструмента на детали",
+  "An assistant that edits the model": "Ассистент, который редактирует модель",
+  "G-code from your post": "G-код из вашего постпроцессора"
 }
