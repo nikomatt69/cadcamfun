@@ -7,6 +7,8 @@ const OrgRef = Schema.Struct({ id: Schema.String, name: Schema.String })
 
 export const MaterialRow = Schema.Struct({
   id: Schema.String,
+  /** Saves of this row, 1 when created; what each save replaced is kept (RM-05). */
+  version: Schema.Number,
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
   properties: Schema.Unknown,
@@ -37,6 +39,11 @@ export const MaterialBody = Schema.Struct({
 /** An editor that holds a copy sends the `updatedAt` it read: the write happens only while it is still current (409 otherwise). */
 export const MaterialUpdateBody = Schema.Struct({ ...MaterialBody.fields, baseUpdatedAt: Schema.optional(Schema.String) })
 
+/** One save of a library row: the row as it was before it (RM-05). `version` is the version that snapshot had. */
+export const LibraryVersion = Schema.Struct({
+  id: Schema.String, version: Schema.Number, data: Schema.Unknown, changedBy: Schema.NullOr(Schema.String), createdAt: Schema.String
+})
+
 const Message = Schema.Struct({ message: Schema.String })
 const id = { id: Schema.String }
 
@@ -59,6 +66,7 @@ export class MaterialsGroup extends HttpApiGroup.make("materials")
       success: MaterialRow,
       error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
+    HttpApiEndpoint.get("history", "/api/materials/:id/versions", { params: id, success: Schema.Array(LibraryVersion), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.delete("remove", "/api/materials/:id", {
       params: id,
       success: Message,

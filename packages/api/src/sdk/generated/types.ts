@@ -5297,6 +5297,7 @@ export type ProductionCostsListMaterialCostsOutput = Array<{
   minimumCharge: number
   material: {
     id: string
+    version: number
     name: string
     description: string | null
     properties: unknown
@@ -5332,6 +5333,7 @@ export type ProductionCostsCreateMaterialCostOutput = {
   minimumCharge: number
   material: {
     id: string
+    version: number
     name: string
     description: string | null
     properties: unknown
@@ -5358,6 +5360,7 @@ export type ProductionCostsGetMaterialCostOutput = {
   minimumCharge: number
   material: {
     id: string
+    version: number
     name: string
     description: string | null
     properties: unknown
@@ -5392,6 +5395,7 @@ export type ProductionCostsUpdateMaterialCostOutput = {
   minimumCharge: number
   material: {
     id: string
+    version: number
     name: string
     description: string | null
     properties: unknown
@@ -5519,6 +5523,7 @@ export type ProductionCostsListToolWearOutput = Array<{
   replacementThreshold: number
   tool: {
     id: string
+    version: number
     name: string
     type: string
     diameter: number
@@ -5568,6 +5573,7 @@ export type ProductionCostsCreateToolWearOutput = {
   replacementThreshold: number
   tool: {
     id: string
+    version: number
     name: string
     type: string
     diameter: number
@@ -5608,6 +5614,7 @@ export type ProductionCostsGetToolWearOutput = {
   replacementThreshold: number
   tool: {
     id: string
+    version: number
     name: string
     type: string
     diameter: number
@@ -5656,6 +5663,7 @@ export type ProductionCostsUpdateToolWearOutput = {
   replacementThreshold: number
   tool: {
     id: string
+    version: number
     name: string
     type: string
     diameter: number
@@ -6654,6 +6662,7 @@ export type MaterialsListInput = {
 
 export type MaterialsListOutput = Array<{
   id: string
+  version: number
   name: string
   description: string | null
   properties: unknown
@@ -6674,6 +6683,7 @@ export type MaterialsCreateInput = {
 
 export type MaterialsCreateOutput = {
   id: string
+  version: number
   name: string
   description: string | null
   properties: unknown
@@ -6688,6 +6698,7 @@ export type MaterialsGetInput = { readonly id: { readonly id: string }["id"] }
 
 export type MaterialsGetOutput = {
   id: string
+  version: number
   name: string
   description: string | null
   properties: unknown
@@ -6712,6 +6723,7 @@ export type MaterialsUpdateInput = {
 
 export type MaterialsUpdateOutput = {
   id: string
+  version: number
   name: string
   description: string | null
   properties: unknown
@@ -6721,6 +6733,16 @@ export type MaterialsUpdateOutput = {
   ownerId: string | null
   organizationId: string | null
 }
+
+export type MaterialsHistoryInput = { readonly id: { readonly id: string }["id"] }
+
+export type MaterialsHistoryOutput = Array<{
+  id: string
+  version: number
+  data: unknown
+  changedBy: string | null
+  createdAt: string
+}>
 
 export type MaterialsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
@@ -6798,6 +6820,7 @@ export type ToolsListInput = {
 
 export type ToolsListOutput = Array<{
   id: string
+  version: number
   name: string
   type: string
   diameter: number
@@ -6846,6 +6869,7 @@ export type ToolsCreateInput = {
 
 export type ToolsCreateOutput = {
   id: string
+  version: number
   name: string
   type: string
   diameter: number
@@ -6874,6 +6898,7 @@ export type ToolsGetInput = { readonly id: { readonly id: string }["id"] }
 
 export type ToolsGetOutput = {
   id: string
+  version: number
   name: string
   type: string
   diameter: number
@@ -6926,6 +6951,7 @@ export type ToolsUpdateInput = {
 
 export type ToolsUpdateOutput = {
   id: string
+  version: number
   name: string
   type: string
   diameter: number
@@ -6949,6 +6975,16 @@ export type ToolsUpdateOutput = {
   ownerId: string | null
   organizationId: string | null
 }
+
+export type ToolsHistoryInput = { readonly id: { readonly id: string }["id"] }
+
+export type ToolsHistoryOutput = Array<{
+  id: string
+  version: number
+  data: unknown
+  changedBy: string | null
+  createdAt: string
+}>
 
 export type ToolsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
@@ -7059,6 +7095,14 @@ export type MachineConfigsGetOutput = { success: true; data: unknown | null; mes
 export type MachineConfigsUpdateInput = { readonly id: { readonly id: string }["id"]; readonly payload: unknown }
 
 export type MachineConfigsUpdateOutput = { success: true; data: unknown | null; message?: string | undefined }
+
+export type MachineConfigsHistoryInput = { readonly id: { readonly id: string }["id"] }
+
+export type MachineConfigsHistoryOutput = {
+  success: true
+  data: Array<{ id: string; version: number; data: unknown; changedBy: string | null; createdAt: string }> | null
+  message?: string | undefined
+}
 
 export type MachineConfigsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
@@ -10633,6 +10677,7 @@ export type LibraryComponentsOutput = {
 export type LibraryMaterialsOutput = {
   data: Array<{
     id: string
+    version: number
     name: string
     description: string | null
     properties: unknown
@@ -10648,6 +10693,7 @@ export type LibraryMaterialsOutput = {
 export type LibraryToolsOutput = {
   data: Array<{
     id: string
+    version: number
     name: string
     type: string
     diameter: number

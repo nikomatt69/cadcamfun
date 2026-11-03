@@ -356,6 +356,8 @@ import type {
   MaterialsGetOutput,
   MaterialsUpdateInput,
   MaterialsUpdateOutput,
+  MaterialsHistoryInput,
+  MaterialsHistoryOutput,
   MaterialsRemoveInput,
   MaterialsRemoveOutput,
   MaterialsStorageSaveInput,
@@ -376,6 +378,8 @@ import type {
   ToolsGetOutput,
   ToolsUpdateInput,
   ToolsUpdateOutput,
+  ToolsHistoryInput,
+  ToolsHistoryOutput,
   ToolsRemoveInput,
   ToolsRemoveOutput,
   ToolsStorageSaveInput,
@@ -400,6 +404,8 @@ import type {
   MachineConfigsGetOutput,
   MachineConfigsUpdateInput,
   MachineConfigsUpdateOutput,
+  MachineConfigsHistoryInput,
+  MachineConfigsHistoryOutput,
   MachineConfigsRemoveInput,
   MachineConfigsRemoveOutput,
   MachineConfigsCloneInput,
@@ -3338,6 +3344,17 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      history: (input: MaterialsHistoryInput, requestOptions?: RequestOptions) =>
+        request<MaterialsHistoryOutput>(
+          {
+            method: "GET",
+            path: `/api/materials/${encodeURIComponent(input.id)}/versions`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       remove: (input: MaterialsRemoveInput, requestOptions?: RequestOptions) =>
         request<MaterialsRemoveOutput>(
           {
@@ -3506,6 +3523,17 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      history: (input: ToolsHistoryInput, requestOptions?: RequestOptions) =>
+        request<ToolsHistoryOutput>(
+          {
+            method: "GET",
+            path: `/api/tools/${encodeURIComponent(input.id)}/versions`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       remove: (input: ToolsRemoveInput, requestOptions?: RequestOptions) =>
         request<ToolsRemoveOutput>(
           {
@@ -3654,6 +3682,17 @@ export function make(options: ClientOptions) {
             body: input["payload"],
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 405, 500, 409, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      history: (input: MachineConfigsHistoryInput, requestOptions?: RequestOptions) =>
+        request<MachineConfigsHistoryOutput>(
+          {
+            method: "GET",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/versions`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
             empty: false,
           },
           requestOptions,

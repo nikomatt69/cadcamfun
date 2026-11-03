@@ -12,7 +12,7 @@ let app: Awaited<ReturnType<typeof makeApp>>
 let mineId: string
 let theirsId: string
 let acting: ActingUser["Service"]
-let user: LocalProfile["user"]
+let user: Parameters<ActingUser["Service"]["bind"]>[2]
 
 beforeAll(async () => {
   app = await makeApp()
@@ -66,3 +66,19 @@ describe("a tool call is admitted by the turn, not by what the model says", () =
     expect(ok).toMatchObject({ ok: true })
   })
 })
+
+describe("a library row the assistant replaces keeps its previous values (RM-05)", () => {
+  test("upsert_tool over an existing id leaves the old row in the tool's history", async () => {
+    expect(await acting.bind(mineId, "turn-lib", user, "Replace the drill")).toBe(true)
+    const handlers = await app.toolHandlers()
+    const made = await acting.invoke(mineId, "turn-lib", () => handlers.upsertTool({ name: "5 mm drill", type: "drill", diameter: 5, material: "HSS" })) as { ok: true; id: string; created: boolean }
+    expect(made).toMatchObject({ ok: true, created: true })
+    const replaced = await acting.invoke(mineId, "turn-lib", () => handlers.upsertTool({ id: made.id, name: "6 mm drill", type: "drill", diameter: 6, material: "HSS" }))
+    expect(replaced).toMatchObject({ ok: true, created: false })
+    const history = (await app.call(`/api/tools/${made.id}/versions`)).body
+    expect(history).toHaveLength(1)
+    expect(history[0].data).toMatchObject({ name: "5 mm drill", diameter: 5, version: 1 })
+    expect((await app.call(`/api/tools/${made.id}`)).body).toMatchObject({ name: "6 mm drill", diameter: 6, version: 2 })
+  })
+})
+

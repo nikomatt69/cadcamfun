@@ -24372,6 +24372,21 @@
                           "id": {
                             "type": "string"
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
                           "name": {
                             "type": "string"
                           },
@@ -24418,6 +24433,7 @@
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "description",
                           "properties",
@@ -24665,6 +24681,21 @@
                         "id": {
                           "type": "string"
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
                         "name": {
                           "type": "string"
                         },
@@ -24711,6 +24742,7 @@
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "description",
                         "properties",
@@ -25027,6 +25059,21 @@
                             "id": {
                               "type": "string"
                             },
+                            "version": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "name": {
                               "type": "string"
                             },
@@ -25073,6 +25120,7 @@
                           },
                           "required": [
                             "id",
+                            "version",
                             "name",
                             "description",
                             "properties",
@@ -25353,6 +25401,21 @@
                         "id": {
                           "type": "string"
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
                         "name": {
                           "type": "string"
                         },
@@ -25399,6 +25462,7 @@
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "description",
                         "properties",
@@ -27153,6 +27217,21 @@
                           "id": {
                             "type": "string"
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
                           "name": {
                             "type": "string"
                           },
@@ -27471,6 +27550,7 @@
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "type",
                           "diameter",
@@ -27725,6 +27805,21 @@
                       "properties": {
                         "id": {
                           "type": "string"
+                        },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
                         },
                         "name": {
                           "type": "string"
@@ -28044,6 +28139,7 @@
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "type",
                         "diameter",
@@ -28361,6 +28457,21 @@
                           "properties": {
                             "id": {
                               "type": "string"
+                            },
+                            "version": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
                             },
                             "name": {
                               "type": "string"
@@ -28680,6 +28791,7 @@
                           },
                           "required": [
                             "id",
+                            "version",
                             "name",
                             "type",
                             "diameter",
@@ -28967,6 +29079,21 @@
                       "properties": {
                         "id": {
                           "type": "string"
+                        },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
                         },
                         "name": {
                           "type": "string"
@@ -29286,6 +29413,7 @@
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "type",
                         "diameter",
@@ -40602,6 +40730,21 @@
                       "id": {
                         "type": "string"
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -40648,6 +40791,7 @@
                     },
                     "required": [
                       "id",
+                      "version",
                       "name",
                       "description",
                       "properties",
@@ -40707,6 +40851,21 @@
                     "id": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
+                    },
                     "name": {
                       "type": "string"
                     },
@@ -40753,6 +40912,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -40917,6 +41077,21 @@
                     "id": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
+                    },
                     "name": {
                       "type": "string"
                     },
@@ -41027,6 +41202,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -41116,6 +41292,21 @@
                     "id": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
+                    },
                     "name": {
                       "type": "string"
                     },
@@ -41162,6 +41353,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -41389,6 +41581,126 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materials/{id}/versions": {
+      "get": {
+        "tags": [
+          "materials"
+        ],
+        "operationId": "materials.history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      },
+                      "data": {},
+                      "changedBy": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "data",
+                      "changedBy",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
                 }
               }
             }
@@ -42138,6 +42450,21 @@
                       "id": {
                         "type": "string"
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -42456,6 +42783,7 @@
                     },
                     "required": [
                       "id",
+                      "version",
                       "name",
                       "type",
                       "diameter",
@@ -42522,6 +42850,21 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
                     },
                     "name": {
                       "type": "string"
@@ -42841,6 +43184,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -43383,6 +43727,21 @@
                     "id": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
+                    },
                     "name": {
                       "type": "string"
                     },
@@ -43765,6 +44124,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -43861,6 +44221,21 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
                     },
                     "name": {
                       "type": "string"
@@ -44180,6 +44555,7 @@
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -44785,6 +45161,126 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tools/{id}/versions": {
+      "get": {
+        "tags": [
+          "tools"
+        ],
+        "operationId": "tools.history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      },
+                      "data": {},
+                      "changedBy": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "data",
+                      "changedBy",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
                 }
               }
             }
@@ -46342,6 +46838,179 @@
                     "data": {
                       "anyOf": [
                         {},
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "message": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "EnvBadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "EnvForbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "EnvNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "EnvMethodNotAllowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "EnvInternal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machine-configs/{id}/versions": {
+      "get": {
+        "tags": [
+          "machineConfigs"
+        ],
+        "operationId": "machineConfigs.history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "data": {},
+                              "changedBy": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "version",
+                              "data",
+                              "changedBy",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
                         {
                           "type": "null"
                         }
@@ -85187,6 +85856,21 @@
                           "id": {
                             "type": "string"
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
                           "name": {
                             "type": "string"
                           },
@@ -85285,6 +85969,7 @@
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "description",
                           "properties",
@@ -85357,6 +86042,21 @@
                         "properties": {
                           "id": {
                             "type": "string"
+                          },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
                           },
                           "name": {
                             "type": "string"
@@ -85728,6 +86428,7 @@
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "type",
                           "diameter",

@@ -82,9 +82,14 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
         }
         // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
         const expected = typeof body.baseUpdatedAt === "string" ? body.baseUpdatedAt : undefined
-        const updated = expected === undefined ? yield* repo.update(params.id, fields) : yield* repo.updateIfCurrent(params.id, fields, expected)
+        const updated = expected === undefined ? yield* repo.update(params.id, fields, f.row.ownerId) : yield* repo.updateIfCurrent(params.id, fields, expected, f.row.ownerId)
         if (updated === "conflict") return yield* envErr(EnvConflict, "The machine configuration was saved elsewhere since it was read. Nothing was overwritten.")
         return okAuth({ ...updated.view, isOwner: true, usageCount: updated.usageCount }, "Machine configuration updated successfully")
+      }).pipe(Effect.catchTag("DatabaseError", internal)))
+    .handle("history", ({ params }) =>
+      Effect.gen(function*() {
+        yield* guarded(params.id)
+        return okAuth(yield* repo.history(params.id))
       }).pipe(Effect.catchTag("DatabaseError", internal)))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {

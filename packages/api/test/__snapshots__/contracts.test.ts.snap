@@ -34436,9 +34436,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "updatedAt": {
                             "type": "string",
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "description",
                           "properties",
@@ -34879,9 +34895,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "updatedAt": {
                             "type": "string",
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "type",
                           "diameter",
@@ -37052,6 +37084,179 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/machine-configs/{id}/versions": {
+      "get": {
+        "operationId": "machineConfigs.history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "changedBy": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                              },
+                              "createdAt": {
+                                "type": "string",
+                              },
+                              "data": {},
+                              "id": {
+                                "type": "string",
+                              },
+                              "version": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "version",
+                              "data",
+                              "changedBy",
+                              "createdAt",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "machineConfigs",
+        ],
+      },
+    },
     "/api/materials": {
       "get": {
         "operationId": "materials.list",
@@ -37141,9 +37346,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "updatedAt": {
                         "type": "string",
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
                     },
                     "required": [
                       "id",
+                      "version",
                       "name",
                       "description",
                       "properties",
@@ -37322,9 +37543,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -37855,9 +38092,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -38075,9 +38328,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "description",
                     "properties",
@@ -38540,6 +38809,126 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
         "tags": [
           "materialsStorage",
+        ],
+      },
+    },
+    "/api/materials/{id}/versions": {
+      "get": {
+        "operationId": "materials.history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "changedBy": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "data": {},
+                      "id": {
+                        "type": "string",
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "data",
+                      "changedBy",
+                      "createdAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "materials",
         ],
       },
     },
@@ -52068,9 +52457,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "updatedAt": {
                             "type": "string",
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "description",
                           "properties",
@@ -52468,9 +52873,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "updatedAt": {
                           "type": "string",
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "description",
                         "properties",
@@ -52816,9 +53237,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "updatedAt": {
                               "type": "string",
                             },
+                            "version": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
                           },
                           "required": [
                             "id",
+                            "version",
                             "name",
                             "description",
                             "properties",
@@ -53231,9 +53668,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "updatedAt": {
                           "type": "string",
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "description",
                         "properties",
@@ -55233,9 +55686,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "updatedAt": {
                             "type": "string",
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
                         },
                         "required": [
                           "id",
+                          "version",
                           "name",
                           "type",
                           "diameter",
@@ -55830,9 +56299,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "updatedAt": {
                           "type": "string",
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "type",
                         "diameter",
@@ -56535,9 +57020,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "updatedAt": {
                               "type": "string",
                             },
+                            "version": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
                           },
                           "required": [
                             "id",
+                            "version",
                             "name",
                             "type",
                             "diameter",
@@ -57153,9 +57654,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "updatedAt": {
                           "type": "string",
                         },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
                       },
                       "required": [
                         "id",
+                        "version",
                         "name",
                         "type",
                         "diameter",
@@ -92423,9 +92940,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "updatedAt": {
                         "type": "string",
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
                     },
                     "required": [
                       "id",
+                      "version",
                       "name",
                       "type",
                       "diameter",
@@ -93254,9 +93787,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -94067,9 +94616,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -94937,9 +95502,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "updatedAt": {
                       "type": "string",
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "id",
+                    "version",
                     "name",
                     "type",
                     "diameter",
@@ -95699,6 +96280,126 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
         "tags": [
           "toolsStorage",
+        ],
+      },
+    },
+    "/api/tools/{id}/versions": {
+      "get": {
+        "operationId": "tools.history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "changedBy": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "data": {},
+                      "id": {
+                        "type": "string",
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "data",
+                      "changedBy",
+                      "createdAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "tools",
         ],
       },
     },

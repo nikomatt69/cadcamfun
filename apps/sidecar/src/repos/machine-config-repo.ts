@@ -4,6 +4,7 @@ import { and, count, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
+import { keepPreviousVersion, readHistory, type LibraryVersionEntry } from "./library-history.ts"
 import { type ImportResults, importLoop } from "./import-loop.ts"
 
 type Row = typeof schema.machineConfigTable.$inferSelect
@@ -36,9 +37,12 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
   /** Row + owner + permission (owner, public, or a toolpath of a project the user can reach). */
   find(userId: string, id: string): Effect.Effect<{ row: Row; view: MachineConfigView; permission: Permission; usageCount: number } | undefined, DatabaseError>
   create(userId: string, d: { name: string; description?: string | null | undefined; type: string; config: unknown; isPublic: boolean }): Effect.Effect<MachineConfigView, DatabaseError>
-  update(id: string, d: MachineConfigUpdate): Effect.Effect<{ view: MachineConfigView; usageCount: number }, DatabaseError>
+  /** `by` is who saved (the previous values are kept in the library history); an assistant command names its own actor. */
+  update(id: string, d: MachineConfigUpdate, by?: string): Effect.Effect<{ view: MachineConfigView; usageCount: number }, DatabaseError>
   /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
-  updateIfCurrent(id: string, d: MachineConfigUpdate, base: string): Effect.Effect<{ view: MachineConfigView; usageCount: number } | "conflict", DatabaseError>
+  updateIfCurrent(id: string, d: MachineConfigUpdate, base: string, by?: string): Effect.Effect<{ view: MachineConfigView; usageCount: number } | "conflict", DatabaseError>
+  /** What each save replaced, newest first (RM-05). */
+  history(id: string): Effect.Effect<LibraryVersionEntry[], DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
   usage(id: string): Effect.Effect<number, DatabaseError>
   /** Plain lookup for the storage routes (owner / public rule is applied by the handler). */
@@ -56,13 +60,14 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
         Effect.andThen(events.resourcesChanged(ownerId), Effect.forEach(orgs, (org) => events.resourcesChanged(ownerId, org), { discard: true }))
       const T = schema.machineConfigTable
       /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
-      const write = (id: string, d: MachineConfigUpdate, base: string | undefined) =>
+      const write = (id: string, d: MachineConfigUpdate, base: string | undefined, by: string | undefined) =>
       query("machineConfigs.update", async (db) => {
         const row = commitMutation(db, "machineConfigs.update", (tx) => {
           const previous = tx.select().from(T).where(eq(T.id, id)).get()
           if (!previous) throw new Error("Machine configuration no longer exists")
           if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: undefined, resourceId: id, changed: false }
-          const saved = tx.update(T).set({ ...d, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
+          const version = keepPreviousVersion(tx, "machine_config", previous, by)
+          const saved = tx.update(T).set({ ...d, version, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
           if (!saved) throw new Error("Machine configuration disappeared during update")
           return { result: saved as typeof saved | undefined, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: saved.updatedAt.toISOString() }
         })
@@ -113,8 +118,9 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
             })
             return { ...serialize(row), owner: await ownerOf(db, userId) }
           }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
-        update: (id, d) => write(id, d, undefined).pipe(Effect.map((row) => row as { view: MachineConfigView; usageCount: number })),
-        updateIfCurrent: (id, d, base) => write(id, d, base),
+        update: (id, d, by) => write(id, d, undefined, by).pipe(Effect.map((row) => row as { view: MachineConfigView; usageCount: number })),
+        updateIfCurrent: (id, d, base, by) => write(id, d, base, by),
+        history: (id) => query("machineConfigs.history", (db) => readHistory(db, "machine_config", id)),
         remove: (id) => query("machineConfigs.remove", async (db) => {
           const orgs = await orgsUsing(db, id)
           const row = commitMutation(db, "machineConfigs.remove", (tx) => {
@@ -157,8 +163,9 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
               const previous = tx.select().from(T).where(eq(T.id, id)).get()
               if (!previous) throw new Error("Imported machine configuration no longer exists")
               const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              const version = keepPreviousVersion(tx, "machine_config", previous, userId)
               tx.update(T).set({
-                name: String(c.name), description: (c.description as string | undefined) || null, type: String(c.type), config: c.config, updatedAt
+                name: String(c.name), description: (c.description as string | undefined) || null, type: String(c.type), config: c.config, version, updatedAt
               }).where(eq(T.id, id)).run()
               return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
             })

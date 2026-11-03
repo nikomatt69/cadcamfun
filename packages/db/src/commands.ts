@@ -23,6 +23,9 @@ const activeCommand = new AsyncLocalStorage<ActiveCommand>()
 /** Lets an existing single-statement repository keep its original path outside governed AI execution. */
 export const hasMutationCommand = (): boolean => activeCommand.getStore() !== undefined
 
+/** The actor of the governed AI command running now, if any (for provenance of a write whose caller did not name one). */
+export const mutationActor = (): string | undefined => activeCommand.getStore()?.command.actorId
+
 /** The Promise edge owns the command; synchronous repository commits consume this immutable context. */
 export const withMutationCommand = <A>(command: MutationCommand, run: () => Promise<A>): Promise<A> =>
   activeCommand.run({ command: Object.freeze({ ...command }), sequence: 0 }, run)

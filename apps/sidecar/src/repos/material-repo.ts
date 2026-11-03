@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { type ImportResults, importLoop } from "./import-loop.ts"
 import { hasOrgWriteAccess, isOrgMember, orgIdsOf, orgRef, userRef } from "./access.ts"
+import { keepPreviousVersion, readHistory, type LibraryVersionEntry } from "./library-history.ts"
 
 type Row = typeof schema.materialTable.$inferSelect
 const toRow = (m: Row): MaterialRow => ({ ...m, createdAt: m.createdAt.toISOString(), updatedAt: m.updatedAt.toISOString() })
@@ -29,9 +30,12 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
   visibleByIds(userId: string, ids: ReadonlyArray<string>): Effect.Effect<Row[], DatabaseError>
   importMany(userId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   create(userId: string, input: MaterialInput & { name: string; properties: unknown }): Effect.Effect<MaterialRow, DatabaseError>
-  update(id: string, input: MaterialInput): Effect.Effect<MaterialRow, DatabaseError>
+  /** `by` is who saved (the previous values are kept in the library history); an assistant command names its own actor. */
+  update(id: string, input: MaterialInput, by?: string): Effect.Effect<MaterialRow, DatabaseError>
   /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
-  updateIfCurrent(id: string, input: MaterialInput, base: string): Effect.Effect<MaterialRow | "conflict", DatabaseError>
+  updateIfCurrent(id: string, input: MaterialInput, base: string, by?: string): Effect.Effect<MaterialRow | "conflict", DatabaseError>
+  /** What each save replaced, newest first (RM-05). */
+  history(id: string): Effect.Effect<LibraryVersionEntry[], DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/MaterialRepo") {
   static readonly layer = Layer.effect(
@@ -41,16 +45,18 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
       const events = yield* LiveEvents
       const T = schema.materialTable
       /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
-      const write = (id: string, input: MaterialInput, base: string | undefined) =>
+      const write = (id: string, input: MaterialInput, base: string | undefined, by: string | undefined) =>
       query("materials.update", (db) => commitMutation(db, "materials.update", (tx) => {
         const previous = tx.select().from(T).where(eq(T.id, id)).get()
         if (!previous) throw new Error("Material no longer exists")
         if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: "conflict" as const, resourceId: id, changed: false }
+        const version = keepPreviousVersion(tx, "material", previous, by)
         const row = tx.update(T).set({
           ...(input.name && { name: input.name }),
           ...(input.description !== undefined && { description: input.description }),
           ...(input.properties ? { properties: input.properties } : {}),
           ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
+          version,
           updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
         }).where(eq(T.id, id)).returning().get()
         if (!row) throw new Error("Material disappeared during update")
@@ -126,9 +132,10 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
               const previous = tx.select().from(T).where(eq(T.id, id)).get()
               if (!previous) throw new Error("Imported material no longer exists")
               const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              const version = keepPreviousVersion(tx, "material", previous, userId)
               tx.update(T).set({
                 name: String(m.name), description: (m.description as string | undefined) || null,
-                properties: m.properties || {}, updatedAt
+                properties: m.properties || {}, version, updatedAt
               }).where(eq(T.id, id)).run()
               return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
             })
@@ -146,8 +153,9 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
             if (!row) throw new Error("Material was not created")
             return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
           })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        update: (id, input) => write(id, input, undefined).pipe(Effect.map((row) => row as MaterialRow)),
-        updateIfCurrent: (id, input, base) => write(id, input, base),
+        update: (id, input, by) => write(id, input, undefined, by).pipe(Effect.map((row) => row as MaterialRow)),
+        updateIfCurrent: (id, input, base, by) => write(id, input, base, by),
+        history: (id) => query("materials.history", (db) => readHistory(db, "material", id)),
         remove: (id) => query("materials.remove", (db) => commitMutation(db, "materials.remove", (tx) => {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }

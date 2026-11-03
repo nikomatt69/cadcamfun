@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { LibraryVersion } from "./materials.ts"
 
 const UserRef = Schema.Struct({ id: Schema.String, name: Schema.NullOr(Schema.String), email: Schema.NullOr(Schema.String) })
 const OrgRef = Schema.Struct({ id: Schema.String, name: Schema.String })
@@ -9,6 +10,8 @@ const NullStr = Schema.NullOr(Schema.String)
 
 export const ToolRow = Schema.Struct({
   id: Schema.String,
+  /** Saves of this row, 1 when created; what each save replaced is kept (RM-05). */
+  version: Schema.Number,
   name: Schema.String,
   type: Schema.String,
   diameter: Schema.Number,
@@ -85,6 +88,7 @@ export class ToolsGroup extends HttpApiGroup.make("tools")
     HttpApiEndpoint.put("update", "/api/tools/:id", {
       params: id, payload: ToolUpdateBody, success: ToolRow, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
+    HttpApiEndpoint.get("history", "/api/tools/:id/versions", { params: id, success: Schema.Array(LibraryVersion), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.delete("remove", "/api/tools/:id", {
       params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError]
     })

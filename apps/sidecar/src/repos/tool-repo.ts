@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { importLoop, type ImportResults } from "./import-loop.ts"
 import { hasOrgWriteAccess, isOrgMember, orgIdsOf, orgRef, userRef } from "./access.ts"
+import { keepPreviousVersion, readHistory, type LibraryVersionEntry } from "./library-history.ts"
 
 type Row = typeof schema.toolTable.$inferSelect
 const toRow = (t: Row): ToolRow => ({ ...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString() })
@@ -27,9 +28,12 @@ export class ToolRepo extends Context.Service<ToolRepo, {
   visibleByIds(userId: string, ids: ReadonlyArray<string>): Effect.Effect<ToolRow[], DatabaseError>
   importMany(userId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   create(userId: string, input: ToolInput & { name: string; type: string; diameter: number; material: string }): Effect.Effect<ToolRow, DatabaseError>
-  update(id: string, input: ToolInput): Effect.Effect<ToolRow, DatabaseError>
+  /** `by` is who saved (the previous values are kept in the library history); an assistant command names its own actor. */
+  update(id: string, input: ToolInput, by?: string): Effect.Effect<ToolRow, DatabaseError>
   /** Compare-and-set: writes only while `updatedAt` still equals `base`, in one transaction; `"conflict"` (nothing written) otherwise. */
-  updateIfCurrent(id: string, input: ToolInput, base: string): Effect.Effect<ToolRow | "conflict", DatabaseError>
+  updateIfCurrent(id: string, input: ToolInput, base: string, by?: string): Effect.Effect<ToolRow | "conflict", DatabaseError>
+  /** What each save replaced, newest first (RM-05). */
+  history(id: string): Effect.Effect<LibraryVersionEntry[], DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/ToolRepo") {
   static readonly layer = Layer.effect(
@@ -39,11 +43,12 @@ export class ToolRepo extends Context.Service<ToolRepo, {
       const events = yield* LiveEvents
       const T = schema.toolTable
       /** One compare-and-set write; without `base` it is unconditional and never answers `"conflict"`. */
-      const write = (id: string, i: ToolInput, base: string | undefined) =>
+      const write = (id: string, i: ToolInput, base: string | undefined, by: string | undefined) =>
       query("tools.update", (db) => commitMutation(db, "tools.update", (tx) => {
         const previous = tx.select().from(T).where(eq(T.id, id)).get()
         if (!previous) throw new Error("Tool no longer exists")
         if (base !== undefined && previous.updatedAt.toISOString() !== base) return { result: "conflict" as const, resourceId: id, changed: false }
+        const version = keepPreviousVersion(tx, "tool", previous, by)
         // Same truthiness rules as the legacy spread: required text/number fields only when truthy, the rest when defined.
         const row = tx.update(T).set({
           ...(i.name && { name: i.name }), ...(i.type && { type: i.type }),
@@ -62,6 +67,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
           ...(i.stickout !== undefined && { stickout: i.stickout }),
           ...(i.notes !== undefined && { notes: i.notes }),
           ...(i.isPublic !== undefined && { isPublic: i.isPublic }),
+          version,
           updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
         }).where(eq(T.id, id)).returning().get()
         if (!row) throw new Error("Tool disappeared during update")
@@ -142,7 +148,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
                 const previous = tx.select().from(T).where(eq(T.id, id)).get()
                 if (!previous) throw new Error("Imported tool no longer exists")
                 const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
-                tx.update(T).set({ ...fields(t), updatedAt }).where(eq(T.id, id)).run()
+                const version = keepPreviousVersion(tx, "tool", previous, userId)
+                tx.update(T).set({ ...fields(t), version, updatedAt }).where(eq(T.id, id)).run()
                 return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
               })
             })
@@ -160,8 +167,9 @@ export class ToolRepo extends Context.Service<ToolRepo, {
             if (!row) throw new Error("Tool was not created")
             return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
           })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        update: (id, i) => write(id, i, undefined).pipe(Effect.map((row) => row as ToolRow)),
-        updateIfCurrent: (id, i, base) => write(id, i, base),
+        update: (id, i, by) => write(id, i, undefined, by).pipe(Effect.map((row) => row as ToolRow)),
+        updateIfCurrent: (id, i, base, by) => write(id, i, base, by),
+        history: (id) => query("tools.history", (db) => readHistory(db, "tool", id)),
         remove: (id) => query("tools.remove", (db) => commitMutation(db, "tools.remove", (tx) => {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }

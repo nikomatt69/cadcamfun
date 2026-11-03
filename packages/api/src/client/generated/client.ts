@@ -2088,9 +2088,14 @@ const Endpoint18_3 = (raw: RawClient["materials"]) => (input: Endpoint18_3Input)
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint18_4Request = Parameters<RawClient["materials"]["remove"]>[0]
+type Endpoint18_4Request = Parameters<RawClient["materials"]["history"]>[0]
 type Endpoint18_4Input = { readonly id: Endpoint18_4Request["params"]["id"] }
 const Endpoint18_4 = (raw: RawClient["materials"]) => (input: Endpoint18_4Input) =>
+  raw["history"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint18_5Request = Parameters<RawClient["materials"]["remove"]>[0]
+type Endpoint18_5Input = { readonly id: Endpoint18_5Request["params"]["id"] }
+const Endpoint18_5 = (raw: RawClient["materials"]) => (input: Endpoint18_5Input) =>
   raw["remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup18 = (raw: RawClient["materials"]) => ({
@@ -2098,7 +2103,8 @@ const adaptGroup18 = (raw: RawClient["materials"]) => ({
   create: Endpoint18_1(raw),
   get: Endpoint18_2(raw),
   update: Endpoint18_3(raw),
-  remove: Endpoint18_4(raw),
+  history: Endpoint18_4(raw),
+  remove: Endpoint18_5(raw),
 })
 
 type Endpoint19_0Request = Parameters<RawClient["materialsStorage"]["save"]>[0]
@@ -2267,9 +2273,14 @@ const Endpoint20_3 = (raw: RawClient["tools"]) => (input: Endpoint20_3Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint20_4Request = Parameters<RawClient["tools"]["remove"]>[0]
+type Endpoint20_4Request = Parameters<RawClient["tools"]["history"]>[0]
 type Endpoint20_4Input = { readonly id: Endpoint20_4Request["params"]["id"] }
 const Endpoint20_4 = (raw: RawClient["tools"]) => (input: Endpoint20_4Input) =>
+  raw["history"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint20_5Request = Parameters<RawClient["tools"]["remove"]>[0]
+type Endpoint20_5Input = { readonly id: Endpoint20_5Request["params"]["id"] }
+const Endpoint20_5 = (raw: RawClient["tools"]) => (input: Endpoint20_5Input) =>
   raw["remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup20 = (raw: RawClient["tools"]) => ({
@@ -2277,7 +2288,8 @@ const adaptGroup20 = (raw: RawClient["tools"]) => ({
   create: Endpoint20_1(raw),
   get: Endpoint20_2(raw),
   update: Endpoint20_3(raw),
-  remove: Endpoint20_4(raw),
+  history: Endpoint20_4(raw),
+  remove: Endpoint20_5(raw),
 })
 
 type Endpoint21_0Request = Parameters<RawClient["toolsStorage"]["save"]>[0]
@@ -2386,20 +2398,25 @@ type Endpoint22_3Input = {
 const Endpoint22_3 = (raw: RawClient["machineConfigs"]) => (input: Endpoint22_3Input) =>
   raw["update"]({ params: { id: input["id"] }, payload: input["payload"] }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint22_4Request = Parameters<RawClient["machineConfigs"]["remove"]>[0]
+type Endpoint22_4Request = Parameters<RawClient["machineConfigs"]["history"]>[0]
 type Endpoint22_4Input = { readonly id: Endpoint22_4Request["params"]["id"] }
 const Endpoint22_4 = (raw: RawClient["machineConfigs"]) => (input: Endpoint22_4Input) =>
+  raw["history"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint22_5Request = Parameters<RawClient["machineConfigs"]["remove"]>[0]
+type Endpoint22_5Input = { readonly id: Endpoint22_5Request["params"]["id"] }
+const Endpoint22_5 = (raw: RawClient["machineConfigs"]) => (input: Endpoint22_5Input) =>
   raw["remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint22_5Request = Parameters<RawClient["machineConfigs"]["clone"]>[0]
-type Endpoint22_5Input = {
-  readonly id: Endpoint22_5Request["params"]["id"]
-  readonly payload: Endpoint22_5Request["payload"]
+type Endpoint22_6Request = Parameters<RawClient["machineConfigs"]["clone"]>[0]
+type Endpoint22_6Input = {
+  readonly id: Endpoint22_6Request["params"]["id"]
+  readonly payload: Endpoint22_6Request["payload"]
 }
-const Endpoint22_5 = (raw: RawClient["machineConfigs"]) => (input: Endpoint22_5Input) =>
+const Endpoint22_6 = (raw: RawClient["machineConfigs"]) => (input: Endpoint22_6Input) =>
   raw["clone"]({ params: { id: input["id"] }, payload: input["payload"] }).pipe(Effect.mapError(mapClientError))
 
-const Endpoint22_6 = (raw: RawClient["machineConfigs"]) => () =>
+const Endpoint22_7 = (raw: RawClient["machineConfigs"]) => () =>
   raw["defaults"]({}).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup22 = (raw: RawClient["machineConfigs"]) => ({
@@ -2407,9 +2424,10 @@ const adaptGroup22 = (raw: RawClient["machineConfigs"]) => ({
   create: Endpoint22_1(raw),
   get: Endpoint22_2(raw),
   update: Endpoint22_3(raw),
-  remove: Endpoint22_4(raw),
-  clone: Endpoint22_5(raw),
-  defaults: Endpoint22_6(raw),
+  history: Endpoint22_4(raw),
+  remove: Endpoint22_5(raw),
+  clone: Endpoint22_6(raw),
+  defaults: Endpoint22_7(raw),
 })
 
 type Endpoint23_0Request = Parameters<RawClient["machineConfigsStorage"]["save"]>[0]

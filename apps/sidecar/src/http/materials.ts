@@ -39,10 +39,16 @@ export const MaterialsHandlers = HttpApiBuilder.group(Api, "materials", Effect.f
         if (!found.canWrite) return yield* new Forbidden({ message: "You do not have permission to modify this material" })
         const { baseUpdatedAt, ...fields } = payload
         // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
-        const updated = baseUpdatedAt === undefined ? yield* repo.update(params.id, fields) : yield* repo.updateIfCurrent(params.id, fields, baseUpdatedAt)
+        const updated = baseUpdatedAt === undefined ? yield* repo.update(params.id, fields, user.id) : yield* repo.updateIfCurrent(params.id, fields, baseUpdatedAt, user.id)
         if (updated === "conflict") return yield* new Conflict({ message: "The material was saved elsewhere since it was read. Nothing was overwritten." })
         return updated
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update material"))))
+    .handle("history", ({ params }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        if (!(yield* repo.find(user.id, params.id))) return yield* new NotFound({ message: "Material not found or access denied" })
+        return yield* repo.history(params.id)
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch material versions"))))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser

@@ -270,6 +270,8 @@ export const materialTable = sqliteTable(
   description: text("description"),
   properties: text("properties", { mode: "json" }).notNull(),
   isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
+  /** Counts the saves of this row (1 when created); the values each save replaced are kept in `LibraryRowVersion`. */
+  version: integer("version").notNull().default(1),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
   ownerId: text("ownerId").references((): AnySQLiteColumn => userTable.id),
@@ -303,6 +305,8 @@ export const toolTable = sqliteTable(
   stickout: real("stickout"),
   notes: text("notes"),
   isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
+  /** Counts the saves of this row (1 when created); the values each save replaced are kept in `LibraryRowVersion`. */
+  version: integer("version").notNull().default(1),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
   ownerId: text("ownerId").references((): AnySQLiteColumn => userTable.id),
@@ -379,6 +383,8 @@ export const machineConfigTable = sqliteTable(
   description: text("description"),
   config: text("config", { mode: "json" }).notNull(),
   isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
+  /** Counts the saves of this row (1 when created); the values each save replaced are kept in `LibraryRowVersion`. */
+  version: integer("version").notNull().default(1),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
   ownerId: text("ownerId").notNull().references((): AnySQLiteColumn => userTable.id),
@@ -387,6 +393,31 @@ export const machineConfigTable = sqliteTable(
 
 export type MachineConfig = typeof machineConfigTable.$inferSelect
 export type NewMachineConfig = typeof machineConfigTable.$inferInsert
+
+export const LibraryKindValues = ["material", "tool", "machine_config"] as const
+
+/**
+ * What a library row held before a save replaced it (RM-05): one row per save, the whole previous row as JSON, so an edit by a
+ * person or by the assistant can be read back and restored. `version` is the version the snapshot had.
+ */
+export const libraryRowVersionTable = sqliteTable(
+  "LibraryRowVersion",
+  {
+  id: text("id").primaryKey().$defaultFn(newId),
+  kind: text("kind", { enum: LibraryKindValues }).notNull(),
+  rowId: text("rowId").notNull(),
+  version: integer("version").notNull(),
+  data: text("data", { mode: "json" }).notNull(),
+  changedBy: text("changedBy"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("LibraryRowVersion_kind_rowId_idx").on(t.kind, t.rowId),
+  ]
+)
+
+export type LibraryRowVersion = typeof libraryRowVersionTable.$inferSelect
+export type NewLibraryRowVersion = typeof libraryRowVersionTable.$inferInsert
 
 export const activityLogTable = sqliteTable(
   "ActivityLog",
