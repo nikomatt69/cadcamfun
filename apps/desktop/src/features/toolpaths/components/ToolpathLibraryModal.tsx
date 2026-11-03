@@ -27,7 +27,7 @@ export interface PredefinedToolpathsLibraryProps {
   readonly onSelect: (item: LibraryPick) => void
 }
 
-const FIELD = "rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-2.5 py-1.5 text-sm text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
+const FIELD = "rounded-[5px] border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-2.5 py-1.5 text-xs text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
 
 export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProps): JSX.Element {
   const app = useApp()
@@ -73,19 +73,19 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
       </div>
 
       <Show when={!loading()} fallback={<LoadingState label={t("pages.loading.library")} />}>
-        <Show when={items().length > 0} fallback={<p class="py-6 text-center text-sm text-[color:var(--ent-text-muted)]">{t("pages.no.toolpaths.match.your.filters")}</p>}>
+        <Show when={items().length > 0} fallback={<p class="py-6 text-center text-xs text-[color:var(--ent-text-muted)]">{t("pages.no.toolpaths.match.your.filters")}</p>}>
           <ul class="max-h-[60vh] divide-y divide-[color:var(--ent-line)] overflow-y-auto">
             <For each={items()}>{(item) => (
               <li class="flex items-start justify-between gap-3 py-3">
                 <div class="min-w-0">
-                  <div class="text-sm font-medium text-[color:var(--ent-text)]">{item.name}</div>
-                  <div class="mt-0.5 text-xs text-[color:var(--ent-text-muted)]">{item.description}</div>
+                  <div class="text-xs font-medium text-[color:var(--ent-text)]">{item.name}</div>
+                  <div class="mt-0.5 text-[11px] text-[color:var(--ent-text-muted)]">{item.description}</div>
                   <div class="mt-1 flex gap-1 text-xs">
-                    <span class="rounded-full bg-[color:var(--ent-accent-soft)] px-2 py-0.5 font-semibold text-[color:var(--ent-accent)]">{TYPE_LABEL[item.type] ?? item.type}</span>
-                    <span class="rounded-full bg-[color:var(--ent-surface-subtle)] px-2 py-0.5 font-semibold text-[color:var(--ent-text)]">{OPERATION_LABEL[item.operationType] ?? item.operationType}</span>
+                    <span class="rounded-full bg-[color:var(--ent-surface-subtle)] px-2 py-0.5 font-medium text-[color:var(--ent-text-muted)]">{TYPE_LABEL[item.type] ?? item.type}</span>
+                    <span class="rounded-full bg-[color:var(--ent-surface-subtle)] px-2 py-0.5 font-medium text-[color:var(--ent-text-muted)]">{OPERATION_LABEL[item.operationType] ?? item.operationType}</span>
                   </div>
                 </div>
-                <button type="button" class="inline-flex shrink-0 items-center gap-1 rounded-md bg-[color:var(--ent-action)] px-3 py-1.5 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50" disabled={props.projectId === ""} onClick={() => props.onSelect(item)}>
+                <button type="button" class="inline-flex shrink-0 items-center gap-1 h-7 rounded-[5px] bg-[color:var(--ent-action)] px-2.5 text-xs font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50" disabled={props.projectId === ""} onClick={() => props.onSelect(item)}>
                   <Download size={14} aria-hidden="true" />{t("ai.suggestions.apply")}
                 </button>
               </li>

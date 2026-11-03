@@ -327,7 +327,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                                 </div>
                               </div>
                               <div class="flex items-center gap-2">
-                                <input id="detail-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 border-[color:var(--ent-line-strong)] accent-blue-600" checked={value().isPublic} onChange={(e) => patch({ isPublic: e.currentTarget.checked })} />
+                                <input id="detail-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 border-[color:var(--ent-line-strong)] accent-[color:var(--ent-accent)]" checked={value().isPublic} onChange={(e) => patch({ isPublic: e.currentTarget.checked })} />
                                 <label for="detail-public" class="text-xs text-[color:var(--ent-text)]">{t("pages.make.toolpath.public.visible.to.all.users")}</label>
                               </div>
                             </form>

@@ -27,8 +27,8 @@ export interface ToolpathFormModalProps {
   readonly onSubmit: (value: ToolpathFormValue) => void | Promise<void>
 }
 
-const INPUT = "w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-sm text-[color:var(--ent-text)] shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
-const LABEL = "mb-1 block text-sm font-medium text-[color:var(--ent-text)]"
+const INPUT = "w-full rounded-[5px] border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-2.5 py-1.5 text-xs text-[color:var(--ent-text)] focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
+const LABEL = "mb-1 block text-xs font-medium text-[color:var(--ent-text-muted)]"
 
 export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
   const [name, setName] = createSignal("")
@@ -104,15 +104,15 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
           </select>
         </div>
         <div class="flex items-center">
-          <input id="toolpath-public" name="isPublic" type="checkbox" class="h-4 w-4 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" checked={isPublic()} onChange={(e) => setIsPublic(e.currentTarget.checked)} />
-          <label for="toolpath-public" class="ml-2 block text-sm text-[color:var(--ent-text)]">{t("pages.make.toolpath.public.visible.to.all.users")}</label>
+          <input id="toolpath-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 rounded border-[color:var(--ent-line-strong)] text-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]" checked={isPublic()} onChange={(e) => setIsPublic(e.currentTarget.checked)} />
+          <label for="toolpath-public" class="ml-2 block text-xs text-[color:var(--ent-text)]">{t("pages.make.toolpath.public.visible.to.all.users")}</label>
         </div>
         <Show when={!props.row}>
           <p class="text-xs text-[color:var(--ent-text-muted)]">{t("pages.the.g.code.is.generated.in.the.cam.page.and.saved.to.the.toolpath.from.there")}</p>
         </Show>
         <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-4">
-          <button type="button" class="rounded-md border border-[color:var(--ent-line-strong)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] disabled:opacity-50" disabled={props.busy} onClick={() => props.onClose()}>{t("common.cancel")}</button>
-          <button type="submit" class="rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50" disabled={props.busy || projectId() === ""}>
+          <button type="button" class="inline-flex h-7 items-center rounded-[5px] border border-[color:var(--ent-line-strong)] px-3 text-xs font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] disabled:opacity-50" disabled={props.busy} onClick={() => props.onClose()}>{t("common.cancel")}</button>
+          <button type="submit" class="inline-flex h-7 items-center rounded-[5px] bg-[color:var(--ent-action)] px-3 text-xs font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50" disabled={props.busy || projectId() === ""}>
             {props.busy ? t("mcp.form.saving") : props.row ? t("common.save") : t("keys.group.create")}
           </button>
         </div>
