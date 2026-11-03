@@ -6,7 +6,7 @@ Actions
 - context_update: replace or add one section (by its heading) of the project's standing context document.
 
 Parameters
-- remember: key (letters, digits, dot, dash, underscore; up to 80 characters), value (up to 2000).
+- remember: key (letters, digits, dot, dash, underscore; up to 80 characters; start it with preference. / lesson. / spec. to type the note), value (up to 2000).
 - context_update: heading (the section's name, up to 80), content (the section's body, up to 2000).
 
 Result (JSON)

@@ -78,6 +78,19 @@ describe("workspace context", () => {
     expect(renderNotes([])).toBe("")
   })
 
+  test("a note whose key starts with preference. / lesson. / spec. is shown with its type; any other key is shown as before", () => {
+    const text = renderNotes([
+      { key: "preference.units", value: "mm only" }, { key: "lesson.vise", value: "jaws need a 0.5 mm relief" },
+      { key: "spec.material", value: "6061-T6" }, { key: "setup", value: "G54" }, { key: "preference.", value: "no name" }, { key: "preferences.x", value: "not a type" }
+    ])
+    expect(text).toContain("- [preference] units: mm only")
+    expect(text).toContain("- [lesson] vise: jaws need a 0.5 mm relief")
+    expect(text).toContain("- [spec] material: 6061-T6")
+    expect(text).toContain("\n- setup: G54")
+    expect(text).toContain("\n- preference.: no name")
+    expect(text).toContain("\n- preferences.x: not a type")
+  })
+
   test("a note cut to the line limit says so and names the action that returns it whole", () => {
     const long = `G55 fixture plate. ${"Vise jaw offset recorded from the probe cycle; ".repeat(20)}LAST-FACT`
     const cut = renderNotes([{ key: "setup", value: long }, { key: "short", value: "mm only" }])

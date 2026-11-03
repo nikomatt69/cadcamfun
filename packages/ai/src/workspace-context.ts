@@ -226,6 +226,13 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   return complete.join("\n") + marker
 }
 
+/** A note whose key starts with one of these words is typed: a standing preference, a lesson learnt, or a specification fact. */
+export const NOTE_TYPES = ["preference", "lesson", "spec"] as const
+const typedKey = (key: string): { readonly type: typeof NOTE_TYPES[number]; readonly rest: string } | undefined => {
+  for (const type of NOTE_TYPES) if (key.startsWith(`${type}.`) && key.length > type.length + 1) return { type, rest: key.slice(type.length + 1) }
+  return undefined
+}
+
 /** Notes the assistant saved itself: newest first up to a count and a size, so they never crowd the workspace out. */
 export const renderNotes = (notes: ReadonlyArray<{ readonly key: string; readonly value: unknown }>, maxChars = 1_500): string => {
   const budget = Math.max(0, Math.floor(num(maxChars) ?? 1_500))
@@ -239,7 +246,8 @@ export const renderNotes = (notes: ReadonlyArray<{ readonly key: string; readonl
     // A note may hold 2 000 characters; the context shows 300. A cut says so and names the action that returns the whole note.
     const whole = untrustedLine(value, 100_000)
     const shown = str(value)?.slice(0, 300) ?? "unknown"
-    const line = `- ${label(note.key)}: ${shown}${whole.length > 300 ? ` [cut; memory action recall reads the whole note]` : ""}`
+    const typed = typedKey(note.key)
+    const line = `- ${typed !== undefined ? `[${typed.type}] ${label(typed.rest)}` : label(note.key)}: ${shown}${whole.length > 300 ? ` [cut; memory action recall reads the whole note]` : ""}`
     const candidate = [...rows, line]
     if (header(notes.length - candidate.length).length + candidate.join("\n").length > budget) break
     rows.push(line)
