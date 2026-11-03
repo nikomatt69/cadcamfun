@@ -12,11 +12,11 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 ## Totals
 
-- Actions: **127** in **15** tools (read 73, write 48, destructive 6).
-- Actions with an identified execution path: **127/127**.
-- Actions named in their tool prompt: **127/127**.
-- Actions mentioned by at least one test file: **126/127**.
-- Actions with a declared result schema: **127/127**.
+- Actions: **128** in **15** tools (read 74, write 48, destructive 6).
+- Actions with an identified execution path: **128/128**.
+- Actions named in their tool prompt: **128/128**.
+- Actions mentioned by at least one test file: **127/128**.
+- Actions with a declared result schema: **128/128**.
 - Prompt files: **63** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **26** (plus user skills from the store); composer commands: **42**.
 
@@ -26,7 +26,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- |
 | `cad` | read | 35 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4471 |
 | `cad_edit` | destructive | 22 | primary:build, editor, modeler | 4536 |
-| `cam` | read | 20 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4452 |
+| `cam` | read | 21 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4817 |
 | `cam_edit` | write | 8 | primary:build, machinist, optimizer | 3050 |
 | `library` | read | 5 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1445 |
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1230 |
@@ -132,6 +132,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:1567` | yes | declared | ai-cam-chain.test.ts |
 | `cam.lathe` | read | — | stock*, contour, bore, tools*, operations*, material, post | local (in-package implementation) — `packages/ai/src/actions/cam-breadth-process.ts` | yes | declared | cam-breadth-actions.test.ts |
 | `cam.process` | read | — | gcode, operationId, tool*, material*, machine, stock*, rpm, mode*, post | handler `machine` → `apps/sidecar/src/http/workspace.ts:79`<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1188` | yes | declared | cam-breadth-actions.test.ts |
+| `cam.verify_nc` | read | — | gcode, operationId, part*, origin, stock*, tools*, machine, tolerance, allowance, cell | handler `operationProgram` → `apps/sidecar/src/services/ai.ts:1188` | yes | declared | cam-breadth-actions.test.ts |
 | `cam.post_test` | read | — | post*, gcode, expected | local (core cam.programOfNc, core cam.testPost) — `packages/ai/src/actions/cam-breadth-process.ts` | yes | declared | cam-breadth-actions.test.ts |
 
 ### `cam_edit`
@@ -277,7 +278,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1770 | ai-specialists.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4471 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 4536 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 4452 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, skills.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 4817 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, skills.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3050 | auto-mode.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1577 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1445 | prompt-corpus.test.ts |
@@ -348,7 +349,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `stock-and-fixtures` | cam | 837 | — |
 | `fea-simulation` | cad | 4364 | cad, cad_edit, library, memory |
 | `cam-turning` | cam | 3782 | cam, cam_edit |
-| `cam-post` | cam | 2933 | cam |
+| `cam-post` | cam | 4569 | cam |
 | `cam-five-axis` | cam | 4609 | cam, cam_edit |
 | `pmi-and-drawing-annotation` | cad | 4701 | cad, cad_edit |
 | `library-setup` | library | 4489 | cad, cam, cam_edit, library, parts, library_edit |
