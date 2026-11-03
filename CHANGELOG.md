@@ -3,6 +3,19 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.75 (November 2026)
+
+## Core
+
+- An operation that fails alone no longer discards the rest (kernel warns instead of blocking, post drops only the toolpaths it cannot write, setup generation isolates throws)
+
+## Desktop
+
+- Generate-all reports failures instead of claiming every toolpath was generated
+- Stageshow shared layer: tokens defined once, 28px controls, opaque dialogs, lean globals.css, WorkspacePage constants on --ent
+- Stageshow analytics, settings, projects, library and update dialogs on --ent tokens, NumberField in resource create form
+- Stageshow cam panels, dialogs and generator sections on panel tokens; translate advanced notes
+
 ## v0.1.74 (November 2026)
 
 ## Desktop
