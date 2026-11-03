@@ -12,6 +12,8 @@ import Mark from "../components/Mark.astro"
 import DocAssistant from "../components/docs/DocAssistant.astro"
 import DocViewerMount from "../components/docs/DocViewerMount.astro"
 import LocaleSelector from "../components/LocaleSelector.astro"
+import DocsShot from "../components/stage/DocsShot"
+import { topicFor } from "../components/stage/topic"
 import { LOCALE_CODES, localeInfo, localizePath, splitLocalePath } from "../i18n/locales"
 import { ui } from "../i18n/ui"
 
@@ -37,6 +39,7 @@ const locale = Astro.props.locale ?? Astro.locals.locale ?? "en"
 const { pathname: barePath } = splitLocalePath(Astro.url.pathname.replace(/\/$/, "") || "/docs")
 const pathname = barePath
 const dir = localeInfo(locale).dir
+const topic = topicFor(pathname)
 ---
 
 <!doctype html>
@@ -106,6 +109,7 @@ const dir = localeInfo(locale).dir
             <h1 class="font-display text-page-title text-terminal-text">{title}</h1>
             {subtitle && <p class="mt-4 max-w-2xl text-page-subtitle text-terminal-muted">{subtitle}</p>}
             <div class="plate-rule" aria-hidden="true"></div>
+            <div data-llm-exclude class={topic === "docs" ? "doc-shot" : "doc-shot doc-shot--tile"}><DocsShot topic={topic} client:only="react" /></div>
           </header>
           <div class="content-body">
             <slot />

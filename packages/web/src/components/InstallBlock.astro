@@ -1,10 +1,8 @@
 ---
 import { text } from "../i18n/catalog"
+import QuickstartTerminal from "./stage/QuickstartTerminal"
 
 const locale = Astro.locals.locale ?? "en"
-const commands = `bun install
-bun test packages apps
-bun run desktop:dev`
 ---
 
 <section class="page-section" aria-labelledby="start-heading">
@@ -26,6 +24,6 @@ bun run desktop:dev`
         </a>
       </div>
     </div>
-    <pre class="material min-w-0 rounded-[var(--radius-card)]"><code class="block overflow-x-auto p-5 font-mono text-[13px] leading-7 text-terminal-text">{commands}</code></pre>
+    <div class="min-w-0"><QuickstartTerminal client:only="react" /></div>
   </div>
 </section>
