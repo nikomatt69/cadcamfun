@@ -1,6 +1,6 @@
 import type { ProjectRow, ProjectWithRelations } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { and, count, eq, inArray, or } from "drizzle-orm"
+import { and, count, desc, eq, inArray, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 
@@ -63,6 +63,8 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
   /** Project the user owns or reaches through an organisation, plus their role there (legacy `findFirst` rule). */
   find(userId: string, id: string): Effect.Effect<Access | undefined, DatabaseError>
   isMember(userId: string, organizationId: string): Effect.Effect<boolean, DatabaseError>
+  /** Every project of the organisation, newest first (the caller has checked membership). */
+  listForOrganization(organizationId: string): Effect.Effect<ProjectWithRelations[], DatabaseError>
   create(userId: string, input: ProjectInput): Effect.Effect<ProjectRow, DatabaseError>
   update(id: string, patch: { name: string; description?: string | null | undefined; organizationId?: string | null | undefined }): Effect.Effect<ProjectWithRelations, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
@@ -93,6 +95,9 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
             const [project] = await hydrate(db, [row])
             return { project: project!, orgRole: ms.find((m) => m.organizationId === row.organizationId)?.role }
           }),
+        listForOrganization: (organizationId) =>
+          query("projects.listForOrganization", async (db) =>
+            hydrate(db, await db.select().from(T).where(eq(T.organizationId, organizationId)).orderBy(desc(T.updatedAt)))),
         isMember: (userId, organizationId) =>
           query("projects.isMember", async (db) => {
             const ms = await memberships(db, userId)

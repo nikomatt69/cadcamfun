@@ -1017,6 +1017,20 @@ export type OrganizationsCreatePayload = { readonly name: string; readonly descr
 
 export type OrganizationsUpdatePayload = { readonly name: string; readonly description?: string | null | undefined }
 
+export type OrganizationsSetMemberRolePayload = {
+  readonly memberId?: string | undefined
+  readonly role?: string | undefined
+}
+
+export type OrganizationsRemoveMemberPayload = { readonly memberId?: string | undefined }
+
+export type OrganizationsInvitePayload = { readonly email?: string | undefined; readonly role?: string | undefined }
+
+export type OrganizationsCreateProjectPayload = {
+  readonly name?: string | undefined
+  readonly description?: string | null | undefined
+}
+
 export type NotificationsUpdatePayload = { readonly isRead: boolean }
 
 export type ProjectsCreatePayload = {
@@ -5795,6 +5809,87 @@ export type OrganizationsUpdateOutput = {
 export type OrganizationsRemoveInput = { readonly id: { readonly id: string }["id"] }
 
 export type OrganizationsRemoveOutput = { message: string }
+
+export type OrganizationsMembersInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly search?: { readonly search?: string | undefined }["search"]
+}
+
+export type OrganizationsMembersOutput = Array<{
+  id: string
+  userId: string
+  organizationId: string
+  role: "ADMIN" | "MANAGER" | "MEMBER"
+  joinedAt: string
+  user: { id: string; name: string | null; email: string | null; image: string | null }
+}>
+
+export type OrganizationsSetMemberRoleInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly memberId?: OrganizationsSetMemberRolePayload["memberId"]
+  readonly role?: OrganizationsSetMemberRolePayload["role"]
+}
+
+export type OrganizationsSetMemberRoleOutput = {
+  id: string
+  userId: string
+  organizationId: string
+  role: "ADMIN" | "MANAGER" | "MEMBER"
+  joinedAt: string
+  user: { id: string; name: string | null; email: string | null; image: string | null }
+}
+
+export type OrganizationsRemoveMemberInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly memberId?: OrganizationsRemoveMemberPayload["memberId"]
+}
+
+export type OrganizationsRemoveMemberOutput = { message: string }
+
+export type OrganizationsInviteInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly email?: OrganizationsInvitePayload["email"]
+  readonly role?: OrganizationsInvitePayload["role"]
+}
+
+export type OrganizationsInviteOutput = {
+  message: "Invitation created and sent" | "Invitation updated and sent"
+  invitation: { id: string; email: string; role: "ADMIN" | "MANAGER" | "MEMBER"; expiresAt: string }
+  inviteUrl: string
+}
+
+export type OrganizationsProjectsInput = { readonly id: { readonly id: string }["id"] }
+
+export type OrganizationsProjectsOutput = Array<{
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  ownerId: string
+  organizationId: string | null
+  isPublic: boolean
+  owner: { id: string; name: string | null; email: string | null }
+  organization: { id: string; name: string } | null
+  _count: { drawings: number; components: number }
+}>
+
+export type OrganizationsCreateProjectInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: OrganizationsCreateProjectPayload["name"]
+  readonly description?: OrganizationsCreateProjectPayload["description"]
+}
+
+export type OrganizationsCreateProjectOutput = {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  ownerId: string
+  organizationId: string | null
+  isPublic: boolean
+}
 
 export type NotificationsListInput = {
   readonly limit?: {

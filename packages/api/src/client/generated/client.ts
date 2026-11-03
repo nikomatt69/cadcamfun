@@ -1776,12 +1776,78 @@ type Endpoint14_4Input = { readonly id: Endpoint14_4Request["params"]["id"] }
 const Endpoint14_4 = (raw: RawClient["organizations"]) => (input: Endpoint14_4Input) =>
   raw["remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint14_5Request = Parameters<RawClient["organizations"]["members"]>[0]
+type Endpoint14_5Input = {
+  readonly id: Endpoint14_5Request["params"]["id"]
+  readonly search?: Endpoint14_5Request["query"]["search"]
+}
+const Endpoint14_5 = (raw: RawClient["organizations"]) => (input: Endpoint14_5Input) =>
+  raw["members"]({ params: { id: input["id"] }, query: { search: input["search"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint14_6Request = Parameters<RawClient["organizations"]["setMemberRole"]>[0]
+type Endpoint14_6Input = {
+  readonly id: Endpoint14_6Request["params"]["id"]
+  readonly memberId?: Endpoint14_6Request["payload"]["memberId"]
+  readonly role?: Endpoint14_6Request["payload"]["role"]
+}
+const Endpoint14_6 = (raw: RawClient["organizations"]) => (input: Endpoint14_6Input) =>
+  raw["setMemberRole"]({
+    params: { id: input["id"] },
+    payload: { memberId: input["memberId"], role: input["role"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint14_7Request = Parameters<RawClient["organizations"]["removeMember"]>[0]
+type Endpoint14_7Input = {
+  readonly id: Endpoint14_7Request["params"]["id"]
+  readonly memberId?: Endpoint14_7Request["payload"]["memberId"]
+}
+const Endpoint14_7 = (raw: RawClient["organizations"]) => (input: Endpoint14_7Input) =>
+  raw["removeMember"]({ params: { id: input["id"] }, payload: { memberId: input["memberId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint14_8Request = Parameters<RawClient["organizations"]["invite"]>[0]
+type Endpoint14_8Input = {
+  readonly id: Endpoint14_8Request["params"]["id"]
+  readonly email?: Endpoint14_8Request["payload"]["email"]
+  readonly role?: Endpoint14_8Request["payload"]["role"]
+}
+const Endpoint14_8 = (raw: RawClient["organizations"]) => (input: Endpoint14_8Input) =>
+  raw["invite"]({ params: { id: input["id"] }, payload: { email: input["email"], role: input["role"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint14_9Request = Parameters<RawClient["organizations"]["projects"]>[0]
+type Endpoint14_9Input = { readonly id: Endpoint14_9Request["params"]["id"] }
+const Endpoint14_9 = (raw: RawClient["organizations"]) => (input: Endpoint14_9Input) =>
+  raw["projects"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint14_10Request = Parameters<RawClient["organizations"]["createProject"]>[0]
+type Endpoint14_10Input = {
+  readonly id: Endpoint14_10Request["params"]["id"]
+  readonly name?: Endpoint14_10Request["payload"]["name"]
+  readonly description?: Endpoint14_10Request["payload"]["description"]
+}
+const Endpoint14_10 = (raw: RawClient["organizations"]) => (input: Endpoint14_10Input) =>
+  raw["createProject"]({
+    params: { id: input["id"] },
+    payload: { name: input["name"], description: input["description"] },
+  }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup14 = (raw: RawClient["organizations"]) => ({
   list: Endpoint14_0(raw),
   create: Endpoint14_1(raw),
   get: Endpoint14_2(raw),
   update: Endpoint14_3(raw),
   remove: Endpoint14_4(raw),
+  members: Endpoint14_5(raw),
+  setMemberRole: Endpoint14_6(raw),
+  removeMember: Endpoint14_7(raw),
+  invite: Endpoint14_8(raw),
+  projects: Endpoint14_9(raw),
+  createProject: Endpoint14_10(raw),
 })
 
 type Endpoint15_0Request = Parameters<RawClient["notifications"]["list"]>[0]

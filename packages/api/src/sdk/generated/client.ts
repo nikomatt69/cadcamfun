@@ -304,6 +304,18 @@ import type {
   OrganizationsUpdateOutput,
   OrganizationsRemoveInput,
   OrganizationsRemoveOutput,
+  OrganizationsMembersInput,
+  OrganizationsMembersOutput,
+  OrganizationsSetMemberRoleInput,
+  OrganizationsSetMemberRoleOutput,
+  OrganizationsRemoveMemberInput,
+  OrganizationsRemoveMemberOutput,
+  OrganizationsInviteInput,
+  OrganizationsInviteOutput,
+  OrganizationsProjectsInput,
+  OrganizationsProjectsOutput,
+  OrganizationsCreateProjectInput,
+  OrganizationsCreateProjectOutput,
   NotificationsListInput,
   NotificationsListOutput,
   NotificationsUpdateInput,
@@ -2942,6 +2954,77 @@ export function make(options: ClientOptions) {
             method: "DELETE",
             path: `/api/organizations/${encodeURIComponent(input.id)}`,
             successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      members: (input: OrganizationsMembersInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsMembersOutput>(
+          {
+            method: "GET",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/members`,
+            query: { search: input["search"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setMemberRole: (input: OrganizationsSetMemberRoleInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsSetMemberRoleOutput>(
+          {
+            method: "PUT",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/members`,
+            body: { memberId: input["memberId"], role: input["role"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeMember: (input: OrganizationsRemoveMemberInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsRemoveMemberOutput>(
+          {
+            method: "DELETE",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/members`,
+            body: { memberId: input["memberId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      invite: (input: OrganizationsInviteInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsInviteOutput>(
+          {
+            method: "POST",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/invite`,
+            body: { email: input["email"], role: input["role"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projects: (input: OrganizationsProjectsInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsProjectsOutput>(
+          {
+            method: "GET",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/projects`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createProject: (input: OrganizationsCreateProjectInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsCreateProjectOutput>(
+          {
+            method: "POST",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/projects`,
+            body: { name: input["name"], description: input["description"] },
+            successStatus: 201,
             declaredStatuses: [400, 403, 500, 401],
             empty: false,
           },

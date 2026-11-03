@@ -54,4 +54,5 @@ Gate: coverage rises per family; `--strict` is green only when 184/184. Handler 
 - 2026-10-16: marketplace removed from the product (owner decision); the `/api/marketplace/*` rows and the Polar-webhook deliverable are gone, inventory total is 184.
 - 2026-11-03: step 1 started: `components/*` versions and comments (5 route files, coverage 131/184 with index, details, relationships, storage, export-import). Remaining in the family: library, analysis. Revision/receipt consolidation still open.
 - 2026-11-03: step 2 `toolpaths/export-import` done (coverage 132/184). Step 1 leaves `components/library` and `components/:id/analysis` open on purpose (see `11-api-parity-brief.md`). Step 3 (organisations, invitations, conversation) is next. Generated clients, contract snapshot and API reference regenerate once the in-flight `verify-nc` contract of another session has landed.
+- 2026-11-03: step 3a done: organisation members, invite, projects (coverage 135/184). Open in step 3: conversations, invitation accept, `conversation/*`.
 

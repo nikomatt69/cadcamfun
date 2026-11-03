@@ -1,6 +1,6 @@
-import { Forbidden, OrganizationDetails, OrganizationRow, OrganizationSummary } from "@cadcamfun/api"
+import { Forbidden, OrganizationDetails, OrganizationMembership, OrganizationRow, OrganizationSummary } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { and, count, eq } from "drizzle-orm"
+import { and, asc, count, eq, or, sql } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 
@@ -9,12 +9,28 @@ const row = (value: typeof schema.organizationTable.$inferSelect) => Schema.deco
   ...value, createdAt: value.createdAt.toISOString(), updatedAt: value.updatedAt.toISOString()
 })
 
+type Role = "ADMIN" | "MANAGER" | "MEMBER"
+export type Membership = typeof OrganizationMembership.Type
+
 export class OrganizationRepo extends Context.Service<OrganizationRepo, {
   list(userId: string): Effect.Effect<ReadonlyArray<typeof OrganizationSummary.Type>, DatabaseError>
   create(userId: string, input: Input): Effect.Effect<typeof OrganizationRow.Type, DatabaseError>
   get(userId: string, id: string): Effect.Effect<typeof OrganizationDetails.Type | undefined, DatabaseError | Forbidden>
   update(userId: string, id: string, input: Input): Effect.Effect<typeof OrganizationRow.Type | undefined, DatabaseError | Forbidden>
   remove(userId: string, id: string): Effect.Effect<void, DatabaseError | Forbidden>
+  /** The user's role in the organisation, `undefined` when they are no member. */
+  membership(userId: string, organizationId: string): Effect.Effect<Role | undefined, DatabaseError>
+  /** Members with their user, by name; `search` matches name or e-mail. */
+  members(organizationId: string, search?: string): Effect.Effect<Membership[], DatabaseError>
+  member(organizationId: string, userId: string): Effect.Effect<Membership | undefined, DatabaseError>
+  setRole(organizationId: string, userId: string, role: Role): Effect.Effect<Membership | undefined, DatabaseError>
+  removeMember(organizationId: string, userId: string): Effect.Effect<void, DatabaseError>
+  adminCount(organizationId: string): Effect.Effect<number, DatabaseError>
+  /** The user with this e-mail is a member already. */
+  isMemberByEmail(organizationId: string, email: string): Effect.Effect<boolean, DatabaseError>
+  name(organizationId: string): Effect.Effect<string | undefined, DatabaseError>
+  /** One open invitation per e-mail and organisation: a repeated invite renews role, token and expiry. */
+  invite(organizationId: string, email: string, role: Role, token: string, expiresAt: Date): Effect.Effect<{ id: string; email: string; role: Role; expiresAt: string; renewed: boolean }, DatabaseError>
 }>()("cadcamfun/OrganizationRepo") {
   static readonly layer = Layer.effect(OrganizationRepo, Effect.gen(function*() {
     const { query } = yield* Database
@@ -29,7 +45,50 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
       if (!membership) return yield* new Forbidden({ message: "You are not a member of this organization" })
       return membership.role
     })
+    const U = schema.userTable
+    const I = schema.organizationInvitationTable
+    const membershipRow = (r: { m: typeof M.$inferSelect; user: { id: string; name: string | null; email: string | null; image: string | null } }): Membership =>
+      ({ id: r.m.id, userId: r.m.userId, organizationId: r.m.organizationId, role: r.m.role, joinedAt: r.m.joinedAt.toISOString(), user: r.user })
+    const userRef = { id: U.id, name: U.name, email: U.email, image: U.image }
     return OrganizationRepo.of({
+      membership: (userId, organizationId) => query("organizations.membership", async (db) =>
+        (await db.select({ role: M.role }).from(M).where(and(eq(M.userId, userId), eq(M.organizationId, organizationId))).limit(1))[0]?.role),
+      members: (organizationId, search) => query("organizations.members", async (db) => {
+        // `like` is case-insensitive for ASCII in SQLite; `%` and `_` typed by the user are matched literally.
+        const needle = search ? `%${search.replace(/[\\%_]/g, "\\$&")}%` : undefined
+        const rows = await db.select({ m: M, user: userRef }).from(M).innerJoin(U, eq(M.userId, U.id))
+          .where(and(eq(M.organizationId, organizationId), needle ? or(sql`${U.name} like ${needle} escape '\\'`, sql`${U.email} like ${needle} escape '\\'`) : undefined))
+          .orderBy(asc(U.name))
+        return rows.map(membershipRow)
+      }),
+      member: (organizationId, userId) => query("organizations.member", async (db) => {
+        const [r] = await db.select({ m: M, user: userRef }).from(M).innerJoin(U, eq(M.userId, U.id))
+          .where(and(eq(M.organizationId, organizationId), eq(M.userId, userId))).limit(1)
+        return r ? membershipRow(r) : undefined
+      }),
+      setRole: (organizationId, userId, role) => query("organizations.setRole", async (db) => {
+        await db.update(M).set({ role }).where(and(eq(M.organizationId, organizationId), eq(M.userId, userId)))
+        const [r] = await db.select({ m: M, user: userRef }).from(M).innerJoin(U, eq(M.userId, U.id))
+          .where(and(eq(M.organizationId, organizationId), eq(M.userId, userId))).limit(1)
+        return r ? membershipRow(r) : undefined
+      }).pipe(Effect.tap(() => changed(userId, organizationId))),
+      removeMember: (organizationId, userId) => query("organizations.removeMember", async (db) => {
+        await db.delete(M).where(and(eq(M.organizationId, organizationId), eq(M.userId, userId)))
+      }).pipe(Effect.tap(() => changed(userId, organizationId))),
+      adminCount: (organizationId) => query("organizations.adminCount", async (db) =>
+        (await db.select({ n: count() }).from(M).where(and(eq(M.organizationId, organizationId), eq(M.role, "ADMIN"))))[0]?.n ?? 0),
+      isMemberByEmail: (organizationId, email) => query("organizations.isMemberByEmail", async (db) =>
+        (await db.select({ id: M.id }).from(M).innerJoin(U, eq(M.userId, U.id)).where(and(eq(M.organizationId, organizationId), eq(U.email, email))).limit(1)).length > 0),
+      name: (organizationId) => query("organizations.name", async (db) =>
+        (await db.select({ name: O.name }).from(O).where(eq(O.id, organizationId)).limit(1))[0]?.name),
+      invite: (organizationId, email, role, token, expiresAt) => query("organizations.invite", (db) => db.transaction((tx) => {
+        const existing = tx.select().from(I).where(and(eq(I.organizationId, organizationId), eq(I.email, email))).get()
+        const saved = existing
+          ? tx.update(I).set({ role, token, expiresAt }).where(eq(I.id, existing.id)).returning().get()
+          : tx.insert(I).values({ email, role, token, organizationId, expiresAt }).returning().get()
+        if (!saved) throw new Error("Invitation was not saved")
+        return { id: saved.id, email: saved.email, role: saved.role, expiresAt: saved.expiresAt.toISOString(), renewed: existing !== undefined }
+      })),
       list: Effect.fn("OrganizationRepo.list")(function*(userId) {
         return yield* query("organizations.list", async (db) => {
           const organizations = await db.select({ organization: O, role: M.role }).from(M)
