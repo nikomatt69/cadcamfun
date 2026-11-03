@@ -18,6 +18,7 @@ import {
   OPERATION_EXAMPLES,
   exampleRequest,
   exampleSettings,
+  examplesFor as operationExamplesFor,
   type OperationExample
 } from "../src/features/cam/lib/examples/operations.ts"
 import {
@@ -81,6 +82,21 @@ describe("operation examples", () => {
       ...["standard", "vase", "support", "infill", "raft", "brim"].map((op) => `3dprinter:${op}`)
     ]
     for (const operation of operations) expect(seen.has(operation), operation).toBe(true)
+    // An example the picker cannot reach is not an example: every one must be listed for its own machine and operation.
+    for (const example of OPERATION_EXAMPLES) {
+      const settings = exampleSettings(example)
+      expect(operationExamplesFor(settings).some((listed) => listed.id === example.id), example.id).toBe(true)
+    }
+  })
+
+  test("the clicked strategy cell comes first and never crosses machines", () => {
+    const slot = OPERATION_EXAMPLES.find((example) => example.settings.operationType === "pocket" && example.cells.includes("slot"))!
+    const list = operationExamplesFor(exampleSettings(slot), "slot")
+    expect(list[0]?.id).toBe(slot.id)
+    expect(list.filter((example) => example.cells.includes("slot"))).toEqual([slot])
+    // The rest of the operation's examples follow, so a cell the user clicked does not hide the other ways to cut it.
+    expect(list.some((example) => example.id !== slot.id && exampleSettings(example).operationType === "pocket")).toBe(true)
+    for (const example of list) expect(exampleSettings(example).machineType).toBe("mill")
   })
 
   test("every strategy cell of the palette has an example", () => {
