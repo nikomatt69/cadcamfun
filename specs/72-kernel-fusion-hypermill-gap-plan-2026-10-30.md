@@ -440,3 +440,8 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   (`kernel-verify-nc-result`). The part's meshes and the stock are put in the program's work frame in `cam/lib/verify-nc.ts`; only a +Z setup is supported (another setup is refused with the reason). Five strings in 11
   locales (machine-translated, not reviewed). Test: `apps/desktop/test/cam-kernel.test.ts` through the real sidecar (the kernel's own program is clean; the same program with a rapid plunged into the part is a fault
   with its NC line). **Open:** pasting or importing foreign NC with its own tool table (the panel checks the kernel's program as edited), non-+Z setups, fixtures and the machine travel in the check.
+- 2026-11-03 (P0-4 on programs the kernel wrote): `kernel/verify-nc-kernel-faults.test.ts` takes the kernel's own NC for three real parts (a 40 x 30 x 8 plate, a 56 x 36 x 10 plate, the parametric mounting
+  plate with counterbored holes), checks that each verifies clean in the independent replay, then moves one straight wall vertex of its finishing pass 0.5 to 1.5 mm toward the part, five seeded cases per
+  part (15 in all): every overcut is found. A first version injected into arc end points and found none: the arc's centre words no longer matched, the replay reads an arc by its centre, so the injection
+  point must be a straight vertex (recorded in the test). This is evidence for the verifier on kernel output, not a fault set over `runJob`'s own claims (an overcut cannot be injected into a job from outside);
+  the nightly corpus gate of step 0.4 remains open.
