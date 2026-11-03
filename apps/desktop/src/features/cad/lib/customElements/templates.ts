@@ -5,20 +5,21 @@
  * with. The geometry bodies are ported verbatim from the legacy templates so an element authored
  * against them behaves the same.
  */
-import type { CustomElementDefinition, CustomElementTemplate } from "../../types/customElements.ts"
+import type { CustomElementDefinition, CustomElementParameter, CustomElementTemplate } from "../../types/customElements.ts"
+import { t } from "../../../../i18n/index.ts"
 
 export const customElementTemplates: Readonly<Record<string, CustomElementTemplate>> = {
   basicBox: {
-    name: "Parametric Box",
-    description: "A simple parametric box with configurable dimensions",
+    get name() { return t("cad.template.basicBox.name") },
+    get description() { return t("cad.template.basicBox.description") },
     category: "Basic Shapes",
     tags: ["box", "basic", "primitive"],
     parameters: {
-      width: { type: "number", default: 50, min: 1, max: 1000, step: 1, description: "Box width", label: "Width" },
-      height: { type: "number", default: 50, min: 1, max: 1000, step: 1, description: "Box height", label: "Height" },
-      depth: { type: "number", default: 50, min: 1, max: 1000, step: 1, description: "Box depth", label: "Depth" },
-      color: { type: "color", default: "#1e88e5", description: "Box color", label: "Color" },
-      wireframe: { type: "boolean", default: false, description: "Show as wireframe", label: "Wireframe" },
+      width: { type: "number", default: 50, min: 1, max: 1000, step: 1, get description() { return t("cad.template.basicBox.width.description") }, get label() { return t("cad.template.basicBox.width.label") } },
+      height: { type: "number", default: 50, min: 1, max: 1000, step: 1, get description() { return t("cad.template.basicBox.height.description") }, get label() { return t("cad.template.basicBox.height.label") } },
+      depth: { type: "number", default: 50, min: 1, max: 1000, step: 1, get description() { return t("cad.template.basicBox.depth.description") }, get label() { return t("cad.template.basicBox.depth.label") } },
+      color: { type: "color", default: "#1e88e5", get description() { return t("cad.template.basicBox.color.description") }, get label() { return t("cad.template.basicBox.color.label") } },
+      wireframe: { type: "boolean", default: false, get description() { return t("cad.template.basicBox.wireframe.description") }, get label() { return t("cad.template.basicBox.wireframe.label") } },
     },
     geometryCode: `// Parametric box geometry
 const geometry = new THREE.BoxGeometry(
@@ -35,16 +36,16 @@ return geometry;`,
   },
 
   parametricGear: {
-    name: "Parametric Gear",
-    description: "A configurable gear with custom teeth count and dimensions",
+    get name() { return t("cad.template.parametricGear.name") },
+    get description() { return t("cad.template.parametricGear.description") },
     category: "Mechanical",
     tags: ["gear", "mechanical", "parametric"],
     parameters: {
-      teeth: { type: "number", default: 20, min: 6, max: 100, step: 1, description: "Number of teeth", label: "Teeth Count" },
-      module: { type: "number", default: 1, min: 0.1, max: 10, step: 0.1, description: "Gear module (size factor)", label: "Module" },
-      thickness: { type: "number", default: 5, min: 1, max: 50, step: 0.5, description: "Gear thickness", label: "Thickness" },
-      holeRadius: { type: "number", default: 2, min: 0, max: 20, step: 0.1, description: "Center hole radius (0 = no hole)", label: "Hole Radius" },
-      color: { type: "color", default: "#b0bec5", description: "Gear color", label: "Color" },
+      teeth: { type: "number", default: 20, min: 6, max: 100, step: 1, get description() { return t("cad.template.parametricGear.teeth.description") }, get label() { return t("cad.template.parametricGear.teeth.label") } },
+      module: { type: "number", default: 1, min: 0.1, max: 10, step: 0.1, get description() { return t("cad.template.parametricGear.module.description") }, get label() { return t("cad.template.parametricGear.module.label") } },
+      thickness: { type: "number", default: 5, min: 1, max: 50, step: 0.5, get description() { return t("cad.template.parametricGear.thickness.description") }, get label() { return t("cad.template.parametricGear.thickness.label") } },
+      holeRadius: { type: "number", default: 2, min: 0, max: 20, step: 0.1, get description() { return t("cad.template.parametricGear.holeRadius.description") }, get label() { return t("cad.template.parametricGear.holeRadius.label") } },
+      color: { type: "color", default: "#b0bec5", get description() { return t("cad.template.parametricGear.color.description") }, get label() { return t("cad.template.parametricGear.color.label") } },
     },
     geometryCode: `// Create parametric gear geometry
 const teeth = parameters.teeth;
@@ -102,16 +103,16 @@ return new THREE.ExtrudeGeometry(gearShape, extrudeSettings);`,
   },
 
   lBracket: {
-    name: "L-Bracket",
-    description: "Configurable L-shaped mounting bracket",
+    get name() { return t("cad.template.lBracket.name") },
+    get description() { return t("cad.template.lBracket.description") },
     category: "Structural",
     tags: ["bracket", "mounting", "structural"],
     parameters: {
-      width1: { type: "number", default: 50, min: 10, max: 200, step: 1, description: "First arm width", label: "Arm 1 Width" },
-      width2: { type: "number", default: 50, min: 10, max: 200, step: 1, description: "Second arm width", label: "Arm 2 Width" },
-      thickness: { type: "number", default: 5, min: 2, max: 20, step: 1, description: "Bracket thickness", label: "Thickness" },
-      height: { type: "number", default: 10, min: 5, max: 50, step: 1, description: "Bracket height", label: "Height" },
-      color: { type: "color", default: "#607d8b", description: "Bracket color", label: "Color" },
+      width1: { type: "number", default: 50, min: 10, max: 200, step: 1, get description() { return t("cad.template.lBracket.width1.description") }, get label() { return t("cad.template.lBracket.width1.label") } },
+      width2: { type: "number", default: 50, min: 10, max: 200, step: 1, get description() { return t("cad.template.lBracket.width2.description") }, get label() { return t("cad.template.lBracket.width2.label") } },
+      thickness: { type: "number", default: 5, min: 2, max: 20, step: 1, get description() { return t("cad.template.lBracket.thickness.description") }, get label() { return t("cad.template.lBracket.thickness.label") } },
+      height: { type: "number", default: 10, min: 5, max: 50, step: 1, get description() { return t("cad.template.lBracket.height.description") }, get label() { return t("cad.template.lBracket.height.label") } },
+      color: { type: "color", default: "#607d8b", get description() { return t("cad.template.lBracket.color.description") }, get label() { return t("cad.template.lBracket.color.label") } },
     },
     geometryCode: `// Create L-bracket geometry
 const group = new THREE.Group();
@@ -136,16 +137,16 @@ return group;`,
   },
 
   spiralSpring: {
-    name: "Spiral Spring",
-    description: "Configurable helical spring with custom parameters",
+    get name() { return t("cad.template.spiralSpring.name") },
+    get description() { return t("cad.template.spiralSpring.description") },
     category: "Mechanical",
     tags: ["spring", "mechanical", "coil"],
     parameters: {
-      radius: { type: "number", default: 10, min: 1, max: 50, step: 0.5, description: "Spring radius", label: "Radius" },
-      wireRadius: { type: "number", default: 1, min: 0.1, max: 5, step: 0.1, description: "Wire thickness", label: "Wire Radius" },
-      turns: { type: "number", default: 8, min: 1, max: 20, step: 1, description: "Number of turns", label: "Turns" },
-      height: { type: "number", default: 50, min: 10, max: 200, step: 1, description: "Total spring height", label: "Height" },
-      color: { type: "color", default: "#9e9e9e", description: "Spring color", label: "Color" },
+      radius: { type: "number", default: 10, min: 1, max: 50, step: 0.5, get description() { return t("cad.template.spiralSpring.radius.description") }, get label() { return t("cad.template.spiralSpring.radius.label") } },
+      wireRadius: { type: "number", default: 1, min: 0.1, max: 5, step: 0.1, get description() { return t("cad.template.spiralSpring.wireRadius.description") }, get label() { return t("cad.template.spiralSpring.wireRadius.label") } },
+      turns: { type: "number", default: 8, min: 1, max: 20, step: 1, get description() { return t("cad.template.spiralSpring.turns.description") }, get label() { return t("cad.template.spiralSpring.turns.label") } },
+      height: { type: "number", default: 50, min: 10, max: 200, step: 1, get description() { return t("cad.template.spiralSpring.height.description") }, get label() { return t("cad.template.spiralSpring.height.label") } },
+      color: { type: "color", default: "#9e9e9e", get description() { return t("cad.template.spiralSpring.color.description") }, get label() { return t("cad.template.spiralSpring.color.label") } },
     },
     geometryCode: `// Create spiral spring geometry
 const springRadius = parameters.radius;
@@ -183,16 +184,16 @@ return springGeometry;`,
   },
 
   customText3D: {
-    name: "3D Text",
-    description: "Extruded 3D text with custom message and styling",
+    get name() { return t("cad.template.customText3D.name") },
+    get description() { return t("cad.template.customText3D.description") },
     category: "Text & Symbols",
     tags: ["text", "3d", "typography"],
     parameters: {
-      text: { type: "string", default: "HELLO", description: "Text to display", label: "Text" },
-      size: { type: "number", default: 20, min: 5, max: 100, step: 1, description: "Text size", label: "Size" },
-      depth: { type: "number", default: 5, min: 1, max: 20, step: 0.5, description: "Text extrusion depth", label: "Depth" },
-      font: { type: "select", default: "helvetiker", options: ["helvetiker", "gentilis", "droid sans", "droid serif"], description: "Font family", label: "Font" },
-      color: { type: "color", default: "#4285f4", description: "Text color", label: "Color" },
+      text: { type: "string", default: "HELLO", get description() { return t("cad.template.customText3D.text.description") }, get label() { return t("cad.template.customText3D.text.label") } },
+      size: { type: "number", default: 20, min: 5, max: 100, step: 1, get description() { return t("cad.template.customText3D.size.description") }, get label() { return t("cad.template.customText3D.size.label") } },
+      depth: { type: "number", default: 5, min: 1, max: 20, step: 0.5, get description() { return t("cad.template.customText3D.depth.description") }, get label() { return t("cad.template.customText3D.depth.label") } },
+      font: { type: "select", default: "helvetiker", options: ["helvetiker", "gentilis", "droid sans", "droid serif"], get description() { return t("cad.template.customText3D.font.description") }, get label() { return t("cad.template.customText3D.font.label") } },
+      color: { type: "color", default: "#4285f4", get description() { return t("cad.template.customText3D.color.description") }, get label() { return t("cad.template.customText3D.color.label") } },
     },
     geometryCode: `// Create 3D text geometry
 // Note: This is a simplified version - real implementation would need font loading
@@ -215,16 +216,16 @@ return geometry;`,
   },
 
   honeycombPattern: {
-    name: "Honeycomb Pattern",
-    description: "Hexagonal honeycomb pattern with configurable parameters",
+    get name() { return t("cad.template.honeycombPattern.name") },
+    get description() { return t("cad.template.honeycombPattern.description") },
     category: "Patterns",
     tags: ["honeycomb", "hexagon", "pattern"],
     parameters: {
-      cellSize: { type: "number", default: 10, min: 2, max: 50, step: 1, description: "Size of each hexagonal cell", label: "Cell Size" },
-      rows: { type: "number", default: 5, min: 1, max: 20, step: 1, description: "Number of rows", label: "Rows" },
-      cols: { type: "number", default: 5, min: 1, max: 20, step: 1, description: "Number of columns", label: "Columns" },
-      thickness: { type: "number", default: 2, min: 0.5, max: 10, step: 0.5, description: "Pattern thickness", label: "Thickness" },
-      color: { type: "color", default: "#ffeb3b", description: "Pattern color", label: "Color" },
+      cellSize: { type: "number", default: 10, min: 2, max: 50, step: 1, get description() { return t("cad.template.honeycombPattern.cellSize.description") }, get label() { return t("cad.template.honeycombPattern.cellSize.label") } },
+      rows: { type: "number", default: 5, min: 1, max: 20, step: 1, get description() { return t("cad.template.honeycombPattern.rows.description") }, get label() { return t("cad.template.honeycombPattern.rows.label") } },
+      cols: { type: "number", default: 5, min: 1, max: 20, step: 1, get description() { return t("cad.template.honeycombPattern.cols.description") }, get label() { return t("cad.template.honeycombPattern.cols.label") } },
+      thickness: { type: "number", default: 2, min: 0.5, max: 10, step: 0.5, get description() { return t("cad.template.honeycombPattern.thickness.description") }, get label() { return t("cad.template.honeycombPattern.thickness.label") } },
+      color: { type: "color", default: "#ffeb3b", get description() { return t("cad.template.honeycombPattern.color.description") }, get label() { return t("cad.template.honeycombPattern.color.label") } },
     },
     geometryCode: `// Create honeycomb pattern
 const group = new THREE.Group();
@@ -304,13 +305,14 @@ export const createDefinitionFromTemplate = (
   const template = customElementTemplates[templateKey]
   if (template === undefined) return null
   return {
+    // The texts of a template resolve through `t()` when read, so the copy takes them once, in the language of the moment.
     name: customName || template.name,
     description: template.description,
     category: template.category,
     tags: [...template.tags],
     version: "1.0.0",
     author: "User",
-    parameters: { ...template.parameters },
+    parameters: Object.fromEntries(Object.entries(template.parameters).map(([name, parameter]): [string, CustomElementParameter] => [name, { ...parameter }])),
     geometryCode: template.geometryCode,
     materialConfig: template.materialConfig ? { ...template.materialConfig } : undefined,
     previewConfig: template.previewConfig ? { ...template.previewConfig } : undefined,

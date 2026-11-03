@@ -3,9 +3,7 @@
   "features/ai/lib/tools.ts": 30,
   "features/auth/screens/signin.tsx": 1,
   "features/auth/screens/signup.tsx": 1,
-  "features/cad/lib/customElements/templates.ts": 66,
   "features/cad/lib/predefinedLibraries.ts": 32,
-  "features/cad/lib/propertyFields.ts": 164,
   "features/cad/store/customElementsStore.ts": 5,
   "features/library/hooks/useUnifiedLibrary.ts": 1,
   "features/manuals/lib/catalogue.ts": 47

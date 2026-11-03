@@ -62,7 +62,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "angle", label: "Angle (°)", type: "number", step: 1 },
+        { name: "angle", get label() { return t("cad.prop.angle") }, type: "number", step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
@@ -123,10 +123,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Outer Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "tube", label: "Tube Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "radialSegments", label: "Radial Segments", type: "number", min: 3, step: 1 },
-        { name: "tubularSegments", label: "Tubular Segments", type: "number", min: 3, step: 1 },
+        { name: "radius", get label() { return t("cad.prop.outerRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "tube", get label() { return t("cad.prop.tubeRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "radialSegments", get label() { return t("cad.prop.radialSegments") }, type: "number", min: 3, step: 1 },
+        { name: "tubularSegments", get label() { return t("cad.prop.tubularSegments") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -136,8 +136,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       // For polygon, we'll provide fields for center coordinates and radius
       // Complex point editing would need a custom editor component
       return [
-        { name: "x", label: "X (Center)", type: "number", step: 0.1 },
-        { name: "y", label: "Y (Center)", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.prop.xCenter") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.prop.yCenter") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
         { name: "sides", get label() { return t("cam.gen.op.sides") }, type: "number", min: 3, step: 1 },
@@ -153,7 +153,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         {
           name: "shape",
-          label: "Shape Type",
+          get label() { return t("cad.prop.shapeType") },
           type: "select",
           options: [
             { value: "rect", get label() { return t("cad.rectangle") } },
@@ -185,10 +185,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
           showIf: (props: { shape: string }) => props.shape === "circle"
         },
         { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "bevel", label: "Bevel", type: "checkbox" },
+        { name: "bevel", get label() { return t("cad.prop.bevel") }, type: "checkbox" },
         {
           name: "bevelThickness",
-          label: "Bevel Thickness",
+          get label() { return t("cad.prop.bevelThickness") },
           type: "number",
           min: 0.1,
           step: 0.1,
@@ -196,7 +196,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         },
         {
           name: "bevelSize",
-          label: "Bevel Size",
+          get label() { return t("cad.prop.bevelSize") },
           type: "number",
           min: 0.1,
           step: 0.1,
@@ -210,29 +210,29 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       // For tube, we need a more complex editor for path points
       // Here we provide basic properties
       return [
-        { name: "radius", label: "Tube Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "tubularSegments", label: "Segments Along Path", type: "number", min: 1, step: 1 },
-        { name: "radialSegments", label: "Segments Around Tube", type: "number", min: 3, step: 1 },
-        { name: "closed", label: "Closed Path", type: "checkbox" },
+        { name: "radius", get label() { return t("cad.prop.tubeRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "tubularSegments", get label() { return t("cad.prop.segmentsAlongPath") }, type: "number", min: 1, step: 1 },
+        { name: "radialSegments", get label() { return t("cad.prop.segmentsAroundTube") }, type: "number", min: 3, step: 1 },
+        { name: "closed", get label() { return t("cad.prop.closedPath") }, type: "checkbox" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" },
-        { name: "path", label: "Path Points", type: "pointList", minPoints: 2 }
+        { name: "path", get label() { return t("cad.prop.pathPoints") }, type: "pointList", minPoints: 2 }
       ];
 
     case "lathe":
       // For lathe, we need a complex editor for profile points
       return [
-        { name: "x", label: "X (Center)", type: "number", step: 0.1 },
-        { name: "y", label: "Y (Center)", type: "number", step: 0.1 },
-        { name: "z", label: "Z (Center)", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.prop.xCenter") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.prop.yCenter") }, type: "number", step: 0.1 },
+        { name: "z", get label() { return t("cad.prop.zCenter") }, type: "number", step: 0.1 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
-        { name: "phiStart", label: "Start Angle (rad)", type: "number", step: 0.1 },
-        { name: "phiLength", label: "Arc Length (rad)", type: "number", min: 0, max: 6.28, step: 0.1 },
+        { name: "phiStart", get label() { return t("cad.prop.startAngleRad") }, type: "number", step: 0.1 },
+        { name: "phiLength", get label() { return t("cad.prop.arcLengthRad") }, type: "number", min: 0, max: 6.28, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" },
-        { name: "points", label: "Profile Points", type: "pointList", minPoints: 2 }
+        { name: "points", get label() { return t("cad.prop.profilePoints") }, type: "pointList", minPoints: 2 }
       ];
 
     case "text":
@@ -241,20 +241,20 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "text", label: "Text Content", type: "text" },
+        { name: "text", get label() { return t("cad.prop.textContent") }, type: "text" },
         { name: "size", get label() { return t("cad.field.fontSize") }, type: "number", min: 1, step: 0.5 },
-        { name: "depth", label: "Extrusion Depth", type: "number", min: 0, step: 0.1 },
+        { name: "depth", get label() { return t("cad.prop.extrusionDepth") }, type: "number", min: 0, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
-        { name: "bevel", label: "Bevel", type: "checkbox" },
+        { name: "bevel", get label() { return t("cad.prop.bevel") }, type: "checkbox" },
         {
           name: "font",
-          label: "Font",
+          get label() { return t("cad.prop.font") },
           type: "select",
           options: [
-            { value: "Arial", label: "Arial" },
-            { value: "Helvetica", label: "Helvetica" },
-            { value: "Times New Roman", label: "Times New Roman" }
+            { value: "Arial", label: "Arial" }, // i18n-ok font family name
+            { value: "Helvetica", label: "Helvetica" }, // i18n-ok font family name
+            { value: "Times New Roman", label: "Times New Roman" } // i18n-ok font family name
           ]
         }
       ];
@@ -265,18 +265,18 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "size", get label() { return t("cad.snap.gridSize") }, type: "number", min: 1, step: 1 },
-        { name: "divisions", label: "Division Count", type: "number", min: 1, step: 1 },
-        { name: "colorCenterLine", label: "Center Line Color", type: "color" },
-        { name: "colorGrid", label: "Grid Color", type: "color" },
+        { name: "divisions", get label() { return t("cad.prop.divisionCount") }, type: "number", min: 1, step: 1 },
+        { name: "colorCenterLine", get label() { return t("cad.prop.centerLineColor") }, type: "color" },
+        { name: "colorGrid", get label() { return t("cad.prop.gridColor") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         {
           name: "plane",
-          label: "Grid Plane",
+          get label() { return t("cad.prop.gridPlane") },
           type: "select",
           options: [
-            { value: "xy", label: "XY Plane" },
-            { value: "xz", label: "XZ Plane" },
-            { value: "yz", label: "YZ Plane" }
+            { value: "xy", get label() { return t("cad.prop.xyPlane") } },
+            { value: "xz", get label() { return t("cad.prop.xzPlane") } },
+            { value: "yz", get label() { return t("cad.prop.yzPlane") } }
           ]
         }
       ];
@@ -310,11 +310,11 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
       // For group elements, we only provide position properties
       // Individual elements within the group need separate editing
       return [
-        { name: "x", label: "X (Group Center)", type: "number", step: 0.1 },
-        { name: "y", label: "Y (Group Center)", type: "number", step: 0.1 },
-        { name: "z", label: "Z (Group Center)", type: "number", step: 0.1 },
+        { name: "x", get label() { return t("cad.prop.xGroupCenter") }, type: "number", step: 0.1 },
+        { name: "y", get label() { return t("cad.prop.yGroupCenter") }, type: "number", step: 0.1 },
+        { name: "z", get label() { return t("cad.prop.zGroupCenter") }, type: "number", step: 0.1 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
-        { name: "elements", label: "Group Elements", type: "list", listType: "element" }
+        { name: "elements", get label() { return t("cad.prop.groupElements") }, type: "list", listType: "element" }
       ];
 
     // ======= PRIMITIVE AVANZATE =======
@@ -323,8 +323,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "baseWidth", label: "Base Width", type: "number", min: 0.1, step: 0.1 },
-        { name: "baseDepth", label: "Base Depth", type: "number", min: 0.1, step: 0.1 },
+        { name: "baseWidth", get label() { return t("cad.prop.baseWidth") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "baseDepth", get label() { return t("cad.prop.baseDepth") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -338,7 +338,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "sides", label: "Sides", type: "number", min: 3, step: 1 },
+        { name: "sides", get label() { return t("cad.prop.sides") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -353,11 +353,11 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         {
           name: "direction",
-          label: "Direction",
+          get label() { return t("cad.prop.direction") },
           type: "select",
           options: [
             { value: "up", label: "Up" },
-            { value: "down", label: "Down" }
+            { value: "down", get label() { return t("cad.prop.down") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -372,7 +372,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radiusX", get label() { return t("cad.field.radiusX") }, type: "number", min: 0.1, step: 0.1 },
         { name: "radiusY", get label() { return t("cad.field.radiusY") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "radiusZ", label: "Radius Z", type: "number", min: 0.1, step: 0.1 },
+        { name: "radiusZ", get label() { return t("cad.prop.radiusZ") }, type: "number", min: 0.1, step: 0.1 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -388,7 +388,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "direction",
-          label: "Direction",
+          get label() { return t("cad.prop.direction") },
           type: "select",
           options: [
             { value: "x", get label() { return t("cad.field.x") } },
@@ -421,8 +421,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "radius", get label() { return t("cad.field.radius") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "startAngle", label: "Start Angle (rad)", type: "number", step: 0.1 },
-        { name: "endAngle", label: "End Angle (rad)", type: "number", step: 0.1 },
+        { name: "startAngle", get label() { return t("cad.prop.startAngleRad") }, type: "number", step: 0.1 },
+        { name: "endAngle", get label() { return t("cad.prop.endAngleRad") }, type: "number", step: 0.1 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -434,7 +434,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "points", label: "Vertices", type: "pointList", exactPoints: 3 },
+        { name: "points", get label() { return t("cad.prop.vertices") }, type: "pointList", exactPoints: 3 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
@@ -443,8 +443,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     // ======= CURVE AVANZATE =======
     case "spline":
       return [
-        { name: "points", label: "Control Points", type: "pointList", minPoints: 2 },
-        { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
+        { name: "points", get label() { return t("cad.prop.controlPoints") }, type: "pointList", minPoints: 2 },
+        { name: "divisions", get label() { return t("cad.prop.divisions") }, type: "number", min: 1, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
@@ -452,8 +452,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "bezier":
       return [
-        { name: "points", label: "Control Points", type: "pointList", minPoints: 4 },
-        { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
+        { name: "points", get label() { return t("cad.prop.controlPoints") }, type: "pointList", minPoints: 4 },
+        { name: "divisions", get label() { return t("cad.prop.divisions") }, type: "number", min: 1, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
@@ -461,9 +461,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "nurbs":
       return [
-        { name: "points", label: "Control Points", type: "pointList", minPoints: 4 },
+        { name: "points", get label() { return t("cad.prop.controlPoints") }, type: "pointList", minPoints: 4 },
         { name: "degree", get label() { return t("cad.field.degree") }, type: "number", min: 1, max: 5, step: 1 },
-        { name: "divisions", label: "Divisions", type: "number", min: 1, step: 1 },
+        { name: "divisions", get label() { return t("cad.prop.divisions") }, type: "number", min: 1, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 10, step: 1 }
@@ -477,7 +477,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "operands", label: "Operand Elements", type: "list", listType: "element" },
+        { name: "operands", get label() { return t("cad.prop.operandElements") }, type: "list", listType: "element" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -501,17 +501,17 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "profile", label: "Profile Points", type: "pointList", minPoints: 2 },
+        { name: "profile", get label() { return t("cad.prop.profilePoints") }, type: "pointList", minPoints: 2 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
-        { name: "angle", label: "Revolution Angle (rad)", type: "number", min: 0, max: 6.28, step: 0.1 },
+        { name: "angle", get label() { return t("cad.prop.revolutionAngleRad") }, type: "number", min: 0, max: 6.28, step: 0.1 },
         {
           name: "axis",
-          label: "Rotation Axis",
+          get label() { return t("cad.prop.rotationAxis") },
           type: "select",
           options: [
-            { value: "x", label: "X Axis" },
-            { value: "y", label: "Y Axis" },
-            { value: "z", label: "Z Axis" }
+            { value: "x", get label() { return t("cad.prop.xAxis") } },
+            { value: "y", get label() { return t("cad.prop.yAxis") } },
+            { value: "z", get label() { return t("cad.prop.zAxis") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -521,9 +521,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "sweep":
       return [
-        { name: "profile", label: "Cross Section", type: "pointList", minPoints: 3 },
-        { name: "path", label: "Path Points", type: "pointList", minPoints: 2 },
-        { name: "radius", label: "Path Radius", type: "number", min: 0.1, step: 0.1 },
+        { name: "profile", get label() { return t("cad.prop.crossSection") }, type: "pointList", minPoints: 3 },
+        { name: "path", get label() { return t("cad.prop.pathPoints") }, type: "pointList", minPoints: 2 },
+        { name: "radius", get label() { return t("cad.prop.pathRadius") }, type: "number", min: 0.1, step: 0.1 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -532,9 +532,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "loft":
       return [
-        { name: "profiles", label: "Section Profiles", type: "pointList", minPoints: 3 },
-        { name: "positions", label: "Section Positions", type: "pointList", minPoints: 2 },
-        { name: "closed", label: "Closed", type: "checkbox" },
+        { name: "profiles", get label() { return t("cad.prop.sectionProfiles") }, type: "pointList", minPoints: 3 },
+        { name: "positions", get label() { return t("cad.prop.sectionPositions") }, type: "pointList", minPoints: 2 },
+        { name: "closed", get label() { return t("cad.prop.closed") }, type: "checkbox" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -547,15 +547,15 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "diameter", get label() { return t("library.tool.diameter") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "pitch", label: "Pitch", type: "number", min: 0.1, step: 0.1 },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
+        { name: "pitch", get label() { return t("cad.prop.pitch") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "handedness",
-          label: "Handedness",
+          get label() { return t("cad.prop.handedness") },
           type: "select",
           options: [
-            { value: "right", label: "Right-handed" },
-            { value: "left", label: "Left-handed" }
+            { value: "right", get label() { return t("cad.prop.rightHanded") } },
+            { value: "left", get label() { return t("cad.prop.leftHanded") } }
           ]
         },
         {
@@ -563,8 +563,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
           get label() { return t("cad.material.standard") },
           type: "select",
           options: [
-            { value: "metric", label: "Metric" },
-            { value: "imperial", label: "Imperial" }
+            { value: "metric", get label() { return t("cad.prop.metric") } },
+            { value: "imperial", get label() { return t("cad.prop.imperial") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -580,8 +580,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "distance", label: "Chamfer Distance", type: "number", min: 0.1, step: 0.1 },
-        { name: "edges", label: "Edges to Chamfer", type: "list", listType: "edge" },
+        { name: "distance", get label() { return t("cad.prop.chamferDistance") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "edges", get label() { return t("cad.prop.edgesToChamfer") }, type: "list", listType: "edge" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -595,8 +595,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
         { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "radius", label: "Fillet Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "edges", label: "Edges to Fillet", type: "list", listType: "edge" },
+        { name: "radius", get label() { return t("cad.prop.filletRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "edges", get label() { return t("cad.prop.edgesToFillet") }, type: "list", listType: "edge" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -607,11 +607,11 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "moduleValue", label: "Module", type: "number", min: 0.1, step: 0.1 },
-        { name: "teeth", label: "Number of Teeth", type: "number", min: 3, step: 1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
-        { name: "pressureAngle", label: "Pressure Angle (°)", type: "number", min: 0, max: 45, step: 1 },
-        { name: "holeDiameter", label: "Center Hole Diameter", type: "number", min: 0, step: 0.1 },
+        { name: "moduleValue", get label() { return t("cad.prop.module") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "teeth", get label() { return t("cad.prop.numberOfTeeth") }, type: "number", min: 3, step: 1 },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "pressureAngle", get label() { return t("cad.prop.pressureAngle") }, type: "number", min: 0, max: 45, step: 1 },
+        { name: "holeDiameter", get label() { return t("cad.prop.centerHoleDiameter") }, type: "number", min: 0, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -622,10 +622,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "radius", label: "Spring Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "wireRadius", label: "Wire Radius", type: "number", min: 0.1, step: 0.1 },
-        { name: "turns", label: "Number of Turns", type: "number", min: 1, step: 0.5 },
-        { name: "height", label: "Total Height", type: "number", min: 0.1, step: 0.1 },
+        { name: "radius", get label() { return t("cad.prop.springRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "wireRadius", get label() { return t("cad.prop.wireRadius") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "turns", get label() { return t("cad.prop.numberOfTurns") }, type: "number", min: 1, step: 0.5 },
+        { name: "height", get label() { return t("cad.prop.totalHeight") }, type: "number", min: 0.1, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -640,9 +640,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "size", get label() { return t("cad.status.size") }, type: "text" },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
-        { name: "thread", label: "Thread Specification", type: "text" },
-        { name: "grade", label: "Material Grade", type: "text" },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "thread", get label() { return t("cad.prop.threadSpecification") }, type: "text" },
+        { name: "grade", get label() { return t("cad.prop.materialGrade") }, type: "text" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -654,15 +654,15 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "size", get label() { return t("cad.status.size") }, type: "text" },
-        { name: "thread", label: "Thread Specification", type: "text" },
+        { name: "thread", get label() { return t("cad.prop.threadSpecification") }, type: "text" },
         {
           name: "type",
-          label: "Nut Type",
+          get label() { return t("cad.prop.nutType") },
           type: "select",
           options: [
-            { value: "hex", label: "Hex Nut" },
-            { value: "square", label: "Square Nut" },
-            { value: "flange", label: "Flange Nut" }
+            { value: "hex", get label() { return t("cad.prop.hexNut") } },
+            { value: "square", get label() { return t("cad.prop.squareNut") } },
+            { value: "flange", get label() { return t("cad.prop.flangeNut") } }
           ]
         },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -676,8 +676,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "size", get label() { return t("cad.status.size") }, type: "text" },
-        { name: "outerDiameter", label: "Outer Diameter", type: "number", min: 0.1, step: 0.1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
+        { name: "outerDiameter", get label() { return t("cad.prop.outerDiameter") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -689,7 +689,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "diameter", get label() { return t("library.tool.diameter") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 0.1 },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 0.1 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -701,10 +701,10 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
-        { name: "openings", label: "Openings", type: "list", listType: "opening" },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "openings", get label() { return t("cad.prop.openings") }, type: "list", listType: "opening" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -716,8 +716,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 1 },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -729,15 +729,15 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
-        { name: "length", label: "Length", type: "number", min: 0.1, step: 1 },
+        { name: "length", get label() { return t("cad.prop.length") }, type: "number", min: 0.1, step: 1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         {
           name: "style",
-          label: "Roof Style",
+          get label() { return t("cad.prop.roofStyle") },
           type: "select",
           options: [
             { value: "flat", get label() { return t("browser.mode.flat") } },
-            { value: "pitched", label: "Pitched" }
+            { value: "pitched", get label() { return t("cad.prop.pitched") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -752,18 +752,18 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "style",
-          label: "Window Style",
+          get label() { return t("cad.prop.windowStyle") },
           type: "select",
           options: [
             { value: "simple", get label() { return t("cam.gen.ai.simple") } },
-            { value: "divided", label: "Divided Panes" }
+            { value: "divided", get label() { return t("cad.prop.dividedPanes") } }
           ]
         },
-        { name: "frameColor", label: "Frame Color", type: "color" },
-        { name: "color", label: "Glass Color", type: "color" },
+        { name: "frameColor", get label() { return t("cad.prop.frameColor") }, type: "color" },
+        { name: "color", get label() { return t("cad.prop.glassColor") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
@@ -775,14 +775,14 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "z", label: "Z", type: "number", step: 0.1 },
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 0.1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 0.1 },
-        { name: "thickness", label: "Thickness", type: "number", min: 0.1, step: 0.1 },
+        { name: "thickness", get label() { return t("cad.prop.thickness") }, type: "number", min: 0.1, step: 0.1 },
         {
           name: "style",
-          label: "Door Style",
+          get label() { return t("cad.prop.doorStyle") },
           type: "select",
           options: [
             { value: "simple", get label() { return t("cam.gen.ai.simple") } },
-            { value: "paneled", label: "Paneled" }
+            { value: "paneled", get label() { return t("cad.prop.paneled") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -798,7 +798,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "width", get label() { return t("cad.width") }, type: "number", min: 0.1, step: 1 },
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         { name: "depth", get label() { return t("cad.depth") }, type: "number", min: 0.1, step: 1 },
-        { name: "steps", label: "Number of Steps", type: "number", min: 1, step: 1 },
+        { name: "steps", get label() { return t("cad.prop.numberOfSteps") }, type: "number", min: 1, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -813,13 +813,13 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "height", get label() { return t("cad.height") }, type: "number", min: 0.1, step: 1 },
         {
           name: "style",
-          label: "Column Style",
+          get label() { return t("cad.prop.columnStyle") },
           type: "select",
           options: [
             { value: "simple", get label() { return t("cam.gen.ai.simple") } },
-            { value: "doric", label: "Doric" },
-            { value: "ionic", label: "Ionic" },
-            { value: "corinthian", label: "Corinthian" }
+            { value: "doric", get label() { return t("cad.prop.doric") } },
+            { value: "ionic", get label() { return t("cad.prop.ionic") } },
+            { value: "corinthian", get label() { return t("cad.prop.corinthian") } }
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -830,8 +830,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     // ======= ELEMENTI SPECIALI =======
     case "path3d":
       return [
-        { name: "points", label: "Path Points", type: "pointList", minPoints: 2 },
-        { name: "radius", label: "Path Thickness", type: "number", min: 0.1, step: 0.1 },
+        { name: "points", get label() { return t("cad.prop.pathPoints") }, type: "pointList", minPoints: 2 },
+        { name: "radius", get label() { return t("cad.prop.pathThickness") }, type: "number", min: 0.1, step: 0.1 },
         { name: "segments", get label() { return t("pages.segments") }, type: "number", min: 3, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -841,9 +841,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     case "point-cloud":
       return [
         { name: "points", get label() { return t("cad.toolpanel.tool.point-cloud") }, type: "pointList", minPoints: 1 },
-        { name: "pointSize", label: "Point Size", type: "number", min: 0.1, step: 0.1 },
-        { name: "colors", label: "Point Colors", type: "colorList" },
-        { name: "color", label: "Default Color", type: "color" },
+        { name: "pointSize", get label() { return t("cad.prop.pointSize") }, type: "number", min: 0.1, step: 0.1 },
+        { name: "colors", get label() { return t("cad.prop.pointColors") }, type: "colorList" },
+        { name: "color", get label() { return t("cad.prop.defaultColor") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
@@ -853,8 +853,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "x", get label() { return t("cad.field.x") }, type: "number", step: 0.1 },
         { name: "y", get label() { return t("cad.field.y") }, type: "number", step: 0.1 },
         { name: "z", label: "Z", type: "number", step: 0.1 },
-        { name: "vertices", label: "Vertices", type: "pointList", minPoints: 3 },
-        { name: "faces", label: "Faces", type: "list", listType: "face" },
+        { name: "vertices", get label() { return t("cad.prop.vertices") }, type: "pointList", minPoints: 3 },
+        { name: "faces", get label() { return t("cad.prop.faces") }, type: "list", listType: "face" },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -863,22 +863,22 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     // ======= STRUMENTI DI MISURAZIONE =======
     case "linear-dimension":
       return [
-        { name: "startPoint", label: "Start Point", type: "point3d" },
-        { name: "endPoint", label: "End Point", type: "point3d" },
+        { name: "startPoint", get label() { return t("cad.prop.startPoint") }, type: "point3d" },
+        { name: "endPoint", get label() { return t("cad.prop.endPoint") }, type: "point3d" },
         {
           name: "offsetDirection",
-          label: "Offset Direction",
+          get label() { return t("cad.prop.offsetDirection") },
           type: "select",
           options: [
-            { value: "x", label: "X Axis" },
-            { value: "y", label: "Y Axis" },
-            { value: "z", label: "Z Axis" }
+            { value: "x", get label() { return t("cad.prop.xAxis") } },
+            { value: "y", get label() { return t("cad.prop.yAxis") } },
+            { value: "z", get label() { return t("cad.prop.zAxis") } }
           ]
         },
-        { name: "offsetAmount", label: "Offset Amount", type: "number", min: 0, step: 1 },
+        { name: "offsetAmount", get label() { return t("cad.prop.offsetAmount") }, type: "number", min: 0, step: 1 },
         {
           name: "unit",
-          label: "Unit",
+          get label() { return t("cad.prop.unit") },
           type: "select",
           options: [
             { value: "mm", get label() { return t("cad.millimeters") } },
@@ -887,7 +887,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
             { value: "in", label: "in" }
           ]
         },
-        { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
+        { name: "precision", get label() { return t("cad.prop.decimalPrecision") }, type: "number", min: 0, max: 6, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -896,11 +896,11 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "angular-dimension":
       return [
-        { name: "vertex", label: "Vertex", type: "point3d" },
-        { name: "startPoint", label: "First Line End", type: "point3d" },
-        { name: "endPoint", label: "Second Line End", type: "point3d" },
-        { name: "radius", label: "Arc Radius", type: "number", min: 1, step: 1 },
-        { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 2, step: 1 },
+        { name: "vertex", get label() { return t("cad.prop.vertex") }, type: "point3d" },
+        { name: "startPoint", get label() { return t("cad.prop.firstLineEnd") }, type: "point3d" },
+        { name: "endPoint", get label() { return t("cad.prop.secondLineEnd") }, type: "point3d" },
+        { name: "radius", get label() { return t("cad.prop.arcRadius") }, type: "number", min: 1, step: 1 },
+        { name: "precision", get label() { return t("cad.prop.decimalPrecision") }, type: "number", min: 0, max: 2, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -909,9 +909,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "radius-dimension":
       return [
-        { name: "center", label: "Circle Center", type: "point3d" },
-        { name: "pointOnCircle", label: "Point on Circle", type: "point3d" },
-        { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
+        { name: "center", get label() { return t("cad.prop.circleCenter") }, type: "point3d" },
+        { name: "pointOnCircle", get label() { return t("cad.prop.pointOnCircle") }, type: "point3d" },
+        { name: "precision", get label() { return t("cad.prop.decimalPrecision") }, type: "number", min: 0, max: 6, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -920,9 +920,9 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "diameter-dimension":
       return [
-        { name: "center", label: "Circle Center", type: "point3d" },
-        { name: "pointOnCircle", label: "Point on Circle", type: "point3d" },
-        { name: "precision", label: "Decimal Precision", type: "number", min: 0, max: 6, step: 1 },
+        { name: "center", get label() { return t("cad.prop.circleCenter") }, type: "point3d" },
+        { name: "pointOnCircle", get label() { return t("cad.prop.pointOnCircle") }, type: "point3d" },
+        { name: "precision", get label() { return t("cad.prop.decimalPrecision") }, type: "number", min: 0, max: 6, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "linewidth", get label() { return t("cad.toolpanel.lineWidth") }, type: "number", min: 1, max: 5, step: 0.5 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -932,8 +932,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     // ======= STRUMENTI DI DISEGNO =======
     case "drawing-pen":
       return [
-        { name: "points", label: "Pen Stroke Points", type: "pointList", minPoints: 2 },
-        { name: "penSize", label: "Pen Size", type: "number", min: 1, max: 10, step: 0.5 },
+        { name: "points", get label() { return t("cad.prop.penStrokePoints") }, type: "pointList", minPoints: 2 },
+        { name: "penSize", get label() { return t("cad.prop.penSize") }, type: "number", min: 1, max: 10, step: 0.5 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
@@ -941,8 +941,8 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "drawing-highlighter":
       return [
-        { name: "points", label: "Highlighter Stroke Points", type: "pointList", minPoints: 2 },
-        { name: "highlighterSize", label: "Highlighter Size", type: "number", min: 1, max: 30, step: 1 },
+        { name: "points", get label() { return t("cad.prop.highlighterStrokePoints") }, type: "pointList", minPoints: 2 },
+        { name: "highlighterSize", get label() { return t("cad.prop.highlighterSize") }, type: "number", min: 1, max: 30, step: 1 },
         { name: "color", get label() { return t("library.color") }, type: "color" },
         { name: "opacity", get label() { return t("cad.material.opacity") }, type: "number", min: 0.1, max: 1, step: 0.1 },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
@@ -952,17 +952,17 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
     case "drawing-text":
       return [
         { name: "position", get label() { return t("cad.field.textPosition") }, type: "point3d" },
-        { name: "text", label: "Text Content", type: "text" },
+        { name: "text", get label() { return t("cad.prop.textContent") }, type: "text" },
         { name: "textSize", get label() { return t("cad.field.textSize") }, type: "number", min: 8, max: 72, step: 1 },
         {
           name: "font",
-          label: "Font",
+          get label() { return t("cad.prop.font") },
           type: "select",
           options: [
-            { value: "Arial", label: "Arial" },
-            { value: "Helvetica", label: "Helvetica" },
-            { value: "Times New Roman", label: "Times New Roman" },
-            { value: "Courier New", label: "Courier New" }
+            { value: "Arial", label: "Arial" }, // i18n-ok font family name
+            { value: "Helvetica", label: "Helvetica" }, // i18n-ok font family name
+            { value: "Times New Roman", label: "Times New Roman" }, // i18n-ok font family name
+            { value: "Courier New", label: "Courier New" } // i18n-ok font family name
           ]
         },
         { name: "color", get label() { return t("library.color") }, type: "color" },
@@ -972,20 +972,20 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     case "drawing-eraser":
       return [
-        { name: "points", label: "Eraser Path Points", type: "pointList", minPoints: 2 },
-        { name: "eraserSize", label: "Eraser Size", type: "number", min: 5, max: 50, step: 1 },
-        { name: "showEraserPath", label: "Show Eraser Path", type: "checkbox" },
+        { name: "points", get label() { return t("cad.prop.eraserPathPoints") }, type: "pointList", minPoints: 2 },
+        { name: "eraserSize", get label() { return t("cad.prop.eraserSize") }, type: "number", min: 5, max: 50, step: 1 },
+        { name: "showEraserPath", get label() { return t("cad.prop.showEraserPath") }, type: "checkbox" },
         { name: "rotation", get label() { return t("cad.field.rotation") }, type: "vector3", unit: "°" },
         { name: "wireframe", get label() { return t("cad.wireframe") }, type: "checkbox" }
       ];
 
     case "drawing-screenshot-area":
       return [
-        { name: "startPoint", label: "Area Start Point", type: "point3d" },
-        { name: "endPoint", label: "Area End Point", type: "point3d" },
+        { name: "startPoint", get label() { return t("cad.prop.areaStartPoint") }, type: "point3d" },
+        { name: "endPoint", get label() { return t("cad.prop.areaEndPoint") }, type: "point3d" },
         {
           name: "format",
-          label: "Image Format",
+          get label() { return t("cad.prop.imageFormat") },
           type: "select",
           options: [
             { value: "png", label: "PNG" },
