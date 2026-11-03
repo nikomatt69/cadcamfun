@@ -1,5 +1,4 @@
 {
-  "features/ai/components/ToolRow.tsx": 9,
   "features/ai/lib/suggestions.ts": 25,
   "features/ai/lib/tools.ts": 30,
   "features/auth/screens/signin.tsx": 1,
