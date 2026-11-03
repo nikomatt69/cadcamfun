@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, on, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createSignal, on, type JSX } from "solid-js"
 import { Cpu, LoaderCircle, Play } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { boundsRows, depthForSelection, dimensionRows, elementSummary, stockForSelection, stockRows, type CadElement } from "../../lib/job.ts"
@@ -8,6 +8,7 @@ import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type GeometryType } from "../../store/generatorStore.ts"
 import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPreview.tsx"
 import { OperationExample } from "./ExamplePreview.tsx"
+import { OperationExamples } from "./OperationExamples.tsx"
 import { Field, INPUT, LABEL, Note, NumberField, Section, Segmented } from "./ui.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
 import { CadElementPicker } from "./CadElementPicker.tsx"
@@ -316,6 +317,7 @@ function ProbeSettings(): JSX.Element {
 export function OperationSection(): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
+  const [paletteCell, setPaletteCell] = createSignal<string>()
   const info = () => cam.generator.getOperationDescription(gen.settings.operationType)
   const operation = (event: Event & { currentTarget: HTMLSelectElement }): void =>
     gen.updateSettings("operationType", event.currentTarget.value as typeof gen.settings.operationType)
@@ -325,6 +327,7 @@ export function OperationSection(): JSX.Element {
    *  Multi-axis and advanced drilling variants resolve to the closest supported core op while
    *  still being visible in the palette as Fusion-class strategies. */
   const handlePaletteSelect = (paletteId: string): void => {
+    setPaletteCell(paletteId)
     const target = paletteToCoreOperation(machineFamily(), paletteId)
     if (target === gen.settings.operationType) {
       // Even if the core op is the same, persist a hint so the assistant / multi-toolpath can
@@ -360,6 +363,8 @@ export function OperationSection(): JSX.Element {
       </div>
 
       <OperationExample />
+
+      <OperationExamples cell={paletteCell()} />
 
       <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "probing"}>
         <ProbeSettings />

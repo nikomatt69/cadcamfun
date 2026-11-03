@@ -188,7 +188,10 @@ export const OPERATION_EXAMPLES: ReadonlyArray<OperationExample> = [
     { kind: "gcode", text: cycleText(cycleLines(cam.generator.FixedCycleType.BORING, { z: -12, r: 2, f: 200 })) }),
   define("drill-bore", "mill-drilling", ["drill_boring"],
     { ...DRILL, toolType: "drill", toolDiameter: 16, depth: 14, stepdown: 14, rpm: 1200, feedrate: 120, plungerate: 120 },
-    { kind: "gcode", text: cycleText(cycleLines(cam.generator.FixedCycleType.BORING_DWELL, { z: -14, r: 2, p: 0.5, f: 120 })) })
+    { kind: "gcode", text: cycleText(cycleLines(cam.generator.FixedCycleType.BORING_DWELL, { z: -14, r: 2, p: 0.5, f: 120 })) }),
+  define("drill-back-bore", "mill-drilling", ["drill_back_bore"],
+    { ...DRILL, toolType: "drill", toolDiameter: 12, depth: 10, stepdown: 10, rpm: 900, feedrate: 90, plungerate: 90 },
+    { kind: "gcode", text: cycleText(cycleLines(cam.generator.FixedCycleType.BACK_BORING, { z: -10, r: 2, f: 90, k: 2 })) }),
 
   // ---- milling, thread
   define("thread-internal", "mill-thread", ["thread-milling"],

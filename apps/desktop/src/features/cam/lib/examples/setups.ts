@@ -5,7 +5,7 @@
  * An example is a title, a description, a miniature (the scene `SectionExample` draws) and the patch it loads into the generator
  * store through the actions the sections already use (`patchSettings`, `patchKernelSettings`, `setPrinter`). Nothing here is a
  * private shortcut: every value is a field of the real settings or of the kernel request, so an example that stops being valid
- * stops decoding, and `setups.test.ts` runs them through the real schemas and the real kernel so they cannot rot.
+ * stops decoding, and `cam-generator-examples.test.ts` runs them through the real schemas and the real kernel so they cannot rot.
  *
  * Machines, cutters, materials and filaments are named by their id in the kernel catalogues and read from there; no number of
  * a catalogue entry is copied into this file.
@@ -242,7 +242,7 @@ const TOOLS: ReadonlyArray<SetupExample> = [
   make("tool-turning", "tool", "lathe", { kind: "tool", family: "lathe", turning: "external" },
     { settings: { machineType: "lathe", toolType: "turning", rpm: 1500, noseRadius: 0.4 } }, "R0.4"),
   make("tool-parting", "tool", "lathe", { kind: "tool", family: "lathe", operation: "parting" },
-    { settings: { machineType: "lathe", toolType: "parting", rpm: 800 } }, "3 mm"),
+    { settings: { machineType: "lathe", operationType: "parting", toolType: "parting", rpm: 800 } }, "3 mm"),
   make("tool-nozzle", "tool", "3dprinter", { kind: "tool", family: "3dprinter", nozzle: 0.4 },
     { settings: { machineType: "3dprinter", toolType: "standard", nozzleDiameter: 0.4 } }, "Ø0.4"),
 ]
