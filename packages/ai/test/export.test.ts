@@ -139,6 +139,25 @@ describe("cad_edit.export", () => {
     }
   }, 90_000)
 
+  test("catalogue parts that were mesh-only (nut, gear, stair, door, styled column) export as STEP and as closed STL", async () => {
+    const { files, handlers } = host()
+    const at = (k: number): [number, number, number] => [k * 60, 0, 0]
+    const history = { parameters: {}, features: [
+      { id: "nut", type: "primitive", element: "nut", params: {}, options: { size: "M8" }, at: at(0), operation: "new" },
+      { id: "gear", type: "primitive", element: "gear", params: { moduleValue: 2, teeth: 18, thickness: 8, holeDiameter: 10 }, at: at(1), operation: "new" },
+      { id: "stair", type: "primitive", element: "stair", params: { width: 40, height: 30, depth: 50, steps: 5 }, at: at(2), operation: "new" },
+      { id: "door", type: "primitive", element: "door", params: { width: 30, height: 60, thickness: 3 }, at: at(3), operation: "new" },
+      { id: "column", type: "primitive", element: "column", params: { radius: 5, height: 60 }, options: { style: "ionic" }, at: at(4), operation: "new" }
+    ] }
+    const stl = await call("cad_edit.export", { format: "stl", history, name: "parts" }, handlers)
+    expect(stl).toMatchObject({ ok: true })
+    expect(stl["bodies"]).toHaveLength(5)
+    for (const body of stl["bodies"]) expect(body, JSON.stringify(body)).toMatchObject({ solid: true })
+    const step = await call("cad_edit.export", { format: "step", history, name: "parts" }, handlers)
+    expect(step).toMatchObject({ ok: true })
+    expect(new TextDecoder().decode(files.get(step["file"].key)!)).toContain("MANIFOLD_SOLID_BREP")
+  }, 60_000)
+
   test("it refuses ids with a history, a host that stores nothing, and a name that leaves the folder", async () => {
     const { handlers } = host()
     expect(await call("cad_edit.export", { format: "stl", ids: ["a"], history: bracket }, handlers)).toMatchObject({ ok: false })

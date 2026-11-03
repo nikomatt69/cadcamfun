@@ -341,7 +341,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad-naming` | cad | 2763 | cad, cad_edit, parts |
 | `cad-workflow` | cad | 6222 | cad, cad_edit, parts |
 | `parametric-design` | cad | 11656 | cad, cad_edit, parts, memory |
-| `fusion-360-modelling` | cad | 15261 | cad, cad_edit, cam, parts |
+| `fusion-360-modelling` | cad | 15322 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 7810 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 2104 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |

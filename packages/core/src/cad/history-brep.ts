@@ -614,6 +614,64 @@ export const catalogueBrep = (
       const moved = transformBrep(b, translation(at))
       return { brep: moved, centre: at }
     }
+    // ---- architecture, standing on Z as `cam/model/element-mesh.ts` draws it (the same defaults, the same axes).
+    case "wall": {
+      const length = num("length", 100), thickness = num("thickness", 5), height = num("height", 30)
+      // The wall stands on its base at z, centred on x and y.
+      return { brep: makeBox(length, thickness, height, W({ x: at.x - length / 2, y: at.y - thickness / 2, z: at.z })), centre: { x: at.x, y: at.y, z: at.z + height / 2 } }
+    }
+    case "floor": {
+      const width = num("width", 100), depth = num("depth", num("length", 100)), thickness = num("thickness", 2)
+      return { brep: makeBox(width, depth, thickness, W({ x: at.x - width / 2, y: at.y - depth / 2, z: at.z - thickness / 2 })), centre: at }
+    }
+    case "window": {
+      const width = num("width", 10), thickness = num("thickness", 0.5), height = num("height", 15)
+      return { brep: makeBox(width, thickness, height, W({ x: at.x - width / 2, y: at.y - thickness / 2, z: at.z - height / 2 })), centre: at }
+    }
+    case "door": {
+      const w = num("width", 10), h = num("height", 20), t = num("thickness", 1)
+      const leaf = makeBox(w, t, h, W({ x: at.x - w / 2, y: at.y - t / 2, z: at.z - h / 2 }))
+      // The knob: a sphere of 0.08 w on the face that looks toward -Y, 0.4 w along the door from its centre.
+      const knobR = 0.08 * w, knobY = at.y - 0.6 * t
+      const centre = { x: at.x, y: at.y + (Math.max(t / 2, knobR - 0.6 * t) - Math.max(t / 2, 0.6 * t + knobR)) / 2, z: at.z }
+      if (!(knobR > 0.1 * t)) return { brep: leaf, centre } // the knob clears the leaf: a sphere apart is no solid of this part
+      try {
+        const joined = booleanBrep(leaf, makeSphere(knobR, W({ x: at.x + 0.4 * w, y: knobY, z: at.z })), "union")
+        return { brep: joined.brep, centre }
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+    case "column": {
+      const r = num("radius", 5), h = num("height", 30), style = options["style"]
+      if (style !== "doric" && style !== "ionic" && style !== "corinthian") return { brep: makeCone(r, r, h, W({ x: at.x, y: at.y, z: at.z - h / 2 })), centre: at }
+      // Base and capital flare to 1.2 r over 5 % of the height; ionic and corinthian crown it with a cone out to 1.32 r.
+      const trim = 0.05 * h, flare = 1.2 * r, crowned = style !== "doric"
+      const outline: Vec2[] = [{ x: flare, y: -h / 2 }, { x: flare, y: -h / 2 + trim }, { x: r, y: -h / 2 + trim }, { x: r, y: h / 2 - trim }, { x: flare, y: h / 2 - trim },
+        crowned ? { x: 1.32 * r, y: h / 2 + 0.025 * h } : { x: flare, y: h / 2 }]
+      const top = outline[outline.length - 1]!.y
+      const ring: Vec2[] = [{ x: 0, y: -h / 2 }, ...outline, { x: 0, y: top }]
+      return { brep: revolveProfile({ loops: [polygonLoop(ring)] }, 2 * Math.PI, { origin: at, name: "column" }), centre: { x: at.x, y: at.y, z: at.z + (top - h / 2) / 2 } }
+    }
+    case "roof": {
+      const w = num("width", 100), d = num("depth", num("length", 100)), h = num("height", 20)
+      if (options["style"] === "flat") return { brep: makeBox(w, d, h / 4, W({ x: at.x - w / 2, y: at.y - d / 2, z: at.z - h / 8 })), centre: at }
+      // A gable: the triangle (-w/2, 0) (w/2, 0) (0, h) in X and Z, running the length d along Y.
+      const pts: Vec3[] = [
+        { x: at.x - w / 2, y: at.y - d / 2, z: at.z }, { x: at.x + w / 2, y: at.y - d / 2, z: at.z }, { x: at.x, y: at.y - d / 2, z: at.z + h },
+        { x: at.x - w / 2, y: at.y + d / 2, z: at.z }, { x: at.x + w / 2, y: at.y + d / 2, z: at.z }, { x: at.x, y: at.y + d / 2, z: at.z + h }
+      ]
+      return { brep: polyhedron(pts, [[0, 1, 2], [3, 5, 4], [0, 3, 4, 1], [1, 4, 5, 2], [0, 2, 5, 3]]), centre: { x: at.x, y: at.y, z: at.z + h / 2 } }
+    }
+    case "stair": {
+      const width = num("width", 10), height = num("height", 20), depth = num("depth", 30), steps = Math.max(1, Math.floor(num("steps", 10)))
+      // One staircase outline in Y and Z, solid down to the base and running toward -Y, extruded across the width (along X).
+      const outline: Vec2[] = [{ x: 0, y: 0 }]
+      for (let i = 0; i < steps; i++) outline.push({ x: -(i * depth) / steps, y: ((i + 1) * height) / steps }, { x: -((i + 1) * depth) / steps, y: ((i + 1) * height) / steps })
+      outline.push({ x: -depth, y: 0 })
+      const onSide = frame({ x: at.x - width / 2, y: at.y, z: at.z }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 })
+      return { brep: extrudeProfile({ loops: [polygonLoop(cleanRing(outline))] }, width, { placement: onSide, name: "stair" }), centre: { x: at.x, y: at.y - depth / 2, z: at.z + height / 2 } }
+    }
     case "ellipsoid":
       // Refused, not approximated: an ellipsoid is the affine image of a sphere and the kernel has no rational
       // ellipsoid surface; a NURBS patch would only be an approximation of it (spec 39 §2: refusal over approximation).
