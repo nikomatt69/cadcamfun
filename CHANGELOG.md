@@ -3,6 +3,26 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.82 (November 2026)
+
+## Core
+
+- Wall, floor, window, door, column, roof and stair are exact catalogue solids (same measures, placement and rotation centre as the mesh); only the ellipsoid stays mesh-only
+
+## Sidecar
+
+- Cam_edit.export kind setup_sheet writes the HTML setup sheet of a kernel-generated program (shared setupSheetOf helper in the sidecar)
+
+## Mobile
+
+- Remove redundant text from settings screen for improved clarity
+- Stageshow row insets (pressed fill holds 12pt of air round the words), chip padding, washes without tonal border
+- Stageshow pass over every component (no AI sparkle icons, one icon stroke, sentence-case labels, no redundant tonal borders)
+
+## Web
+
+- Add compressed translation catalogs and enhance brand asset imports with SVG URLs
+
 ## v0.1.81 (November 2026)
 
 ## Core
