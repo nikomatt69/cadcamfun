@@ -82,7 +82,7 @@
 .assistant-page-surface {
   width: 100%;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -136,7 +136,7 @@
   font-size: 0.87em;
   background: var(--assistant-raised);
   border: 1px solid var(--assistant-line);
-  border-radius: 5px;
+  border-radius: 4px;
   padding: 0.08em 0.36em;
   /* A chip that wraps reads as two whole pills instead of one sliced box. */
   -webkit-box-decoration-break: clone;
@@ -147,7 +147,7 @@
   overflow-x: auto;
   padding: 12px;
   border: 1px solid var(--assistant-line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--assistant-surface);
   line-height: 1.55;
   white-space: pre;
@@ -344,7 +344,7 @@
   align-items: center;
   height: 20px;
   padding: 0 8px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--assistant-raised);
   border: 1px solid var(--assistant-line);
   color: var(--assistant-ink);
@@ -408,7 +408,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px;
   background: color-mix(in srgb, var(--assistant-ink) 3%, transparent);
   border-bottom: 1px solid var(--assistant-line);
 }
@@ -500,7 +500,7 @@
   padding: 4px 8px;
   margin-left: -4px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   text-align: left;
@@ -619,7 +619,7 @@
   height: 28px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--assistant-muted);
   transition: background-color 140ms ease, color 140ms ease;
@@ -676,7 +676,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--assistant-muted);
   text-decoration: none;
   transition: background-color 140ms ease, color 140ms ease;
@@ -724,7 +724,7 @@
   padding: 4px;
   background: var(--assistant-floating);
   border: 1px solid var(--assistant-line-strong);
-  border-radius: 11px;
+  border-radius: 12px;
   box-shadow: 0 18px 42px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.12);
   transform-origin: top right;
   animation: assistant-menu-in 150ms var(--assistant-ease-out) both;
@@ -743,7 +743,7 @@
   min-height: 31px;
   padding: 0 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--assistant-ink);
   font-size: 12px;
@@ -831,7 +831,7 @@
 
 .assistant-stat-card {
   padding: 10px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
   text-align: center;
@@ -854,14 +854,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .assistant-tool-catalogue li {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--assistant-line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--assistant-bg);
 }
 
@@ -888,13 +888,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin: 10px 0;
+  margin: 12px 0;
 }
 
 .assistant-context-facts > div {
   padding: 8px 12px;
   border: 1px solid var(--assistant-line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--assistant-bg);
   min-width: 0;
 }
@@ -941,7 +941,7 @@
   gap: 8px;
   min-height: 44px;
   padding: 8px 12px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
   font-size: 12px;
@@ -981,7 +981,7 @@
 
 /* Provider & Skills & Bridge Settings */
 .assistant-provider-row {
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
   overflow: hidden;
@@ -1030,7 +1030,7 @@
   gap: 8px;
   padding: 6px 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--assistant-ink);
   font-size: 12px;
@@ -1042,8 +1042,8 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 8px 12px;
+  border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
   font-size: 12px;
@@ -1056,9 +1056,9 @@
   max-height: 40vh;
   overflow-y: auto;
   margin: 0 auto 6px;
-  padding: 10px 12px;
+  padding: 12px;
   border: 1px solid var(--assistant-line-strong);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--assistant-surface);
 }
 
@@ -1091,7 +1091,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
@@ -1301,7 +1301,7 @@
   margin-bottom: 20px;
   overflow: hidden;
   border: 1px solid var(--assistant-line);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .assistant-emblem {
@@ -1311,7 +1311,7 @@
   width: 44px;
   height: 44px;
   border: 1px solid var(--assistant-line);
-  border-radius: 13px;
+  border-radius: 12px;
   color: var(--assistant-muted);
   background: var(--assistant-surface);
   box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.45);
@@ -1396,7 +1396,7 @@
   height: 26px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: none;
   color: var(--assistant-muted);
 }
@@ -1427,7 +1427,7 @@
   width: 24px;
   height: 24px;
   flex: 0 0 auto;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--assistant-ink);
 }
 
@@ -1526,7 +1526,7 @@
   padding: 8px 15px;
   background: var(--assistant-raised);
   border: 1px solid var(--assistant-line);
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 13.5px;
   line-height: 1.48;
   color: var(--assistant-ink);
@@ -1549,7 +1549,7 @@
 
 /* Reasoning & Tool Groups inside Messages */
 .assistant-reasoning {
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--assistant-surface);
   padding: 8px 12px;
   font-size: 12px;
@@ -1584,7 +1584,7 @@
 .assistant-retry-row > svg { flex: none; }
 
 .assistant-diagnostic-card {
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--assistant-line);
   background: var(--assistant-surface);
   padding: 8px 12px;
@@ -1603,7 +1603,7 @@
 }
 
 .assistant-tool-group {
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--assistant-surface);
   padding: 8px 12px;
   line-height: 1.4;
@@ -1632,7 +1632,7 @@
 
 /* Tool Call Rows & Blocks */
 .assistant-tool-call {
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: var(--assistant-surface);
   padding: 8px 12px;
@@ -1763,7 +1763,7 @@
 
 .assistant-tool-facts {
   margin-top: 6px;
-  padding-left: 14px;
+  padding-left: 16px;
   color: var(--assistant-muted);
   font-size: 11px;
   list-style: disc;
@@ -1794,7 +1794,7 @@
 
 /* Delegated Task Card (.assistant-task-card) */
 .assistant-task-card {
-  border-radius: 11px;
+  border-radius: 12px;
   line-height: 1.4;
   background: var(--assistant-surface);
   font-size: 12px;
@@ -1904,8 +1904,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 11px;
+  padding: 12px;
+  border-radius: 12px;
   border: 1px solid var(--assistant-line-strong);
   background: var(--assistant-surface);
   font-size: 12px;
@@ -1931,7 +1931,7 @@
   align-items: stretch;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .assistant-permissions .assistant-permission-copy {
@@ -1997,8 +1997,8 @@
   flex-shrink: 0;
   width: var(--assistant-dock-w, min(940px, calc(100% - 28px)));
   margin: 0 auto 6px;
-  padding: 10px 12px;
-  border-radius: 11px;
+  padding: 12px;
+  border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--assistant-coral) 32%, var(--assistant-line));
   background: var(--assistant-surface);
   color: var(--assistant-ink);
@@ -2132,7 +2132,7 @@
   padding: 6px 8px;
   background: var(--assistant-surface);
   border: 1px solid var(--assistant-line);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
   transition: border-color 150ms ease, box-shadow 150ms ease;
   overflow: visible;
@@ -2154,7 +2154,7 @@
 .assistant-attachment {
   max-width: 100%;
   border: 1px solid var(--assistant-line);
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 4px 8px;
   background: var(--assistant-raised);
   color: var(--assistant-ink);
@@ -2491,7 +2491,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 8px;
   width: 100%;
   min-height: 34px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 8px;
   color: var(--assistant-muted);
@@ -2618,7 +2618,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 8px;
   width: 100%;
   min-height: 32px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 8px;
   color: var(--assistant-muted);
@@ -2912,7 +2912,7 @@ html.dark .assistant-surface .assistant-field:focus {
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--assistant-line-strong);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--assistant-floating);
   outline: none;
   box-shadow: 0 36px 90px -28px rgba(0, 0, 0, 0.55), 0 10px 30px -14px rgba(0, 0, 0, 0.35);
@@ -3000,7 +3000,7 @@ html.dark .assistant-surface .assistant-field:focus {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--assistant-line);
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--assistant-bg);
 }
 
@@ -3221,7 +3221,7 @@ html.dark .assistant-surface .assistant-field:focus {
   color: var(--assistant-ink);
   background: var(--assistant-floating);
   border: 1px solid var(--assistant-line-strong);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: 0 24px 56px -18px rgba(0, 0, 0, 0.65), 0 6px 16px rgba(0, 0, 0, 0.18);
   transform-origin: bottom center;
 }
@@ -3375,7 +3375,7 @@ html.dark .assistant-surface .assistant-field:focus {
   min-width: 0;
   padding: 8px 12px;
   border: 1px solid var(--assistant-line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--assistant-bg);
 }
 

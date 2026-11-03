@@ -14,6 +14,7 @@ import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { Effect } from "effect"
 import { Modal } from "../../../shared/ui/modal.tsx"
+import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
 
 export interface ConfigProperty {
   readonly type: string
@@ -127,16 +128,14 @@ export function PluginSettingsDialog(props: PluginSettingsDialogProps): JSX.Elem
     }
     if (schema.type === "number") {
       return (
-        <input
+        <NumberField
           id={`setting-${key}`}
-          type="number"
-          value={value() === undefined || value() === null ? "" : String(value())}
+          optional
+          value={value() === undefined || value() === null ? "" : value()}
           min={schema.minimum}
           max={schema.maximum}
-          onInput={(event) => {
-            const raw = event.currentTarget.value
-            change(key, raw === "" ? undefined : Number.parseFloat(raw))
-          }}
+          onChange={(next) => change(key, next)}
+          onClear={() => change(key, undefined)}
           class={inputClass}
         />
       )

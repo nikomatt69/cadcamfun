@@ -23,12 +23,12 @@ function ManualCard(props: { readonly entry: ManualEntry }): JSX.Element {
     openExternal(entry().url)
   }
   return <article class={`${PANEL} manual-card`} data-manual-id={entry().id}>
-    <div class="manual-card-top"><span class="manual-kind">{t(`manuals.kind.${entry().kind}`)}</span><Show when={entry().access === "account"}><span class="manual-account"><UserRound size={12} aria-hidden="true" />{t("manuals.account")}</span></Show></div>
+    <div class="manual-card-top"><span class="manual-kind">{t(`manuals.kind.${entry().kind}`)}</span><Show when={entry().access === "account"}><span class="manual-account"><UserRound size={14} aria-hidden="true" />{t("manuals.account")}</span></Show></div>
     <p class="manual-publisher">{entry().publisher}</p>
     <h2><a class="manual-open" href={entry().url} target="_blank" rel="noopener noreferrer" onClick={open} aria-label={t("manuals.openTitle", { title: entry().title })}>{entry().title}<ExternalLink size={14} aria-hidden="true" /></a></h2>
     <p class="manual-collection">{entry().collection}</p>
     <div class="manual-card-bottom">
-      <span class="manual-language"><Globe size={12} aria-hidden="true" />{t(entry().language === "en" ? "manuals.english" : "manuals.multipleLanguages")}</span>
+      <span class="manual-language"><Globe size={14} aria-hidden="true" />{t(entry().language === "en" ? "manuals.english" : "manuals.multipleLanguages")}</span>
       <span class="manual-source">{source()}</span>
     </div>
   </article>
