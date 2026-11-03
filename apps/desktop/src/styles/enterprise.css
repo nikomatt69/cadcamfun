@@ -20,7 +20,11 @@
    and every transition is dropped under `prefers-reduced-motion`.
    ========================================================================== */
 
-.reference-shell {
+/* The tokens also apply inside portalled dialogs (they mount on <body>, outside the shell). */
+.reference-shell,
+.ui-modal-scrim,
+.ui-modal-scrim--workspace,
+.library-dialog-scrim {
   --ent-surface: #ffffff;
   --ent-surface-subtle: #f6f7f9;
   --ent-surface-inset: #eef0f3;
@@ -47,7 +51,10 @@
   --ent-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-.dark .reference-shell {
+.dark .reference-shell,
+.dark .ui-modal-scrim,
+.dark .ui-modal-scrim--workspace,
+.dark .library-dialog-scrim {
   --ent-surface: #171b22;
   --ent-surface-subtle: #1c212a;
   --ent-surface-inset: #12161c;

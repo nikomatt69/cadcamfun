@@ -52,6 +52,50 @@
   --panel-bad-soft: #321a18;
 }
 
+/* Dialogs mount on <body> through a Portal, outside any .panel: the same tokens apply on their scrim. */
+.ui-modal-scrim,
+.ui-modal-scrim--workspace,
+.library-dialog-scrim {
+  --panel-bg: #ffffff;
+  --panel-bg-subtle: #f6f7f9;
+  --panel-bg-inset: #eef0f3;
+  --panel-border: #dde1e7;
+  --panel-border-strong: #c3c9d2;
+  --panel-text: #1b2230;
+  --panel-text-muted: #5b6575;
+  --panel-text-faint: #8a93a1;
+  --panel-accent: #2557d6;
+  --panel-accent-hover: #1d47b3;
+  --panel-accent-soft: #e8eefc;
+  --panel-ok: #15803d;
+  --panel-ok-soft: #e7f5ec;
+  --panel-warn: #a15c07;
+  --panel-warn-soft: #fbf1df;
+  --panel-bad: #b42318;
+  --panel-bad-soft: #fbe9e7;
+}
+.dark .ui-modal-scrim,
+.dark .ui-modal-scrim--workspace,
+.dark .library-dialog-scrim {
+  --panel-bg: #171b22;
+  --panel-bg-subtle: #1c212a;
+  --panel-bg-inset: #12161c;
+  --panel-border: #2b323d;
+  --panel-border-strong: #3a4352;
+  --panel-text: #e6e9ef;
+  --panel-text-muted: #9aa4b2;
+  --panel-text-faint: #6f7886;
+  --panel-accent: #6b95f2;
+  --panel-accent-hover: #86a9f5;
+  --panel-accent-soft: #1c2a47;
+  --panel-ok: #4cc07a;
+  --panel-ok-soft: #14291d;
+  --panel-warn: #e0a24a;
+  --panel-warn-soft: #2e2413;
+  --panel-bad: #f08a80;
+  --panel-bad-soft: #321a18;
+}
+
 /* ---- header ------------------------------------------------------------ */
 .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 10px; margin-bottom: 12px; border-bottom: 1px solid var(--panel-border); }
 .panel-header__title { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; color: var(--panel-text); margin: 0; }
