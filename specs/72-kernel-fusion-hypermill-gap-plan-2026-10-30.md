@@ -418,4 +418,5 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
 - 2026-11-03 (P3-1, step 4.1 first half): CAD to CAM associativity is no longer absent. `cam.kernel.partFingerprint` and `programStatus` (spec 59 A1, A2) tell whether the
   model a stored kernel program was made from changed (`current` / `stale` with the class topology, geometry, rigid or inputs / `unknown` with the reason), over
   `GET /api/toolpaths/:id/status` and as `modelChange` in the assistant's `cam review`. Open: regenerate with a diff, `matchOperations`, the desktop banner (spec 59 A3 to A7).
+- 2026-11-03 (step 4.1, second part): a regeneration is previewed with a diff before it is accepted (`programDiff`, `POST /api/toolpaths/:id/regenerate`, `cam regenerate`); see spec 59.
 

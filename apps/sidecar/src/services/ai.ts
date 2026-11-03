@@ -503,6 +503,32 @@ const toolHandlers = Effect.gen(function*() {
         }
       } catch (error) { return { ok: false, error: `The stored program does not match the contract: ${error instanceof Error ? error.message : String(error)}` } }
     },
+    regenerateOperation: async (projectId, operationId, scope, signal) => {
+      const loaded = await load(projectId)
+      const stored = await run(toolpaths.find(acting().id, operationId))
+      if (!stored || stored.project.id !== loaded.projectId || stored.row.drawingId !== loaded.id) return { ok: false, error: "Operation not found in the active drawing" }
+      const data = record(stored.row.data)
+      if (data["kernelArtifact"] === undefined || data["kernelRequest"] === undefined) return { ok: false, error: "Only a program the native CAM kernel generated can be regenerated: this one has no stored request." }
+      const previous = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
+      const current = loaded.elements.filter((e) => e["type"] !== "workpiece")
+      const kept = new Set(((record(data["kernelRequest"])["elements"] as ReadonlyArray<{ readonly id?: unknown }> | undefined) ?? []).map((e) => String(e.id)))
+      const elements = scope === "drawing" ? current : current.filter((e) => kept.has(e.id))
+      if (elements.length === 0) return { ok: false, error: "None of the elements the program was made from are in the drawing any more." }
+      const status = cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: current })
+      const request = Schema.decodeUnknownSync(CamKernelRequest)({ ...record(data["kernelRequest"]), elements: JSON.parse(JSON.stringify(elements)) })
+      const job = cam.kernel.jobOfSnapshot(request)
+      if (job.status === "failed") return { ok: false, error: job.issues.map((i) => i.message).join("; ") }
+      const result = await manufactureRun(projectId, job.value, signal)
+      if (result.status === "failed") return { ok: false, operationId, scope, mutated: false, modelChange: status, error: "The kernel could not machine the drawing as it is now.", issues: result.issues.slice(0, 20) }
+      const next = Schema.decodeUnknownSync(CamKernelArtifact)(result.value)
+      const diff = cam.kernel.programDiff(previous, next)
+      return {
+        ok: true, operationId, scope, mutated: false, modelChange: status, diff, release: next.release,
+        claims: next.claims.map((c) => ({ id: c.id, status: c.status })), issues: next.issues.slice(0, 20),
+        ncLines: next.nc.split("\n").length, ncHash: next.identity.nc,
+        note: "A preview: nothing was stored or replaced. Run cam_edit manufacture to store the new program, or keep the stored one when diff.safe is false."
+      }
+    },
     reviewOperation: async (projectId, operationId) => {
       const loaded = await load(projectId)
       const stored = await run(toolpaths.find(acting().id, operationId))

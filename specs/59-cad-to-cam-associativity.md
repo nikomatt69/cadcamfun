@@ -118,4 +118,11 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   `apps/sidecar/test/cam-program-status.test.ts` (2, through HTTP and the assistant's review). **Open:** A3 regenerate with a restore point, A4 `ProgramDiff`, A5
   `matchOperations`, the desktop banner and badge (A6), partial regeneration (A7); the route compares the model only, the settings comparison needs the caller to pass
   the current settings (the desktop has them).
+- 2026-11-03 (build, A3 preview + A4): `cam.kernel.programDiff(before, after)` (operations added / removed / changed by id with the changed fields and parameter names, tools, cycle
+  time and removed-volume deltas, claims with their direction, release before / after, NC line summary, `safe` = release not lower and no claim worse) and
+  `POST /api/toolpaths/:id/regenerate` (body `{scope?: "program" | "drawing"}`; answers the status, the new artifact and the diff; **stores nothing**), with the assistant's
+  `cam regenerate`. `program` regenerates from the current version of the elements the program was made from, `drawing` from every part element now. An unchanged
+  model regenerates to the same bytes (tested through HTTP). `programStatus` now ignores the `workpiece` stock element. Tests: `kernel/program-diff.test.ts` (5, real kernel
+  runs), `apps/sidecar/test/cam-program-status.test.ts` (4). **Open:** acceptance with a restore point (the existing toolpath update path would be reused), `matchOperations`
+  with override carry-over (A5: matching is by operation id only, so a renamed feature shows as removed + added), the desktop banner and diff view (A6), A7.
 

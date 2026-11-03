@@ -36857,6 +36857,117 @@
         }
       }
     },
+    "/api/invitations/{token}/accept": {
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "operationId": "organizations.acceptInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "organization"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/organizations/{id}/projects": {
       "get": {
         "tags": [
@@ -37838,6 +37949,1545 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{id}/conversations": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.list",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "isGroupChat": {
+                            "type": "boolean"
+                          },
+                          "lastMessage": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "content": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "senderId": {
+                                    "type": "string"
+                                  },
+                                  "sender": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "image": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "image"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "content",
+                                  "createdAt",
+                                  "senderId",
+                                  "sender"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "messageCount": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "participants": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "image": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "joinedAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "image",
+                                "joinedAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "lastReadAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "isGroupChat",
+                          "lastMessage",
+                          "messageCount",
+                          "createdAt",
+                          "updatedAt",
+                          "participants",
+                          "lastReadAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        "page": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        "limit": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        "pages": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "pages",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "conversations",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.create",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "isGroupChat": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "participants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "conversationId": {
+                            "type": "string"
+                          },
+                          "joinedAt": {
+                            "type": "string"
+                          },
+                          "lastReadAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "user": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "image": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "email": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "image",
+                              "email"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userId",
+                          "conversationId",
+                          "joinedAt",
+                          "lastReadAt",
+                          "user"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "organizationId",
+                    "isGroupChat",
+                    "createdAt",
+                    "updatedAt",
+                    "participants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "participantIds": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "isGroupChat": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/conversation/{id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isGroupChat": {
+                      "type": "boolean"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "organizationName": {
+                      "type": "string"
+                    },
+                    "participants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "image": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "joinedAt": {
+                            "type": "string"
+                          },
+                          "lastReadAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "image",
+                          "email",
+                          "joinedAt",
+                          "lastReadAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "isGroupChat",
+                    "organizationId",
+                    "organizationName",
+                    "participants",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.rename",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "isGroupChat": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "participants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "conversationId": {
+                            "type": "string"
+                          },
+                          "joinedAt": {
+                            "type": "string"
+                          },
+                          "lastReadAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "user": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "image": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "email": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "image",
+                              "email"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userId",
+                          "conversationId",
+                          "joinedAt",
+                          "lastReadAt",
+                          "user"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "organizationId",
+                    "isGroupChat",
+                    "createdAt",
+                    "updatedAt",
+                    "participants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/conversation/{id}/messages": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.messages",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "senderId": {
+                            "type": "string"
+                          },
+                          "conversationId": {
+                            "type": "string"
+                          },
+                          "fileId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fileUrl": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "sender": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "image": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "image"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "content",
+                          "senderId",
+                          "conversationId",
+                          "fileId",
+                          "fileUrl",
+                          "createdAt",
+                          "updatedAt",
+                          "sender"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "messages",
+                    "hasMore",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.send",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "senderId": {
+                      "type": "string"
+                    },
+                    "conversationId": {
+                      "type": "string"
+                    },
+                    "fileId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fileUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "sender": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "image": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "image"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "content",
+                    "senderId",
+                    "conversationId",
+                    "fileId",
+                    "fileUrl",
+                    "createdAt",
+                    "updatedAt",
+                    "sender"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fileId": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fileUrl": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/conversation/{id}/read": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "operationId": "conversations.read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
                 }
               }
             }
@@ -52787,6 +54437,2717 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/toolpaths/{id}/regenerate": {
+      "post": {
+        "tags": [
+          "toolpaths"
+        ],
+        "operationId": "toolpaths.regenerate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "current"
+                              ]
+                            },
+                            "displayOnly": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "displayOnly"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "stale"
+                              ]
+                            },
+                            "class": {
+                              "type": "string",
+                              "enum": [
+                                "topology",
+                                "geometry",
+                                "rigid",
+                                "inputs"
+                              ]
+                            },
+                            "added": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "removed": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "changed": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "move": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "inputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "class",
+                            "added",
+                            "removed",
+                            "changed",
+                            "inputs",
+                            "reasons"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "unknown"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "program",
+                        "drawing"
+                      ]
+                    },
+                    "outcome": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ok"
+                              ]
+                            },
+                            "artifact": {
+                              "type": "object",
+                              "properties": {
+                                "schemaVersion": {
+                                  "type": "number",
+                                  "enum": [
+                                    1
+                                  ]
+                                },
+                                "jobId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "material": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "iso": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "iso"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "machine": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "post": {
+                                      "type": "string",
+                                      "enum": [
+                                        "generic",
+                                        "fanuc",
+                                        "grbl",
+                                        "linuxcnc",
+                                        "haas",
+                                        "siemens",
+                                        "heidenhain",
+                                        "okuma",
+                                        "mazak",
+                                        "mitsubishi",
+                                        "brother"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "post"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "setupOrientation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "+Z",
+                                    "-Z",
+                                    "+X",
+                                    "-X",
+                                    "+Y",
+                                    "-Y"
+                                  ]
+                                },
+                                "origin": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "stockBounds": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "max": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "operations": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "strategy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "face",
+                                          "adaptive",
+                                          "pocket",
+                                          "profile",
+                                          "bore",
+                                          "drill",
+                                          "thread",
+                                          "engrave",
+                                          "chamfer",
+                                          "surface",
+                                          "multiaxis",
+                                          "print"
+                                        ]
+                                      },
+                                      "toolId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "cut": {
+                                        "type": "string",
+                                        "enum": [
+                                          "face",
+                                          "slot",
+                                          "rough-side",
+                                          "adaptive",
+                                          "finish-wall",
+                                          "finish-floor",
+                                          "finish-3d",
+                                          "drill",
+                                          "spot",
+                                          "chamfer",
+                                          "engrave",
+                                          "thread-mill",
+                                          "tap",
+                                          "ream",
+                                          "print"
+                                        ]
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "ok",
+                                          "failed"
+                                        ]
+                                      },
+                                      "cutting": {
+                                        "type": "object",
+                                        "properties": {
+                                          "cut": {
+                                            "type": "string",
+                                            "enum": [
+                                              "face",
+                                              "slot",
+                                              "rough-side",
+                                              "adaptive",
+                                              "finish-wall",
+                                              "finish-floor",
+                                              "finish-3d",
+                                              "drill",
+                                              "spot",
+                                              "chamfer",
+                                              "engrave",
+                                              "thread-mill",
+                                              "tap",
+                                              "ream"
+                                            ]
+                                          },
+                                          "rpm": {
+                                            "type": "number"
+                                          },
+                                          "vc": {
+                                            "type": "number"
+                                          },
+                                          "vcRecommended": {
+                                            "type": "number"
+                                          },
+                                          "effectiveDiameter": {
+                                            "type": "number"
+                                          },
+                                          "fz": {
+                                            "type": "number"
+                                          },
+                                          "chipThickness": {
+                                            "type": "number"
+                                          },
+                                          "feed": {
+                                            "type": "number"
+                                          },
+                                          "plungeFeed": {
+                                            "type": "number"
+                                          },
+                                          "ap": {
+                                            "type": "number"
+                                          },
+                                          "ae": {
+                                            "type": "number"
+                                          },
+                                          "stepoverPercent": {
+                                            "type": "number"
+                                          },
+                                          "rampAngle": {
+                                            "type": "number"
+                                          },
+                                          "helixPitch": {
+                                            "type": "number"
+                                          },
+                                          "coolant": {
+                                            "type": "string",
+                                            "enum": [
+                                              "off",
+                                              "flood",
+                                              "mist"
+                                            ]
+                                          },
+                                          "peck": {
+                                            "type": "number"
+                                          },
+                                          "chipBreak": {
+                                            "type": "boolean"
+                                          },
+                                          "feedPerRev": {
+                                            "type": "number"
+                                          },
+                                          "passes": {
+                                            "type": "number"
+                                          },
+                                          "mrr": {
+                                            "type": "number"
+                                          },
+                                          "powerKw": {
+                                            "type": "number"
+                                          },
+                                          "torqueNm": {
+                                            "type": "number"
+                                          },
+                                          "forceN": {
+                                            "type": "number"
+                                          },
+                                          "deflectionMm": {
+                                            "type": "number"
+                                          },
+                                          "limitedBy": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "warnings": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "exceeded": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "source": {
+                                            "type": "string"
+                                          },
+                                          "reference": {
+                                            "type": "object",
+                                            "properties": {
+                                              "table": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "MATERIALS"
+                                                ]
+                                              },
+                                              "row": {
+                                                "type": "string"
+                                              },
+                                              "rowName": {
+                                                "type": "string"
+                                              },
+                                              "columns": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "factors": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "basis": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "table",
+                                              "row",
+                                              "rowName",
+                                              "columns",
+                                              "factors",
+                                              "basis"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "cut",
+                                          "rpm",
+                                          "vc",
+                                          "vcRecommended",
+                                          "effectiveDiameter",
+                                          "fz",
+                                          "chipThickness",
+                                          "feed",
+                                          "plungeFeed",
+                                          "ap",
+                                          "ae",
+                                          "stepoverPercent",
+                                          "rampAngle",
+                                          "helixPitch",
+                                          "coolant",
+                                          "mrr",
+                                          "powerKw",
+                                          "torqueNm",
+                                          "forceN",
+                                          "deflectionMm",
+                                          "limitedBy",
+                                          "warnings",
+                                          "exceeded",
+                                          "source",
+                                          "reference"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "parameters": {
+                                        "type": "object"
+                                      },
+                                      "overridden": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "warnings": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "startZ": {
+                                        "type": "number"
+                                      },
+                                      "cutLength": {
+                                        "type": "number"
+                                      },
+                                      "timeSeconds": {
+                                        "type": "number"
+                                      },
+                                      "removedVolume": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "strategy",
+                                      "toolId",
+                                      "cut",
+                                      "status",
+                                      "parameters",
+                                      "overridden",
+                                      "warnings",
+                                      "cutLength",
+                                      "timeSeconds",
+                                      "removedVolume"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "program": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "units": {
+                                      "type": "string",
+                                      "enum": [
+                                        "mm",
+                                        "inch"
+                                      ]
+                                    },
+                                    "workOffset": {
+                                      "type": "string",
+                                      "enum": [
+                                        "G54",
+                                        "G55",
+                                        "G56",
+                                        "G57",
+                                        "G58",
+                                        "G59"
+                                      ]
+                                    },
+                                    "toolpaths": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "toolId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "spindleRpm": {
+                                            "type": "number",
+                                            "minimum": 0
+                                          },
+                                          "coolant": {
+                                            "type": "string",
+                                            "enum": [
+                                              "off",
+                                              "flood",
+                                              "mist"
+                                            ]
+                                          },
+                                          "moves": {
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Rapid"
+                                                      ]
+                                                    },
+                                                    "to": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        },
+                                                        "z": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "rotary": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "a": {
+                                                          "type": "number"
+                                                        },
+                                                        "b": {
+                                                          "type": "number"
+                                                        },
+                                                        "c": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "additionalProperties": false
+                                                    },
+                                                    "expr": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {},
+                                                        "y": {},
+                                                        "z": {},
+                                                        "feed": {}
+                                                      },
+                                                      "additionalProperties": false
+                                                    },
+                                                    "comp": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "mode": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "left",
+                                                            "right",
+                                                            "off"
+                                                          ]
+                                                        },
+                                                        "register": {
+                                                          "type": "integer",
+                                                          "exclusiveMinimum": 0
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "mode"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "to"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Linear"
+                                                      ]
+                                                    },
+                                                    "to": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        },
+                                                        "z": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "feed": {
+                                                      "type": "number",
+                                                      "exclusiveMinimum": 0
+                                                    },
+                                                    "rotary": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "a": {
+                                                          "type": "number"
+                                                        },
+                                                        "b": {
+                                                          "type": "number"
+                                                        },
+                                                        "c": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "additionalProperties": false
+                                                    },
+                                                    "expr": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {},
+                                                        "y": {},
+                                                        "z": {},
+                                                        "feed": {}
+                                                      },
+                                                      "additionalProperties": false
+                                                    },
+                                                    "comp": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "mode": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "left",
+                                                            "right",
+                                                            "off"
+                                                          ]
+                                                        },
+                                                        "register": {
+                                                          "type": "integer",
+                                                          "exclusiveMinimum": 0
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "mode"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "to",
+                                                    "feed"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Arc"
+                                                      ]
+                                                    },
+                                                    "to": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        },
+                                                        "z": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "center": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "clockwise": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "feed": {
+                                                      "type": "number",
+                                                      "exclusiveMinimum": 0
+                                                    },
+                                                    "comp": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "mode": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "left",
+                                                            "right",
+                                                            "off"
+                                                          ]
+                                                        },
+                                                        "register": {
+                                                          "type": "integer",
+                                                          "exclusiveMinimum": 0
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "mode"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "to",
+                                                    "center",
+                                                    "clockwise",
+                                                    "feed"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Dwell"
+                                                      ]
+                                                    },
+                                                    "seconds": {
+                                                      "type": "number",
+                                                      "minimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "seconds"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Comment"
+                                                      ]
+                                                    },
+                                                    "text": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "text"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Cycle"
+                                                      ]
+                                                    },
+                                                    "cycle": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "drill",
+                                                        "dwell",
+                                                        "peck",
+                                                        "chipBreak",
+                                                        "tap",
+                                                        "ream",
+                                                        "bore"
+                                                      ]
+                                                    },
+                                                    "to": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        },
+                                                        "z": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "feed": {
+                                                      "type": "number",
+                                                      "exclusiveMinimum": 0
+                                                    },
+                                                    "peckDepth": {
+                                                      "type": "number",
+                                                      "minimum": 0
+                                                    },
+                                                    "dwellSeconds": {
+                                                      "type": "number",
+                                                      "minimum": 0
+                                                    },
+                                                    "retractHeight": {
+                                                      "type": "number"
+                                                    },
+                                                    "pitch": {
+                                                      "type": "number",
+                                                      "exclusiveMinimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "cycle",
+                                                    "to",
+                                                    "feed",
+                                                    "peckDepth",
+                                                    "dwellSeconds",
+                                                    "retractHeight"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Orient"
+                                                      ]
+                                                    },
+                                                    "a": {
+                                                      "type": "number"
+                                                    },
+                                                    "b": {
+                                                      "type": "number"
+                                                    },
+                                                    "c": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "SpindleOrient"
+                                                      ]
+                                                    },
+                                                    "angle": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "CutterComp"
+                                                      ]
+                                                    },
+                                                    "side": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "left",
+                                                        "right",
+                                                        "off"
+                                                      ]
+                                                    },
+                                                    "register": {
+                                                      "type": "integer",
+                                                      "minimum": 1
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "side"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Assign"
+                                                      ]
+                                                    },
+                                                    "variable": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "scope": {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "local",
+                                                                "global",
+                                                                "system"
+                                                              ]
+                                                            },
+                                                            "index": {
+                                                              "type": "integer",
+                                                              "minimum": 0
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "scope",
+                                                            "index"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "name": {
+                                                              "type": "string",
+                                                              "minLength": 1,
+                                                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "name"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      ]
+                                                    },
+                                                    "value": {}
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "variable",
+                                                    "value"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "MacroCall"
+                                                      ]
+                                                    },
+                                                    "name": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "args": {
+                                                      "type": "object",
+                                                      "patternProperties": {
+                                                        "^[A-Za-z]$": {}
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "name",
+                                                    "args"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "If"
+                                                      ]
+                                                    },
+                                                    "condition": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "cmp": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "eq",
+                                                            "ne",
+                                                            "lt",
+                                                            "le",
+                                                            "gt",
+                                                            "ge"
+                                                          ]
+                                                        },
+                                                        "a": {},
+                                                        "b": {}
+                                                      },
+                                                      "required": [
+                                                        "cmp",
+                                                        "a",
+                                                        "b"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "condition"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Else"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "EndIf"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "While"
+                                                      ]
+                                                    },
+                                                    "condition": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "cmp": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "eq",
+                                                            "ne",
+                                                            "lt",
+                                                            "le",
+                                                            "gt",
+                                                            "ge"
+                                                          ]
+                                                        },
+                                                        "a": {},
+                                                        "b": {}
+                                                      },
+                                                      "required": [
+                                                        "cmp",
+                                                        "a",
+                                                        "b"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "condition"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "EndWhile"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Label"
+                                                      ]
+                                                    },
+                                                    "name": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "pattern": "^[A-Za-z0-9_]+$"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "name"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Goto"
+                                                      ]
+                                                    },
+                                                    "label": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "pattern": "^[A-Za-z0-9_]+$"
+                                                    },
+                                                    "direction": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "auto",
+                                                        "forward",
+                                                        "backward"
+                                                      ]
+                                                    },
+                                                    "condition": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "cmp": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "eq",
+                                                            "ne",
+                                                            "lt",
+                                                            "le",
+                                                            "gt",
+                                                            "ge"
+                                                          ]
+                                                        },
+                                                        "a": {},
+                                                        "b": {}
+                                                      },
+                                                      "required": [
+                                                        "cmp",
+                                                        "a",
+                                                        "b"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "label"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "CycleBegin"
+                                                      ]
+                                                    },
+                                                    "family": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "heidenhain"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    "number": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": 0
+                                                    },
+                                                    "name": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "params": {
+                                                      "type": "object",
+                                                      "additionalProperties": {
+                                                        "type": "number"
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "family",
+                                                    "number",
+                                                    "name",
+                                                    "params"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "CycleEnd"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Message"
+                                                      ]
+                                                    },
+                                                    "text": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "text"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "operation": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "name"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "toolId",
+                                          "spindleRpm",
+                                          "coolant",
+                                          "moves"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "metadata": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "units",
+                                    "workOffset",
+                                    "toolpaths"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "tools": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "flat",
+                                          "ball",
+                                          "bull",
+                                          "chamfer",
+                                          "spot",
+                                          "drill",
+                                          "facemill",
+                                          "threadmill",
+                                          "engraver",
+                                          "tap",
+                                          "reamer",
+                                          "countersink",
+                                          "boringbar",
+                                          "tslot",
+                                          "dovetail"
+                                        ]
+                                      },
+                                      "diameter": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "flutes": {
+                                        "type": "integer"
+                                      },
+                                      "material": {
+                                        "type": "string",
+                                        "enum": [
+                                          "hss",
+                                          "hss-co",
+                                          "carbide",
+                                          "pcd"
+                                        ]
+                                      },
+                                      "coating": {
+                                        "type": "string",
+                                        "enum": [
+                                          "none",
+                                          "tin",
+                                          "ticn",
+                                          "altin",
+                                          "alcrn",
+                                          "zrn",
+                                          "dlc",
+                                          "diamond"
+                                        ]
+                                      },
+                                      "cornerRadius": {
+                                        "type": "number"
+                                      },
+                                      "angle": {
+                                        "type": "number"
+                                      },
+                                      "tipDiameter": {
+                                        "type": "number"
+                                      },
+                                      "pitch": {
+                                        "type": "number"
+                                      },
+                                      "fluteLength": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "shankDiameter": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "stickout": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "holder": {
+                                        "type": "object",
+                                        "properties": {
+                                          "diameter": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0
+                                          },
+                                          "length": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "diameter",
+                                          "length"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "maxRpm": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "number": {
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "kind",
+                                      "diameter",
+                                      "flutes",
+                                      "material",
+                                      "coating",
+                                      "fluteLength",
+                                      "shankDiameter",
+                                      "stickout",
+                                      "number"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "nc": {
+                                  "type": "string"
+                                },
+                                "claims": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "enum": [
+                                          "bed-fit",
+                                          "heated-start",
+                                          "layers-rise",
+                                          "wall-coverage",
+                                          "skin-coverage",
+                                          "no-spill",
+                                          "filament",
+                                          "cutting-data",
+                                          "machine-limits",
+                                          "operations-complete",
+                                          "no-rapid-in-stock",
+                                          "holder-clearance",
+                                          "no-gouge",
+                                          "material-removed",
+                                          "nc-replay",
+                                          "machine-travel",
+                                          "machine-clearance",
+                                          "setup-workholding",
+                                          "part-coverage"
+                                        ]
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "passed",
+                                          "failed",
+                                          "unsupported",
+                                          "unresolved"
+                                        ]
+                                      },
+                                      "detail": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "status",
+                                      "detail"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "issues": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "InvalidInput",
+                                          "UnknownMaterial",
+                                          "UnknownTool",
+                                          "NoSuitableTool",
+                                          "UnsupportedCapability",
+                                          "GenerationFailed",
+                                          "EmptyToolpath",
+                                          "MachineLimit",
+                                          "RapidInStock",
+                                          "HolderCollision",
+                                          "Gouge",
+                                          "RemainingStock",
+                                          "ReplayMismatch",
+                                          "Cancelled"
+                                        ]
+                                      },
+                                      "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                          "error",
+                                          "warning"
+                                        ]
+                                      },
+                                      "stage": {
+                                        "type": "string",
+                                        "enum": [
+                                          "prepare",
+                                          "plan",
+                                          "cutting-data",
+                                          "generate",
+                                          "post",
+                                          "replay",
+                                          "evidence"
+                                        ]
+                                      },
+                                      "message": {
+                                        "type": "string"
+                                      },
+                                      "operationId": {
+                                        "type": "string"
+                                      },
+                                      "line": {
+                                        "type": "integer"
+                                      },
+                                      "point": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "tag",
+                                      "severity",
+                                      "stage",
+                                      "message"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "release": {
+                                  "type": "string",
+                                  "enum": [
+                                    "blocked",
+                                    "preview",
+                                    "verified-program"
+                                  ]
+                                },
+                                "stock": {
+                                  "type": "object",
+                                  "properties": {
+                                    "initialVolume": {
+                                      "type": "number"
+                                    },
+                                    "finalVolume": {
+                                      "type": "number"
+                                    },
+                                    "partVolume": {
+                                      "type": "number"
+                                    },
+                                    "remainingVolume": {
+                                      "type": "number"
+                                    },
+                                    "maxRemaining": {
+                                      "type": "number"
+                                    },
+                                    "cellSize": {
+                                      "type": "number"
+                                    },
+                                    "fiveAxis": {
+                                      "type": "object",
+                                      "properties": {
+                                        "voxelMm": {
+                                          "type": "number"
+                                        },
+                                        "removedLower": {
+                                          "type": "number"
+                                        },
+                                        "removedUpper": {
+                                          "type": "number"
+                                        },
+                                        "remainingLower": {
+                                          "type": "number"
+                                        },
+                                        "remainingUpper": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "voxelMm",
+                                        "removedLower",
+                                        "removedUpper",
+                                        "remainingLower",
+                                        "remainingUpper"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "initialVolume",
+                                    "finalVolume",
+                                    "partVolume",
+                                    "remainingVolume",
+                                    "maxRemaining",
+                                    "cellSize"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "cycleTimeSeconds": {
+                                  "type": "number"
+                                },
+                                "identity": {
+                                  "type": "object",
+                                  "properties": {
+                                    "job": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "part": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "nc": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "algorithm": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "job",
+                                    "part",
+                                    "nc",
+                                    "algorithm"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "notes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "print": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dialect": {
+                                      "type": "string",
+                                      "enum": [
+                                        "marlin",
+                                        "klipper",
+                                        "reprap"
+                                      ]
+                                    },
+                                    "filament": {
+                                      "type": "object",
+                                      "properties": {
+                                        "material": {
+                                          "type": "string"
+                                        },
+                                        "densityGcm3": {
+                                          "type": "number"
+                                        },
+                                        "diameter": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "material",
+                                        "densityGcm3",
+                                        "diameter"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "nozzle": {
+                                      "type": "object",
+                                      "properties": {
+                                        "diameter": {
+                                          "type": "number"
+                                        },
+                                        "temperature": {
+                                          "type": "number"
+                                        },
+                                        "bedTemperature": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "diameter",
+                                        "temperature",
+                                        "bedTemperature"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "layers": {
+                                      "type": "integer"
+                                    },
+                                    "layerHeight": {
+                                      "type": "number"
+                                    },
+                                    "filamentMm": {
+                                      "type": "number"
+                                    },
+                                    "filamentGrams": {
+                                      "type": "number"
+                                    },
+                                    "timeSeconds": {
+                                      "type": "number"
+                                    },
+                                    "travelMm": {
+                                      "type": "number"
+                                    },
+                                    "retractions": {
+                                      "type": "integer"
+                                    },
+                                    "lengthByKind": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "size": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "orientation": {
+                                      "type": "string"
+                                    },
+                                    "settings": {
+                                      "type": "object",
+                                      "properties": {
+                                        "layerHeight": {
+                                          "type": "number",
+                                          "minimum": 0.04,
+                                          "maximum": 1.2
+                                        },
+                                        "firstLayerHeight": {
+                                          "type": "number",
+                                          "minimum": 0.04,
+                                          "maximum": 1.2
+                                        },
+                                        "walls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 20
+                                        },
+                                        "topLayers": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        "bottomLayers": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        "infillDensity": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        "infillPattern": {
+                                          "type": "string",
+                                          "enum": [
+                                            "lines",
+                                            "grid",
+                                            "triangles",
+                                            "honeycomb",
+                                            "gyroid",
+                                            "concentric"
+                                          ]
+                                        },
+                                        "supports": {
+                                          "type": "string",
+                                          "enum": [
+                                            "none",
+                                            "buildplate",
+                                            "everywhere"
+                                          ]
+                                        },
+                                        "supportAngle": {
+                                          "type": "number",
+                                          "minimum": 10,
+                                          "maximum": 80
+                                        },
+                                        "adhesion": {
+                                          "type": "string",
+                                          "enum": [
+                                            "none",
+                                            "skirt",
+                                            "brim",
+                                            "raft"
+                                          ]
+                                        },
+                                        "brimWidth": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 50
+                                        },
+                                        "printSpeed": {
+                                          "type": "number",
+                                          "minimum": 5,
+                                          "maximum": 600
+                                        },
+                                        "nozzleTemperature": {
+                                          "type": "number",
+                                          "minimum": 120,
+                                          "maximum": 450
+                                        },
+                                        "bedTemperature": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 150
+                                        },
+                                        "fan": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        "vase": {
+                                          "type": "boolean"
+                                        },
+                                        "orientation": {
+                                          "type": "string",
+                                          "enum": [
+                                            "as-designed",
+                                            "auto"
+                                          ]
+                                        },
+                                        "seam": {
+                                          "type": "string",
+                                          "enum": [
+                                            "nearest",
+                                            "aligned",
+                                            "random"
+                                          ]
+                                        },
+                                        "retractionDistance": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 15
+                                        },
+                                        "zHop": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "maximum": 5
+                                        },
+                                        "flow": {
+                                          "type": "number",
+                                          "minimum": 50,
+                                          "maximum": 150
+                                        },
+                                        "relativeExtrusion": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "dialect",
+                                    "filament",
+                                    "nozzle",
+                                    "layers",
+                                    "layerHeight",
+                                    "filamentMm",
+                                    "filamentGrams",
+                                    "timeSeconds",
+                                    "travelMm",
+                                    "retractions",
+                                    "lengthByKind",
+                                    "size",
+                                    "orientation",
+                                    "settings"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "tolerance": {
+                                  "type": "object",
+                                  "properties": {
+                                    "requested": {
+                                      "type": "number"
+                                    },
+                                    "terms": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "enum": [
+                                              "source-tessellation",
+                                              "part-model",
+                                              "path",
+                                              "nc-rounding",
+                                              "stock-replay"
+                                            ]
+                                          },
+                                          "mm": {
+                                            "type": "number"
+                                          },
+                                          "basis": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "mm",
+                                          "basis"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "achieved": {
+                                      "type": "number"
+                                    },
+                                    "unbounded": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "met": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "requested",
+                                    "terms",
+                                    "achieved",
+                                    "unbounded",
+                                    "met"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "schemaVersion",
+                                "jobId",
+                                "material",
+                                "machine",
+                                "origin",
+                                "stockBounds",
+                                "operations",
+                                "program",
+                                "tools",
+                                "nc",
+                                "claims",
+                                "issues",
+                                "release",
+                                "stock",
+                                "cycleTimeSeconds",
+                                "identity",
+                                "notes"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "diff": {
+                              "type": "object",
+                              "properties": {
+                                "same": {
+                                  "type": "boolean"
+                                },
+                                "operations": {
+                                  "type": "object",
+                                  "properties": {
+                                    "added": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "removed": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "changed": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "fields": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "status",
+                                                "strategy",
+                                                "tool",
+                                                "cut",
+                                                "parameters",
+                                                "cutLength",
+                                                "time",
+                                                "removedVolume"
+                                              ]
+                                            }
+                                          },
+                                          "timeSeconds": {
+                                            "type": "object",
+                                            "properties": {
+                                              "before": {
+                                                "type": "number"
+                                              },
+                                              "after": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "before",
+                                              "after"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "removedVolume": {
+                                            "type": "object",
+                                            "properties": {
+                                              "before": {
+                                                "type": "number"
+                                              },
+                                              "after": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "before",
+                                              "after"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "parameters": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "fields",
+                                          "timeSeconds",
+                                          "removedVolume",
+                                          "parameters"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "added",
+                                    "removed",
+                                    "changed"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "tools": {
+                                  "type": "object",
+                                  "properties": {
+                                    "added": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "removed": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "added",
+                                    "removed"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "cycleTimeSeconds": {
+                                  "type": "object",
+                                  "properties": {
+                                    "before": {
+                                      "type": "number"
+                                    },
+                                    "after": {
+                                      "type": "number"
+                                    },
+                                    "delta": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "before",
+                                    "after",
+                                    "delta"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "removedVolume": {
+                                  "type": "object",
+                                  "properties": {
+                                    "before": {
+                                      "type": "number"
+                                    },
+                                    "after": {
+                                      "type": "number"
+                                    },
+                                    "delta": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "before",
+                                    "after",
+                                    "delta"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "claims": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "before": {
+                                        "type": "string",
+                                        "enum": [
+                                          "passed",
+                                          "failed",
+                                          "unsupported",
+                                          "unresolved",
+                                          "absent"
+                                        ]
+                                      },
+                                      "after": {
+                                        "type": "string",
+                                        "enum": [
+                                          "passed",
+                                          "failed",
+                                          "unsupported",
+                                          "unresolved",
+                                          "absent"
+                                        ]
+                                      },
+                                      "direction": {
+                                        "type": "string",
+                                        "enum": [
+                                          "worse",
+                                          "better",
+                                          "changed"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "before",
+                                      "after",
+                                      "direction"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "release": {
+                                  "type": "object",
+                                  "properties": {
+                                    "before": {
+                                      "type": "string",
+                                      "enum": [
+                                        "blocked",
+                                        "preview",
+                                        "verified-program"
+                                      ]
+                                    },
+                                    "after": {
+                                      "type": "string",
+                                      "enum": [
+                                        "blocked",
+                                        "preview",
+                                        "verified-program"
+                                      ]
+                                    },
+                                    "direction": {
+                                      "type": "string",
+                                      "enum": [
+                                        "same",
+                                        "lower",
+                                        "higher"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "before",
+                                    "after",
+                                    "direction"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "nc": {
+                                  "type": "object",
+                                  "properties": {
+                                    "linesBefore": {
+                                      "type": "integer"
+                                    },
+                                    "linesAfter": {
+                                      "type": "integer"
+                                    },
+                                    "linesAdded": {
+                                      "type": "integer"
+                                    },
+                                    "linesRemoved": {
+                                      "type": "integer"
+                                    },
+                                    "identical": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "linesBefore",
+                                    "linesAfter",
+                                    "linesAdded",
+                                    "linesRemoved",
+                                    "identical"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "safe": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "same",
+                                "operations",
+                                "tools",
+                                "cycleTimeSeconds",
+                                "removedVolume",
+                                "claims",
+                                "release",
+                                "nc",
+                                "safe"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "artifact",
+                            "diff"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "failed"
+                              ]
+                            },
+                            "issues": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "InvalidInput",
+                                      "UnknownMaterial",
+                                      "UnknownTool",
+                                      "NoSuitableTool",
+                                      "UnsupportedCapability",
+                                      "GenerationFailed",
+                                      "EmptyToolpath",
+                                      "MachineLimit",
+                                      "RapidInStock",
+                                      "HolderCollision",
+                                      "Gouge",
+                                      "RemainingStock",
+                                      "ReplayMismatch",
+                                      "Cancelled"
+                                    ]
+                                  },
+                                  "severity": {
+                                    "type": "string",
+                                    "enum": [
+                                      "error",
+                                      "warning"
+                                    ]
+                                  },
+                                  "stage": {
+                                    "type": "string",
+                                    "enum": [
+                                      "prepare",
+                                      "plan",
+                                      "cutting-data",
+                                      "generate",
+                                      "post",
+                                      "replay",
+                                      "evidence"
+                                    ]
+                                  },
+                                  "message": {
+                                    "type": "string"
+                                  },
+                                  "operationId": {
+                                    "type": "string"
+                                  },
+                                  "line": {
+                                    "type": "integer"
+                                  },
+                                  "point": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "tag",
+                                  "severity",
+                                  "stage",
+                                  "message"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "issues"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "scope",
+                    "outcome"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "program",
+                      "drawing"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
         }
       }
     },
@@ -88054,6 +92415,9 @@
     },
     {
       "name": "notifications"
+    },
+    {
+      "name": "conversations"
     },
     {
       "name": "projects"

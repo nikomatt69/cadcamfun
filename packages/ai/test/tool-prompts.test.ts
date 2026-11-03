@@ -77,7 +77,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       // Raised to 4 350 when cad pmi_list / pmi_validate (spec 49 P1) joined the cad tool.
       // 4 550 since cad_edit parametric_edit (structural edits of a stored part: parameters, any dimension, features) joined cad_edit.
       // 4 850 since cam verify_nc (foreign NC replayed on the tri-dexel stock, spec 72 step 0.6) joined the cam tool; the detail lives in the cam-post skill.
-      expect(text.length, id).toBeLessThan(4850)
+      // 5 000 since cam regenerate (preview of a fresh program with its diff, spec 59 A3, A4).
+      expect(text.length, id).toBeLessThan(5000)
       // An exposure's prompt is read only by the specialist it is granted to, never with the main catalogue.
       if (!Object.hasOwn(ACTION_EXPOSURES, id)) total += text.length
     }

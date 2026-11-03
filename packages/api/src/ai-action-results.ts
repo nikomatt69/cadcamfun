@@ -12,6 +12,7 @@ import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import type { ActionEffect } from "./ai-actions.ts"
 import { CamTurningPlan } from "./ai-cam.ts"
+import { CamProgramDiff, CamProgramStatus } from "./cam-kernel.ts"
 import { CamLatheResult, CamPostTestResult, CamProcessResult, CamVerifyNcActionResult } from "./ai-cam-breadth.ts"
 import { ExportedFile } from "./ai-export.ts"
 
@@ -411,6 +412,11 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam.lathe": read(CamLatheResult),
   "cam.process": read(CamProcessResult),
   "cam.post_test": read(CamPostTestResult),
+  "cam.regenerate": read(Schema.Struct({
+    ok: Schema.Literal(true), operationId: str, scope: Schema.Literals(["program", "drawing"]), mutated: Schema.Literal(false),
+    modelChange: CamProgramStatus, diff: CamProgramDiff, release: Schema.Literals(["blocked", "preview", "verified-program"]),
+    claims: Schema.Array(Schema.Struct({ id: str, status: str })), issues: Schema.Array(Schema.Unknown), ncLines: int, ncHash: str, note: str
+  })),
   "cam.verify_nc": read(CamVerifyNcActionResult),
   "cam.manufacture": read(manufactured),
   "cam.job": read(jobResult),

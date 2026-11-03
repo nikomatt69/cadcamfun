@@ -157,3 +157,45 @@ export const CamProgramStatus = Schema.Union([
   Schema.Struct({ status: Schema.Literal("unknown"), reason: Schema.String })
 ])
 export type CamProgramStatus = typeof CamProgramStatus.Type
+
+const claimStatus = Schema.Literals(["passed", "failed", "unsupported", "unresolved"])
+const beforeAfter = Schema.Struct({ before: Schema.Finite, after: Schema.Finite })
+
+/** What a regeneration changes against the stored program (`cam.kernel.programDiff`, spec 59 A4). */
+export const CamProgramDiff = Schema.Struct({
+  same: Schema.Boolean,
+  operations: Schema.Struct({
+    added: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
+    removed: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
+    changed: Schema.Array(Schema.Struct({
+      id: Schema.String, name: Schema.String,
+      fields: Schema.Array(Schema.Literals(["status", "strategy", "tool", "cut", "parameters", "cutLength", "time", "removedVolume"])),
+      timeSeconds: beforeAfter, removedVolume: beforeAfter, parameters: strings
+    }))
+  }),
+  tools: Schema.Struct({ added: strings, removed: strings }),
+  cycleTimeSeconds: Schema.Struct({ before: Schema.Finite, after: Schema.Finite, delta: Schema.Finite }),
+  removedVolume: Schema.Struct({ before: Schema.Finite, after: Schema.Finite, delta: Schema.Finite }),
+  claims: Schema.Array(Schema.Struct({ id: Schema.String, before: Schema.Union([claimStatus, Schema.Literal("absent")]), after: Schema.Union([claimStatus, Schema.Literal("absent")]), direction: Schema.Literals(["worse", "better", "changed"]) })),
+  release: Schema.Struct({ before: Schema.Literals(["blocked", "preview", "verified-program"]), after: Schema.Literals(["blocked", "preview", "verified-program"]), direction: Schema.Literals(["same", "lower", "higher"]) }),
+  nc: Schema.Struct({ linesBefore: Schema.Int, linesAfter: Schema.Int, linesAdded: Schema.Int, linesRemoved: Schema.Int, identical: Schema.Boolean }),
+  safe: Schema.Boolean
+})
+export type CamProgramDiff = typeof CamProgramDiff.Type
+
+/**
+ * `scope: "program"` (default) regenerates from the current version of the elements the program was made from; `"drawing"` from every part
+ * element of the drawing now (a program the assistant made from the whole drawing, with a feature added since).
+ */
+export const CamRegenerateRequest = Schema.Struct({ scope: Schema.optionalKey(Schema.Literals(["program", "drawing"])) })
+
+/** A preview of regenerating a stored program: the new artifact and its diff against the stored one. Nothing is stored. */
+export const CamRegenerateResult = Schema.Struct({
+  status: CamProgramStatus,
+  scope: Schema.Literals(["program", "drawing"]),
+  outcome: Schema.Union([
+    Schema.Struct({ status: Schema.Literal("ok"), artifact: CamKernelArtifact, diff: CamProgramDiff }),
+    Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })
+  ])
+})
+export type CamRegenerateResult = typeof CamRegenerateResult.Type

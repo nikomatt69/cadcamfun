@@ -36,6 +36,10 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     run: ({ operationId }, { handlers, projectId }) => handlers.reviewOperation?.(projectId, operationId) ?? { ok: false, error: "Saved review is unavailable in this host." }
   }),
   defineWireAction({
+    id: "cam.regenerate", kind: "read", parameters: CAM_ACTION_INPUTS["cam.regenerate"],
+    run: ({ operationId, scope }, { handlers, projectId, signal }) => handlers.regenerateOperation?.(projectId, operationId, scope ?? "program", signal) ?? { ok: false, error: "Regeneration preview is unavailable in this host." }
+  }),
+  defineWireAction({
     id: "cam.setup_sheet", kind: "read", parameters: CAM_ACTION_INPUTS["cam.setup_sheet"],
     run: ({ operationId }, { handlers, projectId }) => handlers.setupSheetOperation?.(projectId, operationId) ?? { ok: false, error: "Setup sheets are unavailable in this host." }
   }),

@@ -1,4 +1,4 @@
-import { Api, BadRequest, CamKernelArtifact, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
+import { Api, BadRequest, CamKernelArtifact, CamKernelRequest, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
 import { cam, drawing as sheets } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -6,7 +6,7 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolpathRepo, type ToolpathInput } from "../repos/toolpath-repo.ts"
 import { internal } from "./entity-io.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
-import { isPortableProgram, prepareCamProgramData } from "../services/cam-program.ts"
+import { isPortableProgram, prepareCamProgramData, runKernelRequest } from "../services/cam-program.ts"
 import { elementsOf } from "../services/ai-elements.ts"
 
 const fail = (message: string) => (e: unknown) =>
@@ -76,6 +76,28 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
         if (owner === undefined) return { status: "unknown" as const, reason: "the drawing this program was made from cannot be opened" }
         return cam.kernel.programStatus({ request: stored.kernelRequest }, { elements: elementsOf(owner.data) })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to read the program status"))))
+    .handle("regenerate", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const found = yield* load(params.id)
+        const stored = found.row.data as { readonly kernelRequest?: unknown; readonly kernelArtifact?: unknown } | null
+        if (!stored?.kernelRequest || !stored.kernelArtifact) return yield* new BadRequest({ message: "This toolpath has no kernel program: only a program the CAM kernel generated can be regenerated" })
+        if (found.row.drawingId === null) return yield* new BadRequest({ message: "This toolpath is not attached to a drawing, so there is no model to regenerate from" })
+        const user = yield* CurrentUser
+        const owner = yield* drawings.find(user.id, found.row.drawingId)
+        if (owner === undefined) return yield* new BadRequest({ message: "The drawing this program was made from cannot be opened" })
+        const previous = yield* Schema.decodeUnknownEffect(CamKernelArtifact)(stored.kernelArtifact).pipe(Effect.mapError(() => new BadRequest({ message: "The stored kernel program does not match the contract; regenerate it from the CAM page" })))
+        const scope = payload.scope ?? "program"
+        const current = elementsOf(owner.data).filter((e) => e["type"] !== "workpiece")
+        const storedIds = new Set(((stored.kernelRequest as { readonly elements?: ReadonlyArray<{ readonly id?: unknown }> }).elements ?? []).map((e) => String(e.id)))
+        const elements = scope === "drawing" ? current : current.filter((e) => storedIds.has(String(e.id)))
+        if (elements.length === 0) return yield* new BadRequest({ message: "None of the elements the program was made from are in the drawing any more" })
+        const status = cam.kernel.programStatus({ request: stored.kernelRequest }, { elements: current })
+        const request = yield* Schema.decodeUnknownEffect(CamKernelRequest)({ ...(stored.kernelRequest as object), elements: JSON.parse(JSON.stringify(elements)) }).pipe(
+          Effect.mapError((e) => new BadRequest({ message: `The stored request cannot be run again: ${e.message}` })))
+        const result = yield* runKernelRequest(request)
+        if (result.status === "failed") return { status, scope, outcome: { status: "failed" as const, issues: result.issues } }
+        return { status, scope, outcome: { status: "ok" as const, artifact: result.value, diff: cam.kernel.programDiff(previous, result.value) } }
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to regenerate the program"))))
     .handle("postCheck", ({ payload }) =>
       Effect.sync(() => {
         const compiled = cam.compileDefinition(payload.definition)

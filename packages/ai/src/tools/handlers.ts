@@ -46,6 +46,8 @@ export interface ToolHandlersShape {
   machines?(projectId: string): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   setupSheetOperation?(projectId: string, operationId: string): Promise<unknown>
+  /** Previews regenerating a saved kernel program from the drawing now: the new program's release, claims and the diff against the stored one. Nothing is stored. */
+  regenerateOperation?(projectId: string, operationId: string, scope: "program" | "drawing", signal?: AbortSignal): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
   cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>

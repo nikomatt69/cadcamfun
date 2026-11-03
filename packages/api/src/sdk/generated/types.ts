@@ -1033,6 +1033,20 @@ export type OrganizationsCreateProjectPayload = {
 
 export type NotificationsUpdatePayload = { readonly isRead: boolean }
 
+export type ConversationsCreatePayload = {
+  readonly name?: string | null | undefined
+  readonly participantIds?: ReadonlyArray<string> | undefined
+  readonly isGroupChat?: boolean | undefined
+}
+
+export type ConversationsRenamePayload = { readonly name?: string | null | undefined }
+
+export type ConversationsSendPayload = {
+  readonly content?: string | undefined
+  readonly fileId?: string | null | undefined
+  readonly fileUrl?: string | null | undefined
+}
+
 export type ProjectsCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -1199,6 +1213,8 @@ export type ToolpathsUpdatePayload = {
   readonly simulation?: unknown | undefined
   readonly baseUpdatedAt?: string | undefined
 }
+
+export type ToolpathsRegeneratePayload = { readonly scope?: "program" | "drawing" }
 
 export type ToolpathsPostCheckPayload = { readonly definition: unknown; readonly sample?: boolean }
 
@@ -5858,6 +5874,10 @@ export type OrganizationsInviteOutput = {
   inviteUrl: string
 }
 
+export type OrganizationsAcceptInvitationInput = { readonly token: { readonly token: string }["token"] }
+
+export type OrganizationsAcceptInvitationOutput = { message: string; organization: { id: string; name: string } }
+
 export type OrganizationsProjectsInput = { readonly id: { readonly id: string }["id"] }
 
 export type OrganizationsProjectsOutput = Array<{
@@ -5984,6 +6004,144 @@ export type NotificationsRemoveInput = { readonly id: { readonly id: string }["i
 export type NotificationsRemoveOutput = { message: string }
 
 export type NotificationsMarkAllReadOutput = { message: string; count: number }
+
+export type ConversationsListInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly page?: { readonly page?: string | undefined; readonly limit?: string | undefined }["page"]
+  readonly limit?: { readonly page?: string | undefined; readonly limit?: string | undefined }["limit"]
+}
+
+export type ConversationsListOutput = {
+  conversations: Array<{
+    id: string
+    name: string
+    isGroupChat: boolean
+    lastMessage: {
+      id: string
+      content: string
+      createdAt: string
+      senderId: string
+      sender: { id: string; name: string | null; image: string | null }
+    } | null
+    messageCount: number
+    createdAt: string
+    updatedAt: string
+    participants: Array<{ id: string; name: string; image: string | null; joinedAt: string }>
+    lastReadAt: string | null
+  }>
+  pagination: { total: number; page: number; limit: number; pages: number; hasMore: boolean }
+}
+
+export type ConversationsCreateInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: ConversationsCreatePayload["name"]
+  readonly participantIds?: ConversationsCreatePayload["participantIds"]
+  readonly isGroupChat?: ConversationsCreatePayload["isGroupChat"]
+}
+
+export type ConversationsCreateOutput = {
+  id: string
+  name: string | null
+  organizationId: string
+  isGroupChat: boolean
+  createdAt: string
+  updatedAt: string
+  participants: Array<{
+    id: string
+    userId: string
+    conversationId: string
+    joinedAt: string
+    lastReadAt: string | null
+    user: { id: string; name: string | null; image: string | null; email: string | null }
+  }>
+}
+
+export type ConversationsGetInput = { readonly id: { readonly id: string }["id"] }
+
+export type ConversationsGetOutput = {
+  id: string
+  name: string | null
+  isGroupChat: boolean
+  organizationId: string
+  organizationName: string
+  participants: Array<{
+    id: string
+    name: string | null
+    image: string | null
+    email: string | null
+    joinedAt: string
+    lastReadAt: string | null
+  }>
+  createdAt: string
+  updatedAt: string
+}
+
+export type ConversationsRenameInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: ConversationsRenamePayload["name"]
+}
+
+export type ConversationsRenameOutput = {
+  id: string
+  name: string | null
+  organizationId: string
+  isGroupChat: boolean
+  createdAt: string
+  updatedAt: string
+  participants: Array<{
+    id: string
+    userId: string
+    conversationId: string
+    joinedAt: string
+    lastReadAt: string | null
+    user: { id: string; name: string | null; image: string | null; email: string | null }
+  }>
+}
+
+export type ConversationsMessagesInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly cursor?: { readonly cursor?: string | undefined; readonly limit?: string | undefined }["cursor"]
+  readonly limit?: { readonly cursor?: string | undefined; readonly limit?: string | undefined }["limit"]
+}
+
+export type ConversationsMessagesOutput = {
+  messages: Array<{
+    id: string
+    content: string
+    senderId: string
+    conversationId: string
+    fileId: string | null
+    fileUrl: string | null
+    createdAt: string
+    updatedAt: string
+    sender: { id: string; name: string | null; image: string | null }
+  }>
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+export type ConversationsSendInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly content?: ConversationsSendPayload["content"]
+  readonly fileId?: ConversationsSendPayload["fileId"]
+  readonly fileUrl?: ConversationsSendPayload["fileUrl"]
+}
+
+export type ConversationsSendOutput = {
+  id: string
+  content: string
+  senderId: string
+  conversationId: string
+  fileId: string | null
+  fileUrl: string | null
+  createdAt: string
+  updatedAt: string
+  sender: { id: string; name: string | null; image: string | null }
+}
+
+export type ConversationsReadInput = { readonly id: { readonly id: string }["id"] }
+
+export type ConversationsReadOutput = { success: true }
 
 export type ProjectsListOutput = Array<{
   id: string
@@ -7212,6 +7370,447 @@ export type ToolpathsStatusOutput =
       reasons: Array<string>
     }
   | { status: "unknown"; reason: string }
+
+export type ToolpathsRegenerateInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly scope?: ToolpathsRegeneratePayload["scope"]
+}
+
+export type ToolpathsRegenerateOutput = {
+  status:
+    | { status: "current"; displayOnly: Array<string> }
+    | {
+        status: "stale"
+        class: "topology" | "geometry" | "rigid" | "inputs"
+        added: Array<string>
+        removed: Array<string>
+        changed: Array<string>
+        move?: { x: number; y: number; z: number }
+        inputs: Array<string>
+        reasons: Array<string>
+      }
+    | { status: "unknown"; reason: string }
+  scope: "program" | "drawing"
+  outcome:
+    | {
+        status: "ok"
+        artifact: {
+          schemaVersion: 1
+          jobId: string
+          material: { id: string; name: string; iso: string }
+          machine: {
+            id: string
+            name: string
+            post:
+              | "generic"
+              | "fanuc"
+              | "grbl"
+              | "linuxcnc"
+              | "haas"
+              | "siemens"
+              | "heidenhain"
+              | "okuma"
+              | "mazak"
+              | "mitsubishi"
+              | "brother"
+          }
+          setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
+          origin: { x: number; y: number; z: number }
+          stockBounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+          operations: Array<{
+            id: string
+            name: string
+            strategy:
+              | "face"
+              | "adaptive"
+              | "pocket"
+              | "profile"
+              | "bore"
+              | "drill"
+              | "thread"
+              | "engrave"
+              | "chamfer"
+              | "surface"
+              | "multiaxis"
+              | "print"
+            toolId: string
+            cut:
+              | "face"
+              | "slot"
+              | "rough-side"
+              | "adaptive"
+              | "finish-wall"
+              | "finish-floor"
+              | "finish-3d"
+              | "drill"
+              | "spot"
+              | "chamfer"
+              | "engrave"
+              | "thread-mill"
+              | "tap"
+              | "ream"
+              | "print"
+            status: "ok" | "failed"
+            cutting?: {
+              cut:
+                | "face"
+                | "slot"
+                | "rough-side"
+                | "adaptive"
+                | "finish-wall"
+                | "finish-floor"
+                | "finish-3d"
+                | "drill"
+                | "spot"
+                | "chamfer"
+                | "engrave"
+                | "thread-mill"
+                | "tap"
+                | "ream"
+              rpm: number
+              vc: number
+              vcRecommended: number
+              effectiveDiameter: number
+              fz: number
+              chipThickness: number
+              feed: number
+              plungeFeed: number
+              ap: number
+              ae: number
+              stepoverPercent: number
+              rampAngle: number
+              helixPitch: number
+              coolant: "off" | "flood" | "mist"
+              peck?: number
+              chipBreak?: boolean
+              feedPerRev?: number
+              passes?: number
+              mrr: number
+              powerKw: number
+              torqueNm: number
+              forceN: number
+              deflectionMm: number
+              limitedBy: Array<string>
+              warnings: Array<string>
+              exceeded: Array<string>
+              source: string
+              reference: {
+                table: "MATERIALS"
+                row: string
+                rowName: string
+                columns: { [x: string]: number }
+                factors: { [x: string]: number }
+                basis: string
+              }
+            }
+            parameters: { [x: string]: any }
+            overridden: Array<string>
+            warnings: Array<string>
+            startZ?: number
+            cutLength: number
+            timeSeconds: number
+            removedVolume: number
+          }>
+          program: {
+            name: string
+            units: "mm" | "inch"
+            workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+            toolpaths: Array<{
+              id: string
+              name: string
+              toolId: string
+              spindleRpm: number
+              coolant: "off" | "flood" | "mist"
+              moves: Array<
+                | {
+                    _tag: "Rapid"
+                    to: { x: number; y: number; z: number }
+                    rotary?: { a?: number; b?: number; c?: number }
+                    expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                    comp?: { mode: "left" | "right" | "off"; register?: number }
+                  }
+                | {
+                    _tag: "Linear"
+                    to: { x: number; y: number; z: number }
+                    feed: number
+                    rotary?: { a?: number; b?: number; c?: number }
+                    expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                    comp?: { mode: "left" | "right" | "off"; register?: number }
+                  }
+                | {
+                    _tag: "Arc"
+                    to: { x: number; y: number; z: number }
+                    center: { x: number; y: number }
+                    clockwise: boolean
+                    feed: number
+                    comp?: { mode: "left" | "right" | "off"; register?: number }
+                  }
+                | { _tag: "Dwell"; seconds: number }
+                | { _tag: "Comment"; text: string }
+                | {
+                    _tag: "Cycle"
+                    cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
+                    to: { x: number; y: number; z: number }
+                    feed: number
+                    peckDepth: number
+                    dwellSeconds: number
+                    retractHeight: number
+                    pitch?: number
+                  }
+                | { _tag: "Orient"; a?: number; b?: number; c?: number }
+                | { _tag: "SpindleOrient"; angle?: number }
+                | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
+                | {
+                    _tag: "Assign"
+                    variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                    value: JsonValue
+                  }
+                | { _tag: "MacroCall"; name: string; args: { [x: string]: JsonValue } }
+                | {
+                    _tag: "If"
+                    condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+                  }
+                | { _tag: "Else" }
+                | { _tag: "EndIf" }
+                | {
+                    _tag: "While"
+                    condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+                  }
+                | { _tag: "EndWhile" }
+                | { _tag: "Label"; name: string }
+                | {
+                    _tag: "Goto"
+                    label: string
+                    direction?: "auto" | "forward" | "backward"
+                    condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+                  }
+                | {
+                    _tag: "CycleBegin"
+                    family: "heidenhain"
+                    number: number
+                    name: string
+                    params: { [x: string]: number }
+                  }
+                | { _tag: "CycleEnd" }
+                | { _tag: "Message"; text: string }
+              >
+              operation?: { id: string; name: string }
+            }>
+            metadata?: { [x: string]: string }
+          }
+          tools: Array<{
+            id: string
+            name: string
+            kind:
+              | "flat"
+              | "ball"
+              | "bull"
+              | "chamfer"
+              | "spot"
+              | "drill"
+              | "facemill"
+              | "threadmill"
+              | "engraver"
+              | "tap"
+              | "reamer"
+              | "countersink"
+              | "boringbar"
+              | "tslot"
+              | "dovetail"
+            diameter: number
+            flutes: number
+            material: "hss" | "hss-co" | "carbide" | "pcd"
+            coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+            cornerRadius?: number
+            angle?: number
+            tipDiameter?: number
+            pitch?: number
+            fluteLength: number
+            shankDiameter: number
+            stickout: number
+            holder?: { diameter: number; length: number }
+            maxRpm?: number
+            number: number
+          }>
+          nc: string
+          claims: Array<{
+            id:
+              | "bed-fit"
+              | "heated-start"
+              | "layers-rise"
+              | "wall-coverage"
+              | "skin-coverage"
+              | "no-spill"
+              | "filament"
+              | "cutting-data"
+              | "machine-limits"
+              | "operations-complete"
+              | "no-rapid-in-stock"
+              | "holder-clearance"
+              | "no-gouge"
+              | "material-removed"
+              | "nc-replay"
+              | "machine-travel"
+              | "machine-clearance"
+              | "setup-workholding"
+              | "part-coverage"
+            status: "passed" | "failed" | "unsupported" | "unresolved"
+            detail: string
+          }>
+          issues: Array<{
+            tag:
+              | "InvalidInput"
+              | "UnknownMaterial"
+              | "UnknownTool"
+              | "NoSuitableTool"
+              | "UnsupportedCapability"
+              | "GenerationFailed"
+              | "EmptyToolpath"
+              | "MachineLimit"
+              | "RapidInStock"
+              | "HolderCollision"
+              | "Gouge"
+              | "RemainingStock"
+              | "ReplayMismatch"
+              | "Cancelled"
+            severity: "error" | "warning"
+            stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
+            message: string
+            operationId?: string
+            line?: number
+            point?: { x: number; y: number; z: number }
+          }>
+          release: "blocked" | "preview" | "verified-program"
+          stock: {
+            initialVolume: number
+            finalVolume: number
+            partVolume: number
+            remainingVolume: number
+            maxRemaining: number
+            cellSize: number
+            fiveAxis?: {
+              voxelMm: number
+              removedLower: number
+              removedUpper: number
+              remainingLower: number
+              remainingUpper: number
+            }
+          }
+          cycleTimeSeconds: number
+          identity: { job: string; part: string; nc: string; algorithm: string }
+          notes: Array<string>
+          print?: {
+            dialect: "marlin" | "klipper" | "reprap"
+            filament: { material: string; densityGcm3: number; diameter: number }
+            nozzle: { diameter: number; temperature: number; bedTemperature: number }
+            layers: number
+            layerHeight: number
+            filamentMm: number
+            filamentGrams: number
+            timeSeconds: number
+            travelMm: number
+            retractions: number
+            lengthByKind: { [x: string]: number }
+            size: { x: number; y: number; z: number }
+            orientation: string
+            settings: {
+              layerHeight?: number
+              firstLayerHeight?: number
+              walls?: number
+              topLayers?: number
+              bottomLayers?: number
+              infillDensity?: number
+              infillPattern?: "lines" | "grid" | "triangles" | "honeycomb" | "gyroid" | "concentric"
+              supports?: "none" | "buildplate" | "everywhere"
+              supportAngle?: number
+              adhesion?: "none" | "skirt" | "brim" | "raft"
+              brimWidth?: number
+              printSpeed?: number
+              nozzleTemperature?: number
+              bedTemperature?: number
+              fan?: number
+              vase?: boolean
+              orientation?: "as-designed" | "auto"
+              seam?: "nearest" | "aligned" | "random"
+              retractionDistance?: number
+              zHop?: number
+              flow?: number
+              relativeExtrusion?: boolean
+            }
+          }
+          tolerance?: {
+            requested: number
+            terms: Array<{
+              id: "source-tessellation" | "part-model" | "path" | "nc-rounding" | "stock-replay"
+              mm: number
+              basis: string
+            }>
+            achieved: number
+            unbounded: Array<string>
+            met: boolean
+          }
+        }
+        diff: {
+          same: boolean
+          operations: {
+            added: Array<{ id: string; name: string }>
+            removed: Array<{ id: string; name: string }>
+            changed: Array<{
+              id: string
+              name: string
+              fields: Array<
+                "status" | "strategy" | "tool" | "cut" | "parameters" | "cutLength" | "time" | "removedVolume"
+              >
+              timeSeconds: { before: number; after: number }
+              removedVolume: { before: number; after: number }
+              parameters: Array<string>
+            }>
+          }
+          tools: { added: Array<string>; removed: Array<string> }
+          cycleTimeSeconds: { before: number; after: number; delta: number }
+          removedVolume: { before: number; after: number; delta: number }
+          claims: Array<{
+            id: string
+            before: "passed" | "failed" | "unsupported" | "unresolved" | "absent"
+            after: "passed" | "failed" | "unsupported" | "unresolved" | "absent"
+            direction: "worse" | "better" | "changed"
+          }>
+          release: {
+            before: "blocked" | "preview" | "verified-program"
+            after: "blocked" | "preview" | "verified-program"
+            direction: "same" | "lower" | "higher"
+          }
+          nc: { linesBefore: number; linesAfter: number; linesAdded: number; linesRemoved: number; identical: boolean }
+          safe: boolean
+        }
+      }
+    | {
+        status: "failed"
+        issues: Array<{
+          tag:
+            | "InvalidInput"
+            | "UnknownMaterial"
+            | "UnknownTool"
+            | "NoSuitableTool"
+            | "UnsupportedCapability"
+            | "GenerationFailed"
+            | "EmptyToolpath"
+            | "MachineLimit"
+            | "RapidInStock"
+            | "HolderCollision"
+            | "Gouge"
+            | "RemainingStock"
+            | "ReplayMismatch"
+            | "Cancelled"
+          severity: "error" | "warning"
+          stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
+          message: string
+          operationId?: string
+          line?: number
+          point?: { x: number; y: number; z: number }
+        }>
+      }
+}
 
 export type ToolpathsPostCheckInput = {
   readonly definition: ToolpathsPostCheckPayload["definition"]

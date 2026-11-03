@@ -164,6 +164,8 @@ export const CAM_ACTION_INPUTS = {
     params: Schema.optionalKey(params),
     at: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)))
   }),
+  /** A preview of regenerating a saved kernel program from the drawing as it is now, with the diff against the stored program (spec 59 A3, A4). */
+  "cam.regenerate": Schema.Struct({ operationId: id, scope: Schema.optionalKey(Schema.Literals(["program", "drawing"])) }),
   "cam.operations": empty,
   "cam.suggest": Schema.Struct({ params: Schema.optionalKey(params) }),
   "cam.compare_setups": Schema.Struct({ candidates: Schema.Array(CamSetupCandidate).check(Schema.isMinLength(1), Schema.isMaxLength(4)) }),
