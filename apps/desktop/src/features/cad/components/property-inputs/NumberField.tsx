@@ -3,8 +3,18 @@ import { formatNumber, parseNumberText, stepNumber, type NumberRules } from "../
 
 export interface NumberFieldProps extends NumberRules {
   readonly value: unknown
-  /** Called with every valid value while typing; an unfinished or invalid entry keeps the last valid one. */
+  /** Called with every valid value while typing (or on commit when `deferred`); an unfinished or invalid entry keeps the last valid one. */
   onChange(value: number): void
+  /** The field may be left empty: an empty entry is valid and calls `onClear` instead of `onChange`. */
+  readonly optional?: boolean | undefined
+  readonly onClear?: (() => void) | undefined
+  /**
+   * Commit when the entry is finished (the `change` event: leaving the field or Enter, and arrow steps) instead of at every
+   * keystroke, for forms whose rows are rebuilt by a commit (the field would lose focus while typing).
+   */
+  readonly deferred?: boolean | undefined
+  readonly placeholder?: string | undefined
+  readonly testId?: string | undefined
   /** The field's current error (null when valid), so the form can refuse to apply a half-typed dimension. */
   onError?: ((error: string | null) => void) | undefined
   readonly id?: string | undefined
@@ -46,10 +56,14 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
   }, { defer: true }))
   onCleanup(() => { if (error() !== null) props.onError?.(null) })
 
-  const accept = (text: string) => {
+  const blank = (text: string): boolean => props.optional === true && text.trim() === ""
+
+  /** Checks the entry and, when it is valid and `commit` is set, hands it to the form. */
+  const accept = (text: string, commit: boolean = props.deferred !== true) => {
     setDraft(text)
+    if (blank(text)) { report(null); if (commit) props.onClear?.(); return }
     const parsed = parseNumberText(text, rules())
-    if (parsed.ok) { report(null); props.onChange(parsed.value) }
+    if (parsed.ok) { report(null); if (commit) props.onChange(parsed.value) }
     else report(parsed.error)
   }
 
@@ -57,7 +71,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
     const parsed = parseNumberText(draft(), { degrees: props.degrees })
     const base = parsed.ok ? parsed.value : typeof props.value === "number" ? props.value : 0
     const next = stepNumber(base, (props.step ?? 1) * (large ? 10 : 1), direction, rules())
-    accept(formatNumber(next))
+    accept(formatNumber(next), true)
   }
 
   const keyDown = (event: KeyboardEvent) => {
@@ -66,8 +80,9 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
       step(event.key === "ArrowUp" ? 1 : -1, event.shiftKey)
     } else if (event.key === "Enter") {
       // Commit the canonical form before the form submits.
+      if (blank(draft())) { if (props.deferred === true) accept(draft(), true); return }
       const parsed = parseNumberText(draft(), rules())
-      if (parsed.ok) setDraft(formatNumber(parsed.value))
+      if (parsed.ok) { setDraft(formatNumber(parsed.value)); if (props.deferred === true) props.onChange(parsed.value) }
       else { setLeft(true); event.preventDefault() }
     }
   }
@@ -75,6 +90,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
   const blur = () => {
     focused = false
     setLeft(true)
+    if (blank(draft())) return
     const parsed = parseNumberText(draft(), rules())
     if (parsed.ok) setDraft(formatNumber(parsed.value))
   }
@@ -90,6 +106,8 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         spellcheck={false}
         id={props.id}
         name={props.name}
+        placeholder={props.placeholder}
+        data-testid={props.testId}
         aria-label={props.label}
         aria-invalid={visibleError() !== null}
         title={visibleError() ?? undefined}
@@ -97,6 +115,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         disabled={props.disabled ?? false}
         onFocus={(event) => { focused = true; event.currentTarget.select() }}
         onInput={(event) => accept(event.currentTarget.value)}
+        onChange={(event) => { if (props.deferred === true) accept(event.currentTarget.value, true) }}
         onKeyDown={keyDown}
         onBlur={blur}
         class={`${props.class ?? ""} ${visibleError() !== null ? INVALID : ""}`}

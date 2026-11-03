@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronRight, Copy, Crosshair, Eye, EyeOff, FolderPlus, Grid3x3, Layers, Lock, Maximize, Ruler, Scan, MessageSquare, Trash2, Unlock, Ungroup, Plus
 } from "lucide-solid"
 import { useCADStore } from "../../store/cadStore.ts"
+import { NumberField } from "../property-inputs/NumberField.tsx"
 import { useElementsStore } from "../../store/elementsStore.ts"
 import { useLayerStore } from "../../store/layerStore.ts"
 import { useSelectionStore } from "../../store/selectorStore.ts"
@@ -244,16 +245,16 @@ export function OriginBlock(): JSX.Element {
         </label>
         <Show when={custom()}>
           <div class="px-3 pb-2">
-            <input
-              type="number" step="any" aria-label={t("browser.customTolerance")} data-testid="browser-custom-tolerance"
+            <NumberField
+              step={0.001} label={t("browser.customTolerance")} testId="browser-custom-tolerance" deferred
               class={`${SELECT} w-full`} placeholder={t("browser.toleranceIn", { unit: UNIT_TABLE[settings().units].label })}
               value={toDisplay(settings().tolerance, settings().units)}
-              onChange={(event) => onCustom(event.currentTarget.valueAsNumber)}
+              onChange={onCustom}
             />
-            <Show when={problem()}><p class="mt-1 text-xs text-red-600" role="alert">{t("browser.allowed", { range: problem() ?? "" })}</p></Show>
+            <Show when={problem()}><p class="mt-1 text-xs text-[color:var(--ent-bad)]" role="alert">{t("browser.allowed", { range: problem() ?? "" })}</p></Show>
           </div>
         </Show>
-        <div class={TOGGLE_ROW}><span class="mr-2 text-[color:var(--ent-text-muted)]"><Maximize size={14} /></span><span class="flex-1">{t("browser.workpiece")}</span><span class="font-mono tabular-nums">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
+        <div class={TOGGLE_ROW}><span class="mr-2 text-[color:var(--ent-text-muted)]"><Maximize size={14} /></span><span class="flex-none">{t("browser.workpiece")}</span><span class="ml-2 min-w-0 flex-1 text-right font-mono tabular-nums">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
         {row(t("browser.axes"), cad.axisVisible, () => cad.toggleAxis(), <Layers size={14} />, "browser-toggle-axes")}
         {row(t("browser.grid"), cad.gridVisible, () => cad.toggleGrid(), <Grid3x3 size={14} />, "browser-toggle-grid")}
         {row(t("browser.dimensions"), cad.showDimensions, () => cad.toggleDimensions(), <Ruler size={14} />, "browser-toggle-dimensions")}
