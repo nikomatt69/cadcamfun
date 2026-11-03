@@ -1033,6 +1033,20 @@ export type OrganizationsCreateProjectPayload = {
 
 export type NotificationsUpdatePayload = { readonly isRead: boolean }
 
+export type ConversationsCreatePayload = {
+  readonly name?: string | null | undefined
+  readonly participantIds?: ReadonlyArray<string> | undefined
+  readonly isGroupChat?: boolean | undefined
+}
+
+export type ConversationsRenamePayload = { readonly name?: string | null | undefined }
+
+export type ConversationsSendPayload = {
+  readonly content?: string | undefined
+  readonly fileId?: string | null | undefined
+  readonly fileUrl?: string | null | undefined
+}
+
 export type ProjectsCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -5858,6 +5872,10 @@ export type OrganizationsInviteOutput = {
   inviteUrl: string
 }
 
+export type OrganizationsAcceptInvitationInput = { readonly token: { readonly token: string }["token"] }
+
+export type OrganizationsAcceptInvitationOutput = { message: string; organization: { id: string; name: string } }
+
 export type OrganizationsProjectsInput = { readonly id: { readonly id: string }["id"] }
 
 export type OrganizationsProjectsOutput = Array<{
@@ -5984,6 +6002,144 @@ export type NotificationsRemoveInput = { readonly id: { readonly id: string }["i
 export type NotificationsRemoveOutput = { message: string }
 
 export type NotificationsMarkAllReadOutput = { message: string; count: number }
+
+export type ConversationsListInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly page?: { readonly page?: string | undefined; readonly limit?: string | undefined }["page"]
+  readonly limit?: { readonly page?: string | undefined; readonly limit?: string | undefined }["limit"]
+}
+
+export type ConversationsListOutput = {
+  conversations: Array<{
+    id: string
+    name: string
+    isGroupChat: boolean
+    lastMessage: {
+      id: string
+      content: string
+      createdAt: string
+      senderId: string
+      sender: { id: string; name: string | null; image: string | null }
+    } | null
+    messageCount: number
+    createdAt: string
+    updatedAt: string
+    participants: Array<{ id: string; name: string; image: string | null; joinedAt: string }>
+    lastReadAt: string | null
+  }>
+  pagination: { total: number; page: number; limit: number; pages: number; hasMore: boolean }
+}
+
+export type ConversationsCreateInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: ConversationsCreatePayload["name"]
+  readonly participantIds?: ConversationsCreatePayload["participantIds"]
+  readonly isGroupChat?: ConversationsCreatePayload["isGroupChat"]
+}
+
+export type ConversationsCreateOutput = {
+  id: string
+  name: string | null
+  organizationId: string
+  isGroupChat: boolean
+  createdAt: string
+  updatedAt: string
+  participants: Array<{
+    id: string
+    userId: string
+    conversationId: string
+    joinedAt: string
+    lastReadAt: string | null
+    user: { id: string; name: string | null; image: string | null; email: string | null }
+  }>
+}
+
+export type ConversationsGetInput = { readonly id: { readonly id: string }["id"] }
+
+export type ConversationsGetOutput = {
+  id: string
+  name: string | null
+  isGroupChat: boolean
+  organizationId: string
+  organizationName: string
+  participants: Array<{
+    id: string
+    name: string | null
+    image: string | null
+    email: string | null
+    joinedAt: string
+    lastReadAt: string | null
+  }>
+  createdAt: string
+  updatedAt: string
+}
+
+export type ConversationsRenameInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: ConversationsRenamePayload["name"]
+}
+
+export type ConversationsRenameOutput = {
+  id: string
+  name: string | null
+  organizationId: string
+  isGroupChat: boolean
+  createdAt: string
+  updatedAt: string
+  participants: Array<{
+    id: string
+    userId: string
+    conversationId: string
+    joinedAt: string
+    lastReadAt: string | null
+    user: { id: string; name: string | null; image: string | null; email: string | null }
+  }>
+}
+
+export type ConversationsMessagesInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly cursor?: { readonly cursor?: string | undefined; readonly limit?: string | undefined }["cursor"]
+  readonly limit?: { readonly cursor?: string | undefined; readonly limit?: string | undefined }["limit"]
+}
+
+export type ConversationsMessagesOutput = {
+  messages: Array<{
+    id: string
+    content: string
+    senderId: string
+    conversationId: string
+    fileId: string | null
+    fileUrl: string | null
+    createdAt: string
+    updatedAt: string
+    sender: { id: string; name: string | null; image: string | null }
+  }>
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+export type ConversationsSendInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly content?: ConversationsSendPayload["content"]
+  readonly fileId?: ConversationsSendPayload["fileId"]
+  readonly fileUrl?: ConversationsSendPayload["fileUrl"]
+}
+
+export type ConversationsSendOutput = {
+  id: string
+  content: string
+  senderId: string
+  conversationId: string
+  fileId: string | null
+  fileUrl: string | null
+  createdAt: string
+  updatedAt: string
+  sender: { id: string; name: string | null; image: string | null }
+}
+
+export type ConversationsReadInput = { readonly id: { readonly id: string }["id"] }
+
+export type ConversationsReadOutput = { success: true }
 
 export type ProjectsListOutput = Array<{
   id: string
@@ -6820,6 +6976,39 @@ export type ComponentsCreateForProjectOutput = {
   updatedAt: string
   projectId: string
 }
+
+export type ComponentsAnalysisInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsAnalysisOutput = {
+  success: true
+  message: string
+  data: {
+    complexity: { score: number; factors: Array<{ name: string; value: number; benchmark: number }> }
+    performance: { score: number; metrics: Array<{ name: string; value: number; unit: string; benchmark: number }> }
+    compatibility: { score: number; platforms: Array<{ name: string; compatible: boolean }> }
+    usage: { references: number; lastUsed: string; projects: Array<{ id: string; name: string; usageCount: number }> }
+  } | null
+}
+
+export type ComponentsLibraryInput = {
+  readonly type?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["type"]
+  readonly category?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["category"]
+  readonly search?: {
+    readonly type?: string | undefined
+    readonly category?: string | undefined
+    readonly search?: string | undefined
+  }["search"]
+}
+
+export type ComponentsLibraryOutput = { success: true; message: string; data: Array<unknown> | null }
 
 export type ComponentsSaveStorageInput = { readonly id: { readonly id: string }["id"]; readonly payload: unknown }
 

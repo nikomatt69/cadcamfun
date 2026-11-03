@@ -89,6 +89,18 @@ export const ComponentRelationships = Schema.Struct({
   relationships: Schema.Array(Schema.Struct({ sourceId: Schema.String, targetId: Schema.String, type: Schema.Literal("references") }))
 })
 
+/** Structural report of a component. The times and the memory figure are estimates from the JSON size, not measurements. */
+export const ComponentAnalysis = Schema.Struct({
+  complexity: Schema.Struct({ score: Schema.Number, factors: Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.Number, benchmark: Schema.Number })) }),
+  performance: Schema.Struct({ score: Schema.Number, metrics: Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.Number, unit: Schema.String, benchmark: Schema.Number })) }),
+  compatibility: Schema.Struct({ score: Schema.Number, platforms: Schema.Array(Schema.Struct({ name: Schema.String, compatible: Schema.Boolean })) }),
+  usage: Schema.Struct({
+    references: Schema.Number,
+    lastUsed: Schema.String,
+    projects: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, usageCount: Schema.Number }))
+  })
+})
+
 const id = { id: Schema.String }
 const versionParams = { id: Schema.String, versionId: Schema.String }
 const commentParams = { id: Schema.String, commentId: Schema.String }
@@ -115,6 +127,12 @@ export class ComponentsGroup extends HttpApiGroup.make("components")
     HttpApiEndpoint.get("listForProject", "/api/projects/:id/components", { params: id, success: Schema.Array(ComponentRow), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createForProject", "/api/projects/:id/components", {
       params: id, payload: ComponentBody, success: ComponentRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
+    }),
+    HttpApiEndpoint.get("analysis", "/api/components/:id/analysis", { params: id, success: Envelope(ComponentAnalysis), error: envErrors }),
+    // The shipped catalogue of CAD parts. Items come in two shapes (library entries and component data), so they stay `Unknown`.
+    HttpApiEndpoint.get("library", "/api/components/library", {
+      query: { type: Schema.optional(Schema.String), category: Schema.optional(Schema.String), search: Schema.optional(Schema.String) },
+      success: Envelope(Schema.Array(Schema.Unknown)), error: [EnvInternal]
     }),
     // Object storage of a component's data (envelope bodies; the POST body is the raw component data).
     HttpApiEndpoint.post("saveStorage", "/api/components/:id/storage", { params: id, payload: Schema.Unknown, success: Envelope(Schema.Unknown), error: storageErrors }),

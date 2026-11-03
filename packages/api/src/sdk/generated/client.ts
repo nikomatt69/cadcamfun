@@ -312,6 +312,8 @@ import type {
   OrganizationsRemoveMemberOutput,
   OrganizationsInviteInput,
   OrganizationsInviteOutput,
+  OrganizationsAcceptInvitationInput,
+  OrganizationsAcceptInvitationOutput,
   OrganizationsProjectsInput,
   OrganizationsProjectsOutput,
   OrganizationsCreateProjectInput,
@@ -323,6 +325,20 @@ import type {
   NotificationsRemoveInput,
   NotificationsRemoveOutput,
   NotificationsMarkAllReadOutput,
+  ConversationsListInput,
+  ConversationsListOutput,
+  ConversationsCreateInput,
+  ConversationsCreateOutput,
+  ConversationsGetInput,
+  ConversationsGetOutput,
+  ConversationsRenameInput,
+  ConversationsRenameOutput,
+  ConversationsMessagesInput,
+  ConversationsMessagesOutput,
+  ConversationsSendInput,
+  ConversationsSendOutput,
+  ConversationsReadInput,
+  ConversationsReadOutput,
   ProjectsListOutput,
   ProjectsCreateInput,
   ProjectsCreateOutput,
@@ -435,6 +451,10 @@ import type {
   ComponentsListForProjectOutput,
   ComponentsCreateForProjectInput,
   ComponentsCreateForProjectOutput,
+  ComponentsAnalysisInput,
+  ComponentsAnalysisOutput,
+  ComponentsLibraryInput,
+  ComponentsLibraryOutput,
   ComponentsSaveStorageInput,
   ComponentsSaveStorageOutput,
   ComponentsReadStorageInput,
@@ -3009,6 +3029,17 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      acceptInvitation: (input: OrganizationsAcceptInvitationInput, requestOptions?: RequestOptions) =>
+        request<OrganizationsAcceptInvitationOutput>(
+          {
+            method: "POST",
+            path: `/api/invitations/${encodeURIComponent(input.token)}/accept`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       projects: (input: OrganizationsProjectsInput, requestOptions?: RequestOptions) =>
         request<OrganizationsProjectsOutput>(
           {
@@ -3081,6 +3112,90 @@ export function make(options: ClientOptions) {
             path: `/api/notifications/mark-all-read`,
             successStatus: 200,
             declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    conversations: {
+      list: (input: ConversationsListInput, requestOptions?: RequestOptions) =>
+        request<ConversationsListOutput>(
+          {
+            method: "GET",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/conversations`,
+            query: { page: input["page"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      create: (input: ConversationsCreateInput, requestOptions?: RequestOptions) =>
+        request<ConversationsCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/organizations/${encodeURIComponent(input.id)}/conversations`,
+            body: { name: input["name"], participantIds: input["participantIds"], isGroupChat: input["isGroupChat"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      get: (input: ConversationsGetInput, requestOptions?: RequestOptions) =>
+        request<ConversationsGetOutput>(
+          {
+            method: "GET",
+            path: `/api/conversation/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      rename: (input: ConversationsRenameInput, requestOptions?: RequestOptions) =>
+        request<ConversationsRenameOutput>(
+          {
+            method: "PATCH",
+            path: `/api/conversation/${encodeURIComponent(input.id)}`,
+            body: { name: input["name"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      messages: (input: ConversationsMessagesInput, requestOptions?: RequestOptions) =>
+        request<ConversationsMessagesOutput>(
+          {
+            method: "GET",
+            path: `/api/conversation/${encodeURIComponent(input.id)}/messages`,
+            query: { cursor: input["cursor"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      send: (input: ConversationsSendInput, requestOptions?: RequestOptions) =>
+        request<ConversationsSendOutput>(
+          {
+            method: "POST",
+            path: `/api/conversation/${encodeURIComponent(input.id)}/messages`,
+            body: { content: input["content"], fileId: input["fileId"], fileUrl: input["fileUrl"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      read: (input: ConversationsReadInput, requestOptions?: RequestOptions) =>
+        request<ConversationsReadOutput>(
+          {
+            method: "POST",
+            path: `/api/conversation/${encodeURIComponent(input.id)}/read`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 500, 401],
             empty: false,
           },
           requestOptions,
@@ -3871,6 +3986,29 @@ export function make(options: ClientOptions) {
             },
             successStatus: 201,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      analysis: (input: ComponentsAnalysisInput, requestOptions?: RequestOptions) =>
+        request<ComponentsAnalysisOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/analysis`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      library: (input?: ComponentsLibraryInput, requestOptions?: RequestOptions) =>
+        request<ComponentsLibraryOutput>(
+          {
+            method: "GET",
+            path: `/api/components/library`,
+            query: { type: input?.["type"], category: input?.["category"], search: input?.["search"] },
+            successStatus: 200,
+            declaredStatuses: [500, 401],
             empty: false,
           },
           requestOptions,

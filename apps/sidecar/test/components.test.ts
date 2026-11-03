@@ -266,3 +266,43 @@ describe("/api/components/:id/storage and /api/components/export-import", () => 
     expect(bad.body.data.errors[0].error).toBe("Unsupported import mode: merge")
   })
 })
+
+describe("/api/components/library", () => {
+  test("serves the shipped catalogue, filtered by type, category and search", async () => {
+    const all = await app.call("/api/components/library")
+    expect(all.status).toBe(200)
+    expect(all.body).toMatchObject({ success: true, message: "Success" })
+    expect(all.body.data).toHaveLength(40)
+    const workpieces = (await app.call("/api/components/library?type=workpiece")).body.data
+    expect(workpieces.length).toBeGreaterThan(0)
+    expect(workpieces.every((c: { type: string }) => c.type === "workpiece")).toBe(true)
+    expect((await app.call("/api/components/library?category=component")).body.data.every((c: { category: string }) => c.category === "component")).toBe(true)
+    const stock = (await app.call("/api/components/library?search=STOCK")).body.data
+    expect(stock.length).toBeGreaterThan(0)
+    expect((await app.call("/api/components/library?search=zzzz-no-such-part")).body.data).toEqual([])
+    expect((await app.call("/api/components/library", { auth: false })).status).toBe(401)
+  })
+})
+
+describe("/api/components/:id/analysis", () => {
+  test("scores the stored data, counts the components that reference it and names their projects", async () => {
+    const base = (await app.call("/api/components", { method: "POST", json: { projectId, name: "Base part", type: "mechanical", data: { type: "custom", a: { b: { c: { d: { e: 1 } } } } } } })).body.id
+    const flat = await app.call(`/api/components/${base}/analysis`)
+    expect(flat.status).toBe(200)
+    expect(flat.body.data.complexity.factors[0]).toEqual({ name: "Nesting Depth", value: 4, benchmark: 3 })
+    expect(flat.body.data.complexity.score).toBeLessThan(100)
+    expect(flat.body.data.performance.metrics.map((m: { name: string }) => m.name)).toEqual(["Memory Usage", "Render Time", "Load Time"])
+    expect(flat.body.data.compatibility).toMatchObject({ score: 100 })
+    expect(flat.body.data.usage).toMatchObject({ references: 0, projects: [] })
+
+    await app.call("/api/components", { method: "POST", json: { projectId, name: "User 1", data: { references: [base] } } })
+    await app.call("/api/components", { method: "POST", json: { projectId, name: "User 2", data: { references: [base, "other"] } } })
+    const used = (await app.call(`/api/components/${base}/analysis`)).body.data
+    expect(used.usage.references).toBe(2)
+    expect(used.usage.projects).toEqual([{ id: projectId, name: "Fixture", usageCount: 2 }])
+    expect(used.usage.lastUsed).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(used.complexity.factors[2]).toEqual({ name: "Dependencies", value: 0, benchmark: 2 })
+
+    expect((await app.call("/api/components/nope/analysis")).status).toBe(404)
+  })
+})

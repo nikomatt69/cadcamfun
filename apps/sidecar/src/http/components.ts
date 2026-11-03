@@ -5,6 +5,8 @@ import { ComponentRepo, type ComponentPatch } from "../repos/component-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { NotificationService } from "../services/notifications.ts"
 import { StorageService } from "../services/storage.ts"
+import { filterComponentLibrary } from "../repos/components-library.ts"
+import { analyzeComponentData } from "../repos/component-analysis.ts"
 import { type EntityExportIO, exportEntities, exportMeta, internal } from "./entity-io.ts"
 import type { ComponentDetail } from "@cadcamfun/api"
 
@@ -69,6 +71,17 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
   const trimmed = (content: string | undefined) => (content ?? "").trim() === "" ? undefined : content
 
   return handlers
+    // Legacy demanded an `id` query parameter this route never had and so always answered 400; the catalogue is served without it.
+    .handle("library", ({ query }) => Effect.sync(() => ok(filterComponentLibrary(query))))
+    .handle("analysis", ({ params }) =>
+      Effect.gen(function*() {
+        const { user, component } = yield* envReadable(params.id)
+        const referencing = yield* components.referencing(user.id, params.id)
+        const byProject = new Map<string, { id: string; name: string; usageCount: number }>()
+        for (const r of referencing) byProject.set(r.projectId, { id: r.projectId, name: r.projectName, usageCount: (byProject.get(r.projectId)?.usageCount ?? 0) + 1 })
+        const last = referencing.length ? new Date(Math.max(...referencing.map((r) => r.updatedAt.getTime()))) : new Date()
+        return ok({ ...analyzeComponentData(component.data, component.type), usage: { references: referencing.length, lastUsed: last.toISOString().split("T")[0]!, projects: [...byProject.values()] } })
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to analyze component"))))
     .handle("list", ({ query }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser

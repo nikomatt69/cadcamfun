@@ -60,6 +60,8 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   visibleByIds(userId: string, ids: ReadonlyArray<string>): Effect.Effect<Array<typeof ComponentDetail.Type>, DatabaseError>
   /** Legacy export-import loop into one project: `create` inserts, `update` upserts by id inside the project, `skip` inserts unless the id exists there. */
   importMany(projectId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
+  /** Components the user can see that reference this one, with their project's name and last change. */
+  referencing(userId: string, componentId: string): Effect.Effect<Array<{ projectId: string; projectName: string; updatedAt: Date }>, DatabaseError>
   projectOrganization(projectId: string): Effect.Effect<string | null, DatabaseError>
   userName(userId: string): Effect.Effect<string | null, DatabaseError>
 }>()("cadcamfun/ComponentRepo") {
@@ -262,6 +264,16 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
               return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
             })
           })).pipe(Effect.tap(() => events.workspaceChanged(projectId))),
+        referencing: (userId, componentId) =>
+          query("components.referencing", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
+            const hits = await db.select({ c: T, projectName: P.name }).from(T).innerJoin(P, eq(T.projectId, P.id))
+              .where(or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined))
+            return hits
+              .filter(({ c }) => c.id !== componentId && typeof c.data === "object" && c.data !== null
+                && Array.isArray((c.data as { references?: unknown }).references) && ((c.data as { references: unknown[] }).references).includes(componentId))
+              .map(({ c, projectName }) => ({ projectId: c.projectId, projectName, updatedAt: c.updatedAt }))
+          }),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>

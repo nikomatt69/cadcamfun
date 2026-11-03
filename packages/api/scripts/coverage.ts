@@ -1,5 +1,6 @@
 import { OpenApi } from "effect/unstable/httpapi"
 import { Api } from "../src/index.ts"
+import { ACCEPTED_GAPS } from "./accepted-gaps.ts"
 
 export interface InventoryRoute { readonly route: string; readonly methods: readonly string[] }
 export const normalizePath = (path: string) => path.replace(/\{[^}]+\}/g, ":param").replace(/:[A-Za-z][A-Za-z0-9_]*/g, ":param").replace(/\/$/, "")
@@ -12,7 +13,7 @@ export function parseInventory(text: string): InventoryRoute[] {
     return { route: route.replace(/`/g, ""), methods: methods === "?" ? [] : methods.split(",").map((method) => method.trim()) }
   })
 }
-export function contractCoverage(rows: readonly InventoryRoute[]) {
+export function contractCoverage(rows: readonly InventoryRoute[], accepted: ReadonlyArray<{ route: string; reason: string }> = ACCEPTED_GAPS) {
   const paths = OpenApi.fromApi(Api).paths
   const operations = new Map<string, Set<string>>()
   for (const [path, value] of Object.entries(paths)) {
@@ -27,5 +28,9 @@ export function contractCoverage(rows: readonly InventoryRoute[]) {
     const absent = methods.filter((method) => !have?.has(method))
     return have && methods.length > 0 && absent.length === 0 ? [] : [{ route, missingMethods: absent, existingMethods: [...(have ?? [])], unresolvedMethods: methods.length === 0 }]
   })
-  return { total: rows.length, covered: rows.length - missing.length, missing }
+  // A route that is covered never counts as accepted; one that is neither is an open gap.
+  const reasons = new Map(accepted.map((a) => [a.route, a.reason]))
+  const notPorted = missing.filter((row) => reasons.has(row.route)).map((row) => ({ ...row, reason: reasons.get(row.route)! }))
+  const open = missing.filter((row) => !reasons.has(row.route))
+  return { total: rows.length, covered: rows.length - missing.length, missing, accepted: notPorted, open }
 }
