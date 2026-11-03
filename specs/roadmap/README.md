@@ -27,10 +27,10 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | 4 | RM-04 | `04-desktop-parity.md` | **pending** | RM-03 for each vertical's routes | WP6 `apps/desktop` |
 | 5 | RM-05 | `05-library-write.md` | **in progress** (row versions, history and restore built for materials, tools and machine configurations; actions, components/library items and desktop screens open) | RM-01, WP0 | WP0 `packages/db`, WP3, WP4, WP8, WP6 |
 | 6 | RM-06 | `06-context-awareness.md` | **pending** | RM-01 | WP8, WP6, WP11, WP3 snapshot/intent contracts, WP4 authorized context assembly |
-| 7 | RM-07 | `07-ai-lifecycle.md` | **pending** | RM-01, RM-03 receipts for write recovery | WP8, WP0 task persistence, WP3 event/control contracts, WP4 owner binding, WP6 recovery consumers |
+| 7 | RM-07 | `07-ai-lifecycle.md` | **in progress** (durable task journal built as key-value rows with start-up recovery; typed task events, event-buffer resync, lease evidence open) | RM-01, RM-03 receipts for write recovery | WP8, WP0 task persistence, WP3 event/control contracts, WP4 owner binding, WP6 recovery consumers |
 | 8 | RM-08 | `08-mobile-codriver.md` | **pending** | RM-07 stream recovery | WP13 `apps/mobile`, WP4 companion gateway |
 | 9 | RM-09 | `09-cad-cam-depth.md` | **pending** | RM-02 for pure-core work; RM-03 and RM-06 additionally for precision integration | WP1 CAD, WP2 CAM, WP8 quality/action exposure, WP3/WP4/WP6 after core gates (scopes in step spec) |
-| 10 | RM-10 | `10-observability.md` | **pending** | RM-07 | WP8, WP6 |
+| 10 | RM-10 | `10-observability.md` | **in progress** (cost survives a reload; settings total and policy readback open) | RM-07 | WP8, WP6 |
 | 11 | RM-11 | `11-nikcli-bridge.md` | **in progress** (HTTP face + plugin built) | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
 | 12 | RM-12 | `12-native-edge-gpu.md` | **pending** | RM-01 | WP5 `apps/desktop/src-tauri`, WP6 `apps/desktop/src/viewport`, WP3 `packages/api/src/groups`, WP4 `apps/sidecar/src/http`, **new** WP `packages/buffer` |
 | 13 | RM-13 | — | **not started** (reserved) | RM-12 | native edge service: a separate Rust binary supervised by the Tauri shell, gated by `36-native-edge-and-gpu.md` §7 |

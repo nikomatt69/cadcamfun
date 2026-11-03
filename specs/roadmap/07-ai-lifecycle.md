@@ -1,6 +1,6 @@
 # RM-07 — AI session lifecycle (remaining)
 
-Status: **pending**. Depends on: RM-01 and RM-03 receipts for write recovery. Design: `23-ai-runtime-architecture.md` "Further work", [AI-06](../ai/06-owner-safe-lifecycle.md), [spec 28](../28-native-ai-architecture.md). Owners: WP8 `packages/ai`; WP0 `packages/db` task/outcome persistence only; WP3 `packages/api/src` event/control schemas; WP4 `apps/sidecar/src/services/acting-user.ts`, AI admission/control/event handlers and AI services for owner binding; WP6 `apps/desktop/src/ai` task/stream recovery consumers. Matching tests included.
+Status: **in progress** (2026-11-03: the durable task journal of deliverable 2 exists in key-value form; see the change log). Depends on: RM-01 and RM-03 receipts for write recovery. Design: `23-ai-runtime-architecture.md` "Further work", [AI-06](../ai/06-owner-safe-lifecycle.md), [spec 28](../28-native-ai-architecture.md). Owners: WP8 `packages/ai`; WP0 `packages/db` task/outcome persistence only; WP3 `packages/api/src` event/control schemas; WP4 `apps/sidecar/src/services/acting-user.ts`, AI admission/control/event handlers and AI services for owner binding; WP6 `apps/desktop/src/ai` task/stream recovery consumers. Matching tests included.
 
 ## Problem
 
@@ -33,3 +33,6 @@ bun --no-env-file test packages/ai apps/sidecar
 
 - v1: remaining lifecycle + explicit durability seam.
 - 2026-10-12: approved AI-06 durability/ownership contract and consumer scopes; implementation pending, no crash-recovery evidence claimed.
+
+- 2026-11-03: status corrected against the tree. Deliverable 2 exists as AI-11 step 9, with one deviation from this text: the task journal is rows of the SQLite-backed key-value store (`ai.tasks.<id>`, `apps/sidecar/src/services/ai-task-journal.ts`), not a dedicated table with a generated migration. The durability the contract asks for holds (SQLite file, task written before its runner starts, the specialist's report before its session is removed, the outcome before delivery, recovery at start-up by `BackgroundTaskManager.recover`, a row that does not decode skipped and never guessed); what a dedicated table would add is typed columns and an index by owner, which no reader needs yet. Covered by `apps/sidecar/test/ai-task-journal.test.ts` and `packages/ai/test/background-journal.test.ts`, `background-tasks.test.ts`. Still open: lease/heartbeat evidence per attempt and revision/receipt references on the row (the `target` field carries actor, drawing, revision and turn), typed task events for the desktop (deliverable 3), the bounded sequenced event buffers with explicit resync (deliverable 5), and the stall measurement note that closes deliverable 4.
+
