@@ -78,6 +78,6 @@ Goal: every legacy route in `specs/api-inventory.md` exists in the sidecar with 
 
 ### RM-03 step 1c: `components` storage and export-import (2026-11-03)
 
-- Done: `GET,POST,DELETE /api/components/:id/storage`, `GET,POST /api/components/export-import` (both live in the `components` group, so no new group registration). Coverage 129 → 132 once `analysis` and `library` are the only ones left. Tests: `apps/sidecar/test/components.test.ts`.
+- Done: `GET,POST,DELETE /api/components/:id/storage`, `GET,POST /api/components/export-import` (both live in the `components` group, so no new group registration). Coverage 129 → 131. Tests: `apps/sidecar/test/components.test.ts`.
 - Not yet in this family: `library` (static JSON catalogue, not ported), `analysis`.
 - Deviations: storage answers 404 (not 403) for a component the user cannot see, which no longer reveals that it exists; storage delete removes only `storagePath` from the data (legacy wrote `{ ...component.data?.toString, storagePath: null }` and lost the rest); the legacy membership check compared the organisation member with the *component id*, so organisation members never passed, the owner check now also admits them; export without `ids` lists every visible component (legacy listed bucket objects of the user); the export JSON `metadata` carries `projectName` as legacy did. Import is project-scoped and shares `importLoop` with materials and tools; `export` shares `exportEntities` through the narrower `EntityExportIO`.
