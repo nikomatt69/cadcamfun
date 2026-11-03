@@ -4,6 +4,9 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ComponentRepo, type ComponentPatch } from "../repos/component-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { NotificationService } from "../services/notifications.ts"
+import { StorageService } from "../services/storage.ts"
+import { type EntityExportIO, exportEntities, exportMeta, internal } from "./entity-io.ts"
+import type { ComponentDetail } from "@cadcamfun/api"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -12,6 +15,27 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
   const components = yield* ComponentRepo
   const projects = yield* ProjectRepo
   const notifications = yield* NotificationService
+  const storage = yield* StorageService
+
+  const storagePathOf = (data: unknown): string | undefined =>
+    data && typeof data === "object" ? (data as { storagePath?: string }).storagePath : undefined
+  // Storage routes: the component must be one the user can see; anyone else gets 404 (legacy answered 403 for a component that exists).
+  const storageGuard = Effect.fn("components.storage.guard")(function*(id: string) {
+    const user = yield* CurrentUser
+    const found = yield* components.find(user.id, id)
+    if (!found) return yield* envErr(EnvNotFound, "Component not found")
+    return found
+  })
+  const exportIO: EntityExportIO<typeof ComponentDetail.Type> = {
+    plural: "components", noun: "components", title: "Components", type: "component",
+    exportRow: (c, by) => ({
+      id: c.id, name: c.name, description: c.description,
+      type: c.data && typeof c.data === "object" ? (c.data as { type?: string }).type || "unknown" : "unknown",
+      data: c.data, metadata: { ...exportMeta(by), projectName: c.project.name }
+    }),
+    visibleByIds: components.visibleByIds,
+    listAll: components.listVisible
+  }
 
   const load = Effect.fn("components.load")(function*(id: string) {
     const user = yield* CurrentUser
@@ -193,4 +217,53 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
         yield* components.removeComment(params.commentId)
         return ok(null, "Comment deleted successfully")
       }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to delete comment"))))
+    .handle("saveStorage", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const component = yield* storageGuard(params.id)
+        if (!payload) return yield* envErr(EnvBadRequest, "Component data is required")
+        const storagePath = yield* storage.upload(storage.generateObjectPath("component", params.id), payload as object)
+        const data = typeof component.data === "object" && component.data ? component.data : {}
+        yield* components.update(params.id, { data: { ...data, storagePath } })
+        return ok({ storagePath }, "Component saved to storage successfully")
+      }).pipe(Effect.catchTags({ DatabaseError: internal, StorageError: internal })))
+    .handle("readStorage", ({ params, query }) =>
+      Effect.gen(function*() {
+        const component = yield* storageGuard(params.id)
+        const storagePath = storagePathOf(component.data)
+        if (!storagePath) return yield* envErr(EnvNotFound, "This component does not have storage data")
+        if (query.signedUrl === "true") return ok({ signedUrl: yield* storage.signedUrl(storagePath) })
+        return ok(yield* storage.download(storagePath))
+      }).pipe(Effect.catchTags({ DatabaseError: internal, StorageError: internal })))
+    .handle("removeStorage", ({ params }) =>
+      Effect.gen(function*() {
+        const component = yield* storageGuard(params.id)
+        const storagePath = storagePathOf(component.data)
+        if (!storagePath) return yield* envErr(EnvNotFound, "This component does not have storage data")
+        yield* storage.delete(storagePath)
+        // Legacy wrote `{ ...component.data?.toString, storagePath: null }` and so lost the rest of the data; only the path goes.
+        const { storagePath: _removed, ...rest } = component.data as Record<string, unknown>
+        yield* components.update(params.id, { data: rest })
+        return ok(null, "Component storage data deleted successfully")
+      }).pipe(Effect.catchTags({
+        DatabaseError: internal,
+        StorageError: () => Effect.fail(envErr(EnvInternal, "Failed to delete component storage"))
+      })))
+    .handle("export", ({ query }) =>
+      exportEntities(exportIO)(query).pipe(
+        Effect.provideService(StorageService, storage),
+        Effect.catchTags({ DatabaseError: internal, StorageError: internal })))
+    .handle("import", ({ payload }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const body = (payload ?? {}) as { projectId?: string; data?: unknown; path?: string; importMode?: string }
+        if (!body.projectId) return yield* envErr(EnvBadRequest, "Project ID is required")
+        if (!(yield* projects.find(user.id, body.projectId))) return yield* envErr(EnvNotFound, "Project not found or access denied")
+        let importData: unknown
+        if (body.data) importData = body.data
+        else if (body.path) importData = yield* storage.download(body.path)
+        else return yield* envErr(EnvBadRequest, "No import data provided")
+        if (!importData) return yield* envErr(EnvBadRequest, "Invalid import data")
+        const items = (Array.isArray(importData) ? importData : [importData]) as Record<string, unknown>[]
+        return ok(yield* components.importMany(body.projectId, items, body.importMode ?? "create"), "Components imported successfully")
+      }).pipe(Effect.catchTags({ DatabaseError: internal, StorageError: internal })))
 }))

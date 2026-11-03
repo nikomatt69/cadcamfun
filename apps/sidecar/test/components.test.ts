@@ -211,3 +211,58 @@ describe("/api/components (index, details, relationships)", () => {
     expect((await app.call(`/api/components/${a}/relationships`, { headers: other })).status).toBe(404)
   })
 })
+
+describe("/api/components/:id/storage and /api/components/export-import", () => {
+  let id: string
+  beforeAll(async () => {
+    id = (await app.call("/api/components", { method: "POST", json: { projectId, name: "Stored part", data: { type: "bracket", keep: 1 } } })).body.id
+  })
+
+  test("storage: save keeps the data and adds the path, read returns the object or a signed url, delete removes only the path", async () => {
+    expect((await app.call(`/api/components/${id}/storage`)).body.message).toBe("This component does not have storage data")
+    const saved = await app.call(`/api/components/${id}/storage`, { method: "POST", json: { elements: [1, 2, 3] } })
+    expect(saved.body.message).toBe("Component saved to storage successfully")
+    const storagePath = saved.body.data.storagePath
+    expect(storagePath).toStartWith("components/")
+    expect((await app.call(`/api/components/${id}`)).body.data).toEqual({ type: "bracket", keep: 1, storagePath })
+
+    expect((await app.call(`/api/components/${id}/storage`)).body.data).toEqual({ elements: [1, 2, 3] })
+    expect((await app.call(`/api/components/${id}/storage?signedUrl=true`)).body.data.signedUrl).toContain(storagePath)
+
+    const del = await app.call(`/api/components/${id}/storage`, { method: "DELETE" })
+    expect(del.body).toEqual({ success: true, message: "Component storage data deleted successfully", data: null })
+    expect((await app.call(`/api/components/${id}`)).body.data).toEqual({ type: "bracket", keep: 1 })
+    expect((await app.call(`/api/components/${id}/storage`, { method: "DELETE" })).status).toBe(404)
+    expect((await app.call("/api/components/nope/storage")).status).toBe(404)
+  })
+
+  test("export: json carries type, data and the project name; unknown ids and formats are refused", async () => {
+    const res = await app.call(`/api/components/export-import?ids=${id}`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-disposition")).toContain("components-export-")
+    expect(res.body[0]).toMatchObject({ id, name: "Stored part", type: "bracket", data: { keep: 1 }, metadata: { projectName: "Fixture", version: "1.0" } })
+    expect((await app.call("/api/components/export-import?ids=nope")).body.message).toBe("No accessible components found")
+    expect((await app.call(`/api/components/export-import?ids=${id}&format=xml`)).body.message).toBe("Unsupported export format")
+    const zip = await app.call(`/api/components/export-import?ids=${id}&format=zip`)
+    expect(zip.headers.get("content-type")).toBe("application/zip")
+    expect(zip.bytes.length).toBeGreaterThan(100)
+  })
+
+  test("import: needs a project the user can use and rows with name and data; create / update / skip follow the id inside that project", async () => {
+    expect((await app.call("/api/components/export-import", { method: "POST", json: { data: [] } })).body.message).toBe("Project ID is required")
+    expect((await app.call("/api/components/export-import", { method: "POST", json: { projectId: "nope", data: [] } })).status).toBe(404)
+    expect((await app.call("/api/components/export-import", { method: "POST", json: { projectId } })).body.message).toBe("No import data provided")
+
+    const rows = [{ id, name: "Renamed", data: { type: "plate" } }, { name: "Fresh", data: { type: "plate" } }, { name: "No data" }]
+    const skip = await app.call("/api/components/export-import", { method: "POST", json: { projectId, importMode: "skip", data: rows } })
+    expect(skip.body.data).toMatchObject({ skipped: [id], created: [expect.any(String)], errors: [{ id: "unknown", error: "Missing required fields (name, data)" }] })
+    expect((await app.call(`/api/components/${id}`)).body.name).toBe("Stored part")
+
+    const update = await app.call("/api/components/export-import", { method: "POST", json: { projectId, importMode: "update", data: rows[0] } })
+    expect(update.body.data.updated).toEqual([id])
+    expect((await app.call(`/api/components/${id}`)).body).toMatchObject({ name: "Renamed", data: { type: "plate" } })
+
+    const bad = await app.call("/api/components/export-import", { method: "POST", json: { projectId, importMode: "merge", data: rows[0] } })
+    expect(bad.body.data.errors[0].error).toBe("Unsupported import mode: merge")
+  })
+})

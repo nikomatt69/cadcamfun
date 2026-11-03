@@ -52,4 +52,4 @@ Gate: coverage rises per family; `--strict` is green only when 184/184. Handler 
 - 2026-10-12: scoped AI-02 revision/receipt prerequisite for RM-04 and WP0 generated migration ownership; runtime implementation pending.
 - 2026-10-12: made RM-03 the independent persistence prerequisite for RM-02 consumers and RM-09 acceptance, without a reverse RM-02 dependency. Documentation only; no gate claimed.
 - 2026-10-16: marketplace removed from the product (owner decision); the `/api/marketplace/*` rows and the Polar-webhook deliverable are gone, inventory total is 184.
-- 2026-11-03: step 1 started: `components/*` versions and comments (5 route files, coverage 129/184 with index, details, relationships). Remaining in the family: library, analysis, storage, export-import. Revision/receipt consolidation still open.
+- 2026-11-03: step 1 started: `components/*` versions and comments (5 route files, coverage 132/184 with index, details, relationships, storage, export-import). Remaining in the family: library, analysis. Revision/receipt consolidation still open.

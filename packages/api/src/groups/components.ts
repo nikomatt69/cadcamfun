@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, Envelope, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, Envelope, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const NullStr = Schema.NullOr(Schema.String)
 
@@ -93,6 +93,7 @@ const id = { id: Schema.String }
 const versionParams = { id: Schema.String, versionId: Schema.String }
 const commentParams = { id: Schema.String, commentId: Schema.String }
 const envErrors = [EnvBadRequest, EnvForbidden, EnvNotFound, EnvInternal]
+const storageErrors = [EnvBadRequest, EnvForbidden, EnvNotFound, EnvMethodNotAllowed, EnvInternal]
 const Message = Schema.Struct({ message: Schema.String })
 
 export class ComponentsGroup extends HttpApiGroup.make("components")
@@ -115,6 +116,18 @@ export class ComponentsGroup extends HttpApiGroup.make("components")
     HttpApiEndpoint.post("createForProject", "/api/projects/:id/components", {
       params: id, payload: ComponentBody, success: ComponentRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
     }),
+    // Object storage of a component's data (envelope bodies; the POST body is the raw component data).
+    HttpApiEndpoint.post("saveStorage", "/api/components/:id/storage", { params: id, payload: Schema.Unknown, success: Envelope(Schema.Unknown), error: storageErrors }),
+    HttpApiEndpoint.get("readStorage", "/api/components/:id/storage", {
+      params: id, query: { signedUrl: Schema.optional(Schema.String) }, success: Envelope(Schema.Unknown), error: storageErrors
+    }),
+    HttpApiEndpoint.delete("removeStorage", "/api/components/:id/storage", { params: id, success: Envelope(Schema.Unknown), error: storageErrors }),
+    // GET streams a JSON/ZIP download (raw response) or an envelope for `format=bucket`; POST imports into one project.
+    HttpApiEndpoint.get("export", "/api/components/export-import", {
+      query: { ids: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.String)])), format: Schema.optional(Schema.String) },
+      success: Schema.Unknown, error: storageErrors
+    }),
+    HttpApiEndpoint.post("import", "/api/components/export-import", { payload: Schema.Unknown, success: Envelope(Schema.Unknown), error: storageErrors }),
     // Versions: the bodies are plain (legacy answered `res.json`), the single-version read uses the envelope.
     HttpApiEndpoint.get("listVersions", "/api/components/:id/versions", { params: id, success: Schema.Array(ComponentVersionDetail), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createVersion", "/api/components/:id/versions", {

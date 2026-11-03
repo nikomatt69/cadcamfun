@@ -28,8 +28,11 @@ export interface EntityIO<Row extends { id: string; name: string }> {
 export const exportMeta = (userId: string) => ({ exportedAt: new Date().toISOString(), exportedBy: userId, version: "1.0", schemaVersion: "1.0" })
 const safeName = (name: string) => `${name.replace(/[^a-z0-9]/gi, "_")}.json`
 
+/** What the export half needs; a family with its own import (components import into one project) implements only this. */
+export type EntityExportIO<Row extends { id: string; name: string }> = Pick<EntityIO<Row>, "plural" | "noun" | "title" | "type" | "exportRow" | "visibleByIds" | "listAll">
+
 /** Legacy export-import GET: `?ids=&format=json|zip|bucket`. */
-export const exportEntities = <Row extends { id: string; name: string }>(io: EntityIO<Row>) =>
+export const exportEntities = <Row extends { id: string; name: string }>(io: EntityExportIO<Row>) =>
   Effect.fn(`${io.plural}.export`)(function*(query: { ids?: string | ReadonlyArray<string> | undefined; format?: string | undefined }) {
     const user = yield* CurrentUser
     const storage = yield* StorageService

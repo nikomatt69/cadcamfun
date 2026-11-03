@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
+import { importLoop, type ImportResults } from "./import-loop.ts"
 
 type Row = typeof schema.componentTable.$inferSelect
 export const toComponentRow = (c: Row): ComponentRow => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() })
@@ -55,6 +56,10 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   details(userId: string, id: string): Effect.Effect<typeof ComponentFullDetail.Type | "forbidden" | undefined, DatabaseError>
   /** Components that reference this one (in `data.references`) and those it references, restricted to what the user can see. */
   relationships(userId: string, component: ComponentRow): Effect.Effect<typeof ComponentRelationships.Type, DatabaseError>
+  /** Components among `ids` the user can see, with their project's name (for exports). */
+  visibleByIds(userId: string, ids: ReadonlyArray<string>): Effect.Effect<Array<typeof ComponentDetail.Type>, DatabaseError>
+  /** Legacy export-import loop into one project: `create` inserts, `update` upserts by id inside the project, `skip` inserts unless the id exists there. */
+  importMany(projectId: string, items: ReadonlyArray<Record<string, unknown>>, mode: string): Effect.Effect<ImportResults, DatabaseError>
   projectOrganization(projectId: string): Effect.Effect<string | null, DatabaseError>
   userName(userId: string): Effect.Effect<string | null, DatabaseError>
 }>()("cadcamfun/ComponentRepo") {
@@ -232,6 +237,31 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
               ]
             }
           }),
+        visibleByIds: (userId, ids) =>
+          query("components.visibleByIds", async (db) => {
+            if (ids.length === 0) return []
+            const orgIds = await orgIdsOf(db, userId)
+            const hits = await db.select({ c: T, project: { id: P.id, name: P.name, ownerId: P.ownerId } }).from(T).innerJoin(P, eq(T.projectId, P.id))
+              .where(and(inArray(T.id, [...ids]), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)))
+            return hits.map((hit) => ({ ...toComponentRow(hit.c), project: hit.project }))
+          }),
+        importMany: (projectId, items, mode) =>
+          query("components.importMany", (db) => importLoop(items, mode, {
+            validate: (c) => (c.name && c.data ? undefined : "Missing required fields (name, data)"),
+            exists: async (id) => (await db.select({ id: T.id }).from(T).where(and(eq(T.id, id), eq(T.projectId, projectId))).limit(1)).length > 0,
+            create: async (c) => commitMutation(db, "components.import.create", (tx) => {
+              const row = tx.insert(T).values({ name: String(c.name), description: (c.description as string | undefined) || null, data: c.data, projectId }).returning().get()
+              if (!row) throw new Error("Imported component was not created")
+              return { result: row.id, resourceId: row.id, revision: row.updatedAt.toISOString() }
+            }),
+            update: async (id, c) => commitMutation(db, "components.import.update", (tx) => {
+              const previous = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!previous) throw new Error("Imported component no longer exists")
+              const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              tx.update(T).set({ name: String(c.name), description: (c.description as string | undefined) || null, data: c.data, updatedAt }).where(eq(T.id, id)).run()
+              return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+            })
+          })).pipe(Effect.tap(() => events.workspaceChanged(projectId))),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>
