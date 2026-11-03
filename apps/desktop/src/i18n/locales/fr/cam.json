@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "Vérifications dégradées : {claims}.",
   "cam.kernel.diff.unsafe": "Ce programme ne doit pas être repris sans revue : sa validation est plus basse ou une vérification s'est dégradée.",
   "cam.kernel.model.current": "Le dessin correspond toujours au modèle dont ce programme est issu.",
-  "cam.kernel.model.unknown": "Ce programme ne peut pas être comparé au dessin : il n'a pas de modèle enregistré."
+  "cam.kernel.model.unknown": "Ce programme ne peut pas être comparé au dessin : il n'a pas de modèle enregistré.",
+  "cam.kernel.verifyNc.button": "Vérifier le NC de l'éditeur",
+  "cam.kernel.verifyNc.running": "Vérification…",
+  "cam.kernel.verifyNc.clean": "Rejeu indépendant : aucun gouge, aucun rapide dans la matière. Ce n'est pas une validation de la commande.",
+  "cam.kernel.verifyNc.faults": "Le rejeu indépendant a trouvé des problèmes dans le NC :",
+  "cam.kernel.verifyNc.incomplete": "Le rejeu indépendant n'a rien trouvé, mais il est incomplet (pas de verdict) :",
+  "cam.kernel.verifyNc.failed": "La vérification n'a pas pu s'exécuter : {message}"
 }

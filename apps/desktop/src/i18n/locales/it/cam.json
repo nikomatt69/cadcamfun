@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "Verifiche peggiorate: {claims}.",
   "cam.kernel.diff.unsafe": "Questo programma non è sicuro da adottare senza revisione: il rilascio è più basso o una verifica è peggiorata.",
   "cam.kernel.model.current": "Il disegno corrisponde ancora al modello da cui è stato creato questo programma.",
-  "cam.kernel.model.unknown": "Questo programma non può essere confrontato con il disegno: non ha un modello salvato."
+  "cam.kernel.model.unknown": "Questo programma non può essere confrontato con il disegno: non ha un modello salvato.",
+  "cam.kernel.verifyNc.button": "Verifica l'NC nell'editor",
+  "cam.kernel.verifyNc.running": "Verifica in corso…",
+  "cam.kernel.verifyNc.clean": "Replay indipendente: nessun gouge, nessun rapido nel materiale. Non è un'accettazione del controllo.",
+  "cam.kernel.verifyNc.faults": "Il replay indipendente ha trovato problemi nell'NC:",
+  "cam.kernel.verifyNc.incomplete": "Il replay indipendente non ha trovato nulla, ma è incompleto (nessun verdetto):",
+  "cam.kernel.verifyNc.failed": "La verifica non è stata eseguita: {message}"
 }

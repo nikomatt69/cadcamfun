@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "Claims that got worse: {claims}.",
   "cam.kernel.diff.unsafe": "This program is not safe to take over without review: its release is lower or a claim got worse.",
   "cam.kernel.model.current": "The drawing still matches the model this program was made from.",
-  "cam.kernel.model.unknown": "This program cannot be compared with the drawing: it has no stored model."
+  "cam.kernel.model.unknown": "This program cannot be compared with the drawing: it has no stored model.",
+  "cam.kernel.verifyNc.button": "Verify the NC in the editor",
+  "cam.kernel.verifyNc.running": "Verifying…",
+  "cam.kernel.verifyNc.clean": "Independent replay: no gouge, no rapid through material. This is not controller acceptance.",
+  "cam.kernel.verifyNc.faults": "Independent replay found problems in the NC:",
+  "cam.kernel.verifyNc.incomplete": "Independent replay found nothing, but it is incomplete (no verdict):",
+  "cam.kernel.verifyNc.failed": "The check could not run: {message}"
 }

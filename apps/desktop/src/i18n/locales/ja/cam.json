@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "悪化した検証：{claims}。",
   "cam.kernel.diff.unsafe": "このプログラムは確認なしに採用できません。リリースレベルが下がったか、検証が悪化しています。",
   "cam.kernel.model.current": "図面は、このプログラムの作成元のモデルと一致しています。",
-  "cam.kernel.model.unknown": "このプログラムは図面と比較できません。保存されたモデルがありません。"
+  "cam.kernel.model.unknown": "このプログラムは図面と比較できません。保存されたモデルがありません。",
+  "cam.kernel.verifyNc.button": "エディタのNCを検証",
+  "cam.kernel.verifyNc.running": "検証中…",
+  "cam.kernel.verifyNc.clean": "独立したリプレイ：切り込み過ぎも、材料内の早送りもありません。制御装置での合格を意味しません。",
+  "cam.kernel.verifyNc.faults": "独立したリプレイでNCに問題が見つかりました：",
+  "cam.kernel.verifyNc.incomplete": "独立したリプレイでは何も見つかりませんでしたが、不完全です（判定なし）：",
+  "cam.kernel.verifyNc.failed": "検証を実行できませんでした：{message}"
 }

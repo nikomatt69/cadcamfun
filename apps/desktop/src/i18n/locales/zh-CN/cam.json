@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "变差的验证项：{claims}。",
   "cam.kernel.diff.unsafe": "未经审查不应采用此程序：发布等级更低，或有验证项变差。",
   "cam.kernel.model.current": "图纸仍与生成此程序时的模型一致。",
-  "cam.kernel.model.unknown": "无法将此程序与图纸比较：它没有保存模型。"
+  "cam.kernel.model.unknown": "无法将此程序与图纸比较：它没有保存模型。",
+  "cam.kernel.verifyNc.button": "验证编辑器中的 NC",
+  "cam.kernel.verifyNc.running": "正在验证…",
+  "cam.kernel.verifyNc.clean": "独立回放：无过切，无快速移动穿过材料。这不等于数控系统验收。",
+  "cam.kernel.verifyNc.faults": "独立回放在 NC 中发现问题：",
+  "cam.kernel.verifyNc.incomplete": "独立回放未发现问题，但回放不完整（无结论）：",
+  "cam.kernel.verifyNc.failed": "无法运行验证：{message}"
 }

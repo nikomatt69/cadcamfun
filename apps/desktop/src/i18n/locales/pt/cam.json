@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "Verificações que pioraram: {claims}.",
   "cam.kernel.diff.unsafe": "Este programa não é seguro de adotar sem revisão: a liberação é menor ou uma verificação piorou.",
   "cam.kernel.model.current": "O desenho ainda corresponde ao modelo a partir do qual este programa foi feito.",
-  "cam.kernel.model.unknown": "Este programa não pode ser comparado com o desenho: não tem um modelo guardado."
+  "cam.kernel.model.unknown": "Este programa não pode ser comparado com o desenho: não tem um modelo guardado.",
+  "cam.kernel.verifyNc.button": "Verificar o NC do editor",
+  "cam.kernel.verifyNc.running": "Verificando…",
+  "cam.kernel.verifyNc.clean": "Reprodução independente: sem gouge nem rápidos através do material. Não é uma aceitação do comando.",
+  "cam.kernel.verifyNc.faults": "A reprodução independente encontrou problemas no NC:",
+  "cam.kernel.verifyNc.incomplete": "A reprodução independente não encontrou nada, mas está incompleta (sem veredito):",
+  "cam.kernel.verifyNc.failed": "A verificação não pôde ser executada: {message}"
 }

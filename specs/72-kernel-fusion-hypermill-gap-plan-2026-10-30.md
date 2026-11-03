@@ -435,3 +435,8 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   program of that plate (face, roughing, finishing) verifies clean in the independent tri-dexel replay (`kernel/verify-nc-kernel-program.test.ts`, which fails on the old layout), and the model, operations, kernel,
   generator, verify and `test/cam` suites pass (151 + 415 + 1248, 0 failures). **Still open:** interior walls (a pocket, a boss) are not on the lattice, so their passes can still be quantised by up to half a cell; the
   exact B-rep drop-cutter (spec 72 step 3.2) is the real fix. The `no-gouge` claim text still says "one cell of lateral slack", which is the bound for interior walls only.
+- 2026-11-03 (verifyNc in the desktop, step 0.6): the CAM page's kernel section has "Verify the NC in the editor" (`data-testid="kernel-verify-nc"`): the NC text as it is in the editor (a hand edit included) is replayed in the
+  sidecar's kernel worker against the part the program was made from, over `POST /api/toolpaths/verify-nc`, and the verdict (clean / faults / incomplete) and the first findings with their NC lines are shown
+  (`kernel-verify-nc-result`). The part's meshes and the stock are put in the program's work frame in `cam/lib/verify-nc.ts`; only a +Z setup is supported (another setup is refused with the reason). Five strings in 11
+  locales (machine-translated, not reviewed). Test: `apps/desktop/test/cam-kernel.test.ts` through the real sidecar (the kernel's own program is clean; the same program with a rapid plunged into the part is a fault
+  with its NC line). **Open:** pasting or importing foreign NC with its own tool table (the panel checks the kernel's program as edited), non-+Z setups, fixtures and the machine travel in the check.

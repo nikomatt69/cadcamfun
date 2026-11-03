@@ -9,6 +9,7 @@ import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { kernelRequestOf } from "../../lib/job.ts"
 import { modelChangeText } from "../../lib/model-change.ts"
+import { ncVerifyRequest } from "../../lib/verify-nc.ts"
 import { tcpRefusal } from "../../lib/kernel-tcp.ts"
 import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
@@ -55,6 +56,9 @@ interface KernelApi {
   readonly request: () => ReturnType<typeof kernelRequestOf> | undefined
   readonly artifact: () => CamKernelArtifact | undefined
   readonly stale: () => boolean
+  /** The independent replay of the NC in the editor (spec 72 step 0.6). */
+  readonly ncCheck: () => NcCheck
+  readonly verifyEditorNc: () => Promise<void>
   /** What the last generation changed against the program that was there before it (spec 59 A4); undefined for the first one. */
   readonly diff: () => ReturnType<typeof cam.kernel.programDiff> | undefined
   /** Why the model the program was made from differs from the drawing now (spec 59 A2); undefined when the program has no stored elements. */
@@ -87,6 +91,12 @@ const useKernel = (): KernelApi => {
 
 /** Holds the kernel run. The machine, operation and footer sections render its controls; this is not a section of its own. */
 
+export type NcCheck =
+  | { readonly state: "idle" }
+  | { readonly state: "running" }
+  | { readonly state: "failed"; readonly message: string }
+  | { readonly state: "done"; readonly verdict: "clean" | "faults" | "incomplete"; readonly lines: ReadonlyArray<string> }
+
 /** The sentences for what a regeneration changed (spec 59 A4); none when there was no program before it. */
 const diffLines = (diff: ReturnType<typeof cam.kernel.programDiff> | undefined): ReadonlyArray<string> => {
   if (diff === undefined) return []
@@ -115,6 +125,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   const [error, setError] = createSignal<string>()
   const [ownRun, setOwnRun] = createSignal(false)
   const [diff, setDiff] = createSignal<ReturnType<typeof cam.kernel.programDiff>>()
+  const [ncCheck, setNcCheck] = createSignal<NcCheck>({ state: "idle" })
   /** The machine configurations of the library: the machines the person configured, usable by the kernel. */
   const [savedMachines, setSavedMachines] = createSignal<ReadonlyArray<CamMachineConfig>>([])
   /** The machine the panel plans against: a saved configuration, else the preset id. */
@@ -259,6 +270,22 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     })
   }
 
+  /** Replays the NC as it is in the editor (a hand edit included) against the part, in the sidecar's kernel worker. */
+  const verifyEditorNc = async (): Promise<void> => {
+    const value = artifact(), source = store.kernelRequest ?? request()
+    if (value === undefined || source === undefined) return
+    const built = ncVerifyRequest(value, source, store.gcode)
+    if (typeof built === "string") { setNcCheck({ state: "failed", message: built }); return }
+    setNcCheck({ state: "running" })
+    try {
+      const result = await app.runtime.run(api.verifyNc(built))
+      if (disposed) return
+      setNcCheck({ state: "done", verdict: result.verdict, lines: [...result.findings.slice(0, 8).map((f) => f.message), ...(result.verdict === "incomplete" ? result.reasons.slice(0, 4) : [])] })
+    } catch (cause) {
+      if (!disposed) setNcCheck({ state: "failed", message: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
+
   const generate = async (): Promise<void> => {
     const input = request()
     if (!input || gen.isGenerating) return
@@ -279,6 +306,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
       setResult(value)
       // The program that was there before this run, compared with the one this run made (also a blocked one: the person sees what got worse).
       const prior = store.kernelArtifact
+      setNcCheck({ state: "idle" })
       setDiff(value.status === "ok" && prior !== undefined ? cam.kernel.programDiff(prior, value.value) : undefined)
       if (value.status !== "ok" || value.value.release === "blocked") return
       // Publish this exact program, retaining tool changes; old operation programs and verification belong to different NC.
@@ -299,7 +327,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
 
   return (
     <KernelContext.Provider value={{
-      settings, savedMachines, machineValue, linkPost, request, artifact, stale, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
+      settings, savedMachines, machineValue, linkPost, request, artifact, stale, ncCheck, verifyEditorNc, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
       patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result
     }}>
       {props.children}
@@ -529,6 +557,20 @@ export function KernelRunControls(): JSX.Element {
             <Show when={modelChangeText(change())}>{(text) => <p class="panel-hint" data-testid="kernel-model-change">{text()}</p>}</Show>
           )}</Show>
           <p>{t("cam.kernel.summary", { operations: value().operations.length, tools: value().tools.length, seconds: value().cycleTimeSeconds.toFixed(1) })}</p>
+          <button type="button" class="panel-btn" data-testid="kernel-verify-nc" disabled={kernel.ncCheck().state === "running"} onClick={() => void kernel.verifyEditorNc()}>
+            {t(kernel.ncCheck().state === "running" ? "cam.kernel.verifyNc.running" : "cam.kernel.verifyNc.button")}
+          </button>
+          <Show when={kernel.ncCheck()}>{(check) => (
+            <div class="panel-hint space-y-1" role="status" data-testid="kernel-verify-nc-result" data-state={check().state} data-verdict={(check() as { verdict?: string }).verdict ?? ""}>
+              <Show when={check().state === "failed"}><p>{t("cam.kernel.verifyNc.failed", { message: (check() as { message: string }).message })}</p></Show>
+              <Show when={check().state === "done"}>
+                <p class={(check() as { verdict: string }).verdict === "clean" ? "" : "text-[color:var(--panel-warn)]"}>
+                  {t(`cam.kernel.verifyNc.${(check() as { verdict: "clean" | "faults" | "incomplete" }).verdict}` as "cam.kernel.verifyNc.clean")}
+                </p>
+                <For each={(check() as { lines: ReadonlyArray<string> }).lines}>{(line) => <p>{line}</p>}</For>
+              </Show>
+            </div>
+          )}</Show>
           <button type="button" class="panel-btn" data-testid="kernel-setup-sheet" onClick={() => {
             const sheet = setupSheetFile(value(), kernel.request()?.name ?? value().jobId)
             if ("reason" in sheet) kernel.setError(sheet.reason)

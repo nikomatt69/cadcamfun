@@ -1400,5 +1400,11 @@
   "cam.kernel.diff.worse": "Verschlechterte Nachweise: {claims}.",
   "cam.kernel.diff.unsafe": "Dieses Programm sollte nicht ohne Prüfung übernommen werden: Die Freigabe ist niedriger oder ein Nachweis hat sich verschlechtert.",
   "cam.kernel.model.current": "Die Zeichnung entspricht weiterhin dem Modell, aus dem dieses Programm erzeugt wurde.",
-  "cam.kernel.model.unknown": "Dieses Programm kann nicht mit der Zeichnung verglichen werden: Es enthält kein gespeichertes Modell."
+  "cam.kernel.model.unknown": "Dieses Programm kann nicht mit der Zeichnung verglichen werden: Es enthält kein gespeichertes Modell.",
+  "cam.kernel.verifyNc.button": "NC im Editor prüfen",
+  "cam.kernel.verifyNc.running": "Prüfung läuft…",
+  "cam.kernel.verifyNc.clean": "Unabhängiger Replay: kein Gouge, kein Eilgang durch Material. Das ist keine Steuerungsabnahme.",
+  "cam.kernel.verifyNc.faults": "Der unabhängige Replay hat Probleme im NC gefunden:",
+  "cam.kernel.verifyNc.incomplete": "Der unabhängige Replay fand nichts, ist aber unvollständig (kein Urteil):",
+  "cam.kernel.verifyNc.failed": "Die Prüfung konnte nicht laufen: {message}"
 }

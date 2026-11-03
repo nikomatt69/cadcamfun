@@ -46,6 +46,21 @@ test("the additive kernel section runs through the real sidecar and fills the ex
     await new Promise((resolve) => setTimeout(resolve, 500))
     expect(useCamStore.getState().program.toolpaths).toEqual(originalToolpaths)
     expect(document.querySelector("[data-testid='kernel-stale']")).toBeNull()
+    // The NC in the editor is replayed independently against the part (spec 72 step 0.6): the kernel's own program is clean...
+    const verifyButton = document.querySelector<HTMLButtonElement>("[data-testid='kernel-verify-nc']")!
+    verifyButton.click()
+    const clean = await app.wait(() => document.querySelector("[data-testid='kernel-verify-nc-result'][data-state='done']"), 120_000)
+    expect(clean.getAttribute("data-verdict")).toBe("clean")
+    expect(clean.textContent).toContain("not controller acceptance")
+    // ...and a hand edit that plunges a rapid into the part is a fault with the NC line named.
+    const original = store.gcode
+    store.setGcode(original.replace(/\nM30/, "\nG0 X0 Y0 Z-3\nM30"))
+    expect(useCamStore.getState().gcode).not.toBe(original)
+    verifyButton.click()
+    const faulty = await app.wait(() => document.querySelector("[data-testid='kernel-verify-nc-result'][data-verdict='faults']"), 120_000)
+    expect(faulty.textContent).toMatch(/NC line \d+/)
+    store.setGcode(original)
+    await app.wait(() => !document.querySelector("[data-testid='kernel-stale']"))
     const { useCADStore } = await import("../src/features/cad/store/cadStore.ts")
     const originalStock = useCADStore.getState().workpiece
     useCADStore.getState().setWorkpiece({ ...originalStock, configured: true, width: 36, height: 24, depth: 6, x: 0, y: 0 })
