@@ -2467,12 +2467,94 @@ const Endpoint25_4 = (raw: RawClient["components"]) => (input: Endpoint25_4Input
     },
   }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint25_5Request = Parameters<RawClient["components"]["listVersions"]>[0]
+type Endpoint25_5Input = { readonly id: Endpoint25_5Request["params"]["id"] }
+const Endpoint25_5 = (raw: RawClient["components"]) => (input: Endpoint25_5Input) =>
+  raw["listVersions"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint25_6Request = Parameters<RawClient["components"]["createVersion"]>[0]
+type Endpoint25_6Input = {
+  readonly id: Endpoint25_6Request["params"]["id"]
+  readonly data?: Endpoint25_6Request["payload"]["data"]
+  readonly changeMessage?: Endpoint25_6Request["payload"]["changeMessage"]
+}
+const Endpoint25_6 = (raw: RawClient["components"]) => (input: Endpoint25_6Input) =>
+  raw["createVersion"]({
+    params: { id: input["id"] },
+    payload: { data: input["data"], changeMessage: input["changeMessage"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint25_7Request = Parameters<RawClient["components"]["restoreVersion"]>[0]
+type Endpoint25_7Input = {
+  readonly id: Endpoint25_7Request["params"]["id"]
+  readonly versionId?: Endpoint25_7Request["payload"]["versionId"]
+}
+const Endpoint25_7 = (raw: RawClient["components"]) => (input: Endpoint25_7Input) =>
+  raw["restoreVersion"]({ params: { id: input["id"] }, payload: { versionId: input["versionId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint25_8Request = Parameters<RawClient["components"]["getVersion"]>[0]
+type Endpoint25_8Input = {
+  readonly id: Endpoint25_8Request["params"]["id"]
+  readonly versionId: Endpoint25_8Request["params"]["versionId"]
+}
+const Endpoint25_8 = (raw: RawClient["components"]) => (input: Endpoint25_8Input) =>
+  raw["getVersion"]({ params: { id: input["id"], versionId: input["versionId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint25_9Request = Parameters<RawClient["components"]["listComments"]>[0]
+type Endpoint25_9Input = { readonly id: Endpoint25_9Request["params"]["id"] }
+const Endpoint25_9 = (raw: RawClient["components"]) => (input: Endpoint25_9Input) =>
+  raw["listComments"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint25_10Request = Parameters<RawClient["components"]["addComment"]>[0]
+type Endpoint25_10Input = {
+  readonly id: Endpoint25_10Request["params"]["id"]
+  readonly content?: Endpoint25_10Request["payload"]["content"]
+}
+const Endpoint25_10 = (raw: RawClient["components"]) => (input: Endpoint25_10Input) =>
+  raw["addComment"]({ params: { id: input["id"] }, payload: { content: input["content"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint25_11Request = Parameters<RawClient["components"]["editComment"]>[0]
+type Endpoint25_11Input = {
+  readonly id: Endpoint25_11Request["params"]["id"]
+  readonly commentId: Endpoint25_11Request["params"]["commentId"]
+  readonly content?: Endpoint25_11Request["payload"]["content"]
+}
+const Endpoint25_11 = (raw: RawClient["components"]) => (input: Endpoint25_11Input) =>
+  raw["editComment"]({
+    params: { id: input["id"], commentId: input["commentId"] },
+    payload: { content: input["content"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint25_12Request = Parameters<RawClient["components"]["removeComment"]>[0]
+type Endpoint25_12Input = {
+  readonly id: Endpoint25_12Request["params"]["id"]
+  readonly commentId: Endpoint25_12Request["params"]["commentId"]
+}
+const Endpoint25_12 = (raw: RawClient["components"]) => (input: Endpoint25_12Input) =>
+  raw["removeComment"]({ params: { id: input["id"], commentId: input["commentId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
 const adaptGroup25 = (raw: RawClient["components"]) => ({
   get: Endpoint25_0(raw),
   update: Endpoint25_1(raw),
   remove: Endpoint25_2(raw),
   listForProject: Endpoint25_3(raw),
   createForProject: Endpoint25_4(raw),
+  listVersions: Endpoint25_5(raw),
+  createVersion: Endpoint25_6(raw),
+  restoreVersion: Endpoint25_7(raw),
+  getVersion: Endpoint25_8(raw),
+  listComments: Endpoint25_9(raw),
+  addComment: Endpoint25_10(raw),
+  editComment: Endpoint25_11(raw),
+  removeComment: Endpoint25_12(raw),
 })
 
 type Endpoint26_0Request = Parameters<RawClient["toolpaths"]["list"]>[0]

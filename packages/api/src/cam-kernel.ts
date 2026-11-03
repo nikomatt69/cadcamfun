@@ -57,7 +57,7 @@ const cutting = Schema.Struct({
   limitedBy: strings, warnings: strings, exceeded: strings, source: Schema.String,
   reference: cam.generator.CuttingReferenceSchema
 })
-const cutter = Schema.Struct({
+export const CamKernelCutter = Schema.Struct({
   id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"]),
   diameter: positive, flutes: Schema.Int, material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
@@ -80,7 +80,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
     parameters: Schema.Record(Schema.String, Schema.Unknown), overridden: strings, warnings: strings, startZ: Schema.optionalKey(Schema.Finite),
     cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite
   })),
-  program: cam.ProgramSchema, tools: Schema.Array(cutter), nc: Schema.String,
+  program: cam.ProgramSchema, tools: Schema.Array(CamKernelCutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
     id: Schema.Literals(["bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String

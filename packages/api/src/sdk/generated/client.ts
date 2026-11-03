@@ -415,6 +415,22 @@ import type {
   ComponentsListForProjectOutput,
   ComponentsCreateForProjectInput,
   ComponentsCreateForProjectOutput,
+  ComponentsListVersionsInput,
+  ComponentsListVersionsOutput,
+  ComponentsCreateVersionInput,
+  ComponentsCreateVersionOutput,
+  ComponentsRestoreVersionInput,
+  ComponentsRestoreVersionOutput,
+  ComponentsGetVersionInput,
+  ComponentsGetVersionOutput,
+  ComponentsListCommentsInput,
+  ComponentsListCommentsOutput,
+  ComponentsAddCommentInput,
+  ComponentsAddCommentOutput,
+  ComponentsEditCommentInput,
+  ComponentsEditCommentOutput,
+  ComponentsRemoveCommentInput,
+  ComponentsRemoveCommentOutput,
   ToolpathsListInput,
   ToolpathsListOutput,
   ToolpathsCreateInput,
@@ -3687,6 +3703,98 @@ export function make(options: ClientOptions) {
             },
             successStatus: 201,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listVersions: (input: ComponentsListVersionsInput, requestOptions?: RequestOptions) =>
+        request<ComponentsListVersionsOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/versions`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createVersion: (input: ComponentsCreateVersionInput, requestOptions?: RequestOptions) =>
+        request<ComponentsCreateVersionOutput>(
+          {
+            method: "POST",
+            path: `/api/components/${encodeURIComponent(input.id)}/versions`,
+            body: { data: input["data"], changeMessage: input["changeMessage"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      restoreVersion: (input: ComponentsRestoreVersionInput, requestOptions?: RequestOptions) =>
+        request<ComponentsRestoreVersionOutput>(
+          {
+            method: "POST",
+            path: `/api/components/${encodeURIComponent(input.id)}/versions/restore`,
+            body: { versionId: input["versionId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      getVersion: (input: ComponentsGetVersionInput, requestOptions?: RequestOptions) =>
+        request<ComponentsGetVersionOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/versions/${encodeURIComponent(input.versionId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listComments: (input: ComponentsListCommentsInput, requestOptions?: RequestOptions) =>
+        request<ComponentsListCommentsOutput>(
+          {
+            method: "GET",
+            path: `/api/components/${encodeURIComponent(input.id)}/comments`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      addComment: (input: ComponentsAddCommentInput, requestOptions?: RequestOptions) =>
+        request<ComponentsAddCommentOutput>(
+          {
+            method: "POST",
+            path: `/api/components/${encodeURIComponent(input.id)}/comments`,
+            body: { content: input["content"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      editComment: (input: ComponentsEditCommentInput, requestOptions?: RequestOptions) =>
+        request<ComponentsEditCommentOutput>(
+          {
+            method: "PUT",
+            path: `/api/components/${encodeURIComponent(input.id)}/comments/${encodeURIComponent(input.commentId)}`,
+            body: { content: input["content"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeComment: (input: ComponentsRemoveCommentInput, requestOptions?: RequestOptions) =>
+        request<ComponentsRemoveCommentOutput>(
+          {
+            method: "DELETE",
+            path: `/api/components/${encodeURIComponent(input.id)}/comments/${encodeURIComponent(input.commentId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,
           },
           requestOptions,

@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, InternalError, NotFound, validateComponentData, normalizeComponentData } from "@cadcamfun/api"
+import { Api, BadRequest, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, InternalError, NotFound, envErr, normalizeComponentData, ok, validateComponentData } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ComponentRepo, type ComponentPatch } from "../repos/component-repo.ts"
@@ -26,6 +26,23 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
     if (!(yield* projects.find(user.id, projectId))) return yield* new NotFound({ message: "Project not found or access denied" })
     return user
   })
+
+  // Legacy readers (versions, comments) also admit public components; the version restore needs write access.
+  const readable = Effect.fn("components.readable")(function*(id: string) {
+    const user = yield* CurrentUser
+    const component = yield* components.access(user.id, id, "read")
+    if (!component) return yield* new NotFound({ message: "Component not found or access denied" })
+    return { user, component }
+  })
+  const envReadable = Effect.fn("components.envReadable")(function*(id: string) {
+    const user = yield* CurrentUser
+    const component = yield* components.access(user.id, id, "read")
+    if (!component) return yield* envErr(EnvNotFound, "Component not found or access denied")
+    return { user, component }
+  })
+  const envFail = (message: string) => (e: unknown) =>
+    Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(envErr(EnvInternal, message))))
+  const trimmed = (content: string | undefined) => (content ?? "").trim() === "" ? undefined : content
 
   return handlers
     .handle("get", ({ params }) => load(params.id).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch component"))))
@@ -74,4 +91,74 @@ export const ComponentsHandlers = HttpApiBuilder.group(Api, "components", Effect
         }
         return component
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create component"))))
+
+    .handle("listVersions", ({ params }) =>
+      Effect.gen(function*() {
+        yield* readable(params.id)
+        return yield* components.listVersions(params.id)
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch component versions"))))
+    .handle("createVersion", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const { user } = yield* readable(params.id)
+        if (!payload.data) return yield* new BadRequest({ message: "Component data is required" })
+        const validation = validateComponentData(payload.data)
+        if (!validation.valid) return yield* new BadRequest({ message: `Invalid component data: ${validation.errors?.join(", ")}` })
+        const version = yield* components.createVersion(params.id, user.id, normalizeComponentData(payload.data as Record<string, unknown>), payload.changeMessage ?? "")
+        return { ...version, message: "Version created successfully" }
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create component version"))))
+    .handle("restoreVersion", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const componentId = params.id
+        if (!payload.versionId) return yield* new BadRequest({ message: "Component ID and Version ID are required" })
+        if (!(yield* components.access(user.id, componentId, "write"))) return yield* new NotFound({ message: "Component not found or access denied" })
+        const version = yield* components.getVersion(componentId, payload.versionId)
+        if (!version) return yield* new NotFound({ message: "Version not found" })
+        if (version.data) {
+          const validation = validateComponentData(version.data)
+          if (!validation.valid) return yield* new BadRequest({ message: `Invalid version data: ${validation.errors?.join(", ")}` })
+        }
+        const restored = yield* components.restoreVersion(componentId, payload.versionId, user.id, (data) => normalizeComponentData(data as Record<string, unknown>))
+        if (!restored) return yield* new NotFound({ message: "Version not found" })
+        return { ...restored, message: "Version restored successfully" }
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to restore component version"))))
+    .handle("getVersion", ({ params }) =>
+      Effect.gen(function*() {
+        yield* envReadable(params.id)
+        const version = yield* components.getVersion(params.id, params.versionId)
+        if (!version) return yield* envErr(EnvNotFound, "Version not found")
+        return ok(version)
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to fetch component version"))))
+    .handle("listComments", ({ params }) =>
+      Effect.gen(function*() {
+        yield* envReadable(params.id)
+        return ok(yield* components.listComments(params.id))
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to fetch comments"))))
+    .handle("addComment", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const { user } = yield* envReadable(params.id)
+        const content = trimmed(payload.content)
+        if (content === undefined) return yield* envErr(EnvBadRequest, "Comment content is required")
+        return ok(yield* components.addComment(params.id, user.id, content), "Comment added successfully")
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to add comment"))))
+    .handle("editComment", ({ params, payload }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const comment = yield* components.findComment(params.id, params.commentId)
+        if (!comment) return yield* envErr(EnvNotFound, "Comment not found")
+        if (comment.userId !== user.id) return yield* envErr(EnvForbidden, "Not authorized to edit this comment")
+        const content = trimmed(payload.content)
+        if (content === undefined) return yield* envErr(EnvBadRequest, "Comment content is required")
+        return ok(yield* components.editComment(params.commentId, content), "Comment updated successfully")
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to update comment"))))
+    .handle("removeComment", ({ params }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const comment = yield* components.findComment(params.id, params.commentId)
+        if (!comment) return yield* envErr(EnvNotFound, "Comment not found")
+        // Only the author or the project owner may delete.
+        if (comment.userId !== user.id && !(yield* components.isProjectOwner(user.id, params.id))) return yield* envErr(EnvForbidden, "Not authorized to delete this comment")
+        yield* components.removeComment(params.commentId)
+        return ok(null, "Comment deleted successfully")
+      }).pipe(Effect.catchTag("DatabaseError", envFail("Failed to delete comment"))))
 }))

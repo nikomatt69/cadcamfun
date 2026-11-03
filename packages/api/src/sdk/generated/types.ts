@@ -1131,6 +1131,17 @@ export type ComponentsCreateForProjectPayload = {
   readonly thumbnail?: string | null | undefined
 }
 
+export type ComponentsCreateVersionPayload = {
+  readonly data?: unknown | undefined
+  readonly changeMessage?: string | undefined
+}
+
+export type ComponentsRestoreVersionPayload = { readonly versionId?: string | undefined }
+
+export type ComponentsAddCommentPayload = { readonly content?: string | undefined }
+
+export type ComponentsEditCommentPayload = { readonly content?: string | undefined }
+
 export type ToolpathsCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -6525,6 +6536,134 @@ export type ComponentsCreateForProjectOutput = {
   updatedAt: string
   projectId: string
 }
+
+export type ComponentsListVersionsInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsListVersionsOutput = Array<{
+  id: string
+  componentId: string
+  data: unknown
+  changeMessage: string | null
+  userId: string
+  createdAt: string
+  user: { name: string | null; email: string | null }
+}>
+
+export type ComponentsCreateVersionInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly data?: ComponentsCreateVersionPayload["data"]
+  readonly changeMessage?: ComponentsCreateVersionPayload["changeMessage"]
+}
+
+export type ComponentsCreateVersionOutput = {
+  id: string
+  componentId: string
+  data: unknown
+  changeMessage: string | null
+  userId: string
+  createdAt: string
+  message: string
+}
+
+export type ComponentsRestoreVersionInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly versionId?: ComponentsRestoreVersionPayload["versionId"]
+}
+
+export type ComponentsRestoreVersionOutput = {
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  type: string | null
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  projectId: string
+  message: string
+}
+
+export type ComponentsGetVersionInput = {
+  readonly id: { readonly id: string; readonly versionId: string }["id"]
+  readonly versionId: { readonly id: string; readonly versionId: string }["versionId"]
+}
+
+export type ComponentsGetVersionOutput = {
+  success: true
+  message: string
+  data: {
+    id: string
+    componentId: string
+    data: unknown
+    changeMessage: string | null
+    userId: string
+    createdAt: string
+    user: { name: string | null; email: string | null }
+  } | null
+}
+
+export type ComponentsListCommentsInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsListCommentsOutput = {
+  success: true
+  message: string
+  data: Array<{
+    id: string
+    componentId: string
+    content: string
+    userId: string
+    createdAt: string
+    updatedAt: string
+    user: { id: string; name: string | null; email: string | null; image: string | null }
+  }> | null
+}
+
+export type ComponentsAddCommentInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly content?: ComponentsAddCommentPayload["content"]
+}
+
+export type ComponentsAddCommentOutput = {
+  success: true
+  message: string
+  data: {
+    id: string
+    componentId: string
+    content: string
+    userId: string
+    createdAt: string
+    updatedAt: string
+    user: { id: string; name: string | null; email: string | null; image: string | null }
+  } | null
+}
+
+export type ComponentsEditCommentInput = {
+  readonly id: { readonly id: string; readonly commentId: string }["id"]
+  readonly commentId: { readonly id: string; readonly commentId: string }["commentId"]
+  readonly content?: ComponentsEditCommentPayload["content"]
+}
+
+export type ComponentsEditCommentOutput = {
+  success: true
+  message: string
+  data: {
+    id: string
+    componentId: string
+    content: string
+    userId: string
+    createdAt: string
+    updatedAt: string
+    user: { id: string; name: string | null; email: string | null; image: string | null }
+  } | null
+}
+
+export type ComponentsRemoveCommentInput = {
+  readonly id: { readonly id: string; readonly commentId: string }["id"]
+  readonly commentId: { readonly id: string; readonly commentId: string }["commentId"]
+}
+
+export type ComponentsRemoveCommentOutput = { success: true; message: string; data: null | null }
 
 export type ToolpathsListInput = {
   readonly projectId?: {

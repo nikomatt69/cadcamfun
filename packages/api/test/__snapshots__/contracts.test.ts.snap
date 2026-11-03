@@ -25832,6 +25832,1376 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/components/{id}/comments": {
+      "get": {
+        "operationId": "components.listComments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "componentId": {
+                                "type": "string",
+                              },
+                              "content": {
+                                "type": "string",
+                              },
+                              "createdAt": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                              },
+                              "user": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "email": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                  },
+                                  "image": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "email",
+                                  "image",
+                                ],
+                                "type": "object",
+                              },
+                              "userId": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "componentId",
+                              "content",
+                              "userId",
+                              "createdAt",
+                              "updatedAt",
+                              "user",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "post": {
+        "operationId": "components.addComment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "componentId": {
+                              "type": "string",
+                            },
+                            "content": {
+                              "type": "string",
+                            },
+                            "createdAt": {
+                              "type": "string",
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                            },
+                            "user": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "id": {
+                                  "type": "string",
+                                },
+                                "image": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "name": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email",
+                                "image",
+                              ],
+                              "type": "object",
+                            },
+                            "userId": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "componentId",
+                            "content",
+                            "userId",
+                            "createdAt",
+                            "updatedAt",
+                            "user",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/comments/{commentId}": {
+      "delete": {
+        "operationId": "components.removeComment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "commentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "null",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "put": {
+        "operationId": "components.editComment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "commentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "componentId": {
+                              "type": "string",
+                            },
+                            "content": {
+                              "type": "string",
+                            },
+                            "createdAt": {
+                              "type": "string",
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                            },
+                            "user": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "id": {
+                                  "type": "string",
+                                },
+                                "image": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "name": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email",
+                                "image",
+                              ],
+                              "type": "object",
+                            },
+                            "userId": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "componentId",
+                            "content",
+                            "userId",
+                            "createdAt",
+                            "updatedAt",
+                            "user",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/versions": {
+      "get": {
+        "operationId": "components.listVersions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "changeMessage": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "componentId": {
+                        "type": "string",
+                      },
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "data": {},
+                      "id": {
+                        "type": "string",
+                      },
+                      "user": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "email",
+                        ],
+                        "type": "object",
+                      },
+                      "userId": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "componentId",
+                      "data",
+                      "changeMessage",
+                      "userId",
+                      "createdAt",
+                      "user",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "post": {
+        "operationId": "components.createVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "changeMessage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "data": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "changeMessage": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "componentId": {
+                      "type": "string",
+                    },
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "data": {},
+                    "id": {
+                      "type": "string",
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "userId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "componentId",
+                    "data",
+                    "changeMessage",
+                    "userId",
+                    "createdAt",
+                    "message",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/versions/restore": {
+      "post": {
+        "operationId": "components.restoreVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "versionId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "data": {},
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "isPublic": {
+                      "type": "boolean",
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "thumbnail": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "data",
+                    "thumbnail",
+                    "type",
+                    "isPublic",
+                    "createdAt",
+                    "updatedAt",
+                    "projectId",
+                    "message",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/versions/{versionId}": {
+      "get": {
+        "operationId": "components.getVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "changeMessage": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "componentId": {
+                              "type": "string",
+                            },
+                            "createdAt": {
+                              "type": "string",
+                            },
+                            "data": {},
+                            "id": {
+                              "type": "string",
+                            },
+                            "user": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "name": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "name",
+                                "email",
+                              ],
+                              "type": "object",
+                            },
+                            "userId": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "componentId",
+                            "data",
+                            "changeMessage",
+                            "userId",
+                            "createdAt",
+                            "user",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
     "/api/cron/update-expired-trials": {
       "get": {
         "operationId": "billing.cronGet",

@@ -84,8 +84,20 @@ import { LiveEvents } from "./services/live-events.ts"
 import { AssistantTurns } from "./services/assistant-turns.ts"
 import { MetricsRouteLive, httpMetrics } from "./observability.ts"
 
-/** Every group handler; add new route families here as they are implemented. */
-export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, PmiHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, CamSetupHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers, CloudHandlers)
+/**
+ * Route handlers by domain. A new route family goes into the domain it belongs to, and its group into
+ * `ServedApi` below; `Handlers` is only the union of the domains.
+ */
+const PlatformHandlers = Layer.mergeAll(HealthHandlers, SystemHandlers, EventsHandlers, MiscHandlers, KvHandlers, FilesHandlers, WorkspaceHandlers)
+const AccountHandlers = Layer.mergeAll(AuthHandlers, UserHandlers, OrganizationsHandlers, NotificationsHandlers, BillingHandlers, WaitlistHandlers)
+const ProjectHandlers = Layer.mergeAll(ProjectsHandlers, AnalyticsHandlers, ProductionCostsHandlers)
+const ResourceHandlers = Layer.mergeAll(MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, LibraryHandlers)
+const CadHandlers = Layer.mergeAll(DrawingsHandlers, PmiHandlers, ComponentsHandlers, CadExactHandlers)
+const CamHandlers = Layer.mergeAll(ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CamSetupHandlers, ProjectToolpathsHandlers)
+const IntegrationHandlers = Layer.mergeAll(PluginsHandlers, McpHandlers, AiHandlers, CompanionHandlers, VcsHandlers, CloudHandlers)
+
+/** Every group handler. */
+export const Handlers = Layer.mergeAll(PlatformHandlers, AccountHandlers, ProjectHandlers, ResourceHandlers, CadHandlers, CamHandlers, IntegrationHandlers)
 
 /**
  * The version-control services themselves. `LocalProfile` is provided here (not in `RepoServices`)
@@ -123,11 +135,7 @@ const VcsServices = Layer.mergeAll(WorkflowServiceStepsLive, VcsBackfill).pipe(
   Layer.provideMerge(NotificationService.layer),
 )
 
-/**
- * Repositories + services the handlers depend on (needs `Database`). `NotificationService` and
- * `LocalProfile` are absent on purpose: `VcsServices` provides them, because `WorkflowRunner` and the
- * steps it registers need them, and a service provided twice would be built twice.
- */
+/** Cloud project sync: the hosted-sync service on top of its repository, connection and HTTP client. */
 const CloudServices = CloudSync.layer.pipe(
   Layer.provideMerge(CloudProjectRepo.layer),
   Layer.provideMerge(CloudConnections.layer),
@@ -135,7 +143,28 @@ const CloudServices = CloudSync.layer.pipe(
   Layer.provideMerge(StorageService.layer),
 )
 
-const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer)), FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, AssistantTurns.layer, Companion.layer.pipe(Layer.provide(Layer.mergeAll(KvStore.layer, AuthTokens.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer))))), CloudServices)
+/** One identity service for the whole app: it is built once, however many layers need it. */
+const IdentityLive = Identity.layer.pipe(Layer.provide(AuthRepo.layer))
+
+const AccountServices = Layer.mergeAll(AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, IdentityLive, UserRepo.layer, OrganizationRepo.layer, NotificationRepo.layer, BillingRepo.layer, PaymentProvider.layer)
+const ProjectServices = Layer.mergeAll(ProjectRepo.layer, AnalyticsRepo.layer, ProductionCostRepo.layer, CostService.layer)
+const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer)
+const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
+const PlatformServices = Layer.mergeAll(StorageService.layer, FileRepo.layer, MiscRepo.layer, KvStore.layer, LiveEvents.layer, AssistantTurns.layer)
+const IntegrationServices = Layer.mergeAll(
+  PluginRegistryRepo.layer,
+  McpRepo.layer,
+  Companion.layer.pipe(Layer.provide(Layer.mergeAll(KvStore.layer, AuthTokens.layer, IdentityLive))),
+  VcsServices,
+  CloudServices,
+)
+
+/**
+ * Repositories + services the handlers depend on (needs `Database`). `NotificationService` and
+ * `LocalProfile` are absent on purpose: `VcsServices` provides them, because `WorkflowRunner` and the
+ * steps it registers need them, and a service provided twice would be built twice.
+ */
+const RepoServices = Layer.mergeAll(AccountServices, ProjectServices, ResourceServices, CadServices, PlatformServices, IntegrationServices)
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
 export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(Layer.provideMerge(RepoServices))))

@@ -1,4 +1,4 @@
-import type { ComponentDetail, ComponentRow } from "@cadcamfun/api"
+import type { ComponentCommentRow, ComponentDetail, ComponentRow, ComponentVersionDetail, ComponentVersionRow } from "@cadcamfun/api"
 import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, desc, eq, inArray, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
@@ -7,6 +7,12 @@ import { orgIdsOf } from "./access.ts"
 
 type Row = typeof schema.componentTable.$inferSelect
 export const toComponentRow = (c: Row): ComponentRow => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() })
+
+type VersionRecord = typeof schema.componentVersionTable.$inferSelect
+const toVersionRow = (v: VersionRecord): typeof ComponentVersionRow.Type => ({ ...v, createdAt: v.createdAt.toISOString() })
+type CommentRecord = typeof schema.componentCommentTable.$inferSelect
+type Author = { id: string; name: string | null; email: string | null; image: string | null }
+const toCommentRow = (c: CommentRecord, user: Author): typeof ComponentCommentRow.Type => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), user })
 
 export interface ComponentPatch {
   name?: string; description?: string | null; data?: unknown; type?: string | null; isPublic?: boolean; thumbnail?: string | null
@@ -21,6 +27,25 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown; type?: string | null | undefined; isPublic?: boolean | undefined }): Effect.Effect<ComponentRow, DatabaseError>
   update(id: string, patch: ComponentPatch): Effect.Effect<ComponentRow, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
+  /**
+   * The component when the user may use it: `read` also admits public components, `write` only the project owner and the
+   * members of its organisation.
+   */
+  access(userId: string, id: string, mode: "read" | "write"): Effect.Effect<ComponentRow | undefined, DatabaseError>
+  listVersions(componentId: string): Effect.Effect<Array<typeof ComponentVersionDetail.Type>, DatabaseError>
+  getVersion(componentId: string, versionId: string): Effect.Effect<typeof ComponentVersionDetail.Type | undefined, DatabaseError>
+  createVersion(componentId: string, userId: string, data: unknown, changeMessage: string): Effect.Effect<typeof ComponentVersionRow.Type, DatabaseError>
+  /**
+   * Restores a saved version in one transaction: the current data is first saved as a new version
+   * ("Auto-saved before version restore"), then the component takes the version's data. `undefined` when the version is not the component's.
+   */
+  restoreVersion(componentId: string, versionId: string, userId: string, normalize: (data: unknown) => unknown): Effect.Effect<ComponentRow | undefined, DatabaseError>
+  listComments(componentId: string): Effect.Effect<Array<typeof ComponentCommentRow.Type>, DatabaseError>
+  findComment(componentId: string, commentId: string): Effect.Effect<{ userId: string } | undefined, DatabaseError>
+  addComment(componentId: string, userId: string, content: string): Effect.Effect<typeof ComponentCommentRow.Type, DatabaseError>
+  editComment(commentId: string, content: string): Effect.Effect<typeof ComponentCommentRow.Type, DatabaseError>
+  removeComment(commentId: string): Effect.Effect<void, DatabaseError>
+  isProjectOwner(userId: string, componentId: string): Effect.Effect<boolean, DatabaseError>
   projectOrganization(projectId: string): Effect.Effect<string | null, DatabaseError>
   userName(userId: string): Effect.Effect<string | null, DatabaseError>
 }>()("cadcamfun/ComponentRepo") {
@@ -31,6 +56,9 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
       const events = yield* LiveEvents
       const T = schema.componentTable
       const P = schema.projectTable
+      const V = schema.componentVersionTable
+      const C = schema.componentCommentTable
+      const U = schema.userTable
       return ComponentRepo.of({
         find: (userId, id) =>
           query("components.find", async (db) => {
@@ -68,6 +96,75 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           const row = tx.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId, updatedAt: T.updatedAt }).get()
           return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
         })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
+        access: (userId, id, mode) =>
+          query("components.access", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
+            const member = or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)
+            const [hit] = await db.select({ c: T }).from(T).innerJoin(P, eq(T.projectId, P.id))
+              .where(and(eq(T.id, id), mode === "read" ? or(member, eq(T.isPublic, true)) : member)).limit(1)
+            return hit ? toComponentRow(hit.c) : undefined
+          }),
+        listVersions: (componentId) =>
+          query("components.listVersions", async (db) => {
+            const rows = await db.select({ v: V, user: { name: U.name, email: U.email } }).from(V).innerJoin(U, eq(V.userId, U.id))
+              .where(eq(V.componentId, componentId)).orderBy(desc(V.createdAt))
+            return rows.map((r) => ({ ...toVersionRow(r.v), user: r.user }))
+          }),
+        getVersion: (componentId, versionId) =>
+          query("components.getVersion", async (db) => {
+            const [r] = await db.select({ v: V, user: { name: U.name, email: U.email } }).from(V).innerJoin(U, eq(V.userId, U.id))
+              .where(and(eq(V.id, versionId), eq(V.componentId, componentId))).limit(1)
+            return r ? { ...toVersionRow(r.v), user: r.user } : undefined
+          }),
+        createVersion: (componentId, userId, data, changeMessage) =>
+          query("components.createVersion", (db) => commitMutation(db, "components.createVersion", (tx) => {
+            const row = tx.insert(V).values({ componentId, data, changeMessage, userId }).returning().get()
+            if (!row) throw new Error("Version was not created")
+            return { result: toVersionRow(row), resourceId: componentId, revision: row.createdAt.toISOString() }
+          })),
+        restoreVersion: (componentId, versionId, userId, normalize) =>
+          query("components.restoreVersion", (db) => commitMutation(db, "components.restoreVersion", (tx) => {
+            const version = tx.select().from(V).where(and(eq(V.id, versionId), eq(V.componentId, componentId))).get()
+            const previous = tx.select().from(T).where(eq(T.id, componentId)).get()
+            if (!version || !previous) return { result: undefined, resourceId: componentId, changed: false }
+            tx.insert(V).values({ componentId, data: previous.data, changeMessage: "Auto-saved before version restore", userId }).run()
+            const row = tx.update(T).set({ data: normalize(version.data), updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, componentId)).returning().get()
+            if (!row) throw new Error("Component disappeared during restore")
+            return { result: toComponentRow(row), resourceId: componentId, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+        listComments: (componentId) =>
+          query("components.listComments", async (db) => {
+            const rows = await db.select({ c: C, user: { id: U.id, name: U.name, email: U.email, image: U.image } }).from(C).innerJoin(U, eq(C.userId, U.id))
+              .where(eq(C.componentId, componentId)).orderBy(desc(C.createdAt))
+            return rows.map((r) => toCommentRow(r.c, r.user))
+          }),
+        findComment: (componentId, commentId) =>
+          query("components.findComment", async (db) =>
+            (await db.select({ userId: C.userId }).from(C).where(and(eq(C.id, commentId), eq(C.componentId, componentId))).limit(1))[0]),
+        addComment: (componentId, userId, content) =>
+          query("components.addComment", (db) => commitMutation(db, "components.addComment", (tx) => {
+            const row = tx.insert(C).values({ componentId, content, userId }).returning().get()
+            const user = row ? tx.select({ id: U.id, name: U.name, email: U.email, image: U.image }).from(U).where(eq(U.id, userId)).get() : undefined
+            if (!row || !user) throw new Error("Comment was not created")
+            return { result: toCommentRow(row, user), resourceId: row.id, revision: row.updatedAt.toISOString() }
+          })),
+        editComment: (commentId, content) =>
+          query("components.editComment", (db) => commitMutation(db, "components.editComment", (tx) => {
+            const previous = tx.select().from(C).where(eq(C.id, commentId)).get()
+            if (!previous) throw new Error("Comment no longer exists")
+            const row = tx.update(C).set({ content, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(C.id, commentId)).returning().get()
+            const user = row ? tx.select({ id: U.id, name: U.name, email: U.email, image: U.image }).from(U).where(eq(U.id, row.userId)).get() : undefined
+            if (!row || !user) throw new Error("Comment disappeared during update")
+            return { result: toCommentRow(row, user), resourceId: commentId, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+          })),
+        removeComment: (commentId) =>
+          query("components.removeComment", (db) => commitMutation(db, "components.removeComment", (tx) => {
+            const row = tx.delete(C).where(eq(C.id, commentId)).returning({ updatedAt: C.updatedAt }).get()
+            return { result: undefined, resourceId: commentId, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
+          })).pipe(Effect.asVoid),
+        isProjectOwner: (userId, componentId) =>
+          query("components.isProjectOwner", async (db) =>
+            (await db.select({ id: T.id }).from(T).innerJoin(P, eq(T.projectId, P.id)).where(and(eq(T.id, componentId), eq(P.ownerId, userId))).limit(1)).length > 0),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>
