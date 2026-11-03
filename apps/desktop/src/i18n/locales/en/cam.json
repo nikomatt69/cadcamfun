@@ -1394,5 +1394,9 @@
   "cam.kernel.model.geometry": "Model: the shape or placement of {count} element(s) changed.",
   "cam.kernel.model.topology": "Model: {count} element(s) added, removed or changed.",
   "cam.kernel.model.rigid": "Model: the whole part moved by X {x}, Y {y}, Z {z} mm. The program fits the part, not the work zero.",
-  "cam.kernel.model.inputs": "The model is the same; a setting changed: {settings}."
+  "cam.kernel.model.inputs": "The model is the same; a setting changed: {settings}.",
+  "cam.kernel.diff.same": "Same program as before: the NC is byte for byte identical.",
+  "cam.kernel.diff.summary": "Against the previous program: {added} operations added, {removed} removed, {changed} changed; cycle time {seconds} s; release {before} → {after}.",
+  "cam.kernel.diff.worse": "Claims that got worse: {claims}.",
+  "cam.kernel.diff.unsafe": "This program is not safe to take over without review: its release is lower or a claim got worse."
 }

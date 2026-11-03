@@ -1394,5 +1394,9 @@
   "cam.kernel.model.geometry": "Modèle : la forme ou la position de {count} élément(s) a changé.",
   "cam.kernel.model.topology": "Modèle : {count} élément(s) ajouté(s), supprimé(s) ou modifié(s).",
   "cam.kernel.model.rigid": "Modèle : toute la pièce a été déplacée de X {x}, Y {y}, Z {z} mm. Le programme convient à la pièce, pas au zéro pièce.",
-  "cam.kernel.model.inputs": "Le modèle est identique ; un réglage a changé : {settings}."
+  "cam.kernel.model.inputs": "Le modèle est identique ; un réglage a changé : {settings}.",
+  "cam.kernel.diff.same": "Même programme qu'avant : le NC est identique octet pour octet.",
+  "cam.kernel.diff.summary": "Par rapport au programme précédent : {added} opérations ajoutées, {removed} supprimées, {changed} modifiées ; temps de cycle {seconds} s ; validation {before} → {after}.",
+  "cam.kernel.diff.worse": "Vérifications dégradées : {claims}.",
+  "cam.kernel.diff.unsafe": "Ce programme ne doit pas être repris sans revue : sa validation est plus basse ou une vérification s'est dégradée."
 }

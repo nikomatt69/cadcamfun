@@ -1394,5 +1394,9 @@
   "cam.kernel.model.geometry": "Modello: la forma o la posizione di {count} elemento/i è cambiata.",
   "cam.kernel.model.topology": "Modello: {count} elemento/i aggiunto/i, rimosso/i o modificato/i.",
   "cam.kernel.model.rigid": "Modello: l'intero pezzo si è spostato di X {x}, Y {y}, Z {z} mm. Il programma è giusto per il pezzo, non per lo zero pezzo.",
-  "cam.kernel.model.inputs": "Il modello è lo stesso; è cambiata un'impostazione: {settings}."
+  "cam.kernel.model.inputs": "Il modello è lo stesso; è cambiata un'impostazione: {settings}.",
+  "cam.kernel.diff.same": "Stesso programma di prima: l'NC è identico byte per byte.",
+  "cam.kernel.diff.summary": "Rispetto al programma precedente: {added} operazioni aggiunte, {removed} rimosse, {changed} modificate; tempo ciclo {seconds} s; rilascio {before} → {after}.",
+  "cam.kernel.diff.worse": "Verifiche peggiorate: {claims}.",
+  "cam.kernel.diff.unsafe": "Questo programma non è sicuro da adottare senza revisione: il rilascio è più basso o una verifica è peggiorata."
 }

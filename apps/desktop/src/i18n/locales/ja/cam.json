@@ -1394,5 +1394,9 @@
   "cam.kernel.model.geometry": "モデル：{count}個の要素の形状または位置が変わりました。",
   "cam.kernel.model.topology": "モデル：{count}個の要素が追加、削除または変更されました。",
   "cam.kernel.model.rigid": "モデル：部品全体が X {x}、Y {y}、Z {z} mm 移動しました。プログラムは部品には合っていますが、ワーク原点には合いません。",
-  "cam.kernel.model.inputs": "モデルは同じです。設定が変わりました：{settings}。"
+  "cam.kernel.model.inputs": "モデルは同じです。設定が変わりました：{settings}。",
+  "cam.kernel.diff.same": "前回と同じプログラムです。NCはバイト単位で一致します。",
+  "cam.kernel.diff.summary": "前回のプログラムとの比較：操作の追加 {added}、削除 {removed}、変更 {changed}。サイクルタイム {seconds} 秒。リリース {before} → {after}。",
+  "cam.kernel.diff.worse": "悪化した検証：{claims}。",
+  "cam.kernel.diff.unsafe": "このプログラムは確認なしに採用できません。リリースレベルが下がったか、検証が悪化しています。"
 }

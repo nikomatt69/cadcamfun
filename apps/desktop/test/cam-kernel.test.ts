@@ -71,6 +71,17 @@ test("the additive kernel section runs through the real sidecar and fills the ex
     store.setGcode(`${store.gcode}\n; edited`)
     await app.wait(() => document.querySelector("[data-testid='kernel-stale']"))
     expect(useGeneratorStore.getState().isGenerating).toBe(false)
+    // Generating again says what changed against the program that was there (spec 59 A4). Back to the generated NC first.
+    store.setGcode(store.kernelArtifact!.nc)
+    await app.wait(() => !document.querySelector("[data-testid='kernel-stale']"))
+    button.click()
+    const same = await app.wait(() => document.querySelector("[data-testid='kernel-diff']"), 60_000)
+    expect(same.textContent).toContain("byte for byte")
+    useElementsStore.getState().updateElement("plate", { width: 33 } as never)
+    await app.wait(() => !button.disabled)
+    button.click()
+    await app.wait(() => document.querySelector("[data-testid='kernel-diff']")?.textContent?.includes("changed") ? true : null, 60_000)
+    expect(document.querySelector("[data-testid='kernel-diff']")?.textContent).toMatch(/operations added, \d+ removed, \d+ changed; cycle time [+-]\d+\.\d s; release/)
   } finally { view.dispose() }
 })
 

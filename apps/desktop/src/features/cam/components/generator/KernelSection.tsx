@@ -54,6 +54,8 @@ interface KernelApi {
   readonly request: () => ReturnType<typeof kernelRequestOf> | undefined
   readonly artifact: () => CamKernelArtifact | undefined
   readonly stale: () => boolean
+  /** What the last generation changed against the program that was there before it (spec 59 A4); undefined for the first one. */
+  readonly diff: () => ReturnType<typeof cam.kernel.programDiff> | undefined
   /** Why the model the program was made from differs from the drawing now (spec 59 A2); undefined when the program has no stored elements. */
   readonly modelChange: () => ReturnType<typeof cam.kernel.programStatus> | undefined
   readonly planNotes: () => ReadonlyArray<string>
@@ -96,6 +98,21 @@ const modelChangeText = (change: ReturnType<typeof cam.kernel.programStatus>): s
   }
 }
 
+/** The sentences for what a regeneration changed (spec 59 A4); none when there was no program before it. */
+const diffLines = (diff: ReturnType<typeof cam.kernel.programDiff> | undefined): ReadonlyArray<string> => {
+  if (diff === undefined) return []
+  if (diff.same || diff.nc.identical) return [t("cam.kernel.diff.same")]
+  const signed = (n: number): string => `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(1)}`
+  const lines = [t("cam.kernel.diff.summary", {
+    added: diff.operations.added.length, removed: diff.operations.removed.length, changed: diff.operations.changed.length,
+    seconds: signed(diff.cycleTimeSeconds.delta), before: diff.release.before, after: diff.release.after
+  })]
+  const worse = diff.claims.filter((c) => c.direction === "worse").map((c) => c.id)
+  if (worse.length > 0) lines.push(t("cam.kernel.diff.worse", { claims: worse.join(", ") }))
+  if (!diff.safe) lines.push(t("cam.kernel.diff.unsafe"))
+  return lines
+}
+
 export function KernelSession(props: { readonly onGCodeGenerated: (code: string) => void; readonly children: JSX.Element }): JSX.Element {
   const app = useApp()
   const job = useJob()
@@ -108,6 +125,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   const [result, setResult] = createSignal<CamKernelResult>()
   const [error, setError] = createSignal<string>()
   const [ownRun, setOwnRun] = createSignal(false)
+  const [diff, setDiff] = createSignal<ReturnType<typeof cam.kernel.programDiff>>()
   /** The machine configurations of the library: the machines the person configured, usable by the kernel. */
   const [savedMachines, setSavedMachines] = createSignal<ReadonlyArray<CamMachineConfig>>([])
   /** The machine the panel plans against: a saved configuration, else the preset id. */
@@ -270,6 +288,9 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
       const value = await app.runtime.run(api.manufacture(projectId == null ? input : { ...input, progress: { projectId, runId } }), { signal: signal.signal })
       if (disposed || signal.signal.aborted || !owner.current() || request()?.id !== input.id || store.gcode !== previousCode) return
       setResult(value)
+      // The program that was there before this run, compared with the one this run made (also a blocked one: the person sees what got worse).
+      const prior = store.kernelArtifact
+      setDiff(value.status === "ok" && prior !== undefined ? cam.kernel.programDiff(prior, value.value) : undefined)
       if (value.status !== "ok" || value.value.release === "blocked") return
       // Publish this exact program, retaining tool changes; old operation programs and verification belong to different NC.
       store.clearOperationResults()
@@ -289,7 +310,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
 
   return (
     <KernelContext.Provider value={{
-      settings, savedMachines, machineValue, linkPost, request, artifact, stale, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
+      settings, savedMachines, machineValue, linkPost, request, artifact, stale, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
       patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result
     }}>
       {props.children}
@@ -510,6 +531,11 @@ export function KernelRunControls(): JSX.Element {
         <div class="space-y-2 text-xs" data-testid="kernel-evidence">
           <div class="flex justify-between gap-3 font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
           <Show when={kernel.stale()}><p role="status" class="text-[color:var(--panel-warn)]" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
+          <Show when={diffLines(kernel.diff()).length > 0}>
+            <div class="panel-hint space-y-1" data-testid="kernel-diff">
+              <For each={diffLines(kernel.diff())}>{(line) => <p>{line}</p>}</For>
+            </div>
+          </Show>
           <Show when={kernel.stale() ? kernel.modelChange() : undefined}>{(change) => (
             <Show when={modelChangeText(change())}>{(text) => <p class="panel-hint" data-testid="kernel-model-change">{text()}</p>}</Show>
           )}</Show>

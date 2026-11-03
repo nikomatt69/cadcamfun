@@ -144,3 +144,7 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   returned, not yet applied to the stored request on accept (the person's operation list is not stored per feature), the signature is bounds-based (two similar holes swapped can pair wrongly; the
   confidence shows it), A7.
 
+- 2026-11-03 (build, A6 second part): the CAM page's kernel section compares each generation with the program that was there before it (`programDiff`, no API call: the diff is a pure
+  core function) and shows what changed (`data-testid="kernel-diff"`): "same program, byte for byte" or the operations added / removed / changed, the cycle-time delta and the release
+  change, the claims that got worse and a warning when the new program is not safe to take over. Four strings in 11 locales (machine-translated, not reviewed). Test: `apps/desktop/test/cam-kernel.test.ts`.
+  **Open:** a stale badge in the program list and on the toolpath detail screen; Regenerate / Review buttons on a stored program that call the preview and accept routes.

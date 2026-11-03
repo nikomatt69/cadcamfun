@@ -1394,5 +1394,9 @@
   "cam.kernel.model.geometry": "النموذج: تغيّر شكل أو موضع {count} عنصر.",
   "cam.kernel.model.topology": "النموذج: تمت إضافة أو إزالة أو تغيير {count} عنصر.",
   "cam.kernel.model.rigid": "النموذج: تحرّكت القطعة كلها بمقدار X {x} وY {y} وZ {z} مم. البرنامج يناسب القطعة لا نقطة الصفر.",
-  "cam.kernel.model.inputs": "النموذج لم يتغيّر؛ تغيّر إعداد: {settings}."
+  "cam.kernel.model.inputs": "النموذج لم يتغيّر؛ تغيّر إعداد: {settings}.",
+  "cam.kernel.diff.same": "البرنامج نفسه كما كان: NC مطابق بايتًا ببايت.",
+  "cam.kernel.diff.summary": "مقارنةً بالبرنامج السابق: أُضيفت {added} عمليات وأُزيلت {removed} وعُدّلت {changed}؛ زمن الدورة {seconds} ث؛ الإصدار {before} → {after}.",
+  "cam.kernel.diff.worse": "فحوصات ساءت: {claims}.",
+  "cam.kernel.diff.unsafe": "لا يُنصح باعتماد هذا البرنامج دون مراجعة: مستوى إصداره أدنى أو ساء أحد الفحوصات."
 }
