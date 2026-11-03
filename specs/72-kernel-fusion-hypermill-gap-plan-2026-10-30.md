@@ -420,3 +420,12 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `GET /api/toolpaths/:id/status` and as `modelChange` in the assistant's `cam review`. Open: regenerate with a diff, `matchOperations`, the desktop banner (spec 59 A3 to A7).
 - 2026-11-03 (step 4.1, second part): a regeneration is previewed with a diff before it is accepted (`programDiff`, `POST /api/toolpaths/:id/regenerate`, `cam regenerate`); see spec 59.
 
+- 2026-11-03 (P0-4 at NC level, plus a finding): `kernel/verify-nc-fault-injection.test.ts` seeds 30 overcuts of 0.2 to 1 mm (one side of one pass of a multi-pass contour moved toward the part) and 15 clean
+  programs: all 30 are found with the NC line inside the injected pass, all 15 clean programs verify (0 false negatives, 0 false positives on this set; declared error 0.1 mm lattice, an overcut of 0.02 mm is
+  not reported and the result says its threshold). This qualifies `verifyNc`, not whole kernel jobs: a fault set over `runJob` is still open.
+  **Finding (open, kernel accuracy):** `verifyNc` on the kernel's own program for a plain 40 x 30 x 8 plate (default 3D adaptive roughing + steep-and-shallow finishing with a 6 mm ball) reports a gouge in
+  the finishing pass, while the kernel's height-field `no-gouge` claim passes. The finishing passes along the walls sit 2.914 mm from a wall the 3 mm radius ball must stay 3 mm from, i.e. about 0.09 mm
+  into the wall (checked from the NC text, independent of the replay). Face and roughing replay clean. Cause not yet fixed: the 3D finishing path is computed on a sampled height field (spec 72 P2-2, cell
+  and slope limited), and the height-field replay cannot see a sliver cut into a vertical wall. Two consequences: the `no-gouge` text "beyond 0.030 mm (one cell of lateral slack)" is not a bound on this
+  strategy, and `Deviation.depth` is a ray length along the best of three axes, so a 0.3 mm overcut of a vertical wall can be reported as a depth of 2 mm (the verdict is right, the magnitude is not a normal
+  distance). Next step: run the tri-dexel replay for 3-axis surface finishing too, or compensate the wall passes by the sampling error.
