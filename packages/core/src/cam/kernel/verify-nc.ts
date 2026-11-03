@@ -77,7 +77,11 @@ export interface VerifyNcResult {
   /** Motions the interpreter produced, and how many of them cut. */
   readonly moves: number
   readonly feedMoves: number
+  /** `faults`: a gouge, a rapid through material or a travel violation was found; `incomplete`: nothing found but the replay did not see every move; `clean` otherwise. */
+  readonly verdict: "clean" | "faults" | "incomplete"
 }
+
+const FAULT_KINDS: ReadonlySet<NcFinding["kind"]> = new Set(["gouge", "rapid-in-stock", "travel"])
 
 export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   const tolerance = request.tolerance ?? 0.01
@@ -194,8 +198,10 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
     findings.push({ kind: "gouge", ...(line !== undefined ? { line } : {}), ...(at !== undefined ? { point: at } : {}), depth: verdict.gouge.depth, message: `The program cuts ${verdict.gouge.depth.toFixed(3)} mm below the part surface${line !== undefined ? `, first at NC line ${line}` : ""}, beyond the declared error of ${verdict.errorBound.toFixed(3)} mm` })
   }
   reasons.push(...verdict.reasons)
+  const complete = reasons.length === 0
   return {
-    complete: reasons.length === 0, reasons, findings, gouge: verdict.gouge, left: verdict.left, detached: verdict.detached,
-    cell: verdict.cell, errorBound: verdict.errorBound, threshold, moves: run.segments.length, feedMoves
+    complete, reasons, findings, gouge: verdict.gouge, left: verdict.left, detached: verdict.detached,
+    cell: verdict.cell, errorBound: verdict.errorBound, threshold, moves: run.segments.length, feedMoves,
+    verdict: findings.some((f) => FAULT_KINDS.has(f.kind)) ? "faults" : complete ? "clean" : "incomplete"
   }
 }

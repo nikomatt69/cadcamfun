@@ -25347,6 +25347,652 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/components": {
+      "get": {
+        "operationId": "components.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
+            "name": "public",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "data": {},
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "isPublic": {
+                        "type": "boolean",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "projectId": {
+                        "type": "string",
+                      },
+                      "thumbnail": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "data",
+                      "thumbnail",
+                      "type",
+                      "isPublic",
+                      "createdAt",
+                      "updatedAt",
+                      "projectId",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "post": {
+        "operationId": "components.create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "isPublic": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "thumbnail": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "type": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "data": {},
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "isPublic": {
+                      "type": "boolean",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "thumbnail": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "data",
+                    "thumbnail",
+                    "type",
+                    "isPublic",
+                    "createdAt",
+                    "updatedAt",
+                    "projectId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/export-import": {
+      "get": {
+        "operationId": "components.export",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                    },
+                    {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  ],
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {},
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "post": {
+        "operationId": "components.import",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {},
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {},
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
     "/api/components/{id}": {
       "delete": {
         "operationId": "components.remove",
@@ -26544,6 +27190,868 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/details": {
+      "get": {
+        "operationId": "components.details",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "canDelete": {
+                      "type": "boolean",
+                    },
+                    "canEdit": {
+                      "type": "boolean",
+                    },
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "data": {},
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "isPublic": {
+                      "type": "boolean",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "project": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "organization": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                },
+                                "name": {
+                                  "type": "string",
+                                },
+                                "users": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "role": {
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "role",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "users",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "owner": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "email": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "email",
+                          ],
+                          "type": "object",
+                        },
+                        "ownerId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "ownerId",
+                        "owner",
+                        "organization",
+                      ],
+                      "type": "object",
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "thumbnail": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                    "usageStats": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "usedInDrawings": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "usedInDrawings",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "data",
+                    "thumbnail",
+                    "type",
+                    "isPublic",
+                    "createdAt",
+                    "updatedAt",
+                    "projectId",
+                    "project",
+                    "usageStats",
+                    "canEdit",
+                    "canDelete",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/relationships": {
+      "get": {
+        "operationId": "components.relationships",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "relatedComponents": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "description": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                  },
+                                  "isPublic": {
+                                    "type": "boolean",
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                  },
+                                  "projectId": {
+                                    "type": "string",
+                                  },
+                                  "type": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "description",
+                                  "type",
+                                  "projectId",
+                                  "isPublic",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
+                            "relationships": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "sourceId": {
+                                    "type": "string",
+                                  },
+                                  "targetId": {
+                                    "type": "string",
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "references",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "sourceId",
+                                  "targetId",
+                                  "type",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "relatedComponents",
+                            "relationships",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+    },
+    "/api/components/{id}/storage": {
+      "delete": {
+        "operationId": "components.removeStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {},
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "get": {
+        "operationId": "components.readStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "signedUrl",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {},
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvInternalEncoded",
+                },
+              },
+            },
+            "description": "EnvInternal",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "components",
+        ],
+      },
+      "post": {
+        "operationId": "components.saveStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {},
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {},
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "message": {
+                      "type": "string",
+                    },
+                    "success": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvBadRequestEncoded",
+                },
+              },
+            },
+            "description": "EnvBadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvForbiddenEncoded",
+                },
+              },
+            },
+            "description": "EnvForbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvNotFoundEncoded",
+                },
+              },
+            },
+            "description": "EnvNotFound",
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvMethodNotAllowedEncoded",
+                },
+              },
+            },
+            "description": "EnvMethodNotAllowed",
           },
           "500": {
             "content": {
@@ -75572,6 +77080,642 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "issues",
                     "stats",
                     "preview",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "toolpathGenerator",
+        ],
+      },
+    },
+    "/api/toolpaths/verify-nc": {
+      "post": {
+        "operationId": "toolpathGenerator.verifyNc",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowance": {
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  "cell": {
+                    "exclusiveMinimum": 0,
+                    "type": "number",
+                  },
+                  "dwell": {
+                    "enum": [
+                      "seconds",
+                      "milliseconds",
+                    ],
+                    "type": "string",
+                  },
+                  "machine": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "fiveAxis": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "layout": {
+                            "enum": [
+                              "table-AC",
+                              "table-BC",
+                            ],
+                            "type": "string",
+                          },
+                          "pivot": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "layout",
+                          "pivot",
+                        ],
+                        "type": "object",
+                      },
+                      "travel": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "maxX": {
+                            "type": "number",
+                          },
+                          "maxY": {
+                            "type": "number",
+                          },
+                          "maxZ": {
+                            "type": "number",
+                          },
+                          "minX": {
+                            "type": "number",
+                          },
+                          "minY": {
+                            "type": "number",
+                          },
+                          "minZ": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "minX",
+                          "maxX",
+                          "minY",
+                          "maxY",
+                          "minZ",
+                          "maxZ",
+                        ],
+                        "type": "object",
+                      },
+                    },
+                    "type": "object",
+                  },
+                  "nc": {
+                    "maxLength": 40000000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "okuma": {
+                    "type": "boolean",
+                  },
+                  "part": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "indices": {
+                          "items": {
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          "maxItems": 3000000,
+                          "minItems": 3,
+                          "type": "array",
+                        },
+                        "positions": {
+                          "items": {
+                            "type": "number",
+                          },
+                          "maxItems": 3000000,
+                          "minItems": 9,
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "positions",
+                        "indices",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 64,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "start": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                      },
+                      "y": {
+                        "type": "number",
+                      },
+                      "z": {
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z",
+                    ],
+                    "type": "object",
+                  },
+                  "stock": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "max": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "x": {
+                            "type": "number",
+                          },
+                          "y": {
+                            "type": "number",
+                          },
+                          "z": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "z",
+                        ],
+                        "type": "object",
+                      },
+                      "min": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "x": {
+                            "type": "number",
+                          },
+                          "y": {
+                            "type": "number",
+                          },
+                          "z": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "z",
+                        ],
+                        "type": "object",
+                      },
+                    },
+                    "required": [
+                      "min",
+                      "max",
+                    ],
+                    "type": "object",
+                  },
+                  "tolerance": {
+                    "exclusiveMinimum": 0,
+                    "type": "number",
+                  },
+                  "tools": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "cutter": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "angle": {
+                              "type": "number",
+                            },
+                            "coating": {
+                              "enum": [
+                                "none",
+                                "tin",
+                                "ticn",
+                                "altin",
+                                "alcrn",
+                                "zrn",
+                                "dlc",
+                                "diamond",
+                              ],
+                              "type": "string",
+                            },
+                            "cornerRadius": {
+                              "type": "number",
+                            },
+                            "diameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "fluteLength": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "flutes": {
+                              "type": "integer",
+                            },
+                            "headHeight": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "holder": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "diameter": {
+                                  "exclusiveMinimum": 0,
+                                  "type": "number",
+                                },
+                                "length": {
+                                  "exclusiveMinimum": 0,
+                                  "type": "number",
+                                },
+                                "steps": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "diameter": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "length": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "diameter",
+                                      "length",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "maxItems": 16,
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "diameter",
+                                "length",
+                              ],
+                              "type": "object",
+                            },
+                            "id": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "kind": {
+                              "enum": [
+                                "flat",
+                                "ball",
+                                "bull",
+                                "chamfer",
+                                "spot",
+                                "drill",
+                                "facemill",
+                                "threadmill",
+                                "engraver",
+                                "tap",
+                                "reamer",
+                                "countersink",
+                                "boringbar",
+                                "tslot",
+                                "dovetail",
+                              ],
+                              "type": "string",
+                            },
+                            "material": {
+                              "enum": [
+                                "hss",
+                                "hss-co",
+                                "carbide",
+                                "pcd",
+                              ],
+                              "type": "string",
+                            },
+                            "maxRpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "name": {
+                              "type": "string",
+                            },
+                            "neckDiameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "number": {
+                              "type": "integer",
+                            },
+                            "pitch": {
+                              "type": "number",
+                            },
+                            "shankDiameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stickout": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "tipDiameter": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "kind",
+                            "diameter",
+                            "flutes",
+                            "material",
+                            "coating",
+                            "fluteLength",
+                            "shankDiameter",
+                            "stickout",
+                          ],
+                          "type": "object",
+                        },
+                        "number": {
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "number",
+                        "cutter",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 200,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                },
+                "required": [
+                  "nc",
+                  "part",
+                  "stock",
+                  "tools",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cell": {
+                      "type": "number",
+                    },
+                    "complete": {
+                      "type": "boolean",
+                    },
+                    "detached": {
+                      "type": "number",
+                    },
+                    "errorBound": {
+                      "type": "number",
+                    },
+                    "feedMoves": {
+                      "type": "integer",
+                    },
+                    "findings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "depth": {
+                            "type": "number",
+                          },
+                          "kind": {
+                            "enum": [
+                              "gouge",
+                              "rapid-in-stock",
+                              "travel",
+                              "unknown-tool",
+                              "unplaced",
+                              "interpreter",
+                            ],
+                            "type": "string",
+                          },
+                          "line": {
+                            "type": "integer",
+                          },
+                          "message": {
+                            "type": "string",
+                          },
+                          "point": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "message",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "gouge": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                            "z": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z",
+                          ],
+                          "type": "object",
+                        },
+                        "depth": {
+                          "type": "number",
+                        },
+                        "rays": {
+                          "type": "number",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "volume",
+                        "depth",
+                        "rays",
+                      ],
+                      "type": "object",
+                    },
+                    "left": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                            "z": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z",
+                          ],
+                          "type": "object",
+                        },
+                        "depth": {
+                          "type": "number",
+                        },
+                        "rays": {
+                          "type": "number",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "volume",
+                        "depth",
+                        "rays",
+                      ],
+                      "type": "object",
+                    },
+                    "moves": {
+                      "type": "integer",
+                    },
+                    "reasons": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "threshold": {
+                      "type": "number",
+                    },
+                    "verdict": {
+                      "enum": [
+                        "clean",
+                        "faults",
+                        "incomplete",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "complete",
+                    "reasons",
+                    "findings",
+                    "gouge",
+                    "left",
+                    "detached",
+                    "cell",
+                    "errorBound",
+                    "threshold",
+                    "moves",
+                    "feedMoves",
+                    "verdict",
                   ],
                   "type": "object",
                 },

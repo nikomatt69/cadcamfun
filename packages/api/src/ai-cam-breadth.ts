@@ -121,3 +121,60 @@ export const CamPostTestResult = Schema.Struct({
   })),
   basis: Schema.String
 })
+
+const vec3Input = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+const verifyNcMesh = Schema.Struct({
+  positions: Schema.Array(Schema.Finite).check(Schema.isMinLength(9), Schema.isMaxLength(600_000)),
+  indices: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))).check(Schema.isMinLength(3), Schema.isMaxLength(600_000))
+})
+
+/**
+ * `cam.verify_nc` (spec 72 step 0.6): NC the kernel did not write, replayed against the part and the stock on the tri-dexel model.
+ * The program is the text (`gcode`) or a saved operation; the part is inline (CAD elements or closed meshes, drawing coordinates);
+ * `origin` is the work zero in drawing coordinates, so the program, the stock and the part end up in one frame. Nothing is stored.
+ */
+export const CamVerifyNcActionInput = Schema.Struct({
+  gcode: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))),
+  operationId: Schema.optionalKey(Schema.NonEmptyString),
+  part: Schema.Struct({
+    elements: Schema.optionalKey(Schema.Array(Schema.Record(Schema.String, Schema.Unknown)).check(Schema.isMinLength(1), Schema.isMaxLength(500))),
+    meshes: Schema.optionalKey(Schema.Array(verifyNcMesh).check(Schema.isMinLength(1), Schema.isMaxLength(50)))
+  }).check(Schema.makeFilter((part) => (part.elements === undefined) !== (part.meshes === undefined), { message: "Send exactly one of elements or meshes" })),
+  /** Work zero in drawing coordinates (default 0, 0, 0). */
+  origin: Schema.optionalKey(vec3Input),
+  /** The stock block in the work frame, mm. */
+  stock: Schema.Struct({ minX: Schema.Finite, maxX: Schema.Finite, minY: Schema.Finite, maxY: Schema.Finite, minZ: Schema.Finite, maxZ: Schema.Finite }),
+  /** The cutter in the spindle for each tool number the program selects (T1 .. Tn). */
+  tools: Schema.Array(Schema.Struct({
+    number: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 999 })),
+    diameter: positive.check(Schema.isLessThanOrEqualTo(250)), flutes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 16 })),
+    kind: Schema.optionalKey(Schema.Literals(["flat", "ball", "bull", "drill", "chamfer", "spot"])), cornerRadius: Schema.optionalKey(positive), angle: Schema.optionalKey(positive),
+    fluteLength: Schema.optionalKey(positive), stickout: Schema.optionalKey(positive), shankDiameter: Schema.optionalKey(positive),
+    holderDiameter: Schema.optionalKey(positive), holderLength: Schema.optionalKey(positive)
+  })).check(Schema.isMinLength(1), Schema.isMaxLength(40)),
+  /** A machine preset id: its travel and rotary table are checked (see cam materials). */
+  machine: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(60))),
+  tolerance: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
+  allowance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
+  cell: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 0.02, maximum: 5 })))
+})
+export type CamVerifyNcActionInput = typeof CamVerifyNcActionInput.Type
+
+const deviation = Schema.Struct({ depthMm: Schema.Finite, volumeMm3: Schema.Finite, rays: Schema.Finite, at: Schema.optionalKey(vec3Input) })
+
+export const CamVerifyNcActionResult = Schema.Struct({
+  ok: Schema.Literal(true),
+  verdict: Schema.Literals(["clean", "faults", "incomplete"]),
+  complete: Schema.Boolean,
+  reasons: strings,
+  findings: Schema.Array(Schema.Struct({ kind: Schema.String, message: Schema.String, line: Schema.optionalKey(Schema.Int), point: Schema.optionalKey(vec3Input), depthMm: Schema.optionalKey(Schema.Finite) })),
+  gouge: deviation,
+  left: deviation,
+  errorBoundMm: Schema.Finite,
+  thresholdMm: Schema.Finite,
+  cellMm: Schema.Finite,
+  moves: Schema.Int,
+  feedMoves: Schema.Int,
+  warnings: strings,
+  basis: Schema.String
+})

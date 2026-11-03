@@ -12,7 +12,7 @@ import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import type { ActionEffect } from "./ai-actions.ts"
 import { CamTurningPlan } from "./ai-cam.ts"
-import { CamLatheResult, CamPostTestResult, CamProcessResult } from "./ai-cam-breadth.ts"
+import { CamLatheResult, CamPostTestResult, CamProcessResult, CamVerifyNcActionResult } from "./ai-cam-breadth.ts"
 import { ExportedFile } from "./ai-export.ts"
 
 // ---------------------------------------------------------------- shared shapes
@@ -411,6 +411,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam.lathe": read(CamLatheResult),
   "cam.process": read(CamProcessResult),
   "cam.post_test": read(CamPostTestResult),
+  "cam.verify_nc": read(CamVerifyNcActionResult),
   "cam.manufacture": read(manufactured),
   "cam.job": read(jobResult),
   "cam.chain_status": read(chainStatus),

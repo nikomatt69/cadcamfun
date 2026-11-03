@@ -58,4 +58,9 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
       kernelRun("cam-parse", { gcode: payload.gcode, name: payload.name ?? "Program" }, "Failed to parse G-code").pipe(
         Effect.map((analysis) => ({ warnings: analysis.warnings, stats: analysis.stats, program: analysis.program, motion: analysis.motion }))))
     .handle("verify", ({ payload }) => kernelRun("cam-verify", payload, "Failed to verify toolpath"))
+    .handle("verifyNc", ({ payload }) => Effect.gen(function*() {
+      const outcome = yield* kernelRun("cam-verify-nc", payload, "Failed to verify the NC program")
+      if ("error" in outcome) return yield* new BadRequest({ message: outcome.error })
+      return outcome
+    }))
 }))

@@ -12,6 +12,7 @@ import { editHistory } from "./parametric-edit.ts"
 import { cadScene } from "./cad-scene-job.ts"
 import { camJob } from "./cam-job.ts"
 import { camLathe } from "./cam-lathe.ts"
+import { camVerifyNc } from "./cam-verify-nc.ts"
 import { normalizeElement } from "./element-catalog.ts"
 import { groupIntoComponents } from "./component-grouping.ts"
 
@@ -201,6 +202,8 @@ export interface KernelJobs {
   readonly "cad-import-step": { readonly input: CadImportStepInput; readonly output: ReturnType<typeof cadImportStep> }
   /** A drawing sheet of a parametric part: the views, dimensions, section and the title block, as SVG and as entities. */
   readonly "cad-sheet": { readonly input: { readonly history: History; readonly options: drawing.SheetOptions }; readonly output: ReturnType<typeof drawing.generateSheet> }
+  /** NC the kernel did not write replayed against part, stock and tools (`cam-verify-nc.ts`); not cached: the input is the program. */
+  readonly "cam-verify-nc": { readonly input: Parameters<typeof camVerifyNc>[0]; readonly output: ReturnType<typeof camVerifyNc> }
   readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
 }
 
@@ -231,6 +234,7 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cam-generate": (request, report) => cam.generator.generateToolpath(cam.generator.decodeGenerateRequest(request), report === undefined ? {} : { onProgress: report }),
   "cam-parse": ({ gcode, name }) => cam.generator.analyseGcode(gcode, name),
   "cam-verify": (request) => cam.verify.verifyToolpath(request),
+  "cam-verify-nc": camVerifyNc,
   "cad-analyze": cadAnalyze,
   "cad-step": cadStep,
   "cad-setups": cadSetups,

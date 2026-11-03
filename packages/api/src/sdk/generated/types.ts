@@ -1113,6 +1113,16 @@ export type DrawingsCreateForProjectPayload = {
 
 export type PmiUpdatePayload = { readonly pmi: unknown; readonly baseUpdatedAt?: string | undefined }
 
+export type ComponentsCreatePayload = {
+  readonly name?: string | undefined
+  readonly description?: string | null | undefined
+  readonly data?: unknown | undefined
+  readonly type?: string | null | undefined
+  readonly isPublic?: boolean | undefined
+  readonly thumbnail?: string | null | undefined
+  readonly projectId?: string | undefined
+}
+
 export type ComponentsUpdatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -1790,6 +1800,78 @@ export type ToolpathGeneratorVerifyPayload = {
   }
   readonly resolution?: number
   readonly tolerance?: number
+  readonly start?: { readonly x: number; readonly y: number; readonly z: number }
+}
+
+export type ToolpathGeneratorVerifyNcPayload = {
+  readonly nc: string
+  readonly part: ReadonlyArray<{ readonly positions: ReadonlyArray<number>; readonly indices: ReadonlyArray<number> }>
+  readonly stock: {
+    readonly min: { readonly x: number; readonly y: number; readonly z: number }
+    readonly max: { readonly x: number; readonly y: number; readonly z: number }
+  }
+  readonly tools: ReadonlyArray<{
+    readonly number: number
+    readonly cutter: {
+      readonly id: string
+      readonly name: string
+      readonly kind:
+        | "flat"
+        | "ball"
+        | "bull"
+        | "chamfer"
+        | "spot"
+        | "drill"
+        | "facemill"
+        | "threadmill"
+        | "engraver"
+        | "tap"
+        | "reamer"
+        | "countersink"
+        | "boringbar"
+        | "tslot"
+        | "dovetail"
+      readonly diameter: number
+      readonly flutes: number
+      readonly material: "hss" | "hss-co" | "carbide" | "pcd"
+      readonly coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+      readonly cornerRadius?: number
+      readonly angle?: number
+      readonly tipDiameter?: number
+      readonly pitch?: number
+      readonly fluteLength: number
+      readonly shankDiameter: number
+      readonly stickout: number
+      readonly holder?: {
+        readonly diameter: number
+        readonly length: number
+        readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
+      }
+      readonly maxRpm?: number
+      readonly number?: number
+      readonly neckDiameter?: number
+      readonly headHeight?: number
+    }
+  }>
+  readonly tolerance?: number
+  readonly allowance?: number
+  readonly cell?: number
+  readonly machine?: {
+    readonly travel?: {
+      readonly minX: number
+      readonly maxX: number
+      readonly minY: number
+      readonly maxY: number
+      readonly minZ: number
+      readonly maxZ: number
+    }
+    readonly fiveAxis?: {
+      readonly layout: "table-AC" | "table-BC"
+      readonly pivot: { readonly x: number; readonly y: number; readonly z: number }
+    }
+  }
+  readonly dwell?: "seconds" | "milliseconds"
+  readonly okuma?: boolean
   readonly start?: { readonly x: number; readonly y: number; readonly z: number }
 }
 
@@ -6455,6 +6537,113 @@ export type PmiUpdateOutput = {
   issues: Array<{ annotationId?: string | undefined; code: string; message: string }>
 }
 
+export type ComponentsListInput = {
+  readonly projectId?: {
+    readonly projectId?: string | undefined
+    readonly type?: string | undefined
+    readonly search?: string | undefined
+    readonly public?: string | undefined
+  }["projectId"]
+  readonly type?: {
+    readonly projectId?: string | undefined
+    readonly type?: string | undefined
+    readonly search?: string | undefined
+    readonly public?: string | undefined
+  }["type"]
+  readonly search?: {
+    readonly projectId?: string | undefined
+    readonly type?: string | undefined
+    readonly search?: string | undefined
+    readonly public?: string | undefined
+  }["search"]
+  readonly public?: {
+    readonly projectId?: string | undefined
+    readonly type?: string | undefined
+    readonly search?: string | undefined
+    readonly public?: string | undefined
+  }["public"]
+}
+
+export type ComponentsListOutput = Array<{
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  type: string | null
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  projectId: string
+}>
+
+export type ComponentsCreateInput = {
+  readonly name?: ComponentsCreatePayload["name"]
+  readonly description?: ComponentsCreatePayload["description"]
+  readonly data?: ComponentsCreatePayload["data"]
+  readonly type?: ComponentsCreatePayload["type"]
+  readonly isPublic?: ComponentsCreatePayload["isPublic"]
+  readonly thumbnail?: ComponentsCreatePayload["thumbnail"]
+  readonly projectId?: ComponentsCreatePayload["projectId"]
+}
+
+export type ComponentsCreateOutput = {
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  type: string | null
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  projectId: string
+}
+
+export type ComponentsDetailsInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsDetailsOutput = {
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  type: string | null
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  projectId: string
+  project: {
+    id: string
+    name: string
+    description: string | null
+    ownerId: string
+    owner: { id: string; name: string | null; email: string | null }
+    organization: { id: string; name: string; users: Array<{ role: string }> } | null
+  }
+  usageStats: { usedInDrawings: number }
+  canEdit: boolean
+  canDelete: boolean
+}
+
+export type ComponentsRelationshipsInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsRelationshipsOutput = {
+  success: true
+  message: string
+  data: {
+    relatedComponents: Array<{
+      id: string
+      name: string
+      description: string | null
+      type: string | null
+      projectId: string
+      isPublic: boolean
+    }>
+    relationships: Array<{ sourceId: string; targetId: string; type: "references" }>
+  } | null
+}
+
 export type ComponentsGetInput = { readonly id: { readonly id: string }["id"] }
 
 export type ComponentsGetOutput = {
@@ -6536,6 +6725,38 @@ export type ComponentsCreateForProjectOutput = {
   updatedAt: string
   projectId: string
 }
+
+export type ComponentsSaveStorageInput = { readonly id: { readonly id: string }["id"]; readonly payload: unknown }
+
+export type ComponentsSaveStorageOutput = { success: true; message: string; data: unknown | null }
+
+export type ComponentsReadStorageInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly signedUrl?: { readonly signedUrl?: string | undefined }["signedUrl"]
+}
+
+export type ComponentsReadStorageOutput = { success: true; message: string; data: unknown | null }
+
+export type ComponentsRemoveStorageInput = { readonly id: { readonly id: string }["id"] }
+
+export type ComponentsRemoveStorageOutput = { success: true; message: string; data: unknown | null }
+
+export type ComponentsExportInput = {
+  readonly ids?: {
+    readonly ids?: string | ReadonlyArray<string> | undefined
+    readonly format?: string | undefined
+  }["ids"]
+  readonly format?: {
+    readonly ids?: string | ReadonlyArray<string> | undefined
+    readonly format?: string | undefined
+  }["format"]
+}
+
+export type ComponentsExportOutput = unknown
+
+export type ComponentsImportInput = { readonly payload: unknown }
+
+export type ComponentsImportOutput = { success: true; message: string; data: unknown | null }
 
 export type ComponentsListVersionsInput = { readonly id: { readonly id: string }["id"] }
 
@@ -7703,6 +7924,41 @@ export type ToolpathGeneratorVerifyOutput = {
     heights: Array<number>
     gouge: Array<number>
   }
+}
+
+export type ToolpathGeneratorVerifyNcInput = {
+  readonly nc: ToolpathGeneratorVerifyNcPayload["nc"]
+  readonly part: ToolpathGeneratorVerifyNcPayload["part"]
+  readonly stock: ToolpathGeneratorVerifyNcPayload["stock"]
+  readonly tools: ToolpathGeneratorVerifyNcPayload["tools"]
+  readonly tolerance?: ToolpathGeneratorVerifyNcPayload["tolerance"]
+  readonly allowance?: ToolpathGeneratorVerifyNcPayload["allowance"]
+  readonly cell?: ToolpathGeneratorVerifyNcPayload["cell"]
+  readonly machine?: ToolpathGeneratorVerifyNcPayload["machine"]
+  readonly dwell?: ToolpathGeneratorVerifyNcPayload["dwell"]
+  readonly okuma?: ToolpathGeneratorVerifyNcPayload["okuma"]
+  readonly start?: ToolpathGeneratorVerifyNcPayload["start"]
+}
+
+export type ToolpathGeneratorVerifyNcOutput = {
+  complete: boolean
+  reasons: Array<string>
+  findings: Array<{
+    kind: "gouge" | "rapid-in-stock" | "travel" | "unknown-tool" | "unplaced" | "interpreter"
+    message: string
+    line?: number
+    point?: { x: number; y: number; z: number }
+    depth?: number
+  }>
+  gouge: { volume: number; depth: number; rays: number; at?: { x: number; y: number; z: number } }
+  left: { volume: number; depth: number; rays: number; at?: { x: number; y: number; z: number } }
+  detached: number
+  cell: number
+  errorBound: number
+  threshold: number
+  moves: number
+  feedMoves: number
+  verdict: "clean" | "faults" | "incomplete"
 }
 
 export type CadExactAnalyzeInput = {
