@@ -282,13 +282,13 @@ export function ToolpathDetailScreen(): JSX.Element {
                         <Show when={editing() && draft()} fallback={
                           <div class="space-y-4">
                             <Show when={current().description}>
-                              <p class="whitespace-pre-wrap text-sm leading-6 text-[color:var(--ent-text-muted)]">{current().description}</p>
+                              <p class="whitespace-pre-wrap text-xs leading-5 text-[color:var(--ent-text-muted)]">{current().description}</p>
                             </Show>
                             <ToolpathProgramDetails row={current()} drawing={drawing()} />
                             <Show when={current().data && Object.keys(current().data as object).length > 0}>
                               <details class="border-t border-[color:var(--ent-line)] pt-3">
                                 <summary class="cursor-pointer text-xs font-semibold text-[color:var(--ent-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]">{t("pages.toolpath.settings")}</summary>
-                                <div class="mt-2 max-h-80 overflow-auto rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3"><pre class="font-mono text-[11px] text-[color:var(--ent-text)]">{JSON.stringify(current().data, null, 2)}</pre></div>
+                                <div class="mt-2 max-h-80 overflow-auto rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3"><pre class="font-mono text-[11px] text-[color:var(--ent-text)]">{JSON.stringify(current().data, null, 2)}</pre></div>
                               </details>
                             </Show>
                           </div>

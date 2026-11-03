@@ -21,46 +21,45 @@ export function FixedCycleEditor(props: { readonly line: string; readonly onAppl
   return (
     <Show when={result()?.isValid ? result() : undefined}>
       {(cycle) => (
-        <div class={`fixed-cycle-editor bg-white dark:bg-gray-800 dark:text-gray-200 p-4 rounded-md shadow-md border dark:border-gray-700 ${props.class ?? ""}`}>
-          <div class="fixed-cycle-header border-b pb-2 mb-3 dark:border-gray-600">
-            <h3 class="text-lg font-semibold dark:text-gray-100">{g.cycleTitle(cycle().type)}</h3>
-            <div class="fixed-cycle-gcode text-sm text-gray-500 dark:text-gray-400 font-mono mt-1">{cycle().gCode}</div>
+        <div class={`panel-group rounded-[5px] border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)] p-3 ${props.class ?? ""}`}>
+          <div class="grid gap-0.5">
+            <h3 class="m-0 text-xs font-semibold text-[color:var(--panel-text)]">{g.cycleTitle(cycle().type)}</h3>
+            <div class="panel-mono">{cycle().gCode}</div>
           </div>
-          <div class="fixed-cycle-params grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+          <div class="panel-grid panel-grid--2">
             <For each={g.cycleParameterFields(cycle().type)}>
               {(field) => (
-                <div class="param-field">
-                  <label for={`param-${field.name}`} class="block text-sm font-medium mb-1 dark:text-gray-300">
-                    {field.label}
-                    <Show when={field.required}><span class="required text-red-500 ml-1">*</span></Show>
+                <div class="panel-field">
+                  <label for={`param-${field.name}`} class="panel-label">
+                    <span>
+                      {field.label}
+                      <Show when={field.required}><span class="ml-1 text-[color:var(--panel-bad)]">*</span></Show>
+                    </span>
+                    <Show when={field.unit}><span class="panel-label__unit">{field.unit}</span></Show>
                   </label>
-                  <div class="param-input-group flex items-center">
-                    <NumberField
-                      id={`param-${field.name}`}
-                      deferred
-                      min={field.min}
-                      max={field.max}
-                      step={field.step || 1}
-                      value={params()[field.name] ?? field.defaultValue}
-                      onChange={(value) => change(field.name, value)}
-                      class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <Show when={field.unit}><span class="unit ml-2 text-sm text-gray-500 dark:text-gray-400">{field.unit}</span></Show>
-                  </div>
-                  <div class="param-description text-xs text-gray-500 mt-1 dark:text-gray-400">{field.description}</div>
+                  <NumberField
+                    id={`param-${field.name}`}
+                    deferred
+                    min={field.min}
+                    max={field.max}
+                    step={field.step || 1}
+                    value={params()[field.name] ?? field.defaultValue}
+                    onChange={(value) => change(field.name, value)}
+                    class="panel-input"
+                  />
+                  <p class="panel-hint">{field.description}</p>
                 </div>
               )}
             </For>
           </div>
           <Show when={props.onApply}>
-            <div class="fixed-cycle-actions mt-4 text-right">
-              <button
-                class="apply-button px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-gray-800"
-                onClick={() => props.onApply?.(g.generateFixedCycleGCode(cycle().type, params()))}
-              >
-                {t("cam.gen.fc.apply")}
-              </button>
-            </div>
+            <button
+              type="button"
+              class="panel-btn panel-btn--primary panel-btn--block"
+              onClick={() => props.onApply?.(g.generateFixedCycleGCode(cycle().type, params()))}
+            >
+              {t("cam.gen.fc.apply")}
+            </button>
           </Show>
         </div>
       )}
@@ -71,16 +70,16 @@ export function FixedCycleEditor(props: { readonly line: string; readonly onAppl
 /** "Detected Fixed Cycles (n)": one card per cycle with its position and depth (legacy `FixedCycleInfoPanel`). */
 function FixedCycleInfoPanel(props: { readonly cycles: ReadonlyArray<PanelCycle>; readonly onSelect: (index: number) => void }): JSX.Element {
   return (
-    <div class="fixed-cycles-info-panel">
-      <h3>Detected Fixed Cycles ({props.cycles.length})</h3>
-      <div class="cycles-list">
+    <div class="panel-group">
+      <h3 class="panel-group__title">Detected Fixed Cycles ({props.cycles.length})</h3>
+      <div class="grid gap-1">
         <For each={props.cycles}>
           {(cycle, index) => (
-            <div class="cycle-item" onClick={() => props.onSelect(index())}>
-              <div class="cycle-position">X: {cycle.x?.toFixed(2)}, Y: {cycle.y?.toFixed(2)}</div>
-              <div class="cycle-depth">Z: {cycle.z?.toFixed(2)} (R: {cycle.r?.toFixed(2)})</div>
-              <Show when={cycle.q}>{(q) => <div class="cycle-increment">Inc: {q().toFixed(2)}{t("cad.millimeters")}</div>}</Show>
-            </div>
+            <button type="button" class="grid gap-0.5 rounded-[4px] border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)] px-2 py-1.5 text-left text-[11px] tabular-nums text-[color:var(--panel-text)] hover:bg-[color:var(--panel-bg-subtle)]" onClick={() => props.onSelect(index())}>
+              <span>X: {cycle.x?.toFixed(2)}, Y: {cycle.y?.toFixed(2)}</span>
+              <span class="text-[color:var(--panel-text-muted)]">Z: {cycle.z?.toFixed(2)} (R: {cycle.r?.toFixed(2)})</span>
+              <Show when={cycle.q}>{(q) => <span class="text-[color:var(--panel-text-muted)]">Inc: {q().toFixed(2)}{t("cad.millimeters")}</span>}</Show>
+            </button>
           )}
         </For>
       </div>
@@ -123,13 +122,11 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
   }
 
   return (
-    <div data-testid="fixed-cycles-section">
-      <div class="toolpath-generator-integration">
-        <div class="fixed-cycles-actions">
-          <h3>{t("cam.ribbon.cycles")}</h3>
-          <div class="cycle-buttons">
-            <button onClick={fromSelection} disabled={job.selection().length === 0}>{t("cam.gen.fc.generate")}</button>
-          </div>
+    <div class="grid gap-3" data-testid="fixed-cycles-section">
+      <div class="panel-group">
+        <div class="panel-row">
+          <h3 class="panel-group__title">{t("cam.ribbon.cycles")}</h3>
+          <button type="button" class="panel-btn" onClick={fromSelection} disabled={job.selection().length === 0}>{t("cam.gen.fc.generate")}</button>
         </div>
         <Show when={cycles().length > 0}>
           <FixedCycleInfoPanel cycles={cycles()} onSelect={selectCycle} />
@@ -140,14 +137,12 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
       </div>
 
       <Show when={gen.detectedCycles.length > 0}>
-        <div class="mt-4 p-3 bg-blue-50 rounded-md">
-          <h4 class="text-sm font-medium text-blue-800 mb-2">Detected Fixed Cycles ({gen.detectedCycles.length})</h4>
-          <div class="space-y-2">
+        <div class="panel-group">
+          <h4 class="panel-group__title">Detected Fixed Cycles ({gen.detectedCycles.length})</h4>
+          <div class="grid gap-1">
             <For each={gen.detectedCycles}>
               {(cycle) => (
-                <div class="p-2 bg-white rounded border border-blue-200 cursor-pointer hover:bg-blue-50" onClick={() => gen.setSelectedCycle(cycle)}>
-                  <div class="text-xs font-mono">{cycle.gcode}</div>
-                </div>
+                <button type="button" class="rounded-[4px] border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)] px-2 py-1.5 text-left font-mono text-[11px] text-[color:var(--panel-text)] hover:bg-[color:var(--panel-bg-subtle)]" onClick={() => gen.setSelectedCycle(cycle)}>{cycle.gcode}</button>
               )}
             </For>
           </div>
@@ -156,17 +151,17 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
 
       <Show when={gen.selectedCycle}>
         {(cycle) => (
-          <div class="mt-4">
-            <h4 class="text-sm font-medium text-gray-800 mb-2">{t("cam.gen.fc.modify")}</h4>
+          <div class="panel-group">
+            <h4 class="panel-group__title">{t("cam.gen.fc.modify")}</h4>
             <FixedCycleEditor line={cycle().gcode} onApply={apply} />
           </div>
         )}
       </Show>
 
-      <div class="mb-4 flex justify-between">
+      <div class="panel-row">
         <button
           type="button"
-          class="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="panel-btn panel-btn--primary"
           onClick={() => {
             const element = job.element()
             if (!element) { gen.flashError(t("cam.cycles.selectFirst")); return }
@@ -178,7 +173,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
         <Show when={gen.detectedCycles.length > 0}>
           <button
             type="button"
-            class="px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            class="panel-btn"
             onClick={() => {
               const next = g.removeFixedCycles(source())
               gen.setResult(next, [])

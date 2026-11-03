@@ -77,7 +77,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     aria-pressed={cad.gridVisible}
                     onClick={() => cad.toggleGrid()}
                   >
-                    <Grid size={16} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                    <Grid size={16} class={cad.gridVisible ? "text-[color:var(--panel-accent)]" : "text-[color:var(--panel-text-muted)]"} />
                   </button>
                   <button
                     type="button"
@@ -87,7 +87,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     aria-pressed={cad.axisVisible}
                     onClick={() => cad.toggleAxis()}
                   >
-                    <Show when={cad.axisVisible} fallback={<EyeOff size={16} class="text-gray-600 dark:text-gray-400" />}><Eye size={16} class="text-blue-600 dark:text-blue-400" /></Show>
+                    <Show when={cad.axisVisible} fallback={<EyeOff size={16} class="text-[color:var(--panel-text-muted)]" />}><Eye size={16} class="text-[color:var(--panel-accent)]" /></Show>
                   </button>
                   <button
                     type="button"
@@ -97,7 +97,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     aria-pressed={cad.viewMode === "3d"}
                     onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}
                   >
-                    <Box size={16} class={cad.viewMode === "3d" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                    <Box size={16} class={cad.viewMode === "3d" ? "text-[color:var(--panel-accent)]" : "text-[color:var(--panel-text-muted)]"} />
                   </button>
                 </div>
               </Show>

@@ -36,7 +36,7 @@ export function OriginSection(): JSX.Element {
             <div class="panel-field"><label class="panel-label">{t("cam.gen.or.plateDepth")}</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
           </div>
           <CheckRow id="center-on-bed" checked={gen.settings.centerOnBed} onChange={(checked) => gen.updateSettings("centerOnBed", checked)}>{t("cam.gen.or.centrePart")}</CheckRow>
-          <p class="text-xs text-gray-500">{t("cam.gen.or.plateNote")}</p>
+          <p class="panel-hint">{t("cam.gen.or.plateNote")}</p>
         </Match>
         <Match when={gen.settings.machineType === "mill"}>
       <div>
@@ -44,7 +44,7 @@ export function OriginSection(): JSX.Element {
         <select class={FIELD} aria-label={t("cam.status.wcsTitle")} data-testid="origin-work-offset" value={gen.settings.workOffset} onChange={(event) => gen.updateSettings("workOffset", event.currentTarget.value as typeof gen.settings.workOffset)}>
           <For each={cam.ORIGINS.mill.offsets ?? []}>{(offset) => <option value={offset}>{offset}{offset === "G54" ? " (default)" : ""}</option>}</For>
         </select>
-        <p class="text-xs text-gray-500 mt-1">{t("cam.gen.or.originNote")}</p>
+        <p class="panel-hint mt-1">{t("cam.gen.or.originNote")}</p>
       </div>
       <div>
         <label class="panel-label">{t("cam.gen.or.originType")}</label>
@@ -88,7 +88,7 @@ function MachineZero(props: { readonly setting: "latheZero" | "bedOrigin"; reado
       <select class={FIELD} aria-label={props.label} value={current()} onChange={(event) => gen.updateSettings(props.setting, event.currentTarget.value as never)}>
         <For each={options().choices}>{(choice) => <option value={choice.value}>{choice.label}</option>}</For>
       </select>
-      <p class="text-xs text-gray-500 mt-1">{options().choices.find((choice) => choice.value === current())?.meaning}</p>
+      <p class="panel-hint mt-1">{options().choices.find((choice) => choice.value === current())?.meaning}</p>
     </div>
   )
 }

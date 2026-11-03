@@ -7,7 +7,7 @@ import { useJob } from "../../hooks/useJob.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
-import { CheckRow, INPUT, LABEL, Section } from "./ui.tsx"
+import { CheckRow, Group, INPUT, LABEL, Section } from "./ui.tsx"
 
 /** The assistant is optional here (the panel also mounts without the AI provider, e.g. in tests). */
 const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
@@ -15,7 +15,7 @@ const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
 }
 
 function Spinner(props: { readonly class: string }): JSX.Element {
-  return <LoaderCircle class={props.class} size={16} aria-hidden="true" />
+  return <LoaderCircle class={props.class} size={14} aria-hidden="true" />
 }
 
 /**
@@ -57,7 +57,7 @@ export function AiSection(): JSX.Element {
       <CheckRow id="useAI" checked={gen.settings.useAI} onChange={(checked) => gen.updateSettings("useAI", checked)}>{t("cam.gen.ai.enable")}</CheckRow>
 
       <Show when={gen.settings.useAI}>
-        <div>
+        <div class="panel-field">
           <label class={LABEL}>{t("cam.gen.ai.complexity")}</label>
           <select class={INPUT} value={gen.settings.aiDifficulty} onChange={(event) => gen.updateSettings("aiDifficulty", event.currentTarget.value as ToolpathSettings["aiDifficulty"])}>
             <option value="simple">{t("cam.gen.ai.simple")}</option>
@@ -66,7 +66,7 @@ export function AiSection(): JSX.Element {
           </select>
         </div>
 
-        <div>
+        <div class="panel-field">
           <label class={LABEL}>{t("cam.ai.optimizeFor")}</label>
           <select class={INPUT} value={gen.settings.aiOptimize} onChange={(event) => gen.updateSettings("aiOptimize", event.currentTarget.value as ToolpathSettings["aiOptimize"])}>
             <option value="speed">{t("cam.timeline.speed")}</option>
@@ -75,30 +75,28 @@ export function AiSection(): JSX.Element {
           </select>
         </div>
 
-        <div class="p-3 bg-blue-50 rounded-md">
-          <h4 class="text-sm font-medium text-blue-800 mb-2">{t("cam.gen.ai.suggestions")}</h4>
+        <Group title={t("cam.gen.ai.suggestions")}>
           <Show
             when={!gen.isAIProcessing}
-            fallback={<div class="flex justify-center items-center py-4"><Spinner class="animate-spin h-4 w-4 text-blue-500 mr-2" /><span class="text-sm text-blue-600">{t("cam.gen.ai.analyzing")}</span></div>}
+            fallback={<div class="panel-row justify-start gap-2 py-2"><Spinner class="animate-spin" /><span>{t("cam.gen.ai.analyzing")}</span></div>}
           >
-            <Show when={gen.aiSuggestions.length > 0} fallback={<p class="text-sm text-blue-600">{t("cam.gen.ai.enableHint")}</p>}>
-              <ul class="space-y-2">
+            <Show when={gen.aiSuggestions.length > 0} fallback={<p class="panel-hint">{t("cam.gen.ai.enableHint")}</p>}>
+              <ul class="grid gap-1.5">
                 <For each={gen.aiSuggestions}>
                   {(suggestion) => (
-                    <li class="text-sm text-blue-700 flex items-start"><Cpu size={14} class="mt-0.5 mr-2 flex-shrink-0" /><span>{suggestion}</span></li>
+                    <li class="flex items-start gap-2 text-[11.5px] leading-4 text-[color:var(--panel-text)]"><Cpu size={14} class="mt-px flex-none text-[color:var(--panel-text-muted)]" /><span>{suggestion}</span></li>
                   )}
                 </For>
               </ul>
             </Show>
           </Show>
-        </div>
+        </Group>
 
-        <div class="mt-2 p-3 bg-gray-50 rounded-md">
-          <h4 class="text-sm font-medium text-gray-700 mb-2">{t("cam.gen.ai.ask")}</h4>
+        <Group title={t("cam.gen.ai.ask")}>
           <div class="relative">
             <input
               type="text"
-              class="w-full p-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              class={`${INPUT} pr-8`}
               placeholder={t("cam.ai.askPlaceholder")}
               onKeyDown={(event) => {
                 const input = event.currentTarget
@@ -107,14 +105,14 @@ export function AiSection(): JSX.Element {
             />
             <button
               type="button"
-              class="absolute right-1 top-1 flex-none rounded-md p-1.5 text-blue-600 hover:bg-gray-100"
+              class="panel-icon-btn absolute right-0.5 top-0.5 h-6 w-6"
               aria-label={t("cam.ai.send")}
               onClick={() => gen.addAiSuggestion(t("cam.ai.replyNoAI", { material: gen.settings.material }) + t("cam.ai.replyTry"))}
             >
-              <MessageCircle size={16} aria-hidden="true" />
+              <MessageCircle size={14} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </Group>
       </Show>
     </Section>
   )

@@ -25,8 +25,8 @@
 }
 .vp3-root .cam-mini-player button { border-radius: 6px; transition: background-color 120ms ease-out, color 120ms ease-out; }
 .vp3-root .cam-mini-player button:hover:not(:disabled) { background: #2a2a2a; color: #fff; }
-.vp3-root .cam-mini-player .cam-mini-player__toggle { color: #93c5fd; }
-.vp3-root .cam-mini-player .cam-mini-player__run[aria-pressed="true"] { color: #4ade80; background: #ffffff14; }
+.vp3-root .cam-mini-player .cam-mini-player__toggle { color: #e5e5e5; }
+.vp3-root .cam-mini-player .cam-mini-player__run[aria-pressed="true"] { color: #fff; background: #ffffff1f; }
 .cam-mini-player input[type=range] {
   appearance: none;
   -webkit-appearance: none;

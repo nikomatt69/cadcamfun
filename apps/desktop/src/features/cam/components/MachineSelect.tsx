@@ -116,11 +116,11 @@ export default function MachineSelect(): JSX.Element {
 
         <Show when={error() === undefined} fallback={
           <div class="space-y-2">
-            <p class="text-xs text-red-600 dark:text-red-400" role="alert" title={error()}>{t("cam.machine.error")}</p>
-            <button type="button" class="text-xs text-blue-600 dark:text-blue-400" onClick={() => void load()}>{t("cam.machine.retry")}</button>
+            <p class="text-xs text-[color:var(--panel-bad)]" role="alert" title={error()}>{t("cam.machine.error")}</p>
+            <button type="button" class="text-xs text-[color:var(--panel-accent)] hover:underline" onClick={() => void load()}>{t("cam.machine.retry")}</button>
           </div>
         }>
-          <Show when={!loading()} fallback={<p class="text-xs text-gray-500 dark:text-gray-400" role="status">{t("cam.machine.loading")}</p>}>
+          <Show when={!loading()} fallback={<p class="text-[11px] text-[color:var(--panel-text-muted)]" role="status">{t("cam.machine.loading")}</p>}>
             <div class="sidebar-machine-list" role="listbox" aria-label={t("cam.machine.pick")}>
               <button
                 type="button"
@@ -130,16 +130,16 @@ export default function MachineSelect(): JSX.Element {
                 onClick={() => select(undefined)}
               >
                 <span class="mt-0.5 h-4 w-4 flex-shrink-0">
-                  <Show when={selected() === undefined}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
+                  <Show when={selected() === undefined}><Check size={16} class="text-[color:var(--panel-accent)]" aria-hidden="true" /></Show>
                 </span>
                 <span class="min-w-0">
-                  <span class="block text-sm font-medium text-gray-800 dark:text-gray-100">{t("cam.machine.auto")}</span>
-                  <span class="block text-xs text-gray-500 dark:text-gray-400">{t("cam.machine.autoHint")}</span>
+                  <span class="block text-xs font-medium text-[color:var(--panel-text)]">{t("cam.machine.auto")}</span>
+                  <span class="block text-[11px] text-[color:var(--panel-text-muted)]">{t("cam.machine.autoHint")}</span>
                 </span>
               </button>
 
               <Show when={defaults().length > 0}>
-                <p class="px-1 pt-2 text-[11px] font-semibold text-gray-500 dark:text-gray-500">{t("cam.machine.builtin")}</p>
+                <p class="px-1 pt-2 text-[11px] font-semibold text-[color:var(--panel-text-muted)]">{t("cam.machine.builtin")}</p>
                 <For each={defaults()}>{(machine) => (
                   <button
                     type="button"
@@ -150,12 +150,12 @@ export default function MachineSelect(): JSX.Element {
                     onClick={() => select(selected()?.id === machine.id ? undefined : machine)}
                   >
                     <span class="mt-0.5 h-4 w-4 flex-shrink-0">
-                      <Show when={selected()?.id === machine.id}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
+                      <Show when={selected()?.id === machine.id}><Check size={16} class="text-[color:var(--panel-accent)]" aria-hidden="true" /></Show>
                     </span>
                     <span class="min-w-0">
                       <span class="sidebar-choice__title">{machine.name}</span>
                       <span class="panel-badge">{machineTypeLabel(machine)}</span>
-                      <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{line}</span>}</For>
+                      <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-[11px] text-[color:var(--panel-text-muted)]">{line}</span>}</For>
                     </span>
                   </button>
                 )}</For>
@@ -171,12 +171,12 @@ export default function MachineSelect(): JSX.Element {
                   onClick={() => select(selected()?.id === machine.id ? undefined : machine)}
                 >
                   <span class="mt-0.5 h-4 w-4 flex-shrink-0">
-                    <Show when={selected()?.id === machine.id}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
+                    <Show when={selected()?.id === machine.id}><Check size={16} class="text-[color:var(--panel-accent)]" aria-hidden="true" /></Show>
                   </span>
                   <span class="min-w-0">
                     <span class="sidebar-choice__title">{machine.name}</span>
                     <span class="panel-badge">{machineTypeLabel(machine)}</span>
-                    <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{line}</span>}</For>
+                    <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-[11px] text-[color:var(--panel-text-muted)]">{line}</span>}</For>
                   </span>
                 </button>
               )}</For>
@@ -184,15 +184,15 @@ export default function MachineSelect(): JSX.Element {
 
             <Show when={machines().length === 0}>
               <div class="panel-scene panel-scene--empty"><MachineScene /></div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-[11px] text-[color:var(--panel-text-muted)]">
                 {t("cam.machine.empty")}{" "}
-                <A href={MACHINES_PATH} class="text-blue-600 hover:underline dark:text-blue-400">{t("cam.machine.createInLibrary")}</A>
+                <A href={MACHINES_PATH} class="text-[color:var(--panel-accent)] hover:underline">{t("cam.machine.createInLibrary")}</A>
               </p>
             </Show>
           </Show>
         </Show>
 
-        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("cam.machine.hint")}</p>
+        <p class="mt-3 text-[11px] text-[color:var(--panel-text-muted)]">{t("cam.machine.hint")}</p>
       </SidebarSection>
   )
 }

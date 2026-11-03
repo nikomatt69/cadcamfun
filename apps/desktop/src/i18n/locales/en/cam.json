@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "Parallel (raster)",
   "cam.gen.adv.toolComp": "Tool Compensation",
   "cam.gen.adv.useToolComp": "Use tool compensation in G-code (G41/G42)",
+  "cam.gen.adv.toolCompNote": "The tool radius compensation (cutter compensation) will be inserted directly in the G-code. The direction will be determined automatically from the offset and cutting direction settings.",
+  "cam.gen.adv.advancedNote": "The advanced settings allow for more precise control of the toolpath, but may require manual adjustment for optimal results. The advanced features depend on the type of numerical control used.",
   "cam.gen.lathe.params": "Lathe Parameters",
   "cam.gen.lathe.stockDia": "Stock Diameter (mm)",
   "cam.gen.lathe.stockLength": "Stock Length (mm)",

@@ -43,15 +43,15 @@ export default function OperationsList(props: OperationsListProps): JSX.Element 
                   role="listitem"
                 >
                   <button type="button" class="min-w-0 flex-1 rounded-sm text-left" aria-pressed={props.selectedId === row.id} onClick={() => props.onSelect(row.id)}>
-                    <div class="text-sm font-medium truncate">{row.name}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
+                    <div class="text-xs font-medium truncate">{row.name}</div>
+                    <div class="text-[11px] text-[color:var(--panel-text-muted)] truncate flex items-center gap-1.5">
                       <Show when={row.color}>{(color) => <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ "background-color": color() }} aria-hidden="true" />}</Show>
                       <span class="truncate">{row.toolId} · {t("cam.downloads", { count: row.moves })}</span>
                     </div>
                   </button>
                   <button
                     type="button"
-                    class="panel-icon-btn text-red-600"
+                    class="panel-icon-btn text-[color:var(--panel-bad)]"
                     title={t("cam.deleteToolpath")}
                     aria-label={`${t("cam.deleteToolpath")}: ${row.name}`}
                     onClick={(event: MouseEvent) => {

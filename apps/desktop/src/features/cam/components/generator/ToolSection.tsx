@@ -4,7 +4,7 @@ import { predefinedTools } from "../../../cad/lib/predefinedLibraries.ts"
 import { useRead } from "../../../../app/queries.ts"
 import { useGeneratorStore, type LibraryTool, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
-import { CHECKBOX, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { CheckRow, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
 import { cam } from "@cadcamfun/core"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
 import { previewToolModel } from "../../lib/machine-view.ts"
@@ -80,44 +80,44 @@ export function ToolSection(): JSX.Element {
   }
   return (
     <Section id="tool" icon={Wrench} title={t("cam.toolLabel")} testId="tool-section">
-      <div>
+      <div class="panel-field">
         <label class={LABEL}>{t("cam.gen.tool.type")}</label>
         <select class={INPUT} value={gen.settings.toolType} onChange={select} data-testid="tool-type">
           <For each={offered()}>{([value, label]) => <option value={value}>{label}</option>}</For>
         </select>
         <Show when={issues().length > 0}>
           <ul class="mt-1 space-y-1" data-testid="tool-operation-issues">
-            <For each={issues()}>{(issue) => <li class={`text-xs rounded px-2 py-1 ${issue.severity === "error" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{issue.message}</li>}</For>
+            <For each={issues()}>{(issue) => <li class={`rounded-[4px] px-2 py-1 text-[11px] ${issue.severity === "error" ? "bg-[color:var(--panel-bad-soft)] text-[color:var(--panel-bad)]" : "bg-[color:var(--panel-warn-soft)] text-[color:var(--panel-warn)]"}`}>{issue.message}</li>}</For>
           </ul>
         </Show>
       </div>
 
-      <div class="p-3 bg-gray-50 rounded-md">
+      <div class="rounded-[5px] border border-[color:var(--panel-border)] bg-[color:var(--panel-bg-subtle)] p-3">
         <div class="flex justify-between items-start gap-3">
-          <h4 class="text-sm font-medium text-gray-700 mb-2">{toolTitle(machine(), gen.settings.toolType)}</h4>
-          <div class="flex-none text-xs text-gray-500">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
+          <h4 class="mb-2 text-xs font-semibold text-[color:var(--panel-text)]">{toolTitle(machine(), gen.settings.toolType)}</h4>
+          <div class="flex-none text-[11px] text-[color:var(--panel-text-muted)]">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
         </div>
         <div class="flex items-center">
-          <div class="w-20 h-20 mr-4 flex-none bg-white rounded-md border border-gray-200 flex items-center justify-center">
+          <div class="w-20 h-20 mr-4 flex-none bg-[color:var(--panel-bg)] rounded-[5px] border border-[color:var(--panel-border)] flex items-center justify-center">
             <Show when={gen.settings.machineType === "mill"} fallback={<ToolSketch />}>
               <ToolSilhouette cutter={cam.kernel.settingsCutter(gen.settings)} height={76} />
             </Show>
           </div>
           <div class="flex-1">
-            <table class="w-full text-xs">
+            <table class="w-full text-[11px]">
               <tbody>
                 <Show when={machine() !== "3dprinter"} fallback={
                   <>
-                    <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.nozzleDia")}</td><td class="py-1 text-gray-800">{gen.settings.nozzleDiameter} {t("cad.millimeters")}</td></tr>
-                    <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.filamentDia")}</td><td class="py-1 text-gray-800">{gen.settings.filamentDiameter} {t("cad.millimeters")}</td></tr>
+                    <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cam.gen.tool.nozzleDia")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.settings.nozzleDiameter} {t("cad.millimeters")}</td></tr>
+                    <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cam.gen.tool.filamentDia")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.settings.filamentDiameter} {t("cad.millimeters")}</td></tr>
                   </>
                 }>
-                  <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.diameter")}</td><td class="py-1 text-gray-800">{gen.settings.toolDiameter} {t("cad.millimeters")}</td></tr>
-                  <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.flutes")}</td><td class="py-1 text-gray-800">{gen.settings.flutes}</td></tr>
+                  <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cam.gen.tool.diameter")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.settings.toolDiameter} {t("cad.millimeters")}</td></tr>
+                  <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cam.gen.tool.flutes")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.settings.flutes}</td></tr>
                 </Show>
-                <tr><td class="py-1 text-gray-500">{t("cam.gen.tool.maxSpeed")}</td><td class="py-1 text-gray-800">{gen.settings.rpm} RPM</td></tr>
+                <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cam.gen.tool.maxSpeed")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.settings.rpm} RPM</td></tr>
                 <Show when={gen.selectedLibraryTool?.material}>
-                  <tr><td class="py-1 text-gray-500">{t("cad.explorer.material")}</td><td class="py-1 text-gray-800">{gen.selectedLibraryTool?.material}</td></tr>
+                  <tr><td class="py-1 text-[color:var(--panel-text-muted)]">{t("cad.explorer.material")}</td><td class="py-1 text-right tabular-nums text-[color:var(--panel-text)]">{gen.selectedLibraryTool?.material}</td></tr>
                 </Show>
               </tbody>
             </table>
@@ -126,27 +126,24 @@ export function ToolSection(): JSX.Element {
       </div>
 
       <Show when={machine() !== "3dprinter"}>
-        <div>
+        <div class="panel-field">
           <label class={LABEL}>{t("cam.gen.tool.diameterMm")}</label>
           <NumberField min="0.1" step="0.1" value={gen.settings.toolDiameter} onValue={(value) => gen.updateSettings("toolDiameter", value)} />
         </div>
         <Show when={machine() === "mill"}>
-          <div>
+          <div class="panel-field">
             <label class={LABEL}>{t("cam.gen.tool.fluteCount")}</label>
             <NumberField min="1" max="12" int value={gen.settings.flutes} onValue={(value) => gen.updateSettings("flutes", value)} />
           </div>
         </Show>
-        <div>
+        <div class="panel-field">
           <label class={LABEL}>{t("cam.gen.tool.rpm")}</label>
           <NumberField min="1000" step="500" int value={gen.settings.rpm} onValue={(value) => gen.updateSettings("rpm", value)} />
         </div>
-        <div class="flex items-center">
-          <input type="checkbox" id="coolant" class={CHECKBOX} checked={gen.settings.coolant} onChange={(event) => gen.updateSettings("coolant", event.currentTarget.checked)} />
-          <label for="coolant" class="ml-2 block text-sm text-gray-700">{t("cam.gen.tool.coolant")}</label>
-        </div>
+        <CheckRow id="coolant" checked={gen.settings.coolant} onChange={(checked) => gen.updateSettings("coolant", checked)}>{t("cam.gen.tool.coolant")}</CheckRow>
       </Show>
 
-      <div class="mt-2 flex flex-col pt-2 border-t border-gray-200">
+      <div class="panel-group">
         <label class={LABEL}>{t("cam.gen.tool.fromLibrary")}</label>
         <select class={INPUT} value={gen.selectedLibraryTool?.id || gen.selectedLibraryTool?.name || ""} onChange={(event) => pick(event.currentTarget.value)}>
           <option value="">{t("cam.gen.tool.selectOne")}</option>
@@ -161,9 +158,11 @@ export function ToolSection(): JSX.Element {
         </select>
       </div>
 
-      <div class="mt-2 flex justify-between items-center pt-2 border-t border-gray-200">
-        <span class="text-sm text-gray-600">{t("cam.tool.defaultLabel")}</span>
-        <button type="button" class="text-xs text-blue-600 hover:text-blue-800 flex items-center" onClick={upload}><Upload size={14} class="mr-1" /> {t("cam.tool.apply")}</button>
+      <div class="panel-group">
+        <div class="panel-row">
+          <span>{t("cam.tool.defaultLabel")}</span>
+          <button type="button" class="panel-btn" onClick={upload}><Upload size={14} />{t("cam.tool.apply")}</button>
+        </div>
       </div>
     </Section>
   )

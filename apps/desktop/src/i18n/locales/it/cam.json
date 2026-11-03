@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "Parallela (raster)",
   "cam.gen.adv.toolComp": "Compensazione utensile",
   "cam.gen.adv.useToolComp": "Usa la compensazione utensile nel G-code (G41/G42)",
+  "cam.gen.adv.toolCompNote": "La compensazione del raggio utensile verrà inserita direttamente nel G-code. La direzione viene determinata automaticamente dalle impostazioni di offset e di direzione di taglio.",
+  "cam.gen.adv.advancedNote": "Le impostazioni avanzate permettono un controllo più preciso del percorso utensile, ma possono richiedere regolazioni manuali per ottenere risultati ottimali. Le funzioni avanzate dipendono dal tipo di controllo numerico utilizzato.",
   "cam.gen.lathe.params": "Parametri del tornio",
   "cam.gen.lathe.stockDia": "Diametro del grezzo (mm)",
   "cam.gen.lathe.stockLength": "Lunghezza del grezzo (mm)",

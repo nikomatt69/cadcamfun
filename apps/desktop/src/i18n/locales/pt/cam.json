@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "Paralela (varredura)",
   "cam.gen.adv.toolComp": "Compensação da ferramenta",
   "cam.gen.adv.useToolComp": "Usar compensação de ferramenta no G-code (G41/G42)",
+  "cam.gen.adv.toolCompNote": "A compensação do raio da ferramenta será inserida diretamente no G-code. A direção é determinada automaticamente a partir das configurações de deslocamento e de direção de corte.",
+  "cam.gen.adv.advancedNote": "As configurações avançadas permitem um controle mais preciso da trajetória, mas podem exigir ajustes manuais para obter resultados ideais. Os recursos avançados dependem do tipo de comando numérico utilizado.",
   "cam.gen.lathe.params": "Parâmetros do torno",
   "cam.gen.lathe.stockDia": "Diâmetro do bruto (mm)",
   "cam.gen.lathe.stockLength": "Comprimento do bruto (mm)",

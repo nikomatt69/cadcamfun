@@ -51,21 +51,21 @@ export default function KernelSwarf(props: {
   const hint = (): string | undefined => !props.fiveAxis ? t("cam.swarf.needFiveAxis") : !props.planned ? t("cam.swarf.needPlan") : props.flatCutter === undefined ? t("cam.swarf.needCutter") : undefined
 
   return (
-    <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-swarf">
-      <summary class="cursor-pointer text-sm font-medium">{t("cam.swarf.title")}</summary>
+    <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-swarf">
+      <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.swarf.title")}</summary>
       <div class="space-y-2 pt-2">
-        <p class="text-xs text-gray-500">{t("cam.swarf.hint")}</p>
-        <button type="button" class="ui-btn ui-btn-secondary" disabled={busy() || props.elements === undefined || props.elements.length === 0} onClick={() => void run()} data-testid="kernel-swarf-run">
+        <p class="panel-hint">{t("cam.swarf.hint")}</p>
+        <button type="button" class="panel-btn" disabled={busy() || props.elements === undefined || props.elements.length === 0} onClick={() => void run()} data-testid="kernel-swarf-run">
           {busy() ? t("cam.swarf.running") : t("cam.swarf.run")}
         </button>
-        <Show when={error()}>{(message) => <p class="text-xs text-red-700 dark:text-red-300" role="alert" data-testid="kernel-swarf-error">{message()}</p>}</Show>
-        <Show when={hint()}>{(text) => <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="kernel-swarf-hint">{text()}</p>}</Show>
-        <Show when={asked() && walls().length === 0}><p class="text-xs text-gray-500" data-testid="kernel-swarf-none">{t("cam.swarf.none")}</p></Show>
+        <Show when={error()}>{(message) => <p class="text-xs text-[color:var(--panel-bad)]" role="alert" data-testid="kernel-swarf-error">{message()}</p>}</Show>
+        <Show when={hint()}>{(text) => <p class="text-xs text-[color:var(--panel-warn)]" data-testid="kernel-swarf-hint">{text()}</p>}</Show>
+        <Show when={asked() && walls().length === 0}><p class="panel-hint" data-testid="kernel-swarf-none">{t("cam.swarf.none")}</p></Show>
         <ul class="space-y-1">
           <For each={walls()}>{({ part, wall }) => (
-            <li class="flex items-center justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-2 text-xs" data-testid="kernel-swarf-wall" data-kind={wall.kind} data-face={wall.face}>
+            <li class="flex items-center justify-between gap-2 rounded-[4px] border border-[color:var(--panel-border)] px-2 py-2 text-xs" data-testid="kernel-swarf-wall" data-kind={wall.kind} data-face={wall.face}>
               <span>{part}: {t(`cam.swarf.kind.${wall.kind}`)}, {wall.height.toFixed(1)} mm, {t("cam.swarf.lean", { degrees: wall.lean.toFixed(1) })}{wall.concaveRadius !== undefined ? ` · ${t("cam.swarf.concave", { radius: wall.concaveRadius.toFixed(1) })}` : ""}</span>
-              <button type="button" class="ui-btn ui-btn-secondary" disabled={hint() !== undefined} onClick={() => add(wall)} data-testid="kernel-swarf-add">{t("cam.swarf.add")}</button>
+              <button type="button" class="panel-btn" disabled={hint() !== undefined} onClick={() => add(wall)} data-testid="kernel-swarf-add">{t("cam.swarf.add")}</button>
             </li>
           )}</For>
         </ul>

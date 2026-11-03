@@ -96,45 +96,45 @@ export default function KernelPost(props: {
   }
 
   return (
-    <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-post" open={props.current !== undefined}>
-      <summary class="cursor-pointer text-sm font-medium">{t("cam.post.title")}{props.current !== undefined ? ` (${t("cam.post.active")})` : ""}</summary>
+    <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-post" open={props.current !== undefined}>
+      <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.post.title")}{props.current !== undefined ? ` (${t("cam.post.active")})` : ""}</summary>
       <div class="space-y-2 pt-2">
-        <p class="text-xs text-gray-500">{t("cam.post.hint")}</p>
+        <p class="panel-hint">{t("cam.post.hint")}</p>
         <div class="flex flex-wrap gap-2">
           <For each={Object.keys(cam.BUILTIN_DEFINITIONS) as Array<keyof typeof cam.BUILTIN_DEFINITIONS>}>{(id) => (
-            <button type="button" class="ui-btn ui-btn-secondary" onClick={() => start(id)} data-testid={`kernel-post-start-${id}`}>{t("cam.post.startFrom", { post: id })}</button>
+            <button type="button" class="panel-btn" onClick={() => start(id)} data-testid={`kernel-post-start-${id}`}>{t("cam.post.startFrom", { post: id })}</button>
           )}</For>
         </div>
         <Show when={stored().length > 0}>
-          <label class="block text-xs">{t("cam.post.stored")}
-            <select class="w-full rounded border border-gray-300 px-2 py-1 text-xs" data-testid="kernel-post-stored"
+          <label class="panel-field text-[11px] text-[color:var(--panel-text-muted)]">{t("cam.post.stored")}
+            <select class="panel-input" data-testid="kernel-post-stored"
               onChange={(event) => { const row = stored().find((r) => r.id === event.currentTarget.value); if (row !== undefined) { setText(JSON.stringify(row.data, null, 2)); setStoredId(row.id); setIssues([]); setSample(undefined); setChecked(undefined) } event.currentTarget.value = "" }}>
               <option value="">{t("cam.post.choose")}</option>
               <For each={stored()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
             </select>
           </label>
         </Show>
-        <textarea class="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs" rows="10" spellcheck={false} value={text()} onInput={(event) => { setText(event.currentTarget.value); setChecked(undefined) }} data-testid="kernel-post-text" />
+        <textarea class="panel-input font-mono" rows="10" spellcheck={false} value={text()} onInput={(event) => { setText(event.currentTarget.value); setChecked(undefined) }} data-testid="kernel-post-text" />
         <div class="flex flex-wrap gap-2">
-          <button type="button" class="ui-btn ui-btn-secondary" disabled={busy() || text().trim() === ""} onClick={() => void check()} data-testid="kernel-post-check">{t("cam.post.check")}</button>
-          <button type="button" class="ui-btn ui-btn-secondary" disabled={checked() === undefined} onClick={() => props.onUse(checked())} data-testid="kernel-post-use">{t("cam.post.use")}</button>
-          <button type="button" class="ui-btn ui-btn-secondary" disabled={checked() === undefined || busy()} onClick={() => void save()} data-testid="kernel-post-save">{t("cam.post.save")}</button>
-          <Show when={props.current !== undefined}><button type="button" class="ui-btn ui-btn-secondary" onClick={() => { fromMachine = false; props.onUse(undefined) }} data-testid="kernel-post-clear">{t("cam.post.clear")}</button></Show>
+          <button type="button" class="panel-btn" disabled={busy() || text().trim() === ""} onClick={() => void check()} data-testid="kernel-post-check">{t("cam.post.check")}</button>
+          <button type="button" class="panel-btn" disabled={checked() === undefined} onClick={() => props.onUse(checked())} data-testid="kernel-post-use">{t("cam.post.use")}</button>
+          <button type="button" class="panel-btn" disabled={checked() === undefined || busy()} onClick={() => void save()} data-testid="kernel-post-save">{t("cam.post.save")}</button>
+          <Show when={props.current !== undefined}><button type="button" class="panel-btn" onClick={() => { fromMachine = false; props.onUse(undefined) }} data-testid="kernel-post-clear">{t("cam.post.clear")}</button></Show>
         </div>
         <Show when={props.machine !== undefined && props.onLink !== undefined}>
           <div class="flex flex-wrap items-center gap-2 text-xs" data-testid="kernel-post-machine">
             <span>{linked() !== undefined ? t("cam.post.linked", { machine: props.machine!.name }) : t("cam.post.notLinked", { machine: props.machine!.name })}</span>
-            <button type="button" class="ui-btn ui-btn-secondary" disabled={storedId() === undefined || storedId() === linked() || busy()} onClick={() => void props.onLink!(storedId()!).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-link">{t("cam.post.link")}</button>
-            <Show when={linked() !== undefined}><button type="button" class="ui-btn ui-btn-secondary" onClick={() => void props.onLink!(null).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-unlink">{t("cam.post.unlink")}</button></Show>
+            <button type="button" class="panel-btn" disabled={storedId() === undefined || storedId() === linked() || busy()} onClick={() => void props.onLink!(storedId()!).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-link">{t("cam.post.link")}</button>
+            <Show when={linked() !== undefined}><button type="button" class="panel-btn" onClick={() => void props.onLink!(null).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-unlink">{t("cam.post.unlink")}</button></Show>
           </div>
         </Show>
-        <Show when={error()}>{(message) => <p class="text-xs text-red-700 dark:text-red-300" role="alert" data-testid="kernel-post-error">{message()}</p>}</Show>
+        <Show when={error()}>{(message) => <p class="text-xs text-[color:var(--panel-bad)]" role="alert" data-testid="kernel-post-error">{message()}</p>}</Show>
         <Show when={issues().length > 0}>
-          <ul class="space-y-0.5 text-xs text-red-700 dark:text-red-300" data-testid="kernel-post-issues">
+          <ul class="space-y-0.5 text-xs text-[color:var(--panel-bad)]" data-testid="kernel-post-issues">
             <For each={issues()}>{(issue) => <li data-path={issue.path}><code>{issue.path === "" ? "(root)" : issue.path}</code>: {issue.message}</li>}</For>
           </ul>
         </Show>
-        <Show when={sample()}>{(nc) => <pre class="max-h-48 overflow-auto rounded bg-gray-50 dark:bg-gray-900 p-2 text-[11px]" data-testid="kernel-post-sample">{nc().split("\n").slice(0, 40).join("\n")}</pre>}</Show>
+        <Show when={sample()}>{(nc) => <pre class="max-h-48 overflow-auto rounded-[4px] border border-[color:var(--panel-border)] bg-[color:var(--panel-bg-subtle)] p-2 text-[11px]" data-testid="kernel-post-sample">{nc().split("\n").slice(0, 40).join("\n")}</pre>}</Show>
       </div>
     </details>
   )

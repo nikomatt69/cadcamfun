@@ -42,13 +42,13 @@ export function CadElementPicker(): JSX.Element {
       </select>
       <Show when={available().length > 1}>
         <details class="mt-2" data-testid="generator-cad-multi" open={job.selection().length > 1}>
-          <summary class="text-xs text-gray-600 cursor-pointer">Machine several parts ({job.selection().length} selected)</summary>
+          <summary class="cursor-pointer text-[11px] text-[color:var(--panel-text-muted)]">Machine several parts ({job.selection().length} selected)</summary>
           <div class="mt-1 max-h-40 overflow-auto space-y-1">
             <For each={available()}>{(element) => {
               const key = String(element["id"])
               const checked = () => job.selection().some((part) => String(part["id"]) === key)
               return (
-                <label class="flex items-center gap-2 text-xs text-gray-700">
+                <label class="panel-check text-[11px]">
                   <input type="checkbox" checked={checked()} onChange={(event) => {
                     const ids = job.selection().map((part) => String(part["id"])).filter((other) => other !== key)
                     const next = event.currentTarget.checked ? [...ids, key] : ids
@@ -66,7 +66,7 @@ export function CadElementPicker(): JSX.Element {
         </details>
       </Show>
       <Show when={available().length === 0}>
-        <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">{t("cam.generator.noCadElements")}</p>
+        <p class="panel-hint mt-2">{t("cam.generator.noCadElements")}</p>
       </Show>
     </div>
   )

@@ -165,7 +165,7 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
         </select></label></Show>
         <label class="mb-4 block space-y-1 text-xs font-medium text-[color:var(--ent-text-muted)]"><span>{t("cam.save.name")}</span><input class={FIELD} name="camProgramName" value={name()} disabled={busy()} onInput={(event) => setName(event.currentTarget.value)} /></label>
       </>}
-      afterFields={<div class="space-y-2 text-sm">
+      afterFields={<div class="space-y-2 text-xs">
         <Show when={mode() === "new"}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.save.newHint")}</p></Show>
         <Show when={mode() === "update"}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cam.save.versionHint")}</p></Show>
         <Show when={saved}>{(value) => <A href={`/toolpaths/${value().id}`} class="text-[color:var(--ent-accent)] hover:underline" onClick={(event) => { if (busy()) event.preventDefault() }}>{t("cam.save.manage")}</A>}</Show>

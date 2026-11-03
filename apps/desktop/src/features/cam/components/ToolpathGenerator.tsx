@@ -125,7 +125,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   return (
     <KernelSession onGCodeGenerated={props.onGCodeGenerated}>
     <div
-      class={`panel workstation-generator__form ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto bg-white dark:bg-gray-900" : "p-2"}`}
+      class={`panel workstation-generator__form ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto bg-[color:var(--panel-bg)]" : "p-2"}`}
       data-testid="toolpath-generator"
     >
       <Show when={saveOpen()}><SaveCamModal code={camStore.gcode} extension=".nc" projectOnly onClose={() => setSaveOpen(false)} /></Show>
@@ -185,7 +185,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             </Show>
           </button>
           <Show when={running()}>
-            <p class="text-[11px] text-gray-500 text-center tabular-nums" data-testid="generate-progress" aria-live="polite">{progressLabel()}</p>
+            <p class="panel-hint text-center tabular-nums" data-testid="generate-progress" aria-live="polite">{progressLabel()}</p>
           </Show>
           <button type="button" onClick={saveAsToolpath} class="panel-btn panel-btn--block">
             <Save size={14} />{t("cam.generator.saveAsToolpath")}

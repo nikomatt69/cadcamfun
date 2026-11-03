@@ -14,7 +14,7 @@ export function WorkholdingSection(): JSX.Element {
   const gen = useGeneratorStore()
   const set = <K extends keyof ToolpathSettings>(key: K, value: ToolpathSettings[K]): void => gen.patchSettings({ [key]: value, workholdingConfigured: true } as Partial<ToolpathSettings>)
   const number = (id: string, label: string, key: "clampDepth" | "viseJawHeight" | "parallelsHeight" | "gripLength" | "stockBore" | "buildHeight", min: number) => (
-    <div>
+    <div class="panel-field">
       <label class={LABEL} for={id}>{label}</label>
       <NumberField id={id} class={INPUT} min={min} step={1} value={gen.settings[key]} onChange={(value) => set(key, value)} />
     </div>
@@ -23,7 +23,7 @@ export function WorkholdingSection(): JSX.Element {
     <Section id="workholding" icon={Lock} title={t("cam.workholding.title")} testId="workholding-section">
       <div class="space-y-4">
         <Show when={gen.settings.machineType === "mill"}>
-          <div>
+          <div class="panel-field">
             <label class={LABEL} for="workholding-kind">{t("cam.workholding.kind")}</label>
             <select id="workholding-kind" class={INPUT} value={gen.settings.workholding} onChange={(event) => set("workholding", event.currentTarget.value as ToolpathSettings["workholding"])}>
               <option value="vise">{t("cam.workholding.vise")}</option>
@@ -33,7 +33,7 @@ export function WorkholdingSection(): JSX.Element {
             </select>
           </div>
           <Show when={gen.settings.workholding === "vise"}>
-            <div>
+            <div class="panel-field">
               <label class={LABEL} for="vise-axis">{t("cam.workholding.jawAxis")}</label>
               <select id="vise-axis" class={INPUT} value={gen.settings.viseJawAxis} onChange={(event) => set("viseJawAxis", event.currentTarget.value as "x" | "y")}>
                 <option value="x">{t("cad.field.x")}</option>
@@ -46,14 +46,14 @@ export function WorkholdingSection(): JSX.Element {
           </Show>
         </Show>
         <Show when={gen.settings.machineType === "lathe"}>
-          <div>
+          <div class="panel-field">
             <label class={LABEL} for="lathe-turret">{t("cam.workholding.turret")}</label>
             <select id="lathe-turret" class={INPUT} value={gen.settings.latheTurret} onChange={(event) => set("latheTurret", event.currentTarget.value as "rear" | "front")}>
               <option value="rear">{t("cam.workholding.turretRear")}</option>
               <option value="front">{t("cam.workholding.turretFront")}</option>
             </select>
           </div>
-          <div>
+          <div class="panel-field">
             <label class={LABEL} for="chuck-type">{t("cam.workholding.chuck")}</label>
             <select id="chuck-type" class={INPUT} value={gen.settings.chuckType} onChange={(event) => set("chuckType", event.currentTarget.value as ToolpathSettings["chuckType"])}>
               <option value="3-jaw">3-jaw</option>
@@ -66,7 +66,7 @@ export function WorkholdingSection(): JSX.Element {
           <CheckRow id="tailstock" checked={gen.settings.tailstock} onChange={(checked) => set("tailstock", checked)}>{t("cam.workholding.tailstock")}</CheckRow>
         </Show>
         <Show when={gen.settings.machineType === "3dprinter"}>
-          <div>
+          <div class="panel-field">
             <label class={LABEL} for="printer-kinematics">{t("cam.workholding.kinematics")}</label>
             <select id="printer-kinematics" class={INPUT} value={gen.settings.printerKinematics} onChange={(event) => set("printerKinematics", event.currentTarget.value as ToolpathSettings["printerKinematics"])}>
               <option value="cartesian">{t("cam.gen.wh.cartesian")}</option>

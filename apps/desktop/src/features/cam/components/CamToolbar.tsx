@@ -33,9 +33,9 @@ export interface CamToolbarProps {
 }
 
 /** Legacy `btn btn-sm btn-outline` buttons (classes defined in `styles/globals.css`). */
-const OUTLINE = "btn btn-sm btn-outline dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 flex items-center"
-const TOGGLE_ON = "bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
-const TOGGLE_OFF = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+const OUTLINE = "btn btn-sm btn-outline flex items-center"
+const TOGGLE_ON = "bg-[color:var(--ent-accent-soft)] border-[color:var(--ent-accent)] text-[color:var(--ent-accent)]"
+const TOGGLE_OFF = "bg-[color:var(--ent-surface)] border-[color:var(--ent-line-strong)] hover:bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)]"
 
 /** Labels are i18n keys so the tab strip follows the locale (resolved through `t()` at render). */
 const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.editor" | "cam.toolpath" | "cam.postTab"; readonly icon: (size: number) => JSX.Element }> = [
@@ -62,23 +62,23 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
       class="workstation-toolbar w-full flex items-center justify-between"
     >
       <div
-        class="flex rounded-2xl w-max items-center bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-600"
+        class="flex w-max items-center"
       >
         <button
           type="button"
-          class="mr-2 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors duration-150 border border-gray-200 dark:border-gray-600"
+          class="mr-2 rounded-[5px] border border-[color:var(--ent-line)] p-2 transition-colors duration-150 hover:bg-[color:var(--ent-surface-subtle)] focus-visible:outline-none"
           onClick={() => cam.toggleSidebar()}
           aria-label={t("cam.toggleSidebar")}
         >
-          <Menu size={20} class="text-gray-600 dark:text-gray-400" />
+          <Menu size={16} class="text-[color:var(--ent-text-muted)]" />
         </button>
 
-        <div class="ml-6 flex items-center space-x-2">
+        <div class="flex items-center gap-1">
           <button onClick={() => props.onSave()} class={`${OUTLINE} cursor-pointer`} title={t("cam.saveGcode")} aria-label={t("cam.saveGcode")} disabled={!props.canSave}>
             <Save size={16} class="mr-1" />
           </button>
           <label class="btn btn-sm btn-outline flex items-center cursor-pointer" title={t("cam.import")} aria-label={t("cam.import")}>
-            <Upload size={16} class="mr-1 dark:text-gray-300" />
+            <Upload size={16} class="mr-1" />
             <input
               type="file"
               class="hidden"
@@ -96,7 +96,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           <button type="button" title={t("cam.history.title")} aria-label={t("cam.history.title")} class={OUTLINE} onClick={() => props.onOpenHistory?.()}><History size={16} /></button>
           <button
             onClick={() => props.onToggleSimulation()}
-            class={`btn btn-sm ${props.isSimulating ? "btn-danger dark:bg-red-600 dark:hover:bg-red-700" : "btn-success dark:bg-green-600 dark:hover:bg-green-700"} flex items-center`}
+            class={`btn btn-sm ${props.isSimulating ? "btn-danger" : "btn-outline"} flex items-center`}
             title={t(props.isSimulating ? "cam.simStop" : "cam.simStart")}
           >
             <Show when={props.isSimulating} fallback={<Play size={16} />}><Pause size={16} /></Show>
@@ -104,7 +104,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <A
             href="/cad"
-            class="btn btn-sm flex items-center bg-blue-600 text-white hover:bg-blue-700 border-0"
+            class="btn btn-sm btn-outline flex items-center"
             title={t("cam.switchCad")}
           >
             <Grid3x3 size={16} class="mr-1" />
@@ -120,7 +120,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <button
             onClick={() => props.onToggleAi()}
-            class={`p-1.5 border rounded-md flex items-center mr-2 ${props.aiEnhanced ? TOGGLE_ON : TOGGLE_OFF}`}
+            class={`p-1.5 border rounded-[5px] flex items-center mr-2 ${props.aiEnhanced ? TOGGLE_ON : TOGGLE_OFF}`}
             aria-label={t("cam.toggleAi")}
             aria-pressed={props.aiEnhanced}
             title={t(props.aiEnhanced ? "cam.aiDisable" : "cam.aiEnable")}
@@ -131,7 +131,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           </button>
           <button
             onClick={toggleDarkMode}
-            class={`p-1.5 border rounded-md flex items-center ${dark() ? TOGGLE_ON : TOGGLE_OFF}`}
+            class={`p-1.5 border rounded-[5px] flex items-center ${dark() ? TOGGLE_ON : TOGGLE_OFF}`}
             aria-label={t("cam.toggleTheme")}
             aria-pressed={dark()}
           >
@@ -151,10 +151,10 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
               type="button"
               onClick={() => cam.setActiveTab(tab.id)}
               aria-pressed={cam.activeTab === tab.id}
-              class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-150 ${
+              class={`flex items-center px-4 py-2 rounded-[5px] text-sm font-medium transition-colors duration-150 ${
                 cam.activeTab === tab.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600"
+                  ? "bg-[color:var(--ent-accent)] text-white"
+                  : "bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] border border-[color:var(--ent-line)]"
               }`}
             >
               {tab.icon(16)}
@@ -165,7 +165,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
         <button
           type="button"
           onClick={() => props.onToggleChat()}
-          class="flex items-center px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors duration-150"
+          class={`flex items-center rounded-[5px] border px-3 py-2 text-sm font-medium transition-colors duration-150 ${props.showChat ? TOGGLE_ON : TOGGLE_OFF}`}
           aria-label={t(props.showChat ? "cam.chatClose" : "cam.chatOpen")}
         >
           <Show when={props.showChat} fallback={<PanelRight size={16} />}><PanelRightClose size={16} /></Show>

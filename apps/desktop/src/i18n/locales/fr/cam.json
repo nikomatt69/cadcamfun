@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "Parallèle (balayage)",
   "cam.gen.adv.toolComp": "Compensation d'outil",
   "cam.gen.adv.useToolComp": "Utiliser la compensation d'outil dans le G-code (G41/G42)",
+  "cam.gen.adv.toolCompNote": "La compensation du rayon d'outil sera insérée directement dans le G-code. Le sens est déterminé automatiquement à partir des réglages de décalage et de sens de coupe.",
+  "cam.gen.adv.advancedNote": "Les réglages avancés permettent un contrôle plus précis de la trajectoire, mais peuvent nécessiter des ajustements manuels pour un résultat optimal. Les fonctions avancées dépendent du type de commande numérique utilisé.",
   "cam.gen.lathe.params": "Paramètres du tour",
   "cam.gen.lathe.stockDia": "Diamètre du brut (mm)",
   "cam.gen.lathe.stockLength": "Longueur du brut (mm)",

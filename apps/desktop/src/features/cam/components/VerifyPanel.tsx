@@ -78,7 +78,7 @@ export default function VerifyPanel(): JSX.Element {
   const errors = (): number => verify.report?.issues.filter((issue) => issue.severity === "error").length ?? 0
   const stale = (): boolean => verify.report !== null && verify.verifiedGcode !== cam.gcode
   const field = (label: string, key: "cuttingLength" | "stickout" | "holderDiameter" | "holderLength" | "tolerance", step: string): JSX.Element => (
-    <div>
+    <div class="panel-field">
       <label class={LABEL} for={`verify-${key}`}>{label}</label>
       <NumberField id={`verify-${key}`} min="0" step={step} value={verify.holder[key]} accept={(value) => value >= 0} onValue={(value) => verify.setHolder({ [key]: value })} />
     </div>
@@ -86,7 +86,7 @@ export default function VerifyPanel(): JSX.Element {
 
   return (
     <PanelCard title={t("cam.verify.title")} testId="verify-panel">
-      <p class="text-xs text-gray-600 dark:text-gray-400">{t("cam.verify.hint")}</p>
+      <p class="panel-hint">{t("cam.verify.hint")}</p>
 
       <div class="grid grid-cols-2 gap-3">
         {field(t("cam.verify.cuttingLength"), "cuttingLength", "0.5")}
@@ -105,28 +105,28 @@ export default function VerifyPanel(): JSX.Element {
         {verify.running ? t("cam.verify.running") : t("cam.verify.run")}
       </button>
       <Show when={cam.gcode.trim().length === 0}>
-        <div class="overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" aria-hidden="true"><VerifyPreview /></div>
-        <p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.verify.empty")}</p>
+        <div class="overflow-hidden rounded-[5px] border border-[color:var(--panel-border)]" aria-hidden="true"><VerifyPreview /></div>
+        <p class="panel-hint">{t("cam.verify.empty")}</p>
       </Show>
 
       <Show when={verify.error}>
-        <div class="flex items-start rounded-md bg-red-50 p-3 dark:bg-red-950" role="alert">
-          <AlertTriangle class="text-red-500 mr-2 flex-shrink-0 mt-0.5" size={18} />
-          <p class="text-sm text-red-800 dark:text-red-200">{verify.error}</p>
+        <div class="flex items-start rounded-[5px] bg-[color:var(--panel-bad-soft)] text-[color:var(--panel-bad)] p-3" role="alert">
+          <AlertTriangle class="mr-2 mt-0.5 flex-shrink-0" size={14} />
+          <p class="text-xs">{verify.error}</p>
         </div>
       </Show>
 
       <Show when={verify.report}>
         {(report) => (
           <div class="space-y-3" data-testid="verify-report">
-            <Show when={stale()}><p class="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200" role="status" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
+            <Show when={stale()}><p class="rounded-[5px] bg-[color:var(--panel-warn-soft)] text-[color:var(--panel-warn)] p-2 text-xs" role="status" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
             <div
-              class={`flex items-center rounded-md p-3 ${stale() ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200" : report().ok ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200" : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"}`}
+              class={`flex items-center rounded-[5px] p-3 ${stale() ? "bg-[color:var(--panel-bg-subtle)] text-[color:var(--panel-text-muted)]" : report().ok ? "bg-[color:var(--panel-ok-soft)] text-[color:var(--panel-ok)]" : "bg-[color:var(--panel-bad-soft)] text-[color:var(--panel-bad)]"}`}
               role="status"
               data-ok={report().ok}
             >
-              <Show when={report().ok} fallback={<AlertTriangle size={18} class="mr-2" />}><Check size={18} class="mr-2" /></Show>
-              <span class="text-sm font-medium">{report().ok ? t("cam.verify.passed") : t("cam.verify.failed", { count: errors() })}</span>
+              <Show when={report().ok} fallback={<AlertTriangle size={14} class="mr-2" />}><Check size={14} class="mr-2" /></Show>
+              <span class="text-xs font-medium">{report().ok ? t("cam.verify.passed") : t("cam.verify.failed", { count: errors() })}</span>
             </div>
             <Show when={errors() > 0}>
               <button type="button" class="panel-btn panel-btn--block" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
@@ -137,7 +137,7 @@ export default function VerifyPanel(): JSX.Element {
             <ul class="space-y-1" data-testid="verify-issues">
               <For each={sortedIssues(report().issues)}>
                 {(issue) => (
-                  <li class={`text-xs p-2 rounded ${issue.severity === "error" ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200" : issue.severity === "warning" ? "bg-yellow-50 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200" : "bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200"}`} data-code={issue.code}>
+                  <li class={`text-[11px] p-2 rounded-[4px] ${issue.severity === "error" ? "bg-[color:var(--panel-bad-soft)] text-[color:var(--panel-bad)]" : issue.severity === "warning" ? "bg-[color:var(--panel-warn-soft)] text-[color:var(--panel-warn)]" : "bg-[color:var(--panel-bg-subtle)] text-[color:var(--panel-text-muted)]"}`} data-code={issue.code}>
                     <span class="font-semibold">{issue.code}</span>
                     <Show when={issue.line !== undefined}><span class="ml-1 opacity-70">({t("cam.verify.line", { line: issue.line! })})</span></Show>
                     <Show when={issue.count > 1}><span class="ml-1 opacity-70">×{issue.count}</span></Show>
@@ -147,18 +147,18 @@ export default function VerifyPanel(): JSX.Element {
               </For>
             </ul>
 
-            <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs" data-testid="verify-stats">
-              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.removed")}</dt><dd class="tabular-nums">{mm3(report().stats.removedVolume)}</dd>
-              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.remaining")}</dt><dd class="tabular-nums">{mm3(report().stats.remainingVolume)}</dd>
-              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.airCut")}</dt><dd class="tabular-nums">{report().stats.airCutLength.toFixed(1)} {t("cad.millimeters")}</dd>
-              <dt class="text-gray-500 dark:text-gray-400">{t("cam.verify.resolution")}</dt><dd class="tabular-nums">{report().stats.cellSize.toFixed(2)} {t("cad.millimeters")}</dd>
+            <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]" data-testid="verify-stats">
+              <dt class="text-[color:var(--panel-text-muted)]">{t("cam.verify.removed")}</dt><dd class="tabular-nums">{mm3(report().stats.removedVolume)}</dd>
+              <dt class="text-[color:var(--panel-text-muted)]">{t("cam.verify.remaining")}</dt><dd class="tabular-nums">{mm3(report().stats.remainingVolume)}</dd>
+              <dt class="text-[color:var(--panel-text-muted)]">{t("cam.verify.airCut")}</dt><dd class="tabular-nums">{report().stats.airCutLength.toFixed(1)} {t("cad.millimeters")}</dd>
+              <dt class="text-[color:var(--panel-text-muted)]">{t("cam.verify.resolution")}</dt><dd class="tabular-nums">{report().stats.cellSize.toFixed(2)} {t("cad.millimeters")}</dd>
             </dl>
 
             <div>
-              <p class="text-xs text-gray-500 mb-1">{t("cam.verify.map")}</p>
-              <canvas ref={canvas} role="img" aria-label={t("cam.verify.map")} class="w-full border border-gray-300 rounded" style={{ "image-rendering": "pixelated" }} data-testid="verify-map" />
+              <p class="panel-hint mb-1">{t("cam.verify.map")}</p>
+              <canvas ref={canvas} role="img" aria-label={t("cam.verify.map")} class="w-full rounded-[4px] border border-[color:var(--panel-border-strong)]" style={{ "image-rendering": "pixelated" }} data-testid="verify-map" />
             </div>
-            <p class="text-xs text-gray-500">{t("cam.verify.caveat")}</p>
+            <p class="panel-hint">{t("cam.verify.caveat")}</p>
           </div>
         )}
       </Show>

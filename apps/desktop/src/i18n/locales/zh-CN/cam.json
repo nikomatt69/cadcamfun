@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "平行（光栅）",
   "cam.gen.adv.toolComp": "刀具补偿",
   "cam.gen.adv.useToolComp": "在 G 代码中使用刀具补偿（G41/G42）",
+  "cam.gen.adv.toolCompNote": "刀具半径补偿将直接插入 G 代码。方向由偏移和切削方向设置自动确定。",
+  "cam.gen.adv.advancedNote": "高级设置可以更精确地控制刀路，但可能需要手动调整才能获得最佳效果。高级功能取决于所使用的数控系统类型。",
   "cam.gen.lathe.params": "车床参数",
   "cam.gen.lathe.stockDia": "毛坯直径（mm）",
   "cam.gen.lathe.stockLength": "毛坯长度（mm）",

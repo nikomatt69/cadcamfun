@@ -90,7 +90,7 @@ const POST_ACCENT: Record<PostProcessorType, RibbonAction["accent"]> = {
 }
 
 /** One neutral chip for every action: the accent stays in the action data, but a rainbow of borders says nothing the labels do not. */
-const chipClass = (_accent: RibbonAction["accent"]): string => "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+const chipClass = (_accent: RibbonAction["accent"]): string => "border-[color:var(--ent-line)] hover:bg-[color:var(--ent-surface-subtle)]"
 
 export default function CamRibbon(props: CamRibbonProps): JSX.Element {
   const gen = useGeneratorStore()
@@ -255,10 +255,10 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {(entry) => (
             <button
               type="button"
-              class={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border-r border-[color:var(--workspace-border)] transition-colors ${
+              class={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-r border-[color:var(--workspace-border)] transition-colors ${
                 tab() === entry.id
-                  ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-b-2 border-b-blue-500"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  ? "bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)] border-b-2 border-b-[color:var(--ent-accent)]"
+                  : "text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)]"
               }`}
               data-ribbon-tab={entry.id}
               onClick={() => setTab(entry.id)}
@@ -275,7 +275,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
         <For each={groups()}>
           {(group, groupIndex) => (
             <div class={`flex flex-col px-3 pt-2 pb-2 ${groupIndex() < groups().length - 1 ? "border-r border-[color:var(--workspace-border)]" : ""}`}>
-              <div class="text-[11px] leading-4 font-semibold mb-1 text-gray-600 dark:text-gray-400">
+              <div class="text-[11px] leading-4 font-semibold mb-1 text-[color:var(--ent-text-muted)]">
                 {t(group.titleKey)}
               </div>
               <div class="flex flex-wrap gap-2">
@@ -287,12 +287,12 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
                       <button
                         type="button"
                         data-ribbon-action={action.id}
-                        class={`flex flex-none items-center gap-1.5 min-h-[28px] px-2 py-1 rounded-md text-xs leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active() ? "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
+                        class={`flex flex-none items-center gap-1.5 min-h-[28px] px-2 py-1 rounded-[5px] text-xs leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active() ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "bg-[var(--workspace-panel)]"}`}
                         onClick={action.onClick}
                         title={label()}
                         aria-pressed={active()}
                       >
-                        {action.icon(14, active() ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300")}
+                        {action.icon(14, active() ? "text-[color:var(--ent-accent)]" : "text-[color:var(--ent-text-muted)]")}
                         <span class="whitespace-nowrap">{label()}</span>
                       </button>
                     )

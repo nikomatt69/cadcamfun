@@ -40,7 +40,7 @@ const OVERRIDES = ["rpm", "feed", "stepdown", "stepover"] as const
 function OptionalNumber(props: { readonly value: number | undefined; readonly placeholder: string; readonly testId?: string; readonly onValue: (value: number | undefined) => void }): JSX.Element {
   return (
     <DimensionField
-      optional deferred class="w-full rounded border border-gray-300 px-2 py-1 text-xs" placeholder={props.placeholder} value={props.value} testId={props.testId}
+      optional deferred class="panel-input" placeholder={props.placeholder} value={props.value} testId={props.testId}
       onChange={(value) => props.onValue(value <= 0 ? undefined : value)} onClear={() => props.onValue(undefined)}
     />
   )
@@ -274,7 +274,7 @@ export function KernelMachineControls(): JSX.Element {
   const settings = kernel.settings
   return (
     <Show when={millOnly()}>
-      <p class="text-xs text-gray-500">{t("cam.kernel.description")}</p>
+      <p class="panel-hint">{t("cam.kernel.description")}</p>
       <label class={LABEL}>{t("cam.kernel.machine")}
         <select
           class={INPUT} value={kernel.machineValue()} data-testid="kernel-machine"
@@ -307,7 +307,7 @@ export function KernelMachineControls(): JSX.Element {
         </select>
       </label>
       <Show when={settings().setupOrientation !== undefined && settings().setupOrientation !== "+Z"}>
-        <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="kernel-manual-setup-hint">{t("cam.kernel.manualSetupHint")}</p>
+        <p class="text-xs text-[color:var(--panel-warn)]" data-testid="kernel-manual-setup-hint">{t("cam.kernel.manualSetupHint")}</p>
       </Show>
       <KernelSetups
         elements={kernel.request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
@@ -346,18 +346,18 @@ function KernelBreadthControls(): JSX.Element {
   return (
     <>
       <fieldset class="space-y-1" data-testid="kernel-breadth">
-        <legend class="text-sm">{t("cam.kernel.breadth")}</legend>
-        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthHoleCyclesHint")}><input type="checkbox" checked={breadth().holeCycles === true} onChange={(event) => setBreadth("holeCycles", event.currentTarget.checked)} data-testid="kernel-breadth-hole-cycles" />{t("cam.kernel.breadthHoleCycles")}</label>
-        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthTiltedHint")}><input type="checkbox" checked={breadth().tilted === true} onChange={(event) => setBreadth("tilted", event.currentTarget.checked)} data-testid="kernel-breadth-tilted" />{t("cam.kernel.breadthTilted")}</label>
-        <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.breadthNamedHint")}><input type="checkbox" checked={breadth().namedFeatures === true} onChange={(event) => setBreadth("namedFeatures", event.currentTarget.checked)} data-testid="kernel-breadth-named" />{t("cam.kernel.breadthNamed")}</label>
-        <p class="text-xs text-gray-500" data-testid="kernel-breadth-hint">{t("cam.kernel.breadthHint")}</p>
+        <legend class="panel-group__title">{t("cam.kernel.breadth")}</legend>
+        <label class="panel-check" title={t("cam.kernel.breadthHoleCyclesHint")}><input type="checkbox" checked={breadth().holeCycles === true} onChange={(event) => setBreadth("holeCycles", event.currentTarget.checked)} data-testid="kernel-breadth-hole-cycles" />{t("cam.kernel.breadthHoleCycles")}</label>
+        <label class="panel-check" title={t("cam.kernel.breadthTiltedHint")}><input type="checkbox" checked={breadth().tilted === true} onChange={(event) => setBreadth("tilted", event.currentTarget.checked)} data-testid="kernel-breadth-tilted" />{t("cam.kernel.breadthTilted")}</label>
+        <label class="panel-check" title={t("cam.kernel.breadthNamedHint")}><input type="checkbox" checked={breadth().namedFeatures === true} onChange={(event) => setBreadth("namedFeatures", event.currentTarget.checked)} data-testid="kernel-breadth-named" />{t("cam.kernel.breadthNamed")}</label>
+        <p class="panel-hint" data-testid="kernel-breadth-hint">{t("cam.kernel.breadthHint")}</p>
       </fieldset>
       <div class="space-y-0.5">
-        <label class="flex items-center gap-2 text-sm" title={refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}>
+        <label class="panel-check" title={refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}>
           <input type="checkbox" checked={settings().tcp === true && refusal() === undefined} disabled={refusal() !== undefined} onChange={(event) => gen.patchKernelSettings({ tcp: event.currentTarget.checked ? true : undefined })} data-testid="kernel-tcp" />
           {t("cam.kernel.tcp")}
         </label>
-        <p class="text-xs text-gray-500" data-testid="kernel-tcp-hint">{refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}</p>
+        <p class="panel-hint" data-testid="kernel-tcp-hint">{refusal() !== undefined ? t(refusal()!.key, refusal()!.params) : t("cam.kernel.tcpHint")}</p>
       </div>
     </>
   )
@@ -370,59 +370,59 @@ export function KernelOperationControls(): JSX.Element {
   const settings = kernel.settings
   return (
     <Show when={millOnly()}>
-      <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-settings">
-        <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.settings")}</summary>
+      <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-settings">
+        <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.kernel.settings")}</summary>
         <div class="space-y-3 pt-3">
           <label class={LABEL}>{t("cam.kernel.tolerance")}<NumberField id="kernel-tolerance" min="0.001" step="0.001" value={gen.settings.tolerance} onValue={(value) => gen.updateSettings("tolerance", value)} /></label>
           <label class={LABEL}>{t("cam.kernel.finishAllowance")}<NumberField id="kernel-finish-allowance" min="0" max="5" step="0.01" value={settings().finishAllowance ?? cam.kernel.findMaterial(settings().material)?.finishAllowance ?? 0.2} accept={(value) => Number.isFinite(value) && value >= 0 && value <= 5} onValue={(value) => gen.patchKernelSettings({ finishAllowance: value })} /></label>
           <label class={LABEL}>{t("cam.kernel.scallop")}<NumberField id="kernel-scallop" min="0.001" max="1" step="0.001" value={settings().scallop ?? 0.01} accept={(value) => Number.isFinite(value) && value > 0 && value <= 1} onValue={(value) => gen.patchKernelSettings({ scallop: value })} /></label>
           <label class={LABEL}>{t("cam.kernel.deburr")}<NumberField id="kernel-deburr" min="0" max="5" step="0.05" value={settings().deburr ?? 0} accept={(value) => Number.isFinite(value) && value >= 0 && value <= 5} onValue={(value) => gen.patchKernelSettings({ deburr: value > 0 ? value : undefined })} /></label>
           <label class={LABEL}>{t("cam.kernel.tabs")}<NumberField id="kernel-tabs" min="0" max="64" step="1" value={settings().tabs?.count ?? 0} accept={(value) => Number.isInteger(value) && value >= 0 && value <= 64} onValue={(value) => gen.patchKernelSettings({ tabs: value > 0 ? { count: value, width: 4, height: 2 } : undefined })} /></label>
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().subprograms === true} onChange={(event) => gen.patchKernelSettings({ subprograms: event.currentTarget.checked ? true : undefined })} data-testid="kernel-subprograms" />{t("cam.kernel.subprograms")}</label>
-          <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.nativeCyclesHint")}><input type="checkbox" checked={settings().nativeCycles === true} onChange={(event) => gen.patchKernelSettings({ nativeCycles: event.currentTarget.checked ? true : undefined })} data-testid="kernel-native-cycles" />{t("cam.kernel.nativeCycles")}</label>
+          <label class="panel-check"><input type="checkbox" checked={settings().subprograms === true} onChange={(event) => gen.patchKernelSettings({ subprograms: event.currentTarget.checked ? true : undefined })} data-testid="kernel-subprograms" />{t("cam.kernel.subprograms")}</label>
+          <label class="panel-check" title={t("cam.kernel.nativeCyclesHint")}><input type="checkbox" checked={settings().nativeCycles === true} onChange={(event) => gen.patchKernelSettings({ nativeCycles: event.currentTarget.checked ? true : undefined })} data-testid="kernel-native-cycles" />{t("cam.kernel.nativeCycles")}</label>
           <KernelBreadthControls />
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().smoothing !== undefined} onChange={(event) => gen.patchKernelSettings({ smoothing: event.currentTarget.checked ? 0.01 : undefined })} data-testid="kernel-smoothing" />{t("cam.kernel.smoothing")}</label>
+          <label class="panel-check"><input type="checkbox" checked={settings().smoothing !== undefined} onChange={(event) => gen.patchKernelSettings({ smoothing: event.currentTarget.checked ? 0.01 : undefined })} data-testid="kernel-smoothing" />{t("cam.kernel.smoothing")}</label>
           <Show when={settings().smoothing !== undefined}><label class={LABEL}>{t("cam.kernel.smoothingTolerance")}<NumberField id="kernel-smoothing-tolerance" min="0.001" max="1" step="0.001" value={settings().smoothing ?? 0.01} accept={(value) => Number.isFinite(value) && value > 0 && value <= 1} onValue={(value) => gen.patchKernelSettings({ smoothing: value })} /></label></Show>
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().resolution === undefined} onChange={(event) => gen.patchKernelSettings({ resolution: event.currentTarget.checked ? undefined : 0.25 })} data-testid="kernel-auto-resolution" />{t("cam.kernel.autoResolution")}</label>
+          <label class="panel-check"><input type="checkbox" checked={settings().resolution === undefined} onChange={(event) => gen.patchKernelSettings({ resolution: event.currentTarget.checked ? undefined : 0.25 })} data-testid="kernel-auto-resolution" />{t("cam.kernel.autoResolution")}</label>
           <Show when={settings().resolution !== undefined}><label class={LABEL}>{t("cam.kernel.resolution")}<NumberField id="kernel-resolution" min="0.001" step="0.01" value={settings().resolution ?? 0.25} onValue={(value) => gen.patchKernelSettings({ resolution: value })} /></label></Show>
-          <button type="button" class="ui-btn ui-btn-secondary" onClick={() => gen.patchKernelSettings({ finishAllowance: undefined, scallop: undefined, resolution: undefined })}>{t("cam.kernel.resetQuality")}</button>
-          <p class="text-xs text-gray-500">{t("cam.kernel.qualityHint")}</p>
+          <button type="button" class="panel-btn" onClick={() => gen.patchKernelSettings({ finishAllowance: undefined, scallop: undefined, resolution: undefined })}>{t("cam.kernel.resetQuality")}</button>
+          <p class="panel-hint">{t("cam.kernel.qualityHint")}</p>
         </div>
       </details>
-      <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-plan" open={kernel.operations().length > 0}>
-        <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.operations")}{kernel.operations().length > 0 ? ` (${kernel.operations().length})` : ""}</summary>
+      <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-plan" open={kernel.operations().length > 0}>
+        <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.kernel.operations")}{kernel.operations().length > 0 ? ` (${kernel.operations().length})` : ""}</summary>
         <div class="space-y-2 pt-2">
-          <p class="text-xs text-gray-500">{t("cam.kernel.planHint")}</p>
+          <p class="panel-hint">{t("cam.kernel.planHint")}</p>
           <div class="flex gap-2">
-            <button type="button" class="ui-btn ui-btn-secondary" disabled={!kernel.request()} onClick={kernel.plan} data-testid="kernel-plan-button">{t("cam.kernel.plan")}</button>
+            <button type="button" class="panel-btn" disabled={!kernel.request()} onClick={kernel.plan} data-testid="kernel-plan-button">{t("cam.kernel.plan")}</button>
             <Show when={settings().operations !== undefined}>
-              <button type="button" class="ui-btn ui-btn-secondary" onClick={() => { gen.patchKernelSettings({ operations: undefined }); kernel.setPlanNotes([]) }} data-testid="kernel-plan-reset">{t("cam.kernel.planReset")}</button>
+              <button type="button" class="panel-btn" onClick={() => { gen.patchKernelSettings({ operations: undefined }); kernel.setPlanNotes([]) }} data-testid="kernel-plan-reset">{t("cam.kernel.planReset")}</button>
             </Show>
           </div>
-          <For each={kernel.planNotes()}>{(note) => <p class="text-[11px] text-amber-700">{note}</p>}</For>
+          <For each={kernel.planNotes()}>{(note) => <p class="text-[11px] text-[color:var(--panel-warn)]">{note}</p>}</For>
           <For each={kernel.operations()}>
             {(op, index) => {
               const cutter = () => kernel.library().find((c) => c.id === op.tool)
               const own = op as unknown as Readonly<Record<string, number | undefined>>
               return (
-                <div class="rounded border border-gray-200 dark:border-gray-700 p-2 text-xs space-y-1" data-testid="kernel-plan-operation">
+                <div class="rounded-[4px] border border-[color:var(--panel-border)] p-2 text-xs space-y-1" data-testid="kernel-plan-operation">
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
-                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={14} /></button>
-                      <button type="button" class="rounded px-2 py-1 hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={14} /></button>
-                      <button type="button" class="rounded px-2 py-1 text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={14} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-[color:var(--panel-bg-inset)]" aria-label={t("cam.multi.moveUp")} onClick={() => kernel.moveOperation(index(), -1)}><ChevronUp size={14} /></button>
+                      <button type="button" class="rounded px-2 py-1 hover:bg-[color:var(--panel-bg-inset)]" aria-label={t("cam.multi.moveDown")} onClick={() => kernel.moveOperation(index(), 1)}><ChevronDown size={14} /></button>
+                      <button type="button" class="rounded px-2 py-1 text-[color:var(--panel-bad)] hover:bg-[color:var(--panel-bad-soft)]" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => kernel.setOperations(kernel.operations().filter((_, i) => i !== index()))}><X size={14} /></button>
                     </span>
                   </div>
                   <div class="flex items-center gap-1">
                     <Show when={cutter()}>{(c) => <ToolSilhouette cutter={c()} height={36} />}</Show>
-                    <select class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs" value={op.tool} onChange={(event) => kernel.patchOperation(index(), { tool: event.currentTarget.value })} data-testid="kernel-plan-tool">
+                    <select class="panel-input flex-1" value={op.tool} onChange={(event) => kernel.patchOperation(index(), { tool: event.currentTarget.value })} data-testid="kernel-plan-tool">
                       <For each={kernel.library().filter((c) => KINDS[op.strategy].includes(c.kind) || c.id === op.tool)}>{(c) => <option value={c.id}>{c.name}</option>}</For>
                     </select>
-                    <span class="text-gray-500">{op.strategy}</span>
+                    <span class="text-[color:var(--panel-text-muted)]">{op.strategy}</span>
                   </div>
                   <div class="grid grid-cols-4 gap-1">
-                    <For each={OVERRIDES}>{(key) => <label class="text-[11px] text-gray-500">{key}<OptionalNumber value={own[key]} placeholder={t("cam.kernel.fromData")} testId={`kernel-plan-${key}`} onValue={(value) => kernel.patchOperation(index(), { [key]: value })} /></label>}</For>
+                    <For each={OVERRIDES}>{(key) => <label class="text-[11px] text-[color:var(--panel-text-muted)]">{key}<OptionalNumber value={own[key]} placeholder={t("cam.kernel.fromData")} testId={`kernel-plan-${key}`} onValue={(value) => kernel.patchOperation(index(), { [key]: value })} /></label>}</For>
                   </div>
                 </div>
               )
@@ -430,24 +430,24 @@ export function KernelOperationControls(): JSX.Element {
           </For>
         </div>
       </details>
-      <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-cutters">
-        <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.cutters")} ({kernel.usedCutters().length})</summary>
+      <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-cutters">
+        <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.kernel.cutters")} ({kernel.usedCutters().length})</summary>
         <div class="space-y-2 pt-2">
-          <p class="text-xs text-gray-500">{t("cam.kernel.cuttersHint")}</p>
+          <p class="panel-hint">{t("cam.kernel.cuttersHint")}</p>
           <Show when={settings().tools !== undefined}>
-            <button type="button" class="ui-btn ui-btn-secondary" onClick={() => gen.patchKernelSettings({ tools: undefined })}>{t("cam.kernel.cuttersReset")}</button>
+            <button type="button" class="panel-btn" onClick={() => gen.patchKernelSettings({ tools: undefined })}>{t("cam.kernel.cuttersReset")}</button>
           </Show>
           <For each={kernel.usedCutters()}>
             {(c) => (
-              <div class="flex gap-2 rounded border border-gray-200 dark:border-gray-700 p-2 text-xs" data-testid="kernel-cutter">
+              <div class="flex gap-2 rounded-[4px] border border-[color:var(--panel-border)] p-2 text-xs" data-testid="kernel-cutter">
                 <ToolSilhouette cutter={c} height={90} />
                 <div class="flex-1 space-y-1">
                   <div class="font-medium">{c.name}</div>
                   <div class="grid grid-cols-2 gap-1">
-                    <label class="text-[11px] text-gray-500">flutes mm<OptionalNumber value={c.fluteLength} placeholder="" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { fluteLength: v })} /></label>
-                    <label class="text-[11px] text-gray-500">stickout mm<OptionalNumber value={c.stickout} placeholder="" testId="kernel-cutter-stickout" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { stickout: Math.max(v, c.fluteLength) })} /></label>
-                    <label class="text-[11px] text-gray-500">holder Ø<OptionalNumber value={c.holder?.diameter} placeholder={t("cam.kernel.holderNone")} testId="kernel-cutter-holder" onValue={(v) => kernel.patchCutter(c.id, { holder: v === undefined ? null : { diameter: v, length: c.holder?.length ?? 40 } })} /></label>
-                    <label class="text-[11px] text-gray-500">holder length<OptionalNumber value={c.holder?.length} placeholder="" onValue={(v) => { const holder = c.holder; if (v !== undefined && holder !== undefined) kernel.patchCutter(c.id, { holder: { diameter: holder.diameter, length: v } }) }} /></label>
+                    <label class="text-[11px] text-[color:var(--panel-text-muted)]">flutes mm<OptionalNumber value={c.fluteLength} placeholder="" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { fluteLength: v })} /></label>
+                    <label class="text-[11px] text-[color:var(--panel-text-muted)]">stickout mm<OptionalNumber value={c.stickout} placeholder="" testId="kernel-cutter-stickout" onValue={(v) => v !== undefined && kernel.patchCutter(c.id, { stickout: Math.max(v, c.fluteLength) })} /></label>
+                    <label class="text-[11px] text-[color:var(--panel-text-muted)]">holder Ø<OptionalNumber value={c.holder?.diameter} placeholder={t("cam.kernel.holderNone")} testId="kernel-cutter-holder" onValue={(v) => kernel.patchCutter(c.id, { holder: v === undefined ? null : { diameter: v, length: c.holder?.length ?? 40 } })} /></label>
+                    <label class="text-[11px] text-[color:var(--panel-text-muted)]">holder length<OptionalNumber value={c.holder?.length} placeholder="" onValue={(v) => { const holder = c.holder; if (v !== undefined && holder !== undefined) kernel.patchCutter(c.id, { holder: { diameter: holder.diameter, length: v } }) }} /></label>
                   </div>
                 </div>
               </div>
@@ -465,56 +465,56 @@ export function KernelRunControls(): JSX.Element {
   const kernel = useKernel()
   return (
     <Show when={millOnly()}>
-      <button type="button" class="ui-btn ui-btn-primary w-full justify-center" disabled={!kernel.request() || gen.isGenerating} onClick={() => void kernel.generate()} data-testid="kernel-generate">
+      <button type="button" class="panel-btn panel-btn--primary panel-btn--block" disabled={!kernel.request() || gen.isGenerating} onClick={() => void kernel.generate()} data-testid="kernel-generate">
         {t(kernel.ownRun() ? "cam.kernel.generating" : "cam.kernel.generate")}
       </button>
       <Show when={kernel.ownRun() && kernel.progressLabel() !== undefined}>
-        <p class="text-[11px] text-gray-500" data-testid="kernel-progress" aria-live="polite">{kernel.progressLabel()}</p>
+        <p class="panel-hint" data-testid="kernel-progress" aria-live="polite">{kernel.progressLabel()}</p>
       </Show>
-      <Show when={!kernel.request()}><p class="text-xs text-gray-500">{t("cam.kernel.select")}</p></Show>
-      <Show when={kernel.error()}><p role="alert" class="text-xs text-red-600">{kernel.error()}</p></Show>
-      <Show when={kernel.result()?.status === "failed" ? kernel.result() : undefined}>{(value) => <ul class="text-xs text-red-600" role="alert"><For each={value().status === "failed" ? (value() as Extract<CamKernelResult, { status: "failed" }>).issues : []}>{(issue) => <li>{issue.message}</li>}</For></ul>}</Show>
+      <Show when={!kernel.request()}><p class="panel-hint">{t("cam.kernel.select")}</p></Show>
+      <Show when={kernel.error()}><p role="alert" class="text-xs text-[color:var(--panel-bad)]">{kernel.error()}</p></Show>
+      <Show when={kernel.result()?.status === "failed" ? kernel.result() : undefined}>{(value) => <ul class="text-xs text-[color:var(--panel-bad)]" role="alert"><For each={value().status === "failed" ? (value() as Extract<CamKernelResult, { status: "failed" }>).issues : []}>{(issue) => <li>{issue.message}</li>}</For></ul>}</Show>
       <Show when={kernel.artifact()}>{(value) => (
         <div class="space-y-2 text-xs" data-testid="kernel-evidence">
           <div class="flex justify-between gap-3 font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
-          <Show when={kernel.stale()}><p role="status" class="text-amber-600" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
+          <Show when={kernel.stale()}><p role="status" class="text-[color:var(--panel-warn)]" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
           <p>{t("cam.kernel.summary", { operations: value().operations.length, tools: value().tools.length, seconds: value().cycleTimeSeconds.toFixed(1) })}</p>
-          <button type="button" class="ui-btn ui-btn-secondary" data-testid="kernel-setup-sheet" onClick={() => {
+          <button type="button" class="panel-btn" data-testid="kernel-setup-sheet" onClick={() => {
             const sheet = setupSheetFile(value(), kernel.request()?.name ?? value().jobId)
             if ("reason" in sheet) kernel.setError(sheet.reason)
             else downloadText(sheet.file, sheet.html, "text/html")
           }}>{t("cam.kernel.setupSheet")}</button>
           <Show when={value().tolerance}>{(budget) => (
-            <p class="text-gray-500" data-testid="kernel-tolerance-budget" title={budget().terms.map((term) => `${term.id} ${term.mm} mm: ${term.basis}`).join("\n")}>
+            <p class="text-[color:var(--panel-text-muted)]" data-testid="kernel-tolerance-budget" title={budget().terms.map((term) => `${term.id} ${term.mm} mm: ${term.basis}`).join("\n")}>
               {t(budget().met ? "cam.kernel.tolerance.met" : "cam.kernel.tolerance.notMet", { requested: budget().requested, achieved: budget().achieved.toFixed(3) })}
               {budget().unbounded.length > 0 ? ` ${budget().unbounded.join("; ")}.` : ""}
             </p>
           )}</Show>
           <Show when={value().stock.fiveAxis}>{(five) => (
-            <p class="text-gray-500" data-testid="kernel-fiveaxis-stock">
+            <p class="text-[color:var(--panel-text-muted)]" data-testid="kernel-fiveaxis-stock">
               {t("cam.kernel.fiveAxisStock", { removedLower: five().removedLower.toFixed(0), removedUpper: five().removedUpper.toFixed(0), remainingLower: five().remainingLower.toFixed(0), remainingUpper: five().remainingUpper.toFixed(0), voxel: five().voxelMm })}
             </p>
           )}</Show>
           <div class="flex flex-wrap gap-2" data-testid="kernel-tools">
             <For each={value().tools}>
               {(tool) => (
-                <div class="flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700" title={`${tool.name}: Ø${tool.diameter}, ${tool.fluteLength} mm flutes, ${tool.stickout} mm stickout${tool.holder ? `, holder Ø${tool.holder.diameter} x ${tool.holder.length}` : ""}`}>
+                <div class="flex items-center gap-1 rounded border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)] px-2 py-1 text-[11px] text-[color:var(--panel-text)]" title={`${tool.name}: Ø${tool.diameter}, ${tool.fluteLength} mm flutes, ${tool.stickout} mm stickout${tool.holder ? `, holder Ø${tool.holder.diameter} x ${tool.holder.length}` : ""}`}>
                   <ToolSilhouette cutter={tool as cam.kernel.Cutter} height={48} />
                   <span>T{tool.number}<br />Ø{tool.diameter}</span>
                 </div>
               )}
             </For>
           </div>
-          <For each={value().operations}>{(operation) => <div class="border-t border-gray-200 dark:border-gray-700 pt-1"><span class="font-medium">{operation.name}</span><span class="block text-gray-500">{operation.strategy} · {operation.toolId}{operation.cutting ? ` · ${operation.cutting.rpm.toFixed(0)} rpm · ${operation.cutting.feed.toFixed(0)} mm/min` : ""}</span></div>}</For>
+          <For each={value().operations}>{(operation) => <div class="border-t border-[color:var(--panel-border)] pt-1"><span class="font-medium">{operation.name}</span><span class="block text-[color:var(--panel-text-muted)]">{operation.strategy} · {operation.toolId}{operation.cutting ? ` · ${operation.cutting.rpm.toFixed(0)} rpm · ${operation.cutting.feed.toFixed(0)} mm/min` : ""}</span></div>}</For>
           <For each={value().claims}>{(claim) => <div class="flex justify-between gap-2" title={claim.detail}><span>{claim.id}</span><span>{claim.status}</span></div>}</For>
-          <For each={value().issues}>{(issue) => <p class={issue.severity === "error" ? "text-red-600" : "text-amber-600"}>{issue.message}</p>}</For>
+          <For each={value().issues}>{(issue) => <p class={issue.severity === "error" ? "text-[color:var(--panel-bad)]" : "text-[color:var(--panel-warn)]"}>{issue.message}</p>}</For>
           <Show when={value().notes.length > 0}>
             <div class="space-y-0.5" data-testid="kernel-notes">
               <p class="font-medium">{t("cam.kernel.notes")}</p>
-              <For each={value().notes}>{(note) => <p class="text-gray-500">{note}</p>}</For>
+              <For each={value().notes}>{(note) => <p class="text-[color:var(--panel-text-muted)]">{note}</p>}</For>
             </div>
           </Show>
-          <p class="text-gray-500">{t("cam.kernel.scope")}</p>
+          <p class="text-[color:var(--panel-text-muted)]">{t("cam.kernel.scope")}</p>
         </div>
       )}</Show>
     </Show>

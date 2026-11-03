@@ -6,7 +6,7 @@ import { CuttingReferenceView } from "./EvidenceSection.tsx"
 import { useRead } from "../../../../app/queries.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
-import { Field, INPUT, LABEL, Note, Section } from "./ui.tsx"
+import { Field, Group, INPUT, LABEL, Note, Section } from "./ui.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 const MATERIAL_NAMES: Readonly<Record<string, string>> = {
@@ -78,7 +78,7 @@ export function MaterialSection(): JSX.Element {
   return (
     <Show when={gen.settings.machineType === "3dprinter"} fallback={(
     <Section id="material" icon={Package} title={t("cam.material")} summary={MATERIAL_NAMES[gen.settings.material]} testId="material-section">
-      <div>
+      <div class="panel-field">
         <label class={LABEL}>{t("cam.gen.mat.type")}</label>
         <select class={INPUT} value={gen.settings.material} onChange={(event) => gen.updateSettings("material", event.currentTarget.value as ToolpathSettings["material"])}>
           <option value="aluminum">{t("cam.explorer.materialName.aluminum")}</option>
@@ -93,7 +93,7 @@ export function MaterialSection(): JSX.Element {
       </div>
 
       <div class="grid grid-cols-1 gap-2" data-testid="cutting-data-panel">
-        <div>
+        <div class="panel-field">
           <label class={LABEL}>{t("cam.gen.mat.grade")}</label>
           <select class={INPUT} data-testid="material-grade" value={currentGrade()?.id ?? ""} onChange={(event) => {
             const id = event.currentTarget.value
@@ -104,14 +104,14 @@ export function MaterialSection(): JSX.Element {
           </select>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <div>
+          <div class="panel-field">
             <label class={LABEL}>{t("cam.gen.mat.toolMaterial")}</label>
             <select class={INPUT} value={toolMaterial()} onChange={(event) => setToolMaterial(event.currentTarget.value as "carbide" | "hss")}>
               <option value="carbide">{t("cam.gen.mat.carbide")}</option>
               <option value="hss">HSS</option>
             </select>
           </div>
-          <div>
+          <div class="panel-field">
             <label class={LABEL}>{t("cam.gen.mat.machineLimits")}</label>
             <select class={INPUT} value={machineId()} onChange={(event) => setMachineId(event.currentTarget.value)}>
               <For each={cam.kernel.MACHINES}>{(m) => <option value={m.id}>{m.name}</option>}</For>
@@ -120,46 +120,42 @@ export function MaterialSection(): JSX.Element {
         </div>
         <Show when={recommendation()}>
           {(r) => (
-            <div class="p-2 rounded-md bg-emerald-50 text-xs text-emerald-900 space-y-0.5" data-testid="cutting-data-preview">
+            <Note kind="ok" testId="cutting-data-preview">
               <div class="font-medium">Cutting data for {r().material.name} · Ø{gen.settings.toolDiameter} {gen.settings.flutes}{t("cam.status.feed")} {toolMaterial() === "hss" ? "HSS" : "carbide"}</div>
               <div>{r().data.rpm} rpm · F {r().data.feed} mm/min · plunge {r().data.plungeFeed} · Vc {Math.round(r().data.vc)} m/min · fz {r().data.fz} {t("cad.millimeters")}</div>
               <div>ap {r().data.ap} mm · ae {r().data.ae} mm · {r().data.coolant} · {r().data.powerKw} kW · deflection {r().data.deflectionMm} {t("cad.millimeters")}</div>
-              <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-amber-700">{w}</div>}</For>
+              <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-[color:var(--panel-warn)]">{w}</div>}</For>
               <CuttingReferenceView reference={r().data.reference} />
-            </div>
+            </Note>
           )}
         </Show>
       </div>
 
       <Show when={gen.settings.material && properties()}>
         {(property) => (
-          <div class="p-3 bg-blue-50 rounded-md">
-            <h4 class="text-xs font-medium text-blue-800 mb-2">{MATERIAL_NAMES[gen.settings.material] ?? t("cam.gen.mat.other")} {t("cam.properties")}</h4>
-            <div class="grid gap-x-4 gap-y-2 text-xs">
-              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.density")}</span><span class="font-medium text-blue-700">{property().density}</span></div>
-              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.explorer.hardness")}</span><span class="font-medium text-blue-700">{property().hardness}</span></div>
-              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.thermal")}</span><span class="font-medium text-blue-700">{property().thermalBehavior}</span></div>
-              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.chipType")}</span><span class="font-medium text-blue-700">{property().chipType}</span></div>
-              <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.coolant")}</span><span class="font-medium text-blue-700">{property().coolant}</span></div>
-              <Show when={property().recommendedToolCoating}>
-                <div class="flex justify-between gap-3"><span class="text-gray-600">{t("cam.gen.mat.toolCoating")}</span><span class="font-medium text-blue-700">{property().recommendedToolCoating}</span></div>
-              </Show>
-            </div>
-            <button type="button" class="mt-3 text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-200" onClick={applyRecommended}>{t("cam.gen.mat.applyRecommended")}</button>
-          </div>
+          <Group title={`${MATERIAL_NAMES[gen.settings.material] ?? t("cam.gen.mat.other")} ${t("cam.properties")}`}>
+            <dl class="panel-kv">
+              <dt>{t("cam.gen.mat.density")}</dt><dd>{property().density}</dd>
+              <dt>{t("cam.explorer.hardness")}</dt><dd>{property().hardness}</dd>
+              <dt>{t("cam.gen.mat.thermal")}</dt><dd>{property().thermalBehavior}</dd>
+              <dt>{t("cam.gen.mat.chipType")}</dt><dd>{property().chipType}</dd>
+              <dt>{t("cam.gen.mat.coolant")}</dt><dd>{property().coolant}</dd>
+              <Show when={property().recommendedToolCoating}><dt>{t("cam.gen.mat.toolCoating")}</dt><dd>{property().recommendedToolCoating}</dd></Show>
+            </dl>
+            <button type="button" class="panel-btn" onClick={applyRecommended}>{t("cam.gen.mat.applyRecommended")}</button>
+          </Group>
         )}
       </Show>
 
-      <div class="mt-2 p-3 bg-blue-50 rounded-md">
-        <div class="flex justify-between items-center gap-3">
-          <span class="text-sm font-medium text-blue-800">{t("cam.gen.mat.workpieceInfo")}</span>
-          <button type="button" class="text-xs text-blue-600 hover:text-blue-800" onClick={() => gen.flash("Workpiece thickness is determined by the geometry selected in the Operations section", 4000)}>{t("cam.gen.mat.info")}</button>
+      <Group title={t("cam.gen.mat.workpieceInfo")}>
+        <div class="panel-row">
+          <span>{job.stock().width} x {job.stock().height} x {job.stock().depth} mm ({job.stock().material ?? gen.settings.material})</span>
+          <button type="button" class="panel-btn" onClick={() => gen.flash("Workpiece thickness is determined by the geometry selected in the Operations section", 4000)}>{t("cam.gen.mat.info")}</button>
         </div>
-        <div class="mt-1 text-xs text-blue-600">{job.stock().width} x {job.stock().height} x {job.stock().depth} mm ({job.stock().material ?? gen.settings.material})</div>
-        <div class="mt-1 text-xs text-gray-500 italic">{t("cam.gen.mat.thicknessNote")}</div>
-      </div>
+        <p class="panel-hint">{t("cam.gen.mat.thicknessNote")}</p>
+      </Group>
 
-      <div class="mt-2 flex flex-col pt-2 border-t border-gray-200">
+      <div class="panel-group">
         <label class={LABEL}>{t("cam.gen.mat.fromLibrary")}</label>
         <select class={INPUT} onChange={(event) => fromLibrary(event.currentTarget.value)}>
           <option value="">{t("cam.gen.mat.selectOne")}</option>

@@ -43,17 +43,17 @@ export default function KernelSetups(props: {
   const percent = (share: number): string => `${Math.round(share * 100)}`
 
   return (
-    <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-setups">
-      <summary class="cursor-pointer text-sm font-medium">{t("cam.setups.title")}</summary>
+    <details class="border-t border-[color:var(--panel-border)] pt-2" data-testid="kernel-setups">
+      <summary class="cursor-pointer text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.setups.title")}</summary>
       <div class="space-y-2 pt-2">
-        <label class="flex items-center gap-2 text-sm">
+        <label class="panel-check">
           <input type="checkbox" checked={fixture() === "bottom"} onChange={(event) => setFixture(event.currentTarget.checked ? "bottom" : "none")} data-testid="kernel-setups-fixture" />
           {t("cam.setups.heldBottom")}
         </label>
-        <button type="button" class="ui-btn ui-btn-secondary" disabled={busy() || props.elements === undefined || props.elements.length === 0} onClick={() => void run()} data-testid="kernel-setups-run">
+        <button type="button" class="panel-btn" disabled={busy() || props.elements === undefined || props.elements.length === 0} onClick={() => void run()} data-testid="kernel-setups-run">
           {busy() ? t("cam.setups.running") : t("cam.setups.run")}
         </button>
-        <Show when={error()}>{(message) => <p class="text-xs text-red-700 dark:text-red-300" role="alert" data-testid="kernel-setups-error">{message()}</p>}</Show>
+        <Show when={error()}>{(message) => <p class="text-xs text-[color:var(--panel-bad)]" role="alert" data-testid="kernel-setups-error">{message()}</p>}</Show>
         <For each={parts()}>{(part) => {
           const plan = (): Plan => part.plan
           return (
@@ -61,33 +61,33 @@ export default function KernelSetups(props: {
               <p class="font-medium">{part.name}</p>
               <ol class="space-y-1">
                 <For each={plan().setups}>{(setup, index) => (
-                  <li class="flex items-start justify-between gap-2 rounded border border-gray-200 dark:border-gray-700 px-2 py-2" data-testid="kernel-setups-item" data-orientation={setup.orientation}>
+                  <li class="flex items-start justify-between gap-2 rounded-[4px] border border-[color:var(--panel-border)] px-2 py-2" data-testid="kernel-setups-item" data-orientation={setup.orientation}>
                     <span>
                       <strong>{index() + 1}. {setup.orientation}</strong>{" "}
                       {t("cam.setups.share", { percent: percent(setup.share) })}
                       <Show when={setup.holes.length > 0}> · {t("cam.setups.holes", { count: setup.holes.length })}</Show>
                       <br />
-                      <span class="text-gray-500 dark:text-gray-400">
+                      <span class="text-[color:var(--panel-text-muted)]">
                         {setup.prismatic.ok ? t("cam.setups.prismatic") : t("cam.setups.notPrismatic", { reason: setup.prismatic.reason })}
                       </span>
                     </span>
-                    <button type="button" class="ui-btn ui-btn-secondary" disabled={props.current === setup.orientation || (props.current === undefined && setup.orientation === "+Z")} onClick={() => props.onUse(setup.orientation)} data-testid="kernel-setups-use">
+                    <button type="button" class="panel-btn" disabled={props.current === setup.orientation || (props.current === undefined && setup.orientation === "+Z")} onClick={() => props.onUse(setup.orientation)} data-testid="kernel-setups-use">
                       {t("cam.setups.use")}
                     </button>
                   </li>
                 )}</For>
               </ol>
-              <Show when={plan().held.length > 0}><p class="text-gray-500 dark:text-gray-400">{t("cam.setups.held")}</p></Show>
+              <Show when={plan().held.length > 0}><p class="text-[color:var(--panel-text-muted)]">{t("cam.setups.held")}</p></Show>
               <Show when={plan().uncovered.length > 0}>
-                <p class="text-amber-700 dark:text-amber-300" data-testid="kernel-setups-uncovered">{t("cam.setups.uncovered", { count: plan().uncovered.length })}</p>
+                <p class="text-[color:var(--panel-warn)]" data-testid="kernel-setups-uncovered">{t("cam.setups.uncovered", { count: plan().uncovered.length })}</p>
               </Show>
               <Show when={plan().indexed.length > 0}>
-                <p class="text-amber-700 dark:text-amber-300" data-testid="kernel-setups-indexed">{t("cam.setups.indexed", { count: plan().indexed.length })}</p>
+                <p class="text-[color:var(--panel-warn)]" data-testid="kernel-setups-indexed">{t("cam.setups.indexed", { count: plan().indexed.length })}</p>
               </Show>
             </div>
           )
         }}</For>
-        <For each={skipped()}>{(item) => <p class="text-xs text-gray-500 dark:text-gray-400">{item.name}: {item.reason}</p>}</For>
+        <For each={skipped()}>{(item) => <p class="panel-hint">{item.name}: {item.reason}</p>}</For>
       </div>
     </details>
   )

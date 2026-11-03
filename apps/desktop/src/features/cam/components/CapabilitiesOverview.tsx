@@ -52,7 +52,7 @@ function GroupCard(props: GroupCardProps): JSX.Element {
         </span>
         <ChevronDown
           size={14}
-          class="text-gray-400 transition-transform"
+          class="text-[color:var(--panel-text-faint)] transition-transform"
           style={{ transform: open() ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </button>
@@ -121,13 +121,13 @@ export default function CapabilitiesOverview(): JSX.Element {
   ]
   return (
     <div class="capabilities-overview" data-testid="cam-capabilities-overview">
-      <div class="flex items-center gap-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-700">
-        <Wrench size={14} class="text-blue-600 dark:text-blue-400" />
+      <div class="flex items-center gap-2 pb-1 mb-1 border-b border-[color:var(--panel-border)]">
+        <Wrench size={14} class="text-[color:var(--panel-text-muted)]" />
         <div>
-          <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+          <div class="text-[11px] font-semibold text-[color:var(--panel-text-muted)]">
             {t("cam.features.subtitle")}
           </div>
-          <div class="text-[12px] font-semibold text-gray-900 dark:text-white">
+          <div class="text-[12px] font-semibold text-[color:var(--panel-text)]">
             {t("cam.features.title")}
           </div>
         </div>

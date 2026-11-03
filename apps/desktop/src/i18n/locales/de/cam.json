@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "Parallel (Raster)",
   "cam.gen.adv.toolComp": "Werkzeugkorrektur",
   "cam.gen.adv.useToolComp": "Werkzeugkorrektur im G-Code verwenden (G41/G42)",
+  "cam.gen.adv.toolCompNote": "Die Werkzeugradiuskorrektur wird direkt im G-Code eingefügt. Die Richtung wird automatisch aus den Einstellungen für Aufmaß und Schnittrichtung bestimmt.",
+  "cam.gen.adv.advancedNote": "Die erweiterten Einstellungen ermöglichen eine genauere Steuerung der Werkzeugbahn, erfordern aber ggf. manuelle Anpassungen für optimale Ergebnisse. Die erweiterten Funktionen hängen von der verwendeten CNC-Steuerung ab.",
   "cam.gen.lathe.params": "Drehmaschinen-Parameter",
   "cam.gen.lathe.stockDia": "Rohteildurchmesser (mm)",
   "cam.gen.lathe.stockLength": "Rohteillänge (mm)",

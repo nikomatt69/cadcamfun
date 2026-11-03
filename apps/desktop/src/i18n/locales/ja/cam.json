@@ -1072,6 +1072,8 @@
   "cam.gen.adv.parallelRaster": "平行（ラスター）",
   "cam.gen.adv.toolComp": "工具補正",
   "cam.gen.adv.useToolComp": "G コードで工具補正を使用 (G41/G42)",
+  "cam.gen.adv.toolCompNote": "工具半径補正は G コードに直接挿入されます。方向はオフセットと切削方向の設定から自動的に決まります。",
+  "cam.gen.adv.advancedNote": "詳細設定ではツールパスをより細かく制御できますが、最適な結果を得るには手動の調整が必要な場合があります。詳細機能は使用する数値制御の種類に依存します。",
   "cam.gen.lathe.params": "旋盤パラメータ",
   "cam.gen.lathe.stockDia": "素材径 (mm)",
   "cam.gen.lathe.stockLength": "素材長 (mm)",

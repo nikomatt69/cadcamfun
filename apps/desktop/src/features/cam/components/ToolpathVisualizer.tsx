@@ -443,7 +443,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>
             <Show when={props.machine}>{(machine) => (
               <div data-testid="visualizer-machine">
-                <Show when={multiAxis()}><div data-testid="visualizer-multiaxis" class="text-teal-300">{props.machine?.kind === "lathe" ? t("cam.visualizer.millTurn") : rotary()?.layout} · {t("cam.visualizer.previewRotaryTiming")}</div></Show>
+                <Show when={multiAxis()}><div data-testid="visualizer-multiaxis" class="text-slate-300">{props.machine?.kind === "lathe" ? t("cam.visualizer.millTurn") : rotary()?.layout} · {t("cam.visualizer.previewRotaryTiming")}</div></Show>
                 <Show when={props.machine?.kind === "lathe" && multiAxis()}><div class="max-w-xs text-amber-200">{t("cam.visualizer.millTurnRemoval")}</div></Show>
                 <div>{t("cam.visualizer.machine")}: <span class="text-white">{MACHINE_LABELS[machine().kind]}</span> · {machine().kind === "mill" ? t("cam.visualizer.toolTurns") : machine().kind === "lathe" ? t("cam.visualizer.partTurns") : t("cam.visualizer.nothingTurns")}</div>
                 <div>{machine().kind === "3dprinter" ? "E" : t("cam.visualizer.spindle")}: <span class="text-white" data-testid="visualizer-spindle">{spindleText()}</span></div>
@@ -551,7 +551,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 return (
                   <li class={`flex items-center gap-2 rounded px-1.5 py-1 text-xs ${current() ? "bg-blue-600/30" : "hover:bg-white/5"}`} data-testid="operation-row">
                     <span class="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: colorHex(bandColors()[span.path] ?? 0x38bdf8) }} />
-                    <span class="flex-1 min-w-0" title={names()[span.path]}><span class="block truncate">{names()[span.path]}</span><span class="block text-[10px] text-slate-400" data-testid="operation-model">{(() => { const model = path !== undefined ? previewToolFor(path.toolId, props) : undefined; return model !== undefined ? cam.describeTool(model) : t("cam.visualizer.toolUnknown") })()}</span><span class="block text-[10px] text-blue-300">{props.operationTools?.find((tool) => tool.toolId === path?.toolId)?.operations?.map(operationLabel).join(" · ")}</span></span>
+                    <span class="flex-1 min-w-0" title={names()[span.path]}><span class="block truncate">{names()[span.path]}</span><span class="block text-[10px] text-slate-400" data-testid="operation-model">{(() => { const model = path !== undefined ? previewToolFor(path.toolId, props) : undefined; return model !== undefined ? cam.describeTool(model) : t("cam.visualizer.toolUnknown") })()}</span><span class="block text-[10px] text-slate-300">{props.operationTools?.find((tool) => tool.toolId === path?.toolId)?.operations?.map(operationLabel).join(" · ")}</span></span>
                     <Show when={multiTool().get(span.path)}>{(m) => <span class="rounded bg-amber-500/20 px-1 text-[10px] text-amber-200" title={t("cam.operations.multiTool")} data-testid="operation-multitool">{m().position}/{m().total}</span>}</Show>
                     <span class="tabular-nums text-slate-400">{Math.round(span.end - span.start)} s</span>
                     <span class="text-slate-400" title={(() => { const m = path !== undefined ? props.toolModels?.get(path.toolId) : undefined; return m !== undefined ? cam.describeTool(m) : undefined })()} data-testid="operation-tool">{path?.toolId ?? ""}</span>
@@ -577,7 +577,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}
               {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
               <section class="space-y-2 border-t border-slate-700 pt-3">
-                <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.toolpathPoints")}</h4>
+                <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.toolpathPoints")}</h4>
                 {toggle(t("cam.visualizer.showPoints"), showPoints, setShowPoints)}
                 <Show when={showPoints()}>
                   {toggle(t("cam.visualizer.showLabels"), showPointLabels, setShowPointLabels)}
@@ -592,7 +592,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 </Show>
               </section>
               <section class="space-y-2 border-t border-slate-700 pt-3">
-                <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.arcs")}</h4>
+                <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.arcs")}</h4>
                 {toggle(t("cam.visualizer.showArcCenters"), showArcCenters, setShowArcCenters)}
                 {toggle(t("cam.visualizer.showArcRadii"), showArcRadii, setShowArcRadii)}
                 <label class="block text-xs text-slate-200">{t("cam.visualizer.arcTolerance")} <span class="float-right text-slate-400">{arcTolerance().toFixed(2)} {t("cad.millimeters")}</span>
@@ -600,7 +600,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 </label>
               </section>
               <section class="space-y-2 border-t border-slate-700 pt-3">
-                <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.tool")}</h4>
+                <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.tool")}</h4>
                 {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? "done" : "all"))}
                 {toggle(t("cam.visualizer.stopAtCollision"), stopAtCollision, setStopAtCollision)}
                 {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
@@ -608,7 +608,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               </section>
               <Show when={props.machine}>{(machine) => (
                 <section class="space-y-2 border-t border-slate-700 pt-3">
-                  <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.machine")}</h4>
+                  <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.machine")}</h4>
                   <Show when={machine().kind === "lathe" && multiAxis()}>
                     {toggle(t("cam.visualizer.showMachine"), showMachine, setShowMachine)}
                     <label class="block text-xs text-slate-200">{t("cam.visualizer.rotaryFrame")}
@@ -659,7 +659,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 </section>
               )}</Show>
               <section class="space-y-2 border-t border-slate-700 pt-3">
-                <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.workpiece")}</h4>
+                <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.workpiece")}</h4>
                 {toggle(t("cam.visualizer.showWorkpiece"), stockVisible, setStockVisible)}
                 <Show when={stockVisible()}><label class="block text-xs text-slate-200">{t("cam.visualizer.opacity")} <span class="float-right text-slate-400">{Math.round(stockOpacity() * 100)}%</span>
                   <input class="mt-1 w-full accent-blue-500" type="range" min="0.05" max="1" step="0.05" value={stockOpacity()} onInput={(event) => setStockOpacity(Number(event.currentTarget.value))} />
