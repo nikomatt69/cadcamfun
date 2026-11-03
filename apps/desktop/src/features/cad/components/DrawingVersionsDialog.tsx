@@ -46,18 +46,18 @@ export default function DrawingVersionsDialog(props: { readonly open: boolean; r
     <Modal open={props.open} onClose={() => { if (busy() === undefined) props.onClose() }} title={t("save.versions.title")} size="md">
       <div class="px-6 py-4" data-testid="drawing-versions">
         <Show when={!versions.loading} fallback={<LoadingState label={t("common.loading")} rows={2} />}>
-          <Show when={!versions.error} fallback={<div role="alert" class="flex flex-wrap items-center justify-between gap-3 text-sm text-red-700 dark:text-red-400"><span>{t("common.error")}</span><button type="button" class="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700" onClick={() => void refetch()}>{t("common.retry")}</button></div>}>
-          <Show when={(versions() ?? []).length > 0} fallback={<p class="text-sm text-gray-500 dark:text-gray-400">{t("save.versions.empty")}</p>}>
-            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+          <Show when={!versions.error} fallback={<div role="alert" class="flex flex-wrap items-center justify-between gap-3 text-sm text-[color:var(--ent-bad)]"><span>{t("common.error")}</span><button type="button" class="rounded-md border border-[color:var(--ent-line-strong)] px-3 py-1 text-sm text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]" onClick={() => void refetch()}>{t("common.retry")}</button></div>}>
+          <Show when={(versions() ?? []).length > 0} fallback={<p class="text-sm text-[color:var(--ent-text-muted)]">{t("save.versions.empty")}</p>}>
+            <ul class="divide-y divide-[color:var(--ent-line)]">
               <For each={versions()}>
                 {(version) => (
                   <li class="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                     <span>
-                      <time class="block font-medium tabular-nums text-gray-900 dark:text-gray-100" dateTime={version.createdAt}>{new Date(version.createdAt).toLocaleString()}</time>
-                      <span class="text-xs text-gray-500 dark:text-gray-400">{t("save.versions.item", { version: version.version, elements: version.elements })}</span>
+                      <time class="block font-medium tabular-nums text-[color:var(--ent-text)]" dateTime={version.createdAt}>{new Date(version.createdAt).toLocaleString()}</time>
+                      <span class="text-xs text-[color:var(--ent-text-muted)]">{t("save.versions.item", { version: version.version, elements: version.elements })}</span>
                     </span>
                     <button type="button" data-testid="restore-version" disabled={busy() !== undefined} aria-label={`${t("save.versions.restore")}: ${t("save.versions.item", { version: version.version, elements: version.elements })}`} onClick={() => void restore(version)}
-                      class="flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-700">
+                      class="flex items-center gap-1 rounded-md border border-[color:var(--ent-line-strong)] px-3 py-1 text-sm hover:bg-[color:var(--ent-surface-subtle)] disabled:opacity-50">
                       <History size={14} />{t("save.versions.restore")}
                     </button>
                   </li>

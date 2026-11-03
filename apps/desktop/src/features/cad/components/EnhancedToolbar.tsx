@@ -114,7 +114,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
 
   return (
     <Motion.div
-      class="workstation-toolbar flex items-center justify-between w-full text-gray-900 dark:text-white"
+      class="workstation-toolbar flex items-center justify-between w-full text-[color:var(--ent-text)]"
       initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, easing: "ease-out" }}
     >
       <Motion.div
@@ -295,34 +295,34 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
         <Portal>
           <div class="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" onClick={() => setSimulationPosition(null)} />
           <div
-            class="fixed z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+            class="panel fixed z-[9999] bg-[color:var(--panel-bg)] rounded-2xl shadow-2xl border border-[color:var(--panel-border)] overflow-hidden"
             style={{ top: `${position().y}px`, left: `${position().x}px`, width: `${Math.min(1200, window.innerWidth * 0.95)}px`, height: `${Math.min(800, window.innerHeight * 0.9)}px` }}
           >
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div class="flex items-center justify-between p-4 border-b border-[color:var(--panel-border)] bg-[color:var(--panel-bg-subtle)]">
               <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center"><Activity size={16} class="text-white" /></div>
+                <div class="w-8 h-8 bg-[color:var(--panel-accent)] rounded-lg flex items-center justify-center"><Activity size={16} class="text-white" /></div>
                 <div>
-                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{t("cad.tb.feaTitle")}</h2>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">{t("cad.tb.feaSubtitle")}</p>
+                  <h2 class="text-lg font-semibold text-[color:var(--panel-text)]">{t("cad.tb.feaTitle")}</h2>
+                  <p class="text-sm text-[color:var(--panel-text-muted)]">{t("cad.tb.feaSubtitle")}</p>
                 </div>
               </div>
               <div class="flex items-center space-x-2">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mr-4">
-                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1" />{t("cad.tb.systemActive")}</span>
+                <div class="text-xs text-[color:var(--panel-text-muted)] mr-4">
+                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-[color:var(--panel-ok)] rounded-full mr-1" />{t("cad.tb.systemActive")}</span>
                 </div>
-                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label={t("cad.drawing.close")}><X size={16} /></button>
+                <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-[color:var(--panel-bg-subtle)] text-[color:var(--panel-text-muted)] hover:text-[color:var(--panel-text)] transition-colors" aria-label={t("cad.drawing.close")}><X size={16} /></button>
               </div>
             </div>
             <div class="h-[calc(100%-4rem)] overflow-hidden"><SimulationPanel /></div>
-            <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+            <div class="absolute bottom-0 left-0 right-0 bg-[color:var(--panel-bg-subtle)] border-t border-[color:var(--panel-border)] px-4 py-2">
               <div class="flex items-center justify-between text-xs">
-                <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">
-                  <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />{t("cad.tb.simActive")}</span>
+                <div class="flex items-center space-x-4 text-[color:var(--panel-text-muted)]">
+                  <span class="flex items-center"><div class="w-2 h-2 bg-[color:var(--panel-accent)] rounded-full mr-1" />{t("cad.tb.simActive")}</span>
                   <span>Ctrl+Shift+S: Toggle simulation{/* i18n-ok */}</span>
                   <span>F9: Switch mode{/* i18n-ok */}</span>
                   <span>Esc: Close{/* i18n-ok */}</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+                <div class="flex items-center space-x-2 text-[color:var(--panel-text-muted)]">
                   <span>{t("cad.tb.advancedMode")}</span>
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
         <Portal>
           <div class="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" onClick={() => setPmiPosition(null)} />
           <div
-            class="panel fixed z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+            class="panel fixed z-[9999] bg-[color:var(--panel-bg)] rounded-2xl shadow-2xl border border-[color:var(--panel-border)] overflow-hidden"
             style={{ top: `${position().y}px`, left: `${position().x}px`, width: `${Math.min(640, window.innerWidth * 0.95)}px`, height: `${Math.min(800, window.innerHeight * 0.9)}px`, "background": "var(--panel-bg)", "color": "var(--panel-text)" }}
             data-testid="cad-pmi-dialog"
             role="dialog"

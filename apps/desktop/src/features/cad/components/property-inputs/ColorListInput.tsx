@@ -54,7 +54,7 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
       <div class={LABEL}>{props.label} ({value().length || 0} colors)</div>
       <button type="button" onClick={openDialog} disabled={props.disabled ?? false} class={TRIGGER} data-testid="edit-colors">
         <span class="truncate">{t("cad.input.editColors")}</span>
-        <span class="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <span class="flex shrink-0 items-center gap-2 text-xs text-[color:var(--ent-text-muted)]">
           {value().length}
           <Droplet size={16} />
         </span>
@@ -70,28 +70,28 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
         size="lg"
       >
         <div class="grid gap-4 lg:grid-cols-2">
-          <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
-            <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.input.colors")}</h4>
+          <section class="flex min-w-0 flex-col rounded-lg border border-[color:var(--ent-line)]">
+            <header class="flex items-center justify-between gap-2 border-b border-[color:var(--ent-line)] px-3 py-2">
+              <h4 class="text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.input.colors")}</h4>
               <button
                 type="button"
                 onClick={() => { setCurrent(null); setCurrentHex("#000000") }}
-                class="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                class="flex items-center gap-1 rounded-md border border-[color:var(--ent-line-strong)] px-2 py-1 text-xs font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
               >
                 <Plus size={14} /> New color
               </button>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
               <For each={colors()}>{(color, index) =>
-                <div class={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${current() === index() ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/40" : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
+                <div class={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${current() === index() ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "border-transparent hover:bg-[color:var(--ent-surface-subtle)]"}`}>
                   <button type="button" onClick={() => { setCurrent(index()); setCurrentHex(hex(color)) }} class="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    <span class="h-5 w-5 shrink-0 rounded-full border border-gray-300 dark:border-gray-600" style={{ "background-color": hex(color) }} />
-                    <span class="truncate font-mono text-xs text-gray-700 dark:text-gray-200">{hex(color)}</span>
+                    <span class="h-5 w-5 shrink-0 rounded-full border border-[color:var(--ent-line-strong)]" style={{ "background-color": hex(color) }} />
+                    <span class="truncate font-mono text-xs text-[color:var(--ent-text)]">{hex(color)}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => remove(index())}
-                    class="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                    class="shrink-0 rounded-md p-1.5 text-[color:var(--ent-text-faint)] hover:bg-[color:var(--ent-bad-soft)] hover:text-[color:var(--ent-bad)]"
                     title={`Remove ${hex(color)}`}
                     aria-label={`Remove ${hex(color)}`}
                   >
@@ -100,19 +100,19 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
                 </div>}
               </For>
               <Show when={colors().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.noColors")}</p>
+                <p class="px-2 py-6 text-center text-sm text-[color:var(--ent-text-muted)]">{t("cad.input.noColors")}</p>
               </Show>
             </div>
           </section>
 
-          <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <h4 class="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.input.picker")}</h4>
+          <section class="rounded-lg border border-[color:var(--ent-line)] p-3">
+            <h4 class="mb-3 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.input.picker")}</h4>
             <div class="space-y-3">
               <input
                 type="color"
                 value={currentHex()}
                 onInput={(event) => setCurrentHex(event.currentTarget.value)}
-                class="h-10 w-full cursor-pointer rounded border border-gray-300 p-1 dark:border-gray-600"
+                class="h-10 w-full cursor-pointer rounded border border-[color:var(--ent-line-strong)] p-1"
                 aria-label={t("library.color")}
               />
               <div class="flex items-center gap-2">
@@ -120,25 +120,25 @@ export function ColorListInput(props: ColorListInputProps): JSX.Element {
                   type="text"
                   value={currentHex()}
                   onInput={(event) => setCurrentHex(event.currentTarget.value)}
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400"
+                  class="w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-3 py-2 text-sm shadow-sm focus:border-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]"
                   aria-label={t("cad.input.hexColor")}
                 />
                 <button
                   type="button"
                   onClick={add}
-                  class="shrink-0 rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                  class="shrink-0 rounded-md bg-[color:var(--ent-action)] px-3 py-2 text-sm text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]"
                 >
                   {current() !== null ? "Update" : t("cad.add")}
                 </button>
               </div>
               <div>
-                <div class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">{t("cad.input.presets")}</div>
+                <div class="mb-1 text-xs font-medium text-[color:var(--ent-text-muted)]">{t("cad.input.presets")}</div>
                 <div class="grid grid-cols-8 gap-1">
                   <For each={PRESETS}>{(color) =>
                     <button
                       type="button"
                       onClick={() => setCurrentHex(color)}
-                      class="h-6 w-6 rounded-full border border-gray-300 transition-shadow hover:ring-2 hover:ring-blue-400 dark:border-gray-600"
+                      class="h-6 w-6 rounded-full border border-[color:var(--ent-line-strong)] transition-shadow hover:ring-2 hover:ring-[color:var(--ent-accent)]"
                       style={{ "background-color": color }}
                       title={color}
                       aria-label={`Use ${color}`}

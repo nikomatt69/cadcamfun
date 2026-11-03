@@ -176,15 +176,15 @@ export default function ImportExportDialog(props: Props): JSX.Element {
       ]} projectBody={t("cad.importExport.saveAsProjectBody")} onProject={() => setShowProject(true)} onExport={exportFile} onClose={props.onClose} />
     <Modal open={props.mode === "import"} variant="workspace" title={t("cad.io.importDrawing")} onClose={props.onClose}>
       <div class="px-6 py-4">
-        <label for="file-upload" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("cad.importExport.selectFile")}</label>
-        <div class="mb-4 flex flex-col items-center gap-3 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-6 dark:border-gray-600 dark:bg-gray-700/50">
-          <Upload class="h-8 w-8 text-gray-400" aria-hidden="true" /><label for="file-upload" class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cad.importExport.upload")}</label>
+        <label for="file-upload" class="block text-sm font-medium text-[color:var(--ent-text)] mb-1">{t("cad.importExport.selectFile")}</label>
+        <div class="mb-4 flex flex-col items-center gap-3 rounded-md border-2 border-dashed border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface-subtle)] p-6">
+          <Upload class="h-8 w-8 text-[color:var(--ent-text-faint)]" aria-hidden="true" /><label for="file-upload" class="cursor-pointer text-[color:var(--ent-accent)]">{t("cad.importExport.upload")}</label>
           <input id="file-upload" name="file-upload" type="file" accept=".json,.cad,.stl,.obj,.ply,.step,.stp,.iges,.igs" class={SAVE_FIELD} onChange={importFile} />
-          <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.importExport.formats")}</p>
+          <p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.importExport.formats")}</p>
         </div>
-        <p class="rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800/50 dark:bg-yellow-900/20 dark:text-yellow-200">{t("cad.importExport.importWarning")}</p>
+        <p class="rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-warn-soft)] p-4 text-sm text-[color:var(--ent-warn)]">{t("cad.importExport.importWarning")}</p>
       </div>
-      <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 flex justify-end rounded-b-lg"><button type="button" class="px-4 py-2 rounded-md text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600" onClick={props.onClose}>{t("common.cancel")}</button></div>
+      <div class="px-6 py-4 bg-[color:var(--ent-surface-subtle)] border-t border-[color:var(--ent-line)] flex justify-end rounded-b-lg"><button type="button" class="px-4 py-2 rounded-md text-sm bg-[color:var(--ent-surface)] border border-[color:var(--ent-line-strong)]" onClick={props.onClose}>{t("common.cancel")}</button></div>
     </Modal>
     <SaveCADAsProjectModal isOpen={showProject()} onClose={() => setShowProject(false)} organizations={organizations()} />
   </Show>

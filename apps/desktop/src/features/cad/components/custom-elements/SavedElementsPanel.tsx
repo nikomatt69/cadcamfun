@@ -17,8 +17,8 @@ export interface SavedElementsPanelProps {
   readonly onEdit: (definitionId: string) => void
 }
 
-const ROW = "w-full flex items-center justify-between gap-2 p-2 rounded border border-gray-200 dark:border-gray-700"
-const ICON = "p-1 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+const ROW = "w-full flex items-center justify-between gap-2 p-2 rounded border border-[color:var(--ent-line)]"
+const ICON = "p-1 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]"
 
 const download = (filename: string, content: string): void => {
   downloadFile({ name: filename, data: content, mime: "application/json" })
@@ -45,15 +45,15 @@ export default function SavedElementsPanel(props: SavedElementsPanelProps): JSX.
         <input
           type="text"
           placeholder={t("cad.customElements.searchSaved")}
-          class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          class="flex-1 px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--ent-accent)]"
           value={query()}
           onInput={(event) => setQuery(event.currentTarget.value)}
         />
-        <select class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value={category()} onChange={(event) => setCategory(event.currentTarget.value)}>
+        <select class="px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md bg-[color:var(--ent-surface)] text-[color:var(--ent-text)] text-sm" value={category()} onChange={(event) => setCategory(event.currentTarget.value)}>
           <option value="">{t("cad.customElements.allCategories")}</option>
           <For each={categories()}>{(name) => <option value={name}>{name === "" ? t("cad.customElements.uncategorized") : name}</option>}</For>
         </select>
-        <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1" onClick={() => download("custom-elements.json", store.exportAllDefinitions())}>
+        <button type="button" class="px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md text-sm text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] flex items-center gap-1" onClick={() => download("custom-elements.json", store.exportAllDefinitions())}>
           <Download class="w-4 h-4" />
           {t("cad.customElements.exportAll")}
         </button>
@@ -64,20 +64,20 @@ export default function SavedElementsPanel(props: SavedElementsPanelProps): JSX.
           <For each={visible()}>{(definition) =>
             <div class={ROW}>
               <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{definition.name}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{definition.description || definition.category}</div>
+                <div class="text-sm font-medium text-[color:var(--ent-text)] truncate">{definition.name}</div>
+                <div class="text-xs text-[color:var(--ent-text-muted)] truncate">{definition.description || definition.category}</div>
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 <button type="button" class={ICON} title={t("cad.customElements.edit")} onClick={() => props.onEdit(definition.id)}><Pencil class="w-4 h-4" /></button>
                 <button type="button" class={ICON} title={t("cad.customElements.duplicate")} onClick={() => store.duplicateDefinition(definition.id, `${definition.name} ${t("cad.customElements.copyOf")}`)}><Copy class="w-4 h-4" /></button>
                 <button type="button" class={ICON} title={t("cad.customElements.exportJson")} onClick={() => { const json = store.exportDefinition(definition.id); if (json !== null) download(`${definition.name.replace(/\s+/g, "_")}.json`, json) }}><Download class="w-4 h-4" /></button>
-                <button type="button" class={ICON + " hover:text-red-600"} title={t("cad.customElements.delete")} onClick={() => store.deleteDefinition(definition.id)}><Trash2 class="w-4 h-4" /></button>
+                <button type="button" class={ICON + " hover:text-[color:var(--ent-bad)]"} title={t("cad.customElements.delete")} onClick={() => store.deleteDefinition(definition.id)}><Trash2 class="w-4 h-4" /></button>
               </div>
             </div>
           }</For>
         </div>
       }>
-        <div class="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+        <div class="text-center py-8 text-sm text-[color:var(--ent-text-muted)]">
           <div>{t("cad.customElements.noneSaved")}</div>
           <div class="text-xs">{t("cad.customElements.noneSavedHint")}</div>
         </div>

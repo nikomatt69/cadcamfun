@@ -114,7 +114,7 @@ export default function ComponentCreationModal(props: ComponentCreationModalProp
   return (
     <Modal open={props.isOpen} onClose={close} title={t("cad.createComponent.title")} size="lg">
       <form onSubmit={(event) => void create(event)} class="space-y-4" data-component-creation>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{t("cad.createComponent.workflowHint")}</p>
+        <p class="text-sm text-[color:var(--ent-text-muted)]">{t("cad.createComponent.workflowHint")}</p>
         <div class="grid gap-5 md:grid-cols-2">
           <fieldset disabled={busy()} class="min-w-0 space-y-3">
             <label class="block text-sm font-medium">{t("cad.createComponent.name")}
@@ -133,27 +133,27 @@ export default function ComponentCreationModal(props: ComponentCreationModalProp
             </label>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={keepOriginals()} onChange={(event) => setKeepOriginals(event.currentTarget.checked)} />{t("cad.createComponent.keepOriginals")}</label>
           </fieldset>
-          <section class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+          <section class="min-w-0 rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3">
             <h4 class="flex items-center gap-2 text-sm font-medium"><Blocks size={16} />{t("cad.createComponent.contents")}</h4>
-            <p class="my-2 text-xs text-gray-500 dark:text-gray-400">{t("cad.createComponent.summary", { roots: selected().length, total: entries().length, nested: subcomponents() })}</p>
+            <p class="my-2 text-xs text-[color:var(--ent-text-muted)]">{t("cad.createComponent.summary", { roots: selected().length, total: entries().length, nested: subcomponents() })}</p>
             <Show when={bounds()}>{(value) => <p class="mb-2 font-mono text-xs tabular-nums">{t("cad.createComponent.size", { width: value().width.toFixed(2), height: value().height.toFixed(2), depth: value().depth.toFixed(2) })} {t("cad.millimeters")}</p>}</Show>
             <div class="max-h-56 overflow-auto" data-component-hierarchy>
-              <For each={entries()}>{({ element, depth }) => <div class="flex justify-between gap-2 border-t border-gray-200 py-1.5 text-xs dark:border-gray-700" style={{ "padding-left": `${depth * 12}px` }}>
-                <span class="truncate">{element.name || element.type}</span><span class="text-gray-500">{element.type}</span>
+              <For each={entries()}>{({ element, depth }) => <div class="flex justify-between gap-2 border-t border-[color:var(--ent-line)] py-1.5 text-xs" style={{ "padding-left": `${depth * 12}px` }}>
+                <span class="truncate">{element.name || element.type}</span><span class="text-[color:var(--ent-text-muted)]">{element.type}</span>
               </div>}</For>
             </div>
-            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("cad.createComponent.hierarchyHint")}</p>
+            <p class="mt-3 text-xs text-[color:var(--ent-text-muted)]">{t("cad.createComponent.hierarchyHint")}</p>
           </section>
         </div>
-        <fieldset disabled={busy()} class="space-y-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+        <fieldset disabled={busy()} class="space-y-3 border-t border-[color:var(--ent-line)] pt-3">
           <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={saveLibrary()} onChange={(event) => setSaveLibrary(event.currentTarget.checked)} data-component-save-library />{t("cad.saveElement.save")}</label>
           <Show when={saveLibrary()}>
             <div class="flex gap-2">
               <For each={["local", "project"] as const}>{(value) => <button type="button" class="ui-button flex-1" aria-pressed={destination() === value}
-                classList={{ "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300": destination() === value }}
+                classList={{ "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]": destination() === value }}
                 onClick={() => setDestination(value)}>{t(value === "local" ? "cad.saveElement.destinationLocal" : "cad.saveElement.destinationProject")}</button>}</For>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{t(destination() === "local" ? "cad.saveElement.destinationHintLocal" : "cad.saveElement.destinationHintProject")}</p>
+            <p class="text-xs text-[color:var(--ent-text-muted)]">{t(destination() === "local" ? "cad.saveElement.destinationHintLocal" : "cad.saveElement.destinationHintProject")}</p>
             <Show when={destination() === "project"}>
               <label class="block text-sm">{t("cad.saveElement.project")}
                 <select class="ui-input mt-1 w-full" value={projectId()} onChange={(event) => setProjectId(event.currentTarget.value)} data-component-project>
@@ -168,9 +168,9 @@ export default function ComponentCreationModal(props: ComponentCreationModalProp
             </Show>
           </Show>
         </fieldset>
-        <Show when={duplicate()}><p class="text-xs text-amber-600">{t("cad.createComponent.duplicateHint")}</p></Show>
+        <Show when={duplicate()}><p class="text-xs text-[color:var(--ent-warn)]">{t("cad.createComponent.duplicateHint")}</p></Show>
         <Show when={error()}><p class="ui-field-error" role="alert">{error()}</p></Show>
-        <div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+        <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-3">
           <button type="button" class="ui-button" onClick={close} disabled={busy()}>{t("cad.saveElement.cancel")}</button>
           <button type="submit" class="ui-button ui-button-primary flex items-center gap-2" disabled={!canCreate()} data-component-submit><Save size={16} />
             {t(busy() ? "cad.saveElement.saving" : saveLibrary() ? "cad.createComponent.createSave" : "cad.createComponent.create")}

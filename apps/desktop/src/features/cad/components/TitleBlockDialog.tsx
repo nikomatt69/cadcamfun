@@ -76,7 +76,7 @@ export default function TitleBlockDialog(props: { readonly open: boolean; readon
         </div>
       }>
       <form class="space-y-4 px-6 py-4" data-testid="title-block-form" onSubmit={(e) => { e.preventDefault(); void save() }}>
-        <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.titleBlock.intro")}</p>
+        <p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.titleBlock.intro")}</p>
         <For each={GROUPS}>
           {(group) => (
             <Show when={fields(group).length > 0}>
@@ -95,7 +95,7 @@ export default function TitleBlockDialog(props: { readonly open: boolean; readon
             </Show>
           )}
         </For>
-        <Show when={missing().length > 0}><p class="text-xs text-amber-700 dark:text-amber-400" role="status">{t("cad.titleBlock.missing", { fields: missing().join(", ") })}</p></Show>
+        <Show when={missing().length > 0}><p class="text-xs text-[color:var(--ent-warn)]" role="status">{t("cad.titleBlock.missing", { fields: missing().join(", ") })}</p></Show>
       </form>
     </Modal>
   )

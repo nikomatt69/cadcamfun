@@ -298,7 +298,7 @@ export function ToolpathsScreen(): JSX.Element {
                                   <div class="flex items-center gap-2">
                                     <div class="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)]"><Code size={16} class="text-[color:var(--ent-text-faint)]" aria-hidden="true" /></div>
                                     <div>
-                                      <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-[color:var(--ent-text)] hover:text-[color:var(--ent-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={(event) => event.stopPropagation()}>{row.name}</A>
+                                      <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="text-xs font-medium text-[color:var(--ent-text)] hover:text-[color:var(--ent-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ent-accent)]" onClick={(event) => event.stopPropagation()}>{row.name}</A>
                                       <Show when={row.description}><div class="max-w-xs truncate text-[11px] text-[color:var(--ent-text-muted)]">{row.description}</div></Show>
                                     </div>
                                   </div>
@@ -327,7 +327,7 @@ export function ToolpathsScreen(): JSX.Element {
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       <For each={rows()}>{(row) => (
                         <div class={CARD}>
-                          <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500">
+                          <A href={`/toolpaths/${encodeURIComponent(row.id)}`} class="flex flex-1 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--ent-accent)]">
                           <CardBanner
                             icon={<Wrench size={16} aria-hidden="true" />}
                             badge={TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}
@@ -377,10 +377,10 @@ export function ToolpathsScreen(): JSX.Element {
       />
 
       <Modal open={deleting() !== undefined} title={t("cam.deleteToolpath")} onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-gray-700 dark:text-gray-300">{t("pages.are.you.sure.you.want.to.delete.this.toolpath")}</p>
+        <p class="text-sm text-[color:var(--ent-text)]">{t("pages.are.you.sure.you.want.to.delete.this.toolpath")}</p>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" class="rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
-          <button type="button" class="rounded-[5px] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
+          <button type="button" class="rounded-[5px] border border-[color:var(--ent-line)] px-3 py-1.5 text-xs font-medium text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)]" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
+          <button type="button" class="rounded-[5px] border border-[color:var(--ent-bad)] bg-[color:var(--ent-bad-soft)] px-3 py-1.5 text-xs font-medium text-[color:var(--ent-bad)] hover:bg-[color:var(--ent-surface-inset)] disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
         </div>
       </Modal>
     </>

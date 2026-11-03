@@ -17,7 +17,7 @@ interface PointListInputProps {
 
 const TRIGGER = "w-full px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md text-xs bg-[color:var(--ent-surface)] hover:bg-[color:var(--ent-surface-subtle)] flex justify-between items-center gap-2 text-[color:var(--ent-text)]"
 const LABEL = "block text-xs font-medium text-[color:var(--ent-text-muted)] mb-1"
-const COORD = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
+const COORD = "w-full px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md shadow-sm text-sm bg-[color:var(--ent-surface)] text-[color:var(--ent-text)]"
 const AXES = ["x", "y", "z"] as const
 
 /** What the list shows: three decimals at most, no float noise. */
@@ -87,7 +87,7 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
       </div>
       <button type="button" onClick={openDialog} disabled={props.disabled ?? false} class={TRIGGER} data-testid="edit-points">
         <span class="truncate">{t("cad.input.editPoints")}</span>
-        <span class="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <span class="flex shrink-0 items-center gap-2 text-xs text-[color:var(--ent-text-muted)]">
           {value().length}
           <Edit2 size={16} />
         </span>
@@ -105,22 +105,22 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
         size="lg"
       >
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
-            <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.toolpanel.tool.point-cloud")}</h4>
+          <section class="flex min-w-0 flex-col rounded-lg border border-[color:var(--ent-line)]">
+            <header class="flex items-center justify-between gap-2 border-b border-[color:var(--ent-line)] px-3 py-2">
+              <h4 class="text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.toolpanel.tool.point-cloud")}</h4>
               <button
                 type="button"
                 onClick={add}
                 disabled={props.maxPoints !== undefined && points().length >= props.maxPoints}
-                class="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                class="flex items-center gap-1 rounded-md border border-[color:var(--ent-line-strong)] px-2 py-1 text-xs font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus size={14} /> Add point
               </button>
             </header>
             <div class="max-h-[46vh] min-h-[6rem] overflow-y-auto p-2">
               <div class="flex items-center gap-1 px-2 pb-1">
-                <span class="w-20 shrink-0 text-[11px] font-semibold text-gray-500">{t("cad.input.point")}</span>
-                <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 text-[11px] font-semibold text-gray-500">
+                <span class="w-20 shrink-0 text-[11px] font-semibold text-[color:var(--ent-text-muted)]">{t("cad.input.point")}</span>
+                <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 text-[11px] font-semibold text-[color:var(--ent-text-muted)]">
                   <span>{t("cad.field.x")}</span>
                   <span>{t("cad.field.y")}</span>
                   <span>Z</span>
@@ -128,10 +128,10 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
                 <span class="w-7 shrink-0" />
               </div>
               <For each={points()}>{(point, index) =>
-                <div data-testid="point-row" class={`flex items-center gap-1 rounded-md border px-2 py-1.5 ${current() === index() ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/40" : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
+                <div data-testid="point-row" class={`flex items-center gap-1 rounded-md border px-2 py-1.5 ${current() === index() ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "border-transparent hover:bg-[color:var(--ent-surface-subtle)]"}`}>
                   <button type="button" onClick={() => setCurrent(index())} class="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <span class="w-20 shrink-0 text-xs font-semibold text-gray-700 dark:text-gray-200">{t("cad.input.point")} {index() + 1}</span>
-                    <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    <span class="w-20 shrink-0 text-xs font-semibold text-[color:var(--ent-text)]">{t("cad.input.point")} {index() + 1}</span>
+                    <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 font-mono text-xs text-[color:var(--ent-text-muted)]">
                       <span class="truncate">{show(point?.x)}</span>
                       <span class="truncate">{show(point?.y)}</span>
                       <span class="truncate">{show(point?.z)}</span>
@@ -140,7 +140,7 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
                   <button
                     type="button"
                     onClick={() => remove(index())}
-                    class="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                    class="shrink-0 rounded-md p-1.5 text-[color:var(--ent-text-faint)] hover:bg-[color:var(--ent-bad-soft)] hover:text-[color:var(--ent-bad)]"
                     title={`Remove point ${index() + 1}`}
                     aria-label={`Remove point ${index() + 1}`}
                   >
@@ -149,23 +149,23 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
                 </div>}
               </For>
               <Show when={points().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.noPoints")}</p>
+                <p class="px-2 py-6 text-center text-sm text-[color:var(--ent-text-muted)]">{t("cad.input.noPoints")}</p>
               </Show>
             </div>
           </section>
 
-          <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <h4 class="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.input.coordinates")}</h4>
+          <section class="rounded-lg border border-[color:var(--ent-line)] p-3">
+            <h4 class="mb-3 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.input.coordinates")}</h4>
             {/* The picked point is read from the signal, not from `Show`'s condition: point 1 is index 0, which is falsy. */}
             <Show when={current() !== null} fallback={
-              <p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.pickPoint")}</p>
+              <p class="py-6 text-center text-sm text-[color:var(--ent-text-muted)]">{t("cad.input.pickPoint")}</p>
             }>
               <div class="space-y-3">
-                <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.input.point")} {(current() ?? 0) + 1} of {points().length}</p>
+                <p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.input.point")} {(current() ?? 0) + 1} of {points().length}</p>
                 <div class="grid grid-cols-3 gap-2">
                   <For each={AXES}>{(axis) =>
                     <div>
-                      <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">{axis.toUpperCase()}</label>
+                      <label class="mb-1 block text-xs font-medium text-[color:var(--ent-text-muted)]">{axis.toUpperCase()}</label>
                       <NumberField
                         label={`Point ${(current() ?? 0) + 1} ${axis.toUpperCase()}`}
                         value={points()[current() ?? 0]?.[axis] ?? 0}
@@ -179,7 +179,7 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
                 <button
                   type="button"
                   onClick={() => remove(current() ?? 0)}
-                  class="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-red-900/40"
+                  class="flex w-full items-center justify-center gap-2 rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 text-sm text-[color:var(--ent-text)] hover:bg-[color:var(--ent-bad-soft)] hover:text-[color:var(--ent-bad)]"
                 >
                   <Trash2 size={14} /> Remove point {(current() ?? 0) + 1}
                 </button>

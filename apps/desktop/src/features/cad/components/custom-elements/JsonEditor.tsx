@@ -133,8 +133,8 @@ const MATERIAL_TEMPLATES: Readonly<Record<string, string>> = {
 }
 
 const TAB = "px-3 py-2 text-sm border-b-2 transition-colors"
-const TAB_ACTIVE = "border-blue-600 text-blue-600"
-const TAB_IDLE = "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+const TAB_ACTIVE = "border-[color:var(--ent-accent)] text-[color:var(--ent-accent)]"
+const TAB_IDLE = "border-transparent text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]"
 
 const SECTIONS: ReadonlyArray<{ readonly id: Section; readonly labelKey: Key }> = [
   { id: "geometry", labelKey: "cad.customElements.sectionGeometry" },
@@ -206,8 +206,8 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
   }
 
   return (
-    <div class="h-full flex flex-col bg-white dark:bg-gray-800">
-      <div class="flex border-b border-gray-200 dark:border-gray-700">
+    <div class="h-full flex flex-col bg-[color:var(--ent-surface)]">
+      <div class="flex border-b border-[color:var(--ent-line)]">
         <For each={SECTIONS}>{(entry) =>
           <button type="button" onClick={() => setSection(entry.id)} class={`${TAB} ${section() === entry.id ? TAB_ACTIVE : TAB_IDLE}`}>
             {t(entry.labelKey)}
@@ -215,20 +215,20 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
         }</For>
       </div>
 
-      <div class="p-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+      <div class="p-2 bg-[color:var(--ent-surface-subtle)] border-b border-[color:var(--ent-line)]">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <button type="button" onClick={() => void copyText(currentCode()).catch(() => toast.error(t("shell.clipboard.failed")))} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.copy")}>
+            <button type="button" onClick={() => void copyText(currentCode()).catch(() => toast.error(t("shell.clipboard.failed")))} class="p-1 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]" title={t("cad.customElements.copy")}>
               <Copy class="w-4 h-4" />
             </button>
-            <button type="button" onClick={resetToDefault} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.reset")}>
+            <button type="button" onClick={resetToDefault} class="p-1 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]" title={t("cad.customElements.reset")}>
               <RotateCcw class="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => setHelp(!help())} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.help")}>
+            <button type="button" onClick={() => setHelp(!help())} class="p-1 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]" title={t("cad.customElements.help")}>
               <HelpCircle class="w-4 h-4" />
             </button>
           </div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">
+          <div class="text-xs text-[color:var(--ent-text-muted)]">
             {section() === "geometry"
               ? t("cad.customElements.jsGeometryHint")
               : section() === "material"
@@ -240,9 +240,9 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
         <Show when={section() !== "parameters"}>
           <div class="mt-2">
             <div class="flex flex-wrap gap-1 items-center">
-              <span class="text-xs text-gray-600 dark:text-gray-400 mr-2">{t("cad.customElements.templates")}</span>
+              <span class="text-xs text-[color:var(--ent-text-muted)] mr-2">{t("cad.customElements.templates")}</span>
               <For each={Object.entries(section() === "geometry" ? GEOMETRY_TEMPLATES : MATERIAL_TEMPLATES)}>{([name, template]) =>
-                <button type="button" onClick={() => insertTemplate(template)} class="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800">
+                <button type="button" onClick={() => insertTemplate(template)} class="text-xs px-2 py-1 bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)] rounded hover:bg-[color:var(--ent-surface-inset)]">
                   {name}
                 </button>
               }</For>
@@ -251,7 +251,7 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
         </Show>
 
         <Show when={help()}>
-          <div class="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-800 dark:text-blue-200 space-y-1">
+          <div class="mt-2 p-3 bg-[color:var(--ent-accent-soft)] rounded text-xs text-[color:var(--ent-accent)] space-y-1">
             <For each={helpLines()}>{(line) => <p>• {line}</p>}</For>
           </div>
         </Show>
@@ -280,12 +280,12 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
       </div>
 
       <Show when={props.errors.length > 0}>
-        <div class="p-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs max-h-20 overflow-y-auto">
+        <div class="p-2 bg-[color:var(--ent-bad-soft)] border-t border-[color:var(--ent-bad)] text-[color:var(--ent-bad)] text-xs max-h-20 overflow-y-auto">
           <For each={props.errors}>{(error) => <div>• {error}</div>}</For>
         </div>
       </Show>
 
-      <div class="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
+      <div class="px-3 py-2 bg-[color:var(--ent-surface-subtle)] border-t border-[color:var(--ent-line)] text-xs text-[color:var(--ent-text-muted)]">
         <div class="flex justify-between gap-3">
           <span>{section() === "geometry" ? t("cad.customElements.geometryFunction") : section() === "material" ? t("cad.customElements.materialFunction") : t("cad.customElements.parametersConfiguration")}</span>
           <span>{t("cad.customElements.linesAndChars", { lines: lineCount(), chars: currentCode().length })}</span>

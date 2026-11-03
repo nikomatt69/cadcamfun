@@ -28,8 +28,8 @@ export interface PropertyEditorModalProps {
   readonly children: JSX.Element
 }
 
-const CANCEL = "rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-const SAVE = "rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+const CANCEL = "rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)]"
+const SAVE = "rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)] disabled:cursor-not-allowed disabled:opacity-50"
 
 /** The dialog of a property editor: centred, wide, with the actions pinned at the bottom. */
 export function PropertyEditorModal(props: PropertyEditorModalProps): JSX.Element {
@@ -42,7 +42,7 @@ export function PropertyEditorModal(props: PropertyEditorModalProps): JSX.Elemen
       footer={
         <div class="flex w-full items-center gap-3">
           <Show when={props.error !== undefined}>
-            <p class="min-w-0 flex-1 text-xs text-red-600 dark:text-red-400" role="alert">{props.error}</p>
+            <p class="min-w-0 flex-1 text-xs text-[color:var(--ent-bad)]" role="alert">{props.error}</p>
           </Show>
           <div class="ml-auto flex shrink-0 items-center gap-2">
             <button type="button" class={CANCEL} onClick={props.onClose}>{props.cancelLabel ?? t("cad.assembly.cancel")}</button>
@@ -64,7 +64,7 @@ export function PropertyEditorModal(props: PropertyEditorModalProps): JSX.Elemen
         }}
       >
         <Show when={props.subtitle !== undefined}>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{props.subtitle}</p>
+          <p class="text-xs text-[color:var(--ent-text-muted)]">{props.subtitle}</p>
         </Show>
         {props.children}
       </div>

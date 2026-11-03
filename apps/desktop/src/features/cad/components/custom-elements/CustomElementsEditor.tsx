@@ -29,8 +29,8 @@ export interface CustomElementsEditorProps {
 
 type Tab = "code" | "parameters" | "assistant" | "preview" | "saved" | "settings"
 
-const FIELD = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-const ACTION = "px-3 py-1 rounded text-white flex items-center gap-1 disabled:opacity-50"
+const FIELD = "w-full px-3 py-2 border border-[color:var(--ent-line-strong)] rounded-md focus:outline-none focus:ring-2 focus:ring-[color:var(--ent-accent)] bg-[color:var(--ent-surface)] text-[color:var(--ent-text)]"
+const ACTION = "px-3 py-1 rounded flex items-center gap-1 disabled:opacity-50"
 const TAB = "flex items-center gap-2 px-4 py-2 border-b-2 transition-colors"
 
 export default function CustomElementsEditor(props: CustomElementsEditorProps): JSX.Element {
@@ -182,54 +182,54 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
       <Show when={definition()} keyed={false}>
         {(active) => (
           <div class="flex h-[min(78dvh,58rem)] min-h-[24rem] flex-col">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--ent-line)] pb-3">
               <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{active().name}</span>
+                <span class="text-sm font-semibold text-[color:var(--ent-text)]">{active().name}</span>
                 <Show when={unsavedChanges()}>
-                  <span class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">{t("cad.customElements.unsaved")}</span>
+                  <span class="rounded-full bg-[color:var(--ent-warn-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--ent-warn)]">{t("cad.customElements.unsaved")}</span>
                 </Show>
                 <Show when={store.validationErrors.length === 0} fallback={
-                  <span class="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:bg-red-950/60 dark:text-red-300">{t("cad.customElements.errorCount", { count: store.validationErrors.length })}</span>
+                  <span class="rounded-full bg-[color:var(--ent-bad-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--ent-bad)]">{t("cad.customElements.errorCount", { count: store.validationErrors.length })}</span>
                 }>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"><Check size={12} />{t("cad.customElements.valid")}</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-[color:var(--ent-ok-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--ent-ok)]"><Check size={12} />{t("cad.customElements.valid")}</span>
                 </Show>
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class={ACTION + " h-9 bg-slate-100 text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:ring-slate-600 dark:hover:bg-slate-600"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
+                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)] ring-1 ring-[color:var(--ent-line)] hover:bg-[color:var(--ent-surface-inset)]"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
                   <Play class="w-4 h-4" />
                   <span>{t("cad.customElements.preview")}</span>
                 </button>
-                <button type="button" class={ACTION + " h-9 bg-blue-600 hover:bg-blue-700"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
+                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)]"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
                   <Save class="w-4 h-4" />
                   <span>{t("cad.customElements.save")}</span>
                 </button>
-                <button type="button" class={ACTION + " h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
+                <button type="button" class={ACTION + " h-9 bg-[color:var(--ent-text)] text-[color:var(--ent-surface)] hover:bg-[color:var(--ent-text-muted)]"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
                   <Plus class="w-4 h-4" />
                   <span>{t("cad.customElements.addToScene")}</span>
                 </button>
-                <button type="button" class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.exportJson")} onClick={handleExport}>
+                <button type="button" class="p-2 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]" title={t("cad.customElements.exportJson")} onClick={handleExport}>
                   <Download class="w-4 h-4" />
                 </button>
-                <button type="button" class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.importJson")} onClick={() => fileInput?.click()}>
+                <button type="button" class="p-2 text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]" title={t("cad.customElements.importJson")} onClick={() => fileInput?.click()}>
                   <Upload class="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <Show when={store.editorMode === "create"}>
-              <div class="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-slate-200 py-2 dark:border-slate-700">
-                <span class="sticky left-0 shrink-0 bg-white pr-1 text-[11px] font-semibold text-slate-500 dark:bg-slate-800">{t("cad.customElements.templates")}</span>
+              <div class="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[color:var(--ent-line)] py-2">
+                <span class="sticky left-0 shrink-0 bg-[color:var(--ent-surface)] pr-1 text-[11px] font-semibold text-[color:var(--ent-text-muted)]">{t("cad.customElements.templates")}</span>
                 <For each={Object.keys(customElementTemplates)}>
-                  {(key) => <button type="button" class="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-blue-950/40 dark:hover:text-blue-300" onClick={() => handleApplyTemplate(key)}>{customElementTemplates[key]?.name ?? key}</button>}
+                  {(key) => <button type="button" class="shrink-0 rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--ent-text)] transition hover:border-[color:var(--ent-accent)] hover:bg-[color:var(--ent-accent-soft)] hover:text-[color:var(--ent-accent)]" onClick={() => handleApplyTemplate(key)}>{customElementTemplates[key]?.name ?? key}</button>}
                 </For>
               </div>
             </Show>
 
-            <div class="flex shrink-0 gap-1 overflow-x-auto border-b border-gray-200 pt-2 dark:border-gray-700">
+            <div class="flex shrink-0 gap-1 overflow-x-auto border-b border-[color:var(--ent-line)] pt-2">
               <For each={tabs}>
                 {(entry) => (
-                  <button type="button" onClick={() => setTab(entry.id)} class={`${TAB} rounded-t-md ${tab() === entry.id ? "border-blue-600 bg-blue-50/70 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300" : "border-transparent text-gray-600 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-slate-800"}`}>
+                  <button type="button" onClick={() => setTab(entry.id)} class={`${TAB} rounded-t-md ${tab() === entry.id ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]" : "border-transparent text-[color:var(--ent-text-muted)] hover:bg-[color:var(--ent-surface-subtle)]"}`}>
                     {t(entry.labelKey)}
                   </button>
                 )}
@@ -237,7 +237,7 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
             </div>
 
             <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
-              <div class="flex-1 min-h-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+              <div class="flex-1 min-h-0 border-b lg:border-b-0 lg:border-r border-[color:var(--ent-line)] overflow-y-auto">
                 <Show when={tab() === "code"}>
                   <JsonEditor definition={active()} onChange={handleDefinitionChange} errors={store.validationErrors} />
                 </Show>
@@ -258,19 +258,19 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
                 <Show when={tab() === "settings"}>
                   <div class="p-4 space-y-4">
                     <div>
-                      <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.customElements.name")}</span>
+                      <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.customElements.name")}</span>
                       <input type="text" class={FIELD} value={active().name} onInput={(event) => handleDefinitionChange({ name: event.currentTarget.value })} />
                     </div>
                     <div>
-                      <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.customElements.descriptionLabel")}</span>
+                      <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.customElements.descriptionLabel")}</span>
                       <textarea rows={3} class={FIELD} value={active().description ?? ""} onInput={(event) => handleDefinitionChange({ description: event.currentTarget.value })} />
                     </div>
                     <div>
-                      <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.customElements.category")}</span>
+                      <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.customElements.category")}</span>
                       <input type="text" class={FIELD} value={active().category ?? ""} onInput={(event) => handleDefinitionChange({ category: event.currentTarget.value })} />
                     </div>
                     <div>
-                      <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.customElements.tags")}</span>
+                      <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.customElements.tags")}</span>
                       <input type="text" class={FIELD} value={(active().tags ?? []).join(", ")} onInput={(event) => handleDefinitionChange({ tags: event.currentTarget.value.split(",").map((value) => value.trim()).filter(Boolean) })} />
                     </div>
                   </div>
@@ -278,10 +278,10 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
               </div>
 
               <div class="flex-1 min-h-72 flex flex-col">
-                <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                  <div><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{t("cad.customElements.livePreview")}</h3><p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{active().description || t("cad.customElements.previewSubheading")}</p></div>
+                <div class="flex items-center justify-between border-b border-[color:var(--ent-line)] px-4 py-3">
+                  <div><h3 class="text-sm font-semibold text-[color:var(--ent-text)]">{t("cad.customElements.livePreview")}</h3><p class="mt-0.5 text-[11px] text-[color:var(--ent-text-muted)]">{active().description || t("cad.customElements.previewSubheading")}</p></div>
                   <Show when={store.previewError}>
-                    {(error) => <div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-300 text-sm">{error()}</div>}
+                    {(error) => <div class="mt-2 p-2 bg-[color:var(--ent-bad-soft)] border border-[color:var(--ent-bad)] rounded text-[color:var(--ent-bad)] text-sm">{error()}</div>}
                   </Show>
                 </div>
                 <div class="flex-1 min-h-0">

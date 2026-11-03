@@ -206,17 +206,17 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
 
       <Modal open={open()} onClose={() => setOpen(false)} title={t("cad.saveElement.title")}>
         <div class="space-y-4">
-          <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.saveElement.subtitle")}</p>
+          <p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.saveElement.subtitle")}</p>
 
           <Show when={selected()}>
             {(element) => (
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60" data-testid="save-element-preview">
-                <p class="mb-1 text-[11px] font-semibold text-gray-500">{t("cad.saveElement.preview")}</p>
-                <p class="text-sm font-medium text-gray-800 dark:text-gray-200">{describe(element())}</p>
-                <dl class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
+              <div class="rounded-lg border border-[color:var(--ent-line)] bg-[color:var(--ent-surface-subtle)] p-3" data-testid="save-element-preview">
+                <p class="mb-1 text-[11px] font-semibold text-[color:var(--ent-text-muted)]">{t("cad.saveElement.preview")}</p>
+                <p class="text-sm font-medium text-[color:var(--ent-text)]">{describe(element())}</p>
+                <dl class="mt-2 grid grid-cols-2 gap-2 text-xs text-[color:var(--ent-text-muted)]">
                   <For each={previewOf(element())}>{([key, value]) => (
                     <div class="flex min-w-0 gap-1">
-                      <dt class="text-gray-500 capitalize">{key}:</dt>
+                      <dt class="text-[color:var(--ent-text-muted)] capitalize">{key}:</dt>
                       <dd class="truncate font-medium" title={value}>{value}</dd>
                     </div>
                   )}</For>
@@ -226,10 +226,10 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           </Show>
 
           <label class="block">
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.name")}</span>
+            <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.name")}</span>
             <input
               type="text"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+              class="w-full rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-[color:var(--ent-accent)]"
               value={form().name}
               onInput={(event) => change("name", event.currentTarget.value)}
               placeholder={t("cad.saveElement.namePlaceholder")}
@@ -238,10 +238,10 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.description")}</span>
+            <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.description")}</span>
             <textarea
               rows={3}
-              class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+              class="w-full rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-[color:var(--ent-accent)]"
               value={form().description}
               onInput={(event) => change("description", event.currentTarget.value)}
             />
@@ -249,9 +249,9 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
 
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.type")}</span>
+              <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.type")}</span>
               <select
-                class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                class="w-full rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-[color:var(--ent-accent)]"
                 value={form().type}
                 onChange={(event) => change("type", event.currentTarget.value)}
               >
@@ -259,10 +259,10 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
               </select>
             </label>
             <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.tags")}</span>
+              <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.tags")}</span>
               <input
                 type="text"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                class="w-full rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-[color:var(--ent-accent)]"
                 value={form().tags}
                 onInput={(event) => change("tags", event.currentTarget.value)}
                 placeholder={t("cad.saveElement.tagsPlaceholder")}
@@ -271,12 +271,12 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           </div>
 
           <div>
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.destination")}</span>
+            <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.destination")}</span>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="flex-1 rounded-md border px-3 py-2 text-left text-sm"
-                classList={{ "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300": destination() === "local", "border-gray-300 dark:border-gray-600": destination() !== "local" }}
+                classList={{ "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]": destination() === "local", "border-[color:var(--ent-line-strong)]": destination() !== "local" }}
                 aria-pressed={destination() === "local"}
                 onClick={() => setDestination("local")}
               >
@@ -285,14 +285,14 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
               <button
                 type="button"
                 class="flex-1 rounded-md border px-3 py-2 text-left text-sm"
-                classList={{ "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300": destination() === "project", "border-gray-300 dark:border-gray-600": destination() !== "project" }}
+                classList={{ "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)] text-[color:var(--ent-accent)]": destination() === "project", "border-[color:var(--ent-line-strong)]": destination() !== "project" }}
                 aria-pressed={destination() === "project"}
                 onClick={() => setDestination("project")}
               >
                 {t("cad.saveElement.destinationProject")}
               </button>
             </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-xs text-[color:var(--ent-text-muted)]">
               {t(destination() === "local" ? "cad.saveElement.destinationHintLocal" : "cad.saveElement.destinationHintProject")}
             </p>
           </div>
@@ -300,9 +300,9 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           <Show when={destination() === "project"}>
             <div class="space-y-2">
               <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("cad.saveElement.project")}</span>
+                <span class="mb-1 block text-sm font-medium text-[color:var(--ent-text)]">{t("cad.saveElement.project")}</span>
                 <select
-                  class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="w-full rounded-md border border-[color:var(--ent-line-strong)] px-3 py-2 shadow-sm focus:border-[color:var(--ent-accent)] focus:outline-none focus:ring-[color:var(--ent-accent)]"
                   value={projectId()}
                   onChange={(event) => setProjectId(event.currentTarget.value)}
                 >
@@ -310,12 +310,12 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
                   <For each={projects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
                 </select>
               </label>
-              <Show when={projectsState() === "loading"}><p class="text-xs text-gray-500">{t("cad.saveElement.loadingProjects")}</p></Show>
+              <Show when={projectsState() === "loading"}><p class="text-xs text-[color:var(--ent-text-muted)]">{t("cad.saveElement.loadingProjects")}</p></Show>
               <Show when={projectsState() === "failed"}>
-                <p class="text-xs text-amber-600 dark:text-amber-400">{t("cad.saveElement.offline")}</p>
+                <p class="text-xs text-[color:var(--ent-warn)]">{t("cad.saveElement.offline")}</p>
               </Show>
               <Show when={projectsState() === "idle" && projects().length === 0}>
-                <p class="text-xs text-amber-600 dark:text-amber-400">{t("cad.saveElement.noProjects")}</p>
+                <p class="text-xs text-[color:var(--ent-warn)]">{t("cad.saveElement.noProjects")}</p>
               </Show>
               <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={isPublic()} onChange={(event) => setIsPublic(event.currentTarget.checked)} />
@@ -325,24 +325,24 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           </Show>
 
           <Show when={duplicate()}>
-            <p class="text-xs text-amber-600 dark:text-amber-400">{t("cad.saveElement.duplicate")}</p>
+            <p class="text-xs text-[color:var(--ent-warn)]">{t("cad.saveElement.duplicate")}</p>
           </Show>
 
           <Show when={status()?.kind === "error"}>
-            <p class="text-xs text-red-600 dark:text-red-400" role="alert">{status()!.text}</p>
+            <p class="text-xs text-[color:var(--ent-bad)]" role="alert">{status()!.text}</p>
           </Show>
 
-          <div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+          <div class="flex justify-end gap-2 border-t border-[color:var(--ent-line)] pt-3">
             <button
               type="button"
-              class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              class="rounded-md border border-[color:var(--ent-line-strong)] px-4 py-2 text-sm font-medium text-[color:var(--ent-text)] hover:bg-[color:var(--ent-surface-subtle)]"
               onClick={() => setOpen(false)}
             >
               {t("cad.saveElement.cancel")}
             </button>
             <button
               type="button"
-              class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              class="rounded-md bg-[color:var(--ent-action)] px-4 py-2 text-sm font-medium text-[color:var(--ent-action-text)] hover:bg-[color:var(--ent-action-hover)] disabled:opacity-50"
               disabled={!canSave()}
               onClick={() => void save()}
             >

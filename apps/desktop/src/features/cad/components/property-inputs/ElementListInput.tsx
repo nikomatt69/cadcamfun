@@ -122,7 +122,7 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
   }
 
   const rowClass = (active: boolean): string =>
-    `flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left ${active ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/40" : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"}`
+    `flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left ${active ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-accent-soft)]" : "border-transparent hover:bg-[color:var(--ent-surface-subtle)]"}`
 
   return (
     <div class="mb-2">
@@ -144,51 +144,51 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
         size="xl"
       >
         <div class="relative">
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search size={16} class="text-gray-400 dark:text-gray-500" /></div>
+          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search size={16} class="text-[color:var(--ent-text-faint)]" /></div>
           <input
             type="text"
             placeholder={t("cad.input.searchNameId")}
             value={term()}
             onInput={(event) => setTerm(event.currentTarget.value)}
-            class="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400"
+            class="w-full rounded-md border border-[color:var(--ent-line-strong)] bg-[color:var(--ent-surface)] py-2 pl-10 pr-3 text-sm shadow-sm focus:border-[color:var(--ent-accent)] focus:ring-[color:var(--ent-accent)]"
           />
         </div>
 
         <div class="grid gap-4 lg:grid-cols-2">
-          <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
-            <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("plugins.available")}</h4>
-              <span class="text-xs text-gray-500 dark:text-gray-400">{filtered().length} shown</span>
+          <section class="flex min-w-0 flex-col rounded-lg border border-[color:var(--ent-line)]">
+            <header class="flex items-center justify-between gap-2 border-b border-[color:var(--ent-line)] px-3 py-2">
+              <h4 class="text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("plugins.available")}</h4>
+              <span class="text-xs text-[color:var(--ent-text-muted)]">{filtered().length} shown</span>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
               <For each={shown()}>{(candidate) =>
                 <button type="button" onClick={() => toggle(candidate.key)} class={rowClass(isSelected(candidate.key))} data-testid="element-row">
-                  <span class={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected(candidate.key) ? "border-blue-500 bg-blue-500 text-white" : "border-gray-300 dark:border-gray-500"}`}>
+                  <span class={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected(candidate.key) ? "border-[color:var(--ent-accent)] bg-[color:var(--ent-action)] text-[color:var(--ent-action-text)]" : "border-[color:var(--ent-line-strong)]"}`}>
                     <Show when={isSelected(candidate.key)}><Check size={12} /></Show>
                   </span>
                   <span class="min-w-0 flex-1">
-                    <span class="block truncate text-sm text-gray-800 dark:text-gray-200">{candidate.label}</span>
-                    <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{candidate.detail}</span>
+                    <span class="block truncate text-sm text-[color:var(--ent-text)]">{candidate.label}</span>
+                    <span class="block truncate text-xs text-[color:var(--ent-text-muted)]">{candidate.detail}</span>
                   </span>
                   <span class="h-3 w-3 shrink-0 rounded-full" style={{ "background-color": candidate.color }} />
                 </button>}
               </For>
               <Show when={filtered().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <p class="px-2 py-6 text-center text-sm text-[color:var(--ent-text-muted)]">
                   {term() ? `Nothing matches "${term()}".` : "Nothing to pick here."}
                 </p>
               </Show>
               <Show when={hidden() > 0}>
-                <p class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400">…and {hidden()} more. Narrow the search to reach them.</p>
+                <p class="px-2 py-3 text-xs text-[color:var(--ent-text-muted)]">…and {hidden()} more. Narrow the search to reach them.</p>
               </Show>
             </div>
           </section>
 
-          <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
-            <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400">{t("cad.status.selected")}</h4>
+          <section class="flex min-w-0 flex-col rounded-lg border border-[color:var(--ent-line)]">
+            <header class="flex items-center justify-between gap-2 border-b border-[color:var(--ent-line)] px-3 py-2">
+              <h4 class="text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("cad.status.selected")}</h4>
               <Show when={selected().length > 0}>
-                <button type="button" onClick={() => setSelected([])} class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">{t("cad.input.clearAll")}</button>
+                <button type="button" onClick={() => setSelected([])} class="text-xs text-[color:var(--ent-text-muted)] hover:text-[color:var(--ent-text)]">{t("cad.input.clearAll")}</button>
               </Show>
             </header>
             <div class="max-h-[44vh] min-h-[8rem] overflow-y-auto p-2">
@@ -198,13 +198,13 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
                   <div class={rowClass(false)}>
                     <span class="h-3 w-3 shrink-0 rounded-full" style={{ "background-color": candidate()?.color ?? "#cccccc" }} />
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm text-gray-800 dark:text-gray-200">{candidate()?.label ?? key}</span>
-                      <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{candidate()?.detail ?? ""}</span>
+                      <span class="block truncate text-sm text-[color:var(--ent-text)]">{candidate()?.label ?? key}</span>
+                      <span class="block truncate text-xs text-[color:var(--ent-text-muted)]">{candidate()?.detail ?? ""}</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => toggle(key)}
-                      class="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                      class="shrink-0 rounded-md p-1.5 text-[color:var(--ent-text-faint)] hover:bg-[color:var(--ent-bad-soft)] hover:text-[color:var(--ent-bad)]"
                       title={`Remove ${candidate()?.label ?? key}`}
                       aria-label={`Remove ${candidate()?.label ?? key}`}
                     >
@@ -214,10 +214,10 @@ export function ElementListInput(props: ElementListInputProps): JSX.Element {
                 )
               }}</For>
               <Show when={selected().length === 0}>
-                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("cad.input.nothingSelected")}</p>
+                <p class="px-2 py-6 text-center text-sm text-[color:var(--ent-text-muted)]">{t("cad.input.nothingSelected")}</p>
               </Show>
               <Show when={selected().length > LIMIT}>
-                <p class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400">Showing the first {LIMIT} of {selected().length}. Clear some to see the rest.</p>
+                <p class="px-2 py-3 text-xs text-[color:var(--ent-text-muted)]">Showing the first {LIMIT} of {selected().length}. Clear some to see the rest.</p>
               </Show>
             </div>
           </section>
