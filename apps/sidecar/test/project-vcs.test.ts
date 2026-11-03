@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Database, schema } from "@cadcamfun/db"
+import { renderRecentCommits } from "@cadcamfun/ai"
 import { Repository, fetchBranch, memoryBackend, push, repositoryTransport } from "@cadcamfun/vcs"
 import { eq } from "drizzle-orm"
 import { Effect, Layer } from "effect"
@@ -38,6 +39,19 @@ const withProject = <A, E>(body: (ctx: { projectId: string; owner: Actor; compan
   )
 
 describe("ProjectVcs", () => {
+  test("the log the assistant's context reads is newest first and renders as one line per commit (RM-06)", () =>
+    withProject(({ projectId, owner, sql, vcs }) =>
+      Effect.gen(function*() {
+        yield* vcs.commit(projectId, { message: "Initial import" }, owner)
+        sql.update(schema.drawingTable).set({ data: { w: 120, h: 50 } }).where(eq(schema.drawingTable.id, "d1")).run()
+        yield* vcs.commit(projectId, { message: "Widen plate\n\nfrom 100 to 120 mm" }, owner)
+        const text = renderRecentCommits(yield* vcs.log(projectId, undefined, 4), { max: 3 })
+        const rows = text.split("\n").slice(1)
+        expect(rows).toHaveLength(2)
+        expect(rows[0]).toMatch(/^- [0-9a-f]{7} "Widen plate" by Ada on \d{4}-\d{2}-\d{2}$/)
+        expect(rows[1]).toMatch(/^- [0-9a-f]{7} "Initial import" by Ada/)
+      })))
+
   test("commit tracks the database, status reports dirty files", () =>
     withProject(({ projectId, owner, sql, vcs }) =>
       Effect.gen(function*() {

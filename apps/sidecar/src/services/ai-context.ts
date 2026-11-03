@@ -11,7 +11,8 @@
  */
 import {
   assembleContext, assembleContextParts, notesByRecency, OBSERVATION_BUDGET, parseProjectContext, projectContextKey, projectMemoryPrefix, readProjectMemoryFiles,
-  renderNotes, renderProjectContext, renderProjectMemory, renderUserHabits, renderWorkspaceContext,
+  renderNotes, renderProjectContext, renderProjectMemory, renderRecentCommits, renderUserHabits, renderWorkspaceContext,
+  type RecentCommit,
   type AiHost, type ContextAssembly, type ContextParts, type ContextRequest, type ContextSource
 } from "@cadcamfun/ai"
 import { Effect, Option } from "effect"
@@ -36,9 +37,11 @@ export interface AiContextDeps {
   readonly projects: ProjectRepo["Service"]
   readonly host: Option.Option<AiHost["Service"]>
   readonly drawings?: DrawingRepo["Service"]
+  /** The newest commits of a project the actor may read; absent where there is no version control. */
+  readonly recentCommits?: (projectId: string, limit: number) => Effect.Effect<ReadonlyArray<RecentCommit>, unknown>
 }
 
-export const makeAiContext = ({ kv, projects, host, drawings }: AiContextDeps) => {
+export const makeAiContext = ({ kv, projects, host, drawings, recentCommits }: AiContextDeps) => {
   const read = <A>(label: string, effect: Effect.Effect<A, unknown>, fallback: A) =>
     effect.pipe(Effect.catch((error) => Effect.logWarning(`Unable to load ${label}`, error).pipe(Effect.as(fallback))))
 
@@ -91,6 +94,11 @@ export const makeAiContext = ({ kv, projects, host, drawings }: AiContextDeps) =
       }
       const document = yield* read("the project AI context", kv.get(projectContextKey(projectId)), undefined)
       out.push({ id: "project-rules", kind: "requirement", label: "project rules", text: renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text) })
+      // The last commits tell the assistant what was saved, by whom and when; a project without history simply has none.
+      if (recentCommits !== undefined) {
+        const commits = yield* read("the recent commits", recentCommits(projectId, 4), [])
+        out.push({ id: "recent-commits", kind: "memory", label: "recent commits", text: renderRecentCommits(commits, { max: 3 }) })
+      }
       // Brain's files live in the project's scratch folder; without an embedded host there is no Brain and no habits file.
       if (Option.isSome(host)) {
         const projectHost = yield* read("the project's AI host", host.value.runtime.host(projectId), undefined)

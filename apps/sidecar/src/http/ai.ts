@@ -19,6 +19,7 @@ import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
+import { ProjectVcs } from "../services/project-vcs.ts"
 import { makeAiContext } from "../services/ai-context.ts"
 import { HISTORY_SCAN_LIMIT, historyPage, sessionSummaries, type HostHistoryMessage, type HostHistorySession } from "../services/assistant-history.ts"
 
@@ -64,6 +65,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const appConfig = yield* AppConfigService
   const projects = yield* ProjectRepo
   const drawings = yield* DrawingRepo
+  const vcs = yield* ProjectVcs
   actingUser.configureDirectory(join(appConfig.dataDir, "ai", "session-owners"))
   const checkProject = Effect.fn("AiHttp.checkProject")(function*(projectId?: string) {
     const actor = yield* CurrentUser
@@ -204,7 +206,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
    * What the assistant knows before the first word: the caller's context, the project context the UI keeps in the
    * key-value store and notes belonging only to that project.
    */
-  const aiContext = makeAiContext({ kv, projects, host, drawings })
+  const aiContext = makeAiContext({
+    kv, projects, host, drawings,
+    // The log is read through the same service the version-control routes use; a project that has no history yet answers empty.
+    recentCommits: (projectId, limit) => vcs.log(projectId, undefined, limit)
+  })
   /** The turn's context through the one assembly (`ai-context.ts`): authorised sources, one budget, a manifest. */
   const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; sessionId?: string | undefined; drawingId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
     const actor = yield* CurrentUser

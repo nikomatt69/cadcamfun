@@ -246,3 +246,33 @@ export const renderNotes = (notes: ReadonlyArray<{ readonly key: string; readonl
   }
   return (header(notes.length - rows.length) + rows.join("\n")).slice(0, budget)
 }
+
+/** What a commit needs to be shown (the `vcs` log entry, narrowed so this module does not depend on the VCS package). */
+export interface RecentCommit {
+  readonly oid: string
+  readonly message: string
+  readonly author?: { readonly name?: string; readonly time?: number }
+}
+
+/**
+ * The last few commits of the project on one line each: short id, first line of the message, author and day. Commit messages
+ * are written by people and by the assistant, so they are data (labelled one-line text), never instructions. Empty when the
+ * history is empty.
+ */
+export const renderRecentCommits = (commits: ReadonlyArray<RecentCommit>, options: { readonly max?: number; readonly maxChars?: number } = {}): string => {
+  const max = Math.max(0, Math.floor(num(options.max) ?? 3))
+  const budget = Math.max(0, Math.floor(num(options.maxChars) ?? 700))
+  if (commits.length === 0 || max === 0 || budget === 0) return ""
+  const rows: string[] = []
+  const header = (omitted: number) => `Recent commits (newest first${omitted > 0 ? `; ${omitted} more not shown - vcs action log` : ""}):\n`
+  for (const commit of commits.slice(0, max)) {
+    const id = str(commit.oid)?.slice(0, 7) ?? "?"
+    const subject = str(commit.message.split("\n")[0])?.slice(0, 120) ?? "(no message)"
+    const by = str(commit.author?.name)
+    const day = num(commit.author?.time) !== undefined && commit.author!.time! > 0 ? new Date(commit.author!.time! * 1000).toISOString().slice(0, 10) : undefined
+    const line = `- ${id} ${JSON.stringify(subject)}${by !== undefined ? ` by ${by.slice(0, 60)}` : ""}${day !== undefined ? ` on ${day}` : ""}`
+    if (header(commits.length - rows.length - 1).length + [...rows, line].join("\n").length > budget) break
+    rows.push(line)
+  }
+  return rows.length === 0 ? "" : (header(commits.length - rows.length) + rows.join("\n")).slice(0, budget)
+}
