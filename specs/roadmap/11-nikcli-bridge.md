@@ -1,6 +1,6 @@
 # RM-11 — Everything via nikcli (second adapter)
 
-Status: **in progress** (first slice done 2026-10-13: the HTTP face, the plugin and their tests; scoped tokens and plugin AI-tool contributions remain). Depends on: RM-01 (catalogue), RM-03 (HTTP families the bridge will call). Design: `27-everything-via-nikcli.md`. Owners: WP8, WP3, WP4, WP9 `packages/plugin-sdk`.
+Status: **built, acceptance open** (2026-11-03: all four deliverables and the scoped tokens have tests that pass; what is not proven is a standalone nikcli driving a running instance). Depends on: RM-01 (catalogue), RM-03 (HTTP families the bridge will call). Design: `27-everything-via-nikcli.md`. Owners: WP8, WP3, WP4, WP9 `packages/plugin-sdk`.
 
 ## Problem
 
@@ -46,3 +46,6 @@ Catalogue-derived parity checks preserve `cad_grep` reachability, parameter/resu
 
 - v1: second adapter on the RM-01 catalogue.
 - 2026-10-12: replaced stale missing cad_grep registration work with preservation/consolidation and two-adapter parity coverage, confirmed against registry.ts. Documentation only; implementation pending.
+
+- 2026-11-03: status corrected against the tree; each claim below was checked by running its test (53 pass, 0 fail across `packages/nikcli-plugin`, `packages/ai/test/bridge.test.ts` and the sidecar bridge, token, policy and plugin suites). Deliverable 1 (parity): `bridge.test.ts` "every catalogue action is on the bridge with the same effect, or its tool is declared in-process only". Deliverable 2 (contributions in production): `tools/tool-registry.ts` passes the contributed and runtime tools to `buildTools`; `ai-plugin-contributions.test.ts`, `ai-plugin-tools.test.ts`. Deliverable 3 (standalone package and the compatibility gate): `packages/nikcli-plugin` with `test/compat.test.ts` against the pinned `@nikcli-ai/sdk-next` 1.428.0. Deliverable 4 (`cad_grep`): `bridge.test.ts` "cad_grep stays reachable, read-only". The AI-10 scoped, revocable tokens exist (`services/bridge-tokens.ts`): one project, `read` or `write` mode, expiry, listing without the secret, revocation that ends the token at once, only the two bridge routes, a write token never reaches a destructive action (`ai-bridge-tokens.test.ts`). Open: a run of a real standalone nikcli against a live sidecar (no automated test starts one) and the RM-01 acceptance this step depends on.
+

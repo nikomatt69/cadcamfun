@@ -31,7 +31,7 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | 8 | RM-08 | `08-mobile-codriver.md` | **pending** | RM-07 stream recovery | WP13 `apps/mobile`, WP4 companion gateway |
 | 9 | RM-09 | `09-cad-cam-depth.md` | **pending** | RM-02 for pure-core work; RM-03 and RM-06 additionally for precision integration | WP1 CAD, WP2 CAM, WP8 quality/action exposure, WP3/WP4/WP6 after core gates (scopes in step spec) |
 | 10 | RM-10 | `10-observability.md` | **in progress** (cost survives a reload; settings total and policy readback open) | RM-07 | WP8, WP6 |
-| 11 | RM-11 | `11-nikcli-bridge.md` | **in progress** (HTTP face + plugin built) | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
+| 11 | RM-11 | `11-nikcli-bridge.md` | **built, acceptance open** (parity, contributions, compatibility gate, scoped tokens all tested; no live standalone nikcli run) | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
 | 12 | RM-12 | `12-native-edge-gpu.md` | **pending** | RM-01 | WP5 `apps/desktop/src-tauri`, WP6 `apps/desktop/src/viewport`, WP3 `packages/api/src/groups`, WP4 `apps/sidecar/src/http`, **new** WP `packages/buffer` |
 | 13 | RM-13 | — | **not started** (reserved) | RM-12 | native edge service: a separate Rust binary supervised by the Tauri shell, gated by `36-native-edge-and-gpu.md` §7 |
 
