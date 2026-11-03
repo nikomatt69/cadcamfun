@@ -2,7 +2,6 @@
 export const prerender = true
 import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
-import DownloadShot from "../../components/stage/DownloadShot"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
@@ -37,7 +36,6 @@ const toc = [
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <div class="doc-shot doc-shot--tile"><DownloadShot client:only="react" /></div>
     <h2>Platform and capabilities</h2>
     <p><code>apps/mobile</code> is an Expo SDK 57 application using React Native 0.86.3, React 19.2, Expo Router, NativeWind, Reanimated, and Gesture Handler. Its supported pinned network transport is implemented in Swift by the local <code>companion-net</code> module. The iOS bundle identifier is <code>com.cadcamfun.mobile</code>.</p>
     <p>The phone reads projects, reviews history and pull requests, dispatches workflows, receives activity, and interacts with assistant sessions running on the paired desktop. The desktop continues to own the database, geometry computation, AI provider credentials, and workflow execution. A reachable, running desktop is required for those operations.</p>

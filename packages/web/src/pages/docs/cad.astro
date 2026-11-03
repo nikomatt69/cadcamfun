@@ -2,7 +2,6 @@
 export const prerender = true
 import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
-import TopicTile from "../../components/stage/TopicTile"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
@@ -37,7 +36,6 @@ const toc = [
   toc={toc}
 >
   <section id="drawing" class="doc-section">
-    <div class="doc-shot doc-shot--tile"><TopicTile kind="cam" client:only="react" /></div>
     <h2>Drawing entities</h2>
 <p><code>@cadcamfun/core</code> exports CAD functions both directly and under the <code>cad</code> namespace. Schema-first 2D entities use an <code>_tag</code> discriminator: Line, Circle, Arc, Polyline, Rectangle, Ellipse, Spline, Text, Dimension, Hatch, and Block. Each entity has a stable identifier, layer, visibility, and lock state; selection belongs to editor state.</p>
     <p>Entity geometry uses millimetres and radians. Arc angles are normalized to a full turn, and equal start/end angles represent a full circle. A local entity transform applies scale, rotation, then translation; <code>Affine2D</code> supports composed transforms that can include shear. The scene-element and parametric-history adapters have their own documented angular fields, including degree-valued placement and feature controls.</p>
