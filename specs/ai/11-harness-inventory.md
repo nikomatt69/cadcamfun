@@ -32,7 +32,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1230 |
 | `library_edit` | destructive | 7 | primary:build, machinist | 3059 |
 | `memory` | read | 3 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 985 |
-| `memory_edit` | write | 2 | primary:build | 1211 |
+| `memory_edit` | write | 2 | primary:build | 1273 |
 | `research` | read | 2 | primary:build, primary:plan, researcher, editor, modeler, machinist, planner, diagnostician, optimizer | 1213 |
 | `vcs` | read | 4 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1401 |
 | `vcs_edit` | destructive | 7 | primary:build | 2277 |
@@ -285,7 +285,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1445 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3059 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 985 | prompt-corpus.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1211 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1273 | auto-mode.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/mods.txt` | tool description | tools/prompts/index.ts toolPrompt | 1023 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/mods_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2432 | auto-mode.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/parts.txt` | tool description | tools/prompts/index.ts toolPrompt | 1230 | auto-mode.test.ts, prompt-corpus.test.ts |
