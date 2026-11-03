@@ -155,6 +155,22 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
     if (state === "ok") lines.push("Verification covers the configured simulation only; missing tool/holder/fixture data and machine behaviour remain unverified.")
   }
 
+  // The next machining decision, from facts the snapshot states (the reading table of the toolpath-verification skill). It names
+  // what to do, never "safe": a passed replay covers the modelled stock only.
+  const hasProgram = (num(cam["gcodeLines"]) ?? 0) > 0 || toolpaths.length > 0
+  if (hasProgram) {
+    const release = str(artifact["release"])
+    const errors = count(verification["errors"])
+    const next =
+      state === undefined || state === "not-run" ? "verify the program (cam_edit verify): nothing has been replayed yet."
+      : state === "stale" ? "the G-code changed since the last verification: verify the stored program again before reusing the report."
+      : state === "errors" ? `fix the ${errors === undefined ? "reported" : errors} error finding${errors === 1 ? "" : "s"} first (codes and fixes: toolpath-verification skill), then verify again.`
+      : state === "ok" && release !== undefined && release !== "verified-program" ? `the replay found no errors in what was modelled, but the kernel release is ${release}: read the open claims before calling the program ready.`
+      : state === "ok" ? "no errors found in what was modelled; confirm material, work offset and tooling with the user before the program is handed over."
+      : undefined
+    if (next !== undefined) lines.push(`Next decision: ${next}`)
+  }
+
   // 5. Files and G-code size.
   const gcodeLines = num(cam["gcodeLines"]) ?? 0
   if (gcodeLines > 0) lines.push(`G-code: ${gcodeLines} lines.`)

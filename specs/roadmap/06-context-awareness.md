@@ -1,6 +1,6 @@
 # RM-06 — Workspace context depth
 
-Status: **pending**. Depends on: RM-01. Design: `19-context-awareness.md`, `20` Phase 3, `25-project-ai-context.md`, [AI-05](../ai/05-design-intent-and-context.md). Owners: WP8 workspace/project-context, scoped memory and intent modules in `packages/ai/src`; WP6 `apps/desktop/src/ai` snapshot writer; WP11 history read adapter; WP3 `packages/api/src` snapshot/intent contracts; WP4 AI context assembly. Exact additions and matching tests are scoped below.
+Status: **in progress** (2026-11-03: deliverable 2, the next-decision hint, built). Depends on: RM-01. Design: `19-context-awareness.md`, `20` Phase 3, `25-project-ai-context.md`, [AI-05](../ai/05-design-intent-and-context.md). Owners: WP8 workspace/project-context, scoped memory and intent modules in `packages/ai/src`; WP6 `apps/desktop/src/ai` snapshot writer; WP11 history read adapter; WP3 `packages/api/src` snapshot/intent contracts; WP4 AI context assembly. Exact additions and matching tests are scoped below.
 
 ## Problem
 
@@ -42,3 +42,6 @@ Implement [AI-05](../ai/05-design-intent-and-context.md) under this step. Added 
 - 2026-10-12: [AI-05](../ai/05-design-intent-and-context.md) and [spec 28](../28-native-ai-architecture.md) add dimensioned intent, trust/provenance, context-off semantics and actor/project memory isolation. Additional scoped owners: WP3 `packages/api/src` snapshot/intent schemas and WP4 `apps/sidecar/src/http/ai.ts` / AI context implementations for authorized assembly; existing WP8/WP6/WP11 scope remains. No new geometric preview backend before RM-09. Implementation pending.
 
 - v1: finish context Phase 3 on the existing renderer module.
+
+- 2026-11-03: deliverable 2 built: `renderWorkspaceContext` adds one `Next decision:` line when the snapshot holds a program (G-code lines or toolpaths), from facts it states and the reading table of the `toolpath-verification` skill: no verification or `not-run` -> verify (nothing replayed yet); `stale` -> verify the stored program again; `errors` -> fix the N error findings first, then verify again; `ok` -> "no errors found in what was modelled", and when the kernel release is below `verified-program` it names that release and the open claims instead of calling the program ready; `ok` at `verified-program` -> confirm material, work offset and tooling with the user. An unknown state gives no line, an empty workspace gives none, the text never says safe / certified / collision-free, and snapshot strings reach it only through the existing one-line sanitiser. Tests: `packages/ai/test/workspace-context.test.ts` ("the next machining decision"). Not done in this step yet: the snapshot fields `lastGcodeChangedAt` / `lastVerifiedAt` / `stockBox` / machine limits (the desktop writer does not send them), the typed `memory_recall` notes, the last-3-commits line and the AI-05 intent items.
+
