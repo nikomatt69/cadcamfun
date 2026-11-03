@@ -126,3 +126,6 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7. A1/A2 give the badge on their own 
   runs), `apps/sidecar/test/cam-program-status.test.ts` (4). **Open:** acceptance with a restore point (the existing toolpath update path would be reused), `matchOperations`
   with override carry-over (A5: matching is by operation id only, so a renamed feature shows as removed + added), the desktop banner and diff view (A6), A7.
 
+- 2026-11-03 (build, A6 first part): the CAM page's kernel section shows what kind of model change made the program stale (`data-testid="kernel-model-change"`: geometry, topology,
+  rigid move, or the settings that differ; four new strings in the 11 locales, machine-translated and not reviewed). Still open: the Regenerate / Review buttons and the diff view
+  (`KernelDiff.tsx`), the stale badge in the program list and on the toolpath detail screen, acceptance with a restore point.
