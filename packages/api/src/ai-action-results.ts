@@ -16,6 +16,7 @@ import { CamProgramDiff, CamProgramStatus } from "./cam-kernel.ts"
 import { CamLatheResult, CamPostTestResult, CamProcessResult, CamVerifyNcActionResult } from "./ai-cam-breadth.ts"
 import { ExportedFile } from "./ai-export.ts"
 import { CamJobResult } from "./ai-cam-job.ts"
+import { CamSetupIssue, CamSetupPlan } from "./cam-setup.ts"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -225,8 +226,16 @@ const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.L
  */
 const jobResult = CamJobResult
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
+/** A setup plan is a verdict: `valid` is false when the issues list is not empty, and that is an answer, not a refusal. */
+const setupPlan = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue) })
+const setupList = Schema.Struct({
+  ok: Schema.Literal(true), projectId: str,
+  setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, grouping: str, machineType: str }))
+})
 
 // ---------------------------------------------------------------- `cam_edit` (writes)
+
+const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })
 
 const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, ...drawingRef })
 const operationCreated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, name: str, drawing: str, elements: int })
@@ -422,6 +431,8 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam.manufacture": read(manufactured),
   "cam.job": read(jobResult),
   "cam.chain_status": read(chainStatus),
+  "cam.setup_plan": read(setupPlan),
+  "cam.setup_list": read(setupList),
 
   "cam_edit.manufacture": write(["operation", "program"], programStored),
   "cam_edit.turn": write(["operation", "program"], programStored),
@@ -431,6 +442,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   // Replays the stored program and persists only a report bound to its hash and manufacturing inputs.
   "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
+  "cam_edit.setup_save": write(["operation"], setupSaved),
   "cam_edit.export": write(["file"], exported),
 
   "library.component_list": read(componentList),
