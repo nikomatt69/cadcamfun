@@ -8,6 +8,7 @@
  */
 import { METRIC_THREADS } from "../../cad/fasteners.ts"
 import type { Tool } from "../tool.ts"
+import { assemblyProfile } from "./assembly.ts"
 import type { VerifyTool } from "../verify/schema.ts"
 
 export type CutterKind =
@@ -35,6 +36,17 @@ export type CutterKind =
   | "tslot"
   /** A dovetail cutter: widest at the tip (`diameter`), flanks at half of the included `angle` from the axis over `headHeight`, on a neck. */
   | "dovetail"
+  /**
+   * A tapered end mill (spec 69 D1): the tip is `tipDiameter` wide with a corner radius `cornerRadius` (default the full tip radius:
+   * a tapered ball), the flanks open at half of the included `angle` from the axis up to `diameter`, then run straight to the shank.
+   */
+  | "tapered"
+  /** A lollipop (spherical) cutter: a sphere of `diameter` on a neck of `neckDiameter`; it cuts undercuts the neck can reach. */
+  | "lollipop"
+  /** A barrel (circle-segment) cutter: the flank is an arc of `formRadius` over `headHeight`, widest (`diameter`) at mid-height, on a flat tip. */
+  | "barrel"
+  /** A lens cutter: two arcs from the tip point to the top of `headHeight`, widest (`diameter`) at mid-height. */
+  | "lens"
 
 export type ToolMaterial = "hss" | "hss-co" | "carbide" | "pcd"
 
@@ -69,6 +81,8 @@ export interface Cutter {
   readonly pitch?: number
   /** Boring bar / T-slot / dovetail: diameter of the body above the cutting head, mm. */
   readonly neckDiameter?: number
+  /** Barrel cutter: radius of the circle segment that forms the flank, mm (a lens derives its own from the diameter and head height). */
+  readonly formRadius?: number
   /** Boring bar insert height, T-slot disc thickness, dovetail flank height: the axial extent of the cutting head from the tip, mm. */
   readonly headHeight?: number
   /** Length of the cutting edges from the tip, mm. */
@@ -100,7 +114,12 @@ const LEGACY_KIND: Readonly<Record<CutterKind, Tool["kind"]>> = {
   // real head, never less): the conservative bound the replay accepts for shapes it has no exact profile for.
   boringbar: "endmill",
   tslot: "endmill",
-  dovetail: "endmill"
+  dovetail: "endmill",
+  // Swept-profile cutters: the legacy operations see their largest diameter, the replay sees the exact profile (`verifyTool`).
+  tapered: "endmill",
+  lollipop: "ballnose",
+  barrel: "endmill",
+  lens: "endmill"
 }
 
 /** The legacy record the operations take (`cam/tool.ts`). */
@@ -113,11 +132,26 @@ export const legacyTool = (c: Cutter, fallbackMaxRpm = 24000): Tool => ({
   maxRpm: c.maxRpm ?? fallbackMaxRpm,
   stickout: c.stickout,
   ...(c.angle !== undefined && LEGACY_KIND[c.kind] === "vbit" ? { angle: c.angle } : {}),
-  ...(c.kind === "ball" ? { tipRadius: c.diameter / 2 } : c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
+  ...(c.kind === "ball" || c.kind === "lollipop" ? { tipRadius: c.diameter / 2 } : c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })
+
+const SWEPT: ReadonlySet<CutterKind> = new Set<CutterKind>(["tapered", "lollipop", "barrel", "lens"])
+
+/**
+ * The half-section of the cutting zone of a swept-profile cutter as a polyline, finer than `chord` mm of sagitta (default 0.5 µm),
+ * so the heightfield replay, which reads it back as a lower envelope, is exact within the declared bound.
+ */
+export const sweptProfile = (c: Cutter, chord = 0.0005): ReadonlyArray<{ readonly r: number; readonly z: number }> => {
+  // Facets per quarter turn so that R (1 - cos(pi / 4 / n)) <= chord for the largest arc radius of the kind.
+  const R = Math.max(c.formRadius ?? 0, c.diameter / 2)
+  const n = Math.min(2000, Math.max(8, Math.ceil(Math.PI / 4 / Math.acos(Math.max(0, 1 - chord / Math.max(R, chord))))))
+  const p = assemblyProfile(c, { arcSteps: n })
+  return p.points.filter((_, i) => i === 0 || p.parts[i - 1] === "cutting")
+}
 
 /** The record the replay checks take (`cam/verify`): cutting profile, flute length, shank and holder. */
 export const verifyTool = (c: Cutter): VerifyTool => ({
+  ...(SWEPT.has(c.kind) ? { profile: sweptProfile(c) } : {}),
   kind: LEGACY_KIND[c.kind] === "facemill" ? "endmill" : LEGACY_KIND[c.kind],
   diameter: c.diameter,
   cuttingLength: c.fluteLength,
@@ -163,6 +197,29 @@ export const cutterIssues = (c: Cutter): ReadonlyArray<string> => {
     if (c.neckDiameter === undefined || !(c.neckDiameter > 0) || c.neckDiameter >= c.diameter) out.push(`${c.id}: a ${c.kind} needs a neck narrower than its head (0 < neck < D)`)
     if (c.headHeight === undefined || !(c.headHeight > 0) || c.headHeight > c.fluteLength + 1e-9) out.push(`${c.id}: a ${c.kind} needs a head height inside its cutting length`)
     else if (c.kind === "dovetail" && c.angle !== undefined && c.neckDiameter !== undefined && c.diameter / 2 - c.headHeight * Math.tan((c.angle * Math.PI) / 360) < c.neckDiameter / 2 - 1e-9) out.push(`${c.id}: the dovetail flanks run into the neck before the head height`)
+  }
+  if (c.kind === "tapered") {
+    const rt = (c.tipDiameter ?? 0) / 2
+    if (c.tipDiameter === undefined || !(c.tipDiameter > 0) || c.tipDiameter >= c.diameter) out.push(`${c.id}: a tapered cutter needs 0 < tip diameter < D`)
+    else if (c.angle === undefined || c.angle <= 0 || c.angle >= 90) out.push(`${c.id}: a tapered cutter needs its included taper angle (0 < angle < 90)`)
+    else {
+      const rc = Math.min(c.cornerRadius ?? rt, rt), a = (c.angle * Math.PI) / 360
+      const zR = rc - rc * Math.sin(a) + (c.diameter / 2 - (rt - rc + rc * Math.cos(a))) / Math.tan(a)
+      if (c.cornerRadius !== undefined && (c.cornerRadius < 0 || c.cornerRadius > rt + 1e-9)) out.push(`${c.id}: the corner radius of a tapered cutter must be 0..tip radius`)
+      if (zR > c.fluteLength + 1e-9) out.push(`${c.id}: the taper reaches Ø${c.diameter} at ${Math.round(zR * 1000) / 1000} mm, beyond the cutting length ${c.fluteLength} mm`)
+    }
+  }
+  if (c.kind === "lollipop") {
+    if (c.neckDiameter === undefined || !(c.neckDiameter > 0) || c.neckDiameter >= c.diameter) out.push(`${c.id}: a lollipop needs a neck narrower than its sphere (0 < neck < D)`)
+    else if (c.fluteLength < c.diameter / 2 + Math.sqrt((c.diameter / 2) ** 2 - (c.neckDiameter / 2) ** 2) - 1e-9) out.push(`${c.id}: the cutting length is shorter than the sphere (${c.fluteLength} mm)`)
+  }
+  if (c.kind === "barrel" || c.kind === "lens") {
+    if (c.headHeight === undefined || !(c.headHeight > 0) || c.headHeight > c.fluteLength + 1e-9) out.push(`${c.id}: a ${c.kind} needs a head height inside its cutting length`)
+    else if (c.kind === "lens" && c.headHeight < c.diameter - 1e-9) out.push(`${c.id}: a lens head must be at least its diameter high, or its arc would dip below the tip`)
+    else if (c.kind === "barrel") {
+      if (c.formRadius === undefined || !(c.formRadius >= c.headHeight / 2)) out.push(`${c.id}: a barrel needs a form radius of at least half its head height`)
+      else if (c.diameter / 2 - c.formRadius + Math.sqrt(c.formRadius ** 2 - (c.headHeight / 2) ** 2) <= 0) out.push(`${c.id}: the barrel arc closes before the tip face`)
+    }
   }
   return out
 }
