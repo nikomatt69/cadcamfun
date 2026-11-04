@@ -186,7 +186,8 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
     const a = toWorld(start), b = toWorld(end)
     const dw = sub(b, a)
     const lw = Math.hypot(dw.x, dw.y, dw.z)
-    if (!(lw > 1e-12)) return
+    // A block that goes nowhere ends where it is: the skip position is that point and nothing touched.
+    if (!(lw > 1e-12)) { skip = reportedPos(); touched = 0; return }
     const unitDir = scale(dw, 1 / lw)
     const vertical = Math.abs(unitDir.z) > 0.999999
     const hit = world.touch(a, b, { radius: vertical ? ball : triggerRadius(unitDir), centre: ball, axis: worldAxis() })

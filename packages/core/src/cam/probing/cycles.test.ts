@@ -3,7 +3,7 @@ import type { Vec3 } from "../../cad/vec.ts"
 import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type ProbeDevice } from "./device.ts"
 import { planProbeCycle } from "./cycles.ts"
 import { runProbeMoves, type SimMachine } from "./simulate.ts"
-import { boxWorld, cylinderWorld, meshWorld, plateWorld, pocketWorld as pocketBlock, sphereWorld, unionWorld, type Placement, type ProbeWorld3 } from "./world.ts"
+import { boxWorld, cylinderWorld, meshWorld, planeWorld, plateWorld, pocketWorld as pocketBlock, sphereWorld, unionWorld, type Placement, type ProbeWorld3 } from "./world.ts"
 import type { ProbeContext, ProbeCycle, ProbeRoutine } from "./types.ts"
 
 const probe: ProbeDevice = deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: 4 })
@@ -164,5 +164,61 @@ describe("characteristic validation", () => {
     expect(() => evaluateInspection({ diameter: 20 }, [bad])).toThrow(/exceeds/)
     const r = plan({ kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5 })
     expect(() => compileActions(r, [{ kind: "inspect", characteristics: [bad], onFail: "alarm" }], ctx())).toThrow(/exceeds/)
+  })
+})
+
+describe("the tool setter cycles", () => {
+  const ORIGIN = { x: 100, y: 200, z: -300 }
+  const setter = { kind: "contact" as const, position: { x: 400, y: 150, z: -150 }, triggerZ: -290, discDiameter: 12, maxToolDiameter: 40, feeds: { fast: 800, touch: 60 }, brokenTolerance: 0.1 }
+  const sctx = (extra: Partial<ProbeContext> = {}): ProbeContext => ({ ...ctx(), safeZ: 200, setter, workOrigin: ORIGIN, ...extra })
+  const splan = (c: ProbeCycle, extra: Partial<ProbeContext> = {}): ProbeRoutine => {
+    const r = planProbeCycle(c, sctx(extra))
+    if ("refused" in r) throw new Error(r.refused)
+    return r
+  }
+  const mach = (p: ProbeDevice = probe): SimMachine => ({ offsets: { entries: { G54: ORIGIN } }, active: { kind: "g5x", code: "G54" }, probe: p, start: { x: 300 - ORIGIN.x, y: 150 - ORIGIN.y, z: 200 } })
+  // The controlled point's machine height at which the believed tip meets the setter: the trigger height plus how much longer the tool is than believed.
+  const plane = (believed: number, real: number) => planeWorld({ x: 0, y: 0, z: setter.triggerZ + (real - believed) }, { x: 0, y: 0, z: 1 })
+
+  test("tool length is the believed length plus the height deviation, whatever the believed length", () => {
+    for (const [believed, real] of [[0, 87.25], [80, 87.25], [90, 87.25]] as const) {
+      const r = splan({ kind: "tool-length", tool: 5, nominalLength: believed })
+      const out = runProbeMoves(r.moves, plane(believed, real), mach(), { results: r.results, units: r.units })
+      expect(out.stopped).toBeUndefined()
+      close(out.results, { length: real }, 1e-9)
+    }
+  })
+
+  test("a tool beyond the search is refused by the touch (a miss is an alarm)", () => {
+    const r = splan({ kind: "tool-length", tool: 5, nominalLength: 80 })
+    const out = runProbeMoves(r.moves, plane(80, 80 - 40), mach(), {})
+    expect(out.alarms[0]?.code).toBe(991)
+  })
+
+  test("a broken tool alarms past the tolerance, a worn one inside it passes", () => {
+    const r = splan({ kind: "broken-tool", tool: 5, nominalLength: 80 })
+    expect(runProbeMoves(r.moves, plane(80, 79.95), mach(), { results: r.results, units: r.units }).alarms.length).toBe(0)
+    const broken = runProbeMoves(r.moves, plane(80, 78.2), mach(), { results: r.results, units: r.units })
+    expect(broken.alarms[0]?.code).toBe(840)
+    expect(planProbeCycle({ kind: "broken-tool", tool: 5 }, sctx())).toEqual({ refused: expect.stringMatching(/nominal length/) })
+  })
+
+  test("tool radius from two touches on the disc", () => {
+    for (const real of [4.98, 5, 5.07]) {
+      const tool: ProbeDevice = { ...probe, stylus: { ...probe.stylus, ballDiameter: 2 * real }, doubleTouch: false }
+      const r = splan({ kind: "tool-radius", tool: 5, nominalRadius: 5 }, { safeZ: 30 })
+      // A tall disc stands at the setter's centre (machine coordinates).
+      const world = cylinderWorld({ centre: { x: setter.position.x, y: setter.position.y }, radius: setter.discDiameter / 2, z0: -400, z1: setter.triggerZ + 15, inside: false })
+      const out = runProbeMoves(r.moves, world, mach(tool), { results: r.results, units: r.units })
+      expect(out.stopped).toBeUndefined()
+      close(out.results, { radius: real, x: setter.position.x - ORIGIN.x }, 1e-9)
+    }
+  })
+
+  test("refusals: no setter, no work origin, a tool too big, a disc missing", () => {
+    expect("refused" in planProbeCycle({ kind: "tool-length", tool: 1 }, ctx())).toBe(true)
+    expect("refused" in planProbeCycle({ kind: "tool-length", tool: 1 }, { ...ctx(), setter })).toBe(true)
+    expect("refused" in planProbeCycle({ kind: "tool-radius", tool: 1, nominalRadius: 25 }, sctx())).toBe(true)
+    expect("refused" in planProbeCycle({ kind: "tool-radius", tool: 1, nominalRadius: 5 }, sctx({ setter: { ...setter, discDiameter: undefined } }))).toBe(true)
   })
 })

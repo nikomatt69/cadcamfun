@@ -516,8 +516,52 @@ export const planProbeCycle = (cycle: ProbeCycle, ctx: ProbeContext): ProbeRouti
         b.notes.push(`effective radius in ${n} directions: the ring radius less the distance of the ball centre from the found centre`)
         return b.finish(cycle)
       }
-      case "tool-length": case "tool-radius": case "broken-tool":
-        return refuse(`the ${cycle.kind} cycle on the tool setter is not built in this version: measure the tool with the control's own setter cycle`)
+      case "tool-length": case "broken-tool": case "tool-radius": {
+        const setter = ctx.setter, origin = ctx.workOrigin
+        if (setter === undefined) return refuse(`the ${cycle.kind} cycle needs a tool setter on the machine`)
+        if (origin === undefined) return refuse(`the ${cycle.kind} cycle needs the machine position of the work zero (workOrigin): the setter is placed in machine coordinates`)
+        // The setter is in machine coordinates; the program runs in the work offset: subtract the zero's machine position.
+        const sx = setter.position.x - origin.x, sy = setter.position.y - origin.y
+        const zTrig = setter.triggerZ - origin.z
+        const sb = new Builder({ ...ctx, probe: { ...ctx.probe, feeds: { ...ctx.probe.feeds, fast: setter.feeds.fast, touch: setter.feeds.touch } } })
+        if (cycle.kind !== "tool-radius") {
+          // The length the control believes (`nominalLength`, the offset in force; 0 = no length offset): the tip reaches the trigger height when
+          // the true length is that plus how much higher than expected the program's tip stands at contact.
+          const believed = cycle.nominalLength ?? 0
+          if (cycle.kind === "broken-tool" && cycle.nominalLength === undefined) return refuse("a broken-tool check needs the tool's nominal length")
+          // The approach starts at the setter's own height (`position.z`, machine Z): the longest tool's tip must clear it, and the touch searches down from there.
+          const start = setter.position.z - origin.z
+          if (!(start > zTrig + ctx.search)) return refuse("the setter's approach height (position.z) is not above its trigger plane")
+          if (ctx.safeZ < start) return refuse(`the safe height ${ctx.safeZ} must not be below the setter's approach height ${start.toFixed(3)} (work coordinates)`)
+          sb.go({ x: sx, y: sy, z: ctx.safeZ })
+          sb.go({ x: sx, y: sy, z: start })
+          const t = sb.touch("t1", { x: 0, y: 0, z: -1 }, { x: sx, y: sy, z: zTrig }, ["z"])
+          sb.result("length", add(believed, subE(t.z, zTrig)), believed)
+          if (cycle.kind === "broken-tool") {
+            sb.result("deviation", subE(sb.e("length"), believed), 0)
+            sb.moves.push({ _tag: "If", condition: { cmp: "gt", a: call("abs", sb.e("deviation")), b: num(setter.brokenTolerance) } }, { _tag: "Alarm", code: 840, text: "TOOL BROKEN OR WORN BEYOND THE LIMIT" }, { _tag: "EndIf" })
+          }
+          sb.notes.push(`the tool's length is the length in force (${believed}) plus the height the tip stood above the setter's trigger plane (${zTrig.toFixed(3)} in this work offset)`)
+          return sb.finish(cycle)
+        }
+        const disc = setter.discDiameter
+        if (disc === undefined || !(disc > 0)) return refuse("a tool-radius cycle needs the setter's disc diameter")
+        const rn = cycle.nominalRadius
+        if (rn === undefined || !(rn > 0)) return refuse("a tool-radius cycle needs the tool's nominal radius")
+        if (2 * rn > setter.maxToolDiameter) return refuse(`the tool (diameter ${2 * rn}) is larger than the setter takes (${setter.maxToolDiameter})`)
+        const zt = zTrig - 2
+        const half0 = disc / 2 + rn
+        const side = (dir: 1 | -1, name: string): Expr => {
+          const startX = sx - dir * (half0 + ctx.clearance)
+          approach(sb, { x: startX, y: sy }, zt)
+          return sb.touch(name, { x: dir, y: 0, z: 0 }, { x: sx - dir * half0, y: sy, z: zt }, ["x"]).x
+        }
+        const x1 = side(1, "t1"), x2 = side(-1, "t2")
+        sb.result("radius", half(subE(subE(x2, x1), disc)), rn)
+        sb.result("x", half(add(x1, x2)), sx)
+        sb.notes.push("the tool's radius is half the gap between the two touches on the disc less the disc's diameter; its length offset must already be right")
+        return sb.finish(cycle)
+      }
       case "rotary-axis":
         return refuse("a rotary-axis calibration is planned by rotaryRoutine (rotary-cal.ts), not as one cycle")
     }

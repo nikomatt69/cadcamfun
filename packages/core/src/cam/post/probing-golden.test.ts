@@ -4,7 +4,7 @@ import { DEFAULT_PROBE_SETTINGS, deviceOfSettings } from "../probing/device.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
 import { compileActions } from "../probing/actions.ts"
 import { runProbeMoves, type SimMachine } from "../probing/simulate.ts"
-import { plateWorld, type ProbeWorld3 } from "../probing/world.ts"
+import { planeWorld, plateWorld, type ProbeWorld3 } from "../probing/world.ts"
 import type { Characteristic, ProbeAction, ProbeCycle } from "../probing/types.ts"
 import { makeProgram, type Move, type Program } from "../ir.ts"
 import { formatOffsetRef, type WorkOffsetRef } from "../work-offset.ts"
@@ -116,6 +116,29 @@ describe("probe goldens replay to the IR's results", () => {
       near(nc.offsets[formatOffsetRef(dialect.second)]!.y, 250.2, 2e-3)
       const select = id === "siemens" ? "G505" : id === "linuxcnc" ? "G59.2" : id === "haas" ? "G154 P3" : "G54.1 P3"
       expect(text.split("\n").some((l) => l.includes(select))).toBe(true)
+    })
+
+    test(`${id}: a tool length on the setter goes into the tool table`, () => {
+      const setter = { kind: "contact" as const, position: { x: 400, y: 150, z: -150 }, triggerZ: -290, discDiameter: 12, maxToolDiameter: 40, feeds: { fast: 800, touch: 60 }, brokenTolerance: 0.1 }
+      const sctx = { ...ctx, safeZ: 200, setter, workOrigin: BASE }
+      const r0 = planProbeCycle({ kind: "tool-length", tool: 5, nominalLength: 80 }, sctx)
+      if ("refused" in r0) throw new Error(r0.refused)
+      const moves = compileActions(r0, [{ kind: "tool-offset", tool: 5, quantity: "length", result: "length", part: "geometry" }], sctx)
+      const world = planeWorld({ x: 0, y: 0, z: setter.triggerZ + 7.25 }, { x: 0, y: 0, z: 1 })
+      const machine: SimMachine = { ...machineFor(G54, dialect.second), start: { x: 300, y: -50, z: 200 } }
+      const ir = runProbeMoves(moves, world, machine)
+      const program = { ...programOf(`probe ${id}`, moves, G54) }
+      program.toolpaths[0]!.moves = [{ _tag: "Rapid", to: { x: 300, y: -50, z: 200 } }, ...moves]
+      const text = posts[id].emit(program, { header: false })
+      expectGolden(`probing/${id}-tool-length.nc`, text)
+      const nc = simulateNc(text, { world, machine, codes: dialectOf(id)!.probing! })
+      expect(nc.errors).toEqual([])
+      expect(ir.tools.length).toBe(1)
+      expect(nc.tools.length).toBe(1)
+      near(nc.tools[0]!.after, 87.25, 2e-3)
+      near(ir.tools[0]!.after, 87.25, 1e-9)
+      expect(nc.tools[0]!.tool).toBe(5)
+      expect(nc.tools[0]!.part).toBe("geometry")
     })
 
     test(`${id}: a touch that finds nothing is an alarm`, () => {

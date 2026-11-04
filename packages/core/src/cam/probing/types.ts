@@ -68,6 +68,8 @@ export interface ProbeContext {
   /** The tilted plane the cycle runs in (5-axis probing); absent: the work offset itself. */
   readonly frame?: WorkFrame
   readonly setter?: ToolSetter
+  /** Machine position of the active work zero: the tool setter is placed in machine coordinates, the cycles run in the work offset's. */
+  readonly workOrigin?: Vec3
   /** Read the stylus radius from these variables at run time instead of baking it in (`calibrationSource: "variables"`). */
   readonly calibrationVars?: { readonly radius: Expr; readonly zTrigger?: Expr }
 }
