@@ -22,6 +22,27 @@ export { isOfflineSendError }
 
 const MAX_ENTRIES = 50
 
+/** The conversation this project is composing into until the desktop names a session. */
+function localConversationFor(projectId: string): string {
+  const store = useUIStore.getState()
+  const current = store.assistantLocalConversations[projectId]
+  if (current) return current
+  const created = newMobileSessionId()
+  store.setAssistantLocalConversation(projectId, created)
+  return created
+}
+
+/** Persist the host session on every still-queued message composed in the same local conversation. */
+async function bindLocalConversation(op: OfflineAssistantOp, sessionId: string): Promise<void> {
+  if (!op.localConversationId) return
+  await mutateStored(readQueue, writeOfflineQueueRaw, (queue) => queue.map((entry) =>
+    entry.localConversationId === op.localConversationId &&
+    entry.projectId === op.projectId &&
+    entry.desktopFingerprint === op.desktopFingerprint
+      ? { ...entry, sessionId }
+      : entry))
+}
+
 const isOp = (value: unknown): value is OfflineAssistantOp => {
   if (!value || typeof value !== "object") return false
   const op = value as Record<string, unknown>
@@ -55,7 +76,10 @@ export async function queuedTextsForProject(projectId: string): Promise<string[]
 }
 
 export async function enqueueAssistantOp(op: Omit<OfflineAssistantOp, "type" | "queuedAt">): Promise<void> {
-  const entry: OfflineAssistantOp = { ...op, id: newMobileSessionId(), desktopFingerprint: useUIStore.getState().assistantDesktopId ?? undefined, type: "assistant-message", queuedAt: Date.now() }
+  // A message in a named session stays there; one written in a new conversation is grouped
+  // with its siblings so the first delivery opens the host session they all join.
+  const localConversationId = op.sessionId ? undefined : op.localConversationId ?? localConversationFor(op.projectId)
+  const entry: OfflineAssistantOp = { ...op, id: newMobileSessionId(), desktopFingerprint: useUIStore.getState().assistantDesktopId ?? undefined, ...(localConversationId ? { localConversationId } : {}), type: "assistant-message", queuedAt: Date.now() }
   const next = await mutateStored(readQueue, writeOfflineQueueRaw, (queue) => {
     const grown = [...queue, entry]
     return grown.length > MAX_ENTRIES ? grown.slice(grown.length - MAX_ENTRIES) : grown
@@ -95,6 +119,8 @@ async function drainQueue(pairing: Pairing, onSent?: (sent: number) => void): Pr
     active: () => AppState.currentState === "active",
     session: (projectId) => useUIStore.getState().assistantSessions[projectId],
     remember: (projectId, sessionId) => useUIStore.getState().setAssistantSession(projectId, sessionId),
+    bindConversation: bindLocalConversation,
+    isCurrentLocalConversation: (projectId, localConversationId) => useUIStore.getState().assistantLocalConversations[projectId] === localConversationId,
     unsent: isOfflineSendError,
     save: async (previous, next) => {
       await mutateStored(readQueue, writeOfflineQueueRaw, (current) => current.flatMap((entry) => outboxKey(entry) === outboxKey(previous) ? next ? [next] : [] : [entry]))

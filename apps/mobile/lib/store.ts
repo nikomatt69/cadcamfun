@@ -26,6 +26,11 @@ export interface UIState {
   assistantProjectId: string | null
   /** Last chat session per project — resuming it continues the same desktop conversation. */
   assistantSessions: Record<string, string>
+  /**
+   * The conversation a project is composing into before the desktop names its session.
+   * Messages queued offline share it, so reconnecting opens one host session. Memory only.
+   */
+  assistantLocalConversations: Record<string, string>
   assistantPreferences: Record<string, AssistantPreferences>
   /** Last thinking level per provider-qualified model key, across projects. */
   assistantModelVariants: Record<string, string>
@@ -58,6 +63,7 @@ export interface UIState {
   /** Drops the assistant's project, conversations and preferences for projects that are no longer in the desktop's list. */
   forgetMissingProjects: (existingIds: readonly string[]) => void
   setAssistantSession: (projectId: string, sessionId: string) => void
+  setAssistantLocalConversation: (projectId: string, localConversationId: string) => void
   setAssistantPreferences: (projectId: string, preferences: Partial<AssistantPreferences>) => void
   setAssistantDefaults: (patch: Partial<AssistantDefaults>) => void
   rememberModelVariant: (modelKey: string, variant: string | undefined) => void
@@ -106,6 +112,7 @@ export const useUIStore = create<UIState>()(
       assistantDesktopId: null,
       assistantProjectId: null,
       assistantSessions: {},
+      assistantLocalConversations: {},
       assistantPreferences: {},
       assistantModelVariants: {},
       offlineQueueCount: 0,
@@ -119,24 +126,35 @@ export const useUIStore = create<UIState>()(
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
-      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId || (assistantDesktopId !== null && state.assistantDesktopId?.endsWith(`|${assistantDesktopId}`)) ? { assistantDesktopId } : { assistantDesktopId, assistantProjectId: null, assistantSessions: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null }),
+      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId || (assistantDesktopId !== null && state.assistantDesktopId?.endsWith(`|${assistantDesktopId}`)) ? { assistantDesktopId } : { assistantDesktopId, assistantProjectId: null, assistantSessions: {}, assistantLocalConversations: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null }),
       setAssistantProject: (assistantProjectId) => set({ assistantProjectId }),
       forgetMissingProjects: (existingIds) => set((state) => {
         const keep = new Set(existingIds)
         const only = <V,>(record: Record<string, V>) => Object.fromEntries(Object.entries(record).filter(([id]) => keep.has(id)))
         const missing = state.assistantProjectId !== null && !keep.has(state.assistantProjectId)
-        if (!missing && Object.keys(state.assistantSessions).every((id) => keep.has(id)) && Object.keys(state.assistantPreferences).every((id) => keep.has(id))) return state
-        return { assistantProjectId: missing ? null : state.assistantProjectId, assistantSessions: only(state.assistantSessions), assistantPreferences: only(state.assistantPreferences) }
+        if (!missing && Object.keys(state.assistantSessions).every((id) => keep.has(id)) && Object.keys(state.assistantLocalConversations).every((id) => keep.has(id)) && Object.keys(state.assistantPreferences).every((id) => keep.has(id))) return state
+        return { assistantProjectId: missing ? null : state.assistantProjectId, assistantSessions: only(state.assistantSessions), assistantLocalConversations: only(state.assistantLocalConversations), assistantPreferences: only(state.assistantPreferences) }
       }),
       setAssistantSession: (projectId, sessionId) =>
-        set((s) => ({ assistantSessions: { ...s.assistantSessions, [projectId]: sessionId } })),
+        set((s) => {
+          const { [projectId]: _local, ...assistantLocalConversations } = s.assistantLocalConversations
+          return { assistantSessions: { ...s.assistantSessions, [projectId]: sessionId }, assistantLocalConversations }
+        }),
+      setAssistantLocalConversation: (projectId, localConversationId) =>
+        set((s) => ({ assistantLocalConversations: { ...s.assistantLocalConversations, [projectId]: localConversationId } })),
       setAssistantPreferences: (projectId, preferences) => set((state) => ({ assistantPreferences: { ...state.assistantPreferences, [projectId]: { ...resolveAssistantPreferences(state.assistantPreferences[projectId], state.assistantDefaults), ...preferences } } })),
       setAssistantDefaults: (patch) => set((state) => ({ assistantDefaults: { ...state.assistantDefaults, ...patch } })),
       rememberModelVariant: (modelKey, variant) => set((state) => {
         const { [modelKey]: _previous, ...rest } = state.assistantModelVariants
         return { assistantModelVariants: variant ? { ...rest, [modelKey]: variant } : rest }
       }),
-      startAssistantConversation: (projectId) => set((state) => ({ assistantSessions: Object.fromEntries(Object.entries(state.assistantSessions).filter(([id]) => id !== projectId)) })),
+      startAssistantConversation: (projectId) => set((state) => {
+        const { [projectId]: _local, ...assistantLocalConversations } = state.assistantLocalConversations
+        return {
+          assistantSessions: Object.fromEntries(Object.entries(state.assistantSessions).filter(([id]) => id !== projectId)),
+          assistantLocalConversations,
+        }
+      }),
       setAssistantDraft: (assistantDraft) => set({ assistantDraft, assistantProjectId: assistantDraft.projectId }),
       clearAssistantDraft: () => set({ assistantDraft: null }),
       setComposerDraft: (scope, value) => set((state) => {
