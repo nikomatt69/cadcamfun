@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.84 (November 2026)
+
+## Core
+
+- Templates, roughing breadth, probing, link optimisation (spec 60, 72 P2-3/P3-2/P3-4/P4-7) (#34)
+
 ## v0.1.83 (November 2026)
 
 ## Web
