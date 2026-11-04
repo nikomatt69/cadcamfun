@@ -1,9 +1,9 @@
-import { Data, Effect, Exit } from "effect"
-import { jobLevels, type Step, type Workflow } from "./schema.ts"
+import { Cause, Effect, Exit, Schema } from "effect"
+import { jobLevels, type Step, type Workflow, type WorkflowError } from "./schema.ts"
 
 export type Outputs = Readonly<Record<string, unknown>>
 
-export class StepError extends Data.TaggedError("StepError")<{ readonly message: string }> {}
+export class StepError extends Schema.TaggedError<StepError>()("StepError", { message: Schema.String }) {}
 
 export interface StepInput<Ctx> {
   readonly with: Readonly<Record<string, unknown>>
@@ -52,8 +52,7 @@ export const missingSteps = <Ctx>(w: Workflow, registry: StepRegistry<Ctx>): str
   [...new Set(Object.values(w.jobs).flatMap((j) => j.steps.map((s) => s.uses)))].filter((u) => !(u in registry))
 
 // Step ids are unique per workflow, so outputs are shared run-wide: a job reads what the jobs it `needs` produced.
-const runJob = <Ctx>(id: string, steps: readonly Step[], o: RunOptions<Ctx>, outputs: Map<string, Outputs>): Effect.Effect<RunStatus> =>
-  Effect.gen(function* () {
+const runJob = Effect.fn("Workflow.runJob")(function* <Ctx>(id: string, steps: readonly Step[], o: RunOptions<Ctx>, outputs: Map<string, Outputs>) {
     o.onEvent?.({ type: "job-start", job: id })
     let failed = false
     for (const [index, step] of steps.entries()) {
@@ -70,23 +69,23 @@ const runJob = <Ctx>(id: string, steps: readonly Step[], o: RunOptions<Ctx>, out
         if (step.id) outputs.set(step.id, out)
         o.onEvent?.({ type: "step", job: id, index, uses: step.uses, status: "success", outputs: out })
       } else {
-        o.onEvent?.({ type: "step", job: id, index, uses: step.uses, status: "failure", message: String(exit.cause) })
+        o.onEvent?.({ type: "step", job: id, index, uses: step.uses, status: "failure", message: Cause.pretty(exit.cause) })
         if (!step.continueOnError) failed = true
       }
     }
     const status: RunStatus = failed ? "failure" : "success"
     o.onEvent?.({ type: "job-end", job: id, status })
+    yield* Effect.logDebug("job finished").pipe(Effect.annotateLogs({ job: id, status }))
     return status
-  })
+})
 
 /** Runs jobs level by level (independent jobs concurrently); jobs whose `needs` failed are skipped. */
-export const runWorkflow = <Ctx>(w: Workflow, o: RunOptions<Ctx>): Effect.Effect<RunResult, StepError> =>
-  Effect.gen(function* () {
+export const runWorkflow = Effect.fn("Workflow.run")(function* <Ctx>(w: Workflow, o: RunOptions<Ctx>): Effect.fn.Return<RunResult, StepError | WorkflowError> {
     const missing = missingSteps(w, o.registry)
     if (missing.length > 0) return yield* new StepError({ message: `Unknown step(s): ${missing.join(", ")}` })
     const results: Record<string, RunStatus> = {}
     const outputs = new Map<string, Outputs>()
-    for (const level of jobLevels(w)) {
+    for (const level of yield* jobLevels(w)) {
       const statuses = yield* Effect.forEach(
         level,
         (id) => {
@@ -104,4 +103,4 @@ export const runWorkflow = <Ctx>(w: Workflow, o: RunOptions<Ctx>): Effect.Effect
       })
     }
     return { status: Object.values(results).every((s) => s === "success") ? "success" : "failure", jobs: results }
-  })
+})
