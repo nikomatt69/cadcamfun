@@ -483,7 +483,7 @@ const treatEndRims = (b: Brep, id: string, ends: "top" | "bottom" | "both", hole
   })
   if (wanted.size === 0) return b
   const candidates = blendCandidates(b, 0).filter((c) => wanted.has(c.edge))
-  if (candidates.length < wanted.size) return `the exact ${style} of an extrusion's rim takes straight edges and full circles only (the profile has arcs or curves)`
+  if (candidates.length < wanted.size) return `the exact ${style} of an extrusion's rim takes straight edges, circles and rim arcs only (the profile has splines or other curves)`
   const res = blendBrep(b, candidates, size, style)
   if (res.failures.length > 0) return `exact ${style} failed: ${res.failures[0]}`
   if (res.rejected.length > 0) return `exact ${style} refused: ${res.rejected[0]}`

@@ -1,5 +1,5 @@
 import type { CloudProjectStatus } from "@cadcamfun/api"
-import { CompanionError } from "./client"
+import { CompanionError } from "./companion-error"
 
 /** Default English copy shared by the delivery UI and announcements. */
 export const cloudCopy = {

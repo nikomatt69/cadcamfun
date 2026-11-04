@@ -205,6 +205,12 @@ export interface LoftOptions {
   /** The point each section starts from (the mesh rebuild's first ring point); by default its first segment's start. */
   readonly starts?: ReadonlyArray<Vec3 | undefined>
   readonly name?: string
+  /**
+   * Close the loft on itself: the last section is joined to the first by one more span (a ring, torus-like body with no end caps).
+   * Needs three sections or more. Each section runs counter-clockwise about the local direction of travel (the chord from the
+   * section before to the section after), and with `smooth` the Catmull-Rom spline wraps round, so the join is G1.
+   */
+  readonly closed?: boolean
 }
 
 /** The exact solid lofted through two or more closed planar sections. Throws a `RangeError` for what it cannot build. */
@@ -223,12 +229,19 @@ export const loftBrep = (sections: ReadonlyArray<ReadonlyArray<LoftSegment>>, o:
     })
     return startAt(segs, best)
   })
+  const closed = o.closed === true
+  if (closed && sections.length < 3) throw new RangeError("A closed loft needs at least three sections")
   const centres = rings.map((r) => mean(samples(r, count)))
   let direction = sub3(centres[centres.length - 1]!, centres[0]!)
   if (length3(direction) < 1e-9) direction = newell(samples(rings[0]!, count))
   direction = normalize3(direction)
-  // Counter-clockwise about the direction, keeping the start.
-  rings = rings.map((r) => (dot3(newell(samples(r, count)), direction) < 0 ? [...r].reverse().map(segReverse) : r))
+  // Counter-clockwise about the direction (a closed loft: the local direction of travel), keeping the start.
+  const travel = (k: number): Vec3 => {
+    if (!closed) return direction
+    const n = rings.length, d = sub3(centres[(k + 1) % n]!, centres[(k + n - 1) % n]!)
+    return length3(d) < 1e-9 ? direction : normalize3(d)
+  }
+  rings = rings.map((r, k) => (dot3(newell(samples(r, count)), travel(k)) < 0 ? [...r].reverse().map(segReverse) : r))
   // Each start rotated to match the section before.
   for (let k = 1; k < rings.length; k++) {
     const prev = samples(rings[k - 1]!, count), cur = samples(rings[k]!, count)
@@ -260,23 +273,26 @@ export const loftBrep = (sections: ReadonlyArray<ReadonlyArray<LoftSegment>>, o:
   const E = pieces.map((row, k) => row.map((p, c) => { const { curve, t1 } = curveOf(p); return B.edge(curve, 0, t1, V[k]![c]!, V[k]![(c + 1) % C]!) }))
   const smooth = o.smooth === true && S > 2
   // Rows of span k: the two sections, or with the spline their neighbours (clamped at the ends) as well.
-  const spanRows = (k: number): number[] => (smooth ? [Math.max(0, k - 1), k, k + 1, Math.min(S - 1, k + 2)] : [k, k + 1])
+  const spans = closed ? S : S - 1
+  const spanRows = (k: number): number[] =>
+    closed ? (smooth ? [(k + S - 1) % S, k, (k + 1) % S, (k + 2) % S] : [k, (k + 1) % S]) : smooth ? [Math.max(0, k - 1), k, k + 1, Math.min(S - 1, k + 2)] : [k, k + 1]
   const spline = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Vec3[] => [b, add3(b, scale3(sub3(c, a), 1 / 6)), sub3(c, scale3(sub3(d, b), 1 / 6)), c]
   const R: number[][] = []
-  for (let k = 0; k < S - 1; k++) {
+  for (let k = 0; k < spans; k++) {
     R.push(Array.from({ length: C }, (_, c) => {
-      const a = V[k]![c]!, b = V[k + 1]![c]!
+      const a = V[k]![c]!, b = V[(k + 1) % S]![c]!
       if (!smooth) return B.edge(lineCurve(B.vertices[a]!.point, sub3(B.vertices[b]!.point, B.vertices[a]!.point)), 0, length3(sub3(B.vertices[b]!.point, B.vertices[a]!.point)), a, b)
       const pts = spline(...(spanRows(k).map((r) => segPoint(pieces[r]![c]!, 0)) as [Vec3, Vec3, Vec3, Vec3]))
       return B.edge(nurbsCurve({ degree: 3, knots: [0, 0, 0, 0, 1, 1, 1, 1], points: pts.map((p) => [p.x, p.y, p.z]) }), 0, 1, a, b)
     }))
   }
   const name = o.name ?? "loft"
-  for (let k = 0; k < S - 1; k++) {
+  for (let k = 0; k < spans; k++) {
+    const k1 = (k + 1) % S
     for (let c = 0; c < C; c++) {
-      const loop: ReadonlyArray<readonly [number, boolean]> = [[E[k]![c]!, false], [R[k]![(c + 1) % C]!, false], [E[k + 1]![c]!, true], [R[k]![c]!, true]]
-      const simple = smooth ? undefined : analyticColumn(pieces[k]![c]!, pieces[k + 1]![c]!)
-      if (simple !== undefined) { B.face(simple, facesInward(simple, pieces[k]![c]!, pieces[k + 1]![c]!), [loop], `${name}.side`); continue }
+      const loop: ReadonlyArray<readonly [number, boolean]> = [[E[k]![c]!, false], [R[k]![(c + 1) % C]!, false], [E[k1]![c]!, true], [R[k]![c]!, true]]
+      const simple = smooth ? undefined : analyticColumn(pieces[k]![c]!, pieces[k1]![c]!)
+      if (simple !== undefined) { B.face(simple, facesInward(simple, pieces[k]![c]!, pieces[k1]![c]!), [loop], `${name}.side`); continue }
       const { points, weights } = commonRows(spanRows(k).map((r) => pieces[r]![c]!))
       const ctrl: Vec3[][] = smooth
         ? points[0]!.map((_, i) => spline(points[0]![i]!, points[1]![i]!, points[2]![i]!, points[3]![i]!))
@@ -302,8 +318,10 @@ export const loftBrep = (sections: ReadonlyArray<ReadonlyArray<LoftSegment>>, o:
     const loop = out ? E[k]!.map((e) => [e, false] as const) : [...E[k]!].reverse().map((e) => [e, true] as const)
     B.face({ kind: "plane", frame: frame(segPoint(pieces[k]![0]!, 0), n) }, !out, [loop], `${name}.${out ? "end" : "start"}`)
   }
-  cap(0, false)
-  cap(S - 1, true)
+  if (!closed) {
+    cap(0, false)
+    cap(S - 1, true)
+  }
   const brep = B.build(true)
   const rep = validateBrep(brep)
   if (rep.issues.length > 0) throw new RangeError(`the lofted solid is not valid: ${rep.issues[0]!.message}`)

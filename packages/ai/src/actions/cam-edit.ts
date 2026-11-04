@@ -64,6 +64,10 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       })
   }),
   defineWireAction({
+    id: "cam_edit.setup_save", kind: "write", parameters: CAM_ACTION_INPUTS["cam_edit.setup_save"],
+    run: (input, { handlers, projectId }) => handlers.setupSave?.(projectId, input) ?? { ok: false, error: "Saved setups are unavailable in this host." }
+  }),
+  defineWireAction({
     id: "cam_edit.stock_set", kind: "write", replaces: "cam_stock",
     parameters: CAM_ACTION_INPUTS["cam_edit.stock_set"],
     run: ({ stock }, { handlers, projectId }) =>

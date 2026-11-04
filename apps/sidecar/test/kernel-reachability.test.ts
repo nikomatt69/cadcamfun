@@ -25,6 +25,7 @@ const REACH = {
   "cam-parse": { route: "POST /api/toolpaths/parse" },
   "cam-verify": { route: "POST /api/toolpaths/verify" },
   "cam-verify-nc": { route: "POST /api/toolpaths/verify-nc" },
+  "cam-collisions": { route: "POST /api/toolpaths/collisions" },
   "cam-job": { route: "POST /api/cam/jobs" },
   "cam-lathe": { route: "POST /api/cam/lathe" },
   "cad-analyze": { route: "POST /api/cad/exact/analyze" },

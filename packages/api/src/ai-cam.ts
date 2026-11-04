@@ -139,6 +139,15 @@ export const CamVerifyInput = Schema.Struct({
   stock: Schema.optionalKey(cam.verify.BoundsSchema), resolution: Schema.optionalKey(positive),
   tolerance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))), start: Schema.optionalKey(cad.Vec3Schema)
 })
+/** A multi-operation setup (spec 14) to plan and check: no geometry needed, the answer is its programs, tool table and issues. */
+export const CamSetupPlanInput = Schema.Struct({ setup: cam.program.SetupSchema })
+/** Saves a setup in the project under a name; `setupId` + `baseUpdatedAt` update one read earlier (a stale revision is refused). */
+export const CamSetupSaveInput = Schema.Struct({
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  setup: cam.program.SetupSchema,
+  setupId: Schema.optionalKey(id),
+  baseUpdatedAt: Schema.optionalKey(revision)
+})
 export const CamStockSetInput = Schema.Struct({
   stock: Schema.Struct({
     ...cam.generator.StockSchema.fields,
@@ -185,11 +194,16 @@ export const CAM_ACTION_INPUTS = {
   /** A multi-setup job run in process: plan or run every setup, read claims, bounds and failure reasons (skill cam-five-axis). */
   "cam.job": CamJobInput,
   "cam.chain_status": Schema.Struct({ operationId: id }),
+  /** Plan and check a multi-operation setup: programs, tool table, tool changes and the issues row by row. */
+  "cam.setup_plan": CamSetupPlanInput,
+  /** The setups saved in the project. */
+  "cam.setup_list": empty,
   "cam_edit.create": CamCreateInput,
   "cam_edit.update": CamUpdateInput,
   "cam_edit.generate": CamGenerateInput,
   "cam_edit.verify": CamVerifyInput,
   "cam_edit.stock_set": CamStockSetInput,
+  "cam_edit.setup_save": CamSetupSaveInput,
   "cam_edit.manufacture": CamManufactureOperationInput,
   "cam_edit.export": CamExportInput
 } as const

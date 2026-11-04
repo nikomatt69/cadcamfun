@@ -349,3 +349,7 @@ export const defineComponentPrompt = (drawing: { readonly id: string; readonly n
 
 export const changeComponentPrompt = (component: { readonly id: string; readonly name: string }): string =>
   `Review component "${component.name}" (${component.id}) and propose one precise change on an ai/ branch, then open a pull request. Do not edit main.`
+
+/** An editable request; it is never sent until the person finishes and submits it. */
+export const editDesignPrompt = (drawing: { readonly id: string; readonly name: string }, elementId?: string): string =>
+  `Help me edit design "${drawing.name}" (${drawing.id}). ${elementId ? `Focus on element ${elementId}. ` : ""}My requested change: `

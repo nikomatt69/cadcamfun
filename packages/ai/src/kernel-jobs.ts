@@ -13,6 +13,7 @@ import { cadScene } from "./cad-scene-job.ts"
 import { camJob } from "./cam-job.ts"
 import { camLathe } from "./cam-lathe.ts"
 import { camVerifyNc } from "./cam-verify-nc.ts"
+import { machineRun, type MachineRunInput } from "./machine-run.ts"
 import { normalizeElement } from "./element-catalog.ts"
 import { groupIntoComponents } from "./component-grouping.ts"
 
@@ -144,6 +145,31 @@ export const cadRebuild = ({ history, budgetMs, baseline }: CadRebuildInput) => 
   }
 }
 
+/**
+ * The collision report of a mill program (spec 72 P4): the same timeline, set-up and checks as the preview (`machine-run.ts`), cut down
+ * to what a client needs to decide whether to run the program: collisions with stock, shank, holder, machine bodies and near misses,
+ * the machine's travel and rotary limits, and the findings about the set-up.
+ */
+export const camCollisions = (input: Omit<MachineRunInput, "kind" | "at">) => {
+  const run = machineRun({ ...input, kind: "mill" }) as {
+    readonly ok: boolean; readonly error?: string; readonly duration?: number; readonly moves?: number
+    readonly collisions?: ReadonlyArray<{ code: string; severity: "error" | "warning"; seconds: number; line?: number; count: number; message: string }>
+    readonly machineModel?: { readonly limits: ReadonlyArray<{ code: string; severity: "error" | "warning"; line?: number; count: number; message: string }> }
+    readonly findings: ReadonlyArray<{ code: string; severity: "error" | "warning"; assumed: boolean; line?: number; count: number; message: string }>
+    readonly setupProblems: ReadonlyArray<{ readonly message: string }>
+    readonly unsupported: ReadonlyArray<string>
+  }
+  if (!run.ok) return { error: run.error ?? "The program could not be analysed" } as const
+  const collisions = run.collisions ?? []
+  const limits = run.machineModel?.limits ?? []
+  return {
+    duration: run.duration ?? 0, moves: run.moves ?? 0,
+    collisions, limits, findings: run.findings, setupProblems: run.setupProblems.map((p) => p.message), unsupported: run.unsupported,
+    /** True when nothing of severity `error` was found by any of the three checks. */
+    clear: ![...collisions, ...limits, ...run.findings].some((f) => f.severity === "error")
+  } as const
+}
+
 export interface CadImportStepInput {
   readonly step: string
   /** The history to add the bodies to, already decoded against `ParametricHistory` by the caller. */
@@ -244,6 +270,8 @@ export interface KernelJobs {
   readonly "cad-sheet": { readonly input: { readonly history: History; readonly options: drawing.SheetOptions }; readonly output: ReturnType<typeof drawing.generateSheet> }
   /** NC the kernel did not write replayed against part, stock and tools (`cam-verify-nc.ts`); not cached: the input is the program. */
   readonly "cam-verify-nc": { readonly input: Parameters<typeof camVerifyNc>[0]; readonly output: ReturnType<typeof camVerifyNc> }
+  /** The collision report of a mill program (`camCollisions`); not cached: the input is the program. */
+  readonly "cam-collisions": { readonly input: Parameters<typeof camCollisions>[0]; readonly output: ReturnType<typeof camCollisions> }
   readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
 }
 
@@ -256,6 +284,7 @@ export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.Genera
 export type KernelJobName = keyof KernelJobs
 
 export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]["input"], report?: (progress: KernelJobProgress) => void) => KernelJobs[K]["output"] } = {
+  "cam-collisions": camCollisions,
   "cad-group": ({ entries }: { readonly entries: ReadonlyArray<{ readonly index: number; readonly element: Record<string, unknown> }> }) => groupIntoComponents(entries),
   "cad-normalize": ({ elements }) => elements.map((element) => normalizeElement(element)),
   "parametric-diagnosis": parametricDiagnosis,

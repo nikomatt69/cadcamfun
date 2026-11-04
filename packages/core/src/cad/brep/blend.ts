@@ -80,6 +80,8 @@ export interface BlendCandidate {
   readonly reachB: number
   /** For a rim: the cylinder's axis point (in the rim's plane), direction and radius. */
   readonly axis?: { readonly origin: Vec3; readonly dir: Vec3; readonly radius: number }
+  /** Set when the edge is an arc of a rim rather than the whole circle: the angle swept and its sense about `axis.dir` (from `a` to `b`). */
+  readonly arc?: { readonly angle: number; readonly sign: 1 | -1 }
   /** Rims are the "curved" edges of the mesh blend's selection: taken only when asked for. */
   readonly curved: boolean
 }
@@ -139,10 +141,11 @@ export const blendCandidates = (b: Brep, minAngleDegrees = 0.5): BlendCandidate[
       out.push({ edge: ei, curve: "line", a, b: c, nA, nB, faceA: u[0]!.face, faceB: u[1]!.face, convex: dot3(intoA, nB) < 0, length: length3(sub3(c, a)), reachA: reach(u[0]!.face), reachB: reach(u[1]!.face), curved: false })
       return
     }
-    if (e.curve.kind === "circle" && e.v0 === e.v1) {
+    if (e.curve.kind === "circle") {
+      const closedRim = e.v0 === e.v1
       const planeUse = u.find((use) => b.faces[use.face]!.surface.kind === "plane")
       const sphereUse = u.find((use) => b.faces[use.face]!.surface.kind === "sphere")
-      if (planeUse !== undefined && sphereUse !== undefined) {
+      if (closedRim && planeUse !== undefined && sphereUse !== undefined) {
         const p0 = b.vertices[e.v0]!.point
         const nA = outwardNormal(b, planeUse.face, p0), nB = outwardNormal(b, sphereUse.face, p0)
         const sphere = b.faces[sphereUse.face]!.surface
@@ -186,9 +189,14 @@ export const blendCandidates = (b: Brep, minAngleDegrees = 0.5): BlendCandidate[
         // A disc (a plane whose only boundary is the rim itself, such as the top of a cylinder) runs on to the axis, not to zero.
         return far < 1e-9 && b.faces[fi]!.surface.kind === "plane" ? rho : far
       }
+      // An arc of a rim (a rounded corner of a plate): the same section, revolved through the arc only. It is an edge of the
+      // outline like the straight ones, so it is not a "curved" selection.
+      const sweep = e.t1 - e.t0
+      const arc = closedRim ? undefined : { angle: sweep, sign: dot3(e.curve.frame.z, dir) > 0 ? (1 as const) : (-1 as const) }
       out.push({
-        edge: ei, curve: "circle", a: p0, b: p0, nA: na, nB: nb, faceA: ua.face, faceB: ub.face, convex: dot3(intoA, nb) < 0,
-        length: 2 * Math.PI * rho, reachA: reach(ua.face), reachB: reach(ub.face), axis: { origin: centre, dir, radius: rho }, curved: true
+        edge: ei, curve: "circle", a: p0, b: closedRim ? p0 : b.vertices[e.v1]!.point, nA: na, nB: nb, faceA: ua.face, faceB: ub.face, convex: dot3(intoA, nb) < 0,
+        length: (closedRim ? 2 * Math.PI : sweep) * rho, reachA: reach(ua.face), reachB: reach(ub.face), axis: { origin: centre, dir, radius: rho }, curved: closedRim,
+        ...(arc === undefined ? {} : { arc })
       })
     }
   })
@@ -215,7 +223,7 @@ export const selectBlendEdges = (edges: ReadonlyArray<BlendCandidate>, s: BlendS
     q.x >= s.within.min[0] - 1e-3 && q.x <= s.within.max[0] + 1e-3 && q.y >= s.within.min[1] - 1e-3 && q.y <= s.within.max[1] + 1e-3 &&
     q.z >= s.within.min[2] - 1e-3 && q.z <= s.within.max[2] + 1e-3)
   const extremes = (e: BlendCandidate): Vec3[] => {
-    if (e.axis === undefined) return [e.a, e.b]
+    if (e.axis === undefined || e.arc !== undefined) return [e.a, e.b]
     const f = frame(e.axis.origin, e.axis.dir)
     return [0, 1, 2, 3].map((k) => madd3(madd3(e.axis!.origin, f.x, e.axis!.radius * Math.cos((k * Math.PI) / 2)), f.y, e.axis!.radius * Math.sin((k * Math.PI) / 2)))
   }
@@ -322,6 +330,10 @@ const endCuts = (b: Brep, e: BlendCandidate, selected: ReadonlyArray<BlendCandid
   ;[edge.v0, edge.v1].forEach((v, end) => {
     const V = b.vertices[v]!.point
     const self = normalize3(sub3(end === 0 ? e.b : e.a, V))
+    // A selected arc of a rim starts here, tangent to this edge (a rounded corner): this tool stops on the plane square to the
+    // edge through the vertex, where the arc's tool begins, so the blend runs on round the corner without overlap.
+    const arcs = selected.filter((o) => o.arc !== undefined && o.convex === e.convex && (b.edges[o.edge]!.v0 === v || b.edges[o.edge]!.v1 === v))
+    if (arcs.length > 0) { cuts[end]!.push({ n: neg3(self), d: -dot3(self, V) }); return }
     const others = selected.filter((o) => o !== e && o.curve === "line" && o.convex === e.convex && (b.edges[o.edge]!.v0 === v || b.edges[o.edge]!.v1 === v))
     if (others.length === 0) return
     if (style === "fillet" && others.length === 2 && e.convex) {
@@ -414,8 +426,10 @@ const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate,
   }
   // A rim: the cross-section in the (radial, axial) half-plane through the edge's point, revolved about the axis.
   const ax = e.axis!
-  const [rho, h] = radialAxial(e.a, ax.origin, ax.dir)
-  const radial = normalize3(madd3(sub3(e.a, ax.origin), ax.dir, -h))
+  // An arc is revolved right-handed about the axis, so it starts at the end that comes first in that sense.
+  const start = e.arc !== undefined && e.arc.sign < 0 ? e.b : e.a
+  const [rho, h] = radialAxial(start, ax.origin, ax.dir)
+  const radial = normalize3(madd3(sub3(start, ax.origin), ax.dir, -h))
   const to2 = (n: Vec3): Vec2 => ({ x: dot3(n, radial), y: dot3(n, ax.dir) })
   const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, onA, style, g, onB)
   if (typeof loop === "string") return loop
@@ -423,7 +437,7 @@ const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate,
     ? { kind: "line", a: { x: s.a.x + rho, y: s.a.y + h }, b: { x: s.b.x + rho, y: s.b.y + h } }
     : s.kind === "arc" ? { ...s, center: { x: s.center.x + rho, y: s.center.y + h } } : s)
   for (const s of moved) if (s.kind === "line" && (s.a.x < MODEL_TOL || s.b.x < MODEL_TOL)) return `the ${style} reaches the axis of the rim`
-  return revolveProfile({ loops: [moved] }, 2 * Math.PI, { origin: ax.origin, axis: ax.dir, radial, name: "blend" })
+  return revolveProfile({ loops: [moved] }, e.arc?.angle ?? 2 * Math.PI, { origin: ax.origin, axis: ax.dir, radial, name: "blend" })
 }
 
 /** The convex cell bounded by the planes n·p ≤ d, as a polyhedron (undefined when it is empty or not a solid). */

@@ -31,7 +31,13 @@ import { swarfSections, type SwarfCutter, type SwarfWall } from "./swarf.ts"
 export const MultiaxisStrategySchema = Schema.Literals(["parallel", "contour", "swarf"])
 export type MultiaxisStrategy = typeof MultiaxisStrategySchema.Type
 
-export const ToolAxisSchema = Schema.Literals(["normal", "lead"])
+/**
+ * Tool-axis rule (spec 69 F4). `normal` / `lead`: from the surface normal. `point` / `line` / `curve`: the axis points from the contact
+ * to the given point / the nearest point of the line / of the polyline (a tool that always looks at a pivot, a rotation axis or a
+ * guide curve). `surface`: the axis is the normal of a guide surface at the contact (passed to `generateMultiaxis`). `shortest`: of the
+ * leans within `gougeAngle` of the normal that clear the part, the one that lets the shortest holder reach (least stick-out).
+ */
+export const ToolAxisSchema = Schema.Literals(["normal", "lead", "point", "line", "curve", "surface", "shortest"])
 export type ToolAxis = typeof ToolAxisSchema.Type
 
 const Degrees = Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))
@@ -50,6 +56,16 @@ export class MultiaxisParams extends Schema.Class<MultiaxisParams>("cam/Multiaxi
     oneWay: withDefault(Schema.Boolean, false),
     /** `normal`: the tool stands on the surface normal. `lead`: the normal leaned by `lead` and `tilt`. */
     toolAxis: withDefault(ToolAxisSchema, "normal" as const),
+    /** `point`: the point the tool axis passes through. */
+    axisPoint: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+    /** `line`: the line (through `a` and `b`) the tool axis passes through. */
+    axisLine: Schema.optionalKey(Schema.Struct({ a: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }), b: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }) })),
+    /** `curve`: the polyline the tool axis passes through (nearest point). */
+    axisCurve: Schema.optionalKey(Schema.Array(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })).check(Schema.isMinLength(2), Schema.isMaxLength(20000))),
+    /** Largest angle of the tool axis from +Z (tool tilt limit), degrees; a sample beyond it is skipped. Absent = no limit beyond the machine's. */
+    maxTilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 180 }))),
+    /** `shortest`: diameter of the holder whose reach is minimised, mm (default twice the tool diameter). */
+    holderDiameter: Schema.optionalKey(Positive),
     /** Lean towards the direction of travel, degrees (`lead`). */
     lead: withDefault(Degrees, 10),
     /** Lean sideways, degrees (`lead`). */
@@ -120,7 +136,7 @@ const tangentNear = (n: Vec3, hint: Vec3): Vec3 => {
  * The unit tool axis (from the tip up through the holder) at a contact point with normal `n`, the tool moving along
  * `travel`. `normal`: `n` itself. `lead`: `n` leaned towards the travel by `lead` degrees, then turned sideways by `tilt`.
  */
-export const toolAxisAt = (n: Vec3, travel: Vec3, params: { readonly toolAxis: ToolAxis; readonly lead: number; readonly tilt: number }): Vec3 => {
+export const toolAxisAt = (n: Vec3, travel: Vec3, params: { readonly toolAxis: "normal" | "lead"; readonly lead: number; readonly tilt: number }): Vec3 => {
   const normal = unit(n)
   if (params.toolAxis === "normal") return normal
   const forward = tangentNear(normal, travel)
@@ -162,6 +178,8 @@ export const envelopeOf = (p: Vec3, axis: Vec3, tool: Tool, flute: number): { cu
 // ---------------------------------------------------------------- samples
 
 export interface Sample {
+  /** `shortest` only: the stick-out the holder needs at this pose, mm. */
+  readonly reach?: number
   readonly point: Vec3
   readonly angles: RotaryAngles
   readonly tip: Vec3
@@ -182,6 +200,100 @@ const wrap = (deg: number): number => {
   return d
 }
 
+const dist = (a: Vec3, b: Vec3): number => length(add(a, scale(b, -1)))
+
+/** Nearest point of the segment a-b to p. */
+const nearestOnSegment = (p: Vec3, a: Vec3, b: Vec3, clamp: boolean): Vec3 => {
+  const ab = add(b, scale(a, -1))
+  const l2 = dot(ab, ab)
+  if (l2 < 1e-18) return a
+  let t = dot(add(p, scale(a, -1)), ab) / l2
+  if (clamp) t = Math.max(0, Math.min(1, t))
+  return add(a, scale(ab, t))
+}
+
+/**
+ * The unit tool axis by a guide rule (spec 69 F4), from the contact `p` towards the guide, or undefined when the rule has nothing at
+ * `p` (the contact is on the guide, or the guide surface is not under it).
+ */
+export const guideAxis = (params: Pick<MultiaxisParams, "toolAxis" | "axisPoint" | "axisLine" | "axisCurve">, p: Vec3, guide?: TriangleSoup): Vec3 | undefined => {
+  let target: Vec3 | undefined
+  switch (params.toolAxis) {
+    case "point": target = params.axisPoint; break
+    case "line": target = params.axisLine === undefined ? undefined : nearestOnSegment(p, params.axisLine.a, params.axisLine.b, false); break
+    case "curve": {
+      const c = params.axisCurve
+      if (c === undefined) break
+      let best = Infinity
+      for (let i = 0; i + 1 < c.length; i++) { const q = nearestOnSegment(p, c[i]!, c[i + 1]!, true); const d = dist(p, q); if (d < best) { best = d; target = q } }
+      break
+    }
+    case "surface": {
+      const h = guide?.down(p.x, p.y, guide.bounds.max[2] + 1)
+      return h === undefined ? undefined : unit(h.normal)
+    }
+    default: return undefined
+  }
+  if (target === undefined || dist(p, target) < 1e-9) return undefined
+  return unit(add(target, scale(p, -1)))
+}
+
+/** Stick-out the holder (radius `holderRadius`) needs at a pose so that it clears the part, mm: the height of the highest blocked ring plus 1. */
+export const reachOf = (p: Vec3, axis: Vec3, holderRadius: number, from: number, to: number, soup: TriangleSoup, clearance: number): number => {
+  const seed: Vec3 = Math.abs(axis.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+  const u = unit(cross(axis, seed))
+  const v = cross(axis, u)
+  let blocked = from - 1
+  for (let h = from; h <= to; h += 1) {
+    const c = add(p, scale(axis, h))
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4
+      if (!soup.isClear(add(c, add(scale(u, holderRadius * Math.cos(a)), scale(v, holderRadius * Math.sin(a)))), clearance)) { blocked = h; break }
+    }
+  }
+  return blocked + 1
+}
+
+const tiltFromZ = (axis: Vec3): number => Math.acos(Math.max(-1, Math.min(1, axis.z))) / RAD
+
+/**
+ * The full tool assembly and the static bodies of the fixing, in part coordinates (spec 72 P0-6). With it a lean is only accepted when
+ * the flutes, the shank and the holder stay clear of the part and of every box (fixture bodies turn with the part on a table machine,
+ * so they are static here). Without it only the cutter envelope is checked, as before.
+ */
+export interface GenerationAssembly {
+  readonly fluteLength: number
+  readonly shankDiameter: number
+  readonly stickout: number
+  readonly holder?: { readonly diameter: number; readonly length: number }
+  readonly boxes?: ReadonlyArray<{ readonly min: Vec3; readonly max: Vec3 }>
+}
+
+const inBox = (q: Vec3, b: { readonly min: Vec3; readonly max: Vec3 }): boolean =>
+  q.x > b.min.x && q.x < b.max.x && q.y > b.min.y && q.y < b.max.y && q.z > b.min.z && q.z < b.max.z
+
+/** Points on the shank and holder above the contact point `p` (rings every <= 4 mm), and the flutes, for the assembly check. */
+const assemblyPoints = (p: Vec3, axis: Vec3, a: GenerationAssembly): { shank: Vec3[]; holder: Vec3[] } => {
+  const seed: Vec3 = Math.abs(axis.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+  const u = unit(cross(axis, seed))
+  const v = cross(axis, u)
+  const rings = (from: number, to: number, radius: number, into: Vec3[]): void => {
+    const n = Math.max(1, Math.ceil((to - from) / 4))
+    for (let i = 0; i <= n; i++) {
+      const centre = add(p, scale(axis, from + ((to - from) * i) / n))
+      into.push(centre)
+      for (let k = 0; k < 8; k++) {
+        const t = (k * Math.PI) / 4
+        into.push(add(centre, add(scale(u, radius * Math.cos(t)), scale(v, radius * Math.sin(t)))))
+      }
+    }
+  }
+  const shank: Vec3[] = [], holder: Vec3[] = []
+  rings(a.fluteLength, a.stickout, a.shankDiameter / 2, shank)
+  if (a.holder !== undefined) rings(a.stickout, a.stickout + a.holder.length, a.holder.diameter / 2, holder)
+  return { shank, holder }
+}
+
 /**
  * The sample for a contact point: the first lean (the base, then steeper ones in both directions) whose cutter stays
  * clear of the part and whose table angles the machine can reach. `undefined` when none does.
@@ -192,8 +304,55 @@ const sampleAt = (
   params: MultiaxisParams,
   tool: Tool,
   soup: TriangleSoup,
-  k: FiveAxisKinematic
+  k: FiveAxisKinematic,
+  guide?: TriangleSoup,
+  assembly?: GenerationAssembly
 ): Sample | undefined => {
+  const usable = (axis: Vec3): Sample | undefined => {
+    if (params.maxTilt !== undefined && tiltFromZ(axis) > params.maxTilt + 1e-9) return undefined
+    const angles = solveOrientation(axis, k)
+    if (angles === undefined) return undefined
+    const env = envelopeOf(hit.point, axis, tool, params.flute)
+    const free = env.cut.every((q) => !soup.inside(q)) && env.body.every((q) => soup.isClear(q, params.gougeClearance))
+    if (!free) return undefined
+    if (assembly !== undefined) {
+      const boxes = assembly.boxes ?? []
+      const above = assemblyPoints(hit.point, axis, assembly)
+      const clear = [...above.shank, ...above.holder].every((q) => soup.isClear(q, params.gougeClearance) && boxes.every((b) => !inBox(q, b)))
+      if (!clear || [...env.cut, ...env.body].some((q) => boxes.some((b) => inBox(q, b)))) return undefined
+    }
+    return { point: hit.point, angles, tip: tipPosition(hit.point, angles, k), leaned: false }
+  }
+  if (params.toolAxis === "point" || params.toolAxis === "line" || params.toolAxis === "curve" || params.toolAxis === "surface") {
+    const base = guideAxis(params, hit.point, guide)
+    if (base === undefined) return undefined
+    const side = unit(cross(base, tangentNear(base, travel)))
+    const tries: Vec3[] = [base]
+    if (params.gouge) for (const step of [params.gougeAngle / 3, (2 * params.gougeAngle) / 3, params.gougeAngle]) for (const sign of [1, -1]) tries.push(rotateAbout(base, side, sign * step))
+    for (const [index, axis] of tries.entries()) {
+      const s = usable(axis)
+      if (s !== undefined) return { ...s, leaned: index > 0 }
+    }
+    return undefined
+  }
+  if (params.toolAxis === "shortest") {
+    const normal = unit(hit.normal)
+    const forward = tangentNear(normal, travel)
+    const holderRadius = (params.holderDiameter ?? 2 * tool.diameter) / 2
+    const L = params.gougeAngle, to = tool.stickout ?? 60
+    let best: { sample: Sample; reach: number; lean: number } | undefined
+    for (const lead of [0, L / 2, -L / 2, L, -L]) {
+      for (const tilt of [0, L / 2, -L / 2, L, -L]) {
+        const axis = unit(rotateAbout(add(scale(normal, Math.cos(lead * RAD)), scale(forward, Math.sin(lead * RAD))), normal, tilt))
+        const s = usable(axis)
+        if (s === undefined) continue
+        const reach = reachOf(hit.point, axis, holderRadius, tool.diameter * params.flute / 2, to, soup, params.gougeClearance)
+        const lean = Math.hypot(lead, tilt)
+        if (best === undefined || reach < best.reach - 1e-9 || (Math.abs(reach - best.reach) <= 1e-9 && lean < best.lean)) best = { sample: { ...s, leaned: lean > 0, reach }, reach, lean }
+      }
+    }
+    return best?.sample
+  }
   const leans: Array<{ lead: number; tilt: number }> = [{ lead: params.toolAxis === "lead" ? params.lead : 0, tilt: params.toolAxis === "lead" ? params.tilt : 0 }]
   if (params.gouge) {
     const base = leans[0]!.lead
@@ -208,6 +367,12 @@ const sampleAt = (
     const env = envelopeOf(hit.point, axis, tool, params.flute)
     const free = env.cut.every((q) => !soup.inside(q)) && env.body.every((q) => soup.isClear(q, params.gougeClearance))
     if (!free) continue
+    if (assembly !== undefined) {
+      const boxes = assembly.boxes ?? []
+      const above = assemblyPoints(hit.point, axis, assembly)
+      const clear = [...above.shank, ...above.holder].every((q) => soup.isClear(q, params.gougeClearance) && boxes.every((b) => !inBox(q, b)))
+      if (!clear || [...env.cut, ...env.body].some((q) => boxes.some((b) => inBox(q, b)))) continue
+    }
     return { point: hit.point, angles, tip: tipPosition(hit.point, angles, k), leaned: index > 0 }
   }
   return undefined
@@ -215,7 +380,7 @@ const sampleAt = (
 
 // ---------------------------------------------------------------- the operation
 
-export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>, cutter?: SwarfCutter): MultiaxisResult => {
+export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>, cutter?: SwarfCutter, guide?: TriangleSoup, assembly?: GenerationAssembly): MultiaxisResult => {
   const warnings: string[] = []
   const bounds = soup.bounds
   const topZ = bounds.max[2]
@@ -232,6 +397,11 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
     stats
   })
 
+  const missing = params.toolAxis === "point" && params.axisPoint === undefined ? "a point (axisPoint)" : params.toolAxis === "line" && params.axisLine === undefined ? "a line (axisLine)" : params.toolAxis === "curve" && params.axisCurve === undefined ? "a curve (axisCurve)" : params.toolAxis === "surface" && guide === undefined ? "a guide surface" : undefined
+  if (missing !== undefined) {
+    warnings.push(`Tool axis '${params.toolAxis}' needs ${missing}: none was given`)
+    return done([])
+  }
   if (tool.kind === "drill" || tool.kind === "vbit" || tool.kind === "facemill") {
     warnings.push(`A ${tool.kind} cannot machine a 5-axis surface; use an end mill or a ball nose cutter.`)
     return done([])
@@ -264,7 +434,7 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
         // Revisit the first point to cut the closing leg, but never bridge an unreachable interval.
         for (const xy of [...loop, loop[0]!]) {
           const hit = soup.down(xy.x, xy.y, topZ + 1)
-          const sample = take(hit === undefined ? undefined : sampleAt(hit, travelOf(loop, xy), params, tool, soup, k))
+          const sample = take(hit === undefined ? undefined : sampleAt(hit, travelOf(loop, xy), params, tool, soup, k, guide, assembly))
           if (sample === undefined) {
             if (run.length > 0) sections.push(run)
             run = []
@@ -312,7 +482,7 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
     let run: Sample[] = []
     for (const p of line) {
       const hit = soup.down(p.x, p.y, topZ + 1)
-      const sample = hit === undefined ? undefined : take(sampleAt(hit, travel, params, tool, soup, k))
+      const sample = hit === undefined ? undefined : take(sampleAt(hit, travel, params, tool, soup, k, guide, assembly))
       if (sample === undefined) {
         if (run.length > 0) sections.push(run)
         run = []

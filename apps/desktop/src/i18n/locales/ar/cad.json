@@ -1252,5 +1252,12 @@
   "cad.template.honeycombPattern.color.label": "اللون",
   "cad.param.refLost": "فُقد المرجع",
   "cad.param.refLostBy": "أزاله {feature}",
-  "cad.param.refLostSummary": "{count} تحديدات تشير إلى أوجه أو حواف لم تعد موجودة: تلك الميزات لم تُبنَ"
+  "cad.param.refLostSummary": "{count} تحديدات تشير إلى أوجه أو حواف لم تعد موجودة: تلك الميزات لم تُبنَ",
+  "cad.param.rename": "Rename",
+  "cad.param.selectFeature": "Select",
+  "cad.param.group": "Group {count} selected",
+  "cad.param.groupName": "Group name",
+  "cad.param.ungroup": "Ungroup",
+  "cad.param.expandGroup": "Expand",
+  "cad.param.collapseGroup": "Collapse"
 }

@@ -1,13 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, ScrollView, Switch, Text, View, useWindowDimensions } from "react-native"
-import { ChevronDown, ChevronUp, Eye, EyeOff, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
+import { Check, ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
 import type { PreviewCollisionEvent, PreviewMachine, PreviewOperation, ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { MACHINE_LABELS, MACHINE_SOURCE_LABELS } from "@/lib/machine-bodies"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
 import { LINE_COLOR, operationColor, rgbFromHex } from "@/lib/preview-scene"
-import { cutterAt, describeCutter, orderedContacts } from "@/lib/toolpath-review"
+import { crossedContact, cutterAt, describeCutter, hiddenOperationsForIsolation, lineIsSeekable, operationAt, orderedContacts, playbackStart, readGcodeLines } from "@/lib/toolpath-review"
 import {
   PLAYBACK_SPEEDS,
   cumulativeTimes,
@@ -28,6 +28,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { SectionHeader } from "@/components/ui/SectionHeader"
 import { Skeleton } from "@/components/ui/Skeleton"
+import { ActionButton } from "@/components/ui/ActionButton"
 import { previewHeight, layout } from "@/lib/layout"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { SafeAreaView } from "react-native-screens/experimental"
@@ -96,20 +97,12 @@ export function ToolpathReview({
   const [stopAtContact, setStopAtContact] = useState(true)
   const listRef = useRef<FlatList<string>>(null)
   const clock = useRef(0)
+  const checkedSegment = useRef(-1)
+  const completed = useRef(false)
   // A phone lists a screenful of lines at a time: the program is read up to a bound instead of split whole.
-  const lines = useMemo(() => {
-    const text = review?.gcode
-    if (!text) return []
-    const out: string[] = []
-    let start = 0
-    while (out.length < MAX_GCODE_LINES) {
-      const end = text.indexOf("\n", start)
-      if (end < 0) { out.push(text.slice(start)); break }
-      out.push(text.slice(start, end))
-      start = end + 1
-    }
-    return out
-  }, [review?.gcode])
+  const listingData = useMemo(() => readGcodeLines(review?.gcode ?? "", MAX_GCODE_LINES), [review?.gcode])
+  const lines = listingData.lines
+  const lastPreviewLine = useMemo(() => segments.reduce((last, segment) => Math.max(last, segment.line), 0), [segments])
   const kindByLine = useMemo(() => {
     const kinds = new Map<number, ToolpathSegment["kind"]>()
     for (const segment of segments) kinds.set(segment.line, segment.kind)
@@ -127,27 +120,21 @@ export function ToolpathReview({
   const operations = machine?.operations ?? []
   const contacts = useMemo(() => orderedContacts(machine?.events ?? []), [machine?.events])
   const cutter = useMemo(() => cutterAt(operations, playhead), [operations, playhead])
-  const hiddenOperations = useMemo(() => (isolated === undefined ? undefined : new Set([isolated])), [isolated])
+  const hiddenOperations = useMemo(() => hiddenOperationsForIsolation(operations, isolated), [operations, isolated])
 
   useEffect(() => {
     setPlayhead(0)
     setPlaying(false)
     clock.current = 0
+    checkedSegment.current = -1
+    completed.current = false
+    setIsolated(undefined)
   }, [preview?.revision])
 
   useEffect(() => {
-    if (activeLine < 1) return
-    listRef.current?.scrollToIndex({ index: Math.min(activeLine - 1, Math.max(lines.length - 1, 0)), viewPosition: 0.35, animated: false })
+    if (activeLine < 1 || activeLine > lines.length) return
+    listRef.current?.scrollToIndex({ index: activeLine - 1, viewPosition: 0.35, animated: false })
   }, [activeLine, lines.length])
-
-  // "Stop at contact": playing across a contact pauses there, the contact in view (the desktop's "stop at collision").
-  useEffect(() => {
-    if (!playing || !stopAtContact) return
-    const hit = contacts.find((event) => event.segment === playhead)
-    if (hit === undefined) return
-    setPlaying(false)
-    haptic(hit.severity === "error" ? "error" : "warning")
-  }, [playing, playhead, contacts, stopAtContact])
 
   // The simulated clock advances in real time × speed; the block shown is the one running at that time.
   useEffect(() => {
@@ -159,20 +146,33 @@ export function ToolpathReview({
       last = now
       const total = ends[ends.length - 1]!
       const next = indexAtTime(ends, clock.current)
+      const hit = stopAtContact ? crossedContact(contacts, checkedSegment.current, next) : undefined
+      checkedSegment.current = next
+      if (hit) {
+        checkedSegment.current = hit.segment
+        clock.current = startTimeOf(ends, hit.segment)
+        setPlayhead(hit.segment)
+        setPlaying(false)
+        haptic(hit.severity === "error" ? "error" : "warning")
+        return
+      }
       setPlayhead(next)
       if (clock.current >= total) {
+        completed.current = true
         setPlaying(false)
         haptic("success")
       }
     }, PLAYBACK_TICK_MS)
     return () => clearInterval(timer)
-  }, [playing, speed, ends])
+  }, [playing, speed, ends, contacts, stopAtContact])
 
   /** Manual moves stop playback and put the clock at the start of the chosen block. */
   const seek = (index: number) => {
     const next = clampPlayhead(index, segments.length)
     setPlaying(false)
     clock.current = startTimeOf(ends, next)
+    checkedSegment.current = next
+    completed.current = false
     setPlayhead(next)
   }
 
@@ -183,11 +183,11 @@ export function ToolpathReview({
       setPlaying(false)
       return
     }
-    // Replay from the start once the end is reached.
-    if (playhead >= segments.length - 1) {
-      clock.current = 0
-      setPlayhead(0)
-    } else clock.current = Math.max(clock.current, startTimeOf(ends, playhead))
+    const start = playbackStart(completed.current, clock.current, playhead, checkedSegment.current, ends)
+    clock.current = start.clock
+    checkedSegment.current = start.checkedSegment
+    completed.current = false
+    setPlayhead(start.playhead)
     setPlaying(true)
   }
 
@@ -292,7 +292,7 @@ export function ToolpathReview({
         ) : null}
         {segments.length > 0 && preview ? <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 16, rowGap: 4 }}>
           {[
-            { label: "Cycle", value: `≈ ${formatDuration(totals.seconds)}` },
+            { label: preview.truncated ? "Preview cycle" : "Cycle", value: `≈ ${formatDuration(totals.seconds)}` },
             { label: "Cutting", value: `${formatLength(totals.cutLength)} mm` },
             { label: "Rapid travel", value: `${formatLength(totals.rapidLength)} mm` },
             { label: machine?.kind === "3dprinter" ? "Build volume" : machine?.kind === "lathe" ? "Bar" : "Stock", value: formatSize(preview.stock) },
@@ -301,7 +301,7 @@ export function ToolpathReview({
           </Text>)}
         </View> : null}
         {preview?.truncated ? (
-          <Text style={{ color: palette.warning, ...type(12) }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
+          <Text style={{ color: palette.warning, ...type(12) }}>Path truncated to fit on the phone. Time and travel cover only the previewed path.</Text>
         ) : null}
         {cutter ? (
           <Text selectable style={{ color: palette.soft, fontVariant: ["tabular-nums"], ...type(12) }}>
@@ -318,6 +318,9 @@ export function ToolpathReview({
               onIsolate={(index) => { haptic("selection"); setIsolated((current) => (current === index ? undefined : index)) }}
               onColorMode={setColorMode}
             />
+            {isolated !== undefined ? <Text accessibilityLiveRegion="polite" style={{ color: palette.soft, ...type(12) }}>
+              Unassigned moves remain visible.{operationAt(operations, playhead)?.index !== isolated ? " The playhead is outside the selected operation." : ""}
+            </Text> : null}
           </View>
         ) : null}
         {contacts.length > 0 ? (
@@ -327,19 +330,22 @@ export function ToolpathReview({
               contacts={contacts}
               playhead={playhead}
               stopAtContact={stopAtContact}
+              segmentCount={segments.length}
               onToggleStop={() => { haptic("selection"); setStopAtContact((value) => !value) }}
               onSeek={(event) => { haptic("selection"); seek(event.segment) }}
             />
           </View>
         ) : null}
         {split ? null : bar}
+        {review ? <Text style={{ color: palette.soft, ...type(12) }}>To edit with the assistant, open the design used by this toolpath.</Text> : null}
       </View>
   </>
   const listing = <>
       <View style={{ paddingHorizontal: gutter, paddingVertical: 10, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: palette.border }}>
         <Text accessibilityRole="header" style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>G-code</Text>
-        <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{lines.length.toLocaleString("en")} {lines.length === 1 ? "line" : "lines"}</Text>
+        <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{listingData.truncated ? "First " : ""}{lines.length.toLocaleString("en")} {lines.length === 1 ? "line" : "lines"}</Text>
       </View>
+      {activeLine > lines.length && listingData.truncated ? <Text accessibilityRole="summary" style={{ color: palette.warning, paddingHorizontal: gutter, paddingVertical: 6, ...type(12) }}>The current NC line is beyond the displayed listing.</Text> : null}
       <FlatList
         ref={listRef}
         style={{ flex: 1, backgroundColor: palette.surface }}
@@ -355,7 +361,7 @@ export function ToolpathReview({
           listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
         }}
         renderItem={({ item, index }) => (
-          <GcodeRow lineNumber={index + 1} text={item} kind={kindByLine.get(index + 1)} kindColors={kindColor} active={index + 1 === activeLine} disabled={listingDisabled} onSeekLine={seekLine} />
+          <GcodeRow lineNumber={index + 1} text={item} kind={kindByLine.get(index + 1)} kindColors={kindColor} active={index + 1 === activeLine} disabled={listingDisabled || !lineIsSeekable(index + 1, segments.length, lastPreviewLine, !!preview?.truncated)} outsidePreview={!!preview?.truncated && index + 1 > lastPreviewLine} onSeekLine={seekLine} />
         )}
       />
   </>
@@ -432,6 +438,7 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
         return <Pressable key={operation.index} accessibilityRole="button"
           accessibilityState={{ selected: isolated === operation.index }}
           accessibilityLabel={`${operation.name}${shown ? "" : ", hidden"}`}
+          accessibilityHint={isolated === operation.index ? "Show all operations" : "Show this operation and unassigned moves"}
           onPress={() => onIsolate(operation.index)}
           style={({ pressed }) => ({
             minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderRadius: layout.cardRadius,
@@ -447,7 +454,7 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
               Ø{operation.cutter.diameter}
             </Text>
           ) : null}
-          {isolated === operation.index ? <EyeOff size={15} color={palette.accent} /> : null}
+          {isolated === operation.index ? <Check size={15} color={palette.accent} /> : null}
         </Pressable>
       })}
     </ScrollView>
@@ -475,9 +482,10 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
  *
  * Each row seeks to the move that made the contact, so the phone shows what the desktop's timeline marks.
  */
-function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }: {
+function ContactList({ contacts, playhead, segmentCount, stopAtContact, onToggleStop, onSeek }: {
   contacts: readonly PreviewCollisionEvent[]
   playhead: number
+  segmentCount: number
   stopAtContact: boolean
   onToggleStop: () => void
   onSeek: (event: PreviewCollisionEvent) => void
@@ -496,9 +504,13 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
     </Pressable>
     {contacts.map((event) => {
       const current = event.segment === playhead
+      const unavailable = event.segment < 0 || event.segment >= segmentCount
       const tone = event.severity === "error" ? palette.danger : palette.warning
       return <Pressable key={`${event.code}:${event.segment}`} accessibilityRole="button"
         accessibilityLabel={`${event.severity === "error" ? "Error" : "Warning"}: ${event.message}`}
+        accessibilityState={{ disabled: unavailable }}
+        accessibilityHint={unavailable ? "This contact is outside the available preview" : "Show this contact in the preview"}
+        disabled={unavailable}
         onPress={() => onSeek(event)}
         style={({ pressed }) => ({
           minHeight: 44, flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 8,
@@ -509,7 +521,7 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
         <View style={{ flex: 1, gap: 2 }}>
           <Text selectable style={{ color: palette.ink, ...type(13) }}>{event.message}</Text>
           <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(11) }}>
-            {event.code}{event.line !== undefined ? ` · line ${event.line}` : ""} · {formatDuration(event.seconds)}
+            {event.code}{event.line !== undefined ? ` · line ${event.line}` : ""} · {formatDuration(event.seconds)}{unavailable ? " · Outside preview" : ""}
           </Text>
         </View>
       </Pressable>
@@ -610,6 +622,7 @@ const GcodeRow = memo(function GcodeRow({
   kindColors: colors,
   active,
   disabled,
+  outsidePreview,
   onSeekLine,
 }: {
   lineNumber: number
@@ -618,6 +631,7 @@ const GcodeRow = memo(function GcodeRow({
   kindColors: Record<MoveKind, string>
   active: boolean
   disabled: boolean
+  outsidePreview: boolean
   onSeekLine: (lineNumber: number) => void
 }) {
   const { palette } = useTheme()
@@ -625,6 +639,7 @@ const GcodeRow = memo(function GcodeRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Line ${lineNumber}${kind ? `, ${KIND_LABEL[kind]}` : ""}${text.trim() ? `, ${text.trim()}` : ""}`}
+      accessibilityHint={outsidePreview ? "This line is outside the available path preview" : "Show this line in the preview"}
       accessibilityState={{ selected: active, disabled }}
       disabled={disabled}
       onPress={() => onSeekLine(lineNumber)}

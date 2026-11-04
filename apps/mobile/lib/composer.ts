@@ -4,6 +4,27 @@ import { MAX_ATTACHMENTS } from "./attachments"
 
 export type ComposerMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
 
+/** Preserve unfinished text when a workspace action supplies additional context. */
+export const mergeComposerSeed = (draft: string, seed: string): string => {
+  if (!seed.trim()) return draft
+  if (!draft.trim()) return seed
+  return `${draft}\n\n${seed}`
+}
+
+/** Encode the three independent identities without relying on a separator in IDs. */
+export const composerDraftScope = (desktop: string, project: string | null, session: string | undefined, drawingId?: string): string =>
+  JSON.stringify(drawingId ? [desktop, project, session ?? null, drawingId] : [desktop, project, session ?? null])
+
+/** The running-turn steering API has no drawing binding and cannot carry a targeted edit safely. */
+export const canSteerDraft = (drawingId?: string): boolean => !drawingId
+
+/** Carry typing done while a new conversation starts to its newly assigned session. */
+export const moveComposerDraft = (drafts: Record<string, string>, from: string, to: string): Record<string, string> => {
+  if (from === to || !drafts[from]) return drafts
+  const { [from]: source, ...rest } = drafts
+  return { ...rest, [to]: mergeComposerSeed(rest[to] ?? "", source ?? "") }
+}
+
 export const COMPOSER_MODES: ReadonlyArray<{ value: ComposerMode; label: string; hint: string }> = [
   { value: "general", label: "General", hint: "Any question about the project" },
   { value: "cad", label: "CAD", hint: "Sketches, features and geometry" },

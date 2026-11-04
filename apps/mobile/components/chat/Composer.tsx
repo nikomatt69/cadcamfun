@@ -10,12 +10,14 @@ import { AdaptiveBlur } from "@/components/GlassView"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { type as typeStyle } from "@/lib/typography"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import { useUIStore } from "@/lib/store"
 import type { PendingAttachment } from "@/lib/attachments"
 import {
   canAttachMore,
   characterCount,
   composerPlaceholder,
   inputHeights,
+  mergeComposerSeed,
   savedMessagesLabel,
 } from "@/lib/composer"
 import { ComposerContextSheet } from "./composer-context-sheet"
@@ -47,6 +49,8 @@ export function Composer({
   onStop,
   seed,
   seedToken,
+  draftScope,
+  onSeedApplied,
   modelLabel, permissionLabel, onOpenModels, onOpenControls,
   attachments = [],
   onAddAttachment,
@@ -66,9 +70,11 @@ export function Composer({
   onSend: (text: string) => void
   onQueue: (text: string) => void
   onStop: () => void
-  /** Fills the field when `seedToken` changes. The user still sends it. */
+  /** Adds context to the field when `seedToken` changes. The user still sends it. */
   seed?: string
   seedToken?: number
+  draftScope: string
+  onSeedApplied?: (token: number) => void
   modelLabel: string
   permissionLabel: string
   onOpenModels(): void
@@ -91,11 +97,13 @@ export function Composer({
   const { palette, isDark } = useTheme()
   const content = useContentLayout()
   const { width: windowWidth } = useWindowDimensions()
-  const [text, setText] = useState("")
+  const text = useUIStore((state) => state.composerDrafts[draftScope] ?? "")
+  const setText = (value: string | ((previous: string) => string)) => useUIStore.getState().setComposerDraft(draftScope, value)
   const [contextOpen, setContextOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const [viewing, setViewing] = useState<number | null>(null)
   const inputRef = useRef<TextInput>(null)
+  const appliedSeed = useRef<number | undefined>(undefined)
   const sendScale = usePressScale()
   const stopScale = usePressScale()
   const reduced = usePrefersReducedMotion()
@@ -137,9 +145,11 @@ export function Composer({
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
   useEffect(() => {
-    if (seedToken === undefined || !seed) return
-    setText(seed)
-  }, [seed, seedToken])
+    if (seedToken === undefined || !seed || appliedSeed.current === seedToken) return
+    appliedSeed.current = seedToken
+    setText((draft) => mergeComposerSeed(draft, seed))
+    onSeedApplied?.(seedToken)
+  }, [seed, seedToken, draftScope, onSeedApplied])
 
   // The viewer follows the list: removing the photo that is open closes it.
   const viewed = viewing === null ? undefined : attachments[viewing]

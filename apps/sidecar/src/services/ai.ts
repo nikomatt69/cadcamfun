@@ -23,6 +23,7 @@ import { changeParameters, editTimeline, historyRevision, failureMessage, inspec
 import { ActingUser, CurrentTurn, ensureTurnActive, invocationFailureText, isInvocationRefusal } from "./acting-user.ts"
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
+import { CamSetupRepo } from "../repos/cam-setup-repo.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
 import { LibraryRepo } from "../repos/library-repo.ts"
@@ -123,6 +124,7 @@ const toolHandlers = Effect.gen(function*() {
   const projects = yield* ProjectRepo
   const toolpaths = yield* ToolpathRepo
   const components = yield* ComponentRepo
+  const camSetups = yield* CamSetupRepo
   const machines = yield* MachineConfigRepo
   const libraryItems = yield* LibraryRepo
   const costs = yield* ProductionCostRepo
@@ -573,6 +575,23 @@ const toolHandlers = Effect.gen(function*() {
       const refinement = record(data["refinement"])
       const rounds = refinement["revision"] === revision && typeof refinement["rounds"] === "number" ? refinement["rounds"] : 0
       return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: evidence["revision"] ?? null, refinements: { used: rounds, remaining: Math.max(0, 3 - rounds) }, ...(status === "pass" || status === "failed" ? { issues: report["issues"], stats: report["stats"], modelled: evidence["modelled"], start: record(evidence["request"])["start"] } : {}), note: "A pass covers only the saved simulation model at this drawing and program revision." }
+    },
+    setupList: async (projectId) => {
+      { const denied = await refused(projectId); if (denied) return denied }
+      const saved = await run(camSetups.list(projectId))
+      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: doc.setup.operations.length, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
+    },
+    setupSave: async (projectId, input) => {
+      { const denied = await refused(projectId); if (denied) return denied }
+      await assertWrite(projectId)
+      if (input.setupId === undefined) {
+        const doc = await run(camSetups.save(projectId, { name: input.name, setup: input.setup }))
+        return { ok: true, projectId, setupId: doc.id, name: doc.name, updatedAt: doc.updatedAt, created: true }
+      }
+      const updated = await run(camSetups.update(projectId, input.setupId, { name: input.name, setup: input.setup }, input.baseUpdatedAt))
+      if (updated === undefined) return { ok: false, error: "Setup not found in this project." }
+      if (updated === "conflict") return { ok: false, status: "stale", error: "The setup was saved elsewhere since it was read. Nothing was overwritten; read cam setup_list and retry with its updatedAt." }
+      return { ok: true, projectId, setupId: updated.id, name: updated.name, updatedAt: updated.updatedAt, created: false }
     },
     stock: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }

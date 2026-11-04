@@ -4,6 +4,7 @@ import {
   cameraBasis,
   changeComponentPrompt,
   defineComponentPrompt,
+  editDesignPrompt,
   dot,
   fitOrbit,
   hitMeshPart,
@@ -96,6 +97,9 @@ describe("preview picking and toolpath sync", () => {
     expect(defineComponentPrompt({ id: "d1", name: "Plate" }, ["e1", "e2"])).toContain("e1, e2")
     expect(defineComponentPrompt({ id: "d1", name: "Plate" }, [])).toContain("whole design")
     expect(changeComponentPrompt({ id: "c1", name: "Bracket" })).toContain("ai/ branch")
+    expect(editDesignPrompt({ id: "d1", name: "Plate" }, "e1")).toContain("element e1")
+    expect(editDesignPrompt({ id: "d1", name: "Plate" })).toContain("My requested change:")
+    expect(editDesignPrompt({ id: "d1", name: "Plate" })).not.toContain("pull request")
   })
 })
 
