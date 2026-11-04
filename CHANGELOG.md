@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.83 (November 2026)
+
+## Web
+
+- Enhance component accessibility and layout adjustments across various stages and documentation tiles
+
 ## v0.1.82 (November 2026)
 
 ## Core
