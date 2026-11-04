@@ -36,6 +36,7 @@ export const fanucDialect: Dialect = {
   canned: true,
   // Fanuc rigid tapping: M29 S<rpm> puts the spindle in position control before G84.
   rigidTap: { prefix: (rpm) => `M29 S${Math.round(rpm)}` },
+  probing: { syntax: "fanuc", offsets: "fanuc", alarmMax: 200 },
   arcModes: ["ijk", "radius"],
   dwell: "milliseconds",
   uppercaseComments: true,

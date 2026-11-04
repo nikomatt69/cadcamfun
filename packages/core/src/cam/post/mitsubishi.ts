@@ -24,6 +24,7 @@ import type { Dialect, VendorPost } from "./types.ts"
 export const mitsubishiDialect: Dialect = {
   ...fanucDialect,
   id: "mitsubishi",
+  probing: { syntax: "fanuc", offsets: "mitsubishi", alarmMax: 200 },
   rigidTap: undefined,
   smoothing: undefined,
   tiltedPlane: undefined

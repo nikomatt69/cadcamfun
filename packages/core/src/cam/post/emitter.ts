@@ -38,6 +38,8 @@ import { assertCycleSafe } from "../cycle-safety.ts"
 import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
+import { alarmBlocks, machineRapidWord, offsetLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
+import { addressOf } from "../work-offset.ts"
 import { klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import type { WordExpr } from "../macro.ts"
 
@@ -163,6 +165,8 @@ class Writer {
   // True IR position (mm), for arc geometry and cycle expansion.
   ir: Vec3 | undefined
   spindleRpm = 0
+  /** A probe move was written: the position the writer tracks may differ from the control's by a computed amount. */
+  probed = false
   /**
    * Speed to restart at: a spindle orientation stops the spindle, so the next feed move writes `M3 S<rpm>` first. Cleared when an
    * operation states its own spindle word.
@@ -280,6 +284,81 @@ class Writer {
     if (line.startsWith(KLARTEXT_PREFIX)) { this.lines.push(line); return }
     if (/^(N\d+|[A-Za-z_][A-Za-z0-9_]*:|o[<\d].*|;.*|\(.*\))$/.test(line)) { this.lines.push(line); return }
     this.block(line)
+  }
+
+  private probeIo(what: string): ProbeIo {
+    const codes = this.dialect.probing
+    if (codes === undefined) throw new RangeError(`${this.dialect.id}: this post writes no probing (${what})`)
+    return {
+      num: (mm) => this.num(mm), feed: (f) => formatFeed(f * this.scale, this.options.decimals), macro: this.macro, codes, options: this.options.probing, scale: this.scale
+    }
+  }
+
+  /** A touch (a search vector, the skip position stored) or a protected positioning move that must not touch anything. */
+  probeMove(move: Extract<Move, { readonly _tag: "Probe" }>): void {
+    this.endCycle()
+    this.probed = true
+    this.leaveInverse()
+    const io = this.probeIo("Probe")
+    if (move.kind === "touch") {
+      const start = this.ir
+      if (start === undefined) throw new RangeError("A touch needs the tool's position: position the tool with a move before the first touch")
+      for (const line of touchLines(move, start, io)) this.macroLine(line)
+      this.forgetModalState()
+      this.ir = { ...move.to }
+      return
+    }
+    const a = this.axes(move.to, true)
+    this.withExpr(a, move.expr)
+    const target = (key: "x" | "y" | "z", letter: string): string => {
+      const e = move.expr?.[key]
+      if (e === undefined) return this.num(move.to[key])
+      return this.macro.word(letter, e).text
+    }
+    const pl = protectedLines(move, a.words, { x: target("x", "X"), y: target("y", "Y"), z: target("z", "Z") }, io)
+    for (const line of pl.before) this.macroLine(line)
+    this.block(pl.block)
+    for (const line of pl.after) this.macroLine(line)
+    this.forgetModalState()
+    this.ir = { ...move.to }
+    this.px = a.x
+    this.py = a.y
+    this.pz = a.z
+    if (move.expr?.x !== undefined) this.px = undefined
+    if (move.expr?.y !== undefined) this.py = undefined
+    if (move.expr?.z !== undefined) this.pz = undefined
+  }
+
+  offsetUpdate(move: Extract<Move, { readonly _tag: "OffsetUpdate" }>): void {
+    this.endCycle()
+    const io = this.probeIo("OffsetUpdate")
+    for (const line of offsetLines(move, io)) this.macroLine(line)
+  }
+
+  alarm(move: Extract<Move, { readonly _tag: "Alarm" }>): void {
+    this.endCycle()
+    for (const line of alarmBlocks(move, this.probeIo("Alarm"))) this.macroLine(line)
+  }
+
+  report(move: Extract<Move, { readonly _tag: "Report" }>): void {
+    this.endCycle()
+    for (const line of reportLines(move, this.probeIo("Report"))) this.macroLine(line)
+  }
+
+  stop(optional: boolean): void {
+    this.endCycle()
+    this.probeIo("Stop")
+    this.block(stopBlock(optional))
+  }
+
+  /** A rapid in machine coordinates (G53 / SUPA): no work offset, no tool length; the position afterwards is the machine's. */
+  machineRapid(to: Vec3): void {
+    this.endCycle()
+    const word = machineRapidWord(this.probeIo("machine-coordinate rapid")).before
+    const a = this.axes(to, true)
+    this.block(word, ...a.words)
+    this.forgetModalState()
+    this.ir = { ...to }
   }
 
   controlNode(move: Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "Message" }>): void {
@@ -831,7 +910,23 @@ class Writer {
     if (this.skipping) return
     switch (move._tag) {
       case "Rapid":
-        this.rapid(move.to, move.rotary, move.expr, move.comp)
+        if (move.machine === true) this.machineRapid(move.to)
+        else this.rapid(move.to, move.rotary, move.expr, move.comp)
+        break
+      case "Probe":
+        this.probeMove(move)
+        break
+      case "OffsetUpdate":
+        this.offsetUpdate(move)
+        break
+      case "Alarm":
+        this.alarm(move)
+        break
+      case "Report":
+        this.report(move)
+        break
+      case "Stop":
+        this.stop(move.optional)
         break
       case "Linear":
         this.linear(move.to, move.feed, move.rotary, move.expr, move, move.comp)
@@ -997,7 +1092,7 @@ const rejectUnwritable = (program: Program, dialect: Dialect): void => {
     }
     for (const m of toolpath.moves) if (m._tag === "SpindleOrient") spindleOrientRefusal(dialect, m.angle ?? 0)
     // A probe move dropped by a post would leave the work offset unmeasured: refused, never skipped.
-    const probing = toolpath.moves.find((m) => isProbingMove(m) || (m._tag === "Rapid" && m.machine === true))
+    const probing = dialect.probing !== undefined ? undefined : toolpath.moves.find((m) => isProbingMove(m) || (m._tag === "Rapid" && m.machine === true))
     if (probing !== undefined) throw new RangeError(`${dialect.id}: this post writes no probing (${probing._tag === "Rapid" ? "machine-coordinate rapid" : probing._tag}): toolpath "${toolpath.name}" is refused instead of written without it`)
     if (toolpath.moves.some((m) => m._tag === "CutterComp")) cutterCompRefusal(dialect)
     if (simultaneous && !dialect.rotary) {
@@ -1027,6 +1122,15 @@ const planesOf = (program: Program, options: Partial<PostOptions>, dialect: Dial
 const planeKey = (p: TiltedPlane | undefined): string | undefined =>
   p === undefined ? undefined : JSON.stringify([p.frame.origin, p.frame.xAxis, p.frame.yAxis, p.frame.zAxis, p.layout ?? null, p.solution ?? null, p.legacy === true])
 
+/** The block that selects the program's work offset: its `workOffsetRef` where the control addresses it (G54.1 P3, G505, G59.2), else the G54..G59 code. */
+const selectOffset = (program: Program, options: PostOptions, dialect: Dialect): string => {
+  if (program.workOffsetRef === undefined || (program.workOffsetRef.kind === "g5x" && program.workOffsetRef.code === program.workOffset)) return dialect.workOffset?.(program.workOffset) ?? program.workOffset
+  if (dialect.probing === undefined) throw new RangeError(`${dialect.id}: this post writes only G54..G59 as the work offset, not ${program.workOffsetRef.kind}`)
+  const a = addressOf(program.workOffsetRef, dialect.probing.offsets, options.probing?.offsets)
+  if ("refused" in a) throw new RangeError(a.refused)
+  return a.select
+}
+
 export const emitProgram = (program: Program, userOptions: Partial<PostOptions>, dialect: Dialect): string => {
   rejectUnwritable(program, dialect)
   const planes = planesOf(program, userOptions, dialect)
@@ -1054,7 +1158,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     for (const g of plan?.groups ?? []) w.comment(`SUBPROGRAM O${g.number}: ${program.toolpaths[g.leader]!.name} X${g.members.length}`)
   }
   w.block(program.units === "inch" ? (dialect.unitCodes?.inch ?? "G20") : (dialect.unitCodes?.mm ?? "G21"), ...dialect.setup)
-  w.block(dialect.workOffset?.(program.workOffset) ?? program.workOffset)
+  w.block(selectOffset(program, options, dialect))
 
   let zMax = -Infinity
   let first = true
@@ -1159,7 +1263,8 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
 
   w.closeComp()
   w.finishMotion()
-  if (w.ir !== undefined && Number.isFinite(zMax)) w.rapid({ x: w.ir.x, y: w.ir.y, z: Math.max(zMax, w.ir.z) })
+  // A probe program ends where its last protected move left the probe (over a computed point): no rapid back to a nominal one.
+  if (w.ir !== undefined && Number.isFinite(zMax) && !(w.probed && w.ir.z >= zMax - 1e-9)) w.rapid({ x: w.ir.x, y: w.ir.y, z: Math.max(zMax, w.ir.z) })
   // Leave the control with tool length compensation, never with tool-centre-point control still on
   // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
   if (w.macro.open > 0) throw new RangeError(`The program leaves ${w.macro.open} If or While open: every If needs its EndIf and every While its EndWhile`)

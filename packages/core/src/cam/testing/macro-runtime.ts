@@ -27,6 +27,8 @@ export interface Expanded {
   readonly lines: ReadonlyArray<number>
   readonly errors: ReadonlyArray<string>
   readonly family: Family
+  /** The variable store at the end of the run, by the name the control uses (`#105`, `R5`, `$P_UIFR[1,X,TR]`, a lower-cased name). */
+  readonly variables: Readonly<Record<string, number>>
 }
 
 // ---------------------------------------------------------------- detection
@@ -177,6 +179,19 @@ class Parser {
     if (grouped !== undefined) return grouped
     const n = this.eat(/(?:\d+\.?\d*|\.\d+)(?:E[+-]?\d+)?/iy)
     if (n !== undefined) return Number(n)
+    // Siemens system variables: $AC_MEA[1], $AA_MW[X], $P_UIFR[1,X,TR] (the name is kept as written, upper case, no blanks).
+    if (this.eat(/\$/y) !== undefined) {
+      const id = this.eat(/[A-Za-z_][A-Za-z0-9_]*/y)
+      if (id === undefined) throw new Failure(`a system variable needs a name after $ in '${this.s}'`)
+      let name = `$${id.toUpperCase()}`
+      if (this.s[this.i] === "[") {
+        const close = this.s.indexOf("]", this.i)
+        if (close < 0) throw new Failure(`missing ] in '${this.s}'`)
+        name += this.s.slice(this.i, close + 1).toUpperCase().replace(/\s+/g, "")
+        this.i = close + 1
+      }
+      return this.read(name)
+    }
     // Variables: #12, #<name>, #[expr] (indirect), R12, Q12, QL3, VC1.
     if (this.eat(/#/y) !== undefined) {
       const named = this.eat(/<[^>]+>/y)
@@ -233,14 +248,34 @@ const stripComments = (raw: string, family: Family): string =>
 const FUNCTION_WORDS = "SIN|COS|TAN|ASIN|ACOS|ATAN|SQRT|ABS|ROUND|FIX|FUP|LN|EXP|BIN|BCD"
 const LETTER_VARS: Readonly<Record<string, number>> = { A: 1, B: 2, C: 3, I: 4, J: 5, K: 6, D: 7, E: 8, F: 9, H: 11, M: 13, Q: 17, R: 18, S: 19, T: 20, U: 21, V: 22, W: 23, X: 24, Y: 25, Z: 26 }
 
-export const expandMacros = (source: string): Expanded => {
+/** What a host adds to a macro run (spec 73 §5.11): a control that measures, so a block can change a variable and an alarm can stop the run. */
+export interface ExpandOptions {
+  /** Variables set before the first statement (`#5221`, `$P_UIFR[1,X,TR]`, `R5`, a lower-cased name). */
+  readonly variables?: Readonly<Record<string, number>>
+  /** The value of a control variable the host owns (a position, a skip flag); consulted before the variable store. */
+  readonly systemRead?: (name: string) => number | undefined
+  /** Called for every block that goes to the output (and for `DPRNT`): return true when the host ran it, so it is not written. */
+  readonly onBlock?: (block: {
+    readonly text: string
+    readonly line: number
+    readonly stop: (reason: string) => void
+    readonly read: (name: string) => number
+    readonly write: (name: string, value: number) => void
+  }) => boolean
+  /** Called after a variable is written. */
+  readonly onWrite?: (name: string, value: number, line: number) => void
+  /** Called when the program raises an alarm (`#3000`, `SETAL`, `FN 14`, `(abort, ..)`); the run stops. */
+  readonly onAlarm?: (alarm: { readonly code: number; readonly text: string; readonly line: number }) => void
+}
+
+export const expandMacros = (source: string, options: ExpandOptions = {}): Expanded => {
   const family = familyOfText(source)
   const strip = (line: string): string => stripComments(line, family)
   const raw = source.split(/\r?\n/)
   const errors: string[] = []
   const out: string[] = []
   const map: number[] = []
-  const vars = new Map<string, number>()
+  const vars = new Map<string, number>(Object.entries(options.variables ?? {}))
   const stack: Frame[] = []
   let local = new Map<string, number>()
   let steps = 0
@@ -248,20 +283,35 @@ export const expandMacros = (source: string): Expanded => {
   let stopped = false
   const warned = new Set<string>()
   const fail = (line: number, message: string): void => { errors.push(`line ${line}: ${message}`) }
-  const emit = (text: string, line: number): void => { if (text.trim() !== "") { out.push(text); map.push(line) } }
+  let lastMessage = ""
+  const hostRan = (text: string, line: number): boolean =>
+    options.onBlock !== undefined && options.onBlock({ text, line, stop: (reason) => { fail(line, reason); stopped = true }, read: (n) => read(line)(n), write })
+  const emit = (text: string, line: number): void => { if (text.trim() !== "" && !hostRan(text, line)) { out.push(text); map.push(line) } }
+  const alarm = (code: number, text: string, line: number): void => {
+    options.onAlarm?.({ code, text, line })
+    fail(line, `alarm ${code}${text !== "" ? `: ${text}` : ""}: the program stops`)
+    stopped = true
+  }
 
   const isLocalName = (name: string): boolean => (family === "fanuc" || family === "linuxcnc") && stack.length > 0 && /^#\d+$/.test(name) && Number(name.slice(1)) >= 1 && Number(name.slice(1)) <= 33
   const read = (line: number) => (name: string): number => {
+    const host = options.systemRead?.(name)
+    if (host !== undefined) return host
     if (isLocalName(name)) return local.get(name) ?? 0
     if (/^#(?:4\d\d\d|5[0-9]\d\d)$/.test(name) || (family === "heidenhain" && /^Q1\d\d$/.test(name)) || /^#<_/.test(name)) {
       if (!vars.has(name) && !warned.has(name)) { warned.add(name); fail(line, `${name} is a control variable (position, modal state or tool data) that the replay does not model; it reads 0`) }
     }
-    if (family === "siemens" && !/^R\d+$/.test(name) && !vars.has(name) && !local.has(name) && !warned.has(name)) { warned.add(name); fail(line, `'${name}' is not a declared variable`) }
+    if (family === "siemens" && !/^R\d+$/.test(name) && !name.startsWith("$") && !vars.has(name) && !local.has(name) && !warned.has(name)) { warned.add(name); fail(line, `'${name}' is not a declared variable`) }
     return local.get(name) ?? vars.get(name) ?? 0
   }
   const write = (name: string, value: number): void => {
     if (isLocalName(name) || (family === "heidenhain" && /^QL\d+$/.test(name) && stack.length > 0)) local.set(name, value)
     else vars.set(name, value)
+    options.onWrite?.(name, value, pc + 1)
+    if (name === "#3000" && options.onAlarm !== undefined) {
+      const text = /\(([^)]*)\)\s*$/.exec(raw[pc] ?? "")?.[1] ?? ""
+      alarm(value, text.trim(), pc + 1)
+    }
   }
   const val = (text: string, line: number): number => {
     try { return evaluate(text, read(line), family) } catch (error) {
@@ -281,6 +331,10 @@ export const expandMacros = (source: string): Expanded => {
     if ((family === "siemens" ? /^[A-Za-z_][A-Za-z0-9_]*$/ : /^[A-Za-z_][A-Za-z0-9_]{1,}$/).test(t)) return t.toLowerCase()
     return undefined
   }
+
+  /** A `DPRNT[..]` block with its variables replaced by their values (`DPRNT[BORE*DIAM*#105[53]]` -> `DPRNT[BORE*DIAM*20.000]`). */
+  const substitutePrint = (text: string, line: number): string =>
+    text.replace(/(#\d+)\[(\d)(\d)\]/g, (_all, name: string, _i: string, d: string) => val(name, line).toFixed(Number(d)))
 
   // ---- program structure
   const isO = (code: string): number | undefined => { const m = /^O\s*0*(\d+)\b/i.exec(code); return m ? Number(m[1]) : undefined }
@@ -422,6 +476,10 @@ export const expandMacros = (source: string): Expanded => {
     const line = pc + 1
     const rawLine = raw[pc]!
     let code = strip(rawLine)
+    if (family === "linuxcnc") {
+      const ab = /^\(\s*abort\s*,\s*(?:(\d+)\s+)?(.*?)\)\s*$/i.exec(rawLine.trim())
+      if (ab !== null) { alarm(Number(ab[1] ?? 0), ab[2] ?? "", line); return }
+    }
     if (code === "" || code.startsWith("%")) { if (code === "" && rawLine.trim() !== "") emit(rawLine, line); pc++; return }
     if (family === "heidenhain") code = code.replace(/^\d+\s+(?=\S)/, "")
     code = code.replace(/^N\d+\s+(?=\S)/i, "")
@@ -468,11 +526,17 @@ export const expandMacros = (source: string): Expanded => {
       if (en !== null) { const w = matchWhile(pc, Number(en[1])); if (w === undefined) { fail(line, `END${en[1]} has no WHILE .. DO${en[1]}`); stopped = true } else pc = w; return }
       if (/^M99\b/i.test(code)) { leave(); return }
       if (/^(M30|M2)\b/i.test(code) && stack.length === 0) { emit(rawLine, line); stopped = true; return }
-      if (/^#(3000|3006)\s*=/.test(code)) { fail(line, `${code.slice(0, 5)} raises an alarm or stops with a message: the program stops`); stopped = true; return }
+      const al3 = /^#(3000|3006)\s*=\s*(.+?)\s*$/.exec(code)
+      if (al3 !== null) {
+        const text = /\(([^)]*)\)\s*$/.exec(rawLine)?.[1] ?? ""
+        if (al3[1] === "3000") alarm(val(al3[2]!, line), text.trim(), line)
+        else { fail(line, "#3006 stops with a message: the program stops"); stopped = true }
+        return
+      }
       const as = /^((?:#\s*(?:<[^>]+>|\d+|\[[^\]]+\])|VC\d+|VL\d+|VS\d+))\s*=\s*(.+)$/i.exec(code)
       if (as !== null) { const n = targetName(as[1]!, line); if (n === undefined) fail(line, `cannot assign to '${as[1]}'`); else write(n, val(as[2]!, line)); pc++; return }
       if (/^G6[67]\b/.test(code)) { fail(line, `${code.slice(0, 3)}: modal macro calls are not replayed`); pc++; return }
-      if (/^(DPRNT|POPEN|PCLOS|BPRNT)\b/i.test(code)) { pc++; return }
+      if (/^(DPRNT|POPEN|PCLOS|BPRNT)\b/i.test(code)) { if (/^DPRNT/i.test(code)) hostRan(substitutePrint(rawLine, line), line); pc++; return }
       emit(substitute(code, line), line)
       pc++
       return
@@ -535,8 +599,12 @@ export const expandMacros = (source: string): Expanded => {
       }
       if (/^(M17|RET)\b/i.test(code)) { leave(); return }
       if (/^(M30|M2)\b/i.test(code) && stack.length === 0) { emit(rawLine, line); stopped = true; return }
-      if (/^SETAL\b/i.test(code)) { fail(line, "SETAL raises an alarm: the program stops"); stopped = true; return }
-      if (/^(MSG|STOPRE)\b/i.test(code)) { pc++; return }
+      const setal = /^SETAL\s*\(\s*(\d+)/i.exec(code)
+      if (setal !== null) { const n = Number(setal[1]); alarm(n >= 61000 ? n - 61000 : n, lastMessage, line); return }
+      if (/^SETAL\b/i.test(code)) { alarm(0, lastMessage, line); return }
+      if (/^(MSG|STOPRE)\b/i.test(code)) { lastMessage = /MSG\s*\(\s*"([^"]*)"/i.exec(rawLine)?.[1] ?? lastMessage; pc++; return }
+      const sys = /^(\$[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?)\s*=\s*(.+)$/.exec(code)
+      if (sys !== null) { write(sys[1]!.toUpperCase().replace(/\s+/g, ""), val(sys[2]!, line)); pc++; return }
       const as = /^((?:R\d+)|(?:[A-Za-z_][A-Za-z0-9_]{1,}))\s*=\s*(.+)$/.exec(code)
       if (as !== null && (/^R\d+$/i.test(as[1]!) || vars.has(as[1]!.toLowerCase()))) { write(targetName(as[1]!, line)!, val(as[2]!, line)); pc++; return }
       emit(substitute(code, line), line)
@@ -565,7 +633,7 @@ export const expandMacros = (source: string): Expanded => {
           else pc++
           return
         }
-        if (n === 14) { fail(line, "FN 14 raises an error message: the program stops"); stopped = true; return }
+        if (n === 14) { alarm(Number(/(\d+)/.exec(rest)?.[1] ?? 0), "", line); return }
         if ([15, 16, 18, 19, 20, 25, 26, 27, 28, 29, 37].includes(n)) { pc++; return }
         const a = /^(Q[LR]?\d+)\s*=\s*(.*)$/.exec(rest)
         if (a === null) { fail(line, `FN ${n}: cannot read '${rest}'`); pc++; return }
@@ -654,7 +722,7 @@ export const expandMacros = (source: string): Expanded => {
     if (++steps > MAX_STEPS) { fail(pc + 1, `the program ran more than ${MAX_STEPS} statements: stopped (a loop that does not end?)`); break }
     step()
   }
-  return { text: out.join("\n"), lines: map, errors, family }
+  return { text: out.join("\n"), lines: map, errors, family, variables: Object.fromEntries(vars) }
 }
 
 export type { Expr, VarRef }

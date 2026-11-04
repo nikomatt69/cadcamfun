@@ -33,16 +33,13 @@ import { headerTools } from "./header-tools.ts"
 import { nameTools, usesToolChangeWord } from "./tool-words.ts"
 import { expandMacros, hasMacroSyntax } from "./macro-runtime.ts"
 import { decodeKlartext } from "./heidenhain.ts"
+import { compose, frameOfCycle800, frameOfG68, frameOfG682, frameOfPlaneSpatial, mul3, mulT3, type Frame, type P3 } from "./frames.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
 /** Deepest `M98` nesting the interpreter follows (Fanuc allows four). */
 export const MAX_CALL_DEPTH = 8
 
-export interface P3 {
-  readonly x: number
-  readonly y: number
-  readonly z: number
-}
+export type { P3 } from "./frames.ts"
 
 export type GSegment =
   | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly subLine?: number; readonly rotary?: RotaryAngles; readonly tcp?: true }
@@ -647,22 +644,13 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (!/^PLANE SPATIAL\b/.test(code) || spa === undefined || spb === undefined || spc === undefined) {
       errors.push(`line ${physical}: unsupported ${code.split(/\s+/).slice(0, 2).join(" ")}`); unsupported.push({ line: physical, word: "PLANE" }); return
     }
-    frame = { m: mulM3(mulM3(rot3("z", spc), rot3("y", spb)), rot3("x", spa)), t: { x: 0, y: 0, z: 0 }, planar: false }
+    frame = frameOfPlaneSpatial(code)
   }
   /** Siemens CYCLE800 swivel plane: axis-by-axis rotation (the mode's bit pairs name the axes, first in the low bits). */
   const cycle800 = (args: string): void => {
-    const a = args.split(",").map((s) => Number(s.replace(/"[^"]*"/g, "").trim()))
-    const at = (i: number): number => (Number.isFinite(a[i]) ? a[i]! : 0)
-    if (args.trim() === "" || a.slice(4, 13).every((v) => !Number.isFinite(v) || v === 0)) { frame = undefined; return }
-    const mode = Math.round(at(3))
-    if ((mode >> 6) & 3) { errors.push(`line ${physical}: unsupported CYCLE800 mode ${mode} (only axis-by-axis)`); unsupported.push({ line: physical, word: "CYCLE800" }); return }
-    const axisOf = (bits: number): "x" | "y" | "z" | undefined => (bits === 1 ? "x" : bits === 2 ? "y" : bits === 3 ? "z" : undefined)
-    let m = IDENTITY3
-    ;[at(7), at(8), at(9)].forEach((angle, i) => { const axis = axisOf((mode >> (2 * i)) & 3); if (axis !== undefined) m = mulM3(m, rot3(axis, angle)) })
-    const before = { x: at(4) * unit, y: at(5) * unit, z: at(6) * unit }, after = mul3(m, { x: at(10) * unit, y: at(11) * unit, z: at(12) * unit })
-    const additive = Math.round(at(2)) % 10 === 1 && frame !== undefined
-    const own: Frame = { m, t: { x: before.x + after.x, y: before.y + after.y, z: before.z + after.z }, planar: false }
-    frame = additive ? compose(frame!, own) : own
+    const result = frameOfCycle800(args, unit, frame)
+    if ("error" in result) { errors.push(`line ${physical}: ${result.error}`); unsupported.push({ line: physical, word: "CYCLE800" }); return }
+    frame = result.frame
   }
 
   const execLine = (raw: string, index: number, depth: number): Flow => {
@@ -816,14 +804,11 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         if (plane !== 17) { errors.push(`line ${physical}: unsupported G68 outside G17`); unsupported.push({ line: physical, word: "G68" }) }
         else {
           const cx = get("X") !== undefined ? get("X")! * unit : at.x, cy = get("Y") !== undefined ? get("Y")! * unit : at.y
-          const m = rot3("z", get("R") ?? 0)
-          const c = mul3(m, { x: cx, y: cy, z: 0 })
-          frame = { m, t: { x: cx - c.x, y: cy - c.y, z: 0 }, planar: true }
+          frame = frameOfG68(cx, cy, get("R") ?? 0)
         }
       } else {
         // G68.2 X Y Z I J K: the feature frame's origin and its Euler angles (Z, then X', then Z'').
-        const m = mulM3(mulM3(rot3("z", get("I") ?? 0), rot3("x", get("J") ?? 0)), rot3("z", get("K") ?? 0))
-        frame = { m, t: { x: (get("X") ?? 0) * unit, y: (get("Y") ?? 0) * unit, z: (get("Z") ?? 0) * unit }, planar: false }
+        frame = frameOfG682(get, unit)
       }
       return ending ? "end" : "next"
     }
@@ -1173,27 +1158,6 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
 }
 
 // -- frame maths ----------------------------------------------------------------------------------------------------------
-
-type Mat3 = readonly [number, number, number, number, number, number, number, number, number]
-interface Frame { readonly m: Mat3; readonly t: P3; readonly planar: boolean }
-const IDENTITY3: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1]
-const mul3 = (m: Mat3, p: P3): P3 => ({ x: m[0] * p.x + m[1] * p.y + m[2] * p.z, y: m[3] * p.x + m[4] * p.y + m[5] * p.z, z: m[6] * p.x + m[7] * p.y + m[8] * p.z })
-const mulT3 = (m: Mat3, p: P3): P3 => ({ x: m[0] * p.x + m[3] * p.y + m[6] * p.z, y: m[1] * p.x + m[4] * p.y + m[7] * p.z, z: m[2] * p.x + m[5] * p.y + m[8] * p.z })
-const mulM3 = (a: Mat3, b: Mat3): Mat3 => {
-  const out: number[] = []
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) out.push(a[r * 3]! * b[c]! + a[r * 3 + 1]! * b[3 + c]! + a[r * 3 + 2]! * b[6 + c]!)
-  return out as unknown as Mat3
-}
-/** A right-handed rotation about a frame axis, degrees. */
-const rot3 = (axis: "x" | "y" | "z", degrees: number): Mat3 => {
-  const a = (degrees * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a)
-  return axis === "x" ? [1, 0, 0, 0, c, -s, 0, s, c] : axis === "y" ? [c, 0, s, 0, 1, 0, -s, 0, c] : [c, -s, 0, s, c, 0, 0, 0, 1]
-}
-/** `inner` expressed in `outer`: p -> outer(inner(p)). */
-const compose = (outer: Frame, inner: Frame): Frame => {
-  const t = mul3(outer.m, inner.t)
-  return { m: mulM3(outer.m, inner.m), t: { x: t.x + outer.t.x, y: t.y + outer.t.y, z: t.z + outer.t.z }, planar: outer.planar && inner.planar }
-}
 
 /** G words accepted without a geometric effect on the drawn path. */
 const ACCEPTED_G: ReadonlyArray<number> = [5, 5.1, 8, 9, 43, 43.4, 43.5, 49, 53.1, 54.1, 61, 61.1, 62, 63, 64, 103, 187, 234]

@@ -17,6 +17,7 @@ import type { Dialect, Post } from "./types.ts"
 export const mazakDialect: Dialect = {
   ...fanucDialect,
   id: "mazak",
+  probing: { syntax: "fanuc", offsets: "mazak", alarmMax: 200 },
   rigidTap: {},
   cycleCodes: { tap: "G84.2" },
   tcp: "G43.4",

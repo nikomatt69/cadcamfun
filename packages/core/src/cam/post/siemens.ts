@@ -25,6 +25,7 @@ export const siemensProgramName = (program: Program): string => {
 
 export const siemensDialect: Dialect = {
   id: "siemens",
+  probing: { syntax: "siemens", offsets: "siemens" },
   canned: false,
   arcModes: ["ijk"],
   dwell: "seconds",

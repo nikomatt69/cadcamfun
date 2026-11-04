@@ -10,6 +10,7 @@ import type { Dialect, Post } from "./types.ts"
  */
 export const grblDialect: Dialect = {
   id: "grbl",
+  probing: { syntax: "grbl", offsets: "grbl" },
   canned: false,
   arcModes: ["ijk", "radius"],
   dwell: "seconds",

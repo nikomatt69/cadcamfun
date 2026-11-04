@@ -3,6 +3,8 @@ import type { FiveAxisKinematic } from "../five-axis.ts"
 import type { RotaryLayout } from "../indexing.ts"
 import type { CycleMove, Program, WorkOffset } from "../ir.ts"
 import type { WorkFrame } from "../setup.ts"
+import type { OffsetCapacity, OffsetFamily } from "../work-offset.ts"
+import type { ToolOffsetAddresses } from "../probing/device.ts"
 
 export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak" | "mitsubishi" | "brother"
 
@@ -112,6 +114,8 @@ export interface PostOptions {
   readonly inverseTimeFeed?: boolean
   /** Siemens: the number of the kinematic transformation `TRAORI(n)` (default: the machine's first, a bare `TRAORI`). */
   readonly tcpTransformation?: number
+  /** Probing words that depend on the machine (the skip word, the offsets and tool table the control has). */
+  readonly probing?: PostProbingOptions
 }
 
 /** A work plane tilted against the work offset, as the setup defines it (`WorkFrame`: z is the tool axis, x and y lie in the plane). */
@@ -140,6 +144,27 @@ export interface SwivelSettings {
   readonly retractDistance?: number
   /** Status word (`_ST`), as the control's swivel screen writes it; the units digit 1 adds to the active swivel. Default 0. */
   readonly status?: number
+}
+
+/** The probing syntax family of a dialect (`probing-writer.ts`). */
+export type ProbeSyntax = "fanuc" | "linuxcnc" | "siemens" | "heidenhain" | "grbl"
+
+/** The control's probing words (spec 73 §5.8). A dialect without it refuses every probing move. */
+export interface ProbingCodes {
+  readonly syntax: ProbeSyntax
+  /** The control family work offsets are addressed in (`addressOf`). */
+  readonly offsets: OffsetFamily
+  /** The skip word when it is not `G31`. */
+  readonly skip?: string
+  /** Highest user alarm number the control takes (Fanuc 200); a larger code is folded into 1..max. */
+  readonly alarmMax?: number
+}
+
+/** What the machine adds to probing words: the skip word, offsets the control has, where the tool table is. */
+export interface PostProbingOptions {
+  readonly skipCode?: string
+  readonly offsets?: OffsetCapacity
+  readonly toolOffsets?: ToolOffsetAddresses
 }
 
 /** What a dialect needs to write a tilted plane. Numbers are formatted by the writer in output units. */
@@ -309,6 +334,8 @@ export interface Dialect {
   readonly cutterComp?: CutterCompCodes
   /** The control's tilted-plane words; absent: a program with `workPlanes` is refused. */
   readonly tiltedPlane?: TiltedPlaneCodes
+  /** The control's probing words (touch, offset write, alarm, report); absent: a program with a probe move is refused, never written without it. */
+  readonly probing?: ProbingCodes
   /** Inverse-time feed mode (`PostOptions.inverseTimeFeed`): the words that switch it on and back to feed per minute. */
   readonly inverseTime?: { readonly on: string; readonly off: string }
   /** Final program-end block (`M30`, `M2`). */

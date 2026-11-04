@@ -28,6 +28,7 @@ export const haasDialect: Dialect = {
   canned: true,
   // Haas NGC taps rigidly in G84 (setting 130 on); no extra block.
   rigidTap: {},
+  probing: { syntax: "fanuc", offsets: "haas", alarmMax: 999 },
   arcModes: ["ijk", "radius"],
   dwell: "milliseconds",
   uppercaseComments: true,

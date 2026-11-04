@@ -8,6 +8,7 @@ export const genericDialect: Dialect = {
   id: "generic",
   canned: true,
   rigidTap: {},
+  probing: { syntax: "fanuc", offsets: "fanuc", alarmMax: 200 },
   arcModes: ["ijk", "radius"],
   dwell: "seconds",
   uppercaseComments: false,

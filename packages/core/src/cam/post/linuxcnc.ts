@@ -22,6 +22,7 @@ import type { Dialect, Post } from "./types.ts"
  */
 export const linuxcncDialect: Dialect = {
   id: "linuxcnc",
+  probing: { syntax: "linuxcnc", offsets: "linuxcnc" },
   canned: true,
   arcModes: ["ijk", "radius"],
   dwell: "seconds",

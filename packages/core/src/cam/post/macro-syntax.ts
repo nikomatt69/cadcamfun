@@ -93,7 +93,8 @@ export class MacroEmitter {
 
   /** `a` + `b` and the like with the control's own brackets; `top` is true where the value stands alone (right of `=`). */
   expression(e: Expr, top = true): string {
-    if (typeof e === "number") return fmtNumber(e)
+    // A negative literal inside an operation is bracketed: `#1--5` is not a sum on any control.
+    if (typeof e === "number") return e < 0 && !top ? (this.family === "fanuc" || this.family === "linuxcnc" || this.family === "okuma" ? `[${fmtNumber(e)}]` : `(${fmtNumber(e)})`) : fmtNumber(e)
     if ("var" in e) return this.variable(e.var)
     const wrap = (s: string): string => (top ? s : this.family === "fanuc" || this.family === "linuxcnc" || this.family === "okuma" ? `[${s}]` : `(${s})`)
     if ("op" in e) {

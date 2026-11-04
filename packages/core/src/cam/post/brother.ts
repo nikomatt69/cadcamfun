@@ -22,6 +22,7 @@ import type { Dialect, VendorPost } from "./types.ts"
 export const brotherDialect: Dialect = {
   ...fanucDialect,
   id: "brother",
+  probing: { syntax: "fanuc", offsets: "brother", alarmMax: 200 },
   rigidTap: undefined,
   smoothing: undefined,
   tiltedPlane: undefined,
