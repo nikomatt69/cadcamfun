@@ -27,6 +27,7 @@ import {
   expandCycle,
   isControlNode,
   isFullCircle,
+  isProbingMove,
   moveTarget
 } from "../ir.ts"
 import { type ArcMode, type Dialect, type PlaneCall, type PostOptions, type TiltedPlane, defaultPostOptions } from "./types.ts"
@@ -995,6 +996,9 @@ const rejectUnwritable = (program: Program, dialect: Dialect): void => {
       throw new RangeError(`Toolpath "${toolpath.name}" mixes positioned rotary axes (3+2) with simultaneous rotary motion: split it into two operations`)
     }
     for (const m of toolpath.moves) if (m._tag === "SpindleOrient") spindleOrientRefusal(dialect, m.angle ?? 0)
+    // A probe move dropped by a post would leave the work offset unmeasured: refused, never skipped.
+    const probing = toolpath.moves.find((m) => isProbingMove(m) || (m._tag === "Rapid" && m.machine === true))
+    if (probing !== undefined) throw new RangeError(`${dialect.id}: this post writes no probing (${probing._tag === "Rapid" ? "machine-coordinate rapid" : probing._tag}): toolpath "${toolpath.name}" is refused instead of written without it`)
     if (toolpath.moves.some((m) => m._tag === "CutterComp")) cutterCompRefusal(dialect)
     if (simultaneous && !dialect.rotary) {
       throw new RangeError(`Toolpath "${toolpath.name}" drives rotary axes, which the ${dialect.id} post cannot write: use a 5-axis post (haas) or a 3-axis operation`)

@@ -103,7 +103,8 @@ export const GotoSchema = Schema.TaggedStruct("Goto", {
  * the cycle (`number`, its `params` by `Qnnn` key, the call position `x` / `y`) in place of them.
  */
 export const CycleBeginSchema = Schema.TaggedStruct("CycleBegin", {
-  family: Schema.Literals(["heidenhain"]),
+  /** `siemens` (CYCLE97x / 99x measuring cycles) and `renishaw` (G65 P98xx) carry probing cycles (spec 73 §5.9). */
+  family: Schema.Literals(["heidenhain", "siemens", "renishaw"]),
   number: Schema.Int.check(Schema.isGreaterThan(0)),
   name: Schema.String.check(Schema.isMinLength(1)),
   params: Schema.Record(Schema.String, Schema.Finite)
@@ -187,4 +188,76 @@ export const evalCondition = (c: Condition, lookup: (v: VarRef) => number): bool
     case "gt": return a > b + eps
     case "ge": return a >= b - eps
   }
+}
+
+// ---------------------------------------------------------------- expression depth
+
+/** Nesting depth of an expression as a control brackets it: a number or a variable is 0, each operation or function adds one. */
+export const exprDepth = (e: Expr): number => {
+  if (typeof e === "number" || "var" in e) return 0
+  if ("op" in e) return 1 + Math.max(exprDepth(e.a), exprDepth(e.b))
+  return 1 + Math.max(exprDepth(e.a), e.b === undefined ? 0 : exprDepth(e.b))
+}
+
+type ExprCarrier = { readonly _tag: string }
+type AssignNode = { readonly _tag: "Assign"; readonly variable: VarRef; readonly value: Expr }
+
+/**
+ * Splits every expression deeper than `maxDepth` into scratch assignments written just before the move that uses it (Fanuc, Okuma and
+ * LinuxCNC nest brackets five deep, a Klartext formula has its own limit). `temp(i)` names the i-th scratch variable of a statement;
+ * the numbering starts again at each statement, whose scratch values are used up by it. The value of every expression is kept: the
+ * assignments compute exactly its parts. A `While` condition is evaluated on every pass, so one that is too deep is refused instead.
+ */
+export const lowerExprDepth = <M extends ExprCarrier>(moves: ReadonlyArray<M>, maxDepth: number, temp: (i: number) => VarRef): M[] => {
+  if (!(Number.isInteger(maxDepth) && maxDepth >= 1)) throw new RangeError("lowerExprDepth needs a depth of at least 1")
+  const out: M[] = []
+  for (const move of moves) {
+    const pre: AssignNode[] = []
+    let next = 0
+    const spill = (e: Expr): Expr => {
+      const v = temp(next++)
+      pre.push({ _tag: "Assign", variable: v, value: e })
+      return { var: v }
+    }
+    const lower = (e: Expr): Expr => {
+      if (typeof e === "number" || "var" in e) return e
+      if ("op" in e) {
+        let a = lower(e.a), b = lower(e.b)
+        if (1 + Math.max(exprDepth(a), exprDepth(b)) > maxDepth) { if (exprDepth(a) >= exprDepth(b)) a = spill(a); else b = spill(b) }
+        if (1 + Math.max(exprDepth(a), exprDepth(b)) > maxDepth) { if (exprDepth(a) >= exprDepth(b)) a = spill(a); else b = spill(b) }
+        return { op: e.op, a, b }
+      }
+      let a = lower(e.a)
+      let b = e.b === undefined ? undefined : lower(e.b)
+      const d = (): number => 1 + Math.max(exprDepth(a), b === undefined ? 0 : exprDepth(b))
+      if (d() > maxDepth) { if (b === undefined || exprDepth(a) >= exprDepth(b)) a = spill(a); else b = spill(b) }
+      if (d() > maxDepth && b !== undefined) { if (exprDepth(a) >= exprDepth(b)) a = spill(a); else b = spill(b) }
+      return b === undefined ? { fn: e.fn, a } : { fn: e.fn, a, b }
+    }
+    // A statement's top expression stands right of `=` or after a letter, which takes one more level on the bracket families.
+    const top = (e: Expr): Expr => (exprDepth(e) <= maxDepth ? e : lower(e))
+    const cond = (c: Condition): Condition => ({ cmp: c.cmp, a: top(c.a), b: top(c.b) })
+    const m = move as unknown as Record<string, unknown> & { readonly _tag: string }
+    let lowered: Record<string, unknown> = m
+    switch (m._tag) {
+      case "Assign": lowered = { ...m, value: top(m["value"] as Expr) }; break
+      case "OffsetUpdate": lowered = { ...m, value: top(m["value"] as Expr) }; break
+      case "MacroCall": lowered = { ...m, args: Object.fromEntries(Object.entries(m["args"] as Record<string, Expr>).map(([k, v]) => [k, top(v)])) }; break
+      case "If": lowered = { ...m, condition: cond(m["condition"] as Condition) }; break
+      case "Goto": if (m["condition"] !== undefined) lowered = { ...m, condition: cond(m["condition"] as Condition) }; break
+      case "While": {
+        const c = m["condition"] as Condition
+        if (exprDepth(c.a) > maxDepth || exprDepth(c.b) > maxDepth) throw new RangeError(`A While condition nests deeper than ${maxDepth}: compute it into a variable at the end of the loop body`)
+        break
+      }
+      case "Report": lowered = { ...m, values: (m["values"] as ReadonlyArray<{ readonly name: string; readonly value: Expr }>).map((v) => ({ name: v.name, value: top(v.value) })) }; break
+      case "Rapid": case "Linear": case "Probe": {
+        const expr = m["expr"] as Readonly<Record<string, Expr>> | undefined
+        if (expr !== undefined) lowered = { ...m, expr: Object.fromEntries(Object.entries(expr).map(([k, v]) => [k, top(v)])) }
+        break
+      }
+    }
+    out.push(...(pre as unknown as M[]), lowered as unknown as M)
+  }
+  return out
 }

@@ -13,7 +13,8 @@
  *  - an `Arc` whose `to` has the same XY as its start is a **full circle**.
  */
 import { Schema } from "effect"
-import { AssignSchema, CycleBeginSchema, CycleEndSchema, ElseSchema, EndIfSchema, EndWhileSchema, GotoSchema, IfSchema, LabelSchema, MacroCallSchema, MessageSchema, WhileSchema, WordExprSchema } from "./macro.ts"
+import { AssignSchema, CycleBeginSchema, CycleEndSchema, ElseSchema, EndIfSchema, EndWhileSchema, ExprSchema, GotoSchema, IfSchema, LabelSchema, MacroCallSchema, MessageSchema, VarRefSchema, WhileSchema, WordExprSchema } from "./macro.ts"
+import { OFFSET_AXES, WorkOffsetRefSchema } from "./work-offset.ts"
 import { angleInArc, normalizeAngle } from "../cad/arc-math.ts"
 import { Vec2Schema, Vec3Schema } from "../cad/entities.ts"
 import { TAU, type Vec2, type Vec3 } from "../cad/vec.ts"
@@ -56,7 +57,12 @@ export const RapidSchema = Schema.TaggedStruct("Rapid", {
   rotary: Schema.optionalKey(RotarySchema),
   /** Words the control computes (`macro.ts`); `to` stays the nominal position. */
   expr: Schema.optionalKey(WordExprSchema),
-  comp: Schema.optionalKey(CompensationSchema)
+  comp: Schema.optionalKey(CompensationSchema),
+  /**
+   * `to` is in machine coordinates (`G53`, Siemens `SUPA`, Heidenhain `M91`): no work offset, no tool length. A tool setter on the table
+   * is reached this way. A post without the word refuses the program (spec 73 §5.2).
+   */
+  machine: Schema.optionalKey(Schema.Boolean)
 })
 
 export const LinearSchema = Schema.TaggedStruct("Linear", {
@@ -151,6 +157,58 @@ export const CycleSchema = Schema.TaggedStruct("Cycle", {
   pitch: Schema.optionalKey(Positive)
 })
 
+/**
+ * A probe move (spec 73 §5.2). `touch`: the stylus searches along `direction` (unit) for the surface it is expected to meet with the tip
+ * at `to`, at most `overtravel` past it; the control stops at the contact and the tip's coordinates there go into `store`. The search
+ * runs from wherever the tool is (the control writes it as an incremental vector of length `(to - start) . direction + overtravel` from
+ * the nominal start), so a probe that was re-centred by a computed move still searches the same distance. No contact: an alarm
+ * (`onMiss: "alarm"`), or `flag` is set to 1 (`"flag"`; 0 on a contact) and the program goes on. `protected`: a positioning move to `to`
+ * (computed words in `expr`) that must not touch anything: a contact stops the program with an alarm (a crash avoided). The spindle is
+ * off for both: a probe is a sensor.
+ */
+export const ProbeSchema = Schema.TaggedStruct("Probe", {
+  to: Vec3Schema,
+  direction: Vec3Schema,
+  overtravel: NonNegative,
+  /** mm/min. */
+  feed: Positive,
+  kind: Schema.Literals(["touch", "protected"]),
+  onMiss: Schema.Literals(["alarm", "flag"]),
+  store: Schema.optionalKey(Schema.Struct({ x: Schema.optionalKey(VarRefSchema), y: Schema.optionalKey(VarRefSchema), z: Schema.optionalKey(VarRefSchema) })),
+  flag: Schema.optionalKey(VarRefSchema),
+  expr: Schema.optionalKey(WordExprSchema)
+})
+
+/**
+ * A change of a work offset or of a tool's length / radius by the program itself (spec 73 §5.2): `set` makes the axis `value`,
+ * `add` adds `value` to it. Values are what the control holds: mm, and degrees for `A` / `B` / `C` / `R` (the offset's rotation about
+ * the tool axis). A Siemens frame is selected again after it is written. A post that cannot write the offset refuses the program.
+ */
+export const OffsetUpdateSchema = Schema.TaggedStruct("OffsetUpdate", {
+  target: Schema.Union([
+    Schema.Struct({ kind: Schema.Literal("work"), ref: WorkOffsetRefSchema }),
+    Schema.Struct({ kind: Schema.Literal("tool"), tool: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 9999 })), quantity: Schema.Literals(["length", "radius"]), part: Schema.Literals(["geometry", "wear"]) })
+  ]),
+  axis: Schema.Literals(OFFSET_AXES),
+  mode: Schema.Literals(["set", "add"]),
+  value: ExprSchema
+})
+
+/** The program stops with an alarm (`#3000`, `SETAL`, `FN 14`, LinuxCNC `(abort, ..)`): a probe missed, a part out of tolerance. */
+export const AlarmSchema = Schema.TaggedStruct("Alarm", {
+  code: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999 })),
+  text: Schema.String.check(Schema.isMaxLength(60))
+})
+
+/** Values written to the control's report channel (`DPRNT`, `WRITE`, `FN 16`, `(LOG, ..)`) for the inspection record. */
+export const ReportSchema = Schema.TaggedStruct("Report", {
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)),
+  values: Schema.Array(Schema.Struct({ name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(24)), value: ExprSchema })).check(Schema.isMaxLength(32))
+})
+
+/** Program stop: `M0`, or `M1` (`optional`, only when the operator's optional-stop switch is on). */
+export const StopSchema = Schema.TaggedStruct("Stop", { optional: Schema.Boolean })
+
 export const MoveSchema = Schema.Union([
   RapidSchema,
   LinearSchema,
@@ -173,7 +231,12 @@ export const MoveSchema = Schema.Union([
   GotoSchema,
   CycleBeginSchema,
   CycleEndSchema,
-  MessageSchema
+  MessageSchema,
+  ProbeSchema,
+  OffsetUpdateSchema,
+  AlarmSchema,
+  ReportSchema,
+  StopSchema
 ])
 
 export type RapidMove = typeof RapidSchema.Type
@@ -186,6 +249,11 @@ export type OrientMove = typeof OrientSchema.Type
 export type SpindleOrientMove = typeof SpindleOrientSchema.Type
 export type CutterCompMove = typeof CutterCompSchema.Type
 export type CycleMove = typeof CycleSchema.Type
+export type ProbeMove = typeof ProbeSchema.Type
+export type OffsetUpdateMove = typeof OffsetUpdateSchema.Type
+export type AlarmMove = typeof AlarmSchema.Type
+export type ReportMove = typeof ReportSchema.Type
+export type StopMove = typeof StopSchema.Type
 export type Move = typeof MoveSchema.Type
 
 /** Clearance kept above the last depth when a peck cycle rapids back down, mm. */
@@ -204,6 +272,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
     case "Linear":
     case "Arc":
     case "Spline":
+    case "Probe":
       return move.to
     case "Cycle":
       return { x: move.to.x, y: move.to.y, z: move.retractHeight }
@@ -218,7 +287,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
 
 /** Feed of a cutting move; rapids, dwells and comments have none. */
 export const moveFeed = (move: Move): number | undefined =>
-  move._tag === "Linear" || move._tag === "Arc" || move._tag === "Spline" || move._tag === "Cycle" ? move.feed : undefined
+  move._tag === "Linear" || move._tag === "Arc" || move._tag === "Spline" || move._tag === "Cycle" || move._tag === "Probe" ? move.feed : undefined
 
 /**
  * Unsigned XY sweep of an arc about `center` from `from` to `to`. Equal
@@ -252,14 +321,20 @@ export const arcExtrema = (move: ArcMove, from: Vec3): ReadonlyArray<Vec3> => {
 }
 
 /** A move that moves nothing: it is data for the post (a variable, a macro, a branch, a message) or for the operator. */
-export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "CycleBegin" | "CycleEnd" | "Message" }> =>
-  move._tag === "Assign" || move._tag === "CycleBegin" || move._tag === "CycleEnd" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message"
+export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "CycleBegin" | "CycleEnd" | "Message" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" }> =>
+  move._tag === "Assign" || move._tag === "CycleBegin" || move._tag === "CycleEnd" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message" ||
+  move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop"
+
+/** A move of the probing set (spec 73): a post writes it only with `Dialect.probing`. */
+export const isProbingMove = (move: Move): move is Extract<Move, { readonly _tag: "Probe" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" }> =>
+  move._tag === "Probe" || move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop"
 
 /** Length of a move from `from`; arcs use the true radius and sweep and include the helical rise. */
 export const moveLength = (move: Move, from: Vec3): number => {
   switch (move._tag) {
     case "Rapid":
     case "Linear":
+    case "Probe":
       return Math.hypot(move.to.x - from.x, move.to.y - from.y, move.to.z - from.z)
     case "Arc": {
       const r = Math.hypot(from.x - move.center.x, from.y - move.center.y)
@@ -286,6 +361,10 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "CycleBegin":
     case "CycleEnd":
     case "Message":
+    case "OffsetUpdate":
+    case "Alarm":
+    case "Report":
+    case "Stop":
       return 0
   }
 }
@@ -420,6 +499,8 @@ export const ProgramSchema = Schema.Struct({
   /** Output unit; IR coordinates stay millimetres and the post converts. */
   units: ProgramUnitsSchema,
   workOffset: WorkOffsetSchema,
+  /** The offset when it is not one of G54..G59 (G54.1 P3, G505, G59.1, a preset row); the post selects it instead of `workOffset`. */
+  workOffsetRef: Schema.optionalKey(WorkOffsetRefSchema),
   toolpaths: Schema.Array(ToolpathSchema),
   /** Free-form notes for the header (material, stock, ...); never machine data. */
   metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String))
@@ -544,6 +625,7 @@ export const estimateTime = (toolpath: Toolpath, rapidRate: number): number => {
         break
       case "Linear":
       case "Arc":
+      case "Probe":
         seconds += (moveLength(move, from) / move.feed) * 60
         break
       case "Dwell":
@@ -597,6 +679,8 @@ export interface MachineProfile {
   readonly rotary?: MachineRotary
   /** When present, a toolpath referencing an unknown tool is an error. */
   readonly tools?: ReadonlyArray<Pick<Tool, "id">>
+  /** The spindle probe's highest feed, mm/min: a probe move faster than this would break the stylus. */
+  readonly probeMaxFeed?: number
 }
 
 export type ValidationIssue =
@@ -606,6 +690,7 @@ export type ValidationIssue =
   | { readonly _tag: "MissingTool"; readonly message: string; readonly toolId: string; readonly toolpathId: string }
   | { readonly _tag: "SpindleLimit"; readonly message: string; readonly spindleRpm: number; readonly toolpathId: string }
   | { readonly _tag: "RotaryLimit"; readonly message: string; readonly axis: "A" | "B" | "C"; readonly angle: number; readonly toolpathId: string; readonly moveIndex?: number }
+  | { readonly _tag: "ProbeLimit"; readonly message: string; readonly feed: number; readonly toolpathId: string; readonly moveIndex: number }
 
 const fmt = (n: number): string => n.toFixed(3)
 
@@ -623,7 +708,8 @@ const MachineProfileSchema = Schema.Struct({
     b: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
     c: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite }))
   })),
-  tools: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)) })))
+  tools: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)) }))),
+  probeMaxFeed: Schema.optionalKey(Positive)
 })
 
 const validateProgramInput = Schema.decodeUnknownSync(ProgramSchema, { errors: "all" })
@@ -709,7 +795,16 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
         message: `Toolpath "${toolpath.name}" leaves the travel of machine ${machine.id} at X${fmt(point.x)} Y${fmt(point.y)} Z${fmt(point.z)}`
       })
     }
-    for (const move of toolpath.moves) {
+    for (const [moveIndex, move] of toolpath.moves.entries()) {
+      if (move._tag === "Probe") {
+        const d = move.direction
+        if (!(Math.abs(Math.hypot(d.x, d.y, d.z) - 1) <= 1e-6)) {
+          issues.push({ _tag: "InvalidInput", path: `toolpath.${toolpath.id}.moves[${moveIndex}]`, toolpathId: toolpath.id, moveIndex, message: `Toolpath "${toolpath.name}" move ${moveIndex}: a probe direction must be a unit vector` })
+        }
+        if (machine.probeMaxFeed !== undefined && move.feed > machine.probeMaxFeed) {
+          issues.push({ _tag: "ProbeLimit", toolpathId: toolpath.id, moveIndex, feed: move.feed, message: `Toolpath "${toolpath.name}" probes at F${fmt(move.feed)}, above the probe's limit of ${machine.probeMaxFeed}` })
+        }
+      }
       const feed = moveFeed(move)
       if (feed !== undefined && machine.maxFeed !== undefined && feed > machine.maxFeed) {
         issues.push({

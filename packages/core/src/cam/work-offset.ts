@@ -16,7 +16,7 @@
  */
 import { Schema, SchemaTransformation } from "effect"
 import type { Vec3 } from "../cad/vec.ts"
-import { WorkOffsetSchema, type WorkOffset } from "./ir.ts"
+import type { WorkOffset } from "./ir.ts"
 import { binary, call, num, type Condition, type Expr } from "./macro.ts"
 
 const DEG = Math.PI / 180
@@ -35,6 +35,8 @@ export type WorkOffsetRef =
   | { readonly kind: "preset"; readonly row: number }
 
 const G5X: ReadonlyArray<WorkOffset> = ["G54", "G55", "G56", "G57", "G58", "G59"]
+// The same literals as `ir.ts` `WorkOffsetSchema`, declared here because `ir.ts` imports this module.
+const WorkOffsetSchema = Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"])
 
 export const WorkOffsetRefSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("g5x"), code: WorkOffsetSchema }),
