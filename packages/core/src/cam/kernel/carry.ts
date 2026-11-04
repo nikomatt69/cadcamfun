@@ -14,12 +14,19 @@
  */
 import { applyPoint, type Transform } from "../../cad/brep/math.ts"
 import type { ResidualStock } from "./contracts.ts"
-import { setupTransform } from "../setup.ts"
+import { setupTransform, type SetupOrientation } from "../setup.ts"
 
 /** The inverse of a signed permutation (a rotation): its transpose. */
 export const transposeOf = (t: Transform): Transform => {
   const m = t.m
   return { m: [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]], t: { x: 0, y: 0, z: 0 } }
+}
+
+/** The stock box of a setup (oriented coordinates) in CAD world coordinates. */
+export const cadStockOf = (stock: { readonly min: { x: number; y: number; z: number }; readonly max: { x: number; y: number; z: number } }, orientation: SetupOrientation): { readonly min: { x: number; y: number; z: number }; readonly max: { x: number; y: number; z: number } } => {
+  const back = transposeOf(setupTransform(orientation))
+  const cs = [stock.min.x, stock.max.x].flatMap((x) => [stock.min.y, stock.max.y].flatMap((y) => [stock.min.z, stock.max.z].map((z) => applyPoint(back, { x, y, z }))))
+  return { min: { x: Math.min(...cs.map((c) => c.x)), y: Math.min(...cs.map((c) => c.y)), z: Math.min(...cs.map((c) => c.z)) }, max: { x: Math.max(...cs.map((c) => c.x)), y: Math.max(...cs.map((c) => c.y)), z: Math.max(...cs.map((c) => c.z)) } }
 }
 
 export const carriedColumns = (residual: ResidualStock, into: Transform): ((x: number, y: number, zLow: number, zHigh: number) => { top: number; solid: number }) => {

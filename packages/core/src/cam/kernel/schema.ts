@@ -141,7 +141,7 @@ const _print: [typeof PrintRequirementSchema.Type] extends [PrintRequirement] ? 
 void _print
 
 /** A workholding body (`FixtureBody`): an axis-aligned box in CAD world coordinates. */
-export const FixtureBodySchema = Schema.Struct({ id, min: vec3, max: vec3 })
+export const FixtureBodySchema = Schema.Struct({ id, min: vec3, max: vec3, role: Schema.optionalKey(Schema.Literals(["jaw", "clamp", "support"])) })
 
 /** A stock that is not a box (`StockModel`): a vertical bar or a closed mesh in CAD world coordinates. */
 export const StockModelSchema = Schema.Union([

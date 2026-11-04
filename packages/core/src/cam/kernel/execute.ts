@@ -82,7 +82,8 @@ import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } from "./planner.ts"
 import { planPrintJob, runPrintJob } from "./print.ts"
 import { resolveOperations } from "./operation-model.ts"
-import { carriedColumns, transposeOf } from "./carry.ts"
+import { cadStockOf, carriedColumns, transposeOf } from "./carry.ts"
+import { holdingOf } from "./fixtures.ts"
 import { limitToolpath } from "./limits.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
@@ -1526,8 +1527,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       : clearance === undefined ? "no NC was checked against the fixtures"
       : clearance.first !== undefined ? `the tool assembly reaches a fixture or the table at NC line ${clearance.first.line}`
       : clearance.unresolved > 0 || clearance.rotaryMoves > 0 ? `${clearance.unresolved + clearance.rotaryMoves} moves could not be proven clear of the fixtures` : undefined
-    claims.push({ id: "setup-workholding", status: bad === undefined ? "passed" : fixtureInPart.length > 0 || clearance?.first !== undefined ? "failed" : "unresolved",
-      detail: bad ?? `${fixtureBodies.length} fixture bodies (${ids}) stay clear of the tool assembly over ${clearance!.checked} moves (at least ${(clearance!.minClearance ?? 0).toFixed(3)} mm); their contact with the stock is the clamping and is not checked` })
+    // Bodies that name a role (jaw, clamp, support) also have to hold the stock (spec 69 C3); bodies without one are only checked for clearance.
+    const holding = (job.fixtures ?? []).some((f) => f.role !== undefined) ? holdingOf(job.fixtures!, cadStockOf(stock, job.setupOrientation ?? "+Z")) : undefined
+    const status: Claim["status"] = bad !== undefined ? (fixtureInPart.length > 0 || clearance?.first !== undefined ? "failed" : "unresolved") : holding !== undefined && !holding.held ? "unresolved" : "passed"
+    claims.push({ id: "setup-workholding", status,
+      detail: bad ?? (holding !== undefined && !holding.held ? `The fixture bodies are clear of the tool but do not hold the stock: ${holding.detail}` : `${fixtureBodies.length} fixture bodies (${ids}) stay clear of the tool assembly over ${clearance!.checked} moves (at least ${(clearance!.minClearance ?? 0).toFixed(3)} mm); ${holding !== undefined ? `the stock is held by geometry: ${holding.detail} (clamping force and friction are not computed)` : "their contact with the stock is the clamping and is not checked"}`) })
     if (fixtureInPart.length > 0) issues.push(issue("InvalidInput", "evidence", bad!, { severity: "error" }))
     if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z" && hidden === 0 && skippedSamples === 0) claims.push({ id: "part-coverage", status: "unresolved", detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" })
   } else if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(

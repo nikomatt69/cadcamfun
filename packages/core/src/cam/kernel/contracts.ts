@@ -67,6 +67,12 @@ export interface FixtureBody {
   readonly id: string
   readonly min: Vec3
   readonly max: Vec3
+  /**
+   * What the body does (spec 69 C3). `jaw` and `clamp` press on the stock, `support` carries it (parallels, a pallet, a tombstone face).
+   * When any body names a role, `setup-workholding` also decides whether the stock is held (`holdingOf` in `fixtures.ts`); bodies
+   * without a role are only checked for clearance, as before.
+   */
+  readonly role?: "jaw" | "clamp" | "support"
 }
 
 export type WorkOrigin = "stock-center" | "stock-corner"
