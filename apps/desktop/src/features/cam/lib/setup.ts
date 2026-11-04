@@ -47,7 +47,8 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
   post: choices.post,
   grouping: choices.grouping,
   retractBeforeToolChange: choices.retractBeforeToolChange,
-  operations: [...toolpaths].sort((a, b) => a.order - b.order).map((toolpath): Operation => ({
+  // A probe cycle is not a cutting operation: it has its own program (`camProbing.emit`) and never joins the cutting setup.
+  operations: [...toolpaths].filter((toolpath) => toolpath.probe === undefined).sort((a, b) => a.order - b.order).map((toolpath): Operation => ({
     id: toolpath.id,
     name: toolpath.elementName,
     elementIds: [toolpath.elementId],

@@ -92,7 +92,10 @@ export const toolObject = (model: cam.ToolModel, options: ToolObjectOptions = {}
   group.name = model.family === "probe" ? "probe" : `tool:${model.shape}`
   const cutting = model.family === "probe" ? 0xdc2626 : options.color ?? 0xf59e0b
   for (const part of cam.toolMeshes(model, { assumeHolder: options.assumeHolder ?? true, segments: options.segments ?? 40 })) {
-    group.add(meshOf(part, part.part === "cutting" ? cutting : part.part === "shank" ? 0xb8bec6 : 0x4b5563))
+    const mesh = meshOf(part, part.part === "cutting" ? cutting : part.part === "shank" ? 0xb8bec6 : 0x4b5563)
+    // The ruby ball of a probe: a contact pulses it (spec 73 §4), so it is addressable by name.
+    if (model.family === "probe" && part.part === "cutting") mesh.name = "probe:ball"
+    group.add(mesh)
   }
   if (model.family === "mill" && model.shape === "boringBar") {
     // The boring head's single insert, off the axis at the cutting radius.

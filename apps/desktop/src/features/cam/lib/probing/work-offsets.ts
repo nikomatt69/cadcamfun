@@ -112,3 +112,16 @@ export const diffRows = (before: ReadonlyArray<OffsetRow>, after: ReadonlyArray<
   }
   return out
 }
+
+/** What the work-offset select offers for a cycle: the table's rows, then the control's G5x offsets, then `current` when it is neither. */
+export const offsetChoicesOf = (profile: MachineProfile | undefined, current: string): ReadonlyArray<string> => {
+  const keys: string[] = []
+  const add = (key: string) => { if (!keys.includes(key)) keys.push(key) }
+  if (profile !== undefined) {
+    const family = offsetFamilyOf(profile)
+    for (const row of offsetRowsOf(profile)) add(row.key)
+    for (const code of G5X) if (offsetRefusal(code, family, profile.probing?.offsets) === undefined) add(code)
+  } else for (const code of G5X) add(code)
+  add(current)
+  return keys
+}

@@ -7,6 +7,7 @@
  * persistence. Everything is immutable (the legacy store sorted and mutated arrays in place).
  */
 import type { ToolpathSettings } from "./elementJob.ts"
+import type { ProbeOperation } from "./probing/operation.ts"
 
 export interface ToolpathPoint {
   readonly x: number
@@ -38,6 +39,8 @@ export interface ElementToolpath {
   readonly estimatedTime: number
   /** Total path length, mm. */
   readonly distance: number
+  /** A probing cycle (spec 73): set, the toolpath is a probe operation and `toolpathSettings.operationType` is "probing". */
+  readonly probe?: ProbeOperation
 }
 
 export const TOOLPATH_COLORS = [

@@ -33,6 +33,11 @@ export interface PathBufferInput {
   readonly operationNames?: ReadonlyArray<string>
   /** Toolpaths not drawn (the operation browser's eye). */
   readonly hidden?: ReadonlySet<number>
+  /**
+   * Probe touches (class "probe") keep the probe colour in every colour mode, so a measuring move never reads as a cut (spec 73 §4);
+   * needs `classOf`. The legend gains a "probe" entry when the path has one.
+   */
+  readonly probeColors?: boolean
   /** Program point -> display point (lathe mapping, rotary part frame). */
   readonly shown: (p: Vec3, path: number, index: number, seconds?: number) => Vec3
 }
@@ -79,7 +84,9 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
     if (f > 0) { if (f < fMin) fMin = f; if (f > fMax) fMax = f }
     zMin = Math.min(zMin, v.from[i * 3 + 2]!, v.to[i * 3 + 2]!); zMax = Math.max(zMax, v.from[i * 3 + 2]!, v.to[i * 3 + 2]!)
   }
+  const isProbe = (i: number): boolean => input.probeColors === true && input.classOf?.(v.pathIndex[i]!, v.moveIndex[i]!) === "probe"
   const colorOf = (i: number): number => {
+    if (isProbe(i)) return cam.viewer.MOVE_CLASS_COLORS.probe
     switch (input.mode) {
       case "tool": return input.toolColors.get(toolId(i)) ?? 0x38bdf8
       case "operation": return operationColor(v.pathIndex[i]!, palette)
@@ -92,6 +99,7 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
   const rapid = new Float32Array(rapids * 6), rapidStarts = new Float64Array(rapids)
   const rgbCache = new Map<number, readonly [number, number, number]>()
   const used = new Map<string, number>()
+  let probeUsed = false
   let c = 0, r = 0
   for (let i = 0; i < segmentCount; i++) {
     if (!shownSegment(i)) continue
@@ -111,6 +119,7 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
     cut[o] = a.x; cut[o + 1] = a.y; cut[o + 2] = a.z; cut[o + 3] = b.x; cut[o + 4] = b.y; cut[o + 5] = b.z
     cutColors[o] = cutColors[o + 3] = rgbOf[0]; cutColors[o + 1] = cutColors[o + 4] = rgbOf[1]; cutColors[o + 2] = cutColors[o + 5] = rgbOf[2]
     cutStarts[c++] = v.starts[i]!
+    if (isProbe(i)) { probeUsed = true; if (input.mode !== "move") continue }
     if (input.mode === "move") { const klass = input.classOf?.(v.pathIndex[i]!, v.moveIndex[i]!) ?? "cut"; if (!used.has(klass)) used.set(klass, color) }
     else if (input.mode === "operation") { const name = input.operationNames?.[v.pathIndex[i]!] ?? `#${v.pathIndex[i]! + 1}`; if (!used.has(name)) used.set(name, color) }
     else if (input.mode === "tool" && !used.has(toolId(i))) used.set(toolId(i), color)
@@ -120,6 +129,7 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
   else if (input.mode === "z") legend = zMax >= zMin ? [{ label: `Z ${Math.round(zMin * 100) / 100}`, color: rampColor(0) }, { label: `Z ${Math.round(zMax * 100) / 100}`, color: rampColor(1) }] : []
   else if (input.mode === "move") legend = cam.viewer.MOVE_CLASSES.filter((k) => used.has(k)).map((k) => ({ label: k, color: used.get(k)! }))
   else legend = [...used].map(([label, color]) => ({ label, color }))
+  if (probeUsed && input.mode !== "move") legend = [...legend, { label: "probe", color: cam.viewer.MOVE_CLASS_COLORS.probe }]
   return { cut: { positions: cut, colors: cutColors, starts: cutStarts }, rapid: { positions: rapid, starts: rapidStarts }, legend }
 }
 

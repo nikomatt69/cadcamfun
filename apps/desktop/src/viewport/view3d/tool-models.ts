@@ -26,3 +26,16 @@ export const gaugeOfTool = (model: cam.ToolModel | undefined, withHolder = true)
   if (model === undefined || (model.family !== "mill" && model.family !== "probe")) return 60
   return cam.toolProfile(model.family === "mill" && withHolder ? { ...model, holder: model.holder ?? cam.assumedHolderOf(model) } : model).length
 }
+
+/**
+ * The probe the machine carries as a tool model (spec 73 §4): the stylus ball, its length and the body, from the profile's probing
+ * block (`undefined` when the machine names no stylus: the preview then draws the generic probe of the settings).
+ */
+export const probeModelOf = (probing: { readonly stylusDiameter?: number; readonly stylusRadius?: number; readonly stylusLength?: number; readonly body?: { readonly diameter: number } } | undefined): cam.ProbeModel | undefined => {
+  const diameter = probing?.stylusDiameter ?? (probing?.stylusRadius !== undefined ? probing.stylusRadius * 2 : undefined)
+  if (probing === undefined || diameter === undefined) return undefined
+  const assumed: string[] = []
+  if (probing.stylusLength === undefined) assumed.push("stylusLength")
+  if (probing.body === undefined) assumed.push("bodyDiameter")
+  return { family: "probe", ballDiameter: diameter, stylusLength: probing.stylusLength ?? 50, bodyDiameter: probing.body?.diameter ?? 40, assumed }
+}

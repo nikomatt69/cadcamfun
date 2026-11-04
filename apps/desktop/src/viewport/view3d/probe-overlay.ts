@@ -73,22 +73,38 @@ export const probeOverlayModel = (input: ProbeOverlayInput): ProbeOverlayModel =
   }
 }
 
+export type OverlayLayer = "contacts" | "deviations" | "wcs" | "frames" | "calibration"
+export const OVERLAY_LAYERS: ReadonlyArray<OverlayLayer> = ["contacts", "deviations", "wcs", "frames", "calibration"]
+
 export interface ProbeOverlay {
   readonly root: THREE.Group
-  /** Reveal what playback reached by `seconds`; `Infinity` shows the whole run. */
-  update(seconds: number): void
+  /** Reveal what playback reached by `seconds`; `Infinity` shows the whole run. True when something on screen changed. */
+  update(seconds: number): boolean
+  /** The last contact playback has reached by `seconds` (undefined before the first, or when the run has no timeline). */
+  reached(seconds: number): number | undefined
   /** A short flash of the contact made at `index` (the stylus pulse while playing). */
   pulse(index: number): void
+  /** The contact a list row selected, drawn larger and in the highlight colour (undefined: none). */
+  highlight(index: number | undefined): void
+  /** Show or hide one kind of object (the visualizer's Probing settings). */
+  setLayer(layer: OverlayLayer, visible: boolean): void
   dispose(): void
 }
 
-export const PROBE_COLORS = { contact: 0x22d3ee, deviation: 0xf59e0b, frame: 0xa78bfa, sphere: 0x94a3b8 } as const
+export const PROBE_COLORS = { contact: 0x22d3ee, highlight: 0xfacc15, deviation: 0xf59e0b, frame: 0xa78bfa, sphere: 0x94a3b8 } as const
 
-export const createProbeOverlay = (model: ProbeOverlayModel, options: { readonly triadLength?: number; readonly contactRadius?: number } = {}): ProbeOverlay => {
+export interface ProbeOverlayOptions {
+  readonly triadLength?: number
+  readonly contactRadius?: number
+  readonly layers?: Partial<Record<OverlayLayer, boolean>>
+}
+
+export const createProbeOverlay = (model: ProbeOverlayModel, options: ProbeOverlayOptions = {}): ProbeOverlay => {
   const root = new THREE.Group()
   root.name = "probe-overlay"
   const length = options.triadLength ?? 30
   const radius = options.contactRadius ?? 0.6
+  const layers: Record<OverlayLayer, boolean> = { contacts: true, deviations: true, wcs: true, frames: true, calibration: true, ...options.layers }
   const geometries: THREE.BufferGeometry[] = []
   const materials: THREE.Material[] = []
   const own = <G extends THREE.BufferGeometry>(g: G) => { geometries.push(g); return g }
@@ -103,13 +119,14 @@ export const createProbeOverlay = (model: ProbeOverlayModel, options: { readonly
     root.add(mesh)
     return mesh
   })
-  for (const d of model.deviations) {
+  const deviations = model.deviations.map((d) => {
     const line = new THREE.Line(own(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(d.from.x, d.from.y, d.from.z), new THREE.Vector3(d.to.x, d.to.y, d.to.z)])),
       mat(new THREE.LineBasicMaterial({ color: PROBE_COLORS.deviation })))
     line.name = `probe:deviation:${d.index}`
-    line.userData = { magnitude: d.magnitude }
+    line.userData = { magnitude: d.magnitude, contact: d.index }
     root.add(line)
-  }
+    return line
+  })
   const before = triad(frameAxes(), length, "probe:wcs:before", { opacity: 0.35 })
   const c = Math.cos(model.wcsRotation), s = Math.sin(model.wcsRotation)
   const after = triad(frameAxes({ x: c, y: s, z: 0 }, { x: -s, y: c, z: 0 }), length, "probe:wcs:after")
@@ -119,39 +136,68 @@ export const createProbeOverlay = (model: ProbeOverlayModel, options: { readonly
   wcs.name = "probe:wcs"
   wcs.add(before, after)
   root.add(wcs)
-  model.frames.forEach((f, i) => {
+  const frames = model.frames.map((f, i) => {
     const frame = triad(frameAxes(f.x, f.y), length * 0.6, `probe:frame:${i}`)
     frame.position.set(f.origin.x, f.origin.y, f.origin.z)
     root.add(frame)
+    return frame
   })
-  model.spheres.forEach((sphere, i) => {
+  const spheres = model.spheres.map((sphere, i) => {
     const mesh = new THREE.Mesh(own(new THREE.SphereGeometry(sphere.diameter / 2, 24, 16)), mat(new THREE.MeshBasicMaterial({ color: PROBE_COLORS.sphere, wireframe: true, transparent: true, opacity: 0.5 })))
     mesh.name = `probe:calibration:${i}`
     mesh.position.set(sphere.centre.x, sphere.centre.y, sphere.centre.z)
     root.add(mesh)
+    return mesh
   })
   const pulses = new Map<number, number>()
-  const update = (seconds: number) => {
+  let highlighted: number | undefined
+  const show = (object: THREE.Object3D, visible: boolean): boolean => {
+    if (object.visible === visible) return false
+    object.visible = visible
+    return true
+  }
+  const update = (seconds: number): boolean => {
+    let changed = false
+    const now = performanceNow()
+    const live = new Set<number>()
     for (const mesh of contacts) {
+      const index = Number(mesh.name.split(":")[2])
       const time = mesh.userData.time as number | undefined
-      mesh.visible = time === undefined || time <= seconds
-      const pulse = pulses.get(Number(mesh.name.split(":")[2]))
-      mesh.scale.setScalar(pulse !== undefined && performanceNow() - pulse < 300 ? 1.8 : 1)
+      const reached = time === undefined || time <= seconds
+      if (reached) live.add(index)
+      changed = show(mesh, layers.contacts && reached) || changed
+      const pulse = pulses.get(index)
+      const pulsing = pulse !== undefined && now - pulse < 300
+      const scale = index === highlighted ? 2 : pulsing ? 1.8 : 1
+      if (mesh.scale.x !== scale) { mesh.scale.setScalar(scale); changed = true }
+      const color = index === highlighted ? PROBE_COLORS.highlight : PROBE_COLORS.contact
+      const material = mesh.material as THREE.MeshBasicMaterial
+      if (material.color.getHex() !== color) { material.color.setHex(color); changed = true }
+      // A pulse is over when its time is up: draw one more frame at rest.
+      if (pulse !== undefined && !pulsing) pulses.delete(index)
     }
-    for (const child of root.children) if (child.name.startsWith("probe:deviation:")) {
-      const index = Number(child.name.split(":")[2])
-      child.visible = contacts[index]?.visible ?? true
-    }
+    for (const line of deviations) changed = show(line, layers.deviations && live.has(line.userData.contact as number)) || changed
     const switched = !moved || model.switchAt === undefined || seconds >= model.switchAt
-    before.visible = moved
-    after.visible = switched
-    if (!switched) after.visible = false
+    changed = show(wcs, layers.wcs) || changed
+    changed = show(before, moved) || changed
+    changed = show(after, switched) || changed
+    for (const frame of frames) changed = show(frame, layers.frames) || changed
+    for (const sphere of spheres) changed = show(sphere, layers.calibration) || changed
+    return changed || pulses.size > 0
   }
   update(Infinity)
   return {
     root,
     update,
+    reached: (seconds) => {
+      let best: number | undefined
+      let bestTime = -Infinity
+      for (const contact of model.contacts) if (contact.time !== undefined && contact.time <= seconds && contact.time >= bestTime) { best = contact.index; bestTime = contact.time }
+      return best
+    },
     pulse: (index) => { pulses.set(index, performanceNow()) },
+    highlight: (index) => { highlighted = index },
+    setLayer: (layer, visible) => { layers[layer] = visible },
     dispose: () => { for (const g of geometries) g.dispose(); for (const m of materials) m.dispose() }
   }
 }

@@ -212,7 +212,7 @@ describe("one 3D object per tool (spec 31): Resources page, CAM preview and mach
 
   test("the probe has a ruby ball; the setter stands with its pad top at the origin", () => {
     const probe = toolObject(cam.toolModelOf({ type: "probe", diameter: 4 }))
-    const ball = probe.getObjectByName("cutting") as THREE.Mesh
+    const ball = probe.getObjectByName("probe:ball") as THREE.Mesh
     expect((ball.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xdc2626)
     const setter = toolObject(cam.toolModelOf({ type: "toolsetter", diameter: 30 }))
     const box = new THREE.Box3().setFromObject(setter)

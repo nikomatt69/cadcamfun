@@ -1,5 +1,6 @@
-export { View3D, type View3DProps, type ViewPreset, type RenderMode, type TransformMode, type ViewportTransform } from "./view3d.tsx"
+export { View3D, type SurfaceHit, type View3DProps, type ViewPreset, type RenderMode, type TransformMode, type ViewportTransform } from "./view3d.tsx"
 export * from "./playback.ts"
 export * from "./toolpath-overlays.ts"
 export { solidsFromProfiles } from "./modeling.ts"
 export { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
+export * from "./probe-overlay.ts"

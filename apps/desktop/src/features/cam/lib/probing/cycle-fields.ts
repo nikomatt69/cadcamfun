@@ -6,7 +6,7 @@
 import { Schema } from "effect"
 import { probing, type ProbeCycle, type ProbeCycleKind } from "./contract.ts"
 
-export type FieldKind = "length" | "angle" | "int" | "sense" | "boolean" | "choice"
+export type FieldKind = "length" | "angle" | "int" | "sense" | "boolean" | "choice" | "numbers" | "points"
 
 export interface CycleField {
   /** Dotted path into the wire spec (`centre.x`, `sphere.diameter`). */
@@ -30,13 +30,13 @@ const FIELDS: Readonly<Record<ProbeCycleKind, ReadonlyArray<CycleField>>> = {
   bore: [...xy("centre"), L("diameter"), ...side],
   boss: [...xy("centre"), L("diameter"), ...side],
   "edge-angle": [...xy("start"), { path: "alongAngle", kind: "angle" }, L("pitch"), { path: "normalAngle", kind: "angle" }, ...side],
-  plane: [L("expectedZ")],
+  plane: [L("expectedZ"), { path: "points", kind: "points" }],
   sphere: [...xy("centre"), L("centre.z"), L("diameter"), { path: "touches", kind: "choice", choices: [5, 9], optional: true }],
   "tool-length": [{ path: "tool", kind: "int" }, L("nominalLength", true)],
   "tool-radius": [{ path: "tool", kind: "int" }, L("nominalRadius", true)],
   "broken-tool": [{ path: "tool", kind: "int" }, L("nominalLength", true)],
   "stylus-calibrate": [{ path: "artefact.kind", kind: "choice", choices: ["ring", "sphere", "height"] }, ...xy("artefact.centre"), L("artefact.diameter"), L("artefact.depth", true), { path: "directions", kind: "choice", choices: [4, 8, 16], optional: true }],
-  "rotary-axis": [{ path: "axis", kind: "choice", choices: ["A", "B", "C"] }, ...xy("sphere.centre"), L("sphere.centre.z"), L("sphere.diameter")]
+  "rotary-axis": [{ path: "axis", kind: "choice", choices: ["A", "B", "C"] }, ...xy("sphere.centre"), L("sphere.centre.z"), L("sphere.diameter"), { path: "angles", kind: "numbers" }]
 }
 
 /** The stable field list of a cycle kind. */

@@ -27,3 +27,16 @@ export const contactTimes = (contacts: ReadonlyArray<ProbeSimContact>, lines: Re
     return move === undefined ? undefined : ends.get(`${path}:${move}`)
   })
 }
+
+/**
+ * The same times read from the visualizer's own timeline (`cam.viewer.Timeline`): each move knows the NC line that wrote it, so a
+ * contact happens at the end of the first move on its touch line.
+ */
+export const contactTimesOnTimeline = (contacts: ReadonlyArray<ProbeSimContact>, timeline: { readonly moves: ReadonlyArray<{ readonly start: number; readonly duration: number; readonly state: { readonly line?: number | undefined } }> }): ReadonlyArray<number | undefined> => {
+  const endOfLine = new Map<number, number>()
+  for (const move of timeline.moves) {
+    const line = move.state.line
+    if (line !== undefined && !endOfLine.has(line)) endOfLine.set(line, move.start + move.duration)
+  }
+  return contacts.map((contact) => (contact.line === undefined ? undefined : endOfLine.get(contact.line)))
+}

@@ -8,6 +8,8 @@ import { create } from "../../../shared/state/zustand.ts"
 import type { ToolpathSettings } from "../lib/elementJob.ts"
 import * as model from "../lib/multiToolpath.ts"
 import type { ElementToolpath, MultiToolpathState, ToolpathPoint } from "../lib/multiToolpath.ts"
+import * as probes from "../lib/probing/cycles.ts"
+import type { ProbeOperation } from "../lib/probing/operation.ts"
 
 export type { ElementToolpath, ToolpathPoint } from "../lib/multiToolpath.ts"
 export { TOOLPATH_COLORS } from "../lib/multiToolpath.ts"
@@ -39,6 +41,10 @@ interface MultiToolpathStore extends MultiToolpathState {
   clearAllToolpaths(): void
   updateGlobalSettings(settings: Partial<ToolpathSettings>): void
   applyGlobalSettingsToSelected(): void
+  /** A probing cycle (spec 73) as a toolpath; returns its id. */
+  addProbeCycle(probe: ProbeOperation): string
+  updateProbeCycle(id: string, patch: Partial<ProbeOperation>): void
+  duplicateProbeCycle(id: string): string | undefined
 }
 
 const slice = (store: MultiToolpathState): MultiToolpathState => ({
@@ -101,7 +107,19 @@ export const useMultiToolpathStore = create<MultiToolpathStore>((set, get) => {
     clearAllToolpaths: () => apply(state => ({ ...state, toolpaths: [], selectedToolpathIds: [], activeToolpathId: null })),
 
     updateGlobalSettings: settings => apply(state => ({ ...state, globalSettings: { ...state.globalSettings, ...settings } })),
-    applyGlobalSettingsToSelected: () => apply(model.applyGlobalSettingsToSelected)
+    applyGlobalSettingsToSelected: () => apply(model.applyGlobalSettingsToSelected),
+
+    addProbeCycle: (probe) => {
+      const added = probes.addProbeCycle(slice(get()), probe)
+      set(added.state)
+      return added.id
+    },
+    updateProbeCycle: (id, patch) => apply(state => probes.updateProbeCycle(state, id, patch)),
+    duplicateProbeCycle: (id) => {
+      const copy = probes.duplicateProbeCycle(slice(get()), id)
+      set(copy.state)
+      return copy.id
+    }
   }
 })
 
