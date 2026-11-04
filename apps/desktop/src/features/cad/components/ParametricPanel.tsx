@@ -2,9 +2,9 @@ import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { ArrowDown, ArrowUp, ChevronsUp, Delete, Eye, EyeOff, X } from "lucide-solid"
+import { ArrowDown, ArrowUp, ChevronRight, ChevronsUp, Delete, Eye, EyeOff, Pencil, Ungroup, X } from "lucide-solid"
 import {
-  RECIPES, addFeature, analyzeManufacturability, buildRecipe, runModelScript, dimensionInDegrees, dimensionValue, dimensionsOf, removalImpact, removeImported, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, resolveParameters, setDimension,
+  RECIPES, addFeature, analyzeManufacturability, buildRecipe, runModelScript, dimensionInDegrees, dimensionValue, dimensionsOf, removalImpact, removeImported, renameFeature, groupFeatures, ungroupFeatures, setGroupCollapsed, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, resolveParameters, setDimension,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
 import { importStepIntoHistory } from "../lib/importStep.ts"
@@ -91,6 +91,25 @@ export default function ParametricPanel(props: { readonly element: Element; read
     if (state.state === "skipped") return { text: `not built: ${state.by} failed`, tone: "text-[color:var(--ent-bad)]" }
     return { text: "failed", tone: "text-[color:var(--ent-bad)]" }
   }
+  /** The feature whose name is being typed, the features ticked for a group and the name of the group to make. */
+  const [renaming, setRenaming] = createSignal<string | null>(null)
+  const [ticked, setTicked] = createSignal<ReadonlySet<string>>(new Set())
+  const [groupName, setGroupName] = createSignal("")
+  const tick = (id: string) => setTicked((set) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next })
+  const commitRename = (id: string, name: string) => { setRenaming(null); edit((h) => renameFeature(h, id, name)) }
+  /** Group the ticked features; a group is a run of consecutive features, so a refusal says what to move first. */
+  const makeGroup = () => {
+    const ids = [...ticked()]
+    const name = groupName().trim() === "" ? `Group ${(history().groups?.length ?? 0) + 1}` : groupName().trim()
+    const used = new Set((history().groups ?? []).map((g) => g.id))
+    let n = used.size + 1
+    while (used.has(`group${n}`)) n++
+    const result = groupFeatures(history(), { id: `group${n}`, name }, ids)
+    if (result.refusal !== undefined) { setError(`Not grouped: ${result.refusal}`); return }
+    if (edit(() => result.history)) { setTicked(new Set<string>()); setGroupName("") }
+  }
+  const groupOf = (feature: Feature) => feature.group === undefined ? undefined : history().groups?.find((g) => g.id === feature.group)
+  const firstOfGroup = (feature: Feature): boolean => feature.group !== undefined && history().features.find((f) => f.group === feature.group)?.id === feature.id
   const inactive = (id: string): boolean => { const s = built()?.states[id]?.state; return s !== undefined && s !== "ok" && s !== "failed" }
   /**
    * Deleting a feature: the confirmation lists what goes with it (`all`: the features that reference it and those that only act on
@@ -333,12 +352,34 @@ export default function ParametricPanel(props: { readonly element: Element; read
         <Show when={lostRefCount() > 0}>
           <p class="mb-2 text-xs text-[color:var(--ent-bad)]" role="alert" data-testid="ref-lost-summary">{t("cad.param.refLostSummary", { count: lostRefCount() })}</p>
         </Show>
+        <Show when={ticked().size > 0}>
+          <div class="mb-2 flex items-center gap-2" data-testid="group-bar">
+            <input class={`${INPUT} w-40`} value={groupName()} placeholder={t("cad.param.groupName")} aria-label={t("cad.param.groupName")} onInput={(event) => setGroupName(event.currentTarget.value)} />
+            <button type="button" class={SMALL} disabled={props.locked} onClick={makeGroup}>{t("cad.param.group", { count: ticked().size })}</button>
+          </div>
+        </Show>
         <ol class="space-y-3">
           <For each={history().features}>{(feature, index) => <>
-            <li class={`rounded-md border border-[color:var(--ent-line)] p-2 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
+            <Show when={firstOfGroup(feature) ? groupOf(feature) : undefined}>{(group) =>
+              <li class="flex items-center justify-between gap-2 rounded-md bg-[color:var(--ent-line)] px-2 py-1 text-xs font-semibold" data-testid={`group-${group().id}`}>
+                <button type="button" class="flex items-center gap-1" aria-expanded={group().collapsed !== true} aria-label={`${group().collapsed === true ? t("cad.param.expandGroup") : t("cad.param.collapseGroup")} ${group().name}`}
+                  onClick={() => edit((h) => setGroupCollapsed(h, group().id, group().collapsed !== true))}>
+                  <ChevronRight size={12} aria-hidden="true" class={group().collapsed === true ? "" : "rotate-90"} />{group().name}
+                </button>
+                <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("cad.param.ungroup")} ${group().name}`} title={t("cad.param.ungroup")} onClick={() => edit((h) => ungroupFeatures(h, group().id))}><Ungroup size={12} aria-hidden="true" /></button>
+              </li>}
+            </Show>
+            <li class={`rounded-md border border-[color:var(--ent-line)] p-2 ${inactive(feature.id) ? "opacity-60" : ""} ${groupOf(feature)?.collapsed === true ? "hidden" : ""}`} data-testid={`feature-${feature.id}`}>
               <div class="mb-1 flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <span class={`text-xs font-medium ${feature.suppressed === true ? "line-through" : ""}`}>{feature.name ?? feature.id}</span>
+                  <input type="checkbox" class="mr-2" disabled={props.locked} checked={ticked().has(feature.id)} onChange={() => tick(feature.id)} aria-label={`${t("cad.param.selectFeature")} ${feature.id}`} />
+                  <Show when={renaming() === feature.id} fallback={
+                    <span class={`text-xs font-medium ${feature.suppressed === true ? "line-through" : ""}`}>{feature.name ?? feature.id}</span>}>
+                    <input class={`${INPUT} inline-block w-40`} value={feature.name ?? ""} placeholder={feature.id} maxLength={100} aria-label={`${t("cad.param.rename")} ${feature.id} input`} data-testid={`rename-${feature.id}`}
+                      ref={(el) => queueMicrotask(() => el.focus())}
+                      onKeyDown={(event) => { if (event.key === "Enter") commitRename(feature.id, event.currentTarget.value); else if (event.key === "Escape") setRenaming(null) }}
+                      onBlur={(event) => { if (renaming() === feature.id) commitRename(feature.id, event.currentTarget.value) }} />
+                  </Show>
                   <span class="ml-2 text-xs text-[color:var(--ent-text-muted)]">{describe(feature)}</span>
                   <Show when={stateOf(feature.id)}>{(state) =>
                     <span class={`ml-2 text-xs ${state().tone}`} data-testid={`state-${feature.id}`}>{state().text}</span>}
@@ -353,6 +394,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   </For>
                 </div>
                 <div class="flex shrink-0 gap-1">
+                  <button type="button" class={SMALL} disabled={props.locked} aria-label={`${t("cad.param.rename")} ${feature.id}`} title={t("cad.param.rename")} onClick={() => setRenaming(feature.id)}><Pencil size={12} aria-hidden="true" /></button>
                   <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? t("cam.gen.kp.release") : "Suppress"} ${feature.id}`}
                     title={feature.suppressed === true ? "Release: build it again" : "Suppress: leave it, and what needs it, out of the model (nothing is deleted)"}
                     onClick={() => edit((h) => withSuppressed(h, [feature.id], feature.suppressed !== true))}><Show when={feature.suppressed === true} fallback={<EyeOff size={12} aria-hidden="true" />}><Eye size={12} aria-hidden="true" /></Show></button>

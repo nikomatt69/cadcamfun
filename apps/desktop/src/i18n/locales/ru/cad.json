@@ -1252,5 +1252,12 @@
   "cad.template.honeycombPattern.color.label": "Цвет",
   "cad.param.refLost": "Ссылка потеряна",
   "cad.param.refLostBy": "удалено элементом {feature}",
-  "cad.param.refLostSummary": "Выборок, указывающих на несуществующие грани или рёбра: {count}; эти элементы не построены"
+  "cad.param.refLostSummary": "Выборок, указывающих на несуществующие грани или рёбра: {count}; эти элементы не построены",
+  "cad.param.rename": "Rename",
+  "cad.param.selectFeature": "Select",
+  "cad.param.group": "Group {count} selected",
+  "cad.param.groupName": "Group name",
+  "cad.param.ungroup": "Ungroup",
+  "cad.param.expandGroup": "Expand",
+  "cad.param.collapseGroup": "Collapse"
 }
