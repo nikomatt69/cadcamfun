@@ -480,3 +480,12 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   saved-setup `generate` still run `generateSetup` on the request thread (no `cam-setup` job).
 - 2026-11-04 (lane cad, cc/cad-3): **P4-2 partly closed**: annotations anchor to entity refs and follow the geometry (spec 49 change log); the PDF writer
   row of P4-2 was stale (`drawing/pdf.ts`, vector, Helvetica, exists). Open: ref-driven dimensions, view kinds, BOM table.
+- 2026-11-04 (lane API, branch cc/api-2): **process physics and the tolerance gate reach HTTP; a dropped request is proven to cancel its
+  worker.** `CamKernelRequest` takes `process` (`CamProcessRequest`: feed optimisation `off|chip|power`, machine dynamics preset/overrides,
+  Taylor constants, life limit) and `enforceTolerance`; one adapter (`jobOfRequest`, `apps/sidecar/src/services/cam-program.ts`) adds them to
+  core's `jobOfSnapshot` job for `manufacture`, `plan`, the revalidation of a saved program and the assistant's `cam regenerate`. The artifact
+  contract (`CamKernelArtifact`, a `Codec<CamArtifact>`, so the core type is enforced) now carries `process` (`CamProcessReport`, every figure
+  `calibrated: false`), `tipError`, and the `tolerance` claim id it was missing (an artifact with that claim would have been an "invalid
+  artifact" 400 at decode). Tests (`apps/sidecar/test/cam-process.test.ts`): the report and its absence, schema refusals, the gate failing an
+  impossible tolerance without releasing `verified-program`, and a client abort on a seconds-long `manufacture` ending the job as `cancelled`
+  with no worker left running. Open: `programStatus` does not count `process` / `enforceTolerance` among a program's inputs (core).

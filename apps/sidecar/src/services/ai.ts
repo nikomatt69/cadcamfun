@@ -12,7 +12,7 @@ import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { Database, schema } from "@cadcamfun/db"
 import { eq } from "drizzle-orm"
-import { drawingRevision } from "./cam-program.ts"
+import { drawingRevision, jobOfRequest } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
 import { z } from "zod"
@@ -527,7 +527,7 @@ const toolHandlers = Effect.gen(function*() {
       if (elements.length === 0) return { ok: false, error: "None of the elements the program was made from are in the drawing any more." }
       const status = cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: current })
       const request = Schema.decodeUnknownSync(CamKernelRequest)({ ...record(data["kernelRequest"]), elements: JSON.parse(JSON.stringify(elements)) })
-      const job = cam.kernel.jobOfSnapshot(request)
+      const job = jobOfRequest(request)
       if (job.status === "failed") return { ok: false, error: job.issues.map((i) => i.message).join("; ") }
       const result = await manufactureRun(projectId, job.value, signal)
       if (result.status === "failed") return { ok: false, operationId, scope, mutated: false, modelChange: status, error: "The kernel could not machine the drawing as it is now.", issues: result.issues.slice(0, 20) }

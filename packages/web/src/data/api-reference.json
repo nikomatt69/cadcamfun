@@ -58806,7 +58806,8 @@
                                           "machine-travel",
                                           "machine-clearance",
                                           "setup-workholding",
-                                          "part-coverage"
+                                          "part-coverage",
+                                          "tolerance"
                                         ]
                                       },
                                       "status": {
@@ -59322,6 +59323,652 @@
                                     "achieved",
                                     "unbounded",
                                     "met"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "process": {
+                                  "type": "object",
+                                  "properties": {
+                                    "feedOptimisation": {
+                                      "type": "object",
+                                      "properties": {
+                                        "mode": {
+                                          "type": "string",
+                                          "enum": [
+                                            "off",
+                                            "chip",
+                                            "power"
+                                          ]
+                                        },
+                                        "operations": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "operation": {
+                                                "type": "string"
+                                              },
+                                              "report": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "mode": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "off",
+                                                      "chip",
+                                                      "power"
+                                                    ]
+                                                  },
+                                                  "changed": {
+                                                    "type": "integer"
+                                                  },
+                                                  "pieces": {
+                                                    "type": "integer"
+                                                  },
+                                                  "unresolved": {
+                                                    "type": "integer"
+                                                  },
+                                                  "airPieces": {
+                                                    "type": "integer"
+                                                  },
+                                                  "entryPieces": {
+                                                    "type": "integer"
+                                                  },
+                                                  "feedMin": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "feedMax": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "chip": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "bound": {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  },
+                                                  "belowFloor": {
+                                                    "type": "integer"
+                                                  },
+                                                  "cutSecondsBefore": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "cutSecondsAfter": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "totalSecondsBefore": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "totalSecondsAfter": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "cutTimeSaved": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "claimBefore": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "passed",
+                                                      "failed",
+                                                      "unresolved"
+                                                    ]
+                                                  },
+                                                  "claimAfter": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "passed",
+                                                      "failed",
+                                                      "unresolved"
+                                                    ]
+                                                  },
+                                                  "worstRatioBefore": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "worstRatioAfter": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  },
+                                                  "aeBound": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "Infinity",
+                                                          "-Infinity",
+                                                          "NaN"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "mode",
+                                                  "changed",
+                                                  "pieces",
+                                                  "unresolved",
+                                                  "airPieces",
+                                                  "entryPieces",
+                                                  "feedMin",
+                                                  "feedMax",
+                                                  "chip",
+                                                  "bound",
+                                                  "belowFloor",
+                                                  "cutSecondsBefore",
+                                                  "cutSecondsAfter",
+                                                  "totalSecondsBefore",
+                                                  "totalSecondsAfter",
+                                                  "cutTimeSaved",
+                                                  "claimBefore",
+                                                  "claimAfter",
+                                                  "worstRatioBefore",
+                                                  "worstRatioAfter",
+                                                  "aeBound"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": [
+                                              "operation",
+                                              "report"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "mode",
+                                        "operations"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "cycleTime": {
+                                      "type": "object",
+                                      "properties": {
+                                        "seconds": {
+                                          "type": "number"
+                                        },
+                                        "kinematicSeconds": {
+                                          "type": "number"
+                                        },
+                                        "blocks": {
+                                          "type": "integer"
+                                        },
+                                        "calibrated": {
+                                          "type": "boolean",
+                                          "enum": [
+                                            false
+                                          ]
+                                        },
+                                        "basis": {
+                                          "type": "string"
+                                        },
+                                        "withToolChangesSeconds": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "seconds",
+                                        "kinematicSeconds",
+                                        "blocks",
+                                        "calibrated",
+                                        "basis",
+                                        "withToolChangesSeconds"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "toolLife": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "toolId": {
+                                            "type": "string"
+                                          },
+                                          "tool": {
+                                            "type": "integer"
+                                          },
+                                          "lifeUsed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "perOperation": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "operation": {
+                                                  "type": "string"
+                                                },
+                                                "lifeUsed": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "operation",
+                                                "lifeUsed"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "ok",
+                                              "change",
+                                              "exceeded"
+                                            ]
+                                          },
+                                          "changeBefore": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "calibrated": {
+                                            "type": "boolean",
+                                            "enum": [
+                                              false
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "toolId",
+                                          "tool",
+                                          "lifeUsed",
+                                          "perOperation",
+                                          "status",
+                                          "changeBefore",
+                                          "calibrated"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "stability": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "toolId": {
+                                            "type": "string"
+                                          },
+                                          "result": {
+                                            "type": "object",
+                                            "properties": {
+                                              "status": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "measured",
+                                                  "indicative"
+                                                ]
+                                              },
+                                              "aLimMin": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "chatterHz": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "curve": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "rpm": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    "aLim": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    "lobe": {
+                                                      "type": "integer"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "rpm",
+                                                    "aLim",
+                                                    "lobe"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "windows": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "fromRpm": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    "toRpm": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    "aLim": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "number"
+                                                        },
+                                                        {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "Infinity",
+                                                            "-Infinity",
+                                                            "NaN"
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "fromRpm",
+                                                    "toRpm",
+                                                    "aLim"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "calibrated": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                  false
+                                                ]
+                                              },
+                                              "note": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "status",
+                                              "aLimMin",
+                                              "chatterHz",
+                                              "curve",
+                                              "windows",
+                                              "calibrated",
+                                              "note"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "toolId",
+                                          "result"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "calibrated": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        false
+                                      ]
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "feedOptimisation",
+                                    "cycleTime",
+                                    "toolLife",
+                                    "stability",
+                                    "calibrated",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "tipError": {
+                                  "type": "object",
+                                  "properties": {
+                                    "max": {
+                                      "type": "number"
+                                    },
+                                    "mean": {
+                                      "type": "number"
+                                    },
+                                    "samples": {
+                                      "type": "integer"
+                                    },
+                                    "limit": {
+                                      "type": "number"
+                                    },
+                                    "line": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "max",
+                                    "mean",
+                                    "samples",
+                                    "limit"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -63964,7 +64611,8 @@
                                       "machine-travel",
                                       "machine-clearance",
                                       "setup-workholding",
-                                      "part-coverage"
+                                      "part-coverage",
+                                      "tolerance"
                                     ]
                                   },
                                   "status": {
@@ -64480,6 +65128,652 @@
                                 "achieved",
                                 "unbounded",
                                 "met"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "process": {
+                              "type": "object",
+                              "properties": {
+                                "feedOptimisation": {
+                                  "type": "object",
+                                  "properties": {
+                                    "mode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "off",
+                                        "chip",
+                                        "power"
+                                      ]
+                                    },
+                                    "operations": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "operation": {
+                                            "type": "string"
+                                          },
+                                          "report": {
+                                            "type": "object",
+                                            "properties": {
+                                              "mode": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "off",
+                                                  "chip",
+                                                  "power"
+                                                ]
+                                              },
+                                              "changed": {
+                                                "type": "integer"
+                                              },
+                                              "pieces": {
+                                                "type": "integer"
+                                              },
+                                              "unresolved": {
+                                                "type": "integer"
+                                              },
+                                              "airPieces": {
+                                                "type": "integer"
+                                              },
+                                              "entryPieces": {
+                                                "type": "integer"
+                                              },
+                                              "feedMin": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "feedMax": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "chip": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "bound": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "belowFloor": {
+                                                "type": "integer"
+                                              },
+                                              "cutSecondsBefore": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "cutSecondsAfter": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "totalSecondsBefore": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "totalSecondsAfter": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "cutTimeSaved": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "claimBefore": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "passed",
+                                                  "failed",
+                                                  "unresolved"
+                                                ]
+                                              },
+                                              "claimAfter": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "passed",
+                                                  "failed",
+                                                  "unresolved"
+                                                ]
+                                              },
+                                              "worstRatioBefore": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "worstRatioAfter": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              "aeBound": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "Infinity",
+                                                      "-Infinity",
+                                                      "NaN"
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "mode",
+                                              "changed",
+                                              "pieces",
+                                              "unresolved",
+                                              "airPieces",
+                                              "entryPieces",
+                                              "feedMin",
+                                              "feedMax",
+                                              "chip",
+                                              "bound",
+                                              "belowFloor",
+                                              "cutSecondsBefore",
+                                              "cutSecondsAfter",
+                                              "totalSecondsBefore",
+                                              "totalSecondsAfter",
+                                              "cutTimeSaved",
+                                              "claimBefore",
+                                              "claimAfter",
+                                              "worstRatioBefore",
+                                              "worstRatioAfter",
+                                              "aeBound"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "operation",
+                                          "report"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "mode",
+                                    "operations"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "cycleTime": {
+                                  "type": "object",
+                                  "properties": {
+                                    "seconds": {
+                                      "type": "number"
+                                    },
+                                    "kinematicSeconds": {
+                                      "type": "number"
+                                    },
+                                    "blocks": {
+                                      "type": "integer"
+                                    },
+                                    "calibrated": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        false
+                                      ]
+                                    },
+                                    "basis": {
+                                      "type": "string"
+                                    },
+                                    "withToolChangesSeconds": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "seconds",
+                                    "kinematicSeconds",
+                                    "blocks",
+                                    "calibrated",
+                                    "basis",
+                                    "withToolChangesSeconds"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "toolLife": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "toolId": {
+                                        "type": "string"
+                                      },
+                                      "tool": {
+                                        "type": "integer"
+                                      },
+                                      "lifeUsed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "perOperation": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "operation": {
+                                              "type": "string"
+                                            },
+                                            "lifeUsed": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Infinity",
+                                                    "-Infinity",
+                                                    "NaN"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "operation",
+                                            "lifeUsed"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "ok",
+                                          "change",
+                                          "exceeded"
+                                        ]
+                                      },
+                                      "changeBefore": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "calibrated": {
+                                        "type": "boolean",
+                                        "enum": [
+                                          false
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "toolId",
+                                      "tool",
+                                      "lifeUsed",
+                                      "perOperation",
+                                      "status",
+                                      "changeBefore",
+                                      "calibrated"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "stability": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "toolId": {
+                                        "type": "string"
+                                      },
+                                      "result": {
+                                        "type": "object",
+                                        "properties": {
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "measured",
+                                              "indicative"
+                                            ]
+                                          },
+                                          "aLimMin": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "chatterHz": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "curve": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "rpm": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "aLim": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "lobe": {
+                                                  "type": "integer"
+                                                }
+                                              },
+                                              "required": [
+                                                "rpm",
+                                                "aLim",
+                                                "lobe"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "windows": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "fromRpm": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "toRpm": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "aLim": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Infinity",
+                                                        "-Infinity",
+                                                        "NaN"
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "fromRpm",
+                                                "toRpm",
+                                                "aLim"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "calibrated": {
+                                            "type": "boolean",
+                                            "enum": [
+                                              false
+                                            ]
+                                          },
+                                          "note": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "status",
+                                          "aLimMin",
+                                          "chatterHz",
+                                          "curve",
+                                          "windows",
+                                          "calibrated",
+                                          "note"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "toolId",
+                                      "result"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "calibrated": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    false
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "feedOptimisation",
+                                "cycleTime",
+                                "toolLife",
+                                "stability",
+                                "calibrated",
+                                "label"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "tipError": {
+                              "type": "object",
+                              "properties": {
+                                "max": {
+                                  "type": "number"
+                                },
+                                "mean": {
+                                  "type": "number"
+                                },
+                                "samples": {
+                                  "type": "integer"
+                                },
+                                "limit": {
+                                  "type": "number"
+                                },
+                                "line": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "max",
+                                "mean",
+                                "samples",
+                                "limit"
                               ],
                               "additionalProperties": false
                             }
@@ -67575,6 +68869,78 @@
                       },
                       "relativeExtrusion": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "enforceTolerance": {
+                    "type": "boolean"
+                  },
+                  "process": {
+                    "type": "object",
+                    "properties": {
+                      "feedOptimisation": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "chip",
+                          "power"
+                        ]
+                      },
+                      "dynamics": {
+                        "type": "object",
+                        "properties": {
+                          "preset": {
+                            "type": "string",
+                            "enum": [
+                              "economy",
+                              "standard",
+                              "high-speed"
+                            ]
+                          },
+                          "acceleration": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "maximum": 100000
+                          },
+                          "jerk": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "lookAhead": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2000
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "taylor": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "n": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1
+                            },
+                            "c": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "n",
+                            "c"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "lifeLimit": {
+                        "type": "number",
+                        "minimum": 0.05,
+                        "maximum": 1
                       }
                     },
                     "additionalProperties": false
@@ -70740,6 +72106,78 @@
                       },
                       "relativeExtrusion": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "enforceTolerance": {
+                    "type": "boolean"
+                  },
+                  "process": {
+                    "type": "object",
+                    "properties": {
+                      "feedOptimisation": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "chip",
+                          "power"
+                        ]
+                      },
+                      "dynamics": {
+                        "type": "object",
+                        "properties": {
+                          "preset": {
+                            "type": "string",
+                            "enum": [
+                              "economy",
+                              "standard",
+                              "high-speed"
+                            ]
+                          },
+                          "acceleration": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "maximum": 100000
+                          },
+                          "jerk": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "lookAhead": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2000
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "taylor": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "n": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1
+                            },
+                            "c": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "n",
+                            "c"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "lifeLimit": {
+                        "type": "number",
+                        "minimum": 0.05,
+                        "maximum": 1
                       }
                     },
                     "additionalProperties": false
