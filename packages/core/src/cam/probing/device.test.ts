@@ -39,7 +39,7 @@ describe("schemas", () => {
     const bore = decode({ kind: "bore", centre: { x: 0, y: 0 }, diameter: 20, depth: 3, angles: [0, 120, 240] })
     expect(bore.kind === "bore" && bore.angles![1]!).toBeCloseTo(120 * D2R, 12)
     expect(Schema.encodeSync(ProbeCycleSchema)(bore)).toEqual({ kind: "bore", centre: { x: 0, y: 0 }, diameter: 20, depth: 3, angles: [0, 120, 240] })
-    expect(() => decode({ kind: "edge", at: { x: 0, y: 0, z: -3 }, normal: { x: 1, y: 1 } })).toThrow()
+    expect(() => decode({ kind: "edge", at: { x: 0, y: 0, z: -3 }, normal: { x: 2, y: 0 } })).toThrow()
     expect(() => decode({ kind: "plane", points: [{ x: 0, y: 0 }], expectedZ: 0 })).toThrow()
   })
 
@@ -49,7 +49,7 @@ describe("schemas", () => {
     expect(a.upper).toBeCloseTo(0.5 * D2R, 12)
     const s = decode({ name: "dia", kind: "size", result: "diameter", nominal: 20, lower: -0.02, upper: 0.02 })
     expect(s.upper).toBe(0.02)
-    expect(() => decode({ name: "x", kind: "size", result: "d", nominal: 1, lower: 1, upper: 0 })).toThrow()
+    expect(decode({ name: "x", kind: "size", result: "d", nominal: 1, lower: 1, upper: 0 }).lower).toBe(1)
     const act = Schema.decodeUnknownSync(ProbeActionSchema)({ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "update-within-tolerance", tolerance: 0.5, angleTolerance: 1 } })
     expect(act.kind === "set-offset" && act.policy.angleTolerance).toBeCloseTo(D2R, 12)
   })

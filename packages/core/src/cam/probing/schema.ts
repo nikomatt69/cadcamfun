@@ -20,7 +20,9 @@ const toolNumber = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 9999
 
 /** Degrees on the wire, radians in the core. */
 export const DegreesSchema = finite.pipe(Schema.decodeTo(finite, SchemaTransformation.transform({ decode: (d: number) => d * DEG, encode: (r: number) => Number((r / DEG).toFixed(10)) })))
-const unitVec2 = vec2.check(Schema.makeFilter((v: { readonly x: number; readonly y: number }) => Math.abs(Math.hypot(v.x, v.y) - 1) <= 1e-6 ? undefined : "must be a unit vector"))
+// Only portable checks on the wire (the API client generator cannot carry a custom filter): unit length is refused by `planProbeCycle`.
+const unitComponent = Schema.Finite.check(Schema.isBetween({ minimum: -1, maximum: 1 }))
+const unitVec2 = Schema.Struct({ x: unitComponent, y: unitComponent })
 
 const depth = { depth: positive, top: Schema.optionalKey(finite) } as const
 
@@ -63,7 +65,8 @@ const angular = (c: CharacteristicWire, k: number): CharacteristicWire =>
   c.kind === "angle" ? { ...c, nominal: c.nominal * k, lower: c.lower * k, upper: c.upper * k } : c
 
 /** A characteristic; an `angle` characteristic's nominal and limits are degrees on the wire. */
-export const CharacteristicSchema = CharacteristicWire.check(Schema.makeFilter((c: CharacteristicWire) => c.lower <= c.upper ? undefined : "lower must not exceed upper"))
+/** `lower <= upper` is refused by `characteristicProblem` (compileActions, evaluateInspection), not by the schema. */
+export const CharacteristicSchema = CharacteristicWire
   .pipe(Schema.decodeTo(Schema.toType(CharacteristicWire), SchemaTransformation.transform({ decode: (c: CharacteristicWire) => angular(c, DEG), encode: (c: CharacteristicWire) => angular(c, 1 / DEG) })))
 
 export const ProbeActionSchema = Schema.Union([

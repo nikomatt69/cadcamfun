@@ -146,3 +146,23 @@ describe("refusals and alarms", () => {
     close(run({ kind: "z-surface", at: { x: 5, y: 5 }, expectedZ: 2 }, w).out.results, { z: 2 })
   })
 })
+
+describe("validation the wire schema leaves to the core", () => {
+  test("a normal or direction that is not a unit vector is refused", () => {
+    const r = planProbeCycle({ kind: "edge", at: { x: 0, y: 0, z: -3 }, normal: { x: 0.7, y: 0.7 } }, ctx())
+    expect("refused" in r && /unit vector/.test(r.refused)).toBe(true)
+    const a = planProbeCycle({ kind: "edge-angle", start: { x: 0, y: 0 }, along: { x: 0, y: 0.5 }, pitch: 10, normal: { x: -1, y: 0 }, depth: 3 }, ctx())
+    expect("refused" in a && /along/.test(a.refused)).toBe(true)
+  })
+})
+
+describe("characteristic validation", () => {
+  test("limits the wrong way round are refused by evaluateInspection and compileActions", async () => {
+    const { evaluateInspection } = await import("./simulate.ts")
+    const { compileActions } = await import("./actions.ts")
+    const bad = { name: "d", kind: "size" as const, result: "diameter", nominal: 20, lower: 0.1, upper: -0.1 }
+    expect(() => evaluateInspection({ diameter: 20 }, [bad])).toThrow(/exceeds/)
+    const r = plan({ kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5 })
+    expect(() => compileActions(r, [{ kind: "inspect", characteristics: [bad], onFail: "alarm" }], ctx())).toThrow(/exceeds/)
+  })
+})

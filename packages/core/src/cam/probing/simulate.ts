@@ -147,9 +147,18 @@ const structure = (moves: ReadonlyArray<Move>): { readonly partner: Map<number, 
   return { partner, elseOf, labels }
 }
 
-/** Deviation and pass of each characteristic on the results (core units: mm, radians). */
+/** What is wrong with a characteristic as data (limits the wrong way round, a true position without its second result), or undefined. */
+export const characteristicProblem = (c: Characteristic): string | undefined => {
+  if (!(c.lower <= c.upper)) return `characteristic ${c.name}: lower ${c.lower} exceeds upper ${c.upper}`
+  if (c.kind === "true-position" && c.result2 === undefined) return `characteristic ${c.name}: a true position needs its second result`
+  return undefined
+}
+
+/** Deviation and pass of each characteristic on the results (core units: mm, radians). A characteristic that is not valid throws. */
 export const evaluateInspection = (results: Readonly<Record<string, number>>, characteristics: ReadonlyArray<Characteristic>): InspectionVerdict[] =>
   characteristics.map((c) => {
+    const problem = characteristicProblem(c)
+    if (problem !== undefined) throw new RangeError(problem)
     const a = results[c.result] ?? NaN
     if (c.kind === "true-position") {
       const b = c.result2 === undefined ? NaN : results[c.result2] ?? NaN

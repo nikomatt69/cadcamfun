@@ -218,6 +218,9 @@ export const planProbeCycle = (cycle: ProbeCycle, ctx: ProbeContext): ProbeRouti
   if (!(ctx.clearance > 0) || !(ctx.search > 0)) return refuse("the clearance and the search must be positive")
   const r = ballOf(ctx)
   const b = new Builder(ctx)
+  const notUnit = (name: string, v: Vec2): string | undefined => (Math.abs(Math.hypot(v.x, v.y) - 1) <= 1e-6 ? undefined : `the ${cycle.kind} cycle's ${name} must be a unit vector, it has length ${Math.hypot(v.x, v.y).toFixed(6)}`)
+  const unitProblem = cycle.kind === "edge" ? notUnit("normal", cycle.normal) : cycle.kind === "edge-angle" ? notUnit("normal", cycle.normal) ?? notUnit("along", cycle.along) : undefined
+  if (unitProblem !== undefined) return refuse(unitProblem)
   try {
     switch (cycle.kind) {
       case "z-surface": {
