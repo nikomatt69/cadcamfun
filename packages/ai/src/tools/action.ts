@@ -12,6 +12,8 @@ import { z } from "zod"
 import { defineTool, ToolMediaResult, type ToolContext, type ToolDefinition } from "./define.ts"
 import type { ActionContext, ActionKind, ActionSpec } from "../actions/action.ts"
 import { executeAction } from "../actions/action.ts"
+import { toolValidationFailure } from "../tool-validation.ts"
+import { actionUsage } from "./usage.ts"
 
 export interface ActionTool extends ToolDefinition {
   /** The actions this tool carries, keyed by action name. */
@@ -51,7 +53,12 @@ export const defineActionTool = (id: string, actions: Readonly<Record<string, Ac
   return {
     ...definition,
     // The host's schema is the union; the definition is also used directly (tests, the desktop), so it parses too.
-    execute: (input, context) => definition.execute(parameters.parse(input), context),
+    execute: (input, context) => {
+      const parsed = parameters.safeParse(input)
+      if (parsed.success) return definition.execute(parsed.data, context)
+      const action = typeof input === "object" && input !== null ? (input as Record<string, unknown>)["action"] : undefined
+      return Promise.resolve(toolValidationFailure(id, parsed.error, actionUsage(parameters, action)))
+    },
     actions: catalogue,
     kind
   }

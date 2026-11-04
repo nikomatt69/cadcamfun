@@ -6,8 +6,9 @@ import { describe, expect, test } from "bun:test"
 import { boltVolume, capsuleVolume, gearVolume, makeBolt, makeCapsule, makeGear, makeNut, makeWasher, nutVolume, washerVolume } from "./catalogue.ts"
 import { massProperties } from "./mass.ts"
 import { validateBrep } from "./validate.ts"
-import { tessellateBrep } from "./tessellate.ts"
+import { meshEdgeDefects, tessellateBrep } from "./tessellate.ts"
 import { readStepBreps, writeStepBreps } from "./step.ts"
+import { frame } from "./math.ts"
 
 describe("the exact capsule", () => {
   test("its volume is the closed form of a cylinder and two hemispheres", () => {
@@ -31,10 +32,18 @@ describe("the exact capsule", () => {
     expect(report.genus).toBe(0)
   })
 
-  test("its tessellation is watertight", () => {
+  test("its tessellation produces triangles", () => {
     const t = tessellateBrep(makeCapsule(3, 10), { chordTol: 0.05 })
     expect(t.indices.length).toBeGreaterThan(0)
     expect(t.positions.length / 3).toBeGreaterThan(12)
+  })
+
+  test("its tessellation is watertight at the hemispherical seams", () => {
+    for (const direction of ["x", "y", "z"] as const) {
+      const t = tessellateBrep(makeCapsule(3, 10, direction), { chordTol: 0.05 })
+      expect(t.warnings).toEqual([])
+      expect(meshEdgeDefects(t.indices)).toEqual({ open: 0, nonManifold: 0, misoriented: 0 })
+    }
   })
 
   test("the axis directions agree with the editor's", () => {
@@ -42,6 +51,21 @@ describe("the exact capsule", () => {
       const b = makeCapsule(2, 10, direction)
       expect(validateBrep(b).issues.map((i) => i.message)).toEqual([])
       expect(massProperties(b).volume).toBeCloseTo(capsuleVolume(2, 10), 4)
+    }
+  })
+
+  test("a translated and rotated placement keeps its centre and uses its local axes", () => {
+    const placement = frame({ x: 11, y: -7, z: 23 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 })
+    // The local x, y, z axes point along world y, z, x respectively.
+    const axialTensorIndex = { x: 4, y: 8, z: 0 } as const
+    for (const direction of ["x", "y", "z"] as const) {
+      const body = makeCapsule(2, 10, direction, placement)
+      expect(validateBrep(body).manifoldSolid).toBe(true)
+      const properties = massProperties(body)
+      expect(properties.volume).toBeCloseTo(capsuleVolume(2, 10), 4)
+      for (const coordinate of ["x", "y", "z"] as const) expect(properties.centroid[coordinate]).toBeCloseTo(placement.origin[coordinate], 4)
+      const axial = properties.inertia[axialTensorIndex[direction]]!
+      for (const i of [0, 4, 8]) if (i !== axialTensorIndex[direction]) expect(properties.inertia[i]!).toBeGreaterThan(axial)
     }
   })
 })

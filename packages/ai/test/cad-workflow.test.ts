@@ -6,6 +6,8 @@ import { describe, expect, test } from "bun:test"
 import { runAction } from "../src/actions/catalogue.ts"
 import { clearAttachments, prepareAttachments } from "../src/attachments.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
+import { runCadWorkflow } from "../src/actions/cad-workflow.ts"
+import { clearKernelJobCache, kernelJobStats } from "../src/kernel-job.ts"
 
 const call = async (input: Record<string, unknown>, projectId = "wf"): Promise<Record<string, any>> =>
   await runAction("cad.workflow", input, { handlers: {} as ToolHandlersShape, projectId }) as Record<string, any>
@@ -16,10 +18,10 @@ const line = (id: string, p1: string, p2: string) => ({ id, kind: "line", p1, p2
 const bracket = (width: number) => ({
   parameters: { w: width },
   features: [
-    { id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: "w", height: 25 }] } },
+    { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: "w", height: 25 }] } },
     { id: "e", type: "extrude", sketch: "s", depth: 10, operation: "new" }
   ]
-})
+} as const)
 
 const volumeOfStl = (bytes: Uint8Array): number => {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -209,6 +211,35 @@ describe("op assembly", () => {
 })
 
 describe("op sheet and mesh files, chained like an assistant would", () => {
+  test("cancellation reaches the history reader and prevents later sheet or mesh work", async () => {
+    for (const op of ["sheet", "mesh_export"] as const) {
+      const controller = new AbortController()
+      let seen: AbortSignal | undefined
+      let release: (value: unknown) => void = () => {}
+      const response = new Promise<unknown>((resolve) => { release = resolve })
+      const handlers = { parametric: async (_project: string, _input: unknown, signal?: AbortSignal) => { seen = signal; return response } } as ToolHandlersShape
+      const started = kernelJobStats().counters.started
+      const pending = runCadWorkflow({ op, elementId: "part" }, { handlers, projectId: "wf", signal: controller.signal })
+      expect(seen).toBe(controller.signal)
+      controller.abort()
+      release({ ok: true, history: bracket(37) })
+      await expect(pending).rejects.toThrow()
+      expect(kernelJobStats().counters.started).toBe(started)
+    }
+  })
+
+  test("cancelling sheet generation interrupts its worker", async () => {
+    clearKernelJobCache()
+    const controller = new AbortController()
+    const before = kernelJobStats().counters
+    const pending = runCadWorkflow({ op: "sheet", history: bracket(37), format: "svg" }, { handlers: {} as ToolHandlersShape, projectId: "wf", signal: controller.signal })
+    for (let i = 0; i < 100 && kernelJobStats().counters.started === before.started; i++) await Bun.sleep(2)
+    expect(kernelJobStats().counters.started).toBeGreaterThan(before.started)
+    controller.abort()
+    expect(await pending).toMatchObject({ ok: false, op: "sheet" })
+    expect(kernelJobStats().counters.aborted).toBeGreaterThan(before.aborted)
+  })
+
   test("the sheet is a vector PDF whose dimensions follow the model; the 3MF export imports back with the exact volume", async () => {
     const sheet40 = await call({ op: "sheet", history: bracket(40), options: { views: ["front", "top"] } })
     expect(sheet40).toMatchObject({ ok: true, format: "pdf", vector: true, pages: 1 })

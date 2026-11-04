@@ -35,6 +35,17 @@ const exactOf = (h: History) => {
 }
 
 describe("architecture elements are exact solids that sit where the mesh catalogue puts them", () => {
+  test("translated capsules keep their centre in every direction, with and without history rotation", () => {
+    for (const direction of ["x", "y", "z"]) for (const rotation of [undefined, [20, 30, 40] as [number, number, number]]) {
+      const history = part("capsule", { radius: 2, height: 10 }, { direction }, rotation)
+      const mass = massProperties(exactOf(history))
+      const mesh = meshMoments(history)
+      expect(mass.centroid.x).toBeCloseTo(5, 4)
+      expect(mass.centroid.y).toBeCloseTo(-7, 4)
+      expect(mass.centroid.z).toBeCloseTo(3, 4)
+      expect(Math.hypot(mass.centroid.x - mesh.centroid[0], mass.centroid.y - mesh.centroid[1], mass.centroid.z - mesh.centroid[2])).toBeLessThan(0.05)
+    }
+  })
   // Analytic volumes of the catalogue measures; a column or a knob is round, so the mesh (faceted) is a little under the exact one.
   const cases: ReadonlyArray<{ name: string; element: string; params: Record<string, number>; options?: Record<string, string>; volume: number; tolerance: number }> = [
     { name: "wall", element: "wall", params: { length: 120, thickness: 6, height: 40 }, volume: 120 * 6 * 40, tolerance: 1e-6 },

@@ -39,6 +39,20 @@ describe("defineActionTool", () => {
     expect(JSON.parse(await host.execute({ action: "denied" }, call()))).toEqual({ ok: false, _tag: "ActionInvalidInput", actionId: "inspect.denied", error: "Denied" })
   })
 
+  test("direct tool calls return the same validation refusal as the host without executing a mutation", async () => {
+    let writes = 0
+    const tool = defineActionTool("edit", {
+      move: defineAction({ id: "edit.move", kind: "write", parameters: z.object({ distance: z.number().positive() }), run: () => { writes++; return { ok: true } } })
+    }, "Move")
+    for (const input of [{ action: "move", distance: -1 }, { action: "unknown" }, { action: "move" }]) {
+      const direct = await tool.execute(input, context)
+      const host = await toSpec(tool, context).executeWithFiles!(input, call())
+      expect(direct).toEqual(host.value)
+      expect(direct).toMatchObject({ ok: false, _tag: "InvalidToolArguments", mutationApplied: false })
+    }
+    expect(writes).toBe(0)
+  })
+
   test("a thrown exception becomes a tagged failure of the shared contract", async () => {
     const tool = defineActionTool("probe", {
       boom: defineAction({ id: "probe.boom", kind: "read", parameters: z.object({}), run: () => { throw new Error("kernel is down") } })

@@ -76,6 +76,15 @@ export interface BrepTessellation {
   readonly chordTol: number
 }
 
+/** Reject tolerances that cannot describe a finite triangulation before entering the sampling loops. */
+const validateOptions = (options: TessellateOptions): void => {
+  if (options.chordTol !== undefined && !(Number.isFinite(options.chordTol) && options.chordTol > 0)) throw new RangeError("chordTol must be finite and positive")
+  if (options.angleTolDeg !== undefined && !(Number.isFinite(options.angleTolDeg) && options.angleTolDeg >= 0 && options.angleTolDeg <= 180)) throw new RangeError("angleTolDeg must be finite and between 0 and 180 degrees")
+  if (options.maxEdge !== undefined && !(Number.isFinite(options.maxEdge) && options.maxEdge >= 0)) throw new RangeError("maxEdge must be finite and non-negative")
+  if (options.maxPointsPerFace !== undefined && !(Number.isSafeInteger(options.maxPointsPerFace) && options.maxPointsPerFace > 0)) throw new RangeError("maxPointsPerFace must be a positive integer")
+  if (options.paramStep !== undefined && !(Number.isFinite(options.paramStep) && options.paramStep > 0)) throw new RangeError("paramStep must be finite and positive")
+}
+
 // ================================================================ helpers
 
 const bboxDiagonal = (b: Brep): number => {
@@ -103,10 +112,12 @@ class Points {
 
 // ================================================================ edges
 
+const MAX_INITIAL_EDGE_SEGMENTS = 1_000_000
 const sampleEdge = (e: Edge, chord: number, angle: number, maxEdge: number): number[] => {
   if (e.curve.kind === "line") {
     const len = e.t1 - e.t0
     const n = maxEdge > 0 ? Math.max(1, Math.ceil(len / maxEdge)) : 1
+    if (!Number.isFinite(n) || n > MAX_INITIAL_EDGE_SEGMENTS) throw new RangeError("edge sampling exceeds one million initial segments")
     return Array.from({ length: n + 1 }, (_, i) => e.t0 + (len * i) / n)
   }
   // Initial uniform split, then recursive refinement on chord, angle and length.
@@ -114,14 +125,18 @@ const sampleEdge = (e: Edge, chord: number, angle: number, maxEdge: number): num
   if (e.curve.kind === "circle" || e.curve.kind === "ellipse") {
     const r = e.curve.kind === "circle" ? e.curve.radius : Math.max(e.curve.a, e.curve.b)
     const sweep = e.t1 - e.t0
-    const byChord = chord < r ? 2 * Math.acos(1 - chord / r) : Math.PI
+    // This form avoids cancellation in acos(1 - chord / r) when the chord tolerance is tiny relative to the radius.
+    const byChord = chord < r ? 4 * Math.asin(Math.sqrt(chord / (2 * r))) : Math.PI
     const step = Math.min(byChord, angle > 0 ? angle : Math.PI / 2, Math.PI / 2)
+    if (!(step > 0)) throw new RangeError("chordTol is too small to resolve at the edge's radius")
     init = Math.max(2, Math.ceil(sweep / step))
   } else if (e.curve.kind === "nurbs") {
     init = Math.max(4, (e.curve.data.points.length - 1) * 2)
   }
+  if (!Number.isFinite(init) || init > MAX_INITIAL_EDGE_SEGMENTS) throw new RangeError("edge sampling exceeds one million initial segments")
   const out: number[] = []
   const rec = (a: number, b: number, pa: Vec3, pb: Vec3, ta: Vec3, tb: Vec3, depth: number): void => {
+    if (out.length >= MAX_INITIAL_EDGE_SEGMENTS) throw new RangeError("edge sampling exceeds one million segments")
     const m = (a + b) / 2
     const [pm, tm] = curveDerivs(e.curve, m)
     const chordMid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2, z: (pa.z + pb.z) / 2 }
@@ -141,9 +156,46 @@ const sampleEdge = (e: Edge, chord: number, angle: number, maxEdge: number): num
     const b = e.t0 + ((e.t1 - e.t0) * (i + 1)) / init
     const [pa, ta] = curveDerivs(e.curve, a)
     const [pb, tb] = curveDerivs(e.curve, b)
+    if (maxEdge > 0 && dist3(pa, pb) / maxEdge > MAX_INITIAL_EDGE_SEGMENTS) throw new RangeError("edge sampling exceeds one million segments")
     rec(a, b, pa, pb, ta, tb, 0)
   }
   return out
+}
+
+/** A straight edge can still cross a curved face whose normal turns rapidly, particularly on a NURBS loft. Sample that
+ * turn on every incident NURBS face before triangulating either neighbour, so their common boundary remains identical. */
+const sampleNormalTurn = (edge: Edge, params: number[], uses: ReadonlyArray<{ readonly face: Face; readonly coedge: Coedge }>, angle: number, edgeIndex: number, warnings: string[]): number[] => {
+  if (!(angle > 0) || uses.length === 0) return params
+  const limit = Math.cos(angle) - 1e-12
+  const normals = (t: number): Array<Vec3 | undefined> => uses.map(({ face, coedge }) => {
+    const q = coedge.pcurve === undefined ? surfaceProject(face.surface, curvePoint(edge.curve, t)) : curve2Point(coedge.pcurve, t)
+    const uv = "u" in q ? q : { u: q.x, v: q.y }
+    const n = surfaceNormal(face.surface, uv.u, uv.v)
+    return length3(n) > 1e-12 ? n : undefined
+  })
+  const out = [params[0]!]
+  let exhausted = false
+  const split = (a: number, b: number, na: Array<Vec3 | undefined>, nb: Array<Vec3 | undefined>, depth: number): void => {
+    checkBudget()
+    const m = (a + b) / 2, nm = normals(m)
+    const turns = na.some((n, i) => n !== undefined && nb[i] !== undefined && nm[i] !== undefined &&
+      (dot3(n, nb[i]!) < limit || dot3(n, nm[i]!) < limit || dot3(nm[i]!, nb[i]!) < limit))
+    if (turns && depth < 16) { split(a, m, na, nm, depth + 1); split(m, b, nm, nb, depth + 1) }
+    else { if (turns) exhausted = true; out.push(b) }
+  }
+  for (let i = 1; i < params.length; i++) {
+    const a = params[i - 1]!, b = params[i]!
+    split(a, b, normals(a), normals(b), 0)
+  }
+  if (exhausted) warnings.push(`edge ${edgeIndex}: normal sampling depth reached`)
+  return out
+}
+
+const normalUses = (b: Brep): Array<Array<{ readonly face: Face; readonly coedge: Coedge }>> => {
+  const uses: Array<Array<{ readonly face: Face; readonly coedge: Coedge }>> = b.edges.map(() => [])
+  for (const face of b.faces) if (face.surface.kind === "nurbs") for (const loop of face.loops) for (const coedge of loop.coedges)
+    uses[coedge.edge]!.push({ face, coedge })
+  return uses
 }
 
 // ================================================================ faces: parameter-space boundary
@@ -660,7 +712,10 @@ const tessellateFace = (
           const nAt = (id: number, k: number, u: number, v: number): Vec3 =>
             localSu[k] || localSv[k] ? surfaceNormal(s, u + (cu - u) * 1e-4, v + (cv - v) * 1e-4) : nrm(id)
           const na = nAt(a, ka, ua, va), nb = nAt(b2, kb, ub, vb), nc = nAt(c, kc, uc, vc)
-          if (dot3(na, nb) < cosTol || dot3(nb, nc) < cosTol || dot3(nc, na) < cosTol) bad = true
+          // Boundary sampling can land exactly at the angular limit. Roundoff in the normal dot product must not
+          // repeatedly refine a triangle against a fixed boundary edge that already meets that limit.
+          const normalLimit = cosTol - 1e-12
+          if (dot3(na, nb) < normalLimit || dot3(nb, nc) < normalLimit || dot3(nc, na) < normalLimit) bad = true
         }
       }
       if (!bad) passed.add(key)
@@ -735,7 +790,7 @@ export const defaultChordTol = (b: Brep): number => Math.min(0.05, Math.max(0.00
 // ---------------------------------------------------------------- face reuse
 // A blend or any sequence of Booleans meshes the same faces of the growing body again and again (a fillet tool touches a few
 // faces; the rest come out of each Boolean with the same surface object and the same boundary). A face's mesh depends only on
-// its surface, its side, its boundary curves and ranges, and the options, so it is kept per surface object and reused.
+// its surface, its side, its boundary samples and the options, so it is kept per surface object and reused.
 
 const objectIds = new WeakMap<object, number>()
 let nextObjectId = 1
@@ -749,8 +804,8 @@ const FACE_MESHES_PER_SURFACE = 32
 /** Reuse counters (diagnostics: how many face meshes the Booleans took from the cache). */
 export const faceMeshReuse = { hits: 0, misses: 0 }
 
-const faceKey = (b: Brep, face: Face, settings: string): string =>
-  `${settings}|${face.reversed ? 1 : 0}|${face.loops.map((l) => l.coedges.map((c) => { const e = b.edges[c.edge]!; return `${idOf(e.curve)}:${e.t0}:${e.t1}:${c.reversed ? 1 : 0}` }).join(",")).join(";")}`
+const faceKey = (b: Brep, face: Face, settings: string, edges: ReadonlyArray<EdgePolyline>): string =>
+  `${settings}|${face.reversed ? 1 : 0}|${face.loops.map((l) => l.coedges.map((c) => { const e = b.edges[c.edge]!; return `${idOf(e.curve)}:${e.t0}:${e.t1}:${c.reversed ? 1 : 0}:${c.pcurve === undefined ? "" : idOf(c.pcurve)}:${edges[c.edge]!.params.join(",")}` }).join(",")).join(";")}`
 
 /**
  * A cached face mesh carried into this tessellation: each global id it used maps to one id here. Boundary points are the
@@ -779,7 +834,7 @@ const adoptFaceMesh = (cached: FaceMesh, fi: number, b: Brep, edges: ReadonlyArr
 
 /** Tessellates every face of the B-rep; the welded mesh is watertight for a valid closed shell. */
 export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTessellation => {
-
+  validateOptions(options)
   const chord = options.chordTol ?? defaultChordTol(b)
   const angle = ((options.angleTolDeg ?? 15) * Math.PI) / 180
   const maxEdge = options.maxEdge ?? 0
@@ -787,8 +842,9 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const warnings: string[] = []
   const pts = new Points()
   const vg = b.vertices.map((v) => pts.add(v.point))
+  const uses = angle > 0 ? normalUses(b) : []
   const edges: EdgePolyline[] = b.edges.map((e, ei) => {
-    const params = sampleEdge(e, chord, angle, maxEdge)
+    const params = sampleNormalTurn(e, sampleEdge(e, chord, angle, maxEdge), uses[ei] ?? [], angle, ei, warnings)
     const points = params.map((t, i) => (i === 0 ? vg[e.v0]! : i === params.length - 1 ? vg[e.v1]! : pts.add(curvePoint(e.curve, t))))
     void ei
     return { edge: ei, points, params }
@@ -802,7 +858,7 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
     checkBudget()
     let fm: FaceMesh | undefined
     if (options.reuse === true) {
-      const key = faceKey(b, face, settings)
+      const key = faceKey(b, face, settings, edges)
       let bySurface = faceMeshes.get(face.surface)
       const cached = bySurface?.get(key)
       if (cached !== undefined) { faceMeshReuse.hits++; fm = adoptFaceMesh(cached, fi, b, edges, pts) }
@@ -893,14 +949,16 @@ export interface FaceBoundaries {
  * poles closed, holes shifted into the outer window). Used by the Boolean imprint to arrange cut curves in (u, v).
  */
 export const faceBoundaries = (b: Brep, options: TessellateOptions = {}): FaceBoundaries => {
+  validateOptions(options)
   const chord = options.chordTol ?? defaultChordTol(b)
   const angle = ((options.angleTolDeg ?? 15) * Math.PI) / 180
   const maxEdge = options.maxEdge ?? 0
   const warnings: string[] = []
   const pts = new Points()
   const vg = b.vertices.map((v) => pts.add(v.point))
+  const uses = angle > 0 ? normalUses(b) : []
   const edges: EdgePolyline[] = b.edges.map((e, ei) => {
-    const params = sampleEdge(e, chord, angle, maxEdge)
+    const params = sampleNormalTurn(e, sampleEdge(e, chord, angle, maxEdge), uses[ei] ?? [], angle, ei, warnings)
     const points = params.map((t, i) => (i === 0 ? vg[e.v0]! : i === params.length - 1 ? vg[e.v1]! : pts.add(curvePoint(e.curve, t))))
     return { edge: ei, points, params }
   })

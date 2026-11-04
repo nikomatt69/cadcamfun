@@ -96,10 +96,18 @@ describe("assistant results -> editor", () => {
 
 test("kernel body writes appear in the editor and read previews never mutate it", () => {
   const body = { id: "kernel-body", type: "brep", bodyKind: "surface", brep: { faces: [], edges: [], vertices: [], shells: [] } }
-  for (const action of ["shell", "offset", "surface"]) {
+  for (const action of ["shell", "hole", "offset", "surface"]) {
     const output = JSON.stringify({ ok: true, elements: [body] })
     expect(opsFor(`cad_edit.${action}`, output)).toEqual([{ kind: "add", elements: [body] }])
     expect(opsFor(`cad.${action}`, output)).toEqual([])
     expect(opsFor(`cad_edit.${action}`, JSON.stringify({ ok: false, elements: [body] }))).toEqual([])
   }
+})
+
+test("a successful exact hole edit appears in the editor immediately and is not duplicated on replay", () => {
+  const body = { id: "edited-hole", type: "brep", brep: { faces: [], edges: [], vertices: [], shells: [] } }
+  const output = JSON.stringify({ ok: true, elements: [body] })
+  expect(mirrorToolResult("cad_edit.hole", true, output)).toEqual({ added: 1, updated: 0, removed: 0 })
+  expect(useElementsStore.getState().elements.some((element) => element.id === body.id)).toBe(true)
+  expect(mirrorToolResult("cad_edit.hole", true, output)).toEqual({ added: 0, updated: 0, removed: 0 })
 })

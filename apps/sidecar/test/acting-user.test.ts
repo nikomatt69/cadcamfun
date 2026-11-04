@@ -90,6 +90,29 @@ test("the turn is read once at the edge: inside an invocation it is the admitted
   }).pipe(Effect.provide(ActingUser.layer)))
 })
 
+test("a child cancelled during lease validation never enters its tool handler", async () => {
+  await Effect.runPromise(Effect.gen(function*() {
+    const acting = yield* ActingUser
+    const alice = new SessionUser({ id: "alice", name: "Alice", email: "alice@test.local" })
+    expect(yield* Effect.promise(() => acting.bind("p", "parent", alice, "make a plate", "d1"))).toBe(true)
+    let enteredLease!: () => void, releaseLease!: () => void
+    const entered = new Promise<void>((resolve) => { enteredLease = resolve })
+    const gate = new Promise<void>((resolve) => { releaseLease = resolve })
+    let calls = 0, handlerEntries = 0
+    yield* Effect.promise(() => acting.bindChild("p", "parent", "child", alice, "d1", async () => {
+      calls++
+      if (calls > 1) { enteredLease(); await gate }
+    }))
+    const controller = new AbortController()
+    const pending = acting.invoke("p", "child", async () => { handlerEntries++; return "unexpected" }, controller.signal)
+    yield* Effect.promise(() => entered)
+    controller.abort()
+    releaseLease()
+    yield* Effect.promise(async () => { await expect(pending).rejects.toBeInstanceOf(TurnCancelled) })
+    expect(handlerEntries).toBe(0)
+  }).pipe(Effect.provide(ActingUser.layer)))
+})
+
 test("a refused invocation says so; any other failure keeps its own message", () => {
   expect(isInvocationRefusal(new TurnUnowned())).toBe(true)
   expect(isInvocationRefusal(new TurnCancelled())).toBe(true)

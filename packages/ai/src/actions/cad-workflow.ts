@@ -249,7 +249,8 @@ const historyOf = async (input: CadWorkflowInput, op: CadWorkflowInput["op"], co
   if ((input.elementId === undefined) === (input.history === undefined)) return { error: fail(op, "Send exactly one of elementId (an existing parametric part) or history.") }
   if (input.history !== undefined) return { history: input.history as unknown as History }
   if (context.handlers.parametric === undefined) return { error: fail(op, "Parametric project tools are unavailable in this host.") }
-  const inspected = await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }) as Rec | undefined
+  const inspected = await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }, context.signal) as Rec | undefined
+  context.signal?.throwIfAborted()
   if (inspected === undefined || inspected["ok"] === false) return { error: (inspected as Rec | undefined) ?? fail(op, "The part could not be read.") }
   const decoded = decodeHistory(inspected["history"])
   return decoded.success ? { history: decoded.data } : { error: fail(op, "The part has no readable parametric history.") }
@@ -263,7 +264,7 @@ const runSheet = async (input: CadWorkflowInput, context: ActionContext) => {
   const format = input.format ?? "pdf"
   if (format !== "pdf" && format !== "svg") return fail("sheet", "sheet writes pdf or svg.")
   try {
-    const sheet = await runKernelJob("cad-sheet", { history: got.history, options: (input.options ?? {}) as drawing.SheetOptions })
+    const sheet = await runKernelJob("cad-sheet", { history: got.history, options: (input.options ?? {}) as drawing.SheetOptions }, { signal: context.signal })
     const common = {
       ok: true, op: "sheet" as const, format, size: sheet.size, scale: sheet.scale, edgeSource: sheet.edgeSource, views: sheet.views.map((v) => ({ name: v.name, label: v.label, scale: v.scale, kind: v.kind })),
       dimensions: sheet.dimensions.slice(0, 60).map((d) => ({ view: d.view, kind: d.kind, text: d.text, ...(d.value !== undefined ? { value: d.value } : {}) })), callouts: sheet.callouts, warnings: sheet.warnings

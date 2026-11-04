@@ -11,7 +11,7 @@
  */
 export const TOOL_IDS = [
   "cad", "cad_edit", "cam", "cam_edit", "library", "parts", "library_edit",
-  "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent", "cam_verify"
+  "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent", "cam_verify", "mods", "mods_edit"
 ] as const
 
 /** The canonical tool an exposure carries actions of: the row, the facts and the mirrors key on the canonical id. */
@@ -42,6 +42,8 @@ export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
   { id: "library_edit", category: "library", title: "Write the libraries", description: "Create or replace a material, a cutter or a machine configuration and set the project defaults." },
   { id: "memory", category: "memory", title: "Read the notes", description: "The notes and the standing context this project keeps between conversations." },
   { id: "memory_edit", category: "memory", title: "Write the notes", description: "Save a confirmed fact, or replace a section of the project's standing context." },
+  { id: "mods", category: "agents", title: "Read assistant extensions", description: "List or inspect the assistant's configured extensions." },
+  { id: "mods_edit", category: "agents", title: "Manage assistant extensions", description: "Save, enable, disable or remove an assistant extension." },
   { id: "research", category: "research", title: "Research", description: "A live web search over technical sources and paged reading of the files the user attached." },
   { id: "agent", category: "agents", title: "Delegate to a specialist", description: "Hand a job to the researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer agent, each with only the tools its job needs; list, read and cancel their tasks." },
   // `vcs` and `vcs_edit` are deliberately absent: they are not CAD/CAM capabilities, so they are described in

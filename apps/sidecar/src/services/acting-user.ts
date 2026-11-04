@@ -242,6 +242,8 @@ export class ActingUser extends Context.Service<ActingUser, {
         if (!owner || owner.projectId !== projectId) return Promise.reject(new TurnUnowned())
         if (signal?.aborted) return Promise.reject(new TurnCancelled("Tool execution cancelled."))
         await owner.actor.checkLease?.()
+        // A child lease can take time to validate. Cancellation during that await must not enter the handler afterward.
+        if (signal?.aborted) return Promise.reject(new TurnCancelled("Tool execution cancelled."))
         return invocations.run(Object.freeze({ ...owner.actor, ...(signal ? { signal } : {}) }), execute)
       }
     })

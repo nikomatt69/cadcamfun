@@ -37,7 +37,9 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
   research: actionCall,
   vcs: actionCall,
   vcs_edit: actionCall,
-  agent: actionCall
+  agent: actionCall,
+  mods: actionCall,
+  mods_edit: actionCall
 }
 
 export type ToolInputSchemas = typeof ToolInputSchemas

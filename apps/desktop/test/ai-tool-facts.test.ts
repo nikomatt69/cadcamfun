@@ -1,8 +1,9 @@
 /** The summaries the chat shows for version-control and delegation tools, and that no catalogue tool is exempt from validation. */
 import { describe, expect, test } from "bun:test"
 import { toolFacts } from "../src/features/ai/lib/tool-facts.ts"
-import { HOST_TOOLS, isToolId } from "../src/features/ai/lib/stream.ts"
+import { HOST_TOOLS, isToolId, validateToolCall } from "../src/features/ai/lib/stream.ts"
 import { TOOL_IDS } from "../src/features/ai/lib/tools.ts"
+import { EXPOSED_TOOL_IDS } from "../../../packages/ai/src/actions/catalogue.ts"
 
 const task = { id: "11111111-1111-4111-8111-111111111111", agent: "editor", description: "Make the hole 8 mm", status: "completed", background: false, text: "Done: hole-1 radius 3 -> 4." }
 
@@ -33,5 +34,16 @@ describe("tool facts", () => {
     // so they go through the same contract as `cad_edit`; only nikcli's own tools are exempt.
     for (const tool of ["agent", "vcs", "vcs_edit"]) expect(isToolId(tool), tool).toBe(true)
     for (const tool of TOOL_IDS) expect(HOST_TOOLS, tool).not.toContain(tool)
+  })
+
+  test("desktop accepts every catalogue tool and validates extension tool calls", () => {
+    expect(new Set<string>(TOOL_IDS)).toEqual(new Set(EXPOSED_TOOL_IDS))
+    for (const tool of ["mods", "mods_edit"]) {
+      const state = { started: new Set<string>(), finished: new Set<string>() }
+      const event = { type: "tool_call" as const, sessionId: "s", callId: tool, tool, input: { action: "list" } }
+      expect(validateToolCall(event, state)).toEqual([event])
+      const invalid = { ...event, callId: `${tool}-invalid`, input: {} }
+      expect(validateToolCall(invalid, state)[1]).toMatchObject({ type: "tool_result", ok: false })
+    }
   })
 })

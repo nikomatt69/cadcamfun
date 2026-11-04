@@ -7,17 +7,8 @@
  */
 import { frame, WORLD, type Frame, type Vec2, type Vec3 } from "./math.ts"
 import { circleProfileLoop, extrudeProfile, polygonProfileLoop, revolveProfile, type ProfileLoop } from "./sweep.ts"
-import { transformBrep, type Brep } from "./topology.ts"
+import type { Brep } from "./topology.ts"
 import { gearDimensions, gearOutline, type GearSpec } from "../gear.ts"
-
-/** The rotation the editor lays a capsule along its axis: it is built along Z and then turned. */
-const AXIS_ROTATION: Readonly<Record<"x" | "y" | "z", readonly [number, number, number, number, number, number, number, number, number]>> = {
-  // (x, y, z) → (z, x, y): Z becomes X.
-  x: [0, 0, 1, 1, 0, 0, 0, 1, 0],
-  // (x, y, z) → (x, z, −y): Z becomes Y.
-  y: [1, 0, 0, 0, 0, 1, 0, -1, 0],
-  z: [1, 0, 0, 0, 1, 0, 0, 0, 1]
-}
 
 /**
  * A capsule of radius `r` and cylinder length `length`, centred on the placement origin, its axis along
@@ -36,14 +27,12 @@ export const makeCapsule = (r: number, length: number, direction: "x" | "y" | "z
     { kind: "arc", center: { x: 0, y: half }, radius: r, start: 0, end: Math.PI / 2 },
     { kind: "line", a: { x: 0, y: half + r }, b: { x: 0, y: -half - r } }
   ]
-  const alongZ = revolveProfile({ loops: [loop] }, 2 * Math.PI, {
+  return revolveProfile({ loops: [loop] }, 2 * Math.PI, {
     origin: placement.origin,
-    axis: { x: 0, y: 0, z: 1 },
-    radial: { x: 1, y: 0, z: 0 },
+    axis: placement[direction],
+    radial: direction === "x" ? placement.y : placement.x,
     name: "capsule"
   })
-  if (direction === "z") return alongZ
-  return transformBrep(alongZ, { m: AXIS_ROTATION[direction], t: { x: 0, y: 0, z: 0 } })
 }
 
 /** The volume of a capsule from its measures: the cylinder and the two hemispheres. */

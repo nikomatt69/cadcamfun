@@ -43,6 +43,33 @@ non cose che non hai analizzato"). This document **builds nothing** and claims n
 milling kernel, connected end-to-end for single-setup jobs — blocked from Fusion 360 / hyperMILL class first by the
 **release/verification spine (P0)**, then by the **missing multi-setup program model (P1)**, not primarily by strategy count.
 
+### 0.2 Integrated execution and acceptance plan (2026-11-04)
+
+This is an implementation and integration map for the full CAD/CAM/AI objective, not a replacement for the ordered index in
+[`roadmap/README.md`](roadmap/README.md). That index owns sequence, current step, dependencies and edit ownership; the relevant design
+specifications own contracts. The table below defines outcomes and test gates, not permission to start a later RM step. In particular,
+RM-01 catalogue acceptance precedes dependent AI work; RM-09 pure-core work waits for RM-02, and its precision integration also waits
+for RM-03 and RM-06. Do not remove an existing capability to achieve a gate. Implement missing functionality in the existing owning
+module where possible, expose it through the existing interface and adapters, and preserve honest refusals until a case is supported.
+
+| Workstream | Deliverable and owning modules | Dependencies | Evidence required before marking complete |
+| --- | --- | --- | --- |
+| **A. Action and execution seam** | Complete the consolidated catalogue, shared action contracts, host admission, permissions and cancellation in the RM-01 owner directories. Preserve every existing action. | RM-01; persisted receipts follow RM-03/RM-07. | Every action has one contract and an exposure; host and direct calls validate consistently; denied, cancelled and stale writes leave no unauthorized mutation; live model session and RM-01 Verify pass. |
+| **B. Exact CAD and derived geometry** | Complete same-domain/tangent Booleans, general blends, shells and offsets including lofts, NURBS surfacing, non-uniform scaling and exact-or-explicitly-approximate catalogue geometry in `packages/core/src/cad`. Maintain imported-body healing and existing features. | Specs 40, 42–44; RM-09 prerequisites for its deliverables. | Analytic or independent-oracle dimensions, valid manifold topology and STEP round-trip per family; edge-coherent tessellation at requested tolerances; no silent fallback or unreported healing. General cases cannot be closed by a primitive-only test. |
+| **C. History, references and editing** | Complete stable refs across changes, remaining sketch/3D/direct-edit features, incremental replay and imported-body edits; connect references to drawings and CAM. Owners: WP1, then the relevant WP3/WP4/WP6/WP8 adapters. | Specs 41, 45, 58–59; B for dependent geometry; adapter prerequisites above. | Rename, reorder, edit, split and delete fixtures keep correct identity or return a typed stale/ambiguous result; resumed and full rebuilds match; edited imported STEP round-trips. |
+| **D. CAD canvas and AI** | Expose each supported modelling operation through existing catalogue, sidecar and desktop consumers; display the same revision's exact-derived body, face IDs, selections, errors and approximation evidence. | A, B/C core gates; RM-03/RM-06 for precision acceptance. | Real caller → AI action → history/revision → canvas geometry/picking → edit/rebuild → STEP round-trip; compare dimensions, topology and revision identity, not volume alone. Unsupported actions remain explicit. |
+| **E. CAM setup and associativity** | Complete persisted setup/program/tool-table lifecycle, transfer remaining stock between setups, fingerprint dependencies, invalidate stale programs and selectively regenerate. Owners: WP2, WP3/WP4/WP6/WP8 through existing seams. | RM-02/RM-03 and C; specs 14, 59–60. | Two-tool setup posts proper tool changes; second setup starts from the verified prior stock; a changed feature invalidates and regenerates only affected operations; unchanged NC stays identical. |
+| **F. Stock and machine verification** | Complete tri-dexel replay and mesh of remaining stock, tolerance enforcement, fixture/holder/head/table collisions, foreign NC verification and machine-kinematic coverage. | E and specs 51–53, 69; retain existing height-field and verification paths. | Closed stock mesh handles undercuts and tilted paths with declared resolution; seeded gouges, collisions and clean controls are correctly classified; replay checks actual NC bytes, machine and tool identity, setup and revision. Unresolved evidence cannot certify a program. |
+| **G. Machining breadth** | Complete rest cleanup and tool choice, surface limits/strategies, swept-profile tools, simultaneous 5-axis, turning/mill-turn, probing and supported posts in WP2 and their adapters. | E/F, specs 51–54 and 69. | Per-family reference parts and seeded faults prove paths, remaining material and controller output; failed geometry/tool/machine combinations are reported. Do not infer full coverage from one three-axis fixture. |
+| **H. Product breadth and exchange** | Extend assemblies/configurations, drawings/PMI, STEP/IGES and mesh exchange; implement industrial modules and CAE where their contracts and owner decisions allow. | Specs 46–50; C/D. | Entity refs survive edits; independent readers preserve required geometry/metadata; module-specific physical or analytic acceptance fixtures pass. |
+| **I. Qualification and performance** | Maintain independent CAD/CAM corpus, fault injection, machine/controller evidence, CI and performance/memory measurements. | Specs 55, 69 and workstream gates; qualification requires its owner decision. | Reproducible corpus and benchmarks on recorded hardware; no unreviewed unexpected refusals/wrong answers; measured tolerance and replay evidence; real machine/controller acceptance before production qualification. |
+
+**First integration slice:** finish RM-01's actual caller-facing validation and live-session gates. Then take the earliest
+permitted core work under the ordered index and carry each capability through D/E/F rather than declaring a kernel-only function
+integrated. A slice records the exact source revision, commands and results, supported and refused cases, approximation/error bounds,
+and any dependent adapter still missing. The 2026-10-30 rows below are historical: inspect the later change log and current source
+before classifying a capability. Local uncommitted work must be verified in its actual worktree and is not a release baseline.
+
 ## 1. P0 — Trust and release (fix first; nothing later can be called verified without this spine)
 
 | # | Gap | Evidence (opened) | Reference behaviour (not measured) | Size | Depends on |
