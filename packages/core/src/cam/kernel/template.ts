@@ -26,7 +26,7 @@ export type TemplateStrategy = typeof TEMPLATE_STRATEGIES[number]
 /** Parameters a template must never set: they would override the cutting-data limits (power, torque, deflection) the claims rest on. */
 export const TEMPLATE_FORBIDDEN_PARAMS: ReadonlySet<string> = new Set(["rpm", "feed", "plungeFeed", "radialEngagement", "coolant"])
 
-const CUTTER_KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"] as const
+const CUTTER_KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail", "tapered", "lollipop", "barrel", "lens"] as const
 
 const Range = Schema.Struct({ min: Schema.optionalKey(Schema.Finite), max: Schema.optionalKey(Schema.Finite) })
 export type TemplateRange = typeof Range.Type
@@ -393,4 +393,78 @@ export const applyTemplate = (template: CamTemplate, features: ReadonlyArray<Tem
     if (!handled) unmatched.push(f.id)
   }
   return { operations, tools: [...chosen.values()], notes, unmatched, trace }
+}
+
+/* ------------------------------------------------------------------------------------------------------------------------- */
+/* Capture from a program (spec 60 P4)                                                                                         */
+
+export interface CaptureResult {
+  readonly template: CamTemplate
+  /** Operations that map to exactly one feature and became recipes. */
+  readonly captured: ReadonlyArray<string>
+  /** Operations left out, each with the reason (maps to no feature or to several, or has a strategy a recipe cannot build). */
+  readonly notCaptured: ReadonlyArray<{ readonly operation: string; readonly reason: string }>
+}
+
+type P2 = { readonly x: number; readonly y: number }
+const same2 = (a: P2, b: P2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
+const sameRing = (a: ReadonlyArray<P2>, b: ReadonlyArray<P2>): boolean => a.length === b.length && a.every((p, i) => same2(p, b[i]!))
+
+/** The features an operation's geometry belongs to. */
+const featuresOf = (op: OperationSpec, features: ReadonlyArray<TemplateFeature>): ReadonlyArray<TemplateFeature> => {
+  switch (op.strategy) {
+    case "drill": return features.filter((f) => f.kind === "hole" && f.points !== undefined && op.points.every((p) => f.points!.some((q) => same2(p, q))))
+    case "pocket": case "adaptive": return features.filter((f) => f.kind === "pocket" && f.boundary !== undefined && sameRing(f.boundary, op.region.boundary))
+    case "profile": return features.filter((f) => (f.kind === "outline" || f.kind === "boss" || f.kind === "island") && f.boundary !== undefined && sameRing(f.boundary, op.loop))
+    case "chamfer": return features.filter((f) => f.boundary !== undefined && op.loops.some((l) => sameRing(f.boundary!, l.points)))
+    case "bore": case "thread": return features.filter((f) => f.points?.[0] !== undefined && same2(f.points[0], op.center))
+    case "face": return features.filter((f) => f.kind === "face")
+    default: return []
+  }
+}
+
+/**
+ * Generalises a program into a template: an operation that maps to exactly one feature becomes a recipe of a rule for features of
+ * that kind and size; numbers that follow the feature (a drill bottom offset from the feature's bottom) become expressions. The
+ * result is conservative: it reproduces the program on the same part and on parts with features of equal kind and size, and it
+ * says which operations it left out. Not a proof that the generalisation suits other parts.
+ */
+export const captureTemplate = (name: string, operations: ReadonlyArray<OperationSpec>, features: ReadonlyArray<TemplateFeature>, cutters: ReadonlyArray<Cutter>): CaptureResult => {
+  const rules = new Map<string, TemplateRule>()
+  const captured: string[] = []
+  const notCaptured: Array<{ operation: string; reason: string }> = []
+  for (const op of operations) {
+    const hit = featuresOf(op, features)
+    if (hit.length !== 1) { notCaptured.push({ operation: op.id, reason: hit.length === 0 ? "its geometry belongs to no recognised feature" : `its geometry belongs to ${hit.length} features` }); continue }
+    const f = hit[0]!
+    const cutter = cutters.find((c) => c.id === op.tool)
+    if (cutter === undefined) { notCaptured.push({ operation: op.id, reason: `tool ${op.tool} is not in the tool table` }); continue }
+    if (op.strategy === "thread" || op.strategy === "engrave" || op.strategy === "surface" || op.strategy === "multiaxis") { notCaptured.push({ operation: op.id, reason: `a ${op.strategy} operation cannot be a recipe` }); continue }
+    const params: Record<string, TemplateValue> = {}
+    if (op.stepdown !== undefined) params.stepdown = op.stepdown
+    if (op.stepover !== undefined) params.stepover = op.stepover
+    if ("allowance" in op && op.allowance !== undefined) params.allowance = op.allowance
+    if (op.strategy === "drill") {
+      if (op.cut !== undefined && op.cut !== "drill") params.cut = op.cut
+      const delta = op.bottom - f.bottom
+      if (Math.abs(delta) > 1e-9) params.bottom = { expr: `bottom ${delta < 0 ? "-" : "+"} ${Math.abs(delta)}` }
+    }
+    if (op.strategy === "profile") { params.side = op.side; if (op.finish !== undefined) params.finish = op.finish }
+    if (op.strategy === "pocket" && op.finish !== undefined) params.finish = op.finish
+    if (op.strategy === "chamfer") params.width = op.width
+    const key = `captured-${f.id}`
+    const existing = rules.get(key)
+    const recipe: TemplateRecipe = { strategy: op.strategy, tool: { kinds: [cutter.kind], diameter: { min: cutter.diameter, max: cutter.diameter } }, params }
+    if (existing !== undefined) { rules.set(key, { ...existing, then: [...existing.then, recipe] }); captured.push(op.id); continue }
+    const when: TemplateWhen = {
+      kind: f.kind,
+      ...(f.diameter !== undefined ? { diameter: { min: f.diameter, max: f.diameter } } : {}),
+      ...(f.depth !== undefined ? { depth: { min: f.depth, max: f.depth } } : {}),
+      ...(f.through !== undefined ? { through: f.through } : {})
+    }
+    rules.set(key, { id: key, when, then: [recipe], priority: 10, because: `captured from the program: ${op.name ?? op.id}` })
+    captured.push(op.id)
+  }
+  const template: CamTemplate = { name, version: 1, rules: [...rules.values()] }
+  return { template, captured, notCaptured }
 }

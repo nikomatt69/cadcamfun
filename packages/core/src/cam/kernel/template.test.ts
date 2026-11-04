@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { DEFAULT_CUTTERS, type Cutter } from "./cutters.ts"
-import { applyTemplate, selectTool, validateTemplate, type CamTemplate, type TemplateFeature, type ToolCandidate } from "./template.ts"
+import { applyTemplate, captureTemplate, selectTool, validateTemplate, type CamTemplate, type TemplateFeature, type ToolCandidate } from "./template.ts"
 
 const candidates: ReadonlyArray<ToolCandidate> = DEFAULT_CUTTERS.map((cutter) => ({ cutter }))
 const ring = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 30 }, { x: 0, y: 30 }]
@@ -94,5 +94,29 @@ describe("applyTemplate", () => {
   test("an invalid template or a wrong material is refused", () => {
     expect(applyTemplate({ ...template, applies: { materials: ["P"] } }, [pocket], { candidates, material: "N" }).refused).toContain("material")
     expect(applyTemplate({ ...template, rules: [] } as CamTemplate, [pocket], { candidates, material: "N" }).refused).toContain("invalid template")
+  })
+})
+
+describe("captureTemplate", () => {
+  const features: TemplateFeature[] = [hole, pocket, { id: "b1", kind: "boss", top: 0, bottom: -3 }]
+  const applied = applyTemplate(template, features, { candidates, material: "N" })
+  const ops = applied.operations.map((o) => o.spec)
+  const strip = (list: ReadonlyArray<{ spec: unknown }>) => list.map((o) => { const { id: _id, ...rest } = o.spec as Record<string, unknown>; return rest })
+
+  test("capturing a program and applying the template to the same part reproduces the operations", () => {
+    const cap = captureTemplate("captured", ops, features, DEFAULT_CUTTERS)
+    expect(cap.notCaptured).toEqual([])
+    expect(validateTemplate(cap.template)).toEqual([])
+    const again = applyTemplate(cap.template, features, { candidates, material: "N" })
+    expect(again.unmatched).toEqual(["b1"])
+    expect(strip(again.operations)).toEqual(strip(applied.operations))
+    expect(JSON.stringify(cap.template)).toContain("bottom - 0.5")
+  })
+  test("an operation that maps to no feature or a missing tool is reported as not captured", () => {
+    const stray = { ...ops[2]!, id: "stray", region: { boundary: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }] } } as typeof ops[number]
+    const ghost = { ...ops[0]!, id: "ghost", tool: "no-such-tool" }
+    const cap = captureTemplate("c", [stray, ghost, ops[2]!], features, DEFAULT_CUTTERS)
+    expect(cap.captured).toEqual([ops[2]!.id])
+    expect(cap.notCaptured.map((n) => n.operation).sort()).toEqual(["ghost", "stray"])
   })
 })
