@@ -478,3 +478,5 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   `cam.kernel.runTurningJob` (spec 69 I1), `applyTemplate` (spec 60), the operation model (`resolveOperations`, `transformJob`) or the
   `process` evidence of a job (`ManufacturingJob.process` is not in `jobOfSnapshot`/`CamKernelRequest`); `POST /api/cam/setups/generate` and the
   saved-setup `generate` still run `generateSetup` on the request thread (no `cam-setup` job).
+- 2026-11-04 (lane cad, cc/cad-3): **P4-2 partly closed**: annotations anchor to entity refs and follow the geometry (spec 49 change log); the PDF writer
+  row of P4-2 was stale (`drawing/pdf.ts`, vector, Helvetica, exists). Open: ref-driven dimensions, view kinds, BOM table.

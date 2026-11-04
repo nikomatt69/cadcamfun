@@ -11,7 +11,11 @@
  */
 import { emptyDrawing, type Drawing, type Entity } from "../cad/entities.ts"
 import { rebuild, type History, type RebuildResult } from "../cad/history.ts"
-import { rebuildExact } from "../cad/history-brep.ts"
+import { rebuildExact, type ExactRebuild } from "../cad/history-brep.ts"
+import { lookupRef } from "../cad/history-refs.ts"
+import { parseRef } from "../cad/brep/naming-keys.ts"
+import { faceCentre } from "../cad/brep/naming.ts"
+import { curvePoint } from "../cad/brep/geom.ts"
 import { drawingEdges } from "../cad/brep/drawing-edges.ts"
 import { meshBounds, type Mesh } from "../cad/solid.ts"
 import type { Vec2 } from "../cad/vec.ts"
@@ -50,14 +54,40 @@ export interface SheetOptions {
   readonly section?: { readonly axis: Axis; readonly at: number; readonly from?: "+" | "-"; readonly letter?: string; readonly parent?: "front" | "top" | "right" }
   readonly detail?: { readonly view?: "front" | "top" | "right"; readonly centre: V3; readonly radius: number; readonly factor: number; readonly letter?: string }
   readonly flatness?: { readonly value: number; readonly view?: "front" | "top" | "right" }
-  /** Feature control frames (ISO 1101): each leads to the world point `at` of the toleranced feature on its view. */
-  readonly gdt?: ReadonlyArray<{ readonly spec: GdtSpec; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } }>
-  /** Datum feature symbols on the world point `at`, the triangle on the feature, the letter box `side` of it (default below). */
-  readonly datums?: ReadonlyArray<{ readonly letter: string; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly side?: "up" | "down" | "left" | "right" }>
-  /** Balloons (item numbers of the bill of materials) with a leader to the world point `at`. */
-  readonly balloons?: ReadonlyArray<{ readonly text: string; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } }>
+  /**
+   * Feature control frames (ISO 1101): each leads to the toleranced feature on its view. The feature is the entity `ref` names
+   * (`face:plate|plate.top`, `edge:...`, `vertex:...`, spec 41) when given, else the world point `at` (see `AnnotationAnchor`).
+   */
+  readonly gdt?: ReadonlyArray<{ readonly spec: GdtSpec; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } } & AnnotationAnchor>
+  /** Datum feature symbols on their feature (`ref`, else `at`), the triangle on the feature, the letter box `side` of it (default below). */
+  readonly datums?: ReadonlyArray<{ readonly letter: string; readonly view?: "front" | "top" | "right"; readonly side?: "up" | "down" | "left" | "right" } & AnnotationAnchor>
+  /** Balloons (item numbers of the bill of materials) with a leader to their feature (`ref`, else `at`). */
+  readonly balloons?: ReadonlyArray<{ readonly text: string; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } } & AnnotationAnchor>
   /** Draw the views from the exact B-rep edges when every body has an exact model (default true); otherwise from the mesh. */
   readonly exact?: boolean
+}
+
+/**
+ * Where an annotation is attached (spec 49 / spec 41 N6): to a model entity by persistent reference, or to a world point.
+ *
+ * With `ref` the annotation follows its entity through every edit of the history: the reference is resolved on the exact model
+ * the sheet is drawn from, and the leader goes to the entity (a face's centre, an edge's middle, a vertex). `at` is then only the
+ * point the reference was picked at, never a fallback: a reference that is lost, split into several entities or ambiguous is not
+ * drawn and is reported (`DrawingSheet.annotations`, `warnings`), so a drawing never points at a guessed entity.
+ */
+export type AnnotationAnchor = { readonly at: V3; readonly ref?: string } | { readonly at?: V3; readonly ref: string }
+
+/** What became of an annotation's reference on this sheet. */
+export interface AnnotationReport {
+  readonly kind: "gdt" | "datum" | "balloon"
+  /** The frame's text, the datum letter or the balloon's item. */
+  readonly label: string
+  readonly ref?: string
+  /** `attached`: drawn at the referenced entity (or at `at` without a reference); otherwise not drawn, and `reason` says why. */
+  readonly status: "attached" | "lost" | "split" | "ambiguous" | "unresolved"
+  /** The world point the leader goes to, when drawn. */
+  readonly at?: V3
+  readonly reason?: string
 }
 
 export interface DimensionReport {
@@ -82,6 +112,8 @@ export interface DrawingSheet {
   readonly warnings: ReadonlyArray<string>
   /** Where the view edges came from: the exact B-rep (true curves, tangent edges hidden) or the mesh's dihedral angles. */
   readonly edgeSource: "exact" | "mesh"
+  /** Every GD&T frame, datum and balloon with what its anchor resolved to. */
+  readonly annotations: ReadonlyArray<AnnotationReport>
 }
 
 export const scaleText = (s: number): string => (s >= 1 ? `${Number(s.toFixed(3))}:1` : `1:${Number((1 / s).toFixed(3))}`)
@@ -199,8 +231,11 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   // boundaries are not drawn), else from the mesh. The exact tessellation is also the occluder, so edges and faces agree.
   let viewMesh = mesh
   let edges: ReadonlyArray<Edge3> | undefined
+  // The exact model is also what annotation references resolve on: built once, when the views or a reference need it.
+  let exact: ExactRebuild | undefined
+  const exactModel = (): ExactRebuild | undefined => (result === undefined ? undefined : (exact ??= rebuildExact(source as History, result)))
   if (result !== undefined && options.exact !== false) {
-    const ex = rebuildExact(source as History, result)
+    const ex = exactModel()!
     const missing = ex.bodies.find((b) => b.brep === undefined)
     if (missing === undefined) {
       const parts = ex.bodies.map((b) => drawingEdges(b.brep!))
@@ -352,10 +387,26 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   const target = (name: "front" | "top" | "right" | undefined): Placed | undefined => placedPrincipal.find((q) => q.name === (name ?? "front")) ?? placedPrincipal[0]
   const DIR = { up: { x: 0, y: 1 }, down: { x: 0, y: -1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } } as const
   const defined = new Set((options.datums ?? []).map((d) => d.letter))
+  const annotations: AnnotationReport[] = []
+  /** The world point an annotation goes to, or undefined (reported) when its reference does not name one entity. */
+  const anchor = (kind: AnnotationReport["kind"], label: string, a: AnnotationAnchor): V3 | undefined => {
+    if (a.ref === undefined) { annotations.push({ kind, label, status: "attached", at: a.at! }); return a.at }
+    const resolved = resolveAnchor(a.ref, exactModel())
+    if ("reason" in resolved) {
+      annotations.push({ kind, label, ref: a.ref, status: resolved.status, reason: resolved.reason })
+      warnings.push(`${kind === "gdt" ? "GD&T frame" : kind === "datum" ? "Datum" : "Balloon"} '${label}' is not drawn: ${resolved.reason}`)
+      return undefined
+    }
+    annotations.push({ kind, label, ref: a.ref, status: "attached", at: resolved.at })
+    warnings.push(...resolved.notes.map((n) => `${label}: ${n}`))
+    return resolved.at
+  }
   for (const g of options.gdt ?? []) {
     const t = target(g.view)
     if (t === undefined) continue
-    const on = place(t, t.view.toView(g.at))
+    const point = anchor("gdt", fmtFrameLabel(g.spec), g)
+    if (point === undefined) continue
+    const on = place(t, t.view.toView(point))
     const o = g.offset ?? { x: 16, y: 12 }
     const layout = drawFeatureFrame(pen, { x: on.x + o.x, y: on.y + o.y }, g.spec)
     drawFrameLeader(pen, { x: on.x + o.x, y: on.y + o.y + layout.height / 2 }, on)
@@ -365,13 +416,17 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   for (const d of options.datums ?? []) {
     const t = target(d.view)
     if (t === undefined) continue
-    drawDatumFeature(pen, place(t, t.view.toView(d.at)), DIR[d.side ?? "down"], d.letter)
+    const point = anchor("datum", d.letter, d)
+    if (point === undefined) continue
+    drawDatumFeature(pen, place(t, t.view.toView(point)), DIR[d.side ?? "down"], d.letter)
     dimensions.push({ view: t.name, kind: "callout", text: `datum ${d.letter}`, value: undefined })
   }
   for (const b of options.balloons ?? []) {
     const t = target(b.view)
     if (t === undefined) continue
-    const on = place(t, t.view.toView(b.at)), o = b.offset ?? { x: 14, y: 14 }
+    const point = anchor("balloon", b.text, b)
+    if (point === undefined) continue
+    const on = place(t, t.view.toView(point)), o = b.offset ?? { x: 14, y: 14 }
     drawBalloon(pen, { x: on.x + o.x, y: on.y + o.y }, on, b.text)
     dimensions.push({ view: t.name, kind: "callout", text: `item ${b.text}`, value: undefined })
   }
@@ -398,8 +453,32 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   const drawing: Drawing = { ...base, layers: LAYERS.map((l) => ({ id: l.id, name: l.name, visible: true, locked: false, color: l.color })), entities: cv.entities }
   return {
     drawing, svg: drawingToSvg(drawing, { width: W, height: H }), size: { width: W, height: H }, scale, views: reports, dimensions, callouts,
-    section: arranged.section === undefined ? undefined : { loops: arranged.section.loops.length, hatchLines: arranged.section.hatch.length }, warnings, edgeSource
+    section: arranged.section === undefined ? undefined : { loops: arranged.section.loops.length, hatchLines: arranged.section.hatch.length }, warnings, edgeSource,
+    annotations
   }
+}
+
+/** A GD&T frame's label for the report: its kind and value (the drawn text is laid out later). */
+const fmtFrameLabel = (spec: GdtSpec): string => `${spec.kind} ${spec.value}`
+
+/**
+ * The world point of the entity a reference names on the exact model: a face's centre, the middle of an edge, a vertex. Exactly
+ * one entity, or the reason there is none: lost (with the feature that removed it), split (the pieces named), ambiguous.
+ */
+export const resolveAnchor = (text: string, exact: ExactRebuild | undefined):
+  { readonly at: V3; readonly notes: ReadonlyArray<string> } | { readonly status: "lost" | "split" | "ambiguous" | "unresolved"; readonly reason: string } => {
+  const ref = parseRef(text)
+  if (ref === undefined) return { status: "unresolved", reason: `'${text}' is not a reference (expected '<face|edge|vertex>:<body>|<key>')` }
+  if (exact === undefined) return { status: "unresolved", reason: `'${text}' needs the part's history: a bare mesh has no entities to refer to` }
+  const bodies = exact.bodies.map((b) => ({ id: b.id, brep: b.brep }))
+  const hit = lookupRef(text, bodies, exact.timeline, ref.kind)
+  if (!hit.ok) return { status: /^ambiguous/.test(hit.error) ? "ambiguous" : /^reference lost/.test(hit.error) ? "lost" : "unresolved", reason: hit.error }
+  if (hit.indices.length !== 1) return { status: "split", reason: `'${text}' was split into ${hit.indices.length} pieces (${hit.keys.join(", ")}); attach the annotation to one of them` }
+  const i = hit.indices[0]!
+  if (ref.kind === "face") return { at: faceCentre(hit.brep, i), notes: hit.notes }
+  if (ref.kind === "vertex") return { at: hit.brep.vertices[i]!.point, notes: hit.notes }
+  const e = hit.brep.edges[i]!
+  return { at: curvePoint(e.curve, (e.t0 + e.t1) / 2), notes: hit.notes }
 }
 
 const labelOf = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1)
@@ -660,7 +739,11 @@ export const validateSheetOptions = (o: SheetOptions): void => {
   for (const g of o.gdt ?? []) {
     const err = validateGdt(g.spec)
     if (err !== undefined) throw new RangeError(`GD&T ${g.spec.kind}: ${err}`)
-    if (!Object.values(g.at).every(Number.isFinite)) throw new RangeError("Invalid GD&T feature point")
+    if (g.at !== undefined && !Object.values(g.at).every(Number.isFinite)) throw new RangeError("Invalid GD&T feature point")
+  }
+  for (const a of [...(o.gdt ?? []), ...(o.datums ?? []), ...(o.balloons ?? [])]) {
+    if (a.at === undefined && a.ref === undefined) throw new RangeError("An annotation needs a reference (`ref`) or a point (`at`)")
+    if (a.ref !== undefined && parseRef(a.ref) === undefined) throw new RangeError(`'${a.ref}' is not a reference (expected '<face|edge|vertex>:<body>|<key>')`)
   }
   const letters = (o.datums ?? []).map((d) => d.letter)
   if (letters.some((l) => !/^[A-Z]$/.test(l)) || new Set(letters).size !== letters.length) throw new RangeError("Datum features are single capital letters, each defined once")
