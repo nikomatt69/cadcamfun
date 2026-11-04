@@ -5,7 +5,8 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, elementsOfSetup, programFileName, setupOfToolpaths } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
 const base = cam.generator.DEFAULT_SETTINGS
@@ -54,7 +55,38 @@ describe("the panel's toolpaths as a setup", () => {
   })
 })
 
+describe("a saved setup back on the panel", () => {
+  const drawing = [{ id: "el-a", type: "rectangle" }, { id: "el-b", type: "circle" }, { id: "el-c", type: "circle" }]
+
+  test("its operations become the toolpaths in the setup's order, with no G-code, and give back the same setup", () => {
+    const saved = setupOfToolpaths(moveToolpathUp(panel(), "tp-b").toolpaths, { ...DEFAULT_SETUP_CHOICES, name: "Bracket", grouping: "perTool" })
+    const restored = toolpathsOfSetup(saved, drawing, TOOLPATH_COLORS)
+    expect(restored.toolpaths.map((tp) => [tp.id, tp.elementId, tp.order, tp.gcode])).toEqual([["tp-b", "el-b", 0, ""], ["tp-a", "el-a", 1, ""], ["tp-c", "el-c", 2, ""]])
+    expect(restored.toolpaths[0]!.elementType).toBe("circle")
+    expect(restored.missingElementIds).toEqual([])
+    expect(choicesOfSetup(saved)).toMatchObject({ name: "Bracket", grouping: "perTool" })
+    expect(setupOfToolpaths(restored.toolpaths, choicesOfSetup(saved))).toEqual(saved)
+  })
+
+  test("an element gone from the drawing keeps its operation, hidden and reported; a multi-element operation is reported, not guessed", () => {
+    const saved = setupOfToolpaths(panel().toolpaths)
+    const wide = { ...saved, operations: [...saved.operations, { ...saved.operations[0]!, id: "op-wide", elementIds: ["el-a", "el-b"] }] }
+    const restored = toolpathsOfSetup(wide, drawing.filter((e) => e.id !== "el-b"), TOOLPATH_COLORS)
+    expect(restored.toolpaths.map((tp) => [tp.id, tp.visible])).toEqual([["tp-a", true], ["tp-b", false], ["tp-c", true]])
+    expect(restored.missingElementIds).toEqual(["el-b"])
+    expect(restored.skippedOperationIds).toEqual(["op-wide"])
+  })
+})
+
 describe("the setup store", () => {
+  test("an edit of the panel's toolpaths drops the plan made for the old ones", async () => {
+    const { useMultiToolpathStore } = await import("../src/features/cam/store/multiToolpathStore.ts")
+    useSetupStore.getState().setPlan({ programs: [], toolTable: [], toolLoads: 0, toolChanges: 0, warnings: [] })
+    useMultiToolpathStore.getState().replaceToolpaths(panel().toolpaths)
+    expect(useSetupStore.getState().plan).toBeUndefined()
+    useMultiToolpathStore.getState().clearAllToolpaths()
+  })
+
   test("a change of choices drops the stale plan and result", () => {
     const store = useSetupStore.getState()
     store.setPlan({ programs: [], toolTable: [], toolLoads: 0, toolChanges: 0, warnings: [] })
