@@ -22,9 +22,25 @@ const programOf = (gcode: string, unreadable: string) =>
     Effect.mapError((error) => new BadRequest({ message: error.explained ? error.message : unreadable }))
   )
 
+/**
+ * The kernel job of an HTTP request: the snapshot adapter of core, plus what the request carries that the snapshot does not (the
+ * tolerance gate and the process evidence). One function, so the run, the plan and the revalidation of a saved program agree.
+ */
+export const jobOfRequest = (payload: CamKernelRequest) => {
+  const { progress: _progress, enforceTolerance, process, ...snapshot } = payload
+  const job = cam.kernel.jobOfSnapshot(snapshot)
+  if (job.status === "failed") return job
+  const value = {
+    ...job.value,
+    ...(enforceTolerance === true ? { quality: { ...job.value.quality, enforceTolerance: true } } : {}),
+    ...(process !== undefined ? { process: process as cam.kernel.ProcessRequest } : {})
+  }
+  return { status: "ok" as const, value }
+}
+
 /** The same request adapter serves preview generation and persistence revalidation. */
 export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: CamRunProgress) => void) {
-  const job = cam.kernel.jobOfSnapshot(payload)
+  const job = jobOfRequest(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
   // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal
   // terminates the worker) and a job that runs past its deadline is stopped.

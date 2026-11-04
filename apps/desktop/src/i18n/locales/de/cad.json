@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Dicke des Musters",
   "cad.template.honeycombPattern.thickness.label": "Dicke",
   "cad.template.honeycombPattern.color.description": "Farbe des Musters",
-  "cad.template.honeycombPattern.color.label": "Farbe"
+  "cad.template.honeycombPattern.color.label": "Farbe",
+  "cad.param.refLost": "Referenz verloren",
+  "cad.param.refLostBy": "entfernt durch {feature}",
+  "cad.param.refLostSummary": "{count} Auswahlen verweisen auf Flächen oder Kanten, die nicht mehr existieren: diese Features werden nicht erstellt"
 }

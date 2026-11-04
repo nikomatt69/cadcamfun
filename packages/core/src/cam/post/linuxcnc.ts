@@ -31,6 +31,7 @@ export const linuxcncDialect: Dialect = {
   cutterComp: isoCutterComp,
   inverseTime: { on: "G93", off: "G94" },
   smoothing: { on: (tol) => [`G64 P${tol}`], off: ["G61"] },
+  splines: { kind: "bezier" },
   begin: () => ["%"],
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],
   toolChange: (n) => [`T${n} M6`, `G43 H${n}`],

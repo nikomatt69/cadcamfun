@@ -811,6 +811,38 @@ const stageFingerprints = (history: History, result: RebuildResult, active: Retu
 }
 
 /**
+ * The fingerprint chain of the mesh replay (`rebuild(history, { cache })`): entry k covers the imported bases and features 0..k-1,
+ * with the parameter values (and parameter errors) each feature's text reads and its timeline state. The mesh verdict of a feature
+ * is a function of that prefix, so it is not part of the key (the exact chain above adds it because the exact replay reads it).
+ */
+export const meshStageFingerprints = (
+  history: History,
+  values: Readonly<Record<string, number>>,
+  errors: Readonly<Record<string, string>>,
+  planned: Readonly<Record<string, { readonly state: string }>>
+): string[] => {
+  const names = [...new Set([...Object.keys(values), ...Object.keys(errors)])]
+  const out: string[] = [hash53(`mesh|${(history.bases ?? []).map((b) => `${b.id}:${baseTag(b.brep)}`).join(",")}`)]
+  let acc = out[0]!
+  for (const f of history.features) {
+    const text = JSON.stringify(f)
+    const tokens = new Set(text.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [])
+    const read = names.filter((n) => tokens.has(n)).map((n) => `${n}=${values[n]}${errors[n] === undefined ? "" : `!${errors[n]}`}`).join(";")
+    acc = hash53(`${acc}|${text}|${read}|${planned[f.id]?.state ?? "?"}`) + String(text.length)
+    out.push(acc)
+  }
+  return out
+}
+
+/** The longest boundary k whose fingerprint chain matches the cache's from the start and whose state was kept (0 when none). */
+export const resumableBoundary = (cached: ReadonlyArray<string>, fresh: ReadonlyArray<string>, kept: (k: number) => boolean): number => {
+  let k = 0
+  if (cached[0] === fresh[0]) while (k + 1 < fresh.length && cached[k + 1] === fresh[k + 1]) k++
+  while (k > 0 && !kept(k)) k--
+  return k
+}
+
+/**
  * An exact replay advanced on demand. `at(index, bodies)` replays the features before `index` it has not replayed yet and
  * answers the exact model at that point, aligned with the mesh `bodies` of that point. The replay is sequential, so the
  * model after the first `index` features is the same whether it was reached in one call or in several: the mesh rebuild
@@ -952,9 +984,7 @@ export const exactReplay = (history: History, result: RebuildResult, replayOptio
     if (cache !== undefined && !resumed) {
       resumed = true
       // The longest boundary whose whole fingerprint chain matches the cache's and whose state was kept.
-      let k = 0
-      if (cache.fingerprints[0] === fingerprints[0]) while (k + 1 < fingerprints.length && cache.fingerprints[k + 1] === fingerprints[k + 1]) k++
-      while (k > 0 && cache.states[k] === undefined) k--
+      const k = resumableBoundary(cache.fingerprints, fingerprints, (j) => cache.states[j] !== undefined)
       if (k > 0) restoreState(cache.states[k]!, k)
       cache.lastResumedAt = next
       cache.lastReplayed = 0

@@ -133,3 +133,34 @@ test("saved setups stay with their project: strangers get 404, another project d
   const left = await app.Effect.runPromise(database.query("test.left", (db) => db.select().from(app.schema.localKeyValueTable)))
   expect(left.filter((row: { key: string }) => row.key.startsWith(`camSetup/${a}/`))).toEqual([])
 })
+
+test("a saved setup is planned and posted from storage: the same bytes as the stateless route, and the same refusals", async () => {
+  const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Posted" } })).body.id
+  const url = `/api/projects/${projectId}/cam-setups`
+  const saved = (await app.call(url, { method: "POST", json: { name: "Bracket", setup: setup(two) } })).body
+  const elements = { a: rect, b: hole }
+
+  expect((await app.call(`${url}/${saved.id}/plan`, { auth: false })).status).toBe(401)
+  expect((await app.call(`${url}/nope/plan`)).status).toBe(404)
+  expect((await app.call(`${url}/${saved.id}/generate`, { method: "POST", json: { elements }, auth: false })).status).toBe(401)
+  expect((await app.call(`${url}/nope/generate`, { method: "POST", json: { elements } })).status).toBe(404)
+  expect((await app.call(`${url}/${saved.id}/generate`, { method: "POST", json: {} })).status).toBe(400)
+
+  const plan = Schema.decodeUnknownSync(CamSetupPlan)((await app.call(`${url}/${saved.id}/plan`)).body)
+  expect(plan).toEqual(Schema.decodeUnknownSync(CamSetupPlan)((await post("plan", { setup: setup(two) })).body))
+  expect(plan.programs).toHaveLength(1)
+
+  const fromStorage = await app.call(`${url}/${saved.id}/generate`, { method: "POST", json: { elements } })
+  expect(fromStorage.status).toBe(200)
+  const stateless = await post("generate", { setup: setup(two), elements })
+  expect(Schema.decodeUnknownSync(CamSetupGenerated)(fromStorage.body).programs[0]!.gcode).toBe(Schema.decodeUnknownSync(CamSetupGenerated)(stateless.body).programs[0]!.gcode)
+
+  const missing = await app.call(`${url}/${saved.id}/generate`, { method: "POST", json: { elements: { a: rect } } })
+  expect(missing.status).toBe(400)
+  expect(missing.body.message).toContain("Op b: b")
+
+  // Another user's project: the saved setup is not reachable, planned or posted.
+  const stranger = await asStranger()
+  expect((await app.call(`${url}/${saved.id}/plan`, stranger)).status).toBe(404)
+  expect((await app.call(`${url}/${saved.id}/generate`, { method: "POST", json: { elements }, ...stranger })).status).toBe(404)
+})

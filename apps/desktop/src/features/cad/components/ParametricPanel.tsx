@@ -10,6 +10,7 @@ import {
 import { importStepIntoHistory } from "../lib/importStep.ts"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
 import { parseNumberText } from "../lib/numberText.ts"
+import { refLossOf, refLossesOf } from "../lib/ref-loss.ts"
 import { DimensionField } from "./property-inputs/DimensionField.tsx"
 import { ParametersSection } from "./parametric/ParametersSection.tsx"
 import { SketchConstraintsSection } from "./parametric/SketchConstraintsSection.tsx"
@@ -216,6 +217,17 @@ export default function ParametricPanel(props: { readonly element: Element; read
     append({ id: nextId("scale"), type: "scale", factor: 1 })
   }
   const issuesOf = (id: string) => (built()?.issues ?? []).filter((i) => i.feature === id)
+  /** The persistent references a feature lost (the entity is gone), each linked to the feature that removed it when known. */
+  const lostRefsOf = (id: string) => refLossesOf(built()?.issues ?? [], id)
+  const lostRefCount = createMemo(() => (built()?.issues ?? []).filter((i) => refLossOf(i.message) !== undefined).length)
+  /** Brings a feature's row into view and focus (the culprit of a lost reference). */
+  const revealFeature = (id: string): void => {
+    const row = [...document.querySelectorAll<HTMLElement>("[data-testid]")].find((el) => el.dataset["testid"] === `feature-${id}`)
+    if (row === undefined) return
+    row.scrollIntoView?.({ block: "nearest" })
+    row.setAttribute("tabindex", "-1")
+    row.focus()
+  }
 
   // Design rules: the history is checked against a process, a cutter and a material on demand (it rebuilds and samples the solid).
   const [process, setProcess] = createSignal<DfmProcess>("mill")
@@ -318,6 +330,9 @@ export default function ParametricPanel(props: { readonly element: Element; read
           </ul>
         </Show>
         <h5 class="mb-2 text-xs font-semibold text-[color:var(--ent-text-muted)]">{t("subscription.features")}</h5>
+        <Show when={lostRefCount() > 0}>
+          <p class="mb-2 text-xs text-[color:var(--ent-bad)]" role="alert" data-testid="ref-lost-summary">{t("cad.param.refLostSummary", { count: lostRefCount() })}</p>
+        </Show>
         <ol class="space-y-3">
           <For each={history().features}>{(feature, index) => <>
             <li class={`rounded-md border border-[color:var(--ent-line)] p-2 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
@@ -328,6 +343,14 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   <Show when={stateOf(feature.id)}>{(state) =>
                     <span class={`ml-2 text-xs ${state().tone}`} data-testid={`state-${feature.id}`}>{state().text}</span>}
                   </Show>
+                  <For each={lostRefsOf(feature.id)}>{(loss) =>
+                    <span class="ml-2 inline-flex items-center gap-1 rounded border border-[color:var(--ent-bad)] px-1 text-xs text-[color:var(--ent-bad)]" data-testid={`ref-lost-${feature.id}`} data-ref={loss.ref} title={loss.ref}>
+                      {t("cad.param.refLost")}
+                      <Show when={loss.lostBy}>{(by) =>
+                        <button type="button" class="underline" data-testid={`ref-lost-by-${feature.id}`} onClick={() => revealFeature(by())}>{t("cad.param.refLostBy", { feature: by() })}</button>}
+                      </Show>
+                    </span>}
+                  </For>
                 </div>
                 <div class="flex shrink-0 gap-1">
                   <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? t("cam.gen.kp.release") : "Suppress"} ${feature.id}`}

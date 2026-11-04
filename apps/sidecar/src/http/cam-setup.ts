@@ -64,6 +64,20 @@ export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(
       if (updated === "conflict") return yield* new Conflict({ message: "The setup was saved elsewhere since it was read. Nothing was overwritten." })
       return updated
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update the setup"))))
+    .handle("planSaved", ({ params }) => Effect.gen(function*() {
+      yield* projectAccess(params.id)
+      const found = yield* setups.get(params.id, params.setupId)
+      if (!found) return yield* new NotFound({ message: "Setup not found" })
+      return yield* guarded("Failed to plan the setup", () => p.planPrograms(found.setup))
+    }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch the setup"))))
+    .handle("generateSaved", ({ params, payload }) => Effect.gen(function*() {
+      yield* projectAccess(params.id)
+      const found = yield* setups.get(params.id, params.setupId)
+      if (!found) return yield* new NotFound({ message: "Setup not found" })
+      const missing = found.setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
+      if (missing.length > 0) return yield* new BadRequest({ message: `The request carries no element for ${missing.join(", ")}` })
+      return yield* guarded("Failed to generate the setup", () => p.generateSetup(found.setup, (op) => p.geometryFor(op, payload.elements, payload.stock)))
+    }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch the setup"))))
     .handle("remove", ({ params }) => Effect.gen(function*() {
       yield* projectAccess(params.id)
       if (!(yield* setups.remove(params.id, params.setupId))) return yield* new NotFound({ message: "Setup not found" })

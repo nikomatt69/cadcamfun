@@ -118,3 +118,5 @@ N1 → N2/N3 → N4 → N5 (fillet first, then shell and draft) → N7 → N6, N
   - AI: `cad.kernel` (ops `health | refs | resolve`) + skill `cad-naming`; tests `packages/ai/test/cad-kernel-naming.test.ts`.
   - Open: **N4/N5** (features storing refs: the history schema still selects by index/near/box, `migrate.ts` conversion), N6 (drawings, CAM),
     N8 (desktop badge), the 200-run random perturbation of the recipe parts, and fillet/shell/draft features that accept `ref` strings.
+- 2026-11-04 (lane cad, cc/cad-3): **N6 drawing half built**: sheet annotations (GD&T frames, datums, balloons) take `ref` and report
+  `DrawingSheet.annotations` statuses; split / lost / ambiguous refuse, never re-pick (spec 49 change log). CAM consumers still open.

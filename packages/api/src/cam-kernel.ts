@@ -9,6 +9,27 @@ const id = Schema.NonEmptyString
 /** Where to announce a run's progress: a `cam.progress` frame per step on the project's live stream; never stored with the program. */
 export const CamProgressTarget = Schema.Struct({ projectId: id, runId: id })
 
+/**
+ * Process physics of a run (spec 61): per-move feed optimisation on the carried stock (`chip` holds the chip thickness, `power` the
+ * spindle power), the machine dynamics of the cycle-time model, Taylor constants per tool id and the share of life a tool may use.
+ * Every figure the report carries is labelled uncalibrated. Absent: the program and the artifact are unchanged.
+ */
+export const CamProcessRequest = Schema.Struct({
+  feedOptimisation: Schema.optionalKey(Schema.Literals(["off", "chip", "power"])),
+  dynamics: Schema.optionalKey(Schema.Struct({
+    preset: Schema.optionalKey(Schema.Literals(["economy", "standard", "high-speed"])),
+    /** mm/s². */
+    acceleration: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(100_000))),
+    /** mm/s³. */
+    jerk: Schema.optionalKey(positive),
+    /** Blocks the control looks ahead (0: exact stop). */
+    lookAhead: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 2000 })))
+  })),
+  taylor: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ n: positive.check(Schema.isLessThanOrEqualTo(1)), c: positive }))),
+  lifeLimit: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0.05, maximum: 1 })))
+})
+export type CamProcessRequest = typeof CamProcessRequest.Type
+
 /** An explicit CAD snapshot: no stored document or AI session is mutated by this endpoint. */
 export const CamKernelRequest = Schema.Struct({
   setupOrientation: CamManufactureInput.fields.setupOrientation,
@@ -35,6 +56,10 @@ export const CamKernelRequest = Schema.Struct({
   /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */
   postDefinition: CamManufactureInput.fields.postDefinition,
   print: CamManufactureInput.fields.print,
+  /** Release only when the tolerance budget is within `tolerance` (claim `tolerance`, spec 69 B4). */
+  enforceTolerance: Schema.optionalKey(Schema.Boolean),
+  /** Process physics and its evidence (`artifact.process`); see `CamProcessRequest`. */
+  process: Schema.optionalKey(CamProcessRequest),
   /** Where to announce progress (a `cam.progress` frame per operation and stage on the project's live stream); never stored with the program. */
   progress: Schema.optionalKey(CamProgressTarget)
 })
@@ -66,6 +91,38 @@ export const CamKernelCutter = Schema.Struct({
   holder: Schema.optionalKey(Schema.Struct({ diameter: positive, length: positive })), maxRpm: Schema.optionalKey(positive), number: Schema.Int
 })
 
+const uncalibrated = Schema.Literal(false)
+/** The `process` evidence of a run (`cam.kernel.ProcessReport`); every figure uncalibrated, a stability result never a pass. */
+export const CamProcessReport = Schema.Struct({
+  feedOptimisation: Schema.Struct({
+    mode: Schema.Literals(["off", "chip", "power"]),
+    operations: Schema.Array(Schema.Struct({
+      operation: Schema.String,
+      report: Schema.Struct({
+        mode: Schema.Literals(["off", "chip", "power"]), changed: Schema.Int, pieces: Schema.Int, unresolved: Schema.Int, airPieces: Schema.Int, entryPieces: Schema.Int,
+        feedMin: Schema.Number, feedMax: Schema.Number, chip: Schema.Number, bound: Schema.Record(Schema.String, Schema.Number), belowFloor: Schema.Int,
+        cutSecondsBefore: Schema.Number, cutSecondsAfter: Schema.Number, totalSecondsBefore: Schema.Number, totalSecondsAfter: Schema.Number, cutTimeSaved: Schema.Number,
+        claimBefore: Schema.Literals(["passed", "failed", "unresolved"]), claimAfter: Schema.Literals(["passed", "failed", "unresolved"]),
+        worstRatioBefore: Schema.Number, worstRatioAfter: Schema.Number, aeBound: Schema.Number
+      })
+    }))
+  }),
+  cycleTime: Schema.Struct({ seconds: Schema.Finite, kinematicSeconds: Schema.Finite, blocks: Schema.Int, calibrated: uncalibrated, basis: Schema.String, withToolChangesSeconds: Schema.Finite }),
+  toolLife: Schema.Array(Schema.Struct({
+    toolId: Schema.String, tool: Schema.Int, lifeUsed: Schema.Number, perOperation: Schema.Array(Schema.Struct({ operation: Schema.String, lifeUsed: Schema.Number })),
+    status: Schema.Literals(["ok", "change", "exceeded"]), changeBefore: strings, calibrated: uncalibrated
+  })),
+  stability: Schema.Array(Schema.Struct({
+    toolId: Schema.String,
+    result: Schema.Struct({
+      status: Schema.Literals(["measured", "indicative"]), aLimMin: Schema.Number, chatterHz: Schema.Number,
+      curve: Schema.Array(Schema.Struct({ rpm: Schema.Number, aLim: Schema.Number, lobe: Schema.Int })),
+      windows: Schema.Array(Schema.Struct({ fromRpm: Schema.Number, toRpm: Schema.Number, aLim: Schema.Number })), calibrated: uncalibrated, note: Schema.String
+    })
+  })),
+  calibrated: uncalibrated, label: Schema.String
+})
+
 /** Full artifact, including the evidence bound to its NC bytes. Display meshes never replace the CAD snapshot. */
 export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.Struct({
   schemaVersion: Schema.Literal(1), jobId: id,
@@ -82,7 +139,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   })),
   program: cam.ProgramSchema, tools: Schema.Array(CamKernelCutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage"]),
+    id: Schema.Literals(["bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage", "tolerance"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),
@@ -105,7 +162,11 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
     requested: Schema.Finite,
     terms: Schema.Array(Schema.Struct({ id: Schema.Literals(["source-tessellation", "part-model", "path", "nc-rounding", "stock-replay"]), mm: Schema.Finite, basis: Schema.String })),
     achieved: Schema.Finite, unbounded: strings, met: Schema.Boolean
-  }))
+  })),
+  /** Present when the request asked for `process`: feed optimisation per operation, dynamic cycle time, tool life, indicative stability. */
+  process: Schema.optionalKey(CamProcessReport),
+  /** Tool-centre-point output only: the largest distance of the tip the NC makes from the planned path, with its declared limit, mm. */
+  tipError: Schema.optionalKey(Schema.Struct({ max: Schema.Finite, mean: Schema.Finite, samples: Schema.Int, limit: Schema.Finite, line: Schema.optionalKey(Schema.Int) }))
 })
 export type CamKernelArtifact = typeof CamKernelArtifact.Type
 
@@ -114,6 +175,16 @@ export const CamKernelResult: Schema.Codec<cam.kernel.CamResult<cam.kernel.CamAr
   Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })
 ])
 export type CamKernelResult = typeof CamKernelResult.Type
+
+/**
+ * What the kernel would run for a request, without running it (`cam.kernel.planOnly`): the planned operations in machining order (each an
+ * `OperationSpec` record, to edit and send back as `operations`), the planner's notes and what it cannot machine in this setup.
+ */
+export const CamKernelPlanResult = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("ok"), value: Schema.Struct({ operations: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)), notes: strings, unmachined: strings }) }),
+  Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })
+])
+export type CamKernelPlanResult = typeof CamKernelPlanResult.Type
 
 const xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
 

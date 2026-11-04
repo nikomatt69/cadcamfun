@@ -72,3 +72,40 @@ export const elementsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElement
 /** The file name of a generated program: the setup's program number and name, safe for a file system. */
 export const programFileName = (program: { readonly name: string; readonly programNumber: number }, extension = "nc"): string =>
   `${program.programNumber}-${program.name.replace(/[^A-Za-z0-9._-]+/g, "_")}.${extension}`
+
+/** The choices a saved setup was written with, so loading it puts the panel back as it was saved. */
+export const choicesOfSetup = (setup: Setup): SetupChoices => ({
+  name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset
+})
+
+export interface RestoredToolpaths {
+  readonly toolpaths: ReadonlyArray<ElementToolpath>
+  /** Element ids an operation names that the drawing no longer has: the operation is kept (hidden) and reported, not dropped. */
+  readonly missingElementIds: ReadonlyArray<string>
+  /** Operations the panel cannot show as one toolpath per element (none, or several elements): reported, not guessed. */
+  readonly skippedOperationIds: ReadonlyArray<string>
+}
+
+/**
+ * The panel's toolpaths of a saved setup (the inverse of `setupOfToolpaths`): one per operation, in the setup's order, with no G-code
+ * (a loaded setup is regenerated: text generated for another revision of the drawing is not trusted). A disabled operation, or one
+ * whose element is gone, is a hidden toolpath.
+ */
+export const toolpathsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElement>, colors: ReadonlyArray<string>): RestoredToolpaths => {
+  const byId = new Map(elements.map((element) => [String(element["id"]), element]))
+  const toolpaths: ElementToolpath[] = []
+  const missing: string[] = []
+  const skipped: string[] = []
+  for (const op of setup.operations) {
+    const elementId = op.elementIds.length === 1 ? op.elementIds[0]! : undefined
+    if (elementId === undefined) { skipped.push(op.id); continue }
+    const element = byId.get(elementId)
+    if (element === undefined) missing.push(elementId)
+    toolpaths.push({
+      id: op.id, elementId, elementType: String(element?.["type"] ?? ""), elementName: op.name,
+      toolpathSettings: op.params, gcode: "", color: colors[toolpaths.length % Math.max(1, colors.length)] ?? "#888888",
+      visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0
+    })
+  }
+  return { toolpaths, missingElementIds: missing, skippedOperationIds: skipped }
+}

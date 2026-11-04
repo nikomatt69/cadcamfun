@@ -9,6 +9,7 @@ import type { Coolant, Program, Toolpath, WorkOffset } from "../ir.ts"
 import type { PostId, PostOptions } from "../post/types.ts"
 import type { Cutter } from "./cutters.ts"
 import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
+import type { ProcessReport, ProcessRequest } from "./process-report.ts"
 import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
 import type { SwarfWall } from "../operations/swarf.ts"
 
@@ -251,7 +252,7 @@ export type OperationSpec =
    * 3D strategies over the part's surface. Finishing: `parallel` raster, `waterline` constant Z, `steep-shallow` (waterline on walls,
    * raster on flats), `scallop` (constant 3D stepover), `spiral` / `radial` about `center`, `flat` (horizontal faces at their height).
    */
-  | (OperationBase & { readonly strategy: "surface"; readonly mode: SurfaceMode; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string; readonly center?: Vec2 })
+  | (OperationBase & { readonly strategy: "surface"; readonly mode: SurfaceMode; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string; readonly center?: Vec2; /** Tool contact: the sampled height field (default) or exact contact against the part triangles (spec 69 F1). */ readonly contact?: "heightfield" | "mesh" })
   /**
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
@@ -387,6 +388,8 @@ export interface ManufacturingJob {
   readonly post?: { readonly options?: Partial<PostOptions>; readonly definition?: unknown }
   /** How a printer job is sliced (only read when the machine is a `printer`). */
   readonly print?: PrintRequirement
+  /** Process physics (spec 61): per-move feed optimisation and the `process` evidence; absent = no change to the program or the artifact. */
+  readonly process?: ProcessRequest
 }
 
 // ---------------------------------------------------------------- results
@@ -539,6 +542,13 @@ export interface CamArtifact {
   /** Notes of the planner (features it could not machine and why). */
   readonly notes: ReadonlyArray<string>
   readonly tolerance?: ToleranceBudget
+  /** Present when the job asked for `process`: feed optimisation per operation, dynamic cycle time, tool life, indicative stability; all uncalibrated. */
+  readonly process?: ProcessReport
+  /**
+   * Tool-centre-point output only (spec 69 B6): the largest distance of the tool tip the emitted NC makes (replayed, carried to machine
+   * coordinates) from the planned path, mm, with the declared limit it is held to (post splitting tolerance plus angle rounding).
+   */
+  readonly tipError?: { readonly max: number; readonly mean: number; readonly samples: number; readonly limit: number; readonly line?: number }
   /** Present when the machine is a printer: what was printed and how it was measured. */
   readonly print?: PrintReport
 }

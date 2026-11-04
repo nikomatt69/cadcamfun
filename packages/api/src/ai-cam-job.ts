@@ -41,13 +41,16 @@ export const CamJobSetup = Schema.Struct({
   operations: optional(Schema.Array(cam.kernel.OperationSpecSchema).check(Schema.isMaxLength(300)))
 })
 
-export const CamJobPart = Schema.Struct({
+/** The part without the one-of check (that check is a filter the generated HTTP clients cannot port; the route applies it itself). */
+export const CamJobPartFields = Schema.Struct({
   elements: optional(Schema.Array(Schema.Record(Schema.String, Schema.Unknown)).check(Schema.isMinLength(1), Schema.isMaxLength(500))),
   meshes: optional(Schema.Array(Schema.Struct({
     positions: Schema.Array(Schema.Finite).check(Schema.isMinLength(9), Schema.isMaxLength(600_000)),
     indices: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))).check(Schema.isMinLength(3), Schema.isMaxLength(600_000))
   })).check(Schema.isMinLength(1), Schema.isMaxLength(50)))
-}).check(Schema.makeFilter((part) => (part.elements === undefined) !== (part.meshes === undefined), { message: "Send exactly one of elements or meshes" }))
+})
+export const isOnePartSource = (part: typeof CamJobPartFields.Type): boolean => (part.elements === undefined) !== (part.meshes === undefined)
+export const CamJobPart = CamJobPartFields.check(Schema.makeFilter(isOnePartSource, { message: "Send exactly one of elements or meshes" }))
 
 export const CamJobInput = Schema.Struct({
   op: Schema.Literals(["plan", "run"]),
@@ -69,3 +72,21 @@ export const CamJobInput = Schema.Struct({
   nc: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 200 })))
 })
 export type CamJobInput = typeof CamJobInput.Type
+
+/** `POST /api/cam/jobs`: the same job; the handler refuses a part with both or neither of elements and meshes (400). */
+export const CamJobRequest = Schema.Struct({ ...CamJobInput.fields, part: CamJobPartFields })
+export type CamJobRequest = typeof CamJobRequest.Type
+
+const record = Schema.Record(Schema.String, Schema.Unknown)
+/**
+ * What a job answers: `ok` false with `error` (and the kernel's `issues`) when it could not be planned or run; otherwise each setup,
+ * every claim with its detail, the failed and the undecided ones again, the coverage of the job and the notes. A failed claim is an
+ * answer (a verdict), not an error. Shared by `POST /api/cam/jobs` and the assistant's `cam.job`.
+ */
+export const CamJobResult = Schema.Struct({
+  ok: Schema.Boolean, op: Schema.Literals(["plan", "run"]), release: optional(Schema.String),
+  setups: optional(Schema.Array(record)), claims: optional(Schema.Array(record)), failed: optional(Schema.Array(record)), unresolved: optional(Schema.Array(record)),
+  coverage: optional(record), notes: optional(Schema.Array(Schema.String)), issues: optional(Schema.Array(record)),
+  cycleTimeSeconds: optional(Schema.Finite), error: optional(Schema.String)
+})
+export type CamJobResult = typeof CamJobResult.Type

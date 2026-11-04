@@ -7,7 +7,6 @@ import {
   TOOLPATH_COLORS,
   addToolpath,
   applyGlobalSettingsToSelected,
-  combineGCode,
   deselectAllToolpaths,
   formatDuration,
   initialState,
@@ -141,22 +140,7 @@ describe("G-code points", () => {
   })
 })
 
-describe("combined program", () => {
-  test("lists generated toolpaths in execution order, skipping empty ones", () => {
-    let state = withThree()
-    state = updateToolpathGCode(state, "tp-a", "G1 X1", [])
-    state = updateToolpathGCode(state, "tp-c", "G1 X3", [])
-    state = reorderToolpaths(state, ["tp-c", "tp-b", "tp-a"])
-    const text = combineGCode(state.toolpaths, "STAMP")
-    expect(text.startsWith("; Combined G-Code from Multiple Toolpaths\n; Generated: STAMP\n; Total toolpaths: 3")).toBe(true)
-    expect(text.indexOf("G1 X3")).toBeLessThan(text.indexOf("G1 X1"))
-    expect(text).toContain("; ===== Toolpath 1: c =====")
-    expect(text).toContain("; ===== Toolpath 3: a =====")
-    expect(text).not.toContain("Toolpath 2: b")
-    expect(text).toContain(`; Tool: Ø${settings.toolDiameter}mm`)
-    expect(text.endsWith("; ===== End of Combined G-Code =====\n")).toBe(true)
-  })
-
+describe("statistics", () => {
   test("statistics and duration formatting", () => {
     let state = withThree()
     state = updateToolpathGCode(state, "tp-a", "G1 X1", [], { distance: 1500, time: 125 })
@@ -183,7 +167,10 @@ describe("the store", () => {
     expect(store.getState().toolpaths.map(toolpath => toolpath.id)).toEqual([second, first])
     store.getState().updateToolpathGCode(first, "G1 X1 F100", [{ x: 0, y: 0, z: 0, feedrate: 100 }, { x: 1, y: 0, z: 0, feedrate: 100 }])
     expect(store.getState().getToolpathByElementId("el-1")?.distance).toBe(1)
-    expect(store.getState().generateCombinedGCode()).toContain("G1 X1 F100")
+    store.getState().replaceToolpaths([store.getState().getToolpathById(first)!])
+    expect(store.getState().toolpaths.map(toolpath => toolpath.id)).toEqual([first])
+    expect(store.getState().selectedToolpathIds).toEqual([])
+    store.getState().addToolpath("el-2", "rectangle", "Plate", settings)
 
     const saved = JSON.parse(memory.get(STORAGE_KEY)!)
     expect(saved.state.toolpaths).toHaveLength(2)

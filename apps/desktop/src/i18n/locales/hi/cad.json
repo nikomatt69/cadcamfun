@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "पैटर्न की मोटाई",
   "cad.template.honeycombPattern.thickness.label": "मोटाई",
   "cad.template.honeycombPattern.color.description": "पैटर्न का रंग",
-  "cad.template.honeycombPattern.color.label": "रंग"
+  "cad.template.honeycombPattern.color.label": "रंग",
+  "cad.param.refLost": "संदर्भ खो गया",
+  "cad.param.refLostBy": "{feature} द्वारा हटाया गया",
+  "cad.param.refLostSummary": "{count} चयन ऐसे फ़ेस या किनारों की ओर इशारा करते हैं जो अब मौजूद नहीं हैं: वे फ़ीचर नहीं बने"
 }

@@ -35,6 +35,7 @@ import { fiveAxisKinematic } from "../five-axis.ts"
 import type { RotaryAngles } from "../indexing.ts"
 import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriReplay, triCellFor, type TriVerdict } from "./tri-replay.ts"
+import { tipError } from "./tip-error.ts"
 import { turnedPoses } from "./turned-poses.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
@@ -71,6 +72,8 @@ import {
 } from "./contracts.ts"
 import { DEFAULT_CUTTERS, cutterIssues, legacyTool, verifyTool, type Cutter } from "./cutters.ts"
 import { cuttingData, type CutClass, type CuttingData } from "./cutting-data.ts"
+import { optimizeFeeds } from "./feed-optimise.ts"
+import { buildProcessReport, type FeedOperationReport } from "./process-report.ts"
 import { digestOf, sha256 } from "./identity.ts"
 import { DEFAULT_MACHINE } from "./machines.ts"
 import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
@@ -556,6 +559,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   /** Material the program leaves standing on purpose (profile tabs): within `radius` of the stretch of path, up to `z` (work Z). */
   const declaredLeft: Array<{ readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>; readonly radius: number; readonly z: number }> = []
   const outcomes: OperationOutcome[] = []
+  const feedReports: FeedOperationReport[] = []
   const toolpaths: Toolpath[] = []
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
@@ -806,7 +810,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (op.restFrom !== undefined && restTool === undefined) { fail("UnknownTool", `${op.id}: rest-from cutter '${op.restFrom}' is not in the library`, data); return }
           const params = decode(SurfaceParams, {
             ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" || op.mode === "rest" ? 0 : (op.scallop ?? prepared.scallop),
-            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
+            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), ...(op.contact !== undefined ? { contact: op.contact } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
             rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), clearing: op.clearing ?? "adaptive", engagement: Math.max(1, Math.min(50, stepover)),
             ...(restTool !== undefined ? { restFrom: { diameter: restTool.diameter, kind: legacyTool(restTool).kind, ...(restTool.kind === "bull" && restTool.cornerRadius !== undefined ? { tipRadius: restTool.cornerRadius } : {}) } } : {})
           })
@@ -840,7 +844,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     }
     if (tp === undefined || !cuts(tp)) { fail("EmptyToolpath", `${op.id}: the strategy produced no cutting move${generated.warnings.length > 0 ? ` (${generated.warnings.join("; ")})` : ""}`, data); return }
     // The marker comment ties every NC block to its operation in the replay.
-    const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...tp.moves] }
+    // Per-move feed optimisation (spec 61 Z3) on the stock the earlier operations left: plain 3-axis motion only, never rotary moves or canned cycles.
+    let cutMoves = tp.moves
+    const feedMode = job.process?.feedOptimisation ?? "off"
+    if (feedMode !== "off") {
+      if (tp.moves.some((m) => m._tag === "Cycle" || m._tag === "CycleBegin" || ((m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined) || m._tag === "CutterComp")) {
+        warnings.push(`${op.id}: feed optimisation skipped (canned cycles, compensation or rotary moves in this operation)`)
+      } else {
+        const optimised = optimizeFeeds({ moves: tp.moves, stock: provisional, cutter: tool, material, machine: machine.limits, rpm, mode: feedMode })
+        cutMoves = optimised.moves
+        feedReports.push({ operation: op.id, report: optimised.report })
+      }
+    }
+    const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...cutMoves] }
     // Provisional stock: what this operation removes, so the next one enters from the right height.
     const replay = pathFromProgram(makeProgram("provisional", [marked]), { x: 0, y: 0, z: CLEARANCE })
     if (marked.moves.some((m) => (m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined)) {
@@ -1292,6 +1308,12 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // pivot, and the pieces that follow the tip path are within the post's splitting tolerance of the planned machine-axis line.
   const tcpTerm = carry === undefined ? 0 : carry.maxRadius * (Math.PI / 180) * Math.pow(10, -decimals) + (job.post?.options?.tolerance ?? 0.01)
   const rounding = 2 * Math.pow(10, -decimals) + 1e-9 + tcpTerm
+  // Spec 69 B6: for tool-centre-point output the replayed tip is measured against the planned path point by point (not only by extent). Not measured for a control that writes its turning rapids as feed moves (Haas G234): those follow the tip path by design and cannot be told from cuts in the replay.
+  const tipErr: CamArtifact["tipError"] | undefined = carry === undefined || interpreted === undefined || rapidsAsFeed || toolpaths.some((t) => t.moves.some((m) => m._tag === "CutterComp")) ? undefined : (() => {
+    const e = tipError(planned.segments, interpreted.segments as ReadonlyArray<GSegment>)
+    return { max: Math.round(e.max * 1e6) / 1e6, mean: Math.round(e.mean * 1e6) / 1e6, samples: e.samples, limit: Math.round(tcpTerm * 1e6) / 1e6, ...(e.line !== undefined ? { line: e.line } : {}) }
+  })()
+  if (tipErr !== undefined && tipErr.max > tipErr.limit) issues.push(issue("ReplayMismatch", "replay", `The tool tip the tool-centre-point NC makes strays ${tipErr.max.toFixed(4)} mm from the planned path (NC line ${tipErr.line}); the declared limit is ${tipErr.limit.toFixed(4)} mm`, { ...(tipErr.line !== undefined ? { line: tipErr.line } : {}) }))
   const plannedExtent = extent(planned.segments)
   const replayedExtent = interpreted === undefined ? [] : extent(interpreted.segments.filter((s): s is Exclude<GSegment, { kind: "dwell" }> => s.kind !== "dwell" && carry?.interior.has(s) !== true).map((s) => ({ rapid: s.kind === "rapid", to: s.to })))
   // Cutter radius compensation (`G41` / `G42`): the program is the contour and the control's offset moves the tool centre by up to the tool radius
@@ -1528,7 +1550,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...planNotes(prepared), ...subprogramNotes(nc)],
-      tolerance
+      tolerance,
+      ...(job.process !== undefined ? { process: buildProcessReport({ request: job.process, program, operations: finalOutcomes, tools: usedTools, material, rapidFeed: machine.rapidFeed ?? 10000, toolChangeSeconds: machine.toolChangeSeconds ?? 8, feedReports }) } : {}),
+      ...(tipErr !== undefined ? { tipError: tipErr } : {})
     }
   }
 }
