@@ -2,7 +2,7 @@ import { Api, CurrentUser } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { LiveEvents } from "../services/live-events.ts"
-import { probeProgressReporter } from "../services/probe-progress.ts"
+import { probeProgressReporter, probeResultFrame } from "../services/probe-progress.ts"
 import { Probing } from "../services/probing.ts"
 
 /** Probing, work offsets and inspection reports (spec 73 §3.1): the HTTP face of the `Probing` service. */
@@ -70,18 +70,7 @@ export const CamProbingHandlers = HttpApiBuilder.group(Api, "camProbing", Effect
         Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
       )
       report?.("done")
-      if (runId !== undefined) {
-        const data = doc.data !== null && typeof doc.data === "object" ? doc.data as { verdict?: unknown; checks?: unknown; failed?: unknown; maxDeviationMm?: unknown; updates?: unknown } : {}
-        const checks = Array.isArray(data.checks) ? data.checks.length : 0
-        yield* events.publish({
-          type: "probe.result", projectId: params.id, runId, reportId: doc.id, operationId: payload.operationId, at: new Date().toISOString(),
-          verdict: data.verdict === "warn" || data.verdict === "fail" || data.verdict === "missed" || data.verdict === "incomplete" ? data.verdict : "pass",
-          checks, failed: typeof data.failed === "number" ? data.failed : 0,
-          ...(typeof data.maxDeviationMm === "number" ? { maxDeviationMm: data.maxDeviationMm } : {}),
-          offsetsUpdated: Array.isArray(data.updates) && data.updates.length > 0,
-          kind: doc.kind === "rotary" ? "rotary" : "part"
-        })
-      }
+      if (runId !== undefined) yield* events.publish(probeResultFrame(params.id, runId, doc, payload.operationId))
       return doc
     }))
     .handle("reportsSave", Effect.fn("http.camProbing.reportsSave")(function*({ params, payload }) {

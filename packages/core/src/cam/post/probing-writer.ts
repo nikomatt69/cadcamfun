@@ -318,6 +318,21 @@ const writeWork = (m: OffsetUpdateMove, a: OffsetAddress, io: ProbeIo): string[]
   }
 }
 
+/**
+ * A marked Renishaw macro or Siemens measuring cycle (`probing/native.ts`), read from the vendors' manuals, not run on a control. Upper-case
+ * keys of `params` are the macro's letters (`D`, `S`, `Z`), keys with `_` the Siemens classic parameters; `x`, `y`, `z`, `f` say where the
+ * cycle ends, reached by a retract the cycle leaves to the program.
+ */
+export const nativeProbeLines = (move: { readonly family: string; readonly number: number; readonly params: Readonly<Record<string, number>> }, num: (mm: number) => string): string[] => {
+  const p = move.params
+  if (move.family === "renishaw") {
+    const words = Object.keys(p).filter((k) => /^[A-Z]$/.test(k)).sort().map((k) => `${k}${k === "S" ? p[k]!.toFixed(0) + "." : num(p[k]!)}`)
+    return [`G65 P${move.number} ${words.join(" ")}`, `G65 P9810 Z${num(p["z"]!)} F${Math.round(p["f"]!)}`]
+  }
+  const words = Object.keys(p).filter((k) => k.startsWith("_")).sort().map((k) => `${k}=${Number(p[k]!.toFixed(6))}`)
+  return [...words, `CYCLE${move.number}`, `G0 Z${num(p["z"]!)}`]
+}
+
 /** The word of a rapid in machine coordinates (G53 / SUPA), or the reason the control has none. */
 export const machineRapidWord = (io: ProbeIo): { readonly before: string; readonly after?: string } => {
   switch (io.codes.syntax) {

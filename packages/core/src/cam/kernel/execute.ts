@@ -86,6 +86,7 @@ import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } fro
 import { planPrintJob, runPrintJob } from "./print.ts"
 import { resolveOperations } from "./operation-model.ts"
 import { jobTransform, workplaneFrame, workplaneTransform } from "./workplane.ts"
+import { withoutNativeMarks } from "../probing/native.ts"
 import { probeCutterOf, probeRefusal, probeReplayHost, probeToolpath, probingEvidence, type ProbingEvidence } from "./probing.ts"
 import { cadStockOf, carriedColumns, transposeOf } from "./carry.ts"
 import { holdingOf } from "./fixtures.ts"
@@ -1033,7 +1034,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const workPlanes = planeFrame !== undefined && "frame" in planeFrame
     ? Object.fromEntries(toolpaths.map((tp) => [tp.id, { frame: planeFrame.frame, ...(machine.fiveAxis !== undefined ? { layout: machine.fiveAxis.layout } : {}) }]))
     : undefined
-  const emitProgram = (p: Program): string => post.emit(p, { tcp: false, ...job.post?.options, ...(workPlanes !== undefined ? { workPlanes } : {}), ...(wantsTcp && tcpKinematics !== undefined ? { kinematics: tcpKinematics } : {}), toolNumbers: numbers, retractBeforeToolChange: true })
+  // A native probe cycle is marked in the moves; the post writes the marks only with the option, which touches nothing else that is not marked.
+  const nativeProbes = probePlans.filter((p) => p.op.native === true).map((p) => p.op.id)
+  const emitProgram = (p: Program): string => post.emit(p, { tcp: false, ...job.post?.options, ...(nativeProbes.length > 0 ? { nativeCycles: true } : {}), ...(workPlanes !== undefined ? { workPlanes } : {}), ...(wantsTcp && tcpKinematics !== undefined ? { kinematics: tcpKinematics } : {}), toolNumbers: numbers, retractBeforeToolChange: true })
   try {
     // The kernel writes machine coordinates (indexed setups): no tip-control word unless the caller asks for one.
     nc = toolpaths.length === 0 || tcpRefusal !== undefined ? "" : emitProgram(program)
@@ -1098,7 +1101,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // A probe program reads where the probe touched: its macros run against the part as drawn, and its touches come back as moves ending at the contact.
   const probeDevice = probePlans.length === 0 ? undefined : machine.probing?.probes.find((p) => p.id === probePlans[0]!.op.tool)
   const probeHost = probeDevice === undefined ? undefined : probeReplayHost(prepared, postDialect, job.post?.options?.probing, probeDevice)
-  const read = nc === "" ? undefined : interpretGcode(nc, { start: initial, ...(probeHost !== undefined ? { probeMoves: true, macroHost: probeHost.expand } : {}), toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
+  // The vendor's cycle is not replayed: the path, stock and travel evidence reads the inline expansion in its place, and the `probing` claim says so.
+  const replayNc = nativeProbes.length === 0 || nc === "" ? nc : emitProgram({ ...program, toolpaths: program.toolpaths.map((tp) => nativeProbes.includes(tp.id) ? { ...tp, moves: withoutNativeMarks(tp.moves) } : tp) })
+  const read = replayNc === "" ? undefined : interpretGcode(replayNc, { start: initial, ...(probeHost !== undefined ? { probeMoves: true, macroHost: probeHost.expand } : {}), toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
   // Spec 72 step 0.2: motions read under the control's tool-centre-point mode are the tip in part coordinates. Every check below reads machine
   // coordinates with the angles in force, so they are carried across once, here, through the machine's table (or the caller's kinematics).
   const carryKinematic: TipKinematic | undefined = machine.fiveAxis ?? (tcpKinematics !== undefined ? { layout: tcpKinematics.layout, pivot: tcpKinematics.pivot } : undefined)

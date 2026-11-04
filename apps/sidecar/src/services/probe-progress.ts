@@ -27,3 +27,16 @@ export const probeProgressReporter = (events: { readonly publish: (event: LiveEv
     const frame = probeProgressFrame(projectId, runId, progress)
     if (frame !== undefined) Effect.runFork(events.publish(frame))
   }
+
+/** The frame that closes a run with its verdict, shared by the HTTP route and the assistant. */
+export const probeResultFrame = (projectId: string, runId: string, doc: { readonly id: string; readonly kind: string; readonly data: unknown }, operationId: string, at = new Date().toISOString()): LiveEvent => {
+  const data = doc.data !== null && typeof doc.data === "object" ? doc.data as { verdict?: unknown; checks?: unknown; failed?: unknown; maxDeviationMm?: unknown; updates?: unknown } : {}
+  return {
+    type: "probe.result", projectId, runId, reportId: doc.id, operationId, at,
+    verdict: data.verdict === "warn" || data.verdict === "fail" || data.verdict === "missed" || data.verdict === "incomplete" ? data.verdict : "pass",
+    checks: Array.isArray(data.checks) ? data.checks.length : 0, failed: typeof data.failed === "number" ? data.failed : 0,
+    ...(typeof data.maxDeviationMm === "number" ? { maxDeviationMm: data.maxDeviationMm } : {}),
+    offsetsUpdated: Array.isArray(data.updates) && data.updates.length > 0,
+    kind: doc.kind === "rotary" ? "rotary" : "part"
+  }
+}

@@ -187,3 +187,41 @@ describe("probing inside a tilted plane (5-axis: the plane the control swivels t
     expect(Math.abs(g54.z - d.z)).toBeLessThan(6e-3)
   })
 })
+
+describe("native probe cycles in a job", () => {
+  const nativeOp = (id: string, cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction> = []): OperationSpec => ({ id, strategy: "probe", tool: device.id, cycle, actions, native: true })
+  const bore = nativeOp("bore", { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }, [setOffset({ X: "x", Y: "y" })])
+  for (const [label, machine, word] of [
+    ["heidenhain", machineOf("vmc-standard", "heidenhain", { macroStyle: "heidenhain-ts" }), "TCH PROBE 412"],
+    ["renishaw", machineOf("vmc-standard", undefined, { macroStyle: "renishaw" }), "G65 P9814"],
+    ["siemens", machineOf("siemens-840d-vmc", undefined, { macroStyle: "siemens-cycles" }), "CYCLE977"]
+  ] as const) {
+    test(`${label}: the program holds the cycle and the probing claim stays unresolved`, () => {
+      const art = ok(runJob(jobOf(machine, [bore])))
+      expect(art.nc).toContain(word)
+      const claim = art.claims.find((c) => c.id === "probing")!
+      expect(claim.status).toBe("unresolved")
+      expect(claim.detail).toContain("native cycle not replayed")
+      expect(art.probing?.textReplay).toBe("not-replayed")
+      expect(art.issues.filter((i) => i.severity === "error").map((i) => i.message)).toEqual([])
+      expect(art.release).toBe("preview")
+      expect(art.operations[0]!.probe?.native).toBe(word)
+      expect(art.issues.filter((i) => i.severity === "error")).toEqual([])
+    })
+  }
+
+  test("a machine without a cycle package, or a post that is not its own, refuses the operation", () => {
+    const r = prepareJob(jobOf(machineOf("vmc-standard"), [bore]))
+    expect(r.status === "failed" && r.issues[0]!.message).toMatch(/cycle package/)
+    const other = prepareJob(jobOf(machineOf("vmc-standard", undefined, { macroStyle: "heidenhain-ts" }), [bore]))
+    expect(other.status === "failed" && other.issues[0]!.message).toMatch(/does not write/)
+  })
+
+  test("simulation of a native operation is the inline expansion", () => {
+    const prepared = prepareJob(jobOf(machineOf("vmc-standard", undefined, { macroStyle: "renishaw" }), [bore]))
+    if (prepared.status !== "ok") throw new Error(prepared.issues[0]!.message)
+    const runs = simulateProbing(prepared.value, { placement: { translate: { x: 0.2, y: -0.1, z: 0 } } })
+    if ("refused" in runs) throw new Error(runs.refused)
+    expect(runs[0]!.outcome.results["x"]! - 30).toBeCloseTo(0.2, 2)
+  })
+})

@@ -38,9 +38,9 @@ import { assertCycleSafe } from "../cycle-safety.ts"
 import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
-import { alarmBlocks, machineRapidWord, offsetLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
+import { alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
 import { addressOf } from "../work-offset.ts"
-import { klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
+import { isKlartextProbeCycle, klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import type { WordExpr } from "../macro.ts"
 
 const MM_PER_INCH = 25.4
@@ -776,7 +776,26 @@ class Writer {
   private skippedEnd: Vec3 | undefined
 
   private cycleBegin(move: Extract<Move, { readonly _tag: "CycleBegin" }>): void {
-    if (this.dialect.klartextCycles !== true || this.scale !== 1 || move.family !== "heidenhain" || this.options.nativeCycles !== true) return
+    if (this.scale !== 1 || this.options.nativeCycles !== true) return
+    if (move.family !== "heidenhain") {
+      // The vendor's measuring cycle or macro for the post that has it; every other post writes the moves.
+      if (this.dialect.probing?.syntax !== (move.family === "renishaw" ? "fanuc" : "siemens")) return
+      this.endCycle()
+      for (const line of nativeProbeLines(move, (v) => this.num(v))) this.macroLine(line)
+      const { x, y, z } = move.params
+      if (x === undefined || y === undefined || z === undefined) throw new RangeError(`Cycle ${move.number} needs where it ends (x, y, z)`)
+      this.skipping = true
+      this.skippedEnd = { x, y, z }
+      return
+    }
+    if (this.dialect.klartextCycles !== true) return
+    if (isKlartextProbeCycle(move.number)) {
+      this.endCycle()
+      for (const line of klartextFixedCycle(move.number, move.params, this.options.decimals).define) this.lines.push(line)
+      this.skipping = true
+      this.skippedEnd = { x: move.params["x"] ?? 0, y: move.params["y"] ?? 0, z: move.params["Q260"] ?? 0 }
+      return
+    }
     this.endCycle()
     const cycle = klartextFixedCycle(move.number, move.params, this.options.decimals)
     if (cycle.signature !== this.klartextCycleSignature) {

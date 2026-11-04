@@ -12,6 +12,7 @@
 import type { Vec3 } from "../../cad/vec.ts"
 import type { Move, Toolpath } from "../ir.ts"
 import { compileActions } from "../probing/actions.ts"
+import { nativeCycle } from "../probing/native.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
 import { translateCycle } from "../probing/transform.ts"
 import { runProbeMoves, type ProbeTruth, type SimMachine } from "../probing/simulate.ts"
@@ -69,6 +70,11 @@ export const probeRefusal = (op: ProbeOperationSpec, machine: KernelMachine, dia
   if (device.on !== undefined || device.off !== undefined) return `The probe ${device.id} needs its own on / off words (${[...(device.on ?? []), ...(device.off ?? [])].join(" ")}): the post does not write them, put them in the tool-change macro and remove them from the device`
   if (dialect?.probing === undefined) return `Post ${machine.post} writes no probing words: use a post that does (fanuc, haas, mazak, mitsubishi, brother, generic, linuxcnc, siemens, heidenhain) or a machine with one`
   if (tilted && machine.probing.tiltedPlane !== true) return `The setup is a tilted plane and the machine's probing does not say the control probes inside one (probing.tiltedPlane): the touches would be read in the wrong frame`
+  if (op.native === true) {
+    const family = machine.probing.macroStyle === "heidenhain-ts" ? "heidenhain" : machine.probing.macroStyle === "siemens-cycles" ? "siemens" : machine.probing.macroStyle === "renishaw" ? "fanuc" : undefined
+    if (family === undefined) return `Operation ${op.id} asks for the control's own cycle and the machine's probing has no cycle package (macroStyle)`
+    if (dialect.probing.syntax !== family) return `Operation ${op.id} asks for ${machine.probing.macroStyle} cycles, which the ${machine.post} post does not write`
+  }
   if (op.cycle.kind === "stylus-calibrate" || op.cycle.kind === "rotary-axis") return `The ${op.cycle.kind} cycle is run through cam.probing, not as an operation of a cutting job`
   return undefined
 }
@@ -95,6 +101,13 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   let moves: Move[]
   try { moves = compileActions(routine, op.actions ?? [], ctx) } catch (error) { return { refused: error instanceof Error ? error.message : String(error) } }
   const first = moves.find((m) => m._tag === "Probe")
+  let native: string | undefined
+  if (op.native === true) {
+    const marked = nativeCycle(cycle, op.actions ?? [], machine.probing?.macroStyle ?? "inline", moves, { probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: frame !== undefined })
+    if ("refused" in marked) return { refused: `native cycle: ${marked.refused}` }
+    moves = [...marked.moves]
+    native = marked.word
+  }
   const approach: Move[] = []
   if (device.orientSpindle !== undefined) approach.push({ _tag: "SpindleOrient", angle: device.orientSpindle / (Math.PI / 180) })
   if (first !== undefined && first._tag === "Probe") approach.push({ _tag: "Rapid", to: { x: first.to.x, y: first.to.y, z: ctx.safeZ } })
@@ -102,7 +115,8 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   const targets = (op.actions ?? []).flatMap((a) => (a.kind === "set-offset" ? [`${a.ref.kind === "g5x" ? a.ref.code : a.ref.kind}:${Object.keys(a.axes).join("")}`] : a.kind === "tool-offset" ? [`T${a.tool} ${a.quantity}`] : []))
   const summary: ProbeOperationSummary = {
     cycle: op.cycle.kind, touches: routine.contacts.length, device: device.id, nominal: routine.nominal,
-    variables: Object.fromEntries(Object.keys(routine.results).map((k) => [k, `${prefix}${k}`])), offsetTargets: targets
+    variables: Object.fromEntries(Object.keys(routine.results).map((k) => [k, `${prefix}${k}`])), offsetTargets: targets,
+    ...(native !== undefined ? { native } : {})
   }
   return { toolpath, routine, moves: toolpath.moves, summary, device }
 }

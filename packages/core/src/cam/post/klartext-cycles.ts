@@ -67,7 +67,20 @@ export const klartextCycle = (move: CycleMove, decimals: number): KlartextCycle 
 // ---------------------------------------------------------------- cycles the IR marks (CycleBegin .. CycleEnd)
 
 /** A cycle's parameter rows in the order of the cycle manual: number, label, and a default (absent = the caller must give it). */
-interface CycleTable { readonly name: string; readonly rows: ReadonlyArray<readonly [number, string, number | undefined]> }
+interface CycleTable {
+  readonly name: string
+  readonly rows: ReadonlyArray<readonly [number, string, number | undefined]>
+  /** A touch-probe cycle: `TCH PROBE n` runs where it stands in the program, with no call block. */
+  readonly probe?: boolean
+}
+
+// Touch-probe rows, read from the TNC touch probe cycle manual as the author reads them, not run on a control (spec 73 §5.9).
+const CENTRE_DATUM = [[320, "SET-UP CLEARANCE", 0], [260, "CLEARANCE HEIGHT", undefined], [301, "MOVE TO CLEARANCE", 1], [305, "NUMBER IN TABLE", undefined]] as const
+const TS_ROWS = [[381, "PROBE IN TS AXIS", 0], [382, "1ST CO. FOR TS AXIS", 0], [383, "2ND CO. FOR TS AXIS", 0], [384, "3RD CO. FOR TS AXIS", 0], [333, "DATUM", 0]] as const
+const CIRCLE: CycleTable["rows"] = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [262, "NOMINAL DIAMETER", undefined], [325, "STARTING ANGLE", 0], [247, "STEPPING ANGLE", 90], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [331, "DATUM", undefined], [332, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS, [423, "NO. OF PROBE POINTS", 4], [365, "TYPE OF TRAVERSE", 1]]
+const RECT: CycleTable["rows"] = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [323, "1ST SIDE LENGTH", undefined], [324, "2ND SIDE LENGTH", undefined], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [331, "DATUM", undefined], [332, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS]
+const SLOT: CycleTable["rows"] = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [311, "WIDTH", undefined], [272, "MEASURING AXIS", undefined], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [405, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS]
+const TOOL: CycleTable["rows"] = [[340, "CHECK", 0], [260, "CLEARANCE HEIGHT", undefined], [341, "PROBING THE TEETH", 0]]
 
 export const KLARTEXT_CYCLES: Readonly<Record<number, CycleTable>> = {
   // 208 BORE MILLING: a helix of pitch Q334 at the radius that leaves the nominal diameter Q335, Q342 the diameter to rough to first.
@@ -75,6 +88,16 @@ export const KLARTEXT_CYCLES: Readonly<Record<number, CycleTable>> = {
   // Q355 = 0 is one helix through the whole thread; Q207 the milling feed, Q253 and Q512 the feed to pre-position and to approach.
   262: { name: "THREAD MILLING", rows: [[335, "NOMINAL DIAMETER", undefined], [239, "PITCH", undefined], [201, "DEPTH OF THREAD", undefined], [355, "THREADS PER STEP", 0], [253, "F PRE-POSITIONING", 750], [351, "CLIMB OR UP-CUT", 1], [200, "SET-UP CLEARANCE", 0], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [207, "FEED RATE FOR MILLING", undefined], [512, "FEED FOR APPROACHING", 0]] },
   267: { name: "OUTSIDE THREAD MILLING", rows: [[335, "NOMINAL DIAMETER", undefined], [239, "PITCH", undefined], [201, "DEPTH OF THREAD", undefined], [355, "THREADS PER STEP", 0], [253, "F PRE-POSITIONING", 750], [351, "CLIMB OR UP-CUT", 1], [200, "SET-UP CLEARANCE", 0], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [207, "FEED RATE FOR MILLING", undefined], [512, "FEED FOR APPROACHING", 0], [358, "DEPTH FOR COUNTERSINKING", 0], [359, "COUNTERSINKING OFFSET", 0]] },
+  408: { name: "SLOT CENTER REF PT", rows: SLOT, probe: true },
+  409: { name: "RIDGE CENTER REF PT", rows: SLOT, probe: true },
+  410: { name: "DATUM INSIDE RECTAN.", rows: RECT, probe: true },
+  411: { name: "DATUM OUTS. RECTAN.", rows: RECT, probe: true },
+  412: { name: "DATUM INSIDE CIRCLE", rows: CIRCLE, probe: true },
+  413: { name: "DATUM OUTSIDE CIRCLE", rows: CIRCLE, probe: true },
+  417: { name: "DATUM IN TS AXIS", rows: [[263, "1ST POINT 1ST AXIS", undefined], [264, "1ST POINT 2ND AXIS", undefined], [294, "1ST POINT 3RD AXIS", undefined], [320, "SET-UP CLEARANCE", 0], [260, "CLEARANCE HEIGHT", undefined], [305, "NUMBER IN TABLE", undefined], [333, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined]], probe: true },
+  419: { name: "DATUM IN ONE AXIS", rows: [[263, "1ST POINT 1ST AXIS", undefined], [264, "1ST POINT 2ND AXIS", undefined], [261, "MEASURING HEIGHT", undefined], [320, "SET-UP CLEARANCE", 0], [260, "CLEARANCE HEIGHT", undefined], [272, "MEASURING AXIS", undefined], [267, "TRAVERSE DIRECTION", undefined], [305, "NUMBER IN TABLE", undefined], [333, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined]], probe: true },
+  481: { name: "TOOL LENGTH", rows: TOOL, probe: true },
+  482: { name: "TOOL RADIUS", rows: TOOL, probe: true },
   208: { name: "BORE MILLING", rows: [[200, "SET-UP CLEARANCE", 0], [201, "DEPTH", undefined], [206, "FEED RATE FOR PLUNGING", undefined], [334, "INFEED PER HELIX", undefined], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [335, "NOMINAL DIAMETER", undefined], [342, "ROUGHING DIAMETER", 0], [351, "CLIMB OR UP-CUT", 1]] }
 }
 
@@ -87,6 +110,9 @@ export const klartextFixedCycle = (number: number, params: Readonly<Record<strin
     if (v === undefined) throw new RangeError(`Cycle ${number} ${table.name} needs Q${q} (${label.toLowerCase()})`)
     return [q, v, label] as const
   })
-  const lines = [`${KLARTEXT_PREFIX}CYCL DEF ${number} ${table.name} ~`, ...rows.map(([n, v, label], i) => `${KLARTEXT_PREFIX}  Q${n}=${sign(v, decimals)} ;${label}${i === rows.length - 1 ? "" : " ~"}`)]
+  const lines = [`${KLARTEXT_PREFIX}${table.probe === true ? "TCH PROBE" : "CYCL DEF"} ${number} ${table.name} ~`, ...rows.map(([n, v, label], i) => `${KLARTEXT_PREFIX}  Q${n}=${sign(v, decimals)} ;${label}${i === rows.length - 1 ? "" : " ~"}`)]
   return { define: lines, signature: lines.join("\n") }
 }
+
+/** Whether the marked cycle is a touch-probe cycle (it runs where it stands: no call block, no re-use of its definition). */
+export const isKlartextProbeCycle = (number: number): boolean => KLARTEXT_CYCLES[number]?.probe === true

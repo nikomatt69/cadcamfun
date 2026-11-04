@@ -1,4 +1,4 @@
-import { BadRequest, Conflict, WORK_OFFSET_ROWS_MAX, Forbidden, InternalError, NotFound, type CamProbeReportData, type CamProbingEmitRequest, type CamProbingFrame, type CamProbingPlan, type CamProbingPlanRequest, type CamProbingProgram, type CamProbingSettings, type CamProbingSettingsInput, type CamProbingSimulation, type CamProbingSimulateRequest, type CamRotaryCalibrationRequest, type CamRotaryCalibrationResult, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportRunBody, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
+import { BadRequest, Conflict, WORK_OFFSET_ROWS_MAX, Forbidden, InternalError, NotFound, type CamProbeReportData, type CamProbingEmitRequest, CamProbingFrame, type CamProbingPlan, type CamProbingPlanRequest, type CamProbingProgram, type CamProbingSettings, CamProbingSettingsInput, type CamProbingSimulation, type CamProbingSimulateRequest, type CamRotaryCalibrationRequest, type CamRotaryCalibrationResult, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportRunBody, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
 import { camProbePlan, runKernelJobEffect, type CamProbeCalibrateInput, type CamProbePlanInput, type CamProbeRefusal, type CamProbeSimulateInput } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
 import { Context, Effect, Layer, Schema } from "effect"
@@ -67,7 +67,10 @@ const settingsWire = (s: cam.probing.ProbeSettings): CamProbingSettings => ({
 const refusalError = (r: CamProbeRefusal): BadRequest | NotFound => r.status === 404 ? new NotFound({ message: r.error }) : new BadRequest({ message: r.error })
 
 /** The cycle a stored probe operation carries, decoded from its row data (wire degrees), or why it cannot be simulated. */
-const storedCycleOf = (data: unknown): { readonly cycle: cam.probing.ProbeCycle; readonly checks?: ReadonlyArray<cam.probing.Characteristic>; readonly actions?: ReadonlyArray<cam.probing.ProbeAction> } | string => {
+const storedCycleOf = (data: unknown): {
+  readonly cycle: cam.probing.ProbeCycle; readonly checks?: ReadonlyArray<cam.probing.Characteristic>; readonly actions?: ReadonlyArray<cam.probing.ProbeAction>
+  readonly settings?: CamProbingSettingsInput; readonly frame?: CamProbingFrame; readonly sourceRevision?: string
+} | string => {
   const record = recordOf(data)
   const wire = record["operation"] ?? record["cycle"]
   if (wire === undefined) return "The stored probe operation carries no cycle to simulate (its data holds no operation or cycle)."
@@ -75,7 +78,13 @@ const storedCycleOf = (data: unknown): { readonly cycle: cam.probing.ProbeCycle;
     const cycle = Schema.decodeUnknownSync(cam.kernel.ProbeCycleSchema)(wire)
     const checks = record["checks"] === undefined ? undefined : Schema.decodeUnknownSync(Schema.Array(cam.kernel.CharacteristicSchema))(record["checks"])
     const actions = record["actions"] === undefined ? undefined : Schema.decodeUnknownSync(Schema.Array(cam.kernel.ProbeActionSchema))(record["actions"])
-    return { cycle, ...(checks !== undefined && checks.length > 0 ? { checks } : {}), ...(actions !== undefined && actions.length > 0 ? { actions } : {}) }
+    const settings = record["settings"] === undefined ? undefined : Schema.decodeUnknownSync(CamProbingSettingsInput)(record["settings"])
+    const frame = record["frame"] === undefined ? undefined : Schema.decodeUnknownSync(CamProbingFrame)(record["frame"])
+    const sourceRevision = record["sourceRevision"]
+    return {
+      cycle, ...(checks !== undefined && checks.length > 0 ? { checks } : {}), ...(actions !== undefined && actions.length > 0 ? { actions } : {}),
+      ...(settings !== undefined ? { settings } : {}), ...(frame !== undefined ? { frame } : {}), ...(typeof sourceRevision === "string" ? { sourceRevision } : {})
+    }
   } catch {
     return "The stored probe operation does not read as a probe cycle."
   }
@@ -307,7 +316,8 @@ export class Probing extends Context.Service<Probing, {
           const elements = elementsOf(drawing.data) as unknown as ReadonlyArray<Record<string, unknown>>
           if (elements.length === 0) return yield* new BadRequest({ message: "The drawing of the stored probe operation carries no elements to simulate against" })
           const machineId = body.machineConfig ?? row.machineConfigId ?? undefined
-          const setup = yield* resolveSetup(userId, machineId !== undefined ? { machineConfig: machineId } : undefined, undefined)
+          // The figures the operation was planned with, on the machine it runs on now.
+          const setup = yield* resolveSetup(userId, machineId !== undefined ? { ...stored.settings, machineConfig: machineId } : stored.settings, stored.frame)
           // The offsets the control holds before the run are the machine's table (of the setup, when one is named).
           let workOffsets: Record<string, cam.probing.OffsetEntry> | undefined
           if (machineId !== undefined) {
@@ -327,7 +337,10 @@ export class Probing extends Context.Service<Probing, {
           const saved = yield* reports.create(projectId, userId, {
             name: row.name, kind: stored.cycle.kind === "rotary-axis" ? "rotary" : "part", source: "simulated", verdict: wire.verdict, data: wire,
             toolpathId: body.operationId, drawingId: row.drawingId, machineConfigId: machineId ?? null, setupId: body.setupId ?? null, runId: body.runId ?? null,
-            workOffset: cam.probing.formatOffsetRef(setup.settings.workOffset)
+            workOffset: cam.probing.formatOffsetRef(setup.settings.workOffset),
+            // What makes the report stale: the program and the drawing revision it measured.
+            ...(row.gcode ? { programHash: cam.kernel.sha256(row.gcode) } : {}),
+            ...(stored.sourceRevision !== undefined ? { sourceRevision: stored.sourceRevision } : {})
           }).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to save the probe report")))
           if ("refused" in saved) return yield* new BadRequest({ message: saved.refused })
           return saved

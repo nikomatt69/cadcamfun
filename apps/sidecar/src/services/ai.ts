@@ -9,7 +9,7 @@ import {
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, pmi, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, PROBE_FORMAT, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { Database, schema } from "@cadcamfun/db"
 import { eq } from "drizzle-orm"
 import { drawingRevision, jobOfRequest } from "./cam-program.ts"
@@ -24,6 +24,8 @@ import { ActingUser, CurrentTurn, ensureTurnActive, invocationFailureText, isInv
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { CamSetupRepo } from "../repos/cam-setup-repo.ts"
+import { makeAiProbing } from "./ai-probing.ts"
+import { Probing } from "./probing.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
 import { LibraryRepo } from "../repos/library-repo.ts"
@@ -125,6 +127,7 @@ const toolHandlers = Effect.gen(function*() {
   const toolpaths = yield* ToolpathRepo
   const components = yield* ComponentRepo
   const camSetups = yield* CamSetupRepo
+  const probingService = yield* Probing
   const machines = yield* MachineConfigRepo
   const libraryItems = yield* LibraryRepo
   const costs = yield* ProductionCostRepo
@@ -349,7 +352,11 @@ const toolHandlers = Effect.gen(function*() {
     await audit(loaded.projectId, change.action, { drawingId: loaded.id, elementId: created.id, name, ...change.details })
     return { ok: true, ids: [created.id], elements: [created], ...where(loaded) }
   }
+  const aiProbing = makeAiProbing({ probing: probingService, toolpaths, machines, events: liveEvents, actorId: () => acting().id, load, run, audit, refused })
   const handlers: ToolHandlersShape = {
+    probeOperation: aiProbing.probeOperation,
+    probeRun: aiProbing.probeRun,
+    probeApply: aiProbing.probeApply,
     turnOperation: async (projectId, input, signal) => {
       signal?.throwIfAborted()
       const { expectedRevision, machine, machineConfig, ...request } = input
@@ -548,6 +555,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const data = record(stored?.row.data)
       if (stored.row.drawingId !== loaded.id && !(stored.row.drawingId === null && data["format"] === "cadcamfun-cam")) return { ok: false, error: "Operation not found in the active drawing" }
+      if (data["format"] === PROBE_FORMAT) return aiProbing.reviewProbe(loaded, stored.row)
       if (data["turningPlan"] !== undefined) {
         const plan = Schema.decodeUnknownSync(CamTurningPlan)(data["turningPlan"])
         const stale = data["sourceRevision"] !== drawingRevision(loaded) || stored.row.gcode !== plan.nc || record(data["identity"])["nc"] !== cam.kernel.sha256(plan.nc)
