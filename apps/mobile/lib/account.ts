@@ -138,6 +138,6 @@ export const signOut = async (): Promise<void> => {
   } finally {
     publish(null)
     // The assistant's project and conversations belong to the account that just left.
-    useUIStore.setState({ assistantProjectId: null, assistantSessions: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null })
+    useUIStore.setState({ assistantProjectId: null, assistantSessions: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null, composerDrafts: {}, composerTargets: {} })
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react"
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import type { PreviewMachine, PreviewOperation } from "@cadcamfun/api"
@@ -7,6 +7,7 @@ import { Box, Focus, Grid3x3, Maximize2, Minus, PenLine, Plus, X } from "lucide-
 import { AdaptiveBlur } from "@/components/GlassView"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
+import { chooseAction } from "@/lib/manage"
 import { cadPreview, PreviewView, type PreviewScene } from "@/modules/preview"
 import {
   cameraBasis,
@@ -81,6 +82,8 @@ interface PreparedScene {
   readonly shown: Int32Array
 }
 
+const cameraKey = (revision: string, bounds: Bounds) => `${revision}|${bounds.min.join(",")}|${bounds.max.join(",")}`
+
 /** Below this card width the zoom buttons give way: pinch and the accessibility actions still zoom. */
 const COMPACT_WIDTH = 340
 
@@ -121,6 +124,13 @@ export function PreviewViewport(props: PreviewViewportProps) {
   const { fullscreenTitle, fullscreenFooter } = props
   const { palette } = useTheme()
   const [fullscreen, setFullscreen] = useState(false)
+  // Both surfaces show the same camera, so opening or closing full screen does
+  // not discard a carefully chosen inspection angle or zoom level.
+  const [orbit, setOrbit] = useState<Orbit>(() => fitOrbit(props.bounds))
+  const [view, setView] = useState<StandardView | undefined>("iso")
+  const autoFit = useRef(true)
+  const cameraRevision = useRef(cameraKey(props.revision, props.bounds))
+  const camera = { orbit, setOrbit, view, setView, autoFit, cameraRevision }
   // Display toggles are shared by the inline and the full-screen viewer.
   const [showEdges, setShowEdges] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
@@ -177,7 +187,7 @@ export function PreviewViewport(props: PreviewViewportProps) {
 
   return <>
     {/* Covered by the full-screen viewer, the inline one stops following the playhead and the camera: no hidden redraws. */}
-    <Viewport {...props} {...display} prepared={prepared} active={!fullscreen} onExpand={fullscreenTitle !== undefined ? () => setFullscreen(true) : undefined} />
+    <Viewport {...props} {...display} camera={camera} prepared={prepared} active={!fullscreen} onExpand={fullscreenTitle !== undefined ? () => setFullscreen(true) : undefined} />
     {fullscreenTitle !== undefined ? <Modal visible={fullscreen} animationType="slide" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]}
       onRequestClose={() => setFullscreen(false)}>
       <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
@@ -188,7 +198,7 @@ export function PreviewViewport(props: PreviewViewportProps) {
             <X size={22} color={palette.ink} />
           </Pressable>
         </View>
-        <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} prepared={prepared} /> : null}</View>
+        <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} camera={camera} prepared={prepared} /> : null}</View>
         {fullscreenFooter ? <View style={{ paddingHorizontal: layout.gutter, paddingTop: 12, paddingBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border }}>{fullscreenFooter}</View> : null}
       </SafeAreaView>
     </Modal> : null}
@@ -217,8 +227,17 @@ function Viewport({
   onExpand,
   active = true,
   prepared,
+  camera,
 }: PreviewViewportProps & {
   prepared: PreparedScene
+  camera: {
+    orbit: Orbit
+    setOrbit: Dispatch<SetStateAction<Orbit>>
+    view: StandardView | undefined
+    setView: Dispatch<SetStateAction<StandardView | undefined>>
+    autoFit: MutableRefObject<boolean>
+    cameraRevision: MutableRefObject<string>
+  }
   /** False while another viewer covers this one: per-frame updates (playhead, camera) wait until it is visible again. */
   active?: boolean
   showEdges: boolean
@@ -228,8 +247,7 @@ function Viewport({
   onExpand?: () => void
 }) {
   const { palette, glass, isDark } = useTheme()
-  const [orbit, setOrbit] = useState<Orbit>(() => fitOrbit(bounds))
-  const [view, setView] = useState<StandardView | undefined>("iso")
+  const { orbit, setOrbit, view, setView, autoFit, cameraRevision } = camera
   const [meshError, setMeshError] = useState<string | undefined>()
   const [lineError, setLineError] = useState<string | undefined>()
   const [machineError, setMachineError] = useState<string | undefined>()
@@ -245,19 +263,21 @@ function Viewport({
   const compact = size.width < COMPACT_WIDTH
   const aspect = size.width / Math.max(size.height, 1)
   // True while the camera is at a fitted view: a resize or rotation re-fits it. Any orbit, zoom or pan clears it.
-  const autoFit = useRef(true)
   const viewRef = useRef(view)
   viewRef.current = view
 
   useEffect(() => {
+    const key = cameraKey(revision, bounds)
+    if (!active || cameraRevision.current === key) return
+    cameraRevision.current = key
     autoFit.current = true
     setOrbit(fitOrbit(bounds, aspect))
     setView("iso")
-  }, [revision, bounds.min[0], bounds.min[1], bounds.min[2], bounds.max[0], bounds.max[1], bounds.max[2]])
+  }, [active, revision, bounds.min[0], bounds.min[1], bounds.min[2], bounds.max[0], bounds.max[1], bounds.max[2]])
 
   useEffect(() => {
-    if (autoFit.current) setOrbit(viewOrbit(bounds, viewRef.current ?? "iso", aspect))
-  }, [aspect])
+    if (active && autoFit.current) setOrbit(viewOrbit(bounds, viewRef.current ?? "iso", aspect))
+  }, [active, aspect])
 
   useEffect(() => {
     if (!cadPreview) {
@@ -464,8 +484,14 @@ function Viewport({
   }
 
   const frameLabel = selectedBounds ? "Frame selection" : "Fit all"
+  const chooseView = async () => {
+    haptic("selection")
+    const selected = await chooseAction(viewLabel ? `View · ${viewLabel}` : "Choose view", STANDARD_VIEWS.map((item) => item.label))
+    const target = STANDARD_VIEWS.find((item) => item.label === selected)
+    if (target) cameraAction(`view:${target.id}`)
+  }
   const tools: ReadonlyArray<{ action: string; label: string; Icon: typeof Box; hidden?: boolean }> = [
-    { action: "view", label: `Show ${nextView.label.toLowerCase()} view`, Icon: Box },
+    { action: "view", label: viewLabel ? `Choose view, current view ${viewLabel}` : "Choose view", Icon: Box },
     { action: "frame", label: frameLabel, Icon: Focus },
     { action: "decrement", label: "Zoom out", Icon: Minus, hidden: compact },
     { action: "increment", label: "Zoom in", Icon: Plus, hidden: compact },
@@ -592,7 +618,7 @@ function Viewport({
       <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
         style={{ position: "absolute", top: 10, right: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
         {[...tools.filter((tool) => !tool.hidden), ...(onExpand ? [{ action: "expand", label: "Open full-screen viewer", Icon: Maximize2 }] : [])].map(({ action, label, Icon }) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={label}
-          onPress={() => { if (action === "expand") { haptic("selection"); onExpand?.() } else cameraAction(action) }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+          onPress={() => { if (action === "expand") { haptic("selection"); onExpand?.() } else if (action === "view") void chooseView(); else cameraAction(action) }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
           <Icon size={18} color={palette.ink} />
         </Pressable>)}
       </AdaptiveBlur>

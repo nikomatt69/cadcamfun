@@ -1,12 +1,16 @@
 import { expect, test } from "bun:test"
 import {
+  canSteerDraft,
   COUNT_FROM,
   COUNT_WARN,
   cameraRowSubtitle,
   canAttachMore,
   characterCount,
   composerPlaceholder,
+  composerDraftScope,
   inputHeights,
+  mergeComposerSeed,
+  moveComposerDraft,
   modeChipAccessibilityLabel,
   modeLabel,
   parseSlashCommand,
@@ -16,6 +20,36 @@ import {
   stepMode,
 } from "../lib/composer"
 import { MAX_ATTACHMENTS } from "../lib/attachments"
+
+test("incoming context preserves unfinished message text", () => {
+  expect(mergeComposerSeed("", "Review this design")).toBe("Review this design")
+  expect(mergeComposerSeed("  My draft\n", "Review this design")).toBe("  My draft\n\n\nReview this design")
+  expect(mergeComposerSeed("My draft", "  ")).toBe("My draft")
+})
+
+test("draft identities separate desktops, projects, conversations and new conversations", () => {
+  const scope = composerDraftScope("desktop", "project", "session")
+  expect(scope).not.toBe(composerDraftScope("other", "project", "session"))
+  expect(scope).not.toBe(composerDraftScope("desktop", "other", "session"))
+  expect(scope).not.toBe(composerDraftScope("desktop", "project", "other"))
+  expect(scope).not.toBe(composerDraftScope("desktop", "project", undefined))
+  expect(composerDraftScope("a|b", "c", undefined)).not.toBe(composerDraftScope("a", "b|c", undefined))
+  expect(composerDraftScope("desktop", "project", "session", "drawing-a")).not.toBe(composerDraftScope("desktop", "project", "session", "drawing-b"))
+  expect(composerDraftScope("desktop", "project", "session", "drawing-a")).not.toBe(scope)
+})
+
+test("drawing-specific requests cannot use unbound running-turn steering", () => {
+  expect(canSteerDraft("drawing-a")).toBe(false)
+  expect(canSteerDraft()).toBe(true)
+})
+
+test("typing during conversation startup moves once and preserves an existing destination", () => {
+  const drafts = { new: "typing while waiting", existing: "already here", other: "untouched" }
+  const moved = moveComposerDraft(drafts, "new", "existing")
+  expect(moved).toEqual({ existing: "already here\n\ntyping while waiting", other: "untouched" })
+  expect(moveComposerDraft(moved, "new", "existing")).toBe(moved)
+  expect(moveComposerDraft(drafts, "new", "new")).toBe(drafts)
+})
 
 test("the placeholder follows the connection, then the live turn, then the mode", () => {
   expect(composerPlaceholder({ offline: true, busy: true, mode: "cam" })).toContain("offline")

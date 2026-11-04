@@ -34,10 +34,13 @@ export function PairingStory() {
   }
   const connectedOn = useAnimatedStyle(() => ({ opacity: amount(clock.get(), BEATS.connected, BEATS.drop) }))
   const searchingOn = useAnimatedStyle(() => ({ opacity: 1 - amount(clock.get(), BEATS.connected, BEATS.drop) }))
-  const row = (span: readonly [number, number]) => ({
-    opacity: amount(clock.get(), span, BEATS.drop),
-    transform: [{ translateY: (1 - amount(clock.get(), span, BEATS.drop)) * 14 }],
-  })
+  const row = (span: readonly [number, number]) => {
+    "worklet"
+    return {
+      opacity: amount(clock.get(), span, BEATS.drop),
+      transform: [{ translateY: (1 - amount(clock.get(), span, BEATS.drop)) * 14 }],
+    }
+  }
   const rowAStyle = useAnimatedStyle(() => row(BEATS.rowA))
   const rowBStyle = useAnimatedStyle(() => row(BEATS.rowB))
 

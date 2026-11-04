@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { canSteerDraft, composerDraftScope, mergeComposerSeed } from "@/lib/composer"
 import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect, useRouter } from "expo-router"
@@ -98,6 +99,7 @@ export default function AssistantScreen() {
   }, [measureKeyboardOrigin]))
 
   const projectId = useUIStore((state) => state.assistantProjectId)
+  const storedSession = useUIStore((state) => projectId ? state.assistantSessions[projectId] : undefined)
   const draft = useUIStore((state) => state.assistantDraft)
   const setAssistantProject = useUIStore((state) => state.setAssistantProject)
   const setAssistantSession = useUIStore((state) => state.setAssistantSession)
@@ -150,7 +152,14 @@ export default function AssistantScreen() {
   const posting = useRef(false)
   /** Last journal sequence seen per session: a new follower resumes from it instead of replaying the conversation. */
   const cursors = useRef(new Map<string, number>())
-  const [followed, setFollowed] = useState<string | undefined>()
+  const [followedState, setFollowedState] = useState<{ projectId: string | null; sessionId: string | undefined }>({ projectId: null, sessionId: undefined })
+  const followed = followedState.projectId === projectId ? followedState.sessionId : undefined
+  const setFollowed = (sessionId: string | undefined) => setFollowedState({ projectId, sessionId })
+  const desktopIdentity = config ? pairingIdentity(config) : ""
+  const scopeSession = followedState.projectId === projectId ? followed : storedSession
+  const baseScope = composerDraftScope(desktopIdentity, projectId, scopeSession)
+  const drawingTarget = useUIStore((state) => state.composerTargets[baseScope])
+  const draftScope = composerDraftScope(desktopIdentity, projectId, scopeSession, drawingTarget?.id)
   const [link, setLink] = useState<"idle" | "connecting" | "live" | "reconnecting">("idle")
   const [screenFocused, setScreenFocused] = useState(false)
   const [appActive, setAppActive] = useState(AppState.currentState === "active")
@@ -247,15 +256,26 @@ export default function AssistantScreen() {
 
   useEffect(() => {
     if (!draft || draft.projectId !== projectId) return
-    // Stored drafts keep their `mode` field for compatibility; it is ignored here.
-    setPromptSeed({ projectId: draft.projectId, text: draft.text, token: Date.now() })
+    // A targeted handoff is placed into its own composer buffer so text for a
+    // different drawing is never silently combined with this request.
+    const target = draft.drawingId ? { id: draft.drawingId, name: draft.drawingName || draft.drawingId } : undefined
+    const targetScope = composerDraftScope(desktopIdentity, projectId, scopeSession, target?.id)
+    useUIStore.getState().setComposerTarget(baseScope, target)
+    useUIStore.getState().setComposerDraft(targetScope, (previous) => mergeComposerSeed(previous, draft.text))
     clearAssistantDraft()
-  }, [draft, projectId, clearAssistantDraft])
+  }, [draft, projectId, clearAssistantDraft, desktopIdentity, scopeSession, baseScope])
 
   // The outbox delivered a message written offline and the desktop opened a session for it: follow that session.
-  const storedSession = useUIStore((state) => projectId ? state.assistantSessions[projectId] : undefined)
   useEffect(() => {
     if (!storedSession || storedSession === sessionRef.current || posting.current) return
+    if (!sessionRef.current && projectId) {
+      const desktop = config ? pairingIdentity(config) : ""
+      const from = composerDraftScope(desktop, projectId, undefined)
+      const to = composerDraftScope(desktop, projectId, storedSession)
+      const target = useUIStore.getState().composerTargets[from]
+      useUIStore.getState().moveComposerDraft(composerDraftScope(desktop, projectId, undefined, target?.id), composerDraftScope(desktop, projectId, storedSession, target?.id))
+      useUIStore.getState().moveComposerTarget(from, to)
+    }
     sessionRef.current = storedSession
     const key = logKeyFor(storedSession)
     if (logKeyRef.current) logs.current.set(logKeyRef.current, logRef.current)
@@ -264,7 +284,7 @@ export default function AssistantScreen() {
     setHistoryRows(emptyLog)
     setOlderBefore(null)
     setFollowed(storedSession)
-  }, [storedSession, logKeyFor])
+  }, [storedSession, logKeyFor, projectId, config])
 
   /**
    * A conversation opened from the list: its stored past comes from the desktop's own history, so the
@@ -416,7 +436,7 @@ export default function AssistantScreen() {
       }
       // nikcli offline outbox: the message waits on this iPhone and is delivered once, in order, when the desktop is back.
       try {
-        await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
+        await enqueueAssistantOp({ projectId, text, ...(drawingTarget ? { drawingId: drawingTarget.id } : {}), sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
         apply({ type: "user", text, offline: true })
         toast("Desktop offline · message saved and sent when it reconnects", "info")
         haptic("selection")
@@ -434,18 +454,28 @@ export default function AssistantScreen() {
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
     const sent = attachments
+    const requestedSessionId = sessionRef.current
     apply({ type: "user", text, ...(sent.length > 0 ? { attachments: sent.map((item) => item.name), previews: attachmentPreviews(sent) } : {}) })
     jumpToLatest(false)
     try {
       // The desktop owns the turn from here; this answers as soon as the host session exists.
       const started = await client.promptSession({
         projectId, message: text,
-        ...(sessionRef.current ? { sessionId: sessionRef.current } : {}),
+        ...(drawingTarget ? { drawingId: drawingTarget.id } : {}),
+        ...(requestedSessionId ? { sessionId: requestedSessionId } : {}),
         agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model,
         permissionMode: preferences.permissionMode, includeContext: preferences.includeContext,
         ...(sent.length > 0 ? { attachments: sent.map((item) => ({ name: item.name, mime: item.mime, data: item.data, encoding: "base64" as const })) } : {}),
       })
       if (version !== generation.current) return
+      if (!requestedSessionId) {
+        const desktop = config ? pairingIdentity(config) : ""
+        const from = composerDraftScope(desktop, projectId, undefined)
+        const to = composerDraftScope(desktop, projectId, started.sessionId)
+        const target = useUIStore.getState().composerTargets[from]
+        useUIStore.getState().moveComposerDraft(composerDraftScope(desktop, projectId, undefined, target?.id), composerDraftScope(desktop, projectId, started.sessionId, target?.id))
+        useUIStore.getState().moveComposerTarget(from, to)
+      }
       sessionRef.current = started.sessionId
       setAssistantSession(projectId, started.sessionId)
       // A follower already on this session keeps its own cursor; a new one replays the turn from its first event.
@@ -467,6 +497,12 @@ export default function AssistantScreen() {
       setStopRequested(false)
       const running = sessionRef.current
       if (isBusyRefusal(error) && running) {
+        if (!canSteerDraft(drawingTarget?.id)) {
+          setBusy(false)
+          reuse(text)
+          toast("Wait for the current turn to finish before sending a drawing-specific request.", "info")
+          return
+        }
         // The desktop is already running a turn here (started on the desktop, or the phone missed its start) and
         // refused this prompt before it ran. Steering it into that turn is what the user would have done seeing it.
         if (sent.length > 0) {
@@ -534,6 +570,11 @@ export default function AssistantScreen() {
     const sessionId = sessionRef.current
     const version = generation.current
     if (!client || !projectId || !sessionId || connectivity !== "online") { reuse(text); return }
+    if (!canSteerDraft(drawingTarget?.id)) {
+      reuse(text)
+      toast("Wait for the current turn to finish before sending a drawing-specific request.", "info")
+      return
+    }
     apply({ type: "user", text, queued: true })
     jumpToLatest(false)
     try {
@@ -812,9 +853,11 @@ export default function AssistantScreen() {
         />
       ) : null}
 
+      {drawingTarget ? <Text accessibilityRole="summary" style={{ paddingHorizontal: content.gutter, paddingVertical: 8, color: palette.soft, ...type(12) }}>Design target: {drawingTarget.name}</Text> : null}
       <Composer
         savedCount={savedCount}
-        key={projectId ?? "no-project"}
+        draftScope={draftScope}
+        onSeedApplied={(token) => setPromptSeed((current) => current?.token === token ? null : current)}
         busy={busy && online}
         offline={!online}
         stopping={stopRequested}

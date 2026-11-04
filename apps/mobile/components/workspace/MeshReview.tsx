@@ -8,6 +8,7 @@ import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 import { previewHeight, layout } from "@/lib/layout"
 import { formatSize, partBounds } from "@/lib/preview-sim"
+import { visibleFeatureTrees } from "@/lib/mesh-inspection"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ActionButton } from "@/components/ui/ActionButton"
@@ -19,7 +20,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { Skeleton } from "@/components/ui/Skeleton"
 
 /** One reading surface keeps preview, parameters and elements reachable on every phone size. */
-export function MeshReview({ title, mesh, loading, error, onRetry, parameters, features, selectedPartId, onSelectPart, actionLabel, onAction }: {
+export function MeshReview({ title, mesh, loading, error, onRetry, parameters, features, selectedPartId, onSelectPart, actionLabel, onAction, secondaryAction, assistantUnavailable }: {
   /** Shown in the full-screen viewer. */
   title?: string
   mesh: MeshPreview | undefined
@@ -31,8 +32,10 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
   features?: readonly PreviewFeatureTree[]
   selectedPartId: string | undefined
   onSelectPart: (id: string | undefined) => void
-  actionLabel: string
-  onAction: () => void
+  actionLabel?: string
+  onAction?: () => void
+  assistantUnavailable?: string
+  secondaryAction?: { label: string; onPress: () => void }
 }) {
   const { palette } = useTheme()
   const { width: windowWidth, height } = useWindowDimensions()
@@ -42,6 +45,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
   const parts = mesh?.parts ?? []
   const triangles = mesh ? Math.floor(mesh.indices.length / 3) : 0
   const selectedPart = parts.find((part) => part.id === selectedPartId)
+  const visibleFeatures = useMemo(() => visibleFeatureTrees(features ?? [], selectedPartId), [features, selectedPartId])
   const selectedSize = useMemo(() => {
     if (!mesh || !selectedPart) return undefined
     const bounds = partBounds(mesh.positions, mesh.indices, selectedPart)
@@ -86,7 +90,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
         </Text> : null}
         {mesh && loading ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, paddingTop: 4, ...type(12) }}>Updating to the latest desktop revision…</Text> : null}
         {error ? <View style={{ paddingTop: 12 }}><ErrorBanner message={error} actionLabel="Retry" onAction={onRetry} /></View> : null}
-        {mesh?.truncated ? <Text style={{ color: palette.warning, paddingTop: 12, ...type(13) }}>Showing a simplified preview to keep navigation responsive.</Text> : null}
+        {mesh?.truncated ? <Text accessibilityRole="summary" style={{ color: palette.warning, paddingTop: 12, ...type(13) }}>This preview is incomplete and may omit geometry. Inspect the full design on the desktop.</Text> : null}
         {parameters?.length ? <>
           <SectionHeader padded={false}>Parameters</SectionHeader>
           <SurfaceCard inset={false}>{parameters.map((parameter, index) => <View key={parameter.key}>
@@ -94,9 +98,18 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
             <ListRow title={parameter.key} subtitle={parameter.value} showChevron={false} />
           </View>)}</SurfaceCard>
         </> : null}
-        {features?.length ? <>
+        {features?.length || selectedPartId ? <>
           <SectionHeader padded={false}>Feature tree</SectionHeader>
-          {features.map((tree) => <FeatureTree key={tree.elementId} tree={tree} />)}
+          {selectedPartId ? <View style={{ gap: 8, paddingBottom: 8 }}>
+            <Text accessibilityLiveRegion="polite" style={{ color: palette.soft, ...type(13) }}>
+              {visibleFeatures.length ? `Showing features for ${selectedPart?.name || selectedPartId}` : `No feature history available for ${selectedPart?.name || selectedPartId}.`}
+            </Text>
+            <ActionButton variant="secondary" label="Show all features" onPress={() => { haptic("selection"); onSelectPart(undefined) }} />
+          </View> : null}
+          {visibleFeatures.map((tree) => <FeatureTree key={tree.elementId} tree={tree}
+            selected={tree.elementId === selectedPartId}
+            selectable={parts.some((part) => part.id === tree.elementId)}
+            onSelect={() => { haptic("selection"); onSelectPart(tree.elementId) }} />)}
         </> : null}
         <SectionHeader padded={false}>Elements</SectionHeader>
       </View>}
@@ -108,8 +121,10 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
       </SurfaceCard>}
     />
     </View>
-    <View style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: palette.border, backgroundColor: palette.background }}>
-      <ActionButton label={actionLabel} icon={<MessageSquareText size={18} color={palette.onAccent} />} disabled={!mesh} onPress={onAction} />
+    <View style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 0.5, borderTopColor: palette.border, backgroundColor: palette.background }}>
+      {secondaryAction ? <ActionButton label={secondaryAction.label} variant="secondary" disabled={!mesh} onPress={secondaryAction.onPress} /> : null}
+      {assistantUnavailable ? <Text style={{ color: palette.soft, ...type(12) }}>{assistantUnavailable}</Text> : null}
+      {actionLabel && onAction ? <ActionButton label={actionLabel} icon={<MessageSquareText size={18} color={palette.onAccent} />} disabled={!mesh} onPress={onAction} /> : null}
     </View>
   </SafeAreaView>
 }
@@ -128,12 +143,11 @@ function PartRow({ part, selected, onPress }: { part: MeshPart; selected: boolea
  * The desktop shows the same tree in its property panel: the phone reads a part without the desktop, which is what a
  * companion is for.
  */
-function FeatureTree({ tree }: { tree: PreviewFeatureTree }) {
+function FeatureTree({ tree, selected, selectable, onSelect }: { tree: PreviewFeatureTree; selected: boolean; selectable: boolean; onSelect: () => void }) {
   const { palette } = useTheme()
-  return <SurfaceCard inset={false}>
-    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-      <Text style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>{tree.name}</Text>
-    </View>
+  return <SurfaceCard inset={false} style={selected ? { borderColor: palette.accent, borderWidth: 1 } : undefined}>
+    <ListRow title={tree.name} subtitle={`${tree.features.length.toLocaleString("en")} ${tree.features.length === 1 ? "feature" : "features"}`}
+      showChevron={false} {...(selectable ? { selected, onPress: onSelect, accessibilityHint: "Selects this element in the design preview." } : {})} />
     {tree.features.map((feature, index) => <View key={feature.id}>
       {index ? <Divider inset={16} /> : null}
       <ListRow title={feature.type} subtitle={feature.parameters.map((parameter) => `${parameter.key} ${parameter.value}`).join(" · ")}

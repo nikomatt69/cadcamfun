@@ -8,6 +8,9 @@ import type { AssistantPreferences, AssistantProvider } from "./assistant-prefer
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
 import { cloudProjectStatus } from "./cloud-delivery"
+import { CompanionError } from "./companion-error"
+
+export { CompanionError } from "./companion-error"
 
 /**
  * `GET /api/ai/status` as the phone can rely on it. The current API always sends `providers` and `host`; `host` stays
@@ -87,17 +90,6 @@ export interface Transport {
   request(path: string, method: string, body?: unknown, signal?: AbortSignal, extra?: Readonly<Record<string, string>>): Promise<TransportResponse>
   /** Raw text chunks (SSE frames split arbitrarily); the caller feeds them to `sseParser`. */
   stream(path: string, method: string, body?: unknown, signal?: AbortSignal): AsyncGenerator<string>
-}
-
-export class CompanionError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    /** The gateway's back-off (`retry-after`) in milliseconds, when it sent one. */
-    readonly retryAfterMs?: number,
-  ) {
-    super(message)
-  }
 }
 
 export interface ProjectSummary {
