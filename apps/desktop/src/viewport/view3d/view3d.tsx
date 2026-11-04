@@ -26,6 +26,7 @@ import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry }
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 import { attachRenderLook, currentLookTier } from "../render-look-setting.ts"
 import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
+import { createProbeOverlay, type OverlayLayer, type ProbeOverlay, type ProbeOverlayModel } from "./probe-overlay.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
@@ -135,11 +136,32 @@ export interface View3DProps {
     readonly operationNames?: ReadonlyArray<string>
     /** Source lines of canned cycles (`cam.viewer.cycleLinesOf`), for the move classes. */
     readonly cycleLines?: ReadonlySet<number>
+    /** Probe touches keep the probe colour in every colour mode, with a legend entry (spec 73 §4). */
+    readonly probeColors?: boolean
   }
   /** The colours the path is drawn in, after each rebuild (the legend). */
   readonly onPathLegend?: (legend: ReadonlyArray<LegendEntry>) => void
   /** The live stock's volumes, after every change (the panel's readout). */
   readonly onStockInfo?: (info: StockInfo | undefined) => void
+  /** A probe run drawn over the program (spec 73 §4): contacts, deviation arrows, the work offset before and after, tilted frames, calibration spheres. */
+  readonly probeOverlay?: {
+    readonly model: ProbeOverlayModel
+    readonly layers?: Partial<Record<OverlayLayer, boolean>>
+    /** The contact a list row selected. */
+    readonly highlight?: number | undefined
+    readonly triadLength?: number
+  }
+  /** The contact playback has reached (undefined before the first): the visualizer's contact readout. */
+  readonly onProbeContact?: (index: number | undefined) => void
+  /** Pick a feature on the model: while `active`, the next click on a solid reports the point and the surface normal instead of selecting. */
+  readonly surfacePick?: { readonly active: boolean; onHit(hit: SurfaceHit): void }
+}
+
+export interface SurfaceHit {
+  readonly point: Vec3
+  readonly normal: Vec3
+  /** The solid's index in `solids`. */
+  readonly solidIndex?: number
 }
 
 export const disposeGroup = (group: THREE.Object3D): void => {
@@ -169,7 +191,7 @@ export function View3D(props: View3DProps) {
   const [transformMode, setTransformMode] = createSignal<TransformMode>("none")
   const [selected, setSelected] = createSignal<number>()
   let fit = () => {}, appearance = () => {}, transform = () => {}, applyLighting = () => {}, applyMaterial = () => {}, applySection = () => {}
-  let rebuild = () => {}, setPreset = () => {}
+  let rebuild = () => {}, setPreset = () => {}, rebuildProbe = () => {}, setPickCursor = () => {}
   // The orientation cube drives the camera rig (set up on mount) and is fed the camera's frame every frame it moves.
   let snapView: (direction: readonly [number, number, number]) => void = () => {}
   let orbitView: (dAzimuth: number, dPolar: number) => void = () => {}
@@ -192,6 +214,8 @@ export function View3D(props: View3DProps) {
   createEffect(() => { props.lighting; untrack(applyLighting) })
   createEffect(() => { props.material; untrack(applyMaterial) })
   createEffect(() => { props.section; untrack(applySection) })
+  createEffect(() => { props.probeOverlay; untrack(rebuildProbe) })
+  createEffect(() => { props.surfacePick?.active; untrack(setPickCursor) })
   onMount(() => {
     if (!host) return
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100000)
@@ -302,6 +326,23 @@ export function View3D(props: View3DProps) {
     }
     const marker = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf59e0b }))
     scene.add(marker)
+    // The probe run (spec 73 §4): its own group in the scene, rebuilt when the run changes, revealed by the playhead.
+    let probe: ProbeOverlay | undefined
+    let probeReached: number | undefined
+    let ballPulseUntil = 0
+    const disposeProbe = (): void => { if (probe === undefined) return; scene.remove(probe.root); probe.dispose(); probe = undefined }
+    rebuildProbe = () => {
+      invalidate()
+      disposeProbe()
+      probeReached = undefined
+      const spec = props.probeOverlay
+      if (spec === undefined) { props.onProbeContact?.(undefined); return }
+      probe = createProbeOverlay(spec.model, { ...(spec.layers !== undefined ? { layers: spec.layers } : {}), ...(spec.triadLength !== undefined ? { triadLength: spec.triadLength } : {}) })
+      probe.highlight(spec.highlight)
+      probe.update(seconds)
+      scene.add(probe.root)
+    }
+    setPickCursor = () => { if (host) host.style.cursor = props.surfacePick?.active === true ? "crosshair" : "" }
     // The tool in the spindle as its 3D assembly (cutting zone in the tool's colour, shank, holder), one group per toolId.
     const toolGroups = new Map<string, THREE.Group | null>()
     let machineScene: MachineScene | undefined
@@ -581,7 +622,7 @@ export function View3D(props: View3DProps) {
       const display = props.toolpathDisplay
       const mode = display?.colorMode ?? "tool"
       let classOf: ((path: number, index: number) => cam.viewer.MoveClass | undefined) | undefined
-      if (mode === "move" && props.program) {
+      if ((mode === "move" || display?.probeColors === true) && props.program) {
         const timeline = machineScene?.timeline ?? cam.viewer.buildTimeline(props.program, props.motion, cam.viewer.DEFAULT_RAPID_RATE, start)
         const classes = cam.viewer.classifyMoves(timeline, {
           ...(machine !== undefined ? { kind: machine.kind } : {}),
@@ -593,6 +634,7 @@ export function View3D(props: View3DProps) {
       const buffers = pathBuffers(machine?.kind === "3dprinter" ? emptyPlayback() : playback, {
         mode, toolColors: colors, shown,
         ...(classOf !== undefined ? { classOf } : {}),
+        ...(display?.probeColors === true ? { probeColors: true } : {}),
         ...(display?.operationNames !== undefined ? { operationNames: display.operationNames } : {}),
         ...(display?.hiddenPaths !== undefined ? { hidden: new Set(display.hiddenPaths) } : {})
       }, TOOL_COLORS)
@@ -698,6 +740,18 @@ export function View3D(props: View3DProps) {
       if (event.button !== 0 || gizmo.dragging || preset() === "four-view" || Math.hypot(event.clientX - pointerStart[0], event.clientY - pointerStart[1]) > 4 || gizmo.axis) return
       const rect = renderer.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), activeCamera)
+      const surface = props.surfacePick
+      if (surface?.active === true) {
+        // The part's surface under the cursor: its point and outward normal (the face normal turned into the scene), for the probe target.
+        const found = raycaster.intersectObjects(content.children, false).find((hit) => hit.object instanceof THREE.Mesh && typeof hit.object.userData.solidIndex === "number" && hit.face !== undefined && hit.face !== null)
+        if (found?.face) {
+          const normal = found.face.normal.clone().transformDirection(found.object.matrixWorld)
+          // A face seen from behind (a backface of a closed solid) points away from the viewer: flip it toward the camera.
+          if (normal.dot(raycaster.ray.direction) > 0) normal.negate()
+          surface.onHit({ point: { x: found.point.x, y: found.point.y, z: found.point.z }, normal: { x: normal.x, y: normal.y, z: normal.z }, solidIndex: found.object.userData.solidIndex as number })
+        }
+        return
+      }
       const hit = raycaster.intersectObjects(content.children, false).find(hit => hit.object instanceof THREE.Mesh && typeof hit.object.userData.solidIndex === "number")
       if (selectedMesh && selectedMesh.material instanceof THREE.MeshStandardMaterial) selectedMesh.material.emissive.setHex(0)
       selectedMesh = hit?.object as THREE.Mesh | undefined
@@ -737,6 +791,15 @@ export function View3D(props: View3DProps) {
       previous = now
       let p = positionAt(playback, seconds)
       if (machineScene?.update(seconds)) invalidate()
+      if (probe !== undefined) {
+        if (probe.update(seconds)) invalidate()
+        const reached = probe.reached(seconds)
+        if (reached !== probeReached) {
+          probeReached = reached
+          props.onProbeContact?.(reached)
+          if (reached !== undefined) { probe.pulse(reached); ballPulseUntil = performance.now() + 300; setTimeout(invalidate, 340); invalidate() }
+        }
+      }
       // The live stock follows the playhead: the material the program has removed by now.
       if (liveStock !== undefined) {
         liveStock.simulation.advanceTo(seconds)
@@ -772,6 +835,8 @@ export function View3D(props: View3DProps) {
       const visible = playback.segmentCount > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null
+      const ball = active?.getObjectByName("probe:ball")
+      if (ball) { const k = performance.now() < ballPulseUntil ? 1.35 : 1; if (ball.scale.x !== k) { ball.scale.setScalar(k); invalidate() } }
       const lean = rotaryPose(seconds)
       if (placeTable(lean?.table)) invalidate()
       if (active && machineScene) {
@@ -807,7 +872,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { rig.dispose(); unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); unregisterKeys?.(); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { rig.dispose(); unregisterCapture(); disposeProbe(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); unregisterKeys?.(); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; rebuildProbe = () => {}; setPickCursor = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

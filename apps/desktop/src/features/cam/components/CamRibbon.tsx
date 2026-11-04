@@ -16,6 +16,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import {
   Box,
   Cog,
+  Crosshair,
   Download,
   Folder,
   History,
@@ -75,7 +76,7 @@ export interface CamRibbonProps {
   /** Receives the active tab request (the page already keeps one). */
   readonly onSelectActiveTab?: (tab: "editor" | "toolpath" | "post") => void
   /** Receives a request to switch the right inspector to the named tab. */
-  readonly onSelectRightTab?: (tab: "generator" | "cycles" | "verify") => void
+  readonly onSelectRightTab?: (tab: "generator" | "cycles" | "verify" | "probing") => void
   /** Receives a request to show a sidebar tab; workpiece and origin live in the machine tab. */
   readonly onSelectSidebarTab?: (tab: "explorer" | "settings" | "machine") => void
   /** Receives the post the user picked in the ribbon (every post the core writes). */
@@ -215,6 +216,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             actions: [
               { id: "open-cycles", labelKey: "cam.ribbon.cycles", icon: (s, k) => <ListChecks size={s} class={k} />, accent: "cyan", onClick: () => props.onSelectRightTab?.("cycles") },
               { id: "open-verify", labelKey: "cam.ribbon.verify", icon: (s, k) => <ShieldCheck size={s} class={k} />, accent: "green", onClick: () => props.onSelectRightTab?.("verify") },
+              { id: "open-probing", labelKey: "cam.ribbon.probing", icon: (s, k) => <Crosshair size={s} class={k} />, accent: "cyan", onClick: () => props.onSelectRightTab?.("probing") },
               { id: "open-toolpath", labelKey: "cam.ribbon.toolpath", icon: (s, k) => <PlayCircle size={s} class={k} />, accent: "green", onClick: () => props.onSelectActiveTab?.("toolpath") }
             ]
           }

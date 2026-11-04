@@ -10,7 +10,7 @@
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
-import { Box, ShieldCheck, Wrench } from "lucide-solid"
+import { Box, Crosshair, ShieldCheck, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -48,6 +48,17 @@ import { renderProgramSheet, programSheetPaths } from "../lib/program-sheet.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { mountCamHistory, useCamHistoryStore } from "../store/camHistoryStore.ts"
 import CamHistoryModal from "../components/CamHistoryModal.tsx"
+import { ProbingTab } from "../components/probing/ProbingTab.tsx"
+import { useProbing } from "../hooks/useProbing.ts"
+import { freshProgram, freshResult, useProbingStore } from "../store/probingStore.ts"
+import { useInspectionStore } from "../store/inspectionStore.ts"
+import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
+import { probeCycles } from "../lib/probing/cycles.ts"
+import { overlayModelOf } from "../lib/probing/overlay-input.ts"
+import { partSolidsOf } from "../lib/probing/part-solids.ts"
+import { workOriginOf } from "../lib/probing/probe-targets.ts"
+import { probeModelOf } from "../../../viewport/view3d/tool-models.ts"
+import { profileOfMachine } from "../lib/probing/machine.ts"
 
 const PARSE_DELAY_MS = 400
 /** The rapid rate the CAM store's own estimates use (mm/min). */
@@ -126,6 +137,20 @@ export default function CamPage(): JSX.Element {
     }
   })
   const generator = makeToolpathGenerator(app.client)
+  // Probing (spec 73 §4): the selected probe cycle's program, parsed, plays in the 3D view in place of the editor's program.
+  const probingState = useProbingStore()
+  const inspectionState = useInspectionStore()
+  const toolpathState = useMultiToolpathStore()
+  const selectedProbe = createMemo(() => probeCycles({ toolpaths: toolpathState.toolpaths }).find((cycle) => cycle.id === probingState.selectedId))
+  const probePreview = createMemo(() => {
+    const cycle = selectedProbe()
+    if (cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
+    const program = freshProgram(probingState.programs, cycle.id, cycle.probe)
+    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.nc }
+  })
+  const shownProgram = () => probePreview()?.program ?? camStore.program
+  const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
+  const shownGcode = () => probePreview()?.nc ?? camStore.gcode
   const [search, setSearch] = useSearchParams()
 
   const [gcode, setGcodeSignal] = createSignal<string>(camStore.gcode)
@@ -223,7 +248,22 @@ export default function CamPage(): JSX.Element {
   }, { defer: true }))
 
   // The same start as the preview, so the clock stops where the drawn program ends.
-  const duration = createMemo(() => cam.viewer.buildTimeline(camStore.program, camStore.motion, RAPID_RATE_MM_PER_MIN, cam.viewer.programStart(machineChoice().kind, camStore.program)).duration)
+  const shownTimeline = createMemo(() => cam.viewer.buildTimeline(shownProgram(), shownMotion(), RAPID_RATE_MM_PER_MIN, cam.viewer.programStart(machineChoice().kind, shownProgram())))
+  const duration = createMemo(() => shownTimeline().duration)
+  // A different program on the stage starts from its beginning.
+  createEffect(on(() => probePreview()?.nc, () => { camStore.setPlaying(false); camStore.setPlaybackTime(0) }, { defer: true }))
+  const probeRun = createMemo(() => inspectionState.opened ?? (selectedProbe() === undefined ? undefined : freshResult(probingState.results, selectedProbe()!.id, selectedProbe()!.probe)))
+  const probeOverlay = createMemo(() => {
+    const run = probeRun(), cycle = selectedProbe()
+    if (run === undefined || cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
+    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: probePreview() !== undefined ? shownTimeline() : undefined })
+  })
+  const probePart = createMemo(() => {
+    if (camStore.rightTab !== "probing") return undefined
+    const stock = previewStock()
+    return partSolidsOf(elementStore.elements, workOriginOf(stock), stock)
+  })
+  const probeToolModel = createMemo(() => (probePreview() !== undefined ? probeModelOf(profileOfMachine(cadStore.selectedMachine)?.probing) ?? cam.toolModelOf({ type: "probe", diameter: 6 }) : undefined))
   // Leaving the page stops the simulation clock.
   onCleanup(() => camStore.setPlaying(false))
 
@@ -371,6 +411,8 @@ export default function CamPage(): JSX.Element {
     camStore.setController(storeController(next))
   }
   const cycleController = (): ReturnType<typeof controllerOfPost> => controllerOfPost(selectedPostProcessor())
+  // Probing cycles are written into the program like the cycles tab's blocks: appended while editing, else they replace it.
+  const probing = useProbing({ insert: onCycleCode })
 
 
   return (
@@ -449,17 +491,22 @@ export default function CamPage(): JSX.Element {
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-lg">
                 <ToolpathVisualizer
-                  stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece}
+                  stock={previewStock()} program={shownProgram()} workpiece={camStore.workpiece}
+                  {...(camStore.rightTab === "probing" ? { probe: {
+                    model: probeOverlay(), ...(probePart() !== undefined ? { part: probePart()! } : {}), picking: probingState.picking, highlight: probingState.highlight,
+                    deviationScale: app.settings.settings().probing.deviationScale, onPick: probing.pickHit,
+                    onDeviationScale: (deviationScale: number) => app.settings.update({ probing: { ...app.settings.settings().probing, deviationScale } })
+                  } } : {})}
                   playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1}
                   playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime}
                   dock={<TitleBlockOverlay mode="3d" cam />}
                   {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
                   {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
-                  machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()}
+                  machine={previewMachine()} defaultToolModel={probeToolModel() ?? toolModel()} toolIssues={probePreview() !== undefined ? [] : toolIssues()}
                   operationTools={operationTools().length > 0 ? operationTools() : importedTools()}
                   {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})}
-                  {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})}
-                  machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode}
+                  {...(shownMotion() !== undefined ? { motion: shownMotion()! } : {})}
+                  machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={shownGcode()}
                 />
               </div>
             </Show>
@@ -481,7 +528,8 @@ export default function CamPage(): JSX.Element {
             tabs={[
               { id: "generator", label: t("cam.generatorPanel"), title: t("cam.generatorPanel"), icon: (size) => <Wrench size={size} /> },
               { id: "cycles", label: t("cam.cycles"), title: t("cam.cycles"), icon: (size) => <Box size={size} /> },
-              { id: "verify", label: t("cam.verify"), title: t("cam.verify"), icon: (size) => <ShieldCheck size={size} /> }
+              { id: "verify", label: t("cam.verify"), title: t("cam.verify"), icon: (size) => <ShieldCheck size={size} /> },
+              { id: "probing", label: t("cam.probing.title"), title: t("cam.probing.title"), icon: (size) => <Crosshair size={size} /> }
             ]}>
               <div class="workstation-generator">
                 <Show when={camStore.rightTab === "generator" || camStore.rightTab === "control"}>
@@ -489,6 +537,9 @@ export default function CamPage(): JSX.Element {
                 </Show>
                 <Show when={camStore.rightTab === "verify"}>
                   <VerifyPanel />
+                </Show>
+                <Show when={camStore.rightTab === "probing"}>
+                  <ProbingTab controller={probing} />
                 </Show>
                 <Show when={camStore.rightTab === "cycles"}>
                   <CyclesTab controller={cycleController()} gcode={gcode()} onInsert={onCycleCode} onReplace={setGcode} />

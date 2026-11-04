@@ -308,6 +308,10 @@ function ProbeSettings(): JSX.Element {
           <option value="fanuc">{t("cam.gen.op.dialectFanuc")}</option>
         </select>
       </div>
+      <div class="panel-field">
+        <p class="panel-hint">{t("cam.probing.openPanelHint")}</p>
+        <button type="button" class="panel-btn panel-btn--fit" data-testid="open-probing-panel" onClick={() => useCamStore.getState().setRightTab("probing")}>{t("cam.probing.openPanel")}</button>
+      </div>
       <p class="panel-hint">The spindle stays off. The result is written to work offset {s().workOffset}; the stylus is a ball, so contact is half its diameter before the surface and the cycle corrects for it.</p>
     </div>
   )

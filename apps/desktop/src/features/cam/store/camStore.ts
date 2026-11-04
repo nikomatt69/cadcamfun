@@ -25,7 +25,7 @@ export type ControllerType = "gcode" | "grbl" | "fanuc"
 /** The workspace tabs. The 3D view lives in the toolpath tab; there is no second "preview" of it. */
 export type ActiveTab = "editor" | "toolpath" | "post"
 export type SidebarTab = "workpiece" | "generator" | "operations"
-export type RightTab = "generator" | "cycles" | "verify" | "control"
+export type RightTab = "generator" | "cycles" | "verify" | "probing" | "control"
 
 export interface Workpiece {
   readonly x: number

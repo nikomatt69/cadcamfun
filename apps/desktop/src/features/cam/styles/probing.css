@@ -1,0 +1,81 @@
+/* The Probing tab (spec 73 §4). Built on the panel tokens: flat blocks, one stroke, sentence-case eyebrows, no tonal borders. */
+.probing-tab .panel-header__title { font-size: 13px; }
+.probing-eyebrow { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: var(--panel-text-muted); text-transform: none; letter-spacing: normal; }
+
+.probing-palette { display: grid; gap: 10px; }
+.probing-palette__cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.probing-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 7px 4px; border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); background: var(--panel-bg); color: var(--panel-text); font-size: 11px; line-height: 14px; text-align: center; cursor: pointer; }
+.probing-cell span { max-width: 100%; overflow-wrap: anywhere; }
+.probing-cell:hover:not(:disabled) { background: var(--panel-bg-inset); }
+.probing-cell:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+.probing-cell:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.probing-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.probing-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; border: 1px solid transparent; border-radius: var(--ent-control-radius); }
+.probing-row[data-selected="true"] { background: var(--panel-accent-soft); }
+.probing-row__main { display: flex; flex: 1 1 auto; align-items: center; gap: 6px; min-width: 0; padding: 4px 6px; border: 0; background: transparent; color: var(--panel-text); font-size: 12px; text-align: left; cursor: pointer; }
+.probing-row__main:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -2px; }
+.probing-row__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.probing-row__tools { display: flex; flex: none; gap: 0; }
+
+.probing-editor { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid var(--panel-border); }
+.probing-editor__title { display: flex; align-items: center; gap: 8px; }
+.probing-target { display: flex; gap: 6px; }
+.probing-target select { flex: 1 1 auto; min-width: 0; }
+.probing-follow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.probing-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.probing-row-actions > select { flex: 1 1 140px; min-width: 0; }
+.probing-check { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) repeat(3, minmax(0, 0.8fr)) auto; gap: 4px; align-items: center; }
+.probing-issues { margin: 0; padding-left: 14px; }
+.probing-plan { padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); }
+.probing-notes { margin: 0; padding-left: 14px; }
+.probing-tag { margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--panel-bg-inset); color: var(--panel-text-muted); font-size: 10.5px; font-weight: 500; }
+.probing-tag--warn { background: var(--panel-warn-soft); color: var(--panel-warn); }
+
+.probing-offsets { display: grid; gap: 8px; }
+.probing-offsets__scope { display: flex; gap: 6px; align-items: center; }
+.probing-offsets__scope select { flex: 1 1 auto; min-width: 0; }
+.probing-table-scroll { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); }
+.probing-table { min-width: max-content; width: 100%; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.probing-table__row { display: grid; grid-template-columns: minmax(92px, 1.3fr) repeat(var(--cols, 3), minmax(68px, 1fr)); gap: 4px; align-items: center; padding: 3px 4px; }
+.probing-table__row + .probing-table__row { border-top: 1px solid var(--panel-border); }
+.probing-table__row--head { background: var(--panel-bg-subtle); color: var(--panel-text-muted); font-size: 11px; font-weight: 500; }
+.probing-table__key { display: flex; flex-wrap: wrap; align-items: center; color: var(--panel-text); font-weight: 500; }
+.probing-table .probing-cell-input { text-align: right; }
+.probing-diff { display: grid; gap: 2px; margin: 0; padding: 6px 8px; list-style: none; border: 1px solid var(--panel-border); border-radius: var(--ent-control-radius); font-size: 11px; }
+.probing-diff li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.probing-diff__key { color: var(--panel-text-muted); }
+.probing-diff__delta { color: var(--panel-text); font-weight: 600; }
+
+.probing-inspection { display: grid; gap: 8px; }
+.probing-run { display: flex; align-items: center; gap: 8px; margin: 0; }
+.probing-summary { margin: 0; font-size: 12px; font-weight: 600; }
+.probing-verdicts { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.probing-verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "pill name figures" "gauge gauge gauge" "band band band"; gap: 3px 8px; align-items: center; width: 100%; padding: 6px; border: 1px solid transparent; border-radius: var(--ent-control-radius); background: transparent; color: var(--panel-text); font-size: 12px; text-align: left; cursor: pointer; }
+.probing-verdict > .panel-badge { grid-area: pill; }
+.probing-verdict[aria-pressed="true"] { background: var(--panel-accent-soft); }
+.probing-verdict:hover { background: var(--panel-bg-inset); }
+.probing-verdict:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -2px; }
+.probing-verdict__name { grid-area: name; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.probing-verdict__figures { grid-area: figures; display: flex; gap: 8px; font-variant-numeric: tabular-nums; }
+.probing-verdict__dev { font-weight: 600; }
+.probing-verdict__band { grid-area: band; color: var(--panel-text-faint); font-size: 10.5px; }
+.probing-gauge { grid-area: gauge; position: relative; height: 6px; border-radius: 3px; background: var(--panel-warn-soft); }
+.probing-gauge__ok { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--panel-ok-soft); }
+.probing-gauge__mark { position: absolute; top: -2px; width: 2px; height: 10px; margin-left: -1px; background: var(--panel-text); }
+li[data-status="fail"] .probing-gauge__mark { background: var(--panel-bad); }
+
+.probing-program { display: grid; gap: 8px; }
+.probing-code { max-height: 260px; white-space: pre; }
+.probing-code__line { display: block; }
+.probing-code__line[data-contact="true"] { background: var(--panel-accent-soft); }
+.probing-code__no { display: inline-block; min-width: 3ch; margin-right: 8px; color: var(--panel-text-faint); text-align: right; user-select: none; }
+
+.probing-contacts { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; font-size: 11px; font-variant-numeric: tabular-nums; }
+.probing-contact { display: grid; grid-template-columns: 2ch minmax(0, 1fr) auto 7ch; gap: 8px; width: 100%; padding: 3px 6px; border: 0; border-radius: var(--ent-control-radius); background: transparent; color: var(--panel-text); text-align: left; cursor: pointer; }
+.probing-contact[aria-pressed="true"] { background: var(--panel-accent-soft); }
+.probing-contact:hover { background: var(--panel-bg-inset); }
+.probing-contact:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -2px; }
+.probing-contact__no { color: var(--panel-text-faint); }
+.probing-contact__pos { color: var(--panel-text-muted); }
+.probing-contact__dev { text-align: right; font-weight: 600; }

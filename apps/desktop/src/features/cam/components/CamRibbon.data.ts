@@ -44,6 +44,7 @@ export interface RibbonActionSpec {
     | "right-generator"
     | "right-cycles"
     | "right-verify"
+    | "right-probing"
     | "operation-change"
     | "post-fanuc"
     | "post-haas"
@@ -176,6 +177,7 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
       actions: [
         { id: "open-cycles", labelKey: "cam.ribbon.cycles", accent: "cyan", route: "right-cycles" },
         { id: "open-verify", labelKey: "cam.ribbon.verify", accent: "green", route: "right-verify" },
+        { id: "open-probing", labelKey: "cam.ribbon.probing", accent: "cyan", route: "right-probing" },
         { id: "open-toolpath", labelKey: "cam.ribbon.toolpath", accent: "green", route: "active-toolpath" },
         { id: "play-sim", labelKey: "cam.ribbon.editor", accent: "green", route: "play-simulation" }
       ]
@@ -223,6 +225,7 @@ export const RIBBON_ROUTES = new Set<RibbonActionSpec["route"]>([
   "right-generator",
   "right-cycles",
   "right-verify",
+  "right-probing",
   "operation-change",
   "post-fanuc",
   "post-haas",

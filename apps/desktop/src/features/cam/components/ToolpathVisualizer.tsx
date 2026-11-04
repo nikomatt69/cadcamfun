@@ -9,8 +9,9 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, type JSX } from "solid-js"
 import { ChevronDown, ChevronUp, Eye, EyeOff, ListTree, Play, RotateCcw, Settings, X } from "lucide-solid"
-import { cam } from "@cadcamfun/core"
-import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
+import { cam, type Solid } from "@cadcamfun/core"
+import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
+import { View3D, toolpathOverlayModel, OVERLAY_LAYERS, type MachineInfo, type OverlayLayer, type ProbeOverlayModel, type RenderMode, type SurfaceHit, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
 import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice, type OperationTool } from "../lib/machine-view.ts"
 import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
@@ -25,7 +26,24 @@ import { gaugeOfTool, previewToolFor } from "../../../viewport/view3d/tool-model
 import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
 import "../../../styles/viewport-chrome.css"
 
+/** What the probing panel shows in the 3D view (spec 73 §4). */
+export interface ToolpathProbeProps {
+  /** The run to draw (contacts, deviation arrows, work offset before and after, tilted frame, calibration spheres). */
+  readonly model: ProbeOverlayModel | undefined
+  /** The part and stock surfaces a feature can be picked on. */
+  readonly part?: ReadonlyArray<Solid>
+  /** The next click on the part fills the selected cycle. */
+  readonly picking: boolean
+  /** The contact a list row selected. */
+  readonly highlight?: number | undefined
+  readonly deviationScale: number
+  onPick?(hit: SurfaceHit): void
+  onDeviationScale?(scale: number): void
+}
+
 export interface ToolpathVisualizerProps {
+  /** The probe run and the part to pick on; absent: no probing in this view. */
+  readonly probe?: ToolpathProbeProps
   readonly program: cam.Program
   readonly workpiece: Workpiece
   readonly stock?: cam.generator.Stock
@@ -118,6 +136,17 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [legend, setLegend] = createSignal<ReadonlyArray<LegendEntry>>([])
   const [rate, setRate] = createSignal(1)
   const [operationsOpen, setOperationsOpen] = createSignal(false)
+  // Probing (spec 73 §4): which kinds of overlay object are drawn, the part for picking, the contact the playhead reached.
+  const [probeLayers, setProbeLayers] = createSignal<Readonly<Record<OverlayLayer, boolean>>>({ contacts: true, deviations: true, wcs: true, frames: true, calibration: true })
+  const [showPart, setShowPart] = createSignal(false)
+  const [probeContact, setProbeContact] = createSignal<number | undefined>(undefined)
+  const probeReadout = createMemo(() => {
+    const model = props.probe?.model, index = probeContact()
+    if (model === undefined || index === undefined) return undefined
+    const contact = model.contacts[index]
+    if (contact === undefined) return undefined
+    return { index, name: contact.name, tip: contact.tip, deviation: model.deviations.find((d) => d.index === index)?.magnitude }
+  })
   createEffect(on(() => props.program, () => { setHidden([]) }, { defer: true }))
   const cycleLines = createMemo(() => (props.gcode !== undefined ? cam.viewer.cycleLinesOf(props.gcode) : undefined))
   /** The clock the 3D view plays: the machine scene's, or the same timeline built here when no machine is shown. */
@@ -331,7 +360,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackRate={props.playbackRate * rate()}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             stock={stock()}
-            toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
+            {...(props.probe !== undefined && (showPart() || props.probe.picking) && props.probe.part !== undefined ? { solids: props.probe.part } : {})}
+            {...(props.probe?.model !== undefined ? { probeOverlay: { model: props.probe.model, layers: probeLayers(), highlight: props.probe.highlight, triadLength: 20 } } : {})}
+            {...(props.probe !== undefined ? { surfacePick: { active: props.probe.picking, onHit: (hit: SurfaceHit) => props.probe?.onPick?.(hit) }, onProbeContact: setProbeContact } : {})}
+            toolpathDisplay={{ probeColors: props.probe?.model !== undefined, showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
             onStockInfo={setStockInfo}
             {...(effectiveMachine() !== undefined ? { machine: effectiveMachine()!, machineDisplay: machineDisplay(), machineOptions: machineOptions(), onMachineInfo: setMachineInfo } : {})}
@@ -528,10 +560,16 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 )}</For>
               </ol>
             </Show>
+            <Show when={probeReadout()}>{(r) => (
+              <p class="rounded-lg bg-neutral-900 px-2 py-1 text-[11px] leading-5 text-slate-200" data-testid="probe-readout" role="status">
+                {t("cam.probe3d.readout", { index: r().index + 1, name: r().name, x: fmt(r().tip.x), y: fmt(r().tip.y), z: fmt(r().tip.z) })}
+                <Show when={r().deviation !== undefined}> · {t("cam.probe3d.readoutDeviation", { deviation: (r().deviation ?? 0).toFixed(4) })}</Show>
+              </p>
+            )}</Show>
             <Show when={legend().length > 0}>
               <ul class="rounded-lg bg-neutral-900 px-2 py-1 text-[11px] leading-5 text-slate-200" data-testid="path-legend">
                 <For each={legend().slice(0, 12)}>{(entry) => (
-                  <li class="flex items-center gap-1.5"><span class="inline-block h-2 w-3 rounded-sm" style={{ background: colorHex(entry.color) }} />{colorMode() === "move" ? moveLabel(entry.label as cam.viewer.MoveClass) : entry.label}</li>
+                  <li class="flex items-center gap-1.5"><span class="inline-block h-2 w-3 rounded-sm" style={{ background: colorHex(entry.color) }} />{colorMode() === "move" || entry.label === "probe" ? moveLabel(entry.label as cam.viewer.MoveClass) : entry.label}</li>
                 )}</For>
               </ul>
             </Show>
@@ -656,6 +694,16 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                       </label>
                     </Show>
                   </Show>
+                </section>
+              )}</Show>
+              <Show when={props.probe}>{(probe) => (
+                <section class="space-y-2 border-t border-slate-700 pt-3" data-testid="probe-settings-group">
+                  <h4 class="text-xs font-semibold text-slate-300">{t("cam.probe3d.group")}</h4>
+                  <For each={OVERLAY_LAYERS}>{(layerName) => toggle(t(`cam.probe3d.layer.${layerName}` as never), () => probeLayers()[layerName], (on) => setProbeLayers({ ...probeLayers(), [layerName]: on }))}</For>
+                  {toggle(t("cam.probe3d.showPart"), showPart, setShowPart)}
+                  <label class="block text-xs text-slate-200">{t("cam.probe3d.deviationScale")}
+                    <NumberField class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" testId="probe-deviation-scale" deferred min={1} max={10000} value={probe().deviationScale} onChange={(value) => probe().onDeviationScale?.(value)} />
+                  </label>
                 </section>
               )}</Show>
               <section class="space-y-2 border-t border-slate-700 pt-3">
