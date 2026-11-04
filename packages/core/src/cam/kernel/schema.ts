@@ -89,11 +89,11 @@ export const OperationSpecSchema = Schema.Union([
     ...overrides, strategy: Schema.Literal("surface"), mode: Schema.Literals(SURFACE_MODES),
     slopeAngle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 }))),
     allowance: Schema.optionalKey(nonNegative), scallop: Schema.optionalKey(positive), clearing: Schema.optionalKey(Schema.Literals(["contour", "adaptive"])),
-    angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id), center: Schema.optionalKey(point)
+    angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id), center: Schema.optionalKey(point), contact: Schema.optionalKey(Schema.Literals(["heightfield", "mesh"]))
   }),
   Schema.Struct({
     ...overrides, strategy: Schema.Literal("multiaxis"), mode: Schema.optionalKey(MultiaxisStrategySchema), top: Schema.Finite, stepover: positive,
-    angle: Schema.optionalKey(Schema.Finite), toolAxis: Schema.optionalKey(Schema.Literals(["normal", "lead"])),
+    angle: Schema.optionalKey(Schema.Finite), toolAxis: Schema.optionalKey(Schema.Literals(["normal", "lead", "point", "line", "curve", "shortest"])), axisPoint: Schema.optionalKey(vec3), axisLine: Schema.optionalKey(Schema.Struct({ a: vec3, b: vec3 })), axisCurve: Schema.optionalKey(Schema.Array(vec3).check(Schema.isMinLength(2), Schema.isMaxLength(20000))), maxTilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 180 }))), holderDiameter: Schema.optionalKey(positive),
     lead: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
     tilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
     /** `mode: "swarf"`: the walls to cut with the side of the cutter (read from the exact solid by `swarfWalls`). */
