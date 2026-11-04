@@ -11,6 +11,7 @@ import * as THREE from "three"
 import { cam, type Vec3 } from "@cadcamfun/core"
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool } from "./tool-models.ts"
+import { labelSprite, triad } from "./triad.ts"
 
 const v = cam.viewer
 
@@ -125,36 +126,9 @@ const bodyMesh = (body: cam.viewer.Body): THREE.Object3D => {
   return object
 }
 
-const labelSprite = (text: string, color: number, size: number): THREE.Sprite => {
-  const canvas = typeof document !== "undefined" ? document.createElement("canvas") : undefined
-  const context = canvas?.getContext("2d") ?? null
-  let map: THREE.Texture | null = null
-  if (canvas && context) {
-    canvas.width = 128; canvas.height = 64
-    context.font = "bold 40px sans-serif"; context.textAlign = "center"; context.textBaseline = "middle"
-    context.fillStyle = `#${color.toString(16).padStart(6, "0")}`; context.fillText(text, 64, 32)
-    map = new THREE.CanvasTexture(canvas)
-  }
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ ...(map ? { map } : { color }), transparent: true, depthTest: false }))
-  sprite.scale.set(size * 2, size, 1)
-  sprite.renderOrder = 30
-  sprite.name = `label:${text}`
-  return sprite
-}
-
-const triad = (setup: cam.viewer.MachineSetup, length: number): THREE.Group => {
-  const group = new THREE.Group()
-  group.name = "machine-triad"
+const machineTriad = (setup: cam.viewer.MachineSetup, length: number): THREE.Group => {
   const { axes, rotary } = v.displayAxes(setup)
-  for (const axis of axes) {
-    const dir = new THREE.Vector3(axis.direction.x, axis.direction.y, axis.direction.z)
-    const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), length, axis.color, length * 0.18, length * 0.09)
-    arrow.name = `axis:${axis.name}`
-    group.add(arrow)
-    const label = labelSprite(`${axis.label}+`, axis.color, length * 0.22)
-    label.position.copy(dir.clone().multiplyScalar(length * 1.18))
-    group.add(label)
-  }
+  const group = triad(axes, length, "machine-triad")
   if (rotary !== undefined) {
     // An arc with an arrow head round the axis of what turns, in the sense of M3.
     const axis = new THREE.Vector3(rotary.axis.x, rotary.axis.y, rotary.axis.z)
@@ -220,7 +194,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     if (setup.kind === "mill" && display.showMachine && body.role === "table") continue
     ;(body.spins ? spinning : statics).add(bodyMesh(body))
   }
-  if (display.showTriad) root.add(triad(setup, Math.max(30, Math.min(120, input.scale * 0.6))))
+  if (display.showTriad) root.add(machineTriad(setup, Math.max(30, Math.min(120, input.scale * 0.6))))
 
   // Moves into the workholding, drawn over the path in red.
   const hits = v.collidingMoves(setup, timeline, input.tool)
