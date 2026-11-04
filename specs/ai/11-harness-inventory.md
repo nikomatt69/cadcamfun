@@ -88,7 +88,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `cad_edit.surface` | write | drawing | operation*, patches*, thickness, direction, tolerance, name | handler `cadStoreBodies` → `apps/sidecar/src/services/ai.ts:770` | yes | declared | action-inputs-cad.test.ts, tool-usage.test.ts, ai-exact.test.ts |
 | `cad_edit.shell` | write | drawing | id*, thickness*, open, wallByFace | handler `cadBuildShell` → `apps/sidecar/src/services/ai.ts:841` | yes | declared | action-inputs-cad.test.ts, repeated-failure.test.ts, ai-exact.test.ts |
-| `cad_edit.hole` | write | drawing | id*, hole, nurbs, distance, direction, mode, angle, neutral, pull, tolerance, fillet, radius, boss, diameter, taper, fill | handler `cadBuildHole` → `apps/sidecar/src/services/ai.ts:861` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
+| `cad_edit.hole` | write | drawing | id*, hole, nurbs, distance, direction, mode, angle, neutral, pull, tolerance, fillet, radius, boss, diameter, taper, fill | handler `cadBuildHole` → `apps/sidecar/src/services/ai.ts:861` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts, ai-editor-sync.test.ts |
 | `cad_edit.title_block_set` | write | drawing | titleBlock* | handler `cadTitleBlock` → `apps/sidecar/src/services/ai.ts:712` | yes | declared | action-inputs-cad.test.ts, ai-drawing.test.ts |
 | `cad_edit.offset` | write | drawing | id*, distance* | handler `cadBuildOffset` → `apps/sidecar/src/services/ai.ts:896` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:1044` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, post-edit-diagnostics.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-industrial-gripper.test.ts, ai-industrial-mechanisms.test.ts, ai-resource-generator.test.ts, ai-stock-inspection.test.ts, assistant-history.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-project-sessions.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
@@ -230,7 +230,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `agent.start` (was `agent_task`) | write | task | description*, prompt, brief, agent, subagent_type, background | contribution `agent.start` → `packages/ai/src/nikcli/background-tools.ts:164` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, agent-brief.test.ts, agents.test.ts, background-tools.test.ts, bridge.test.ts, nikcli-host.test.ts, specialists-host.test.ts, ai-bridge.test.ts, ai-specialists.test.ts, ai-task-card.test.ts, ai-tool-facts.test.ts |
-| `agent.list` (was `agent_tasks`) | read | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:165` | yes | declared | action-contracts.test.ts, action-inputs.test.ts, background-tools.test.ts, ai-task-card.test.ts |
+| `agent.list` (was `agent_tasks`) | read | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:165` | yes | declared | action-contracts.test.ts, action-inputs.test.ts, background-tools.test.ts, ai-task-card.test.ts, ai-tool-facts.test.ts |
 | `agent.read` (was `agent_task_read`) | read | — | taskId* | contribution `agent.read` → `packages/ai/src/nikcli/background-tools.ts:166` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
 | `agent.cancel` (was `agent_task_cancel`) | write | task | taskId* | contribution `agent.cancel` → `packages/ai/src/nikcli/background-tools.ts:167` | yes | declared | action-inputs.test.ts, background-tools.test.ts |
 
@@ -238,7 +238,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mods.list` (was `mods_list`) | read | — | — | contribution `mods.list` → `packages/ai/src/nikcli/mod-tools.ts:193` | yes | declared | mod-tools.test.ts |
+| `mods.list` (was `mods_list`) | read | — | — | contribution `mods.list` → `packages/ai/src/nikcli/mod-tools.ts:193` | yes | declared | mod-tools.test.ts, ai-tool-facts.test.ts |
 | `mods.read` (was `mods_read`) | read | — | id* | contribution `mods.read` → `packages/ai/src/nikcli/mod-tools.ts:194` | yes | declared | mod-tools.test.ts |
 
 ### `mods_edit`

@@ -202,7 +202,7 @@ export class Probing extends Context.Service<Probing, {
           const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
           const input: CamProbePlanInput = {
             ...planInputOf(setup, payload), dialect: payload.dialect,
-            ...(payload.options !== undefined ? { options: { ...(payload.options.orientSpindle !== undefined ? { orientSpindle: payload.options.orientSpindle * DEG } : {}), ...(payload.options.programNumber !== undefined ? { programNumber: payload.options.programNumber } : {}), ...(payload.options.lineNumbers !== undefined ? { lineNumbers: payload.options.lineNumbers } : {}) } } : {})
+            ...(payload.options !== undefined ? { options: { ...(payload.options.orientSpindle !== undefined ? { orientSpindle: payload.options.orientSpindle } : {}), ...(payload.options.programNumber !== undefined ? { programNumber: payload.options.programNumber } : {}), ...(payload.options.lineNumbers !== undefined ? { lineNumbers: payload.options.lineNumbers } : {}) } } : {})
           }
           const out = payload.feature !== undefined
             ? yield* runKernelJobEffect("cam-probe-plan", input).pipe(Effect.catch(explainKernelFailure("Failed to write the probing program")))
