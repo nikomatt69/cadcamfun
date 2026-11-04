@@ -463,3 +463,5 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
 - 2026-11-04 (lane cad, cc/cad-1): **P1-6 / step 2.4 closed in core.** The mesh replay now resumes from the first dirty feature too
   (`rebuild(history, { cache: newRebuildCache() })`, see spec 58 change log); with `ExactStageCache` both replays resume, and every
   resumed result deep-equals the full replay. Open: a per-part cache in the sidecar (lane D).
+- 2026-11-04 (lane cad, cc/cad-2): **P2-10 sketch half partly closed**: 2D fillet, mirror, linear/circular pattern, offset and project-edges tools in
+  `cad/sketch-tools.ts` (spec 45 change log). Still open in P2-10: 3D sketch, blocks, delete/replace/split face and extrude until-next/to-body history operations.
