@@ -5447,6 +5447,107 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/ai/extensions/plugins/tools": {
+      "get": {
+        "operationId": "ai.extensionPluginTools",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tools": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "read",
+                              "write",
+                            ],
+                            "type": "string",
+                          },
+                          "parameters": {
+                            "type": "object",
+                          },
+                          "pluginId": {
+                            "type": "string",
+                          },
+                          "pluginName": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "pluginId",
+                          "pluginName",
+                          "id",
+                          "description",
+                          "kind",
+                          "parameters",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "tools",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/extensions/plugins/{id}": {
       "delete": {
         "operationId": "ai.removeExtensionPlugin",
@@ -5734,6 +5835,145 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/extensions/plugins/{id}/tools/{toolId}": {
+      "post": {
+        "operationId": "ai.invokeExtensionPluginTool",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "toolId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "confirm": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "pluginId": {
+                      "type": "string",
+                    },
+                    "result": {},
+                    "toolId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "pluginId",
+                    "toolId",
+                    "result",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
           },
           "500": {
             "content": {

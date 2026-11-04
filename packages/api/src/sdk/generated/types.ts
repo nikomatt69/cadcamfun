@@ -90,6 +90,10 @@ export type TokenBadRequest = { readonly _tag: "TokenBadRequest"; readonly error
 export const isTokenBadRequest = (value: unknown): value is TokenBadRequest =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "TokenBadRequest"
 
+export type Forbidden = { readonly _tag: "Forbidden"; readonly message: string }
+export const isForbidden = (value: unknown): value is Forbidden =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Forbidden"
+
 export type AiBadRequest = { readonly _tag: "AiBadRequest"; readonly error: string }
 export const isAiBadRequest = (value: unknown): value is AiBadRequest =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AiBadRequest"
@@ -232,10 +236,6 @@ export const isDesktopConflict = (value: unknown): value is DesktopConflict =>
 export type DesktopNotFound = { readonly _tag: "DesktopNotFound"; readonly success: false; readonly error: string }
 export const isDesktopNotFound = (value: unknown): value is DesktopNotFound =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "DesktopNotFound"
-
-export type Forbidden = { readonly _tag: "Forbidden"; readonly message: string }
-export const isForbidden = (value: unknown): value is Forbidden =>
-  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Forbidden"
 
 export type PluginBadRequest = {
   readonly _tag: "PluginBadRequest"
@@ -447,6 +447,11 @@ export type AiInstallExtensionPluginPayload = {
   readonly manifest: string
   readonly source: string
   readonly files?: { readonly [x: string]: string } | undefined
+}
+
+export type AiInvokeExtensionPluginToolPayload = {
+  readonly args?: JsonValue | undefined
+  readonly confirm?: boolean | undefined
 }
 
 export type AiToggleExtensionPluginPayload = { readonly enabled: boolean }
@@ -4040,6 +4045,26 @@ export type AiInstallExtensionPluginOutput = {
     modes: number
   }>
 }
+
+export type AiExtensionPluginToolsOutput = {
+  tools: Array<{
+    pluginId: string
+    pluginName: string
+    id: string
+    description: string
+    kind: "read" | "write"
+    parameters: { [x: string]: JsonValue }
+  }>
+}
+
+export type AiInvokeExtensionPluginToolInput = {
+  readonly id: { readonly id: string; readonly toolId: string }["id"]
+  readonly toolId: { readonly id: string; readonly toolId: string }["toolId"]
+  readonly args?: AiInvokeExtensionPluginToolPayload["args"]
+  readonly confirm?: AiInvokeExtensionPluginToolPayload["confirm"]
+}
+
+export type AiInvokeExtensionPluginToolOutput = { pluginId: string; toolId: string; result: JsonValue }
 
 export type AiToggleExtensionPluginInput = {
   readonly id: { readonly id: string }["id"]

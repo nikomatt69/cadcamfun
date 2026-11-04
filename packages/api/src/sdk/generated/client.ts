@@ -98,6 +98,9 @@ import type {
   AiExtensionPluginsOutput,
   AiInstallExtensionPluginInput,
   AiInstallExtensionPluginOutput,
+  AiExtensionPluginToolsOutput,
+  AiInvokeExtensionPluginToolInput,
+  AiInvokeExtensionPluginToolOutput,
   AiToggleExtensionPluginInput,
   AiToggleExtensionPluginOutput,
   AiExtensionModsOutput,
@@ -1560,6 +1563,29 @@ export function make(options: ClientOptions) {
             body: { manifest: input["manifest"], source: input["source"], files: input["files"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      extensionPluginTools: (requestOptions?: RequestOptions) =>
+        request<AiExtensionPluginToolsOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/extensions/plugins/tools`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      invokeExtensionPluginTool: (input: AiInvokeExtensionPluginToolInput, requestOptions?: RequestOptions) =>
+        request<AiInvokeExtensionPluginToolOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/extensions/plugins/${encodeURIComponent(input.id)}/tools/${encodeURIComponent(input.toolId)}`,
+            body: { args: input["args"], confirm: input["confirm"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,
           },
           requestOptions,
