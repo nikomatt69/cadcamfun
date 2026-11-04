@@ -1252,5 +1252,12 @@
   "cad.template.honeycombPattern.color.label": "Farbe",
   "cad.param.refLost": "Referenz verloren",
   "cad.param.refLostBy": "entfernt durch {feature}",
-  "cad.param.refLostSummary": "{count} Auswahlen verweisen auf Flächen oder Kanten, die nicht mehr existieren: diese Features werden nicht erstellt"
+  "cad.param.refLostSummary": "{count} Auswahlen verweisen auf Flächen oder Kanten, die nicht mehr existieren: diese Features werden nicht erstellt",
+  "cad.param.rename": "Rename",
+  "cad.param.selectFeature": "Select",
+  "cad.param.group": "Group {count} selected",
+  "cad.param.groupName": "Group name",
+  "cad.param.ungroup": "Ungroup",
+  "cad.param.expandGroup": "Expand",
+  "cad.param.collapseGroup": "Collapse"
 }

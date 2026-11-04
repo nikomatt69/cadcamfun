@@ -1252,5 +1252,12 @@
   "cad.template.honeycombPattern.color.label": "रंग",
   "cad.param.refLost": "संदर्भ खो गया",
   "cad.param.refLostBy": "{feature} द्वारा हटाया गया",
-  "cad.param.refLostSummary": "{count} चयन ऐसे फ़ेस या किनारों की ओर इशारा करते हैं जो अब मौजूद नहीं हैं: वे फ़ीचर नहीं बने"
+  "cad.param.refLostSummary": "{count} चयन ऐसे फ़ेस या किनारों की ओर इशारा करते हैं जो अब मौजूद नहीं हैं: वे फ़ीचर नहीं बने",
+  "cad.param.rename": "Rename",
+  "cad.param.selectFeature": "Select",
+  "cad.param.group": "Group {count} selected",
+  "cad.param.groupName": "Group name",
+  "cad.param.ungroup": "Ungroup",
+  "cad.param.expandGroup": "Expand",
+  "cad.param.collapseGroup": "Collapse"
 }
