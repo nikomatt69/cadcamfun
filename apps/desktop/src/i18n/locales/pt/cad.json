@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Espessura do padrão",
   "cad.template.honeycombPattern.thickness.label": "Espessura",
   "cad.template.honeycombPattern.color.description": "Cor do padrão",
-  "cad.template.honeycombPattern.color.label": "Cor"
+  "cad.template.honeycombPattern.color.label": "Cor",
+  "cad.param.refLost": "Referência perdida",
+  "cad.param.refLostBy": "removido por {feature}",
+  "cad.param.refLostSummary": "{count} seleções apontam para faces ou arestas que não existem mais: esses recursos não são construídos"
 }

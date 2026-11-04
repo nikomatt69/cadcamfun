@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Pattern thickness",
   "cad.template.honeycombPattern.thickness.label": "Thickness",
   "cad.template.honeycombPattern.color.description": "Pattern color",
-  "cad.template.honeycombPattern.color.label": "Color"
+  "cad.template.honeycombPattern.color.label": "Color",
+  "cad.param.refLost": "Reference lost",
+  "cad.param.refLostBy": "removed by {feature}",
+  "cad.param.refLostSummary": "{count} selections point at faces or edges that no longer exist: those features are not built"
 }
