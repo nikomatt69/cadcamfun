@@ -419,6 +419,51 @@ export const libraryRowVersionTable = sqliteTable(
 export type LibraryRowVersion = typeof libraryRowVersionTable.$inferSelect
 export type NewLibraryRowVersion = typeof libraryRowVersionTable.$inferInsert
 
+export const ProbeReportKindValues = ["part", "rotary", "stylus", "tool-setter"] as const
+export const ProbeReportSourceValues = ["simulated", "machine", "imported"] as const
+export const ProbeReportVerdictValues = ["pass", "warn", "fail", "missed", "incomplete"] as const
+
+/**
+ * One probing / in-process inspection result (spec 73): what a probe program measured (simulated on the part model, read back
+ * from a machine, or imported), the per-check verdicts and the work-offset change it proposed. Reports outlive the probe
+ * operation they came from (`set null`) and go with their project. The full report is `data` (core `ProbeReport` JSON);
+ * `verdict`, `programHash` and `sourceRevision` are copied out so a list can filter and mark stale reports without parsing it.
+ */
+export const probeReportTable = sqliteTable(
+  "ProbeReport",
+  {
+  id: text("id").primaryKey().$defaultFn(newId),
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  drawingId: text("drawingId").references((): AnySQLiteColumn => drawingTable.id, { onDelete: "set null" }),
+  toolpathId: text("toolpathId").references((): AnySQLiteColumn => toolpathTable.id, { onDelete: "set null" }),
+  machineConfigId: text("machineConfigId").references((): AnySQLiteColumn => machineConfigTable.id, { onDelete: "set null" }),
+  /** Saved CAM setup id (a KV row, so no foreign key). */
+  setupId: text("setupId"),
+  runId: text("runId"),
+  name: text("name").notNull(),
+  kind: text("kind", { enum: ProbeReportKindValues }).notNull(),
+  source: text("source", { enum: ProbeReportSourceValues }).notNull(),
+  verdict: text("verdict", { enum: ProbeReportVerdictValues }).notNull(),
+  /** Work offset the program measured into (`G54`, `G54.1 P3`, ...). */
+  workOffset: text("workOffset"),
+  /** sha256 of the probe program that produced the report. */
+  programHash: text("programHash"),
+  /** Drawing revision the probe operation was planned on; a newer drawing makes the report stale. */
+  sourceRevision: text("sourceRevision"),
+  data: text("data", { mode: "json" }).notNull(),
+  measuredAt: integer("measuredAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  createdById: text("createdById").notNull().references((): AnySQLiteColumn => userTable.id),
+  },
+  (t) => [
+    index("ProbeReport_project_created_idx").on(t.projectId, t.createdAt),
+    index("ProbeReport_toolpath_idx").on(t.toolpathId),
+  ]
+)
+
+export type ProbeReport = typeof probeReportTable.$inferSelect
+export type NewProbeReport = typeof probeReportTable.$inferInsert
+
 export const activityLogTable = sqliteTable(
   "ActivityLog",
   {

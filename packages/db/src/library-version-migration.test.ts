@@ -19,11 +19,12 @@ test("the library-version migration keeps legacy rows and gives them version 1",
   directories.push(directory)
   const real = join(import.meta.dir, "..", "drizzle")
   const names = readdirSync(real).filter((name) => /^\d{14}_/.test(name)).sort()
-  const last = names.at(-1)!
-  expect(last).toContain("sticky_sandman")
+  const at = names.findIndex((name) => name.includes("sticky_sandman"))
+  expect(at).toBeGreaterThan(0)
+  const last = names[at]!
   const folder = join(directory, "migrations")
   mkdirSync(folder)
-  for (const name of names.slice(0, -1)) cpSync(join(real, name), join(folder, name), { recursive: true })
+  for (const name of names.slice(0, at)) cpSync(join(real, name), join(folder, name), { recursive: true })
   const path = join(directory, "cadcamfun.db")
 
   await start(path, folder)
