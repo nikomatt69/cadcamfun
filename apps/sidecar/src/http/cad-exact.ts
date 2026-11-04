@@ -81,7 +81,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         // The history is checked here, at the boundary, so a malformed one is a 400 that names each refused field and not a worker fault.
         const decoded = decodeHistory(payload.history)
         if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
-        return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
+        let baseline: unknown
+        if (payload.baseline !== undefined) {
+          const before = decodeHistory(payload.baseline)
+          if (!before.success) return yield* new BadRequest({ message: `Invalid baseline history: ${before.problems.slice(0, 8).join("; ")}` })
+          baseline = before.data
+        }
+        return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(baseline !== undefined ? { baseline } : {}), ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
       }))
     .handle("importStep", ({ payload }) =>
       Effect.gen(function*() {

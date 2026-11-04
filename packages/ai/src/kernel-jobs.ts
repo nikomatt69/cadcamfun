@@ -5,7 +5,7 @@
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
 import { cadKernelReport } from "./actions/cad-kernel-report.ts"
 import { cadExport, cadExportBodies, cadExportScene, camStockExport } from "./actions/export-kernel.ts"
-import { brep, cad, cam, drawing, exactDigest, exactSummary, rebuild, rebuildExact, type History } from "@cadcamfun/core"
+import { brep, cad, cam, drawing, exactDigest, exactSummary, newExactStageCache, rebuild, rebuildExact, type History } from "@cadcamfun/core"
 import { decodeHistory, decodeStartHistory, parametricReport, parseHistory } from "./parametric.ts"
 import { parametricDiagnosis, parametricExact, parametricTimeline } from "./parametric-jobs.ts"
 import { editHistory } from "./parametric-edit.ts"
@@ -80,27 +80,67 @@ export const cadHole = ({ elements, edit }: CadHoleInput) => {
   }
 }
 
-export interface CadRebuildInput { readonly history: unknown; readonly budgetMs?: number }
+export interface CadRebuildInput {
+  readonly history: unknown
+  readonly budgetMs?: number
+  /** The history as it was before the edit, already decoded: the rebuild then resumes from the last feature the edit did not touch. */
+  readonly baseline?: unknown
+}
+
+/** What a feature does to the solid, for the per-feature reports: a blend, a shell, a boolean (combine, split, a cut or intersect) or any other feature. */
+const reportKind = (feature: History["features"][number]): "blend" | "shell" | "boolean" | "feature" => {
+  switch (feature.type) {
+    case "fillet": return "blend"
+    case "shell": return "shell"
+    case "combine": case "split": return "boolean"
+    default: { const operation = "operation" in feature ? (feature as { readonly operation?: string }).operation : undefined; return operation === "cut" || operation === "intersect" ? "boolean" : "feature" }
+  }
+}
 
 /**
  * A history rebuilt from its features alone (spec 72 step 1.3): the mesh rebuild's issues and parameters plus the exact model of each
  * body, and the digest a client holding its own kernel compares with. The same `rebuild` + `rebuildExact` the desktop runs locally.
+ * Also: the state of every feature, the exact replay's warnings sorted by the kind of feature that raised them (blend, shell, boolean),
+ * the healing state of each imported base, and, with a `baseline`, how much of the replay an edit reused (`incremental`).
  */
-export const cadRebuild = ({ history, budgetMs }: CadRebuildInput) => {
+export const cadRebuild = ({ history, budgetMs, baseline }: CadRebuildInput) => {
   const decoded = parseHistory(history)
   const result = rebuild(decoded)
   let warnings: ReadonlyArray<string> = []
+  let incremental: { readonly resumedAt: number; readonly replayed: number; readonly features: number } | undefined
   const summary = brep.withBudget(budgetMs ?? 60_000, () => {
-    const exact = rebuildExact(decoded, result)
+    let cache: ReturnType<typeof newExactStageCache> | undefined
+    if (baseline !== undefined) {
+      cache = newExactStageCache()
+      const before = parseHistory(baseline)
+      rebuildExact(before, rebuild(before), { cache })
+    }
+    const exact = rebuildExact(decoded, result, cache === undefined ? {} : { cache })
+    if (cache !== undefined) incremental = { resumedAt: cache.lastResumedAt ?? 0, replayed: cache.lastReplayed ?? decoded.features.length, features: decoded.features.length }
     warnings = exact.warnings
     return exactSummary(exact)
+  })
+  const features = decoded.features.map((f) => {
+    const state = result.states[f.id]
+    return { id: f.id, type: f.type, state: state?.state ?? "ok", ...(state !== undefined && "by" in state ? { by: state.by } : {}) }
+  })
+  const kinds = new Map(decoded.features.map((f) => [f.id, reportKind(f)] as const))
+  const reports = warnings.flatMap((message) => {
+    const feature = decoded.features.find((f) => message.startsWith(`${f.id}:`))
+    return feature === undefined ? [] : [{ feature: feature.id, kind: kinds.get(feature.id) ?? "feature", message }]
+  })
+  const healing = (decoded.bases ?? []).map((base) => {
+    const limit = brep.toleranceLimit(base.brep)
+    const maxTolerance = base.source?.maxTolerance ?? 0
+    return { id: base.id, ...(base.source?.name !== undefined ? { name: base.source.name } : {}), faces: base.brep.faces.length, maxTolerance, limit, loose: maxTolerance > limit, ...(base.source?.healed !== undefined ? { healed: base.source.healed } : {}) }
   })
   return {
     ok: result.bodies.length > 0 && !result.issues.some((i) => i.severity === "error"),
     parameters: result.parameters,
     bodies: summary, digest: exactDigest(summary),
     issues: result.issues.map((i) => ({ feature: i.feature, severity: i.severity, message: i.message, ...(i.remedy !== undefined ? { remedy: i.remedy } : {}) })),
-    warnings
+    warnings, features, reports, healing,
+    ...(incremental !== undefined ? { incremental } : {})
   }
 }
 

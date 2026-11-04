@@ -575,6 +575,10 @@ import type {
   CamSetupGetOutput,
   CamSetupUpdateInput,
   CamSetupUpdateOutput,
+  CamSetupPlanSavedInput,
+  CamSetupPlanSavedOutput,
+  CamSetupGenerateSavedInput,
+  CamSetupGenerateSavedOutput,
   CamSetupRemoveInput,
   CamSetupRemoveOutput,
   LibraryListInput,
@@ -4801,7 +4805,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/cad/exact/rebuild`,
-            body: { history: input["history"], budgetMs: input["budgetMs"] },
+            body: { history: input["history"], budgetMs: input["budgetMs"], baseline: input["baseline"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,
@@ -4906,6 +4910,29 @@ export function make(options: ClientOptions) {
             body: { name: input["name"], setup: input["setup"], baseUpdatedAt: input["baseUpdatedAt"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      planSaved: (input: CamSetupPlanSavedInput, requestOptions?: RequestOptions) =>
+        request<CamSetupPlanSavedOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}/plan`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      generateSaved: (input: CamSetupGenerateSavedInput, requestOptions?: RequestOptions) =>
+        request<CamSetupGenerateSavedOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}/generate`,
+            body: { elements: input["elements"], stock: input["stock"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,
