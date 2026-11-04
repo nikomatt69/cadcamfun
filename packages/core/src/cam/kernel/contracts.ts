@@ -78,6 +78,16 @@ export interface FixtureBody {
 export type WorkOrigin = "stock-center" | "stock-corner"
 
 /**
+ * A tilted work plane for a 3+2 setup (spec 69 C1; `kernel/workplane.ts`): `normal` is the tool axis in CAD world coordinates, `xHint` the
+ * direction the plane's x follows (default CAD +X). Operations are in the plane's own coordinates. Needs a machine whose post writes a
+ * tilted plane and explicit operations; not combined with `setupOrientation`.
+ */
+export interface Workplane {
+  readonly normal: Vec3
+  readonly xHint?: Vec3
+}
+
+/**
  * One fixing of the part inside a job (spec 69 C1): everything that can differ between the setups of the same part. `orientation` is
  * the CAD direction facing the spindle (default `+Z`); every field but `id` is optional and means what the same field of the job means.
  * A job without `setups` is one setup made of its own fields (`setupsOf`), so a stored v1 job loads and runs as before.
@@ -86,6 +96,8 @@ export interface JobSetup {
   readonly id: string
   readonly name?: string
   readonly orientation?: SetupOrientation
+  /** A tilted plane (3+2) instead of an orientation. */
+  readonly workplane?: Workplane
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
   readonly stock?: StockBox
@@ -395,6 +407,8 @@ export interface ManufacturingJob {
   readonly stockModel?: StockModel
   /** Manual refixture: CAD direction facing the spindle; operations use the oriented setup coordinates. */
   readonly setupOrientation?: SetupOrientation
+  /** Tilted work plane (3+2); see `Workplane`. */
+  readonly workplane?: Workplane
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
   /**
@@ -557,6 +571,8 @@ export interface CamArtifact {
   readonly machine: { readonly id: string; readonly name: string; readonly post: PostId }
   /** Manual setup orientation; omitted for legacy artifacts. */
   readonly setupOrientation?: SetupOrientation
+  /** The tilted plane of a 3+2 setup; the coordinates of the artifact are the plane's. */
+  readonly workplane?: Workplane
   /** Work zero in oriented setup coordinates (toolpaths are relative to it). */
   readonly origin: Vec3
   /** Resolved raw stock in oriented setup coordinates; subtract `origin` to display it alongside the work-coordinate NC. */
