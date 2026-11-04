@@ -543,8 +543,6 @@ import type {
   ToolpathGeneratorManufactureOutput,
   ToolpathGeneratorPlanInput,
   ToolpathGeneratorPlanOutput,
-  ToolpathGeneratorJobInput,
-  ToolpathGeneratorJobOutput,
   ToolpathGeneratorLatheInput,
   ToolpathGeneratorLatheOutput,
   ToolpathGeneratorParseInput,
@@ -599,6 +597,26 @@ import type {
   CamSetupGenerateSavedOutput,
   CamSetupRemoveInput,
   CamSetupRemoveOutput,
+  CamProbingCalibrateRotaryInput,
+  CamProbingCalibrateRotaryOutput,
+  CamProbingWorkOffsetsGetInput,
+  CamProbingWorkOffsetsGetOutput,
+  CamProbingWorkOffsetsPutInput,
+  CamProbingWorkOffsetsPutOutput,
+  CamProbingProbeConfigGetInput,
+  CamProbingProbeConfigGetOutput,
+  CamProbingProbeConfigPutInput,
+  CamProbingProbeConfigPutOutput,
+  CamProbingReportsListInput,
+  CamProbingReportsListOutput,
+  CamProbingReportsGetInput,
+  CamProbingReportsGetOutput,
+  CamProbingReportsRunInput,
+  CamProbingReportsRunOutput,
+  CamProbingReportsSaveInput,
+  CamProbingReportsSaveOutput,
+  CamProbingReportsRemoveInput,
+  CamProbingReportsRemoveOutput,
   LibraryListInput,
   LibraryListOutput,
   LibraryCreateInput,
@@ -4706,27 +4724,6 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      job: (input: ToolpathGeneratorJobInput, requestOptions?: RequestOptions) =>
-        request<ToolpathGeneratorJobOutput>(
-          {
-            method: "POST",
-            path: `/api/cam/jobs`,
-            body: {
-              op: input["op"],
-              material: input["material"],
-              machine: input["machine"],
-              part: input["part"],
-              tools: input["tools"],
-              quality: input["quality"],
-              setups: input["setups"],
-              nc: input["nc"],
-            },
-            successStatus: 200,
-            declaredStatuses: [400, 500, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
       lathe: (input: ToolpathGeneratorLatheInput, requestOptions?: RequestOptions) =>
         request<ToolpathGeneratorLatheOutput>(
           {
@@ -5122,6 +5119,163 @@ export function make(options: ClientOptions) {
           {
             method: "DELETE",
             path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    camProbing: {
+      calibrateRotary: (input: CamProbingCalibrateRotaryInput, requestOptions?: RequestOptions) =>
+        request<CamProbingCalibrateRotaryOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/probing/calibrate-rotary`,
+            body: {
+              axis: input["axis"],
+              sphere: input["sphere"],
+              angles: input["angles"],
+              assumed: input["assumed"],
+              settings: input["settings"],
+              truth: input["truth"],
+              measured: input["measured"],
+              dialect: input["dialect"],
+              progress: input["progress"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workOffsetsGet: (input: CamProbingWorkOffsetsGetInput, requestOptions?: RequestOptions) =>
+        request<CamProbingWorkOffsetsGetOutput>(
+          {
+            method: "GET",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/work-offsets`,
+            query: { setupId: input["setupId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workOffsetsPut: (input: CamProbingWorkOffsetsPutInput, requestOptions?: RequestOptions) =>
+        request<CamProbingWorkOffsetsPutOutput>(
+          {
+            method: "PUT",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/work-offsets`,
+            query: { setupId: input["setupId"] },
+            body: { entries: input["entries"], baseUpdatedAt: input["baseUpdatedAt"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      probeConfigGet: (input: CamProbingProbeConfigGetInput, requestOptions?: RequestOptions) =>
+        request<CamProbingProbeConfigGetOutput>(
+          {
+            method: "GET",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/probe`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      probeConfigPut: (input: CamProbingProbeConfigPutInput, requestOptions?: RequestOptions) =>
+        request<CamProbingProbeConfigPutOutput>(
+          {
+            method: "PUT",
+            path: `/api/machine-configs/${encodeURIComponent(input.id)}/probe`,
+            body: {
+              probing: input["probing"],
+              toolSetter: input["toolSetter"],
+              rotaryCalibration: input["rotaryCalibration"],
+              baseUpdatedAt: input["baseUpdatedAt"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      reportsList: (input: CamProbingReportsListInput, requestOptions?: RequestOptions) =>
+        request<CamProbingReportsListOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/probe-reports`,
+            query: { operationId: input["operationId"], limit: input["limit"], before: input["before"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      reportsGet: (input: CamProbingReportsGetInput, requestOptions?: RequestOptions) =>
+        request<CamProbingReportsGetOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/probe-reports/${encodeURIComponent(input.reportId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      reportsRun: (input: CamProbingReportsRunInput, requestOptions?: RequestOptions) =>
+        request<CamProbingReportsRunOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/probe-reports`,
+            body: {
+              operationId: input["operationId"],
+              misplacement: input["misplacement"],
+              machineConfig: input["machineConfig"],
+              setupId: input["setupId"],
+              calibrationError: input["calibrationError"],
+              runId: input["runId"],
+            },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      reportsSave: (input: CamProbingReportsSaveInput, requestOptions?: RequestOptions) =>
+        request<CamProbingReportsSaveOutput>(
+          {
+            method: "PUT",
+            path: `/api/projects/${encodeURIComponent(input.id)}/probe-reports`,
+            body: {
+              name: input["name"],
+              kind: input["kind"],
+              source: input["source"],
+              verdict: input["verdict"],
+              data: input["data"],
+              toolpathId: input["toolpathId"],
+              drawingId: input["drawingId"],
+              machineConfigId: input["machineConfigId"],
+              setupId: input["setupId"],
+              runId: input["runId"],
+              workOffset: input["workOffset"],
+              programHash: input["programHash"],
+              sourceRevision: input["sourceRevision"],
+              measuredAt: input["measuredAt"],
+            },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      reportsRemove: (input: CamProbingReportsRemoveInput, requestOptions?: RequestOptions) =>
+        request<CamProbingReportsRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/projects/${encodeURIComponent(input.id)}/probe-reports/${encodeURIComponent(input.reportId)}`,
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
             empty: false,

@@ -1672,6 +1672,213 @@ export type ToolpathGeneratorManufacturePayload = {
         }>
         readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
       }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "probe"
+        readonly cycle:
+          | {
+              readonly kind: "z-surface"
+              readonly at: { readonly x: number; readonly y: number }
+              readonly expectedZ: number
+            }
+          | {
+              readonly kind: "edge"
+              readonly at: { readonly x: number; readonly y: number; readonly z: number }
+              readonly normal: { readonly x: number; readonly y: number }
+            }
+          | {
+              readonly kind: "corner"
+              readonly corner: { readonly x: number; readonly y: number }
+              readonly inside: boolean
+              readonly xSense: 1 | -1
+              readonly ySense: 1 | -1
+              readonly depth: number
+              readonly top?: number
+              readonly inset?: number
+              readonly touchesPerEdge?: 1 | 2
+            }
+          | {
+              readonly kind: "web" | "pocket"
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly width: number
+              readonly angle: number
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "rectangle"
+              readonly inside: boolean
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly size: { readonly x: number; readonly y: number }
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "bore" | "boss"
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly diameter: number
+              readonly depth: number
+              readonly top?: number
+              readonly angles?: ReadonlyArray<number>
+            }
+          | {
+              readonly kind: "edge-angle"
+              readonly start: { readonly x: number; readonly y: number }
+              readonly along: { readonly x: number; readonly y: number }
+              readonly pitch: number
+              readonly normal: { readonly x: number; readonly y: number }
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "plane"
+              readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+              readonly expectedZ: number
+            }
+          | {
+              readonly kind: "sphere"
+              readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+              readonly diameter: number
+              readonly touches?: 5 | 9
+            }
+          | {
+              readonly kind: "tool-length" | "tool-radius" | "broken-tool"
+              readonly tool: number
+              readonly nominalLength?: number
+              readonly nominalRadius?: number
+            }
+          | {
+              readonly kind: "stylus-calibrate"
+              readonly artefact:
+                | {
+                    readonly kind: "ring"
+                    readonly centre: { readonly x: number; readonly y: number }
+                    readonly diameter: number
+                    readonly depth: number
+                    readonly top?: number
+                  }
+                | {
+                    readonly kind: "sphere"
+                    readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+                    readonly diameter: number
+                  }
+                | {
+                    readonly kind: "height"
+                    readonly at: { readonly x: number; readonly y: number }
+                    readonly z: number
+                  }
+              readonly directions?: 4 | 8 | 16
+            }
+          | {
+              readonly kind: "rotary-axis"
+              readonly axis: "A" | "B" | "C"
+              readonly sphere: {
+                readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+                readonly diameter: number
+              }
+              readonly angles: ReadonlyArray<number>
+            }
+        readonly actions?: ReadonlyArray<
+          | {
+              readonly kind: "set-offset"
+              readonly ref:
+                | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                | { readonly kind: "extended"; readonly p: number }
+                | { readonly kind: "frame"; readonly n: number }
+                | { readonly kind: "linuxcnc"; readonly p: number }
+                | { readonly kind: "preset"; readonly row: number }
+              readonly axes: {
+                readonly X?: string
+                readonly Y?: string
+                readonly Z?: string
+                readonly A?: string
+                readonly B?: string
+                readonly C?: string
+                readonly R?: string
+              }
+              readonly policy: {
+                readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"
+                readonly tolerance?: number
+                readonly angleTolerance?: number
+                readonly deadband?: number
+                readonly limit?: number
+              }
+            }
+          | {
+              readonly kind: "rotation"
+              readonly result: string
+              readonly via: "g68" | "offset-r" | "table-c"
+              readonly ref?:
+                | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                | { readonly kind: "extended"; readonly p: number }
+                | { readonly kind: "frame"; readonly n: number }
+                | { readonly kind: "linuxcnc"; readonly p: number }
+                | { readonly kind: "preset"; readonly row: number }
+              readonly policy: {
+                readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"
+                readonly tolerance?: number
+                readonly angleTolerance?: number
+                readonly deadband?: number
+                readonly limit?: number
+              }
+            }
+          | {
+              readonly kind: "tool-offset"
+              readonly tool: number
+              readonly quantity: "length" | "radius"
+              readonly result: string
+              readonly part: "geometry" | "wear"
+            }
+          | {
+              readonly kind: "inspect"
+              readonly characteristics: ReadonlyArray<{
+                readonly name: string
+                readonly kind: "size" | "position" | "true-position" | "flatness" | "angle"
+                readonly result: string
+                readonly result2?: string
+                readonly nominal: number
+                readonly nominal2?: number
+                readonly lower: number
+                readonly upper: number
+              }>
+              readonly onFail: "alarm" | "stop" | "flag" | "continue"
+              readonly flag?: string
+            }
+          | {
+              readonly kind: "wear-comp"
+              readonly tool: number
+              readonly quantity: "length" | "radius"
+              readonly result: string
+              readonly nominal: number
+              readonly gain: number
+              readonly deadband: number
+              readonly limit: number
+              readonly sense: 1 | -1
+            }
+          | { readonly kind: "report"; readonly results: ReadonlyArray<string> }
+        >
+        readonly search?: number
+        readonly clearance?: number
+        readonly doubleTouch?: boolean
+        readonly resultPrefix?: string
+        readonly native?: boolean
+      }
   >
   readonly tools?: ReadonlyArray<{
     readonly id: string
@@ -1696,6 +1903,7 @@ export type ToolpathGeneratorManufacturePayload = {
       | "lollipop"
       | "barrel"
       | "lens"
+      | "probe"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -2145,6 +2353,213 @@ export type ToolpathGeneratorPlanPayload = {
         }>
         readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
       }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "probe"
+        readonly cycle:
+          | {
+              readonly kind: "z-surface"
+              readonly at: { readonly x: number; readonly y: number }
+              readonly expectedZ: number
+            }
+          | {
+              readonly kind: "edge"
+              readonly at: { readonly x: number; readonly y: number; readonly z: number }
+              readonly normal: { readonly x: number; readonly y: number }
+            }
+          | {
+              readonly kind: "corner"
+              readonly corner: { readonly x: number; readonly y: number }
+              readonly inside: boolean
+              readonly xSense: 1 | -1
+              readonly ySense: 1 | -1
+              readonly depth: number
+              readonly top?: number
+              readonly inset?: number
+              readonly touchesPerEdge?: 1 | 2
+            }
+          | {
+              readonly kind: "web" | "pocket"
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly width: number
+              readonly angle: number
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "rectangle"
+              readonly inside: boolean
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly size: { readonly x: number; readonly y: number }
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "bore" | "boss"
+              readonly centre: { readonly x: number; readonly y: number }
+              readonly diameter: number
+              readonly depth: number
+              readonly top?: number
+              readonly angles?: ReadonlyArray<number>
+            }
+          | {
+              readonly kind: "edge-angle"
+              readonly start: { readonly x: number; readonly y: number }
+              readonly along: { readonly x: number; readonly y: number }
+              readonly pitch: number
+              readonly normal: { readonly x: number; readonly y: number }
+              readonly depth: number
+              readonly top?: number
+            }
+          | {
+              readonly kind: "plane"
+              readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+              readonly expectedZ: number
+            }
+          | {
+              readonly kind: "sphere"
+              readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+              readonly diameter: number
+              readonly touches?: 5 | 9
+            }
+          | {
+              readonly kind: "tool-length" | "tool-radius" | "broken-tool"
+              readonly tool: number
+              readonly nominalLength?: number
+              readonly nominalRadius?: number
+            }
+          | {
+              readonly kind: "stylus-calibrate"
+              readonly artefact:
+                | {
+                    readonly kind: "ring"
+                    readonly centre: { readonly x: number; readonly y: number }
+                    readonly diameter: number
+                    readonly depth: number
+                    readonly top?: number
+                  }
+                | {
+                    readonly kind: "sphere"
+                    readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+                    readonly diameter: number
+                  }
+                | {
+                    readonly kind: "height"
+                    readonly at: { readonly x: number; readonly y: number }
+                    readonly z: number
+                  }
+              readonly directions?: 4 | 8 | 16
+            }
+          | {
+              readonly kind: "rotary-axis"
+              readonly axis: "A" | "B" | "C"
+              readonly sphere: {
+                readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+                readonly diameter: number
+              }
+              readonly angles: ReadonlyArray<number>
+            }
+        readonly actions?: ReadonlyArray<
+          | {
+              readonly kind: "set-offset"
+              readonly ref:
+                | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                | { readonly kind: "extended"; readonly p: number }
+                | { readonly kind: "frame"; readonly n: number }
+                | { readonly kind: "linuxcnc"; readonly p: number }
+                | { readonly kind: "preset"; readonly row: number }
+              readonly axes: {
+                readonly X?: string
+                readonly Y?: string
+                readonly Z?: string
+                readonly A?: string
+                readonly B?: string
+                readonly C?: string
+                readonly R?: string
+              }
+              readonly policy: {
+                readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"
+                readonly tolerance?: number
+                readonly angleTolerance?: number
+                readonly deadband?: number
+                readonly limit?: number
+              }
+            }
+          | {
+              readonly kind: "rotation"
+              readonly result: string
+              readonly via: "g68" | "offset-r" | "table-c"
+              readonly ref?:
+                | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                | { readonly kind: "extended"; readonly p: number }
+                | { readonly kind: "frame"; readonly n: number }
+                | { readonly kind: "linuxcnc"; readonly p: number }
+                | { readonly kind: "preset"; readonly row: number }
+              readonly policy: {
+                readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"
+                readonly tolerance?: number
+                readonly angleTolerance?: number
+                readonly deadband?: number
+                readonly limit?: number
+              }
+            }
+          | {
+              readonly kind: "tool-offset"
+              readonly tool: number
+              readonly quantity: "length" | "radius"
+              readonly result: string
+              readonly part: "geometry" | "wear"
+            }
+          | {
+              readonly kind: "inspect"
+              readonly characteristics: ReadonlyArray<{
+                readonly name: string
+                readonly kind: "size" | "position" | "true-position" | "flatness" | "angle"
+                readonly result: string
+                readonly result2?: string
+                readonly nominal: number
+                readonly nominal2?: number
+                readonly lower: number
+                readonly upper: number
+              }>
+              readonly onFail: "alarm" | "stop" | "flag" | "continue"
+              readonly flag?: string
+            }
+          | {
+              readonly kind: "wear-comp"
+              readonly tool: number
+              readonly quantity: "length" | "radius"
+              readonly result: string
+              readonly nominal: number
+              readonly gain: number
+              readonly deadband: number
+              readonly limit: number
+              readonly sense: 1 | -1
+            }
+          | { readonly kind: "report"; readonly results: ReadonlyArray<string> }
+        >
+        readonly search?: number
+        readonly clearance?: number
+        readonly doubleTouch?: boolean
+        readonly resultPrefix?: string
+        readonly native?: boolean
+      }
   >
   readonly tools?: ReadonlyArray<{
     readonly id: string
@@ -2169,6 +2584,7 @@ export type ToolpathGeneratorPlanPayload = {
       | "lollipop"
       | "barrel"
       | "lens"
+      | "probe"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -2236,449 +2652,6 @@ export type ToolpathGeneratorPlanPayload = {
     readonly lifeLimit?: number
   }
   readonly progress?: { readonly projectId: string; readonly runId: string }
-}
-
-export type ToolpathGeneratorJobPayload = {
-  readonly op: "plan" | "run"
-  readonly material: string
-  readonly machine?: string
-  readonly part: {
-    readonly elements?: ReadonlyArray<{ readonly [x: string]: any }>
-    readonly meshes?: ReadonlyArray<{
-      readonly positions: ReadonlyArray<number>
-      readonly indices: ReadonlyArray<number>
-    }>
-  }
-  readonly tools?: ReadonlyArray<{
-    readonly id: string
-    readonly name: string
-    readonly kind:
-      | "flat"
-      | "ball"
-      | "bull"
-      | "chamfer"
-      | "spot"
-      | "drill"
-      | "facemill"
-      | "threadmill"
-      | "engraver"
-      | "tap"
-      | "reamer"
-      | "countersink"
-      | "boringbar"
-      | "tslot"
-      | "dovetail"
-      | "tapered"
-      | "lollipop"
-      | "barrel"
-      | "lens"
-    readonly diameter: number
-    readonly flutes: number
-    readonly material: "hss" | "hss-co" | "carbide" | "pcd"
-    readonly coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
-    readonly cornerRadius?: number
-    readonly angle?: number
-    readonly tipDiameter?: number
-    readonly pitch?: number
-    readonly neckDiameter?: number
-    readonly formRadius?: number
-    readonly headHeight?: number
-    readonly fluteLength: number
-    readonly shankDiameter: number
-    readonly stickout: number
-    readonly holder?: {
-      readonly diameter: number
-      readonly length: number
-      readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
-    }
-    readonly maxRpm?: number
-    readonly number?: number
-  }>
-  readonly quality?: {
-    readonly resolution?: number
-    readonly tolerance?: number
-    readonly finishAllowance?: number
-    readonly scallop?: number
-    readonly enforceTolerance?: boolean
-  }
-  readonly setups: ReadonlyArray<{
-    readonly id: string
-    readonly name?: string
-    readonly orientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
-    readonly origin?: "stock-center" | "stock-corner"
-    readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-    readonly stock?: {
-      readonly min: { readonly x: number; readonly y: number; readonly z: number }
-      readonly max: { readonly x: number; readonly y: number; readonly z: number }
-    }
-    readonly stockModel?:
-      | {
-          readonly kind: "cylinder"
-          readonly center: { readonly x: number; readonly y: number }
-          readonly radius: number
-          readonly z0: number
-          readonly z1: number
-          readonly segments?: number
-        }
-      | {
-          readonly kind: "mesh"
-          readonly mesh: { readonly positions: ReadonlyArray<number>; readonly indices: ReadonlyArray<number> }
-        }
-    readonly fixtures?: ReadonlyArray<{
-      readonly id: string
-      readonly min: { readonly x: number; readonly y: number; readonly z: number }
-      readonly max: { readonly x: number; readonly y: number; readonly z: number }
-    }>
-    readonly operations?: ReadonlyArray<
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "face"
-          readonly bottom: number
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "adaptive"
-          readonly region: {
-            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-          }
-          readonly top: number
-          readonly bottom: number
-          readonly allowance?: number
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "pocket"
-          readonly region: {
-            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-          }
-          readonly top: number
-          readonly bottom: number
-          readonly allowance?: number
-          readonly finish?: boolean
-          readonly within?: {
-            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-          }
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "profile"
-          readonly loop: ReadonlyArray<{ readonly x: number; readonly y: number }>
-          readonly side: "outside" | "inside"
-          readonly top: number
-          readonly bottom: number
-          readonly allowance?: number
-          readonly finish?: boolean
-          readonly tabs?: ReadonlyArray<{ readonly position: number; readonly width: number; readonly height: number }>
-          readonly leadIn?: "direct" | "arc" | "ramp" | "helix"
-          readonly leadRadius?: number
-          readonly compensation?: "none" | "controller"
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "bore"
-          readonly center: { readonly x: number; readonly y: number }
-          readonly diameter: number
-          readonly top: number
-          readonly bottom: number
-          readonly allowance?: number
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "drill"
-          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
-          readonly top: number
-          readonly bottom: number
-          readonly cut?: "drill" | "spot" | "tap" | "ream"
-          readonly cycle?:
-            | { readonly kind: "countersink"; readonly diameter: number }
-            | {
-                readonly kind: "deep"
-                readonly peck: number
-                readonly retract: "full" | "chip-break"
-                readonly peckReduction?: number
-                readonly minPeck?: number
-                readonly chipBreakRetract?: number
-                readonly fullRetractEvery?: number
-                readonly dwell?: number
-              }
-            | {
-                readonly kind: "back-bore"
-                readonly diameter: number
-                readonly pilotDiameter: number
-                readonly face: number
-              }
-            | {
-                readonly kind: "tilted"
-                readonly peck?: number
-                readonly chipBreak?: boolean
-                readonly sites: ReadonlyArray<{
-                  readonly entry: { readonly x: number; readonly y: number; readonly z: number }
-                  readonly direction: { readonly x: number; readonly y: number; readonly z: number }
-                  readonly depth: number
-                }>
-              }
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "thread"
-          readonly center: { readonly x: number; readonly y: number }
-          readonly diameter: number
-          readonly pitch: number
-          readonly internal: boolean
-          readonly top: number
-          readonly length: number
-          readonly rightHand?: boolean
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "engrave"
-          readonly paths: ReadonlyArray<{
-            readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly closed: boolean
-          }>
-          readonly top: number
-          readonly depth: number
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "chamfer"
-          readonly loops: ReadonlyArray<{
-            readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly side: "outside" | "inside"
-          }>
-          readonly top: number
-          readonly width: number
-          readonly tipOffset?: number
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover?: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "surface"
-          readonly mode:
-            | "roughing"
-            | "rest"
-            | "parallel"
-            | "waterline"
-            | "steep-shallow"
-            | "scallop"
-            | "spiral"
-            | "radial"
-            | "flat"
-          readonly slopeAngle?: number
-          readonly allowance?: number
-          readonly scallop?: number
-          readonly clearing?: "contour" | "adaptive"
-          readonly angle?: number
-          readonly restFrom?: string
-          readonly center?: { readonly x: number; readonly y: number }
-          readonly contact?: "heightfield" | "mesh"
-        }
-      | {
-          readonly id: string
-          readonly enabled?: boolean
-          readonly dependsOn?: ReadonlyArray<string>
-          readonly limits?: {
-            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
-            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
-            readonly containment?: "edge" | "centre"
-          }
-          readonly name?: string
-          readonly tool: string
-          readonly rpm?: number
-          readonly feed?: number
-          readonly plungeFeed?: number
-          readonly stepdown?: number
-          readonly stepover: number
-          readonly coolant?: "off" | "flood" | "mist"
-          readonly radialEngagement?: number
-          readonly strategy: "multiaxis"
-          readonly mode?: "parallel" | "contour" | "swarf"
-          readonly top: number
-          readonly angle?: number
-          readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"
-          readonly axisPoint?: { readonly x: number; readonly y: number; readonly z: number }
-          readonly axisLine?: {
-            readonly a: { readonly x: number; readonly y: number; readonly z: number }
-            readonly b: { readonly x: number; readonly y: number; readonly z: number }
-          }
-          readonly axisCurve?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
-          readonly maxTilt?: number
-          readonly holderDiameter?: number
-          readonly lead?: number
-          readonly tilt?: number
-          readonly walls?: ReadonlyArray<{
-            readonly bottom: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
-            readonly top: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
-            readonly normal: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
-            readonly concaveRadius?: number
-          }>
-          readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
-        }
-    >
-  }>
-  readonly nc?: number
 }
 
 export type ToolpathGeneratorLathePayload = {
@@ -2764,6 +2737,12 @@ export type ToolpathGeneratorVerifyPayload = {
     readonly name: string
     readonly units: "mm" | "inch"
     readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    readonly workOffsetRef?:
+      | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+      | { readonly kind: "extended"; readonly p: number }
+      | { readonly kind: "frame"; readonly n: number }
+      | { readonly kind: "linuxcnc"; readonly p: number }
+      | { readonly kind: "preset"; readonly row: number }
     readonly toolpaths: ReadonlyArray<{
       readonly id: string
       readonly name: string
@@ -2782,6 +2761,7 @@ export type ToolpathGeneratorVerifyPayload = {
               readonly feed?: JsonValue
             }
             readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
+            readonly machine?: boolean
           }
         | {
             readonly _tag: "Linear"
@@ -2865,13 +2845,71 @@ export type ToolpathGeneratorVerifyPayload = {
           }
         | {
             readonly _tag: "CycleBegin"
-            readonly family: "heidenhain"
+            readonly family: "heidenhain" | "siemens" | "renishaw"
             readonly number: number
             readonly name: string
             readonly params: { readonly [x: string]: number }
           }
         | { readonly _tag: "CycleEnd" }
         | { readonly _tag: "Message"; readonly text: string }
+        | {
+            readonly _tag: "Probe"
+            readonly to: { readonly x: number; readonly y: number; readonly z: number }
+            readonly direction: { readonly x: number; readonly y: number; readonly z: number }
+            readonly overtravel: number
+            readonly feed: number
+            readonly kind: "touch" | "protected"
+            readonly onMiss: "alarm" | "flag"
+            readonly store?: {
+              readonly x?:
+                | { readonly scope: "local" | "global" | "system"; readonly index: number }
+                | { readonly name: string }
+              readonly y?:
+                | { readonly scope: "local" | "global" | "system"; readonly index: number }
+                | { readonly name: string }
+              readonly z?:
+                | { readonly scope: "local" | "global" | "system"; readonly index: number }
+                | { readonly name: string }
+            }
+            readonly flag?:
+              | { readonly scope: "local" | "global" | "system"; readonly index: number }
+              | { readonly name: string }
+            readonly expr?: {
+              readonly x?: JsonValue
+              readonly y?: JsonValue
+              readonly z?: JsonValue
+              readonly feed?: JsonValue
+            }
+          }
+        | {
+            readonly _tag: "OffsetUpdate"
+            readonly target:
+              | {
+                  readonly kind: "work"
+                  readonly ref:
+                    | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                    | { readonly kind: "extended"; readonly p: number }
+                    | { readonly kind: "frame"; readonly n: number }
+                    | { readonly kind: "linuxcnc"; readonly p: number }
+                    | { readonly kind: "preset"; readonly row: number }
+                }
+              | {
+                  readonly kind: "tool"
+                  readonly tool: number
+                  readonly quantity: "length" | "radius"
+                  readonly part: "geometry" | "wear"
+                }
+            readonly axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+            readonly mode: "set" | "add"
+            readonly value: JsonValue
+          }
+        | { readonly _tag: "Alarm"; readonly code: number; readonly text: string }
+        | {
+            readonly _tag: "Report"
+            readonly label: string
+            readonly values: ReadonlyArray<{ readonly name: string; readonly value: JsonValue }>
+          }
+        | { readonly _tag: "Stop"; readonly optional: boolean }
       >
       readonly operation?: { readonly id: string; readonly name: string }
     }>
@@ -3928,6 +3966,7 @@ export type CamSetupLinkReportPayload = {
             readonly feed?: JsonValue
           }
           readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
+          readonly machine?: boolean
         }
       | {
           readonly _tag: "Linear"
@@ -4011,13 +4050,71 @@ export type CamSetupLinkReportPayload = {
         }
       | {
           readonly _tag: "CycleBegin"
-          readonly family: "heidenhain"
+          readonly family: "heidenhain" | "siemens" | "renishaw"
           readonly number: number
           readonly name: string
           readonly params: { readonly [x: string]: number }
         }
       | { readonly _tag: "CycleEnd" }
       | { readonly _tag: "Message"; readonly text: string }
+      | {
+          readonly _tag: "Probe"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly direction: { readonly x: number; readonly y: number; readonly z: number }
+          readonly overtravel: number
+          readonly feed: number
+          readonly kind: "touch" | "protected"
+          readonly onMiss: "alarm" | "flag"
+          readonly store?: {
+            readonly x?:
+              | { readonly scope: "local" | "global" | "system"; readonly index: number }
+              | { readonly name: string }
+            readonly y?:
+              | { readonly scope: "local" | "global" | "system"; readonly index: number }
+              | { readonly name: string }
+            readonly z?:
+              | { readonly scope: "local" | "global" | "system"; readonly index: number }
+              | { readonly name: string }
+          }
+          readonly flag?:
+            | { readonly scope: "local" | "global" | "system"; readonly index: number }
+            | { readonly name: string }
+          readonly expr?: {
+            readonly x?: JsonValue
+            readonly y?: JsonValue
+            readonly z?: JsonValue
+            readonly feed?: JsonValue
+          }
+        }
+      | {
+          readonly _tag: "OffsetUpdate"
+          readonly target:
+            | {
+                readonly kind: "work"
+                readonly ref:
+                  | { readonly kind: "g5x"; readonly code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                  | { readonly kind: "extended"; readonly p: number }
+                  | { readonly kind: "frame"; readonly n: number }
+                  | { readonly kind: "linuxcnc"; readonly p: number }
+                  | { readonly kind: "preset"; readonly row: number }
+              }
+            | {
+                readonly kind: "tool"
+                readonly tool: number
+                readonly quantity: "length" | "radius"
+                readonly part: "geometry" | "wear"
+              }
+          readonly axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+          readonly mode: "set" | "add"
+          readonly value: JsonValue
+        }
+      | { readonly _tag: "Alarm"; readonly code: number; readonly text: string }
+      | {
+          readonly _tag: "Report"
+          readonly label: string
+          readonly values: ReadonlyArray<{ readonly name: string; readonly value: JsonValue }>
+        }
+      | { readonly _tag: "Stop"; readonly optional: boolean }
     >
     readonly operation?: { readonly id: string; readonly name: string }
   }>
@@ -4455,6 +4552,160 @@ export type CamSetupGenerateSavedPayload = {
     readonly material?: string
     readonly elementId?: string
   }
+}
+
+export type CamProbingCalibrateRotaryPayload = {
+  readonly axis: "A" | "B" | "C"
+  readonly sphere: {
+    readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+    readonly diameter: number
+  }
+  readonly angles: ReadonlyArray<number>
+  readonly assumed?: {
+    readonly layout: "table-AC" | "table-BC"
+    readonly pivot: { readonly x: number; readonly y: number; readonly z: number }
+  }
+  readonly settings?: {
+    readonly machineConfig?: string
+    readonly stylusDiameter?: number
+    readonly feed?: number
+    readonly fastFeed?: number
+    readonly positioningFeed?: number
+    readonly search?: number
+    readonly clearance?: number
+    readonly safeZ?: number
+    readonly overtravel?: number
+    readonly backoff?: number
+    readonly doubleTouch?: boolean
+    readonly workOffset?: string
+    readonly toolNumber?: number
+    readonly effectiveRadius?: number
+    readonly orientSpindle?: number
+  }
+  readonly truth?: {
+    readonly pivot?: { readonly x: number; readonly y: number; readonly z: number }
+    readonly tilt?: number
+  }
+  readonly measured?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+  readonly dialect?:
+    | "generic"
+    | "fanuc"
+    | "grbl"
+    | "linuxcnc"
+    | "haas"
+    | "siemens"
+    | "heidenhain"
+    | "okuma"
+    | "mazak"
+    | "mitsubishi"
+    | "brother"
+  readonly progress?: { readonly projectId: string; readonly runId: string }
+}
+
+export type CamProbingWorkOffsetsPutPayload = {
+  readonly entries: {
+    readonly [x: string]: {
+      readonly x: number
+      readonly y: number
+      readonly z: number
+      readonly a?: number
+      readonly b?: number
+      readonly c?: number
+      readonly rotation?: number
+    }
+  }
+  readonly baseUpdatedAt?: string
+}
+
+export type CamProbingProbeConfigPutPayload = {
+  readonly probing?: {
+    readonly cycles?: ReadonlyArray<string>
+    readonly stylusRadius?: number
+    readonly feed?: number
+    readonly dialect?: "linuxcnc" | "fanuc"
+    readonly id?: string
+    readonly stylusDiameter?: number
+    readonly toolNumber?: number
+    readonly stylusLength?: number
+    readonly shankDiameter?: number
+    readonly body?: { readonly diameter: number; readonly length: number }
+    readonly feeds?: {
+      readonly positioning?: number
+      readonly fast?: number
+      readonly touch?: number
+      readonly max?: number
+    }
+    readonly overtravel?: { readonly xy?: number; readonly z?: number }
+    readonly backoff?: number
+    readonly doubleTouch?: boolean
+    readonly orientSpindle?: number
+    readonly on?: ReadonlyArray<string>
+    readonly off?: ReadonlyArray<string>
+    readonly calibration?: {
+      readonly effectiveRadius: number
+      readonly directional?: ReadonlyArray<{ readonly angle: number; readonly radius: number }>
+      readonly zTrigger?: number
+      readonly centreOffset?: { readonly x: number; readonly y: number }
+      readonly calibratedAt?: string
+    }
+    readonly macroStyle?: "inline" | "renishaw" | "heidenhain-ts" | "siemens-cycles"
+    readonly skipCode?: string
+    readonly skipFrame?: "program" | "work"
+    readonly tiltedPlane?: boolean
+    readonly offsets?: { readonly extended?: number; readonly frames?: number; readonly presets?: number }
+    readonly calibrationSource?: "baked" | "variables"
+  } | null
+  readonly toolSetter?: {
+    readonly kind: "contact" | "laser"
+    readonly position: { readonly x: number; readonly y: number; readonly z: number }
+    readonly triggerZ: number
+    readonly discDiameter?: number
+    readonly maxToolDiameter: number
+    readonly feeds: { readonly fast: number; readonly touch: number }
+    readonly radiusRpm?: number
+    readonly brokenTolerance: number
+  } | null
+  readonly rotaryCalibration?: {
+    readonly pivotMeasured?: { readonly x: number; readonly y: number; readonly z: number }
+    readonly axisDirection?: { readonly x: number; readonly y: number; readonly z: number }
+    readonly axisError?: number
+    readonly rms?: number
+    readonly at: string
+  } | null
+  readonly baseUpdatedAt?: string
+}
+
+export type CamProbingReportsRunPayload = {
+  readonly operationId: string
+  readonly misplacement?: {
+    readonly x?: number
+    readonly y?: number
+    readonly z?: number
+    readonly a?: number
+    readonly b?: number
+    readonly c?: number
+  }
+  readonly machineConfig?: string
+  readonly setupId?: string
+  readonly calibrationError?: number
+  readonly runId?: string
+}
+
+export type CamProbingReportsSavePayload = {
+  readonly name: string
+  readonly kind: "part" | "rotary" | "stylus" | "tool-setter"
+  readonly source: "simulated" | "machine" | "imported"
+  readonly verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+  readonly data: unknown
+  readonly toolpathId?: string | null
+  readonly drawingId?: string | null
+  readonly machineConfigId?: string | null
+  readonly setupId?: string | null
+  readonly runId?: string | null
+  readonly workOffset?: string | null
+  readonly programHash?: string | null
+  readonly sourceRevision?: string | null
+  readonly measuredAt?: string
 }
 
 export type LibraryCreatePayload = {
@@ -9571,6 +9822,12 @@ export type ToolpathsRegenerateOutput = {
             name: string
             units: "mm" | "inch"
             workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+            workOffsetRef?:
+              | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+              | { kind: "extended"; p: number }
+              | { kind: "frame"; n: number }
+              | { kind: "linuxcnc"; p: number }
+              | { kind: "preset"; row: number }
             toolpaths: Array<{
               id: string
               name: string
@@ -9584,6 +9841,7 @@ export type ToolpathsRegenerateOutput = {
                     rotary?: { a?: number; b?: number; c?: number }
                     expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
                     comp?: { mode: "left" | "right" | "off"; register?: number }
+                    machine?: boolean
                   }
                 | {
                     _tag: "Linear"
@@ -9648,13 +9906,49 @@ export type ToolpathsRegenerateOutput = {
                   }
                 | {
                     _tag: "CycleBegin"
-                    family: "heidenhain"
+                    family: "heidenhain" | "siemens" | "renishaw"
                     number: number
                     name: string
                     params: { [x: string]: number }
                   }
                 | { _tag: "CycleEnd" }
                 | { _tag: "Message"; text: string }
+                | {
+                    _tag: "Probe"
+                    to: { x: number; y: number; z: number }
+                    direction: { x: number; y: number; z: number }
+                    overtravel: number
+                    feed: number
+                    kind: "touch" | "protected"
+                    onMiss: "alarm" | "flag"
+                    store?: {
+                      x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                      y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                      z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                    }
+                    flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                    expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                  }
+                | {
+                    _tag: "OffsetUpdate"
+                    target:
+                      | {
+                          kind: "work"
+                          ref:
+                            | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                            | { kind: "extended"; p: number }
+                            | { kind: "frame"; n: number }
+                            | { kind: "linuxcnc"; p: number }
+                            | { kind: "preset"; row: number }
+                        }
+                      | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+                    axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+                    mode: "set" | "add"
+                    value: JsonValue
+                  }
+                | { _tag: "Alarm"; code: number; text: string }
+                | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+                | { _tag: "Stop"; optional: boolean }
               >
               operation?: { id: string; name: string }
             }>
@@ -10348,6 +10642,12 @@ export type ToolpathGeneratorManufactureOutput =
           name: string
           units: "mm" | "inch"
           workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+          workOffsetRef?:
+            | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+            | { kind: "extended"; p: number }
+            | { kind: "frame"; n: number }
+            | { kind: "linuxcnc"; p: number }
+            | { kind: "preset"; row: number }
           toolpaths: Array<{
             id: string
             name: string
@@ -10361,6 +10661,7 @@ export type ToolpathGeneratorManufactureOutput =
                   rotary?: { a?: number; b?: number; c?: number }
                   expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
                   comp?: { mode: "left" | "right" | "off"; register?: number }
+                  machine?: boolean
                 }
               | {
                   _tag: "Linear"
@@ -10422,13 +10723,49 @@ export type ToolpathGeneratorManufactureOutput =
                 }
               | {
                   _tag: "CycleBegin"
-                  family: "heidenhain"
+                  family: "heidenhain" | "siemens" | "renishaw"
                   number: number
                   name: string
                   params: { [x: string]: number }
                 }
               | { _tag: "CycleEnd" }
               | { _tag: "Message"; text: string }
+              | {
+                  _tag: "Probe"
+                  to: { x: number; y: number; z: number }
+                  direction: { x: number; y: number; z: number }
+                  overtravel: number
+                  feed: number
+                  kind: "touch" | "protected"
+                  onMiss: "alarm" | "flag"
+                  store?: {
+                    x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                    y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                    z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                  }
+                  flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                  expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+                }
+              | {
+                  _tag: "OffsetUpdate"
+                  target:
+                    | {
+                        kind: "work"
+                        ref:
+                          | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                          | { kind: "extended"; p: number }
+                          | { kind: "frame"; n: number }
+                          | { kind: "linuxcnc"; p: number }
+                          | { kind: "preset"; row: number }
+                      }
+                    | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+                  axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+                  mode: "set" | "add"
+                  value: JsonValue
+                }
+              | { _tag: "Alarm"; code: number; text: string }
+              | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+              | { _tag: "Stop"; optional: boolean }
             >
             operation?: { id: string; name: string }
           }>
@@ -10742,32 +11079,6 @@ export type ToolpathGeneratorPlanOutput =
       }>
     }
 
-export type ToolpathGeneratorJobInput = {
-  readonly op: ToolpathGeneratorJobPayload["op"]
-  readonly material: ToolpathGeneratorJobPayload["material"]
-  readonly machine?: ToolpathGeneratorJobPayload["machine"]
-  readonly part: ToolpathGeneratorJobPayload["part"]
-  readonly tools?: ToolpathGeneratorJobPayload["tools"]
-  readonly quality?: ToolpathGeneratorJobPayload["quality"]
-  readonly setups: ToolpathGeneratorJobPayload["setups"]
-  readonly nc?: ToolpathGeneratorJobPayload["nc"]
-}
-
-export type ToolpathGeneratorJobOutput = {
-  ok: boolean
-  op: "plan" | "run"
-  release?: string
-  setups?: Array<{ [x: string]: any }>
-  claims?: Array<{ [x: string]: any }>
-  failed?: Array<{ [x: string]: any }>
-  unresolved?: Array<{ [x: string]: any }>
-  coverage?: { [x: string]: any }
-  notes?: Array<string>
-  issues?: Array<{ [x: string]: any }>
-  cycleTimeSeconds?: number
-  error?: string
-}
-
 export type ToolpathGeneratorLatheInput = {
   readonly stock: ToolpathGeneratorLathePayload["stock"]
   readonly contour?: ToolpathGeneratorLathePayload["contour"]
@@ -10812,6 +11123,12 @@ export type ToolpathGeneratorParseOutput = {
     name: string
     units: "mm" | "inch"
     workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    workOffsetRef?:
+      | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+      | { kind: "extended"; p: number }
+      | { kind: "frame"; n: number }
+      | { kind: "linuxcnc"; p: number }
+      | { kind: "preset"; row: number }
     toolpaths: Array<{
       id: string
       name: string
@@ -10825,6 +11142,7 @@ export type ToolpathGeneratorParseOutput = {
             rotary?: { a?: number; b?: number; c?: number }
             expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
             comp?: { mode: "left" | "right" | "off"; register?: number }
+            machine?: boolean
           }
         | {
             _tag: "Linear"
@@ -10881,9 +11199,51 @@ export type ToolpathGeneratorParseOutput = {
             direction?: "auto" | "forward" | "backward"
             condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
           }
-        | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+        | {
+            _tag: "CycleBegin"
+            family: "heidenhain" | "siemens" | "renishaw"
+            number: number
+            name: string
+            params: { [x: string]: number }
+          }
         | { _tag: "CycleEnd" }
         | { _tag: "Message"; text: string }
+        | {
+            _tag: "Probe"
+            to: { x: number; y: number; z: number }
+            direction: { x: number; y: number; z: number }
+            overtravel: number
+            feed: number
+            kind: "touch" | "protected"
+            onMiss: "alarm" | "flag"
+            store?: {
+              x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+            }
+            flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+            expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+          }
+        | {
+            _tag: "OffsetUpdate"
+            target:
+              | {
+                  kind: "work"
+                  ref:
+                    | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                    | { kind: "extended"; p: number }
+                    | { kind: "frame"; n: number }
+                    | { kind: "linuxcnc"; p: number }
+                    | { kind: "preset"; row: number }
+                }
+              | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+            axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+            mode: "set" | "add"
+            value: JsonValue
+          }
+        | { _tag: "Alarm"; code: number; text: string }
+        | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+        | { _tag: "Stop"; optional: boolean }
       >
       operation?: { id: string; name: string }
     }>
@@ -11479,6 +11839,12 @@ export type CamSetupGenerateOutput = {
       name: string
       units: "mm" | "inch"
       workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      workOffsetRef?:
+        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+        | { kind: "extended"; p: number }
+        | { kind: "frame"; n: number }
+        | { kind: "linuxcnc"; p: number }
+        | { kind: "preset"; row: number }
       toolpaths: Array<{
         id: string
         name: string
@@ -11492,6 +11858,7 @@ export type CamSetupGenerateOutput = {
               rotary?: { a?: number; b?: number; c?: number }
               expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
               comp?: { mode: "left" | "right" | "off"; register?: number }
+              machine?: boolean
             }
           | {
               _tag: "Linear"
@@ -11548,9 +11915,51 @@ export type CamSetupGenerateOutput = {
               direction?: "auto" | "forward" | "backward"
               condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
             }
-          | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+          | {
+              _tag: "CycleBegin"
+              family: "heidenhain" | "siemens" | "renishaw"
+              number: number
+              name: string
+              params: { [x: string]: number }
+            }
           | { _tag: "CycleEnd" }
           | { _tag: "Message"; text: string }
+          | {
+              _tag: "Probe"
+              to: { x: number; y: number; z: number }
+              direction: { x: number; y: number; z: number }
+              overtravel: number
+              feed: number
+              kind: "touch" | "protected"
+              onMiss: "alarm" | "flag"
+              store?: {
+                x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              }
+              flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+            }
+          | {
+              _tag: "OffsetUpdate"
+              target:
+                | {
+                    kind: "work"
+                    ref:
+                      | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                      | { kind: "extended"; p: number }
+                      | { kind: "frame"; n: number }
+                      | { kind: "linuxcnc"; p: number }
+                      | { kind: "preset"; row: number }
+                  }
+                | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+              axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+              mode: "set" | "add"
+              value: JsonValue
+            }
+          | { _tag: "Alarm"; code: number; text: string }
+          | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+          | { _tag: "Stop"; optional: boolean }
         >
         operation?: { id: string; name: string }
       }>
@@ -11604,7 +12013,7 @@ export type CamSetupProbePlanInput = {
 
 export type CamSetupProbePlanOutput = {
   steps: Array<
-    | { kind: "rapid"; x?: number; y?: number; z?: number }
+    | { kind: "rapid"; x?: number; y?: number; z?: number; guard?: true }
     | { kind: "rapid-mid"; axis: "X" | "Y"; store: number; store2: number }
     | { kind: "touch"; axis: "X" | "Y" | "Z"; distance: number; store: number }
     | {
@@ -11638,7 +12047,7 @@ export type CamSetupProbeEmitInput = {
 export type CamSetupProbeEmitOutput = {
   gcode: string
   steps: Array<
-    | { kind: "rapid"; x?: number; y?: number; z?: number }
+    | { kind: "rapid"; x?: number; y?: number; z?: number; guard?: true }
     | { kind: "rapid-mid"; axis: "X" | "Y"; store: number; store2: number }
     | { kind: "touch"; axis: "X" | "Y" | "Z"; distance: number; store: number }
     | {
@@ -11683,6 +12092,7 @@ export type CamSetupLinkReportOutput = {
           rotary?: { a?: number; b?: number; c?: number }
           expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
           comp?: { mode: "left" | "right" | "off"; register?: number }
+          machine?: boolean
         }
       | {
           _tag: "Linear"
@@ -11739,9 +12149,51 @@ export type CamSetupLinkReportOutput = {
           direction?: "auto" | "forward" | "backward"
           condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
         }
-      | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+      | {
+          _tag: "CycleBegin"
+          family: "heidenhain" | "siemens" | "renishaw"
+          number: number
+          name: string
+          params: { [x: string]: number }
+        }
       | { _tag: "CycleEnd" }
       | { _tag: "Message"; text: string }
+      | {
+          _tag: "Probe"
+          to: { x: number; y: number; z: number }
+          direction: { x: number; y: number; z: number }
+          overtravel: number
+          feed: number
+          kind: "touch" | "protected"
+          onMiss: "alarm" | "flag"
+          store?: {
+            x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+            y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+            z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+          }
+          flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+          expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+        }
+      | {
+          _tag: "OffsetUpdate"
+          target:
+            | {
+                kind: "work"
+                ref:
+                  | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                  | { kind: "extended"; p: number }
+                  | { kind: "frame"; n: number }
+                  | { kind: "linuxcnc"; p: number }
+                  | { kind: "preset"; row: number }
+              }
+            | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+          axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+          mode: "set" | "add"
+          value: JsonValue
+        }
+      | { _tag: "Alarm"; code: number; text: string }
+      | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+      | { _tag: "Stop"; optional: boolean }
     >
     operation?: { id: string; name: string }
   }>
@@ -12620,6 +13072,12 @@ export type CamSetupGenerateSavedOutput = {
       name: string
       units: "mm" | "inch"
       workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      workOffsetRef?:
+        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+        | { kind: "extended"; p: number }
+        | { kind: "frame"; n: number }
+        | { kind: "linuxcnc"; p: number }
+        | { kind: "preset"; row: number }
       toolpaths: Array<{
         id: string
         name: string
@@ -12633,6 +13091,7 @@ export type CamSetupGenerateSavedOutput = {
               rotary?: { a?: number; b?: number; c?: number }
               expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
               comp?: { mode: "left" | "right" | "off"; register?: number }
+              machine?: boolean
             }
           | {
               _tag: "Linear"
@@ -12689,9 +13148,51 @@ export type CamSetupGenerateSavedOutput = {
               direction?: "auto" | "forward" | "backward"
               condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
             }
-          | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+          | {
+              _tag: "CycleBegin"
+              family: "heidenhain" | "siemens" | "renishaw"
+              number: number
+              name: string
+              params: { [x: string]: number }
+            }
           | { _tag: "CycleEnd" }
           | { _tag: "Message"; text: string }
+          | {
+              _tag: "Probe"
+              to: { x: number; y: number; z: number }
+              direction: { x: number; y: number; z: number }
+              overtravel: number
+              feed: number
+              kind: "touch" | "protected"
+              onMiss: "alarm" | "flag"
+              store?: {
+                x?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                y?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                z?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              }
+              flag?: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+            }
+          | {
+              _tag: "OffsetUpdate"
+              target:
+                | {
+                    kind: "work"
+                    ref:
+                      | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+                      | { kind: "extended"; p: number }
+                      | { kind: "frame"; n: number }
+                      | { kind: "linuxcnc"; p: number }
+                      | { kind: "preset"; row: number }
+                  }
+                | { kind: "tool"; tool: number; quantity: "length" | "radius"; part: "geometry" | "wear" }
+              axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
+              mode: "set" | "add"
+              value: JsonValue
+            }
+          | { _tag: "Alarm"; code: number; text: string }
+          | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
+          | { _tag: "Stop"; optional: boolean }
         >
         operation?: { id: string; name: string }
       }>
@@ -12744,6 +13245,324 @@ export type CamSetupRemoveInput = {
 }
 
 export type CamSetupRemoveOutput = { message: string }
+
+export type CamProbingCalibrateRotaryInput = {
+  readonly axis: CamProbingCalibrateRotaryPayload["axis"]
+  readonly sphere: CamProbingCalibrateRotaryPayload["sphere"]
+  readonly angles: CamProbingCalibrateRotaryPayload["angles"]
+  readonly assumed?: CamProbingCalibrateRotaryPayload["assumed"]
+  readonly settings?: CamProbingCalibrateRotaryPayload["settings"]
+  readonly truth?: CamProbingCalibrateRotaryPayload["truth"]
+  readonly measured?: CamProbingCalibrateRotaryPayload["measured"]
+  readonly dialect?: CamProbingCalibrateRotaryPayload["dialect"]
+  readonly progress?: CamProbingCalibrateRotaryPayload["progress"]
+}
+
+export type CamProbingCalibrateRotaryOutput = {
+  axis: "A" | "B" | "C"
+  centres: Array<{ x: number; y: number; z: number }>
+  calibration?: {
+    pivot: { x: number; y: number; z: number }
+    axisDirection: { x: number; y: number; z: number }
+    pivotError: { x: number; y: number; z: number }
+    axisTilt: number
+    radius: number
+    rms: number
+  }
+  refused?: string
+  nc?: string
+  notes: Array<string>
+}
+
+export type CamProbingWorkOffsetsGetInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly setupId?: { readonly setupId?: string | undefined }["setupId"]
+}
+
+export type CamProbingWorkOffsetsGetOutput = {
+  machineConfigId: string
+  setupId: string | null
+  entries: { [x: string]: { x: number; y: number; z: number; a?: number; b?: number; c?: number; rotation?: number } }
+  updatedAt: string
+  isOwner: boolean
+}
+
+export type CamProbingWorkOffsetsPutInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly setupId?: { readonly setupId?: string | undefined }["setupId"]
+  readonly entries: CamProbingWorkOffsetsPutPayload["entries"]
+  readonly baseUpdatedAt?: CamProbingWorkOffsetsPutPayload["baseUpdatedAt"]
+}
+
+export type CamProbingWorkOffsetsPutOutput = {
+  machineConfigId: string
+  setupId: string | null
+  entries: { [x: string]: { x: number; y: number; z: number; a?: number; b?: number; c?: number; rotation?: number } }
+  updatedAt: string
+  isOwner: boolean
+}
+
+export type CamProbingProbeConfigGetInput = { readonly id: { readonly id: string }["id"] }
+
+export type CamProbingProbeConfigGetOutput = {
+  machineConfigId: string
+  probing: {
+    cycles?: Array<string>
+    stylusRadius?: number
+    feed?: number
+    dialect?: "linuxcnc" | "fanuc"
+    id?: string
+    stylusDiameter?: number
+    toolNumber?: number
+    stylusLength?: number
+    shankDiameter?: number
+    body?: { diameter: number; length: number }
+    feeds?: { positioning?: number; fast?: number; touch?: number; max?: number }
+    overtravel?: { xy?: number; z?: number }
+    backoff?: number
+    doubleTouch?: boolean
+    orientSpindle?: number
+    on?: Array<string>
+    off?: Array<string>
+    calibration?: {
+      effectiveRadius: number
+      directional?: Array<{ angle: number; radius: number }>
+      zTrigger?: number
+      centreOffset?: { x: number; y: number }
+      calibratedAt?: string
+    }
+    macroStyle?: "inline" | "renishaw" | "heidenhain-ts" | "siemens-cycles"
+    skipCode?: string
+    skipFrame?: "program" | "work"
+    tiltedPlane?: boolean
+    offsets?: { extended?: number; frames?: number; presets?: number }
+    calibrationSource?: "baked" | "variables"
+  } | null
+  toolSetter: {
+    kind: "contact" | "laser"
+    position: { x: number; y: number; z: number }
+    triggerZ: number
+    discDiameter?: number
+    maxToolDiameter: number
+    feeds: { fast: number; touch: number }
+    radiusRpm?: number
+    brokenTolerance: number
+  } | null
+  rotaryCalibration: {
+    pivotMeasured?: { x: number; y: number; z: number }
+    axisDirection?: { x: number; y: number; z: number }
+    axisError?: number
+    rms?: number
+    at: string
+  } | null
+  updatedAt: string
+  isOwner: boolean
+}
+
+export type CamProbingProbeConfigPutInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly probing?: CamProbingProbeConfigPutPayload["probing"]
+  readonly toolSetter?: CamProbingProbeConfigPutPayload["toolSetter"]
+  readonly rotaryCalibration?: CamProbingProbeConfigPutPayload["rotaryCalibration"]
+  readonly baseUpdatedAt?: CamProbingProbeConfigPutPayload["baseUpdatedAt"]
+}
+
+export type CamProbingProbeConfigPutOutput = {
+  machineConfigId: string
+  probing: {
+    cycles?: Array<string>
+    stylusRadius?: number
+    feed?: number
+    dialect?: "linuxcnc" | "fanuc"
+    id?: string
+    stylusDiameter?: number
+    toolNumber?: number
+    stylusLength?: number
+    shankDiameter?: number
+    body?: { diameter: number; length: number }
+    feeds?: { positioning?: number; fast?: number; touch?: number; max?: number }
+    overtravel?: { xy?: number; z?: number }
+    backoff?: number
+    doubleTouch?: boolean
+    orientSpindle?: number
+    on?: Array<string>
+    off?: Array<string>
+    calibration?: {
+      effectiveRadius: number
+      directional?: Array<{ angle: number; radius: number }>
+      zTrigger?: number
+      centreOffset?: { x: number; y: number }
+      calibratedAt?: string
+    }
+    macroStyle?: "inline" | "renishaw" | "heidenhain-ts" | "siemens-cycles"
+    skipCode?: string
+    skipFrame?: "program" | "work"
+    tiltedPlane?: boolean
+    offsets?: { extended?: number; frames?: number; presets?: number }
+    calibrationSource?: "baked" | "variables"
+  } | null
+  toolSetter: {
+    kind: "contact" | "laser"
+    position: { x: number; y: number; z: number }
+    triggerZ: number
+    discDiameter?: number
+    maxToolDiameter: number
+    feeds: { fast: number; touch: number }
+    radiusRpm?: number
+    brokenTolerance: number
+  } | null
+  rotaryCalibration: {
+    pivotMeasured?: { x: number; y: number; z: number }
+    axisDirection?: { x: number; y: number; z: number }
+    axisError?: number
+    rms?: number
+    at: string
+  } | null
+  updatedAt: string
+  isOwner: boolean
+}
+
+export type CamProbingReportsListInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly operationId?: {
+    readonly operationId?: string | undefined
+    readonly limit?: string | undefined
+    readonly before?: string | undefined
+  }["operationId"]
+  readonly limit?: {
+    readonly operationId?: string | undefined
+    readonly limit?: string | undefined
+    readonly before?: string | undefined
+  }["limit"]
+  readonly before?: {
+    readonly operationId?: string | undefined
+    readonly limit?: string | undefined
+    readonly before?: string | undefined
+  }["before"]
+}
+
+export type CamProbingReportsListOutput = Array<{
+  id: string
+  projectId: string
+  drawingId: string | null
+  toolpathId: string | null
+  machineConfigId: string | null
+  setupId: string | null
+  runId: string | null
+  name: string
+  kind: "part" | "rotary" | "stylus" | "tool-setter"
+  source: "simulated" | "machine" | "imported"
+  verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+  workOffset: string | null
+  programHash: string | null
+  sourceRevision: string | null
+  measuredAt: string
+  createdAt: string
+  createdById: string
+}>
+
+export type CamProbingReportsGetInput = {
+  readonly id: { readonly id: string; readonly reportId: string }["id"]
+  readonly reportId: { readonly id: string; readonly reportId: string }["reportId"]
+}
+
+export type CamProbingReportsGetOutput = {
+  id: string
+  projectId: string
+  drawingId: string | null
+  toolpathId: string | null
+  machineConfigId: string | null
+  setupId: string | null
+  runId: string | null
+  name: string
+  kind: "part" | "rotary" | "stylus" | "tool-setter"
+  source: "simulated" | "machine" | "imported"
+  verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+  workOffset: string | null
+  programHash: string | null
+  sourceRevision: string | null
+  measuredAt: string
+  createdAt: string
+  createdById: string
+  data: unknown
+}
+
+export type CamProbingReportsRunInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly operationId: CamProbingReportsRunPayload["operationId"]
+  readonly misplacement?: CamProbingReportsRunPayload["misplacement"]
+  readonly machineConfig?: CamProbingReportsRunPayload["machineConfig"]
+  readonly setupId?: CamProbingReportsRunPayload["setupId"]
+  readonly calibrationError?: CamProbingReportsRunPayload["calibrationError"]
+  readonly runId?: CamProbingReportsRunPayload["runId"]
+}
+
+export type CamProbingReportsRunOutput = {
+  id: string
+  projectId: string
+  drawingId: string | null
+  toolpathId: string | null
+  machineConfigId: string | null
+  setupId: string | null
+  runId: string | null
+  name: string
+  kind: "part" | "rotary" | "stylus" | "tool-setter"
+  source: "simulated" | "machine" | "imported"
+  verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+  workOffset: string | null
+  programHash: string | null
+  sourceRevision: string | null
+  measuredAt: string
+  createdAt: string
+  createdById: string
+  data: unknown
+}
+
+export type CamProbingReportsSaveInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name: CamProbingReportsSavePayload["name"]
+  readonly kind: CamProbingReportsSavePayload["kind"]
+  readonly source: CamProbingReportsSavePayload["source"]
+  readonly verdict: CamProbingReportsSavePayload["verdict"]
+  readonly data: CamProbingReportsSavePayload["data"]
+  readonly toolpathId?: CamProbingReportsSavePayload["toolpathId"]
+  readonly drawingId?: CamProbingReportsSavePayload["drawingId"]
+  readonly machineConfigId?: CamProbingReportsSavePayload["machineConfigId"]
+  readonly setupId?: CamProbingReportsSavePayload["setupId"]
+  readonly runId?: CamProbingReportsSavePayload["runId"]
+  readonly workOffset?: CamProbingReportsSavePayload["workOffset"]
+  readonly programHash?: CamProbingReportsSavePayload["programHash"]
+  readonly sourceRevision?: CamProbingReportsSavePayload["sourceRevision"]
+  readonly measuredAt?: CamProbingReportsSavePayload["measuredAt"]
+}
+
+export type CamProbingReportsSaveOutput = {
+  id: string
+  projectId: string
+  drawingId: string | null
+  toolpathId: string | null
+  machineConfigId: string | null
+  setupId: string | null
+  runId: string | null
+  name: string
+  kind: "part" | "rotary" | "stylus" | "tool-setter"
+  source: "simulated" | "machine" | "imported"
+  verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+  workOffset: string | null
+  programHash: string | null
+  sourceRevision: string | null
+  measuredAt: string
+  createdAt: string
+  createdById: string
+  data: unknown
+}
+
+export type CamProbingReportsRemoveInput = {
+  readonly id: { readonly id: string; readonly reportId: string }["id"]
+  readonly reportId: { readonly id: string; readonly reportId: string }["reportId"]
+}
+
+export type CamProbingReportsRemoveOutput = { message: string }
 
 export type LibraryListInput = {
   readonly category?: {
@@ -13342,11 +14161,38 @@ export type EventsSubscribeOutput =
         | "analysis"
         | "cycles"
         | "record"
+        | "probe"
         | undefined
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined
       ahead?: number | undefined
+    }
+  | {
+      type: "probe.progress"
+      at: string
+      projectId: string
+      runId: string
+      phase: "running" | "done" | "cancelled"
+      stage?: "queued" | "plan" | "touch" | "check" | "offsets" | "record" | undefined
+      operationId?: string | undefined
+      index?: number | undefined
+      count?: number | undefined
+      ahead?: number | undefined
+    }
+  | {
+      type: "probe.result"
+      at: string
+      projectId: string
+      runId: string
+      reportId?: string | undefined
+      operationId?: string | undefined
+      verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+      checks: number
+      failed: number
+      maxDeviationMm?: number | undefined
+      offsetsUpdated: boolean
+      kind: "part" | "rotary"
     }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }
@@ -13480,11 +14326,38 @@ export type EventsSubscribeAllOutput =
         | "analysis"
         | "cycles"
         | "record"
+        | "probe"
         | undefined
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined
       ahead?: number | undefined
+    }
+  | {
+      type: "probe.progress"
+      at: string
+      projectId: string
+      runId: string
+      phase: "running" | "done" | "cancelled"
+      stage?: "queued" | "plan" | "touch" | "check" | "offsets" | "record" | undefined
+      operationId?: string | undefined
+      index?: number | undefined
+      count?: number | undefined
+      ahead?: number | undefined
+    }
+  | {
+      type: "probe.result"
+      at: string
+      projectId: string
+      runId: string
+      reportId?: string | undefined
+      operationId?: string | undefined
+      verdict: "pass" | "warn" | "fail" | "missed" | "incomplete"
+      checks: number
+      failed: number
+      maxDeviationMm?: number | undefined
+      offsetsUpdated: boolean
+      kind: "part" | "rotary"
     }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }

@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 import { CamSetupDocument, CamSetupGenerated, CamSetupGenerateRequest, CamSetupGenerateSavedRequest, CamSetupPlan, CamSetupRequest, CamSetupSaveBody, CamSetupUpdateBody, CamSetupValidation } from "../cam-setup.ts"
 
@@ -19,8 +19,9 @@ export class CamSetupGroup extends HttpApiGroup.make("camSetup")
     HttpApiEndpoint.post("validate", "/api/cam/setups/validate", { payload: CamSetupRequest, success: CamSetupValidation, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("generate", "/api/cam/setups/generate", { payload: CamSetupGenerateRequest, success: CamSetupGenerated, error: [BadRequest, InternalError] }),
     // Program-layer tools: probing steps and their text for a control, and the air between cuts.
-    HttpApiEndpoint.post("probePlan", "/api/cam/probe/plan", { payload: CamProbePlanRequest, success: CamProbePlan, error: [BadRequest, InternalError] }),
-    HttpApiEndpoint.post("probeEmit", "/api/cam/probe/emit", { payload: CamProbeEmitRequest, success: CamProbeProgram, error: [BadRequest, InternalError] }),
+    // Deprecated (spec 73 §1): the `camProbing` group (`/api/cam/probing/*`) plans and writes probe cycles for every control; these two stay and delegate to it.
+    HttpApiEndpoint.post("probePlan", "/api/cam/probe/plan", { payload: CamProbePlanRequest, success: CamProbePlan, error: [BadRequest, InternalError] }).annotate(OpenApi.Deprecated, true),
+    HttpApiEndpoint.post("probeEmit", "/api/cam/probe/emit", { payload: CamProbeEmitRequest, success: CamProbeProgram, error: [BadRequest, InternalError] }).annotate(OpenApi.Deprecated, true),
     HttpApiEndpoint.post("linkReport", "/api/cam/linking/report", { payload: CamLinkReportRequest, success: CamLinkReport, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("linkOrder", "/api/cam/linking/order", { payload: CamLinkOrderRequest, success: CamLinkOrder, error: [BadRequest, InternalError] }),
     // The saved setups of a project: one document each, revisioned by `updatedAt` like drawings and components.

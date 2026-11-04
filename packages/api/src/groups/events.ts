@@ -91,12 +91,45 @@ export const CamProgress = Schema.Struct({
   projectId: Schema.String,
   runId: Schema.String,
   phase: Schema.Literals(["running", "done", "cancelled"]),
-  stage: Schema.optional(Schema.Literals(["queued", "operations", "post", "replay", "evidence", "toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"])),
+  stage: Schema.optional(Schema.Literals(["queued", "operations", "post", "replay", "evidence", "toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record", "probe"])),
   operationId: Schema.optional(Schema.String),
   index: Schema.optional(Schema.Number),
   count: Schema.optional(Schema.Number),
   /** `queued`: how many jobs are ahead of this one for a worker. */
   ahead: Schema.optional(Schema.Number)
+})
+
+/**
+ * Where a probe run is (spec 73): `plan` (feature to cycle), `touch` (a touch simulated), `check` (characteristics evaluated), `offsets`
+ * (the offset table written), `record` (the report stored), then `done` or `cancelled`. `queued`: jobs ahead for a worker.
+ */
+export const ProbeProgress = Schema.Struct({
+  type: Schema.Literal("probe.progress"),
+  at: Schema.String,
+  projectId: Schema.String,
+  runId: Schema.String,
+  phase: Schema.Literals(["running", "done", "cancelled"]),
+  stage: Schema.optional(Schema.Literals(["queued", "plan", "touch", "check", "offsets", "record"])),
+  operationId: Schema.optional(Schema.String),
+  index: Schema.optional(Schema.Number),
+  count: Schema.optional(Schema.Number),
+  ahead: Schema.optional(Schema.Number)
+})
+
+/** The outcome of a probe run: one verdict, how many checks and how many failed, and whether offsets were written. */
+export const ProbeResult = Schema.Struct({
+  type: Schema.Literal("probe.result"),
+  at: Schema.String,
+  projectId: Schema.String,
+  runId: Schema.String,
+  reportId: Schema.optional(Schema.String),
+  operationId: Schema.optional(Schema.String),
+  verdict: Schema.Literals(["pass", "warn", "fail", "missed", "incomplete"]),
+  checks: Schema.Number,
+  failed: Schema.Number,
+  maxDeviationMm: Schema.optional(Schema.Number),
+  offsetsUpdated: Schema.Boolean,
+  kind: Schema.Literals(["part", "rotary"])
 })
 
 /** A saved working-copy change, including changes that have not been committed. */
@@ -149,7 +182,7 @@ export const CatalogueUpdated = Schema.Struct({ type: Schema.Literal("catalogue.
 /** Every frame a publisher may put on the sidecar's bus. */
 const PUBLISHED = [
   PrOpened, PrMerged, PrClosed, PrReviewed, Commit,
-  WorkflowStarted, WorkflowFinished, AiSession, CamProgress, WorkspaceChanged, ResourcesChanged, CatalogueUpdated,
+  WorkflowStarted, WorkflowFinished, AiSession, CamProgress, ProbeProgress, ProbeResult, WorkspaceChanged, ResourcesChanged, CatalogueUpdated,
   NotificationCreated, NotificationUpdated, NotificationDeleted, NotificationReadAll, OrganizationsChanged
 ] as const
 

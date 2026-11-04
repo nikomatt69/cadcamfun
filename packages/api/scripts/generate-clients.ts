@@ -36,7 +36,11 @@ export const PROMISE_UNSUPPORTED: Readonly<Record<string, string>> = {
   "plugins.bootstrap": "JavaScript response, not JSON",
   "files.download": "binary/stream response",
   "toolpathGenerator.generate": "request schema the type emitter cannot print (free-form CAD element records)",
-  "toolpathGenerator.suggest": "request schema the type emitter cannot print (free-form CAD element records)"
+  "toolpathGenerator.suggest": "request schema the type emitter cannot print (free-form CAD element records)",
+  "toolpathGenerator.job": "operations carry the probe cycle union (spec 73), which the Promise type emitter cannot print; the Effect client keeps the endpoint",
+  "camProbing.plan": "request schema the type emitter cannot print (a feature carries free-form CAD element records)",
+  "camProbing.emit": "request schema the type emitter cannot print (a feature carries free-form CAD element records)",
+  "camProbing.simulate": "request schema the type emitter cannot print (free-form CAD element records)"
 }
 
 /** Every `group.endpoint` of the contract, straight from the reflection (no codegen involved). */
