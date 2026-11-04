@@ -26,7 +26,7 @@ export type TemplateStrategy = typeof TEMPLATE_STRATEGIES[number]
 /** Parameters a template must never set: they would override the cutting-data limits (power, torque, deflection) the claims rest on. */
 export const TEMPLATE_FORBIDDEN_PARAMS: ReadonlySet<string> = new Set(["rpm", "feed", "plungeFeed", "radialEngagement", "coolant"])
 
-const CUTTER_KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"] as const
+const CUTTER_KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail", "tapered", "lollipop", "barrel", "lens"] as const
 
 const Range = Schema.Struct({ min: Schema.optionalKey(Schema.Finite), max: Schema.optionalKey(Schema.Finite) })
 export type TemplateRange = typeof Range.Type

@@ -2,8 +2,14 @@
   "name": "@cadcamfun/vcs",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "bun check -p tsconfig.json" },
-  "dependencies": {},
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "bun check -p tsconfig.json"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112"
+  },
   "devDependencies": {}
 }

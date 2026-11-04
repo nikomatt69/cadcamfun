@@ -35,6 +35,7 @@ import { fiveAxisKinematic } from "../five-axis.ts"
 import type { RotaryAngles } from "../indexing.ts"
 import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriReplay, triCellFor, type TriVerdict } from "./tri-replay.ts"
+import { tipError } from "./tip-error.ts"
 import { turnedPoses } from "./turned-poses.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
@@ -1274,6 +1275,12 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // pivot, and the pieces that follow the tip path are within the post's splitting tolerance of the planned machine-axis line.
   const tcpTerm = carry === undefined ? 0 : carry.maxRadius * (Math.PI / 180) * Math.pow(10, -decimals) + (job.post?.options?.tolerance ?? 0.01)
   const rounding = 2 * Math.pow(10, -decimals) + 1e-9 + tcpTerm
+  // Spec 69 B6: for tool-centre-point output the replayed tip is measured against the planned path point by point (not only by extent). Not measured for a control that writes its turning rapids as feed moves (Haas G234): those follow the tip path by design and cannot be told from cuts in the replay.
+  const tipErr: CamArtifact["tipError"] | undefined = carry === undefined || interpreted === undefined || rapidsAsFeed || toolpaths.some((t) => t.moves.some((m) => m._tag === "CutterComp")) ? undefined : (() => {
+    const e = tipError(planned.segments, interpreted.segments as ReadonlyArray<GSegment>)
+    return { max: Math.round(e.max * 1e6) / 1e6, mean: Math.round(e.mean * 1e6) / 1e6, samples: e.samples, limit: Math.round(tcpTerm * 1e6) / 1e6, ...(e.line !== undefined ? { line: e.line } : {}) }
+  })()
+  if (tipErr !== undefined && tipErr.max > tipErr.limit) issues.push(issue("ReplayMismatch", "replay", `The tool tip the tool-centre-point NC makes strays ${tipErr.max.toFixed(4)} mm from the planned path (NC line ${tipErr.line}); the declared limit is ${tipErr.limit.toFixed(4)} mm`, { ...(tipErr.line !== undefined ? { line: tipErr.line } : {}) }))
   const plannedExtent = extent(planned.segments)
   const replayedExtent = interpreted === undefined ? [] : extent(interpreted.segments.filter((s): s is Exclude<GSegment, { kind: "dwell" }> => s.kind !== "dwell" && carry?.interior.has(s) !== true).map((s) => ({ rapid: s.kind === "rapid", to: s.to })))
   // Cutter radius compensation (`G41` / `G42`): the program is the contour and the control's offset moves the tool centre by up to the tool radius
@@ -1510,7 +1517,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...planNotes(prepared), ...subprogramNotes(nc)],
-      tolerance
+      tolerance,
+      ...(tipErr !== undefined ? { tipError: tipErr } : {})
     }
   }
 }

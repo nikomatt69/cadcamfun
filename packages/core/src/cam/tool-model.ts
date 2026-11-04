@@ -244,7 +244,7 @@ export const toolModelFromSettings = (s: ToolpathSettings, kind: MachineKind = s
   return toolModelOf({ type: s.toolType === "vbit" ? "vbit" : s.toolType, diameter: s.toolDiameter, numberOfFlutes: s.flutes, ...(s.toolType === "threadmill" ? { threadPitch: s.threadPitch } : {}) }, "mill")
 }
 
-const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver", tap: "tap", reamer: "reamer", countersink: "chamfer", boringbar: "boringBar", tslot: "disc", dovetail: "dovetail" }
+const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver", tap: "tap", reamer: "reamer", countersink: "chamfer", boringbar: "boringBar", tslot: "disc", dovetail: "dovetail", tapered: "tapered", lollipop: "lollipop", barrel: "barrel", lens: "barrel" }
 
 /** The model of a kernel cutter (the kernel's own tool library): the same shape the preview draws for a resource. */
 export const toolModelFromCutter = (c: Cutter): MillModel => ({

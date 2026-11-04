@@ -43,3 +43,48 @@ test("a malformed history is a 400 that names the refused fields", async () => {
   expect(response.status).toBe(400)
   expect(JSON.stringify(response.body)).toContain("Invalid parametric history")
 })
+
+// ---- reports, incremental and healing (spec 72 step 1.3 additions)
+
+const plate = (lastDiameter: number) => {
+  const features: Array<Record<string, unknown>> = [
+    { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 120, height: 80 }] } },
+    { id: "plate", type: "extrude", sketch: "s", depth: "thick", operation: "new" }
+  ]
+  for (let i = 0; i < 6; i++) features.push({ id: `h${i}`, type: "hole", plane: "XY", offset: "thick", at: [15 + (i % 3) * 40, 20 + Math.floor(i / 3) * 40], diameter: i === 5 ? lastDiameter : 4, depth: "thick" })
+  return { parameters: { thick: 10 }, features }
+}
+
+test("every feature reports its state, and a rebuild with a baseline reports how much of the replay the edit reused", async () => {
+  const before = plate(4)
+  const after = plate(6)
+  const plain = Schema.decodeUnknownSync(CadRebuildReport)((await post({ history: after })).body)
+  expect(plain.features.map((f) => f.id)).toEqual(["s", "plate", "h0", "h1", "h2", "h3", "h4", "h5"])
+  expect(plain.features.every((f) => f.state === "ok")).toBe(true)
+  expect(plain.incremental).toBeUndefined()
+  expect(plain.healing).toEqual([])
+
+  const resumed = Schema.decodeUnknownSync(CadRebuildReport)((await post({ history: after, baseline: before })).body)
+  // Only the last hole changed: the replay resumes after the seven features that did not.
+  expect(resumed.incremental).toEqual({ resumedAt: 7, replayed: 1, features: 8 })
+  // Resuming is an optimisation, never a different answer.
+  expect(resumed.digest).toBe(plain.digest)
+  expect(resumed.bodies[0]!.volume).toBeCloseTo(120 * 80 * 10 - 5 * Math.PI * 2 * 2 * 10 - Math.PI * 3 * 3 * 10, 6)
+})
+
+test("a malformed baseline is a 400 of its own", async () => {
+  const response = await post({ history: plate(4), baseline: { parameters: {}, features: [{ id: "x", type: "no-such-feature" }] } })
+  expect(response.status).toBe(400)
+  expect(JSON.stringify(response.body)).toContain("Invalid baseline history")
+})
+
+test("a feature that cannot be built is reported with its state and the issue behind it", async () => {
+  const broken = plate(4)
+  broken.features.push({ id: "round", type: "fillet", radius: 500 })
+  const report = Schema.decodeUnknownSync(CadRebuildReport)((await post({ history: broken })).body)
+  const round = report.features.find((f) => f.id === "round")
+  expect(round).toBeDefined()
+  expect(round!.type).toBe("fillet")
+  expect(round!.state).not.toBe("ok")
+  expect(report.issues.some((i) => i.feature === "round")).toBe(true)
+})

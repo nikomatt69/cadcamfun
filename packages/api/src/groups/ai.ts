@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi"
-import { BadRequest, Conflict, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
 import { AiStreamEventSchema, ToolCallEvent, ToolResultEvent, TodoEvent, ToolDiagnosticEvent, UsageSchema } from "../ai-events.ts"
 
 const opt = Schema.optional
@@ -175,6 +175,18 @@ export const AiMcpList = Schema.Struct({ servers: Schema.Array(AiMcpEntry) })
 export const AiMcpSave = Schema.Struct({ projectId: Schema.String, name: Schema.String, config: AiMcpConfig })
 export const AiExtensionPlugin = Schema.Struct({ id: Schema.String, name: Schema.String, version: Schema.String, enabled: Schema.Boolean, tools: Schema.Number, mods: Schema.Number, modes: Schema.Number })
 export const AiExtensionPlugins = Schema.Struct({ plugins: Schema.Array(AiExtensionPlugin) })
+/** A tool a running plugin offers: what `POST /api/ai/extensions/plugins/:id/tools/:toolId` runs. */
+export const AiPluginTool = Schema.Struct({
+  pluginId: Schema.String, pluginName: Schema.String, id: Schema.String, description: Schema.String,
+  kind: Schema.Literals(["read", "write"]),
+  /** JSON Schema of the arguments. */
+  parameters: Schema.Record(Schema.String, Schema.Json)
+})
+export const AiPluginTools = Schema.Struct({ tools: Schema.Array(AiPluginTool) })
+/** `confirm` is the HTTP form of the approval the assistant asks for: a `write` tool does not run without it. */
+export const AiPluginInvokeBody = Schema.Struct({ args: Schema.optional(Schema.Json), confirm: Schema.optional(Schema.Boolean) })
+/** What the plugin's tool answered (its own `{ ok, ... }` shape is passed through as `result`). */
+export const AiPluginInvokeReply = Schema.Struct({ pluginId: Schema.String, toolId: Schema.String, result: Schema.Json })
 /**
  * One mod in the Extensions panel: a record of the app-owned store (`origin` assistant/user) or a mod an enabled plugin
  * ships (`origin` plugin, host-managed: it follows the plugin and cannot be toggled here).
@@ -341,6 +353,10 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.delete("removeExtensionPlugin", "/api/ai/extensions/plugins/:id", { params: { id: Schema.String }, success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("extensionPlugins", "/api/ai/extensions/plugins", { success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("installExtensionPlugin", "/api/ai/extensions/plugins", { payload: AiPluginBundle, success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("extensionPluginTools", "/api/ai/extensions/plugins/tools", { success: AiPluginTools, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("invokeExtensionPluginTool", "/api/ai/extensions/plugins/:id/tools/:toolId", {
+      params: { id: Schema.String, toolId: Schema.String }, payload: AiPluginInvokeBody, success: AiPluginInvokeReply, error: [BadRequest, Forbidden, NotFound, InternalError]
+    }),
     HttpApiEndpoint.put("toggleExtensionPlugin", "/api/ai/extensions/plugins/:id", { params: { id: Schema.String }, payload: Schema.Struct({ enabled: Schema.Boolean }), success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("extensionMods", "/api/ai/extensions/mods", { success: AiExtensionMods, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.put("toggleExtensionMod", "/api/ai/extensions/mods/:id", { params: { id: Schema.String }, payload: Schema.Struct({ enabled: Schema.Boolean }), success: AiExtensionMods, error: [BadRequest, InternalError] }),
