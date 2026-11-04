@@ -3,6 +3,21 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.91 (November 2026)
+
+## Sidecar
+
+- ProbeReportRepo and WorkOffsetStore over machine configs (spec 73 §3.2)
+
+## Database
+
+- ProbeReport table for probing and inspection reports (spec 73)
+
+## Documentation
+
+- Spec 73 core detail from planner 1
+- Spec 73 probing and inspection, decisions from three plans
+
 ## v0.1.90 (November 2026)
 
 ## Core
