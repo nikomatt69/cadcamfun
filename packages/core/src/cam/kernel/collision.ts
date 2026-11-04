@@ -30,8 +30,8 @@ import { headAxis, type HeadKinematic } from "./head.ts"
 const DEG = Math.PI / 180
 const SAMPLES = 9
 
-export interface Capsule { readonly a: Vec3; readonly b: Vec3; readonly radius: number }
-export interface Solid { readonly sdf: (p: Vec3) => number }
+export interface Capsule { readonly a: Vec3; readonly b: Vec3; readonly radius: number; /** Which body of the tool assembly this is (`shank`, `holder`, `housing`), for naming a colliding pair. */ readonly part?: string }
+export interface Solid { readonly sdf: (p: Vec3) => number; /** What the obstacle is (`table`, a fixture id), for naming a colliding pair. */ readonly name?: string }
 
 /**
  * The moving joint values of a motion: the tilt (A or B) and C, degrees, and, for a machine whose linear axes move the spindle,
@@ -69,7 +69,8 @@ export const cylinderSolid = (base: Vec3, axis: Vec3, z0: number, z1: number, ra
  * An axis-aligned box in its own frame. `toBox` maps a machine point into that frame (the identity for a fixed box, the inverse
  * table rotation for a box carried by the table). Exact signed distance.
  */
-export const boxSolid = (center: Vec3, half: Vec3, toBox: (p: Vec3) => Vec3): Solid => ({
+export const boxSolid = (center: Vec3, half: Vec3, toBox: (p: Vec3) => Vec3, name?: string): Solid => ({
+  ...(name !== undefined ? { name } : {}),
   sdf: (p) => {
     const q = toBox(p)
     const dx = Math.abs(q.x - center.x) - half.x, dy = Math.abs(q.y - center.y) - half.y, dz = Math.abs(q.z - center.z) - half.z
@@ -88,13 +89,13 @@ const toPartFrame = (layout: RotaryLayout, pose: Pose, pivot: Vec3): ((p: Vec3) 
 }
 
 /** The non-cutting segments of a tool as capsules along the tool axis, from the tip (z = 0) up the shank and holder. */
-const toolSegments = (cutter: Cutter): Array<{ readonly z0: number; readonly z1: number; readonly radius: number }> => {
+const toolSegments = (cutter: Cutter): Array<{ readonly z0: number; readonly z1: number; readonly radius: number; readonly part: string }> => {
   const profile = assemblyProfile(cutter)
-  const out: Array<{ z0: number; z1: number; radius: number }> = []
+  const out: Array<{ z0: number; z1: number; radius: number; part: string }> = []
   for (let i = 0; i + 1 < profile.points.length; i++) {
     if (profile.parts[i] === "cutting") continue
     const a = profile.points[i]!, b = profile.points[i + 1]!
-    out.push({ z0: Math.min(a.z, b.z), z1: Math.max(a.z, b.z), radius: Math.max(a.r, b.r) })
+    out.push({ z0: Math.min(a.z, b.z), z1: Math.max(a.z, b.z), radius: Math.max(a.r, b.r), part: profile.parts[i]! })
   }
   return out
 }
@@ -103,8 +104,8 @@ const toolSegments = (cutter: Cutter): Array<{ readonly z0: number; readonly z1:
 const toolCapsules = (cutter: Cutter, nose: Vec3, down: Vec3, gauge: number, housing?: { readonly radius: number; readonly height: number }): Capsule[] => {
   const up = scale(down, -1)
   const at = (z: number): Vec3 => add(nose, scale(up, z - gauge))
-  const out: Capsule[] = toolSegments(cutter).map((s) => ({ a: at(s.z0), b: at(s.z1), radius: s.radius }))
-  if (housing !== undefined) out.push({ a: nose, b: add(nose, scale(up, housing.height)), radius: housing.radius })
+  const out: Capsule[] = toolSegments(cutter).map((s) => ({ a: at(s.z0), b: at(s.z1), radius: s.radius, part: s.part }))
+  if (housing !== undefined) out.push({ a: nose, b: add(nose, scale(up, housing.height)), radius: housing.radius, part: "housing" })
   return out
 }
 
@@ -164,10 +165,10 @@ export const trunnionScene = (cutter: Cutter, layout: RotaryLayout, nose: Vec3, 
  * A fixed tool moved by the linear axes over fixed obstacles (the 3-axis machine): the spindle nose is the pose's `nose`, and the
  * flutes, shank and holder hang from it along the tool axis (down into the part, so the holder rises above the nose).
  */
-export const linearScene = (cutter: Cutter, obstacles: ReadonlyArray<Solid>): Scene => ({
+export const linearScene = (cutter: Cutter, obstacles: ReadonlyArray<Solid>, options: { readonly housing?: { readonly radius: number; readonly height: number } } = {}): Scene => ({
   probesAt: (pose) => {
     if (pose.nose === undefined) throw new RangeError("A linear scene needs the spindle nose of the pose")
-    return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout)
+    return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout, options.housing)
   },
   obstaclesAt: () => obstacles,
   reachProbes: 0,
@@ -175,7 +176,7 @@ export const linearScene = (cutter: Cutter, obstacles: ReadonlyArray<Solid>): Sc
 })
 
 /** A box carried by the table, in the table's own (unrotated) frame: centre and half extents, mm. */
-export interface TableBody { readonly centre: Vec3; readonly half: Vec3 }
+export interface TableBody { readonly centre: Vec3; readonly half: Vec3; /** Names the body in a collision pair (`table`, a fixture id). */ readonly name?: string }
 
 /**
  * A spindle moved by the linear axes over bodies carried by a trunnion table (the five-axis machine at a turned pose): the
@@ -183,7 +184,7 @@ export interface TableBody { readonly centre: Vec3; readonly half: Vec3 }
  * blocks) are boxes in the table's frame that turn with `tilt` and `c` about `pivot`. The stock and the part are not bodies
  * here: the replay checks the assembly against the material itself.
  */
-export const rotatingTableScene = (cutter: Cutter, layout: RotaryLayout, pivot: Vec3, bodies: ReadonlyArray<TableBody>): Scene => {
+export const rotatingTableScene = (cutter: Cutter, layout: RotaryLayout, pivot: Vec3, bodies: ReadonlyArray<TableBody>, options: { readonly housing?: { readonly radius: number; readonly height: number } } = {}): Scene => {
   const corners = bodies.flatMap((b) => {
     const out: Vec3[] = []
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) out.push(add(b.centre, { x: sx * b.half.x, y: sy * b.half.y, z: sz * b.half.z }))
@@ -193,9 +194,9 @@ export const rotatingTableScene = (cutter: Cutter, layout: RotaryLayout, pivot: 
   return {
     probesAt: (pose) => {
       if (pose.nose === undefined) throw new RangeError("A rotating-table scene needs the spindle nose of the pose")
-      return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout)
+      return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout, options.housing)
     },
-    obstaclesAt: (pose) => bodies.map((b) => boxSolid(b.centre, b.half, toPartFrame(layout, pose, pivot))),
+    obstaclesAt: (pose) => bodies.map((b) => boxSolid(b.centre, b.half, toPartFrame(layout, pose, pivot), b.name)),
     reachProbes: 0,
     reachObstacles
   }
@@ -203,7 +204,7 @@ export const rotatingTableScene = (cutter: Cutter, layout: RotaryLayout, pivot: 
 
 /** The table of a machine as an obstacle: a box of `length` x `width` centred on (`cx`, `cy`), its top at `top`, `depth` mm deep. */
 export const tableBox = (cx: number, cy: number, top: number, length: number, width: number, depth: number): Solid =>
-  boxSolid({ x: cx, y: cy, z: top - depth / 2 }, { x: length / 2, y: width / 2, z: depth / 2 }, (p) => p)
+  boxSolid({ x: cx, y: cy, z: top - depth / 2 }, { x: length / 2, y: width / 2, z: depth / 2 }, (p) => p, "table")
 
 /** Evaluate the clearance of a pose: the least signed distance over probe samples, and the half sample spacing it may hide. */
 export interface Clearance {
@@ -211,20 +212,25 @@ export interface Clearance {
   readonly value: number
   /** The true clearance is at least `value - slack`. */
   readonly slack: number
+  /** The probe part and the obstacle that gave `value` (for naming a collision). */
+  readonly pair?: string
 }
 
 const evaluate = (scene: Scene, pose: Pose): Clearance => {
   const obstacles = scene.obstaclesAt(pose)
-  let value = Infinity, slack = 0
+  let value = Infinity, slack = 0, pair: string | undefined
   for (const cap of scene.probesAt(pose)) {
     const spacing = length3(sub(cap.b, cap.a)) / (SAMPLES - 1)
     slack = Math.max(slack, spacing / 2)
     for (let k = 0; k < SAMPLES; k++) {
       const p = add(cap.a, scale(sub(cap.b, cap.a), k / (SAMPLES - 1)))
-      for (const o of obstacles) value = Math.min(value, o.sdf(p) - cap.radius)
+      for (const o of obstacles) {
+        const d = o.sdf(p) - cap.radius
+        if (d < value) { value = d; pair = `${cap.part ?? "tool"} x ${o.name ?? "obstacle"}` }
+      }
     }
   }
-  return { value: Number.isFinite(value) ? value : Infinity, slack }
+  return { value: Number.isFinite(value) ? value : Infinity, slack, ...(pair !== undefined ? { pair } : {}) }
 }
 
 /** The largest change of clearance over a joint move, mm: Σ reach · |Δθ| in radians, over both moving bodies. */
@@ -243,6 +249,8 @@ export interface MotionCheck {
   readonly at?: number
   /** Number of pose evaluations used. */
   readonly evaluations: number
+  /** The colliding pair, `<tool part> x <obstacle>` (`collision`). */
+  readonly pair?: string
 }
 
 /**
@@ -263,9 +271,9 @@ export const checkMotion = (scene: Scene, from: Pose, to: Pose, options: { reado
     return evaluate(scene, poseAt(t))
   }
   const start = evalAt(0)
-  if (start.value < 0) return { verdict: "collision", clearance: start.value, at: 0, evaluations }
+  if (start.value < 0) return { verdict: "collision", clearance: start.value, at: 0, evaluations, ...(start.pair !== undefined ? { pair: start.pair } : {}) }
   const end = evalAt(1)
-  if (end.value < 0) return { verdict: "collision", clearance: end.value, at: 1, evaluations }
+  if (end.value < 0) return { verdict: "collision", clearance: end.value, at: 1, evaluations, ...(end.pair !== undefined ? { pair: end.pair } : {}) }
   let certified = Infinity
   let unresolved = false
   const stack: Array<{ a: number; va: Clearance; b: number; vb: Clearance; depth: number }> = [{ a: 0, va: start, b: 1, vb: end, depth: 0 }]
@@ -278,7 +286,7 @@ export const checkMotion = (scene: Scene, from: Pose, to: Pose, options: { reado
     if (depth >= maxDepth) { unresolved = true; certified = Math.min(certified, lower); continue }
     const m = (a + b) / 2
     const vm = evalAt(m)
-    if (vm.value < 0) return { verdict: "collision", clearance: vm.value, at: m, evaluations }
+    if (vm.value < 0) return { verdict: "collision", clearance: vm.value, at: m, evaluations, ...(vm.pair !== undefined ? { pair: vm.pair } : {}) }
     stack.push({ a, va, b: m, vb: vm, depth: depth + 1 }, { a: m, va: vm, b, vb, depth: depth + 1 })
   }
   return { verdict: unresolved ? "unresolved" : "clear", clearance: certified, evaluations }

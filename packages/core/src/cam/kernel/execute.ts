@@ -1368,13 +1368,14 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const clearance = interpreted !== undefined && clearTable !== undefined
     ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, clearTable, {
         ...(machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } }),
-        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => f.body) } : {})
+        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => ({ ...f.body, name: f.id })) } : {}),
+        ...(machine.spindleHousing !== undefined ? { housing: machine.spindleHousing } : {})
       })
     : undefined
   if (clearance?.first !== undefined) {
     const f = clearance.first
     const cutter = cutterByNumber.get(toolAtLine[f.line] ?? -1)
-    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
+    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm${f.pair !== undefined ? `, pair ${f.pair}` : ""})`, { line: f.line, point: f.point }))
   }
 
   // ------------------------------------------------------------ evidence
