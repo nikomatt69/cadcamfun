@@ -35,6 +35,7 @@ import camPost from "./text/cam-post.md" with { type: "text" }
 import camFiveAxis from "./text/cam-five-axis.md" with { type: "text" }
 import pmiAndDrawingAnnotation from "./text/pmi-and-drawing-annotation.md" with { type: "text" }
 import librarySetup from "./text/library-setup.md" with { type: "text" }
+import probingAndInspection from "./text/probing-and-inspection.md" with { type: "text" }
 
 /** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
 export const USER_MARKER = ".user-skill"
@@ -105,7 +106,8 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "drilling-and-holes", description: "Drilling operations: cycles, peck rules, through-hole depth, large holes.", category: "cam", tags: ["cam", "drilling"], body: skillText(drillingAndHoles) },
   { name: "precision-and-tolerances", description: "Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.", category: "cam", tags: ["precision", "tolerance", "iso286"], body: skillText(precisionAndTolerances) },
   { name: "industrial-standards", description: "ISO 2768 tolerances, ISO 286 fits, surface finish, fastener holes, tap drills, keys, gears, preferred numbers, DFM rules per process, material densities.", category: "cad", tags: ["iso", "din", "tolerance", "fits", "dfm", "standards"], body: skillText(industrialStandards) },
-  { name: "machines-and-axes", description: "Mill, lathe and printer: axis senses, zeros and work offsets, probes and tool setters, checking a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: skillText(machinesAndAxes) },
+  { name: "machines-and-axes", description: "Mill, lathe, printer: axis senses, zeros, checking a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: skillText(machinesAndAxes) },
+  { name: "probing-and-inspection", description: "Touch probing: cycles, work offsets, 5-axis, rotary calibration, inspection, tool setter.", category: "cam", tags: ["cam", "probing", "inspection", "work-offsets"], body: skillText(probingAndInspection) },
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: skillText(drawingsAndImages) },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: skillText(pluginAuthoring) },
   { name: "cad-naming", description: "Stable face/edge/vertex refs: make, resolve after edits, naming health.", category: "cad", tags: ["cad", "naming", "references", "kernel"], body: skillText(cadNaming) },

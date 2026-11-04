@@ -186,7 +186,7 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       const error = input.calibrationError
       const run_ = await attempt(probing.plan.calibrateRotary(user, {
         axis: cycle["axis"] as "A" | "B" | "C", sphere, angles: cycle["angles"] as ReadonlyArray<number>,
-        ...(machineConfig !== undefined ? { settings: { machineConfig } } : {}), ...(error !== undefined ? { truth: error } : {})
+        settings: { ...record(data["settings"]) as CamProbingSettingsInput, ...(machineConfig !== undefined ? { machineConfig } : {}) }, ...(error !== undefined ? { truth: error } : {})
       }, report))
       if (!run_.ok) return run_
       const measured: CamRotaryCalibrationResult = run_.value

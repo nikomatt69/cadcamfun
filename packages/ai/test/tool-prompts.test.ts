@@ -101,7 +101,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +300: cad_edit parametric_edit (set_parameter ... ungroup_features) and the hole thread / tolerance / fit fields.
     // Aligned with `BUDGETS.descriptions` in corpus.ts (35 600): the merged cam job and five-axis actions put main at 34 396, above the old 34 100.
     // +300: cam setup_plan / setup_list and cam_edit setup_save (saved multi-operation setups, RM-02).
-    expect(total).toBeLessThan(35_900)
+    // +400: cam_edit probe / probe_run / probe_apply and the machine probing fields of library_edit (spec 73).
+    expect(total).toBeLessThan(36_300)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

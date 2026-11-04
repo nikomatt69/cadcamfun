@@ -3,18 +3,19 @@
  * reaches the machine's offsets, failed or stale reports are refused, and `cam review` reads the verdict. Real database, real kernel.
  */
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
-import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { brep } from "@cadcamfun/core"
 import { makeApp } from "./helpers.ts"
 
 setDefaultTimeout(120_000)
 let app: Awaited<ReturnType<typeof makeApp>>
-let handlers: ToolHandlersShape
 let projectId: string
 let drawingId: string
 let machineId: string
-const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
-const run = async (id: string, input: unknown) => JSON.parse(await buildTools(handlers, projectId).find((t) => t.id === id)!.execute(input, ctx))
+/** The catalogue's HTTP face: the same registry, input schemas and handlers the in-app assistant calls. */
+const run = async (tool: string, input: Record<string, unknown>) => {
+  const response = await app.call("/api/ai/actions/invoke", { method: "POST", json: { projectId, tool, input } })
+  return (response.body.result ?? response.body) as Record<string, any>
+}
 
 /** A 100 x 60 x 20 plate whose top is z = 0, with a 20 mm hole at (30, 30). */
 const plate = () => {
@@ -25,7 +26,6 @@ const elements = () => [{ id: "part", type: "brep", brep: plate(), x: 0, y: 0, z
 
 beforeAll(async () => {
   app = await makeApp()
-  handlers = await app.toolHandlers()
   projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Probing" } })).body.id
   drawingId = (await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Plate", data: { elements: elements(), version: "1.0" } } })).body.id
   const saved = await run("library_edit", {
@@ -103,7 +103,7 @@ test("a failed report and a report of another machine are refused", async () => 
 
 test("a rotary calibration: the pivot error is recovered, written to the machine; never to a setup", async () => {
   const stored = await run("cam_edit", {
-    action: "probe", operation: { kind: "rotary-axis", axis: "A", sphere: { centre: { x: 0, y: 0, z: 150 }, diameter: 25 }, angles: [-60, -30, 0, 30, 60] }, machineConfig: machineId, dialect: "fanuc"
+    action: "probe", operation: { kind: "rotary-axis", axis: "A", sphere: { centre: { x: 0, y: 0, z: 150 }, diameter: 25 }, angles: [-60, -30, 0, 30, 60] }, machineConfig: machineId, dialect: "fanuc", settings: { safeZ: 260 }
   })
   expect(stored).toMatchObject({ ok: true, cycle: "rotary-axis" })
   const report = await run("cam_edit", { action: "probe_run", operationId: stored.operationId, calibrationError: { pivot: { x: 0.03, y: -0.02, z: 100.05 } } })
