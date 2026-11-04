@@ -312,3 +312,4 @@ Tests: truePivot = assumed + (0.03, −0.02, 0.05) and 0.01° tilt recovered to 
 ## Change log
 
 - 2026-11-04: spec written from three plans; `ProbeReport` table built (7d8318a5).
+- 2026-11-04 (desktop, B): Probing tab (palette, cycle editor with NumberField only, target picker with pick-on-model, work-offset table with 409 handling, inspection list, program preview), probe cycles as `probing` toolpaths, stores, offset/report client over `camProbing`, `probe.progress` / `probe.result` / stale-table handling, 3D overlay + surface pick + probe colours in the visualizer, 11 locales, `camProbing` in the web reference; NOT built (waiting for the api schemas of plan / emit / simulate / calibrate-rotary / reports run, the events and the sidecar services behind them): the program calls (Write program, Simulate, Show in 3D data), calibration write-back.
