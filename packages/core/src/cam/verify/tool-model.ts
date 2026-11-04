@@ -36,8 +36,39 @@ export interface ToolModel {
 const DRILL_POINT_ANGLE = 118
 const DEFAULT_VBIT_ANGLE = 60
 
+/**
+ * Lower envelope of a half-section polyline: for each radius the least height at which the solid exists, as a lookup with linear
+ * interpolation between the polyline's own radii (dense on arcs). Vertical segments (steps) contribute their lower end.
+ */
+const lowerEnvelope = (pts: ReadonlyArray<{ readonly r: number; readonly z: number }>): { readonly profile: (r: number) => number; readonly radius: number } => {
+  const radii = [...new Set(pts.map((p) => p.r))].sort((a, b) => a - b)
+  const zAt = (r: number): number => {
+    let best = Infinity
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]!, b = pts[i + 1]!
+      const lo = Math.min(a.r, b.r), hi = Math.max(a.r, b.r)
+      if (r < lo - 1e-12 || r > hi + 1e-12) continue
+      const z = hi - lo < 1e-12 ? Math.min(a.z, b.z) : a.z + ((b.z - a.z) * (r - a.r)) / (b.r - a.r)
+      if (z < best) best = z
+    }
+    return best
+  }
+  const z = radii.map(zAt)
+  const profile = (r: number): number => {
+    if (r <= radii[0]!) return z[0]!
+    const last = radii.length - 1
+    if (r >= radii[last]!) return z[last]!
+    let lo = 0, hi = last
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (radii[mid]! <= r) lo = mid; else hi = mid }
+    const t = (r - radii[lo]!) / (radii[hi]! - radii[lo]!)
+    return z[lo]! + (z[hi]! - z[lo]!) * t
+  }
+  return { profile, radius: radii[radii.length - 1]! }
+}
+
 export const toolModel = (tool: VerifyTool): ToolModel => {
-  const radius = tool.diameter / 2
+  const swept = tool.profile !== undefined && tool.profile.length >= 2 ? lowerEnvelope(tool.profile) : undefined
+  const radius = swept?.radius ?? tool.diameter / 2
   const kind = tool.kind ?? "endmill"
   const corner = kind === "ballnose" ? radius : Math.min(tool.tipRadius ?? 0, radius)
   const cone = (angle: number): ((r: number) => number) => {
@@ -46,7 +77,8 @@ export const toolModel = (tool: VerifyTool): ToolModel => {
   }
   let profile: (r: number) => number
   let flat = false
-  if (kind === "vbit") profile = cone(tool.angle ?? DEFAULT_VBIT_ANGLE)
+  if (swept !== undefined) profile = swept.profile
+  else if (kind === "vbit") profile = cone(tool.angle ?? DEFAULT_VBIT_ANGLE)
   else if (kind === "drill") profile = cone(tool.angle ?? DRILL_POINT_ANGLE)
   else if (corner > 0) {
     const inner = radius - corner
@@ -55,6 +87,7 @@ export const toolModel = (tool: VerifyTool): ToolModel => {
     profile = () => 0
     flat = true
   }
+  if (swept !== undefined) flat = false
 
   const fluteLength = tool.cuttingLength
   const shankRadius = (tool.shankDiameter ?? tool.diameter) / 2
