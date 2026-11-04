@@ -38,6 +38,8 @@ import { OrganizationsHandlers } from "./http/organizations.ts"
 import { ConversationsHandlers } from "./http/conversations.ts"
 import { ConversationRepo } from "./repos/conversation-repo.ts"
 import { CamSetupRepo } from "./repos/cam-setup-repo.ts"
+import { ProbeReportRepo } from "./repos/probe-report-repo.ts"
+import { WorkOffsetStore } from "./repos/work-offset-store.ts"
 import { AiUsageRepo } from "./repos/ai-usage-repo.ts"
 import { NotificationsHandlers } from "./http/notifications.ts"
 import { ProductionCostsHandlers } from "./http/production-costs.ts"
@@ -153,7 +155,9 @@ const IdentityLive = Identity.layer.pipe(Layer.provide(AuthRepo.layer))
 
 const AccountServices = Layer.mergeAll(AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, IdentityLive, UserRepo.layer, OrganizationRepo.layer, ConversationRepo.layer, NotificationRepo.layer, BillingRepo.layer, PaymentProvider.layer)
 const ProjectServices = Layer.mergeAll(ProjectRepo.layer, AnalyticsRepo.layer, ProductionCostRepo.layer, CostService.layer)
-const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, CamSetupRepo.layer)
+const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, CamSetupRepo.layer, ProbeReportRepo.layer,
+  // Work offsets and probe configuration are slices of the machine configuration (spec 73), over the same repository.
+  WorkOffsetStore.layer.pipe(Layer.provide(MachineConfigRepo.layer)))
 const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
 const PlatformServices = Layer.mergeAll(StorageService.layer, FileRepo.layer, MiscRepo.layer, KvStore.layer, LiveEvents.layer, AssistantTurns.layer)
 const IntegrationServices = Layer.mergeAll(
