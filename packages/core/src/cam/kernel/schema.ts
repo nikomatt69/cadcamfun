@@ -9,6 +9,11 @@ import { CoolantSchema, WorkOffsetSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
 import { PROFILE_LEAD_INS, SURFACE_MODES, type JobSetup, type OperationSpec, type PrintRequirement } from "./contracts.ts"
 import { MultiaxisStrategySchema } from "../operations/multiaxis.ts"
+import { ProbeOperationFieldsSchema } from "../probing/schema.ts"
+import { WorkOffsetRefSchema } from "../work-offset.ts"
+
+export { CalibrationArtefactSchema, CharacteristicSchema, DegreesSchema, KernelProbingSchema, ProbeActionSchema, ProbeCycleSchema, ProbeDeviceSchema, ToolSetterSchema } from "../probing/schema.ts"
+export { OffsetEntrySchema, UpdatePolicySchema, WorkOffsetRefSchema, WorkOffsetTableSchema } from "../work-offset.ts"
 
 export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
 
@@ -100,7 +105,9 @@ export const OperationSpecSchema = Schema.Union([
     walls: Schema.optionalKey(Schema.Array(SwarfWallSchema).check(Schema.isMaxLength(64))),
     /** `mode: "swarf"`: a point on each wall to cut (CAD world mm); the kernel reads the rulings from the exact solid. */
     near: Schema.optionalKey(Schema.Array(vec3).check(Schema.isMinLength(1), Schema.isMaxLength(64)))
-  })
+  }),
+  /** A probe cycle (spec 73): `tool` is the probe device id. */
+  Schema.Struct({ ...overrides, strategy: Schema.Literal("probe"), ...ProbeOperationFieldsSchema })
 ])
 
 // The schemas describe exactly the kernel's records: a drift fails the typecheck here, not at runtime.
@@ -161,7 +168,7 @@ export const WorkplaneSchema = Schema.Struct({ normal: vec3, xHint: Schema.optio
 export const JobSetupSchema = Schema.Struct({
   id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))),
   orientation: Schema.optionalKey(SetupOrientationSchema), workplane: Schema.optionalKey(WorkplaneSchema), origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
-  workOffset: Schema.optionalKey(WorkOffsetSchema), stock: Schema.optionalKey(stockBox), stockModel: Schema.optionalKey(StockModelSchema),
+  workOffset: Schema.optionalKey(WorkOffsetSchema), workOffsetRef: Schema.optionalKey(WorkOffsetRefSchema), stock: Schema.optionalKey(stockBox), stockModel: Schema.optionalKey(StockModelSchema),
   fixtures: Schema.optionalKey(Schema.Array(FixtureBodySchema).check(Schema.isMaxLength(64))),
   operations: Schema.optionalKey(Schema.Array(OperationSpecSchema).check(Schema.isMaxLength(2000)))
 })

@@ -439,7 +439,7 @@ export const captureTemplate = (name: string, operations: ReadonlyArray<Operatio
     const f = hit[0]!
     const cutter = cutters.find((c) => c.id === op.tool)
     if (cutter === undefined) { notCaptured.push({ operation: op.id, reason: `tool ${op.tool} is not in the tool table` }); continue }
-    if (op.strategy === "thread" || op.strategy === "engrave" || op.strategy === "surface" || op.strategy === "multiaxis") { notCaptured.push({ operation: op.id, reason: `a ${op.strategy} operation cannot be a recipe` }); continue }
+    if (op.strategy === "thread" || op.strategy === "engrave" || op.strategy === "surface" || op.strategy === "multiaxis" || op.strategy === "probe") { notCaptured.push({ operation: op.id, reason: `a ${op.strategy} operation cannot be a recipe` }); continue }
     const params: Record<string, TemplateValue> = {}
     if (op.stepdown !== undefined) params.stepdown = op.stepdown
     if (op.stepover !== undefined) params.stepover = op.stepover

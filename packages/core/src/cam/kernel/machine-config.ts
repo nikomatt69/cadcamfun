@@ -18,6 +18,7 @@ import type { KernelMachine } from "./contracts.ts"
 import { MACHINE_CATALOGUE } from "./machines.ts"
 import type { PostId } from "../post/types.ts"
 import { configOfProfile, postOfController, profileOfConfig, type MachineConfigFields, type MachineProfile } from "./machine-profile.ts"
+import { kernelProbingOfProfile } from "./machine-probing.ts"
 
 export { postOfController }
 
@@ -105,11 +106,12 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
   const rotary = profile.rotary
   const turning = profile.turning
   const travel = profile.travel
+  const probing = kernelProbingOfProfile(profile)
   const assumptions: string[] = []
   if (profile.workVolume !== undefined) {
     assumptions.push("The work volume is the space the part takes, not the axis travel: the travel check stays off unless the configuration carries one")
   }
-  if (rotary !== undefined && rotary.pivot === undefined) {
+  if (rotary !== undefined && rotary.pivot === undefined && rotary.calibration?.pivotMeasured === undefined) {
     assumptions.push("The rotary table's pivot is not configured: the preview assumes the rotation centre at the work origin")
   }
   if (kind === "mill" && rotary !== undefined && rotary.tilt === undefined && rotary.rotation !== undefined) {
@@ -151,6 +153,7 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
     ...(profile.coolant !== undefined ? { coolant: profile.coolant } : {}),
     ...(profile.accuracy !== undefined ? { accuracy: profile.accuracy } : {}),
     ...(profile.toolChanger?.capacity !== undefined ? { toolCapacity: profile.toolChanger.capacity } : {}),
+    ...(kind === "mill" && probing !== undefined ? { probing } : {}),
     ...(kind === "lathe" && turning !== undefined
       ? {
         turning: {
@@ -169,7 +172,8 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
       ? {
         fiveAxis: {
           layout: rotary.layout,
-          pivot: rotary.pivot ?? { x: 0, y: 0, z: 0 },
+          // A measured pivot (rotary calibration, spec 73 §5.14) is where the table really turns.
+          pivot: rotary.calibration?.pivotMeasured ?? rotary.pivot ?? { x: 0, y: 0, z: 0 },
           tilt: [rotary.tilt.min, rotary.tilt.max] as const,
           ...(rotary.rotation !== undefined ? { rotation: [rotary.rotation.min, rotary.rotation.max] as const } : {})
         }

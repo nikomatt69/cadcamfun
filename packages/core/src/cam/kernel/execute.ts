@@ -66,6 +66,7 @@ import {
   type ManufacturingJob,
   type OperationOutcome,
   type OperationSpec,
+  type CuttingOperationSpec,
   type ReleaseLevel,
   type ResidualStock,
   type StockBox,
@@ -361,6 +362,10 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (ids.has(op.id)) issues.push(issue("InvalidInput", "prepare", `Duplicate operation id '${op.id}'`))
     ids.add(op.id)
     if (op.limits !== undefined && op.strategy === "multiaxis") issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: machining limits are planar regions and the five-axis moves are in machine coordinates (the table has turned), so they are not clipped; limit the surface the operation is given instead`, { operationId: op.id }))
+    if (op.strategy === "probe") {
+      issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: probe operations are not run by this kernel version (spec 73 §5.12 is not built yet): plan and simulate them with cam.probing`, { operationId: op.id }))
+      continue
+    }
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
@@ -375,7 +380,7 @@ const planNotes = (p: PreparedJob): ReadonlyArray<string> => [
   ...(p.plan?.decisions ?? []).map((d) => `${d.rule}: ${d.feature} ${d.outcome}${d.operations.length > 0 ? ` (${d.operations.join(", ")})` : ""}${d.reason !== undefined ? ` - ${d.reason}` : ""}`)
 ]
 
-const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
+const cutOf = (op: CuttingOperationSpec, tool: Cutter): CutClass => {
   switch (op.strategy) {
     case "face": return "face"
     case "adaptive": return "adaptive"
@@ -629,6 +634,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const runOperation = (op: OperationSpec, opIndex: number): void => {
     checkpoint({ stage: "operations", operation: { id: op.id, index: opIndex, count: operations.length } })
+    // prepareJob refuses probe operations; nothing below is for a sensor.
+    if (op.strategy === "probe") return
     const tool = toolOf(op.tool)
     const cut = cutOf(op, tool)
     const legacy = legacyTool(tool, machine.limits.maxRpm)
@@ -954,7 +961,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       outcomes.length = before.outcomes
       const tool = tools.find((t) => t.id === op.tool)
       issues.push(issue("GenerationFailed", "generate", `${op.id}: ${error instanceof Error ? error.message : String(error)}`, { operationId: op.id, severity: "warning" }))
-      outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: op.strategy, toolId: op.tool, cut: tool !== undefined ? cutOf(op, tool) : "rough-side", status: "failed", parameters: {}, overridden: [], warnings: [], startZ: 0, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
+      outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: op.strategy, toolId: op.tool, cut: op.strategy === "probe" ? "probe" : tool !== undefined ? cutOf(op, tool) : "rough-side", status: "failed", parameters: {}, overridden: [], warnings: [], startZ: 0, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
     }
   })
 

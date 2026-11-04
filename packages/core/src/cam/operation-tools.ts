@@ -57,7 +57,7 @@ export const OPERATION_TOOLS: Readonly<Record<string, OperationTools>> = {
 /** Kernel strategies by the generator operation that does the same cut. */
 const STRATEGY_KEY: Readonly<Record<Strategy, string>> = {
   face: "mill/face", adaptive: "mill/pocket", pocket: "mill/pocket", profile: "mill/profile", bore: "mill/contour", drill: "mill/drill",
-  thread: "mill/threading", engrave: "mill/engrave", chamfer: "mill/chamfer", surface: "mill/3d_surface", multiaxis: "mill/multiaxis"
+  thread: "mill/threading", engrave: "mill/engrave", chamfer: "mill/chamfer", surface: "mill/3d_surface", multiaxis: "mill/multiaxis", probe: "mill/probing"
 }
 
 /** The table key of the generator's operation (the variant included). */

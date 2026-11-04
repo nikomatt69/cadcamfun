@@ -17,6 +17,7 @@ import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
 import type { CamIssue, CamResult, FixtureBody, JobSetup, ManufacturingJob, OperationSpec, RegionSpec, StockBox, StockModel } from "./contracts.ts"
+import { translateCycle } from "../probing/transform.ts"
 
 const refuse = (message: string): CamResult<never> => ({ status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message }] })
 
@@ -134,6 +135,10 @@ export const transformOperation = (op: OperationSpec, t: Transform2, options: Tr
     case "surface": {
       const angle = op.angle === undefined ? {} : { angle: t.kind === "rotate" ? op.angle + t.angle : t.kind === "mirror" ? (t.axis === "x" ? 180 - op.angle : -op.angle) : op.angle }
       return { status: "ok", value: { ...keep, ...(op.center !== undefined ? { center: pt(op.center) } : {}), ...angle, ...(op.restFrom !== undefined ? { restFrom: rename(op.restFrom) } : {}) } as OperationSpec }
+    }
+    case "probe": {
+      if (t.kind !== "translate") return refuse(`Operation ${op.id}: a probe cycle carries touch directions and senses, which are not ${mirrored ? "mirrored" : "rotated"} here; plan the cycle in the new place`)
+      return { status: "ok", value: { ...keep, cycle: translateCycle(op.cycle, t.dx, t.dy, dz) } as OperationSpec }
     }
     case "multiaxis": {
       if (t.kind !== "translate") return refuse(`Operation ${op.id}: a five-axis contact carries tool-axis directions and wall normals, which are not ${mirrored ? "mirrored" : "rotated"} here; re-plan it in the new place`)

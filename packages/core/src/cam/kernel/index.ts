@@ -33,6 +33,7 @@ export * from "./template.ts"
 export * from "./machines.ts"
 export * from "./machine-config.ts"
 export * from "./machine-profile.ts"
+export * from "./machine-probing.ts"
 export { planJob, inscribedRadius, type Plan, type PlanInput } from "./planner.ts"
 export { prepareJob, executeJob, runJob, planOnly, KERNEL_ALGORITHM, type PreparedJob, type PrepareOptions, type RunOptions, type KernelProgress } from "./execute.ts"
 export * from "./compat.ts"
@@ -44,6 +45,10 @@ export * from "./linking.ts"
 export * from "./setup-sheet.ts"
 export { SETUP_ORIENTATIONS, setupTransform, type SetupOrientation } from "../setup.ts"
 export { CutterSchema, OperationSpecSchema, PrintRequirementSchema, SetupOrientationSchema } from "./schema.ts"
+export {
+  CalibrationArtefactSchema, CharacteristicSchema, DegreesSchema, KernelProbingSchema, ProbeActionSchema, ProbeCycleSchema, ProbeDeviceSchema, ToolSetterSchema,
+  OffsetEntrySchema, UpdatePolicySchema, WorkOffsetRefSchema, WorkOffsetTableSchema
+} from "./schema.ts"
 export { runPrintJob, planPrintJob, printSettingsOf, PRINT_ALGORITHM } from "./print.ts"
 export { jobOfSnapshot, type KernelSnapshot } from "./snapshot.ts"
 export { headAxis, headFor, headTip, type HeadKinematic, type HeadSolution } from "./head.ts"

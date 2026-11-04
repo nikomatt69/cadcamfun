@@ -12,6 +12,9 @@ import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
 import type { ProcessReport, ProcessRequest } from "./process-report.ts"
 import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
 import type { SwarfWall } from "../operations/swarf.ts"
+import type { WorkOffsetRef } from "../work-offset.ts"
+import type { KernelProbing } from "../probing/device.ts"
+import type { ProbeOperationFields, ProbeOperationSummary } from "../probing/types.ts"
 
 export const KERNEL_SCHEMA_VERSION = 1
 
@@ -100,6 +103,8 @@ export interface JobSetup {
   readonly workplane?: Workplane
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
+  /** The offset the setup runs in when it is not one of G54..G59 (G54.1 P3, G505, G59.1); wins over `workOffset` (spec 73). */
+  readonly workOffsetRef?: WorkOffsetRef
   readonly stock?: StockBox
   readonly stockModel?: StockModel
   readonly fixtures?: ReadonlyArray<FixtureBody>
@@ -202,6 +207,8 @@ export interface KernelMachine {
     readonly yTravel?: number
     readonly turret?: "rear" | "front"
   }
+  /** The spindle probes, tool setter and what the control offers for probing (spec 73); absent: the machine cannot probe. */
+  readonly probing?: KernelProbing
 }
 
 /** Process overrides an operation may carry; anything absent comes from the cutting data. */
@@ -302,6 +309,17 @@ export type OperationSpec =
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
    */
   | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"; readonly axisPoint?: Vec3; readonly axisLine?: { readonly a: Vec3; readonly b: Vec3 }; readonly axisCurve?: ReadonlyArray<Vec3>; readonly maxTilt?: number; readonly holderDiameter?: number; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
+
+  /**
+   * A probe cycle (spec 73): the spindle stays off, nothing is cut. `tool` is the probe device id (`KernelMachine.probing.probes`);
+   * the cycle is in the setup's coordinates like every other operation.
+   */
+  | (OperationBase & { readonly strategy: "probe" } & ProbeOperationFields)
+
+/** The probe member of `OperationSpec`. */
+export type ProbeOperationSpec = Extract<OperationSpec, { readonly strategy: "probe" }>
+/** Every operation that cuts. */
+export type CuttingOperationSpec = Exclude<OperationSpec, { readonly strategy: "probe" }>
 
 export type Strategy = OperationSpec["strategy"]
 
@@ -416,6 +434,8 @@ export interface ManufacturingJob {
   readonly workplane?: Workplane
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
+  /** The offset the job runs in when it is not one of G54..G59; wins over `workOffset` (spec 73). */
+  readonly workOffsetRef?: WorkOffsetRef
   /**
    * Several fixings of the same part (spec 69 C1), each with its own orientation, work offset, stock, fixtures and operations. Run them with
    * `runSetups` (`kernel/setups.ts`): `runJob` refuses a job that lists setups, because one NC cannot hold several fixings. The job's own
@@ -475,7 +495,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage" | "tolerance"
+  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage" | "tolerance" | "probing"
   readonly status: ClaimStatus
   readonly detail: string
 }
@@ -487,7 +507,7 @@ export interface OperationOutcome {
   readonly name: string
   readonly strategy: Strategy | "print"
   readonly toolId: string
-  readonly cut: CutClass | "print"
+  readonly cut: CutClass | "print" | "probe"
   readonly status: "ok" | "failed"
   readonly cutting?: CuttingData
   /** The parameters handed to the strategy, after cutting data and overrides. */
@@ -501,6 +521,8 @@ export interface OperationOutcome {
   readonly timeSeconds: number
   /** Volume removed by this operation in the final replay of the emitted NC, mm³. */
   readonly removedVolume: number
+  /** A probe operation: what it touches and where its results go. */
+  readonly probe?: ProbeOperationSummary
 }
 
 export interface StockSummary {
@@ -618,6 +640,11 @@ export interface CamArtifact {
   readonly tipError?: { readonly max: number; readonly mean: number; readonly samples: number; readonly limit: number; readonly line?: number }
   /** Present when the machine is a printer: what was printed and how it was measured. */
   readonly print?: PrintReport
+  /**
+   * Present when the job has probe operations (spec 73): their ids and whether the replay of the emitted NC text gives the same
+   * contacts and results as the IR run (`agrees`), not (`differs`), or could not be replayed (`not-replayed`, native cycles).
+   */
+  readonly probing?: { readonly operations: ReadonlyArray<string>; readonly textReplay: "agrees" | "differs" | "not-replayed" }
 }
 
 export type CamResult<T> =

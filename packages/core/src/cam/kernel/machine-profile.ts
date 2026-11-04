@@ -15,6 +15,10 @@ import { Schema } from "effect"
 import { CoolantSchema, WorkOffsetSchema, type Coolant, type WorkOffset } from "../ir.ts"
 import type { PostId } from "../post/types.ts"
 import type { Rigidity } from "./cutting-data.ts"
+import {
+  MachineProbingSchema, MachineRotaryCalibrationSchema, MachineToolSetterSchema, MachineWorkOffsetTableSchema, probingOfConfig, rotaryCalibrationOfConfig,
+  toolSetterOfConfig, workOffsetTableOfConfig, type MachineProbing, type MachineRotaryCalibration, type MachineToolSetter, type MachineWorkOffsetTable
+} from "./machine-probing.ts"
 
 /** The post ids the kernel can write; the controller's name picks one when the profile does not name it. */
 export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"] as const
@@ -122,6 +126,8 @@ export interface MachineRotary {
   readonly pivot?: { readonly x: number; readonly y: number; readonly z: number }
   /** `control`: the control applies the tool centre point; `program`: the program is in machine coordinates. */
   readonly tcp?: "control" | "program"
+  /** What the last rotary calibration measured (spec 73 §5.14); `pivotMeasured` replaces `pivot` for the kernel. */
+  readonly calibration?: MachineRotaryCalibration
 }
 
 /** What a turning centre holds and turns. */
@@ -151,17 +157,7 @@ export interface MachineWorkOffsets {
   readonly default?: WorkOffset
 }
 
-/** The touch probe: what it can measure and how. */
-export interface MachineProbing {
-  /** The cycles the control offers (surface, edge, corner, bore, boss, tool length). */
-  readonly cycles?: readonly string[]
-  /** The radius of the stylus, mm. */
-  readonly stylusRadius?: number
-  /** The feed the probe moves at, mm/min. */
-  readonly feed?: number
-  /** The dialect the probe reports in: linuxcnc/grbl style G38.2, or Fanuc style G31. */
-  readonly dialect?: "linuxcnc" | "fanuc"
-}
+export type { MachineProbing, MachineToolSetter, MachineWorkOffsetTable, MachineRotaryCalibration, OffsetEntryConfig } from "./machine-probing.ts"
 
 /** The tool changer: what it holds and how long a change takes. */
 export interface MachineToolChanger {
@@ -259,6 +255,10 @@ export interface MachineProfile {
   readonly turning?: MachineTurning
   readonly workOffsets?: MachineWorkOffsets
   readonly probing?: MachineProbing
+  /** The tool setter on the table (spec 73). */
+  readonly toolSetter?: MachineToolSetter
+  /** The work offsets the machine holds, per machine and per setup (spec 73 §1). */
+  readonly workOffsetTable?: MachineWorkOffsetTable
   readonly toolChanger?: MachineToolChanger
   readonly coolant?: MachineCoolant
   readonly accuracy?: MachineAccuracy
@@ -311,7 +311,8 @@ export const MachineProfileSchema = Schema.Struct({
     tilt: Schema.optionalKey(range),
     rotation: Schema.optionalKey(range),
     pivot: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
-    tcp: Schema.optionalKey(Schema.Literals(["control", "program"]))
+    tcp: Schema.optionalKey(Schema.Literals(["control", "program"])),
+    calibration: Schema.optionalKey(MachineRotaryCalibrationSchema)
   })),
   turning: Schema.optionalKey(Schema.Struct({
     maxBarDiameter: Schema.optionalKey(nonNegative),
@@ -327,12 +328,9 @@ export const MachineProfileSchema = Schema.Struct({
     available: Schema.Array(WorkOffsetSchema),
     default: Schema.optionalKey(WorkOffsetSchema)
   })),
-  probing: Schema.optionalKey(Schema.Struct({
-    cycles: Schema.optionalKey(Schema.Array(Schema.String)),
-    stylusRadius: Schema.optionalKey(positive),
-    feed: Schema.optionalKey(positive),
-    dialect: Schema.optionalKey(Schema.Literals(["linuxcnc", "fanuc"]))
-  })),
+  probing: Schema.optionalKey(MachineProbingSchema),
+  toolSetter: Schema.optionalKey(MachineToolSetterSchema),
+  workOffsetTable: Schema.optionalKey(MachineWorkOffsetTableSchema),
   toolChanger: Schema.optionalKey(Schema.Struct({
     type: Schema.optionalKey(Schema.Literals(["manual", "carousel", "chain", "umbrella", "rack"])),
     capacity: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
@@ -483,7 +481,9 @@ const rotaryOf = (config: Record<string, unknown>): MachineRotary | undefined =>
   const rotation = rangeOf(source["rotation"])
   const pivot = pointOf(source["pivot"])
   const tcp = source["tcp"] === "program" ? "program" : source["tcp"] === "control" ? "control" : undefined
+  const calibration = rotaryCalibrationOfConfig(source["calibration"])
   return {
+    ...(calibration !== undefined ? { calibration } : {}),
     layout,
     ...(tilt !== undefined ? { tilt } : {}),
     ...(rotation !== undefined ? { rotation } : {}),
@@ -519,20 +519,7 @@ const turningOf = (config: Record<string, unknown>, extra: Record<string, unknow
   }
 }
 
-const probingOf = (config: Record<string, unknown>): MachineProbing | undefined => {
-  const source = record(config["probing"])
-  if (Object.keys(source).length === 0) return undefined
-  const cycles = stringsOf(source["cycles"])
-  const stylusRadius = numberOf(source["stylusRadius"])
-  const feed = numberOf(source["feed"])
-  const dialect = source["dialect"] === "fanuc" ? "fanuc" : source["dialect"] === "linuxcnc" ? "linuxcnc" : undefined
-  return {
-    ...(cycles !== undefined && cycles.length > 0 ? { cycles } : {}),
-    ...(stylusRadius !== undefined ? { stylusRadius } : {}),
-    ...(feed !== undefined ? { feed } : {}),
-    ...(dialect !== undefined ? { dialect } : {})
-  }
-}
+const probingOf = (config: Record<string, unknown>): MachineProbing | undefined => probingOfConfig(config["probing"])
 
 const toolChangerOf = (config: Record<string, unknown>, extra: Record<string, unknown>): MachineToolChanger | undefined => {
   const source = record(config["toolChanger"])
@@ -692,6 +679,8 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
   const turning = turningOf(source, extra)
   const workOffsets = workOffsetsOf(source)
   const probing = probingOf(source)
+  const toolSetter = toolSetterOfConfig(source["toolSetter"])
+  const workOffsetTable = workOffsetTableOfConfig(source["workOffsetTable"])
   const toolChanger = toolChangerOf(source, extra)
   const coolant = coolantOf(source)
   const accuracy = accuracyOf(source)
@@ -719,6 +708,8 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
     ...(turning !== undefined ? { turning } : {}),
     ...(workOffsets !== undefined ? { workOffsets } : {}),
     ...(probing !== undefined ? { probing } : {}),
+    ...(toolSetter !== undefined ? { toolSetter } : {}),
+    ...(workOffsetTable !== undefined ? { workOffsetTable } : {}),
     ...(toolChanger !== undefined ? { toolChanger } : {}),
     ...(coolant !== undefined ? { coolant } : {}),
     ...(accuracy !== undefined ? { accuracy } : {}),
@@ -746,6 +737,8 @@ export const configOfProfile = (profile: MachineProfile): MachineConfigFields =>
     ...(profile.turning !== undefined ? { turning: profile.turning } : {}),
     ...(profile.workOffsets !== undefined ? { workOffsets: profile.workOffsets } : {}),
     ...(profile.probing !== undefined ? { probing: profile.probing } : {}),
+    ...(profile.toolSetter !== undefined ? { toolSetter: profile.toolSetter } : {}),
+    ...(profile.workOffsetTable !== undefined ? { workOffsetTable: profile.workOffsetTable } : {}),
     ...(profile.toolChanger !== undefined ? { toolChanger: profile.toolChanger } : {}),
     ...(profile.coolant !== undefined ? { coolant: profile.coolant } : {}),
     ...(profile.accuracy !== undefined ? { accuracy: profile.accuracy } : {}),
