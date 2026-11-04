@@ -3,7 +3,7 @@
  * magnitude, so a count alone would let a few huge programs fill the memory. Recency is the Map's insertion order: a read
  * deletes and re-inserts. An entry larger than the whole byte budget is not stored.
  */
-export interface BoundedCacheOptions<K, V> {
+export interface BoundedCacheOptions<K, V> { 
   readonly maxEntries: number
   readonly maxBytes: number
   readonly sizeOf: (value: V) => number
