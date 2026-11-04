@@ -3,6 +3,28 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.86 (November 2026)
+
+## Core
+
+- Annotations attach to model entities by persistent reference (spec 49, spec 41 N6, P4-2)
+- Sketch fillet, mirror, pattern, offset and project-edges tools (spec 45 K3/K1, P2-10)
+- Incremental mesh rebuild resumes from the first dirty feature (spec 58 T4, P1-6)
+
+## Desktop
+
+- Show tool-result evidence and an answer's weakest release in the assistant
+- Save and load multi-operation setups with tool table and conflict UI
+
+## Sidecar
+
+- Process physics and tolerance gate over HTTP, cancellation proven end to end
+- Kernel reachability gate and routes for sheet, plan, multi-setup job and lathe
+
+## Web
+
+- Remove inline styles and import external CSS for better maintainability
+
 ## v0.1.85 (November 2026)
 
 ## Core
