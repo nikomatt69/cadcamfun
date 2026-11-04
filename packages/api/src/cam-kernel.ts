@@ -115,6 +115,16 @@ export const CamKernelResult: Schema.Codec<cam.kernel.CamResult<cam.kernel.CamAr
 ])
 export type CamKernelResult = typeof CamKernelResult.Type
 
+/**
+ * What the kernel would run for a request, without running it (`cam.kernel.planOnly`): the planned operations in machining order (each an
+ * `OperationSpec` record, to edit and send back as `operations`), the planner's notes and what it cannot machine in this setup.
+ */
+export const CamKernelPlanResult = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("ok"), value: Schema.Struct({ operations: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)), notes: strings, unmachined: strings }) }),
+  Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })
+])
+export type CamKernelPlanResult = typeof CamKernelPlanResult.Type
+
 const xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
 
 /** The setup sheet of a stored program (`cam.kernel.setupSheetData`): everything on it comes from the program's own artifact. */

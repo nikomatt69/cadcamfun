@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
+import { ParametricDrawingOptions } from "./ai-parametric.ts"
 
 const vec3 = cad.Vec3Schema
 const num = Schema.Finite
@@ -321,3 +322,37 @@ export const CadImportStepReport = Schema.Struct({
   warnings: Schema.Array(Schema.String)
 })
 export type CadImportStepReport = typeof CadImportStepReport.Type
+
+/**
+ * A production drawing sheet of a parametric part (`drawing.generateSheet`): the principal views from the exact B-rep edges, the
+ * dimensions, section and detail views, GD&T and the title block. The part is the history in the body, or a parametric element of a
+ * stored drawing the caller can open (then the drawing's title block fills the sheet and `options` win over it). Nothing is stored.
+ */
+export const CadSheetRequest = Schema.Struct({
+  /** The history as the editor stores it (decoded against `ParametricHistory`; a refused field is a 400). */
+  history: Schema.optionalKey(Schema.Json),
+  /** A stored drawing and the id of its parametric element: send both, instead of `history`. */
+  drawingId: Schema.optionalKey(id),
+  elementId: Schema.optionalKey(id),
+  options: Schema.optionalKey(ParametricDrawingOptions)
+})
+export type CadSheetRequest = typeof CadSheetRequest.Type
+
+const bounds2 = Schema.Struct({ minX: num, minY: num, maxX: num, maxY: num })
+export const CadSheetReport = Schema.Struct({
+  svg: Schema.String,
+  size: Schema.Struct({ width: num, height: num }),
+  scale: num,
+  views: Schema.Array(Schema.Struct({ name: Schema.String, label: Schema.String, scale: num, kind: Schema.Literals(["principal", "iso", "section", "detail"]), bounds: bounds2 })),
+  dimensions: Schema.Array(Schema.Struct({ view: Schema.String, kind: Schema.Literals(["linear", "radius", "diameter", "angular", "callout"]), text: Schema.String, value: Schema.optionalKey(num) })),
+  /** Hole and thread callouts, each as its lines joined by ` / `. */
+  callouts: Schema.Array(Schema.String),
+  /** Present when the sheet has a section view. */
+  section: Schema.optionalKey(Schema.Struct({ loops: int, hatchLines: int })),
+  warnings: Schema.Array(Schema.String),
+  /** Where the view edges came from: the exact B-rep (true curves) or the mesh's dihedral angles. */
+  edgeSource: Schema.Literals(["exact", "mesh"]),
+  /** The sheet as drawing entities (`drawing.Drawing`), for a PDF or DXF the client writes. */
+  drawing: Schema.Unknown
+})
+export type CadSheetReport = typeof CadSheetReport.Type

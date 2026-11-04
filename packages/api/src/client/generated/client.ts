@@ -3277,17 +3277,128 @@ const Endpoint29_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint29_1Request = Parameters<RawClient["toolpathGenerator"]["generate"]>[0]
+type Endpoint29_1Request = Parameters<RawClient["toolpathGenerator"]["plan"]>[0]
 type Endpoint29_1Input = {
-  readonly settings: Endpoint29_1Request["payload"]["settings"]
-  readonly geometry: Endpoint29_1Request["payload"]["geometry"]
-  readonly printer: Endpoint29_1Request["payload"]["printer"]
+  readonly setupOrientation?: Endpoint29_1Request["payload"]["setupOrientation"]
+  readonly material: Endpoint29_1Request["payload"]["material"]
   readonly machine?: Endpoint29_1Request["payload"]["machine"]
-  readonly stamp?: Endpoint29_1Request["payload"]["stamp"]
-  readonly evidence?: Endpoint29_1Request["payload"]["evidence"]
+  readonly machineConfig?: Endpoint29_1Request["payload"]["machineConfig"]
+  readonly origin?: Endpoint29_1Request["payload"]["origin"]
+  readonly finishAllowance?: Endpoint29_1Request["payload"]["finishAllowance"]
+  readonly scallop?: Endpoint29_1Request["payload"]["scallop"]
+  readonly schemaVersion: Endpoint29_1Request["payload"]["schemaVersion"]
+  readonly id: Endpoint29_1Request["payload"]["id"]
+  readonly name: Endpoint29_1Request["payload"]["name"]
+  readonly elements: Endpoint29_1Request["payload"]["elements"]
+  readonly stock?: Endpoint29_1Request["payload"]["stock"]
+  readonly tolerance?: Endpoint29_1Request["payload"]["tolerance"]
+  readonly resolution?: Endpoint29_1Request["payload"]["resolution"]
+  readonly workOffset?: Endpoint29_1Request["payload"]["workOffset"]
+  readonly operations?: Endpoint29_1Request["payload"]["operations"]
+  readonly tools?: Endpoint29_1Request["payload"]["tools"]
+  readonly deburr?: Endpoint29_1Request["payload"]["deburr"]
+  readonly tabs?: Endpoint29_1Request["payload"]["tabs"]
+  readonly breadth?: Endpoint29_1Request["payload"]["breadth"]
+  readonly subprograms?: Endpoint29_1Request["payload"]["subprograms"]
+  readonly nativeCycles?: Endpoint29_1Request["payload"]["nativeCycles"]
+  readonly tcp?: Endpoint29_1Request["payload"]["tcp"]
+  readonly smoothing?: Endpoint29_1Request["payload"]["smoothing"]
+  readonly postDefinition?: Endpoint29_1Request["payload"]["postDefinition"]
+  readonly print?: Endpoint29_1Request["payload"]["print"]
   readonly progress?: Endpoint29_1Request["payload"]["progress"]
 }
 const Endpoint29_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_1Input) =>
+  raw["plan"]({
+    payload: {
+      setupOrientation: input["setupOrientation"],
+      material: input["material"],
+      machine: input["machine"],
+      machineConfig: input["machineConfig"],
+      origin: input["origin"],
+      finishAllowance: input["finishAllowance"],
+      scallop: input["scallop"],
+      schemaVersion: input["schemaVersion"],
+      id: input["id"],
+      name: input["name"],
+      elements: input["elements"],
+      stock: input["stock"],
+      tolerance: input["tolerance"],
+      resolution: input["resolution"],
+      workOffset: input["workOffset"],
+      operations: input["operations"],
+      tools: input["tools"],
+      deburr: input["deburr"],
+      tabs: input["tabs"],
+      breadth: input["breadth"],
+      subprograms: input["subprograms"],
+      nativeCycles: input["nativeCycles"],
+      tcp: input["tcp"],
+      smoothing: input["smoothing"],
+      postDefinition: input["postDefinition"],
+      print: input["print"],
+      progress: input["progress"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint29_2Request = Parameters<RawClient["toolpathGenerator"]["job"]>[0]
+type Endpoint29_2Input = {
+  readonly op: Endpoint29_2Request["payload"]["op"]
+  readonly material: Endpoint29_2Request["payload"]["material"]
+  readonly machine?: Endpoint29_2Request["payload"]["machine"]
+  readonly part: Endpoint29_2Request["payload"]["part"]
+  readonly tools?: Endpoint29_2Request["payload"]["tools"]
+  readonly quality?: Endpoint29_2Request["payload"]["quality"]
+  readonly setups: Endpoint29_2Request["payload"]["setups"]
+  readonly nc?: Endpoint29_2Request["payload"]["nc"]
+}
+const Endpoint29_2 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_2Input) =>
+  raw["job"]({
+    payload: {
+      op: input["op"],
+      material: input["material"],
+      machine: input["machine"],
+      part: input["part"],
+      tools: input["tools"],
+      quality: input["quality"],
+      setups: input["setups"],
+      nc: input["nc"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint29_3Request = Parameters<RawClient["toolpathGenerator"]["lathe"]>[0]
+type Endpoint29_3Input = {
+  readonly stock: Endpoint29_3Request["payload"]["stock"]
+  readonly contour?: Endpoint29_3Request["payload"]["contour"]
+  readonly bore?: Endpoint29_3Request["payload"]["bore"]
+  readonly tools: Endpoint29_3Request["payload"]["tools"]
+  readonly operations: Endpoint29_3Request["payload"]["operations"]
+  readonly material?: Endpoint29_3Request["payload"]["material"]
+  readonly post?: Endpoint29_3Request["payload"]["post"]
+}
+const Endpoint29_3 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_3Input) =>
+  raw["lathe"]({
+    payload: {
+      stock: input["stock"],
+      contour: input["contour"],
+      bore: input["bore"],
+      tools: input["tools"],
+      operations: input["operations"],
+      material: input["material"],
+      post: input["post"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint29_4Request = Parameters<RawClient["toolpathGenerator"]["generate"]>[0]
+type Endpoint29_4Input = {
+  readonly settings: Endpoint29_4Request["payload"]["settings"]
+  readonly geometry: Endpoint29_4Request["payload"]["geometry"]
+  readonly printer: Endpoint29_4Request["payload"]["printer"]
+  readonly machine?: Endpoint29_4Request["payload"]["machine"]
+  readonly stamp?: Endpoint29_4Request["payload"]["stamp"]
+  readonly evidence?: Endpoint29_4Request["payload"]["evidence"]
+  readonly progress?: Endpoint29_4Request["payload"]["progress"]
+}
+const Endpoint29_4 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_4Input) =>
   raw["generate"]({
     payload: {
       settings: input["settings"],
@@ -3300,37 +3411,37 @@ const Endpoint29_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint29_2Request = Parameters<RawClient["toolpathGenerator"]["suggest"]>[0]
-type Endpoint29_2Input = {
-  readonly settings: Endpoint29_2Request["payload"]["settings"]
-  readonly geometry: Endpoint29_2Request["payload"]["geometry"]
+type Endpoint29_5Request = Parameters<RawClient["toolpathGenerator"]["suggest"]>[0]
+type Endpoint29_5Input = {
+  readonly settings: Endpoint29_5Request["payload"]["settings"]
+  readonly geometry: Endpoint29_5Request["payload"]["geometry"]
 }
-const Endpoint29_2 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_2Input) =>
+const Endpoint29_5 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_5Input) =>
   raw["suggest"]({ payload: { settings: input["settings"], geometry: input["geometry"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint29_3Request = Parameters<RawClient["toolpathGenerator"]["parse"]>[0]
-type Endpoint29_3Input = {
-  readonly gcode: Endpoint29_3Request["payload"]["gcode"]
-  readonly name: Endpoint29_3Request["payload"]["name"]
+type Endpoint29_6Request = Parameters<RawClient["toolpathGenerator"]["parse"]>[0]
+type Endpoint29_6Input = {
+  readonly gcode: Endpoint29_6Request["payload"]["gcode"]
+  readonly name: Endpoint29_6Request["payload"]["name"]
 }
-const Endpoint29_3 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_3Input) =>
+const Endpoint29_6 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_6Input) =>
   raw["parse"]({ payload: { gcode: input["gcode"], name: input["name"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint29_4Request = Parameters<RawClient["toolpathGenerator"]["verify"]>[0]
-type Endpoint29_4Input = {
-  readonly gcode?: Endpoint29_4Request["payload"]["gcode"]
-  readonly program?: Endpoint29_4Request["payload"]["program"]
-  readonly stock: Endpoint29_4Request["payload"]["stock"]
-  readonly tool: Endpoint29_4Request["payload"]["tool"]
-  readonly fixtures: Endpoint29_4Request["payload"]["fixtures"]
-  readonly target?: Endpoint29_4Request["payload"]["target"]
-  readonly resolution?: Endpoint29_4Request["payload"]["resolution"]
-  readonly tolerance: Endpoint29_4Request["payload"]["tolerance"]
-  readonly start?: Endpoint29_4Request["payload"]["start"]
+type Endpoint29_7Request = Parameters<RawClient["toolpathGenerator"]["verify"]>[0]
+type Endpoint29_7Input = {
+  readonly gcode?: Endpoint29_7Request["payload"]["gcode"]
+  readonly program?: Endpoint29_7Request["payload"]["program"]
+  readonly stock: Endpoint29_7Request["payload"]["stock"]
+  readonly tool: Endpoint29_7Request["payload"]["tool"]
+  readonly fixtures: Endpoint29_7Request["payload"]["fixtures"]
+  readonly target?: Endpoint29_7Request["payload"]["target"]
+  readonly resolution?: Endpoint29_7Request["payload"]["resolution"]
+  readonly tolerance: Endpoint29_7Request["payload"]["tolerance"]
+  readonly start?: Endpoint29_7Request["payload"]["start"]
 }
-const Endpoint29_4 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_4Input) =>
+const Endpoint29_7 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_7Input) =>
   raw["verify"]({
     payload: {
       gcode: input["gcode"],
@@ -3345,21 +3456,21 @@ const Endpoint29_4 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint29_5Request = Parameters<RawClient["toolpathGenerator"]["verifyNc"]>[0]
-type Endpoint29_5Input = {
-  readonly nc: Endpoint29_5Request["payload"]["nc"]
-  readonly part: Endpoint29_5Request["payload"]["part"]
-  readonly stock: Endpoint29_5Request["payload"]["stock"]
-  readonly tools: Endpoint29_5Request["payload"]["tools"]
-  readonly tolerance?: Endpoint29_5Request["payload"]["tolerance"]
-  readonly allowance?: Endpoint29_5Request["payload"]["allowance"]
-  readonly cell?: Endpoint29_5Request["payload"]["cell"]
-  readonly machine?: Endpoint29_5Request["payload"]["machine"]
-  readonly dwell?: Endpoint29_5Request["payload"]["dwell"]
-  readonly okuma?: Endpoint29_5Request["payload"]["okuma"]
-  readonly start?: Endpoint29_5Request["payload"]["start"]
+type Endpoint29_8Request = Parameters<RawClient["toolpathGenerator"]["verifyNc"]>[0]
+type Endpoint29_8Input = {
+  readonly nc: Endpoint29_8Request["payload"]["nc"]
+  readonly part: Endpoint29_8Request["payload"]["part"]
+  readonly stock: Endpoint29_8Request["payload"]["stock"]
+  readonly tools: Endpoint29_8Request["payload"]["tools"]
+  readonly tolerance?: Endpoint29_8Request["payload"]["tolerance"]
+  readonly allowance?: Endpoint29_8Request["payload"]["allowance"]
+  readonly cell?: Endpoint29_8Request["payload"]["cell"]
+  readonly machine?: Endpoint29_8Request["payload"]["machine"]
+  readonly dwell?: Endpoint29_8Request["payload"]["dwell"]
+  readonly okuma?: Endpoint29_8Request["payload"]["okuma"]
+  readonly start?: Endpoint29_8Request["payload"]["start"]
 }
-const Endpoint29_5 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_5Input) =>
+const Endpoint29_8 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_8Input) =>
   raw["verifyNc"]({
     payload: {
       nc: input["nc"],
@@ -3378,11 +3489,14 @@ const Endpoint29_5 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
 
 const adaptGroup29 = (raw: RawClient["toolpathGenerator"]) => ({
   manufacture: Endpoint29_0(raw),
-  generate: Endpoint29_1(raw),
-  suggest: Endpoint29_2(raw),
-  parse: Endpoint29_3(raw),
-  verify: Endpoint29_4(raw),
-  verifyNc: Endpoint29_5(raw),
+  plan: Endpoint29_1(raw),
+  job: Endpoint29_2(raw),
+  lathe: Endpoint29_3(raw),
+  generate: Endpoint29_4(raw),
+  suggest: Endpoint29_5(raw),
+  parse: Endpoint29_6(raw),
+  verify: Endpoint29_7(raw),
+  verifyNc: Endpoint29_8(raw),
 })
 
 type Endpoint30_0Request = Parameters<RawClient["cadExact"]["analyze"]>[0]
@@ -3526,6 +3640,23 @@ const Endpoint30_6 = (raw: RawClient["cadExact"]) => (input: Endpoint30_6Input) 
     },
   }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint30_7Request = Parameters<RawClient["cadExact"]["sheet"]>[0]
+type Endpoint30_7Input = {
+  readonly history?: Endpoint30_7Request["payload"]["history"]
+  readonly drawingId?: Endpoint30_7Request["payload"]["drawingId"]
+  readonly elementId?: Endpoint30_7Request["payload"]["elementId"]
+  readonly options?: Endpoint30_7Request["payload"]["options"]
+}
+const Endpoint30_7 = (raw: RawClient["cadExact"]) => (input?: Endpoint30_7Input) =>
+  raw["sheet"]({
+    payload: {
+      history: input?.["history"],
+      drawingId: input?.["drawingId"],
+      elementId: input?.["elementId"],
+      options: input?.["options"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup30 = (raw: RawClient["cadExact"]) => ({
   analyze: Endpoint30_0(raw),
   step: Endpoint30_1(raw),
@@ -3534,6 +3665,7 @@ const adaptGroup30 = (raw: RawClient["cadExact"]) => ({
   hole: Endpoint30_4(raw),
   rebuild: Endpoint30_5(raw),
   importStep: Endpoint30_6(raw),
+  sheet: Endpoint30_7(raw),
 })
 
 type Endpoint31_0Request = Parameters<RawClient["camSetup"]["plan"]>[0]
