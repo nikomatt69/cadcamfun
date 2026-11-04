@@ -4,7 +4,7 @@
  * the machine's; the stylus is the ball at the tip of the probe.
  */
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
-import { boxSurface, cylinderWallSurface, discSurface, faceSurface, meshSurface, planeSurface, sphereSurface, sweepSphere, unionSurface, type Surface } from "./sphere-cast.ts"
+import { boxSurface, cylinderWallSurface, discSurface, faceSurface, meshSurface, planeSurface, rectangleSurface, sphereSurface, sweepSphere, unionSurface, type Surface } from "./sphere-cast.ts"
 
 /** How the part sits: rotated about the vertical through the origin by `rotate` (radians), then shifted by `translate`. */
 export interface Placement {
@@ -103,6 +103,26 @@ const faceSide = (min: Vec3, max: Vec3): Surface => {
       return best
     }
   }
+}
+
+/**
+ * A block `min..max` with a rectangular pocket `pocket.min..pocket.max` (XY) cut `pocket.depth` into its top: the top face around the
+ * opening, the four walls and the floor.
+ */
+export const pocketWorld = (min: Vec3, max: Vec3, pocket: { readonly min: Vec2; readonly max: Vec2; readonly depth: number }, placement?: Placement): ProbeWorld3 => {
+  const z = max.z, f = max.z - pocket.depth
+  const a = pocket.min, b = pocket.max
+  const s: Surface[] = [
+    faceSurface({ x: min.x, y: min.y }, { x: max.x, y: a.y }, z), faceSurface({ x: min.x, y: b.y }, { x: max.x, y: max.y }, z),
+    faceSurface({ x: min.x, y: a.y }, { x: a.x, y: b.y }, z), faceSurface({ x: b.x, y: a.y }, { x: max.x, y: b.y }, z),
+    faceSurface(a, b, f),
+    rectangleSurface({ x: a.x, y: a.y, z: f }, { x: b.x - a.x, y: 0, z: 0 }, { x: 0, y: 0, z: pocket.depth }),
+    rectangleSurface({ x: a.x, y: b.y, z: f }, { x: b.x - a.x, y: 0, z: 0 }, { x: 0, y: 0, z: pocket.depth }),
+    rectangleSurface({ x: a.x, y: a.y, z: f }, { x: 0, y: b.y - a.y, z: 0 }, { x: 0, y: 0, z: pocket.depth }),
+    rectangleSurface({ x: b.x, y: a.y, z: f }, { x: 0, y: b.y - a.y, z: 0 }, { x: 0, y: 0, z: pocket.depth }),
+    faceSide(min, max)
+  ]
+  return surfaceWorld(unionSurface(s), placement)
 }
 
 export const sphereWorld = (centre: Vec3, radius: number, placement?: Placement): ProbeWorld3 => surfaceWorld(sphereSurface(centre, radius), placement)

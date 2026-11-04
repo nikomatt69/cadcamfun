@@ -30,8 +30,6 @@ export interface SweepHit {
 
 const CONTACT_EPS = 1e-12
 const MAX_STEPS = 100_000
-/** Distance over which a ball leaving the surface it starts on is not taken as touching it. */
-const LEAVE = 1e-5
 
 const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
 const len = (a: Vec3): number => Math.hypot(a.x, a.y, a.z)
@@ -53,8 +51,8 @@ export const sweepSphere = (surface: Surface, from: Vec3, to: Vec3, radius: numb
       const n = sub(c, q.point)
       const nl = len(n)
       const normal = nl > 0 ? { x: n.x / nl, y: n.y / nl, z: n.z / nl } : { x: -d.x, y: -d.y, z: -d.z }
-      // A ball that starts in contact and moves away from the surface leaves it (a retract from a touch): not a contact.
-      if (t <= LEAVE && normal.x * d.x + normal.y * d.y + normal.z * d.z > 1e-9) { t = Math.min(L, t + 1e-7); if (t >= L) return undefined; continue }
+      // A ball in contact that moves away from the surface is leaving it (a retract from a touch): not a contact.
+      if (normal.x * d.x + normal.y * d.y + normal.z * d.z > 1e-9) { if (t >= L) return undefined; t = Math.min(L, t + Math.max(Math.abs(gap), 1e-9)); continue }
       return { t, centre: c, point: q.point, normal }
     }
     if (t >= L) return undefined
@@ -255,6 +253,22 @@ export const meshSurface = (meshes: ReadonlyArray<{ readonly positions: ArrayLik
       }
       visit(root)
       return best
+    }
+  }
+}
+
+/** A rectangle in any orientation: `corner` and two perpendicular edges `u`, `v` (a wall, a floor, a datum face). */
+export const rectangleSurface = (corner: Vec3, u: Vec3, v: Vec3): Surface => {
+  const uu = u.x * u.x + u.y * u.y + u.z * u.z, vv = v.x * v.x + v.y * v.y + v.z * v.z
+  if (!(uu > 0 && vv > 0) || Math.abs(u.x * v.x + u.y * v.y + u.z * v.z) > 1e-9 * Math.sqrt(uu * vv)) throw new RangeError("a rectangle needs two perpendicular edges")
+  const pts = [corner, { x: corner.x + u.x, y: corner.y + u.y, z: corner.z + u.z }, { x: corner.x + v.x, y: corner.y + v.y, z: corner.z + v.z }, { x: corner.x + u.x + v.x, y: corner.y + u.y + v.y, z: corner.z + u.z + v.z }]
+  return {
+    bounds: { min: { x: Math.min(...pts.map((p) => p.x)), y: Math.min(...pts.map((p) => p.y)), z: Math.min(...pts.map((p) => p.z)) }, max: { x: Math.max(...pts.map((p) => p.x)), y: Math.max(...pts.map((p) => p.y)), z: Math.max(...pts.map((p) => p.z)) } },
+    nearest: (p) => {
+      const d = sub(p, corner)
+      const s = Math.max(0, Math.min(1, (d.x * u.x + d.y * u.y + d.z * u.z) / uu))
+      const t = Math.max(0, Math.min(1, (d.x * v.x + d.y * v.y + d.z * v.z) / vv))
+      return nearest(p, { x: corner.x + u.x * s + v.x * t, y: corner.y + u.y * s + v.y * t, z: corner.z + u.z * s + v.z * t })
     }
   }
 }

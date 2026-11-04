@@ -3,8 +3,7 @@ import type { Vec3 } from "../../cad/vec.ts"
 import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type ProbeDevice } from "./device.ts"
 import { planProbeCycle } from "./cycles.ts"
 import { runProbeMoves, type SimMachine } from "./simulate.ts"
-import { boxWorld, cylinderWorld, meshWorld, plateWorld, sphereWorld, surfaceWorld, unionWorld, type Placement, type ProbeWorld3 } from "./world.ts"
-import { faceSurface, unionSurface, boxSurface } from "./sphere-cast.ts"
+import { boxWorld, cylinderWorld, meshWorld, plateWorld, pocketWorld as pocketBlock, sphereWorld, unionWorld, type Placement, type ProbeWorld3 } from "./world.ts"
 import type { ProbeContext, ProbeCycle, ProbeRoutine } from "./types.ts"
 
 const probe: ProbeDevice = deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: 4 })
@@ -52,7 +51,7 @@ describe("cycles reproduce nominal on their analytic world", () => {
     close(run({ kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }, block()).out.results, { x: 0, y: 0, rotation: 0, rotationY: 0 })
     close(run({ kind: "corner", corner: { x: 100, y: 60 }, inside: false, xSense: -1, ySense: -1, depth: 5, touchesPerEdge: 1 }, block()).out.results, { x: 100, y: 60 })
     // a pocket 40 x 30 at (50, 30), 10 deep in a block: four walls
-    const pocketWorld = surfaceWorld(unionSurface([faceSurface({ x: 0, y: 0 }, { x: 100, y: 60 }, 0), boxSurface({ x: 30, y: 15, z: -10 }, { x: 70, y: 45, z: 20 })]))
+    const pocketWorld = pocketBlock({ x: 0, y: 0, z: -20 }, { x: 100, y: 60, z: 0 }, { min: { x: 30, y: 15 }, max: { x: 70, y: 45 }, depth: 10 })
     close(run({ kind: "corner", corner: { x: 30, y: 15 }, inside: true, xSense: -1, ySense: -1, depth: 5 }, pocketWorld).out.results, { x: 30, y: 15, rotation: 0 })
     close(run({ kind: "rectangle", inside: true, centre: { x: 50, y: 30 }, size: { x: 40, y: 30 }, depth: 5 }, pocketWorld).out.results, { x: 50, y: 30, sizeX: 40, sizeY: 30 })
     close(run({ kind: "pocket", centre: { x: 50, y: 30 }, width: 30, angle: Math.PI / 2, depth: 5 }, pocketWorld).out.results, { x: 50, y: 30, width: 30 })
@@ -73,7 +72,7 @@ describe("cycles reproduce nominal on their analytic world", () => {
     expect(out.stopped).toBeUndefined()
     for (let k = 0; k < 8; k++) expect(out.results[`r${k}`]!).toBeCloseTo(1.98 + 0.01 * Math.abs(Math.cos((k * Math.PI) / 4)), 9)
     close(out.results, { x: 0, y: 0 })
-    close(run({ kind: "stylus-calibrate", artefact: { kind: "height", at: { x: 10, y: 10 }, z: 0 } }, block(), probe, { truth: { pretravelZ: 0.004 } }).out.results, { zTrigger: -0.004 })
+    close(run({ kind: "stylus-calibrate", artefact: { kind: "height", at: { x: 10, y: 10 }, z: 0 } }, block(), probe, { truth: { pretravelZ: 0.004 } }).out.results, { zTrigger: 0.004 })
   })
 })
 
