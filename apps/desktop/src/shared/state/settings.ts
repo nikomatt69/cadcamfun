@@ -37,6 +37,76 @@ export interface Settings {
   readonly autosave: boolean
   /** Minutes between automatic saves (one of `AUTOSAVE_MINUTES`). */
   readonly autosaveMinutes: number
+  /** Defaults of new probe cycles (spec 73). */
+  readonly probing: ProbingDefaults
+}
+
+/** How a probe cycle uses what it measured (core `UpdateMode`, spec 73 §5.3). */
+export const PROBE_UPDATE_MODES = ["set", "report", "update-within-tolerance", "alarm-outside-tolerance"] as const
+export type ProbeUpdateMode = (typeof PROBE_UPDATE_MODES)[number]
+
+/**
+ * Defaults a new probe cycle starts from (spec 73 §4), in millimetres and mm/min. The machine's probe configuration and the cycle
+ * itself override them; these only fill what neither says.
+ */
+export interface ProbingDefaults {
+  readonly touchFeed: number
+  readonly fastFeed: number
+  /** Distance above the surface the probe starts its search from. */
+  readonly clearance: number
+  readonly safeHeight: number
+  /** How far past the expected surface the probe searches before it reports a miss. */
+  readonly search: number
+  readonly overtravel: number
+  readonly defaultUpdateMode: ProbeUpdateMode
+  readonly defaultWorkOffset: string
+  /** Inspection tolerance a new check starts with (± mm). */
+  readonly defaultTolerance: number
+  /** How much the 3D view exaggerates a measured deviation so a few microns are visible. */
+  readonly deviationScale: number
+}
+
+export const DEFAULT_PROBING: ProbingDefaults = {
+  touchFeed: 100,
+  fastFeed: 1000,
+  clearance: 5,
+  safeHeight: 25,
+  search: 10,
+  overtravel: 2,
+  defaultUpdateMode: "set",
+  defaultWorkOffset: "G54",
+  defaultTolerance: 0.05,
+  deviationScale: 100
+}
+
+/** Bounds per numeric probing default: a value outside them falls back to its default (field by field). */
+export const PROBING_BOUNDS: Readonly<Record<Exclude<keyof ProbingDefaults, "defaultUpdateMode" | "defaultWorkOffset">, readonly [number, number]>> = {
+  touchFeed: [1, 2000],
+  fastFeed: [1, 10000],
+  clearance: [0.5, 100],
+  safeHeight: [1, 500],
+  search: [0.5, 100],
+  overtravel: [0, 50],
+  defaultTolerance: [0.0005, 5],
+  deviationScale: [1, 10000]
+}
+
+/** Work offsets a default may name: G54..G59, G54.1 P1..P300, G505..G599 (Siemens), or a LinuxCNC G59.1..G59.3. */
+const WORK_OFFSET = /^(G5[4-9]|G54\.1 P([1-9]\d?|[12]\d\d|300)|G5(0[5-9]|[1-9]\d)|G59\.[1-3])$/
+
+/** Decodes the probing defaults one field at a time, so one bad field does not reset the others. */
+export const decodeProbingDefaults = (raw: unknown): ProbingDefaults => {
+  if (typeof raw !== "object" || raw === null) return DEFAULT_PROBING
+  const record = raw as Record<string, unknown>
+  const numeric = Object.fromEntries(Object.entries(PROBING_BOUNDS).map(([key, [min, max]]) => {
+    const value = record[key]
+    return [key, typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : DEFAULT_PROBING[key as keyof typeof PROBING_BOUNDS]]
+  })) as Pick<ProbingDefaults, keyof typeof PROBING_BOUNDS>
+  return {
+    ...numeric,
+    defaultUpdateMode: isOneOf(PROBE_UPDATE_MODES, record["defaultUpdateMode"]) ? record["defaultUpdateMode"] : DEFAULT_PROBING.defaultUpdateMode,
+    defaultWorkOffset: typeof record["defaultWorkOffset"] === "string" && WORK_OFFSET.test(record["defaultWorkOffset"]) ? record["defaultWorkOffset"] : DEFAULT_PROBING.defaultWorkOffset
+  }
 }
 
 /** The intervals the settings offer; a stored value outside this list falls back to the default. */
@@ -53,7 +123,8 @@ export const DEFAULT_SETTINGS: Settings = {
   glass: true,
   nativeNotifications: true,
   autosave: true,
-  autosaveMinutes: 2
+  autosaveMinutes: 2,
+  probing: DEFAULT_PROBING
 }
 
 const STORAGE_KEY = "cadcamfun.settings"
@@ -83,7 +154,8 @@ export const decodeSettings = (raw: unknown): Settings => {
     glass: typeof record["glass"] === "boolean" ? record["glass"] : DEFAULT_SETTINGS.glass,
     nativeNotifications: typeof record["nativeNotifications"] === "boolean" ? record["nativeNotifications"] : DEFAULT_SETTINGS.nativeNotifications,
     autosave: typeof record["autosave"] === "boolean" ? record["autosave"] : DEFAULT_SETTINGS.autosave,
-    autosaveMinutes: (AUTOSAVE_MINUTES as ReadonlyArray<unknown>).includes(record["autosaveMinutes"]) ? record["autosaveMinutes"] as number : DEFAULT_SETTINGS.autosaveMinutes
+    autosaveMinutes: (AUTOSAVE_MINUTES as ReadonlyArray<unknown>).includes(record["autosaveMinutes"]) ? record["autosaveMinutes"] as number : DEFAULT_SETTINGS.autosaveMinutes,
+    probing: decodeProbingDefaults(record["probing"])
   }
 }
 
