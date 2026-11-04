@@ -11,6 +11,9 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { EntryResult, CorpusEntry } from "./runner.ts"
 
+/** What the scorecard needs of an entry of any kind. */
+export type CorpusRef = Pick<CorpusEntry, "id" | "capabilities">
+
 export interface VendorExpectation { readonly expectation: string; readonly url: string; readonly date: string }
 
 export interface Capability {
@@ -37,7 +40,7 @@ export const VENDORS = [["fusion360", "Fusion 360"], ["solidworks", "SolidWorks"
 
 export const scoreRows = (
   capabilities: ReadonlyArray<Capability>,
-  corpus: ReadonlyArray<CorpusEntry>,
+  corpus: ReadonlyArray<CorpusRef>,
   report: CorpusReport | undefined,
   root: string
 ): ReadonlyArray<Row> => capabilities.map((capability) => {

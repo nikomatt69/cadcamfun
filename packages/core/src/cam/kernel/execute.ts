@@ -517,6 +517,12 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const { job, material, tools, machine, origin, stock, operations } = prepared
   const issues: CamIssue[] = []
   const o = origin
+  // Fixture bodies in work coordinates (turned AABB): multi-axis generation keeps the whole tool assembly out of them (spec 72 P0-6).
+  const fixtureBoxesWork = (job.fixtures ?? []).map((f) => {
+    const t = setupTransform(job.setupOrientation ?? "+Z")
+    const cs = [f.min.x, f.max.x].flatMap((x) => [f.min.y, f.max.y].flatMap((y) => [f.min.z, f.max.z].map((z) => applyPoint(t, { x, y, z }))))
+    return { min: { x: Math.min(...cs.map((c) => c.x)) - o.x, y: Math.min(...cs.map((c) => c.y)) - o.y, z: Math.min(...cs.map((c) => c.z)) - o.z }, max: { x: Math.max(...cs.map((c) => c.x)) - o.x, y: Math.max(...cs.map((c) => c.y)) - o.y, z: Math.max(...cs.map((c) => c.z)) - o.z } }
+  })
   const workMeshes: Mesh64[] = prepared.meshes.map((m) => {
     const p = Float64Array.from(m.positions)
     for (let k = 0; k < p.length; k += 3) { p[k] = p[k]! - o.x; p[k + 1] = p[k + 1]! - o.y; p[k + 2] = p[k + 2]! - o.z }
@@ -799,7 +805,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           // The soup and the program are in work coordinates.
           const move = (p: Vec3): Vec3 => ({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z })
           const walls = given.map((w) => ({ bottom: w.bottom.map(move), top: w.top.map(move), normal: w.normal, ...(w.concaveRadius !== undefined ? { concaveRadius: w.concaveRadius } : {}) }))
-          const r = generateMultiaxis(params, soup, legacyTool(tool), kin, walls, op.mode === "swarf" ? { fluteLength: tool.fluteLength, shankDiameter: tool.shankDiameter, stickout: tool.stickout, ...(tool.holder !== undefined ? { holder: tool.holder } : {}) } : undefined)
+          const assembly = { fluteLength: tool.fluteLength, shankDiameter: tool.shankDiameter, stickout: tool.stickout, ...(tool.holder !== undefined ? { holder: tool.holder } : {}) }
+          const r = generateMultiaxis(params, soup, legacyTool(tool), kin, walls, op.mode === "swarf" ? assembly : undefined, { ...assembly, boxes: fixtureBoxesWork })
           generated = { toolpath: r.toolpath, skippedSamples: r.stats.skipped, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
           break
         }
@@ -1491,7 +1498,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     claims.push({ id: "setup-workholding", status: bad === undefined ? "passed" : fixtureInPart.length > 0 || clearance?.first !== undefined ? "failed" : "unresolved",
       detail: bad ?? `${fixtureBodies.length} fixture bodies (${ids}) stay clear of the tool assembly over ${clearance!.checked} moves (at least ${(clearance!.minClearance ?? 0).toFixed(3)} mm); their contact with the stock is the clamping and is not checked` })
     if (fixtureInPart.length > 0) issues.push(issue("InvalidInput", "evidence", bad!, { severity: "error" }))
-    if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z" && hidden === 0 && skippedSamples === 0) claims.push({ id: "part-coverage", status: "unresolved", detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" })
+    // Spec 72 P0-2: with the fixing described by bodies and nothing hidden from this orientation, the replay in the setup frame is as
+    // complete as for +Z, so no extra open part-coverage claim is forced; the faces that look away belong to other setups (runSetups).
   } else if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
     { id: "setup-workholding", status: "unresolved", detail: "Manual refixture requires independently configured and checked workholding; no fixture is assumed by this program" },
     ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])

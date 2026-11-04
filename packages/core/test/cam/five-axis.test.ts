@@ -251,6 +251,19 @@ describe("simultaneous 5-axis operation", () => {
     expect(validate(makeProgram("p", [result.toolpath]), { id: "umc", travel: { minX: -305, maxX: 305, minY: -203, maxY: 203, minZ: -300, maxZ: 300 }, rotary: { b: { min: -35, max: 120 }, c: { min: 0, max: 360 } } }).filter((i) => i._tag === "RotaryLimit")).toEqual([])
   })
 
+  test("the whole tool assembly is kept out of fixture bodies in generation (spec 72 P0-6)", () => {
+    const assembly = { fluteLength: 15, shankDiameter: 6, stickout: 30, holder: { diameter: 30, length: 40 } }
+    // A clamp 25 mm above the plate over its middle: the shank and holder of a vertical tool reach it, the flutes do not.
+    const clamp = { min: { x: 10, y: -5, z: 25 }, max: { x: 30, y: 45, z: 45 } }
+    const free = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, { ...assembly, boxes: [] })
+    const blocked = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, { ...assembly, boxes: [clamp] })
+    expect(free.stats.skipped).toBe(0)
+    expect(blocked.stats.skipped).toBeGreaterThan(0)
+    expect(blocked.stats.points).toBeLessThan(free.stats.points)
+    // Without the assembly the old cutter-only check cannot see the clamp.
+    expect(generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc).stats.skipped).toBe(0)
+  })
+
   test("a leaned cutter uses the table and the program is emitted by the Haas post", () => {
     const result = generateMultiaxis(params({ toolAxis: "lead", lead: 15 }), plate, endmill, umc)
     const cuts = result.toolpath.moves.filter((m) => m._tag === "Linear")
