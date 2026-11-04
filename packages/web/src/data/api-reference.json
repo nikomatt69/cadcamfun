@@ -64699,6 +64699,77 @@
                               "minLength": 1,
                               "maxLength": 80
                             },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
                             "name": {
                               "type": "string",
                               "maxLength": 120
@@ -64766,6 +64837,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -64898,6 +65040,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -65089,6 +65302,77 @@
                               "minLength": 1,
                               "maxLength": 80
                             },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
                             "name": {
                               "type": "string",
                               "maxLength": 120
@@ -65246,6 +65530,77 @@
                               "minLength": 1,
                               "maxLength": 80
                             },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
                             "name": {
                               "type": "string",
                               "maxLength": 120
@@ -65343,6 +65698,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -65631,6 +66057,77 @@
                               "minLength": 1,
                               "maxLength": 80
                             },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
                             "name": {
                               "type": "string",
                               "maxLength": 120
@@ -65737,6 +66234,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -65849,6 +66417,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -65970,6 +66609,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -66093,6 +66803,77 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 200
+                            },
+                            "limits": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "avoid": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 200
+                                },
+                                "containment": {
+                                  "type": "string",
+                                  "enum": [
+                                    "edge",
+                                    "centre"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             "name": {
                               "type": "string",
@@ -66336,7 +67117,11 @@
                             "countersink",
                             "boringbar",
                             "tslot",
-                            "dovetail"
+                            "dovetail",
+                            "tapered",
+                            "lollipop",
+                            "barrel",
+                            "lens"
                           ]
                         },
                         "diameter": {
@@ -66388,6 +67173,10 @@
                           "exclusiveMinimum": 0
                         },
                         "neckDiameter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "formRadius": {
                           "type": "number",
                           "exclusiveMinimum": 0
                         },
@@ -72366,6 +73155,28 @@
                       "tipRadius": {
                         "type": "number",
                         "exclusiveMinimum": 0
+                      },
+                      "profile": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "r": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "r",
+                            "z"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 2,
+                        "maxItems": 20000
                       }
                     },
                     "required": [
