@@ -86,6 +86,17 @@ function childEnv(): Record<string, string | undefined> {
   return { ...process.env };
 }
 
+/** The production bundles of Monaco, OCCT and the source maps exceed the intel runner's default ~2 GB Node heap. */
+const FRONTEND_HEAP_MB = 4096;
+
+function frontendEnv(): Record<string, string | undefined> {
+  const options = process.env.NODE_OPTIONS?.trim();
+  return {
+    ...childEnv(),
+    NODE_OPTIONS: options ? `${options} --max-old-space-size=${FRONTEND_HEAP_MB}` : `--max-old-space-size=${FRONTEND_HEAP_MB}`,
+  };
+}
+
 let dryRun = false;
 let target: string | undefined;
 let bundles: string | undefined;
@@ -334,7 +345,7 @@ async function stepBundle(): Promise<void> {
     signing = assertSigningConfig(config, signingEnv, platform, release);
   }
   announce(5, "build the desktop frontend and bundle the app");
-  await run(["bun", "run", "--filter", "@cadcamfun/desktop", "build"]);
+  await run(["bun", "run", "--filter", "@cadcamfun/desktop", "build"], { env: frontendEnv() });
   // Match nikcli's release scripts: prepare the frontend once above, then prevent Tauri from
   // invoking beforeBuildCommand again. This also avoids Windows resolving a workspace bin shim.
   const thumbprint = process.env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT;

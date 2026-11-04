@@ -39,11 +39,13 @@
     "babel-preset-expo": "~57.0.14",
     "nativewind": "^4.1.23",
     "react-native-worklets": "0.10.1",
+    "rollup": "4.64.12",
     "turbo": "^2.11.7",
     "typescript": "^5.9.0"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-rc.112",
-    "@effect/platform-node": "4.0.0-rc.112"
+    "@effect/platform-node": "4.0.0-rc.112",
+    "rollup": "4.64.12"
   }
 }
