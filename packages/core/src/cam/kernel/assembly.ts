@@ -43,6 +43,10 @@ const arc = (cr: number, cz: number, radius: number, from: number, to: number, s
     return { r: cr + radius * Math.cos(a), z: cz + radius * Math.sin(a) }
   })
 
+/** An arc with `steps` facets per quarter turn (so a long arc is as fine as a short one). */
+const arcFine = (cr: number, cz: number, radius: number, from: number, to: number, steps: number): ProfilePoint[] =>
+  arc(cr, cz, radius, from, to, Math.max(2, Math.ceil((Math.abs(to - from) / (Math.PI / 2)) * steps)))
+
 /** The cutting zone from the tip (on the axis) to the top of the flutes at the cutting radius. */
 const cuttingZone = (c: Cutter, steps: number): ProfilePoint[] => {
   const R = c.diameter / 2
@@ -70,6 +74,45 @@ const cuttingZone = (c: Cutter, steps: number): ProfilePoint[] => {
       const neck = Math.min(Math.max((c.neckDiameter ?? c.diameter / 2) / 2, 1e-3), R)
       const upper = Math.max(neck, R - h * Math.tan((((c.angle ?? 60) / 2) * Math.PI) / 180))
       return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: upper, z: h }, ...(upper > neck + 1e-9 ? [{ r: neck, z: h }] : []), { r: neck, z: Math.max(top, h) }]
+    }
+    case "tapered": {
+      // Flat tip of radius `rt` with a corner arc `rc` (a tapered ball when rc = rt) tangent to the flank at half the included angle.
+      const rt = Math.min(Math.max((c.tipDiameter ?? 0) / 2, 0), R)
+      const rc = Math.min(Math.max(c.cornerRadius ?? rt, 0), rt)
+      const a = (((c.angle ?? 3) / 2) * Math.PI) / 180
+      const tanA = Math.max(Math.tan(a), 1e-9)
+      const tangent = { r: rt - rc + rc * Math.cos(a), z: rc - rc * Math.sin(a) }
+      const zR = tangent.z + Math.max(R - tangent.r, 0) / tanA
+      return [
+        { r: 0, z: 0 }, ...(rt - rc > 1e-9 ? [{ r: rt - rc, z: 0 }] : []),
+        ...(rc > 1e-9 ? arcFine(rt - rc, rc, rc, -Math.PI / 2, -a, steps).slice(1) : []),
+        { r: R, z: zR }, ...(top > zR + 1e-9 ? [{ r: R, z: top }] : [])
+      ]
+    }
+    case "lollipop": {
+      // A sphere centred R above the tip, cut off where it meets the neck: the upper part of the sphere is the undercut.
+      const neck = Math.min(Math.max((c.neckDiameter ?? c.diameter / 2) / 2, 1e-3), R)
+      const upper = Math.acos(neck / R)
+      const z1 = R + R * Math.sin(upper)
+      return [{ r: 0, z: 0 }, ...arcFine(0, R, R, -Math.PI / 2, upper, steps).slice(1), { r: neck, z: Math.max(top, z1) }]
+    }
+    case "barrel": {
+      // Flat tip; the flank is the circle of radius `formRadius` centred at (R - Rf, h/2), so it is widest (R) at mid-height.
+      const h = Math.min(Math.max(c.headHeight ?? top, 1e-3), top)
+      const Rf = Math.max(c.formRadius ?? R, h / 2)
+      const centre = R - Rf
+      const phi = Math.asin(Math.min(1, h / 2 / Rf))
+      const r0 = Math.max(0, centre + Rf * Math.cos(phi))
+      const neck = Math.min(Math.max((c.neckDiameter ?? 2 * r0) / 2, 1e-3), r0)
+      return [{ r: 0, z: 0 }, ...arcFine(centre, h / 2, Rf, -phi, phi, steps), ...(neck < r0 - 1e-9 ? [{ r: neck, z: h }] : []), { r: neck, z: Math.max(top, h) }]
+    }
+    case "lens": {
+      // Two arcs from the tip point on the axis to the top of the head, widest (R) at mid-height: chord h, sagitta R.
+      const h = Math.min(Math.max(c.headHeight ?? top, 1e-3), top)
+      const Rf = (R * R + (h / 2) * (h / 2)) / (2 * R)
+      const phi = Math.atan2(h / 2, Rf - R)
+      const neck = Math.min(Math.max((c.neckDiameter ?? 0) / 2, 0), R)
+      return [...arcFine(R - Rf, h / 2, Rf, -phi, phi, steps), ...(neck > 1e-9 ? [{ r: neck, z: h }] : []), { r: neck, z: Math.max(top, h) }]
     }
     case "chamfer":
     case "spot":

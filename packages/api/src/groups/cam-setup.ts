@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, Conflict, Forbidden, InternalError, NotFound } from "../errors.ts"
-import { CamSetupDocument, CamSetupGenerated, CamSetupGenerateRequest, CamSetupPlan, CamSetupRequest, CamSetupSaveBody, CamSetupUpdateBody, CamSetupValidation } from "../cam-setup.ts"
+import { CamSetupDocument, CamSetupGenerated, CamSetupGenerateRequest, CamSetupGenerateSavedRequest, CamSetupPlan, CamSetupRequest, CamSetupSaveBody, CamSetupUpdateBody, CamSetupValidation } from "../cam-setup.ts"
 
 const project = { id: Schema.String }
 const document = { id: Schema.String, setupId: Schema.String }
@@ -24,6 +24,11 @@ export class CamSetupGroup extends HttpApiGroup.make("camSetup")
     HttpApiEndpoint.get("get", "/api/projects/:id/cam-setups/:setupId", { params: document, success: CamSetupDocument, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/projects/:id/cam-setups/:setupId", {
       params: document, payload: CamSetupUpdateBody, success: CamSetupDocument, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
+    }),
+    // A saved setup posted: the same planning and generation as the stateless routes, over the setup as stored.
+    HttpApiEndpoint.get("planSaved", "/api/projects/:id/cam-setups/:setupId/plan", { params: document, success: CamSetupPlan, error: [BadRequest, NotFound, InternalError] }),
+    HttpApiEndpoint.post("generateSaved", "/api/projects/:id/cam-setups/:setupId/generate", {
+      params: document, payload: CamSetupGenerateSavedRequest, success: CamSetupGenerated, error: [BadRequest, NotFound, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/projects/:id/cam-setups/:setupId", {
       params: document, success: Schema.Struct({ message: Schema.String }), error: [BadRequest, NotFound, InternalError]
