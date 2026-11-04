@@ -3,6 +3,26 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.85 (November 2026)
+
+## Core
+
+- B6 tip-error gate for tool-centre-point output
+- Machining limits - boundary and avoid regions (spec 69 C7)
+- Effect v4 integration checkpoint
+- Operation model - enable/disable, dependencies, copy/mirror/pattern (spec 69 C6)
+- ManufacturingJob.setups[] with a v1 job as one setup (spec 69 C1)
+- A5 gate uses a fixture that is clean at the fine cell, add the degraded-gouge soundness gate
+
+## Sidecar
+
+- Rebuild reports (feature states, blend/shell/boolean, healing, incremental baseline) and posting of saved setups
+- HTTP invocation of plugin AI tools with capability checks (P1-11)
+
+## API
+
+- Regenerate clients for CAM job model
+
 ## v0.1.84 (November 2026)
 
 ## Core
