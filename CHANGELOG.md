@@ -3,6 +3,20 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.88 (November 2026)
+
+## Core
+
+- Versioned cutting-data library, tool life book, sister tools, magazine plan (spec 69 D4) (#59)
+- B3 fault injection through runJob (30 overcuts, 30 undercuts, 15 clean jobs) (#52)
+- Tool data CSV, ISO 13399 XML subset and presetter list (spec 69 D3) (#56)
+- Holder library and minimum stick-out search (spec 69 D2) (#53)
+- Wire swept profile, mesh contact and shortest chain ordering into the operations (spec 69 D1/F1/F11) (#49)
+
+## API
+
+- Setups[] (C1), operation model (C6), machining limits (C7) (#51)
+
 ## v0.1.87 (November 2026)
 
 - No notable changes
