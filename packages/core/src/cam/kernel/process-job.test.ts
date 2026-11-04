@@ -1,4 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { setupSheetData, setupSheetHtml } from "./setup-sheet.ts"
 import { runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
 
 setDefaultTimeout(100_000)
@@ -61,5 +62,16 @@ describe("process physics in a kernel job (spec 61, spec 69 G0 to G2)", () => {
       expect(r.report.worstRatioAfter).toBeLessThanOrEqual(Math.max(1, r.report.worstRatioBefore) + 1e-9)
       expect(r.report.feedMax).toBeLessThanOrEqual(a.operations.find((o) => o.id === r.operation)!.cutting!.feed * 3 + 1e-6)
     }
+  })
+  test("the setup sheet carries the process section only when the job asked for it, labelled uncalibrated", () => {
+    const without = setupSheetData(plain)
+    expect(typeof without === "string" ? "" : without.process).toBeUndefined()
+    const d = setupSheetData(ok(runJob(job({ process: {} }))))
+    if (typeof d === "string") throw new Error(d)
+    expect(d.process!.label).toContain("uncalibrated")
+    expect(d.process!.tools.length).toBeGreaterThan(0)
+    const html = setupSheetHtml(d)
+    expect(html).toContain("Process (uncalibrated)")
+    expect(html).toContain("indicative")
   })
 })
