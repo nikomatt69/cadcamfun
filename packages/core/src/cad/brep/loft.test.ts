@@ -64,6 +64,35 @@ describe("exact loft through planar sections", () => {
     expect(rel(solid(b), volume)).toBeLessThan(1e-10)
   })
 
+  test("a closed loft of squares round a circle is a ring: no caps, G1 join, Pappus volume", () => {
+    const S = 12, R = 20
+    const ring = (n: number) => Array.from({ length: n }, (_, k) => {
+      const t = (2 * PI * k) / n
+      return loftSection(rectangleProfileLoop(-2, -2, 2, 2), frame(v(R * Math.cos(t), R * Math.sin(t), 0), v(-Math.sin(t), Math.cos(t), 0), v(Math.cos(t), Math.sin(t), 0)))
+    })
+    const smooth = loftBrep(ring(S), { closed: true, smooth: true })
+    const pappus = 2 * PI * R * 16
+    expect(smooth.faces.length).toBe(4 * S)
+    expect(smooth.faces.every((f) => f.name !== "loft.start" && f.name !== "loft.end")).toBe(true)
+    expect(rel(solid(smooth), pappus)).toBeLessThan(5e-3)
+    const straight = loftBrep(ring(S), { closed: true })
+    const vs = solid(straight)
+    expect(vs).toBeLessThan(pappus)
+    expect(rel(vs, pappus)).toBeLessThan(0.05)
+    // More sections converge on the exact ring.
+    expect(rel(solid(loftBrep(ring(24), { closed: true })), pappus)).toBeLessThan(rel(vs, pappus))
+    expect(() => loftBrep(ring(2), { closed: true })).toThrow(RangeError)
+  })
+
+  test("a closed loft with circle sections", () => {
+    const sections = Array.from({ length: 10 }, (_, k) => {
+      const t = (2 * PI * k) / 10
+      return loftSection(circleProfileLoop({ x: 0, y: 0 }, 3), frame(v(15 * Math.cos(t), 15 * Math.sin(t), 0), v(-Math.sin(t), Math.cos(t), 0), v(Math.cos(t), Math.sin(t), 0)))
+    })
+    const b = loftBrep(sections, { closed: true, smooth: true })
+    expect(rel(solid(b), 2 * PI * 15 * PI * 9)).toBeLessThan(5e-3)
+  })
+
   test("a spline section is refused", () => {
     expect(() => loftSection([{ kind: "nurbs", data: { degree: 1, knots: [0, 0, 1, 1], points: [[0, 0], [1, 0]] } }], at(0))).toThrow(RangeError)
   })
