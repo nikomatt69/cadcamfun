@@ -32,7 +32,7 @@ const locale = Astro.locals.locale ?? "en"
     </div>
 
     <div class="hero-anim hero-stage" style="animation-delay: 120ms">
-      <HeroWorkbench client:only="react" />
+      <div aria-hidden="true"><HeroWorkbench client:only="react" /></div>
     </div>
   </div>
 </section>

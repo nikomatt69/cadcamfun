@@ -5,7 +5,7 @@ import "./docsshot.css"
 // The docs assistant answering from the pages: a question lands, a short
 // pause, the answer streams in place, the pages it read arrive last.
 
-const A = "Pick the LinuxCNC post in the setup, then press Post. The G-code is written next to the project as a .ngc file."
+const A = "The built-in posts include generic, Fanuc, GRBL and Haas. LinuxCNC is recognized, but is not implemented in this registry."
 const WORDS = A.split(" ").length
 
 type S = { asked: boolean; thinking: boolean; words: number; sources: boolean }
@@ -45,7 +45,7 @@ export default function DocsAssistantShot() {
             </nav>
             <div className="ds-chat">
               <div className="ds-msg ds-msg--me" data-show={s.asked || undefined}>
-                <Text>How do I post toolpaths to LinuxCNC?</Text>
+                <Text>Which post processors are available?</Text>
               </div>
               <div className="ds-think" data-show={s.thinking || undefined}>
                 <Text>Reading the docs…</Text>
@@ -54,8 +54,8 @@ export default function DocsAssistantShot() {
                 <Stream text={A} count={s.words} />
               </div>
               <div className="ds-sources" data-show={s.sources || undefined}>
-                <span className="ds-source"><Text>Posts</Text></span>
-                <span className="ds-source"><Text>Setups</Text></span>
+                <span className="ds-source"><Text>CAM</Text></span>
+                <span className="ds-source"><Text>Controller dialects</Text></span>
               </div>
             </div>
           </div>

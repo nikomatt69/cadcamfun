@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "As importações apontam para dentro, da janela à geometria.",
+  "Sketch": "Esboço",
+  "Machine setup": "Configuração da máquina",
+  "Workflow run": "Execução do fluxo de trabalho",
   ", and capabilities.": "e capacidades.",
   ", and client/pairing logic under": "e lógica de cliente/emparelhamento em",
   ", and default": "e padrão",

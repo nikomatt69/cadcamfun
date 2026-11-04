@@ -12,6 +12,7 @@
 .dg-layers .dg-window { height: 160px; }
 .dg-layers .ss-stage[data-layout="compact"] .dg-window { height: 280px; }
 .dg .ss-stage[data-layout="compact"] .dg-window { left: 8px; width: 342px; height: 280px; }
+.dg-layers .ss-stage[data-layout="compact"] .dg-window { left: 16px; width: 326px; height: 318px; }
 
 .dg-chip {
   position: absolute;

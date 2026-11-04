@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
-import HeroWorkbench from "../../components/stage/HeroWorkbench"
+import TopicTile from "../../components/stage/TopicTile"
 import FlowWindow from "../../components/stage/FlowWindow"
 import { text } from "../../i18n/catalog"
 
@@ -21,7 +21,10 @@ const failed = text(locale, "Sign in failed")
         <p class="mt-4 max-w-md text-[15px] leading-relaxed text-terminal-muted">
           {text(locale, "The form checks the")} <code>User</code> {text(locale, "table in the SQLite file Drizzle migrates, and stores the session in")} <code>Session</code>.
         </p>
-        <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
+        <figure class="mt-8 max-w-[400px]">
+          <TopicTile kind="account" client:only="react" />
+          <figcaption class="mt-2 text-[12px] text-terminal-muted">{text(locale, "Example")}</figcaption>
+        </figure>
       </div>
       <FlowWindow client:load title={text(locale, "Sign in")}>
       <form id="studio-login">

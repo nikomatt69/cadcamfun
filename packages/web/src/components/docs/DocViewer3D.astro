@@ -4,6 +4,9 @@
  * (extruded profiles, boxes, cylinders, toolpath polylines) with three.js and orbit controls.
  * Coordinates are millimetres, Z up, matching the CADCAMFUN core conventions.
  */
+import "../../stageshow/kit/stage.css"
+import { Window } from "../../stageshow/kit/window"
+
 export interface ViewerSolid {
   kind: "box" | "extrude" | "cylinder" | "sphere" | "mesh"
   /** box: [x, y, z] size, placed with its minimum corner at `at`. */
@@ -47,15 +50,42 @@ const { title, caption, solids = [], paths = [], labels = [], height = 340, anim
 const scene = JSON.stringify({ solids, paths, labels, animate })
 ---
 
-<figure class="doc-viewer3d not-prose my-6 rounded-[var(--radius-md)] border border-terminal-border bg-terminal-panel" data-scene={scene}>
-  <div class="flex items-center justify-between px-3 py-2 text-[12px] text-terminal-muted">
-    <span class="font-display font-bold text-terminal-text">{title}</span>
-    <span>Drag to orbit · scroll to zoom · right-drag to pan</span>
-  </div>
-  <div class="doc-viewer3d-canvas" style={`height:${height}px;position:relative`}>
-    <noscript><p class="p-3 text-[13px]">Enable JavaScript to view this interactive 3D example.</p></noscript>
-  </div>
-  {animate && <div class="px-3 pb-2"><button type="button" class="doc-viewer3d-play rounded border border-terminal-border px-2 py-1 text-[12px]">Replay toolpath</button></div>}
-  {caption && <figcaption class="px-3 pb-3 text-[13px] text-terminal-muted">{caption}</figcaption>}
+<figure class="ss-stage doc-viewer3d not-prose my-6" data-scene={scene}>
+  <Window title={title} className="doc-viewer3d-window">
+    <div class="doc-viewer3d-help">Drag to orbit · scroll to zoom · right-drag to pan</div>
+    <div class="doc-viewer3d-canvas" style={`height:${height}px;position:relative`}>
+      <noscript><p class="p-3 text-[13px]">Enable JavaScript to view this interactive 3D example.</p></noscript>
+    </div>
+    {animate && <div class="doc-viewer3d-actions"><button type="button" class="doc-viewer3d-play">Replay toolpath</button></div>}
+  </Window>
+  {caption && <figcaption class="doc-viewer3d-caption">{caption}</figcaption>}
 </figure>
+
+<style is:global>
+  .doc-viewer3d.ss-stage {
+    --ss-surface: rgb(var(--terminal-panel));
+    --ss-chrome: rgb(var(--terminal-panel));
+    --ss-canvas: rgb(var(--terminal-bg));
+    --ss-text: rgb(var(--terminal-muted));
+    --ss-text-strong: rgb(var(--terminal-text));
+    --ss-line: rgb(var(--terminal-border) / 0.5);
+    --ss-shadow-window: var(--shadow-soft);
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: auto;
+    color: rgb(var(--terminal-text));
+    font: inherit;
+    user-select: text;
+  }
+  .doc-viewer3d .doc-viewer3d-window { height: auto; background: var(--ss-surface); }
+  .doc-viewer3d .ss-window__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-viewer3d astro-slot { display: contents; }
+  .doc-viewer3d-help { padding: 0.7rem 0.75rem 0; color: var(--ss-text); font-size: 0.75rem; line-height: 1.4; }
+  .doc-viewer3d-actions { padding: 0 0.75rem 0.75rem; }
+  .doc-viewer3d-play { padding: 0.35rem 0.65rem; border: 1px solid var(--ss-line); border-radius: 6px; background: var(--ss-canvas); color: var(--ss-text-strong); font: inherit; font-size: 0.75rem; cursor: pointer; }
+  .doc-viewer3d-play:focus-visible { outline: 2px solid rgb(var(--terminal-accent)); outline-offset: 2px; }
+  .doc-viewer3d-caption { padding: 0.65rem 0.15rem 0; color: var(--ss-text); font-size: 0.8125rem; line-height: 1.45; }
+</style>
 

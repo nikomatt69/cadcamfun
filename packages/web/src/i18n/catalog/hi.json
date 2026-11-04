@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "इम्पोर्ट विंडो से ज्यामिति की ओर अंदर जाते हैं।",
+  "Sketch": "स्केच",
+  "Machine setup": "मशीन सेटअप",
+  "Workflow run": "वर्कफ़्लो रन",
   "-prefixed tag does not match the version in Tauri configuration. Release validation stops before platform builds.": "-प्रीफिक्स्ड टैग टौरी कॉन्फ़िगरेशन में संस्करण से मेल नहीं खाता है। प्लेटफ़ॉर्म बनने से पहले रिलीज़ सत्यापन रुक जाता है।",
   "-programs,": "-कार्यक्रम,",
   ", a credential": ", एक प्रमाण पत्र",

@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "Importe zeigen nach innen, vom Fenster zur Geometrie.",
+  "Sketch": "Skizze",
+  "Machine setup": "Maschineneinrichtung",
+  "Workflow run": "Workflow-Ausführung",
   "-prefixed tag does not match the version in Tauri configuration. Release validation stops before platform builds.": "-prefixed-Tag stimmt nicht mit der Version in der Tauri-Konfiguration überein. Die Release-Validierung stoppt, bevor die Plattform erstellt wird.",
   "-programs,": "-Programme,",
   ", a credential": ", ein Ausweis",

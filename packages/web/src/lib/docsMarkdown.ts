@@ -46,6 +46,15 @@ export function extractSubtitle(html: string): string {
   return parsed(html).querySelector("p.text-page-subtitle")?.textContent?.replace(/\s+/g, " ").trim() ?? ""
 }
 
+/** The localized layout renders its own header, so preserve the source API example. */
+export function extractApiExample(html: string): { method: string; path: string } | undefined {
+  const shot = parsed(html).querySelector("[data-api-example-method][data-api-example-path]")
+  const method = shot?.getAttribute("data-api-example-method") ?? ""
+  const path = shot?.getAttribute("data-api-example-path") ?? ""
+  if (!/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(method) || !path.startsWith("/")) return undefined
+  return { method, path }
+}
+
 export function extractDescription(html: string): string {
   return parsed(html).querySelector('meta[name="description"]')?.getAttribute("content")?.replace(/\s+/g, " ").trim() ?? ""
 }

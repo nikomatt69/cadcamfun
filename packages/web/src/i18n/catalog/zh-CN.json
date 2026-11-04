@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "导入从窗口指向内部的几何层。",
+  "Sketch": "草图",
+  "Machine setup": "机床设置",
+  "Workflow run": "工作流运行",
   ", and capabilities.": "和能力。",
   ", and client/pairing logic under": "，以及客户端/配对逻辑",
   ", and default": "，和默认的",

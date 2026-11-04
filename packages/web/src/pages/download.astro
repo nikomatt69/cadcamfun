@@ -2,7 +2,7 @@
 import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
 import DownloadShot from "../components/stage/DownloadShot"
-import QuickstartTerminal from "../components/stage/QuickstartTerminal"
+import FlowWindow from "../components/stage/FlowWindow"
 import ReleaseBrowser from "../components/stage/ReleaseBrowser"
 import TopicTile from "../components/stage/TopicTile"
 import { text } from "../i18n/catalog"
@@ -36,6 +36,7 @@ const labels = {
   version: text(locale, "Version"),
   allReleases: text(locale, "All releases"),
   copy: text(locale, "Copy"),
+  copied: text(locale, "Copied"),
 }
 ---
 
@@ -48,8 +49,9 @@ const labels = {
       <p class="mt-4 max-w-2xl text-[16px] leading-relaxed text-terminal-muted">
         {text(locale, "Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.")}
       </p>
-      <div class="mt-10 max-w-[760px]"><DownloadShot client:only="react" /></div>
+      <div class="mt-10 max-w-[760px]" aria-hidden="true"><DownloadShot client:only="react" /></div>
       <ReleaseBrowser client:only="react" labels={labels} />
+      <noscript><p class="mt-6 text-[14px]"><a class="font-semibold text-terminal-accent" href="https://github.com/nikomatt69/cadcamfun/releases">{labels.allReleases}</a></p></noscript>
 
       <section class="mt-14" aria-labelledby="homebrew-heading">
         <h2 id="homebrew-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "macOS with Homebrew")}</h2>
@@ -57,8 +59,9 @@ const labels = {
           {text(locale, "When the release cask is published, this installs the macOS app. It does not replace the Windows or Linux packages above.")}
         </p>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <div class="min-w-0 w-[520px] max-w-full"><QuickstartTerminal client:only="react" commands={["brew install --cask nikomatt69/tap/cadcamfun"]} title="Terminal" path="~" /></div>
-          <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold">{labels.copy}</button>
+          <div class="homebrew-command min-w-0 w-[520px] max-w-full"><FlowWindow client:load title="Terminal"><code>brew install --cask nikomatt69/tap/cadcamfun</code></FlowWindow></div>
+          <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold" data-copy-label={labels.copy} data-copied-label={labels.copied}>{labels.copy}</button>
+          <span id="homebrew-copy-status" class="sr-only" role="status"></span>
         </div>
       </section>
 
@@ -100,8 +103,28 @@ const labels = {
   </main>
 </Layout>
 
+<style>
+  .homebrew-command :global(.ss-stage) { user-select: text; }
+  .homebrew-command :global(code) { overflow-wrap: anywhere; }
+</style>
+
 <script>
-  document.querySelector("#homebrew-copy")?.addEventListener("click", async () => {
-    await navigator.clipboard.writeText("brew install --cask nikomatt69/tap/cadcamfun")
+  const homebrewCopy = document.querySelector<HTMLButtonElement>("#homebrew-copy")
+  const homebrewStatus = document.querySelector<HTMLElement>("#homebrew-copy-status")
+  let copyTimer = 0
+  homebrewCopy?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("brew install --cask nikomatt69/tap/cadcamfun")
+      const copied = homebrewCopy.dataset.copiedLabel ?? "Copied"
+      homebrewCopy.textContent = copied
+      if (homebrewStatus) homebrewStatus.textContent = copied
+      window.clearTimeout(copyTimer)
+      copyTimer = window.setTimeout(() => {
+        homebrewCopy.textContent = homebrewCopy.dataset.copyLabel ?? "Copy"
+        if (homebrewStatus) homebrewStatus.textContent = ""
+      }, 1600)
+    } catch {
+      // The displayed command remains available to select when clipboard access is unavailable.
+    }
   })
 </script>

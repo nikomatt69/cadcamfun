@@ -87,6 +87,9 @@ export interface StageProps<S> {
 }
 
 const NONE = {}
+// Layout measurement runs before paint in the browser; on the server there
+// is no layout to measure and React's layout-effect warning is not useful.
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 export function Stage<S extends object>({
   width,
@@ -143,7 +146,11 @@ export function Stage<S extends object>({
   // film.mjs can slow every stage down (--slow) and film any stage dark (--dark)
   const film = typeof window === 'undefined' ? {} : ((window as unknown as { __stageshow?: { slow?: number; theme?: Theme } }).__stageshow ?? {})
   const speed = speedProp / (film.slow ?? 1)
-  const theme = film.theme ?? themeProp
+  // Film overrides are browser-only. Applying them during hydration makes the
+  // first client render disagree with the server-rendered stage.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const theme = (mounted ? film.theme : undefined) ?? themeProp
   const [kind, setKind] = useState<CursorKind>(cursor?.kind ?? 'pointer')
   // A ring that spreads from the click point and fades, drawn under the cursor
   const ripple = (at: Point) => {
@@ -169,7 +176,7 @@ export function Stage<S extends object>({
 
   // Fit: pick the layout from the container width, then scale its design
   // size into it.
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     const fit = fitRef.current
     if (!fit) return
     const measure = () => {
@@ -241,8 +248,8 @@ export function Stage<S extends object>({
     const next = measureAll()
     setRects((prev) => (sameRects(prev, next) ? prev : next))
   }, [measureAll])
-  useLayoutEffect(remeasure)
-  useLayoutEffect(() => () => {
+  useClientLayoutEffect(remeasure)
+  useClientLayoutEffect(() => () => {
     clock.cancelLayoutRaf(passes.current.frame)
     passes.current = { n: 0, frame: 0, owed: false }
   }, [])
@@ -264,7 +271,7 @@ export function Stage<S extends object>({
   // and again after a wide/compact switch, nothing transitions. Otherwise
   // anything placed from rect() would visibly travel from 0,0 into place.
   const [settling, setSettling] = useState(true)
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     setSettling(true)
     let live = true
     let frame = 0
@@ -319,7 +326,7 @@ export function Stage<S extends object>({
   }, [])
 
   // Stills have no script to hover things, so mark them here.
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     if (!still || !hover) return
     const root = rootRef.current
     hover.forEach((name) => root?.querySelector(`[data-target="${name}"]`)?.setAttribute('data-hover', ''))
@@ -327,7 +334,7 @@ export function Stage<S extends object>({
 
   // Rest the cursor at its start point, unless a script is running: then the
   // cursor is mid-story, and a resize must not send it back to rest
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     if (cursor && !loopAt.current) place(resolve(restAt()))
   }, [scale, layout]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -559,7 +566,7 @@ export function Stage<S extends object>({
     }
   }, [still, script, makeAct, play, layout]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     if (cursor && !still && !dragging.current) autoRef.current?.(pos.current)
   }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
 

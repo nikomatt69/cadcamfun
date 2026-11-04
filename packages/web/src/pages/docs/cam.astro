@@ -5,6 +5,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
+import DocStageExample from "../../components/docs/DocStageExample.astro"
 
 const toc = [
   { title: "From geometry to a program", href: "#pipeline" },
@@ -64,6 +65,7 @@ const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
     <p>Posts share an emitter with fixed-decimal formatting, comment sanitization, tool changes, arc handling, optional line numbering, and cycle expansion. Defaults are three decimal places, canned cycles enabled, IJK arcs, header enabled, and 0.01 mm tolerance. Unsupported arc formats fall back through the dialect's supported forms and linearization.</p>
     <p><code>toolNumbers</code> maps tool identifiers to explicit positive integer pockets. Unmapped tools use first-use numbering while avoiding occupied numbers. <code>retractBeforeToolChange</code> is opt-in; it raises Z to the program's highest reached position before a tool change. Subprogram emission is also opt-in and depends on dialect support. Review the selected controller's output and machine configuration before production use.</p>
     <p>Repeated toolpaths can be emitted as subprograms. A toolpath qualifies when, after its positioning move, its motion is another toolpath's motion translated within 5 × 10⁻⁶ mm, with the same move kinds, feeds, and arc senses. Each group needs at least six body moves and must save at least twelve moves in total. Toolpaths with canned cycles or rotary words are never candidates (<code>packages/core/src/cam/post/subprograms.ts</code>).</p>
+    <DocStageExample kind="post" label="Controller dialects" />
   </section>
 
   <section id="kernel" class="doc-section">

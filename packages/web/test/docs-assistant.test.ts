@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { docsIndex } from "../src/data/docsIndex"
 import { guideTitle, parseMessages, visibleAnswer, wantsArtifact, withheldTail, workersAiDeltas } from "../src/lib/docsAssistant"
 import { extractArtifact, publishArtifact, safeFilename, toHtmlFile } from "../src/lib/docsArtifact"
-import { docsPaths, extractTitle, toMarkdown } from "../src/lib/docsMarkdown"
+import { docsPaths, extractApiExample, extractTitle, toMarkdown } from "../src/lib/docsMarkdown"
 import { parseToolCalls } from "../src/lib/docsPlanner"
 import { condenseMarkdown, selectDocs, tokenize } from "../src/lib/docsRetrieval"
 import { type ArtifactBucket, canViewArtifact, readArtifact, readArtifactContent } from "../src/lib/artifact"
@@ -71,6 +71,13 @@ describe("markdown pipeline", () => {
 
   test("reads the page title", () => {
     expect(extractTitle(html)).toBe("CAM and G-code")
+  })
+
+  test("preserves a source page's API example for the localized header", () => {
+    const source = '<div data-api-example-method="GET" data-api-example-path="/api/projects/{id}"></div>'
+    expect(extractApiExample(source)).toEqual({ method: "GET", path: "/api/projects/{id}" })
+    expect(extractApiExample(html)).toBeUndefined()
+    expect(extractApiExample('<div data-api-example-method="INVALID" data-api-example-path="/api/projects"></div>')).toBeUndefined()
   })
 
   test("refuses pages without an AI-readable article", () => {

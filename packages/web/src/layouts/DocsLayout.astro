@@ -28,6 +28,7 @@ interface Props {
   description?: string
   toc?: TocItem[]
   locale?: import("../i18n/locales").Locale
+  apiExample?: import("../components/stage/ProductTiles").ApiExample
 }
 const {
   title = "Documentation",
@@ -109,7 +110,7 @@ const topic = topicFor(pathname)
             <h1 class="font-display text-page-title text-terminal-text">{title}</h1>
             {subtitle && <p class="mt-4 max-w-2xl text-page-subtitle text-terminal-muted">{subtitle}</p>}
             <div class="plate-rule" aria-hidden="true"></div>
-            <div data-llm-exclude class={topic === "docs" ? "doc-shot" : "doc-shot doc-shot--tile"}><DocsShot topic={topic} client:only="react" /></div>
+            <div data-llm-exclude data-api-example-method={Astro.props.apiExample?.method} data-api-example-path={Astro.props.apiExample?.path} class={topic === "docs" ? "doc-shot" : "doc-shot doc-shot--tile"}><DocsShot topic={topic} apiExample={Astro.props.apiExample} client:only="react" /></div>
           </header>
           <div class="content-body">
             <slot />

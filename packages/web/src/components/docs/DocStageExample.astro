@@ -1,0 +1,28 @@
+---
+import TopicTile from "../stage/TopicTile"
+import type { TopicKind } from "../stage/ProductTiles"
+import { text } from "../../i18n/catalog"
+
+interface Props {
+  kind: TopicKind
+  label: string
+}
+
+const { kind, label } = Astro.props
+const locale = Astro.locals.locale ?? "en"
+---
+
+<figure class="doc-stage-example not-prose my-7">
+  <div class="doc-stage-example__scene" data-llm-exclude>
+    <TopicTile kind={kind} client:only="react" />
+  </div>
+  <figcaption class="doc-stage-example__caption">
+    <span>{text(locale, "Example")}</span><span aria-hidden="true"> · </span><span>{text(locale, label)}</span>
+  </figcaption>
+</figure>
+
+<style>
+  .doc-stage-example { margin-inline: 0; max-width: 400px; }
+  .doc-stage-example__scene { width: 100%; aspect-ratio: 4 / 3; }
+  .doc-stage-example__caption { margin-top: 0.65rem; color: rgb(var(--terminal-muted)); font-size: 0.8125rem; line-height: 1.45; }
+</style>

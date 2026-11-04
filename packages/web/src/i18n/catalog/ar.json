@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "تتجه الاستيرادات إلى الداخل، من النافذة إلى الهندسة.",
+  "Sketch": "رسم تخطيطي",
+  "Machine setup": "إعداد الماكينة",
+  "Workflow run": "تشغيل سير العمل",
   ", and capabilities.": "، والإمكانيات.",
   ", and client/pairing logic under": "ومنطق العميل/الاقتران ضمن",
   ", and default": "، والافتراضي",

@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "Gli import puntano verso il centro, dalla finestra alla geometria.",
+  "Sketch": "Schizzo",
+  "Machine setup": "Configurazione macchina",
+  "Workflow run": "Esecuzione del workflow",
   ", and the default branch is": "e il ramo predefinito è",
   ", and the dialect files: registered posts and shared program emission.": "e i file dialettali: post registrati ed emissione di programmi condivisi.",
   ", and the machine's reachable private addresses. It is kept in": "e gli indirizzi privati raggiungibili della macchina. È tenuto dentro",

@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "Импорты направлены внутрь: от окна к геометрии.",
+  "Sketch": "Эскиз",
+  "Machine setup": "Настройка станка",
+  "Workflow run": "Запуск процесса",
   "-prefixed tag does not match the version in Tauri configuration. Release validation stops before platform builds.": "Тег с префиксом не соответствует версии в конфигурации Tauri. Проверка выпуска прекращается до сборки платформы.",
   "-programs,": "-программы,",
   ", a credential": ", полномочия",

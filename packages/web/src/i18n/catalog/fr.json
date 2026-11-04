@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "Les imports pointent vers le centre, de la fenêtre à la géométrie.",
+  "Sketch": "Esquisse",
+  "Machine setup": "Configuration de la machine",
+  "Workflow run": "Exécution du workflow",
   ", and the default branch is": ", et la branche par défaut est",
   ", and the dialect files: registered posts and shared program emission.": ", et les fichiers dialectes : messages enregistrés et émission de programmes partagés.",
   ", and the machine's reachable private addresses. It is kept in": ", et les adresses privées accessibles de la machine. Il est conservé dans",

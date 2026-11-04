@@ -1,0 +1,52 @@
+.studio-example .ss-stage {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--ss-well);
+  background-image: none;
+}
+
+.studio-example .studio-example__window {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 520px;
+  height: 300px;
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow-hero);
+}
+
+.studio-example .ss-stage[data-layout="compact"] .studio-example__window {
+  left: 20px;
+  width: 318px;
+}
+
+.studio-example .studio-example__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 8px;
+  font-size: 12px;
+}
+
+.studio-example .studio-example__content {
+  height: 100%;
+  padding: 18px 12px;
+  background: var(--ss-surface);
+}
+
+.studio-example .studio-example__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 8px 14px;
+  color: var(--ss-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.studio-example .studio-example__heading > span:last-child {
+  color: var(--ss-text);
+  font-size: 11px;
+  font-weight: 400;
+}

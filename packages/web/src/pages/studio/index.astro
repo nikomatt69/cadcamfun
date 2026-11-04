@@ -1,8 +1,9 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
-import HeroWorkbench from "../../components/stage/HeroWorkbench"
+import TopicTile from "../../components/stage/TopicTile"
 import FlowWindow from "../../components/stage/FlowWindow"
+import StudioSettingsExample from "../../components/stage/StudioSettingsExample"
 import { text } from "../../i18n/catalog"
 
 const locale = Astro.locals.locale ?? "en"
@@ -38,7 +39,10 @@ export const prerender = false
         <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">{text(locale, "Sign out")}</button>
       </div>
       <p id="studio-who" class="mt-4 text-[15px] text-terminal-muted"></p>
-      <div class="mt-8 max-w-[560px]"><HeroWorkbench client:only="react" /></div>
+      <figure class="mt-8 max-w-[400px]">
+        <TopicTile kind="db" client:only="react" />
+        <figcaption class="mt-2 text-[12px] text-terminal-muted">{text(locale, "Example")}</figcaption>
+      </figure>
 
       <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Workspace")}</h2>
       <div class="mt-4"><FlowWindow client:load title={text(locale, "Workspace")}>
@@ -60,6 +64,10 @@ export const prerender = false
       <p class="mt-2 max-w-2xl text-[14px] leading-relaxed text-terminal-muted">
         {text(locale, "Profile, password, API keys, and the git name used for commits. These write the local database for the signed-in user. Email stays as stored.")}
       </p>
+      <figure class="mt-6 max-w-[560px]">
+        <StudioSettingsExample client:only="react" labels={{ account: text(locale, "Account"), profile: text(locale, "Profile"), password: text(locale, "Password"), git: text(locale, "Git identity"), keys: text(locale, "API keys"), example: text(locale, "Example") }} />
+        <figcaption class="mt-2 text-[12px] text-terminal-muted">{text(locale, "Example")}</figcaption>
+      </figure>
       <p id="account-status" class="mt-3 text-[14px] text-terminal-muted" role="status"></p>
 
       <div class="mt-6"><FlowWindow client:load title={text(locale, "Profile")}>

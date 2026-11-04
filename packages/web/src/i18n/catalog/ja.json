@@ -1,4 +1,8 @@
 {
+  "Imports point inward, from the window to geometry.": "インポートはウィンドウからジオメトリへ内向きに向かいます。",
+  "Sketch": "スケッチ",
+  "Machine setup": "機械のセットアップ",
+  "Workflow run": "ワークフローの実行",
   ", and capabilities.": "、および機能。",
   ", and client/pairing logic under": "、および以下のクライアント/ペアリング ロジック",
   ", and default": "、およびデフォルト",

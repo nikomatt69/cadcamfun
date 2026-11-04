@@ -1,7 +1,7 @@
 ---
 export const prerender = false
 import DocsLayout from "../../../layouts/DocsLayout.astro"
-import { docsFetcher, docsPaths, extractArticleBody, extractDescription, extractSubtitle, extractTitle, extractToc } from "../../../lib/docsMarkdown"
+import { docsFetcher, docsPaths, extractApiExample, extractArticleBody, extractDescription, extractSubtitle, extractTitle, extractToc } from "../../../lib/docsMarkdown"
 import { isLocale, localizePath, type Locale } from "../../../i18n/locales"
 import { translateArticleHtml, translateTextList, workersAiTranslator } from "../../../i18n/translate"
 import { ui } from "../../../i18n/ui"
@@ -20,6 +20,7 @@ let title = "Documentation"
 let description = ""
 let subtitle = ""
 let articleHtml = ""
+let apiExample: { method: string; path: string } | undefined
 let translated = false
 let toc: Array<{ title: string; href: string; depth: number }> = []
 if (docsPaths.has(bare)) {
@@ -28,6 +29,7 @@ if (docsPaths.has(bare)) {
     const page = await docsFetcher(env).fetch(source.toString(), { headers: { Accept: "text/html", Cookie: "cadcamfun_locale=en" } })
     if (!page.ok) throw new Error(`Could not load ${bare}: ${page.status}`)
     const html = await page.text()
+    apiExample = extractApiExample(html)
     title = extractTitle(html)
     description = extractDescription(html)
     subtitle = extractSubtitle(html)
@@ -48,7 +50,7 @@ if (docsPaths.has(bare)) {
 Astro.response.headers.set("Content-Language", locale)
 ---
 
-<DocsLayout title={title} subtitle={subtitle} description={description || title} toc={toc} locale={locale}>
+<DocsLayout title={title} subtitle={subtitle} description={description || title} toc={toc} locale={locale} apiExample={apiExample && { ...apiExample, title }}>
   {docsPaths.has(bare) ? (
     <>
       <p class="not-prose mb-6 rounded-[6px] border border-terminal-border px-4 py-3 text-sm text-terminal-muted">

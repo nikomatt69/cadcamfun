@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
-import { Icon, Stage, Text, Window } from "../../stageshow/kit"
+import { Icon, Text, Window } from "../../stageshow/kit"
 import { useSiteTheme } from "./useSiteTheme"
+import "../../stageshow/kit/stage.css"
 import "./releases.css"
 
 type Kind = "dmg" | "msi" | "nsis" | "deb" | "rpm" | "checksums" | "notes"
@@ -45,31 +46,22 @@ function formatSize(bytes: number): string {
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
 }
 
-const ROW = 36
-const HEAD = 30
-const BAR = 38
-const PAD = 16
-
 function PlatformStage({ title, slugs, version, hits, labels }: { title: string; slugs: string[]; version: Version; hits: Set<string>; labels: ReleaseLabels }) {
   const theme = useSiteTheme()
   const cols = slugs.map((slug) => ({ slug, assets: version.platforms.find((p) => p.slug === slug)?.assets ?? null }))
-  const rows = cols.map((c) => Math.max(1, c.assets?.length ?? 1))
-  const wideH = BAR + PAD * 2 + HEAD + Math.max(...rows) * ROW
-  const compactH = BAR + PAD * 2 + rows.reduce((sum, r) => sum + HEAD + r * ROW + PAD, 0) - PAD
   const labelFor = (kind: Kind) => labels[kind]
   return (
-    <Stage width={760} height={wideH + 32} compact={{ below: 560, width: 358, height: compactH + 32 }} theme={theme} greys="cool" className="rl" key={`${title}-${version.version}`}>
-      {(_s, _r, layout) => (
-        <Window title={title} className="rl-window" style={{ height: layout === "compact" ? compactH : wideH }}>
+    <div className="ss-stage rl" data-theme={theme} data-palette="accent" data-fidelity="standard" data-greys="cool" data-layout="wide">
+        <Window title={title} className="rl-window">
           <div className="rl-body">
             {cols.map((col) => (
               <div key={col.slug} className="rl-col" data-current={hits.has(col.slug) || undefined}>
                 <Text className="rl-col__title">{SLUG_LABEL[col.slug] ?? col.slug}</Text>
-                {col.assets === null ? (
+                {!col.assets?.length ? (
                   <span className="rl-empty">{labels.notInRelease}</span>
                 ) : (
                   col.assets.map((asset) => (
-                    <a key={asset.url} className="rl-asset" href={asset.url}>
+                    <a key={asset.url} className="rl-asset" href={asset.url} aria-label={`${labelFor(asset.kind)} · ${title} ${SLUG_LABEL[col.slug] ?? col.slug}`}>
                       <Icon name="file" size={14} />
                       <span className="rl-asset__name">{labelFor(asset.kind)}</span>
                       <span className="rl-asset__size">{formatSize(asset.size)}</span>
@@ -80,8 +72,7 @@ function PlatformStage({ title, slugs, version, hits, labels }: { title: string;
             ))}
           </div>
         </Window>
-      )}
-    </Stage>
+    </div>
   )
 }
 

@@ -1,15 +1,12 @@
-.ws .ss-fit { margin-inline: 0; }
-.ws .ss-stage { overflow: hidden; background: transparent; background-image: none; }
+.ss-stage.ws { position: relative; top: auto; left: auto; width: 100%; height: auto; overflow: visible; background: transparent; background-image: none; user-select: text; }
 .ws .ws-window {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 968px;
+  width: 100%;
+  height: auto;
   background: var(--ss-surface);
   border-radius: 10px;
   box-shadow: var(--ss-shadow-hero);
 }
-.ws .ss-stage[data-layout="compact"] .ws-window { left: 8px; width: 342px; }
+.ws .ws-window .ss-window__main { min-width: 0; }
 
 .ws-side { display: flex; flex-direction: column; gap: 8px; padding: 44px 10px 12px; }
 .ws-side__head, .ws-cell__role {
@@ -28,7 +25,13 @@
   background: var(--ss-surface);
   min-height: 100%;
 }
-.ws .ss-stage[data-layout="compact"] .ws-grid { grid-template-columns: 1fr; padding: 12px; }
+.ws-compact-apps { display: none; }
+@media (max-width: 719px) {
+  .ws .ws-window > .ss-window__side { display: none; }
+  .ws .ws-grid { grid-template-columns: 1fr; padding: 12px; }
+  .ws-compact-apps { display: grid; gap: 8px; }
+  .ws-compact-apps .ws-side__head { padding: 6px 2px; }
+}
 
 .ws-cell {
   display: flex;

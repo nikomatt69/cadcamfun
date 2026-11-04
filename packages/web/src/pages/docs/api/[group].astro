@@ -14,6 +14,7 @@ export function getStaticPaths() {
 }
 const { group } = Astro.props
 const entries = operationsFor(group)
+const exampleEntry = [...entries].sort((a, b) => a.path.length - b.path.length)[0]
 const schemas = referencedSchemas(entries)
 const category = apiCategories.find((c) => c.slugs.includes(group.slug))?.title ?? "API"
 // Operations grouped by the first path segment after /api, like the resource sections of the server.
@@ -33,7 +34,7 @@ const toc = [
   { title: "Troubleshooting", href: "#group-troubleshooting" },
 ]
 ---
-<DocsLayout title={group.title} subtitle={group.summary} description={`CADCAMFUN ${group.title} API (${category}): ${entries.length} operations with parameters, typed request and response schemas, SDK and curl examples.`} toc={toc}>
+<DocsLayout title={group.title} subtitle={group.summary} description={`CADCAMFUN ${group.title} API (${category}): ${entries.length} operations with parameters, typed request and response schemas, SDK and curl examples.`} toc={toc} apiExample={exampleEntry && { title: group.title, method: exampleEntry.method, path: exampleEntry.path }}>
   <div id="playground"><ApiPlayground /></div>
 
   <section id="operations" class="doc-section">

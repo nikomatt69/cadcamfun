@@ -5,6 +5,7 @@ import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
 import DocRelated from "../../../components/docs/DocRelated.astro"
+import DocStageExample from "../../../components/docs/DocStageExample.astro"
 
 const toc = [
   { title: "What a project contains", href: "#scope" },
@@ -141,6 +142,7 @@ curl --fail-with-body -X PUT "$CADCAM_URL/api/components/$CADCAM_COMPONENT_ID" \
 
   <section id="history" class="doc-section">
     <h2>Choose the history you need</h2>
+    <DocStageExample kind="history" label="Project history" />
     <table>
       <thead><tr><th>Mechanism</th><th>Preserves</th><th>Use</th></tr></thead>
       <tbody>

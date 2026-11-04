@@ -43,7 +43,7 @@ const docLinks = [
           {text(locale, "From sketch to G-code in one window.")}
         </h2>
         <div class="mt-10">
-          <ProductTiles client:only="react" titles={[text(locale, "Toolpaths on the part"), text(locale, "An assistant that edits the model"), text(locale, "G-code from your post")]} />
+          <ProductTiles client:only="react" titles={[text(locale, "Toolpaths on the part"), text(locale, "An assistant that edits the model"), text(locale, "G-code from your post"), text(locale, "Sketch"), text(locale, "Machine setup"), text(locale, "Workflow run")]} />
         </div>
       </div>
     </section>
@@ -52,7 +52,7 @@ const docLinks = [
       <div class="page-shell">
         <p class="font-mono text-eyebrow uppercase text-terminal-accent">{text(locale, "Boundaries")}</p>
         <h2 id="boundary-heading" class="font-display mt-3 max-w-2xl text-[clamp(1.8rem,3vw,2.6rem)] font-bold tracking-[-0.035em]">
-          {text(locale, "Imports point inward, from geometry to the window.")}
+          {text(locale, "Imports point inward, from the window to geometry.")}
         </h2>
         <div class="mt-10 max-w-[760px]"><LayerDiagram client:only="react" /></div>
         <div class="material mt-6 rounded-[var(--radius-card)] p-5 sm:p-8">

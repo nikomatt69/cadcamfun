@@ -1,5 +1,5 @@
 import { Box, Download, Layers, PenLine } from "lucide-react"
-import { Bar, Code, Stage, Text, Window, Prompt, Caret, type Act } from "../../stageshow/kit"
+import { Bar, Code, Stage, Text, Window, Caret, type Act } from "../../stageshow/kit"
 import { PartView } from "./PartView"
 import { useSiteTheme } from "./useSiteTheme"
 import "./workbench.css"
@@ -113,7 +113,6 @@ export default function HeroWorkbench() {
           </Window>
 
           <Window chrome="terminal" title="bracket.nc" className="wb-terminal" data-show={s.post || undefined}>
-            <Prompt path="~/bracket">post --linuxcnc</Prompt>
             <Code lines={GCODE} count={s.lines} className="wb-code" />
             <Caret />
           </Window>

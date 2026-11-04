@@ -1,11 +1,11 @@
 import { Avatar, Bar, Caret, Code, Icon, Prompt, Row, Segmented, Stage, Stream, Text, Toggle, Window } from "../../stageshow/kit"
 import { PartView } from "./PartView"
 import { useSiteTheme } from "./useSiteTheme"
+import { workflowScript, WORKFLOW_POSTER, WORKFLOW_STEPS } from "./workflow-sequence"
 import "./workbench.css"
 import "./tiles.css"
 
-// Three feature tiles for the home page, one per thing the app does: toolpaths
-// over the part, an assistant that edits the model, G-code posted from it.
+// Product examples for the home page and documentation topics.
 // Each is a still: the payoff is on screen, real words only where the story is.
 
 const TILE = { width: 400, height: 300, compact: { below: 400, width: 358, height: 300 } } as const
@@ -13,9 +13,11 @@ const TILE = { width: 400, height: 300, compact: { below: 400, width: 358, heigh
 function Tile({ children, name }: { children: (layout: "wide" | "compact") => React.ReactNode; name: string }) {
   const theme = useSiteTheme()
   return (
-    <Stage {...TILE} theme={theme} greys="cool" className={`tile tile-${name}`}>
-      {(_s, _r, layout) => children(layout)}
-    </Stage>
+    <div aria-hidden="true">
+      <Stage {...TILE} theme={theme} greys="cool" className={`tile tile-${name}`}>
+        {(_s, _r, layout) => children(layout)}
+      </Stage>
+    </div>
   )
 }
 
@@ -101,7 +103,7 @@ function PostTile() {
           </Window>
           <div className="tile-card tile-card--post">
             <Text className="tile-card__label">Post</Text>
-            <Text className="tile-card__value">LinuxCNC</Text>
+            <Text className="tile-card__value">GRBL</Text>
             <Bar w={60} h={5} tone={2} />
           </div>
         </>
@@ -131,29 +133,20 @@ function CadTile() {
   )
 }
 
-const API_LINES = [
-  "POST /api/toolpaths",
-  '{ "operation": "pocket",',
-  '  "depth": 4 }',
-  "",
-  { text: "200 OK", kind: "add" as const },
-  '{ "cycle": "04:12" }',
-]
+export type ApiExample = { title: string; method: string; path: string }
 
-function ApiTile() {
+function ApiTile({ example = { title: "Projects", method: "GET", path: "/api/projects" } }: { example?: ApiExample }) {
   return (
     <Tile name="api">
       {() => (
-        <>
-          <Window chrome="terminal" title="HttpApi" className="tile-window">
-            <Code lines={API_LINES} className="tile-code" />
-          </Window>
-          <div className="tile-card tile-card--api">
-            <Text className="tile-card__label">Contract</Text>
-            <Text className="tile-card__value">api</Text>
-            <Bar w={48} h={5} tone={2} />
+        <Window title="HTTP API" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-api">
+            <div className="tile-api__heading"><Text>{example.title}</Text><span>Endpoint</span></div>
+            <div className="tile-api__request"><span>{example.method}</span><code>{example.path}</code></div>
+            <div className="tile-api__detail"><Text>Contract</Text><span>OpenAPI</span></div>
+            <div className="tile-api__detail"><Text>Client</Text><span>SDK</span></div>
           </div>
-        </>
+        </Window>
       )}
     </Tile>
   )
@@ -297,7 +290,7 @@ function UpdateTile() {
         <>
           <Window title="CADCAMFUN" className="tile-window" body={{ className: "tile-body" }}>
             <div className="tile-list tile-settings">
-              <div className="tile-setting"><Text>Version 0.1.76</Text><Icon name="check" size={14} /></div>
+              <div className="tile-setting"><Text>Desktop app</Text><Icon name="check" size={14} /></div>
               <div className="tile-setting"><Text>Check for updates</Text><Toggle on /></div>
               <div className="tile-setting"><Bar w={90} h={7} tone={2} /><Bar w={30} h={7} tone={2} /></div>
             </div>
@@ -338,28 +331,228 @@ function PairTile() {
   )
 }
 
-export type TopicKind = "cam" | "ai" | "post" | "cad" | "api" | "history" | "arch" | "term" | "db" | "config" | "update" | "pair"
+function WorkflowTile() {
+  const theme = useSiteTheme()
+  return (
+    <div aria-hidden="true">
+      <Stage {...TILE} initial={{ completed: 0 }} poster={WORKFLOW_POSTER} script={workflowScript} play="once" theme={theme} greys="cool" className="tile tile-workflow">
+      {(state) => (
+        <Window title="Workflow run" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-flow">
+            <div className="tile-flow__heading"><Text>Bracket setup</Text><span>main</span></div>
+            {WORKFLOW_STEPS.map((step, index) => (
+              <div className="tile-flow__step" key={step} data-state={index < state.completed ? "done" : index === state.completed ? "running" : "pending"}>
+                <span className="tile-flow__marker"><span className="tile-flow__play"><Icon name="play" size={12} /></span><span className="tile-flow__check"><Icon name="check" size={12} /></span></span>
+                <Text>{step}</Text>
+                <span className="tile-flow__state"><span className="tile-flow__queued">Queued</span><span className="tile-flow__running">Running</span><span className="tile-flow__done">Done</span></span>
+              </div>
+            ))}
+          </div>
+        </Window>
+      )}
+      </Stage>
+    </div>
+  )
+}
+
+function PluginTile() {
+  return (
+    <Tile name="plugin">
+      {() => (
+        <Window title="Plugins" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-plugin">
+            <div className="tile-plugin__heading"><Text>Installed</Text><span>2 plugins</span></div>
+            <div className="tile-plugin__row"><span className="tile-plugin__icon"><Icon name="gear" size={16} /></span><div><Text>Tool assistant</Text><small>AI tool</small></div><Toggle on /></div>
+            <div className="tile-plugin__row"><span className="tile-plugin__icon"><Icon name="file" size={16} /></span><div><Text>Part inspector</Text><small>AI tool</small></div><Toggle on /></div>
+            <div className="tile-plugin__footer"><Bar w={70} h={7} tone={2} /><Bar w={44} h={20} r={5} tone={2} /></div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function SketchTile() {
+  return (
+    <Tile name="sketch">
+      {() => (
+        <Window title="Sketch" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-sketch">
+            <svg viewBox="0 0 290 208" aria-hidden="true" focusable="false">
+              <path className="tile-sketch__axis" d="M20 150H270M72 18V192" />
+              <path className="tile-sketch__shape" d="M72 150V65H220V150Z" />
+              <circle className="tile-sketch__hole" cx="146" cy="108" r="23" />
+              <path className="tile-sketch__dimension" d="M72 166V179M220 166V179M72 173H220" />
+              <text x="146" y="190" textAnchor="middle">80 mm</text>
+              <circle cx="72" cy="150" r="4" className="tile-sketch__point" />
+            </svg>
+            <span className="tile-sketch__badge"><Icon name="check" size={12} /><Text>Constrained</Text></span>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function MeshTile() {
+  return (
+    <Tile name="mesh">
+      {() => (
+        <Window title="Mesh preview" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-mesh">
+            <div className="tile-mesh__viewport"><PartView pocket /></div>
+            <div className="tile-mesh__details"><Text>Part preview</Text><span>Triangle mesh</span></div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function MachineTile() {
+  return (
+    <Tile name="machine">
+      {() => (
+        <Window title="Machine setup" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-machine">
+            <div className="tile-machine__row"><Text>Machine</Text><span>3-axis mill</span></div>
+            <div className="tile-machine__row"><Text>Stock</Text><span>Aluminium</span></div>
+            <div className="tile-machine__row"><Text>Work offset</Text><span>G54</span></div>
+            <div className="tile-machine__foot"><Icon name="check" size={12} /><Text>Setup ready</Text></div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function FeatureTile() {
+  const features = ["Sketch 1", "Extrude", "Pocket", "Fillet"]
+  return (
+    <Tile name="feature">
+      {() => (
+        <Window title="Feature history" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-feature">
+            <div className="tile-feature__view"><PartView pocket /></div>
+            <div className="tile-feature__list">
+              {features.map((feature, index) => (
+                <div className="tile-feature__row" key={feature} data-selected={index === 2 || undefined}>
+                  <span>{String(index + 1).padStart(2, "0")}</span><Text>{feature}</Text>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function PlaybackTile() {
+  return (
+    <Tile name="playback">
+      {() => (
+        <Window title="Toolpath preview" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-playback">
+            <div className="tile-playback__view"><PartView pocket path /></div>
+            <div className="tile-playback__controls">
+              <span className="tile-playback__play"><Icon name="play" size={13} /></span>
+              <span className="tile-playback__track"><span /></span>
+              <Text>02:06 / 04:12</Text>
+            </div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function ResourceTile() {
+  const files = ["packages/core", "packages/api", "apps/sidecar", "apps/desktop"]
+  return (
+    <Tile name="resource">
+      {() => (
+        <Window title="Source map" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-resource">
+            <div className="tile-resource__heading"><Text>Workspace</Text><span>Repository</span></div>
+            {files.map((file, index) => (
+              <div className="tile-resource__row" key={file} data-selected={index === 0 || undefined}>
+                <Icon name="file" size={14} /><Text>{file}</Text><Icon name="chevron-right" size={13} />
+              </div>
+            ))}
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function ToleranceTile() {
+  return (
+    <Tile name="tolerance">
+      {() => (
+        <Window title="Tessellation" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-tolerance">
+            <svg viewBox="0 0 160 150" aria-hidden="true" focusable="false">
+              <circle cx="80" cy="75" r="48" className="tile-tolerance__circle" />
+              <path d="M80 27 114 41 128 75 114 109 80 123 46 109 32 75 46 41Z" className="tile-tolerance__polygon" />
+            </svg>
+            <div className="tile-tolerance__caption"><Text>Curve tolerance</Text><span>0.1 mm</span></div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+function AccountTile() {
+  return (
+    <Tile name="account">
+      {() => (
+        <Window title="Local profile" toolbar={<Icon name="more" size={16} />} className="tile-window" body={{ className: "tile-body" }}>
+          <div className="tile-account">
+            <div className="tile-account__person"><Avatar name="Alex" size={32} tone="person" /><div><Text>Alex Morgan</Text><span>Local account</span></div></div>
+            <div className="tile-account__field"><Text>Profile</Text><span>Personal details</span><Icon name="chevron-right" size={14} /></div>
+            <div className="tile-account__field"><Text>API keys</Text><span>Manage access</span><Icon name="chevron-right" size={14} /></div>
+          </div>
+        </Window>
+      )}
+    </Tile>
+  )
+}
+
+export type TopicKind = "cam" | "ai" | "post" | "cad" | "api" | "history" | "arch" | "term" | "db" | "config" | "update" | "pair" | "workflow" | "plugin" | "sketch" | "mesh" | "machine" | "feature" | "playback" | "resource" | "tolerance" | "account"
 
 /** One tile on its own, for a docs page or a form that wants a picture of the thing it describes. */
-export function TopicTile({ kind }: { kind: TopicKind }) {
+export function TopicTile({ kind, apiExample }: { kind: TopicKind; apiExample?: ApiExample }) {
   switch (kind) {
     case "cam": return <CamTile />
     case "ai": return <AssistantTile />
     case "post": return <PostTile />
     case "cad": return <CadTile />
-    case "api": return <ApiTile />
+    case "api": return <ApiTile example={apiExample} />
     case "history": return <HistoryTile />
     case "term": return <TermTile />
     case "db": return <DbTile />
     case "config": return <ConfigTile />
     case "update": return <UpdateTile />
     case "pair": return <PairTile />
-    default: return <ArchTile />
+    case "workflow": return <WorkflowTile />
+    case "plugin": return <PluginTile />
+    case "sketch": return <SketchTile />
+    case "mesh": return <MeshTile />
+    case "machine": return <MachineTile />
+    case "feature": return <FeatureTile />
+    case "playback": return <PlaybackTile />
+    case "resource": return <ResourceTile />
+    case "tolerance": return <ToleranceTile />
+    case "account": return <AccountTile />
+    case "arch": return <ArchTile />
   }
 }
 
-export default function ProductTiles({ titles }: { titles: [string, string, string] }) {
-  const tiles = [<CamTile key="cam" />, <AssistantTile key="ai" />, <PostTile key="post" />]
+export default function ProductTiles({ titles }: { titles: [string, string, string, string, string, string] }) {
+  const tiles = [<CamTile key="cam" />, <AssistantTile key="ai" />, <PostTile key="post" />, <SketchTile key="sketch" />, <MachineTile key="machine" />, <WorkflowTile key="workflow" />]
   return (
     <div className="tiles-grid">
       {tiles.map((tile, i) => (

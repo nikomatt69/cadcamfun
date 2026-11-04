@@ -5,6 +5,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
+import DocStageExample from "../../components/docs/DocStageExample.astro"
 
 const toc = [
   { title: "Drawing entities", href: "#drawing" },
@@ -47,6 +48,7 @@ const toc = [
 <p>The sketch model contains named points, lines between points, circles with a center and radius, and counter-clockwise arcs. Shared point identifiers express shared endpoints. Constraints include coincidence, horizontal and vertical alignment, distances, lengths, parallel and perpendicular lines, equal lengths and radii, tangency, symmetry, and geometric incidence.</p>
     <p>The numerical solver minimizes constraint residuals with a Levenberg–Marquardt iteration and a central-difference Jacobian. It reports degrees of freedom, free points, redundant equations, and conflicting constraints. A result can be fully constrained, under-constrained, over-constrained, conflicting, or failed. An under-constrained solution can satisfy every dimension while still allowing motion; callers must preserve that distinction.</p>
     <p>Sketch constraints receive numbers. Parametric histories resolve parameter expressions before invoking the solver. Sketch angle constraints are radians; use the feature's own input convention when converting a user-entered dimension.</p>
+    <DocStageExample kind="sketch" label="Constrained sketches" />
   </section>
 
   <section id="history" class="doc-section">

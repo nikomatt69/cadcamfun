@@ -1,44 +1,41 @@
 import { Bar, Connector, Icon, Row, Stage, Text, Window } from "../../stageshow/kit"
 import { useSiteTheme } from "./useSiteTheme"
+import { dependencyConnector } from "./layer-diagram"
 import "./diagrams.css"
 
 // Two home-page diagrams drawn as product UI: the packages and apps of the
 // workspace, and the direction imports point (geometry to the window).
 
 const LAYERS = ["core", "api", "sidecar", "desktop"] as const
-const CHIP = { w: 112, h: 44, y: 64, x0: 28, gap: 52 }
+const CHIP = { w: 112, h: 34 }
 
 /** Imports point inward: four layers, one arrow between each. */
 export function LayerDiagram() {
   const theme = useSiteTheme()
-  const at = (i: number) => CHIP.x0 + i * (CHIP.w + CHIP.gap)
   return (
+    <div aria-hidden="true">
     <Stage width={720} height={150} compact={{ below: 560, width: 358, height: 300 }} theme={theme} greys="cool" className="dg dg-layers">
-      {(_s, _r, layout) => {
+      {(_s, rect, layout) => {
         const compact = layout === "compact"
-        const pos = (i: number) => (compact ? { x: 20 + (i % 2) * 168, y: 36 + Math.floor(i / 2) * 104 } : { x: at(i), y: CHIP.y })
+        const pos = (i: number) => compact ? { x: 107, y: 12 + i * 48 } : { x: 24 + i * 150, y: 24 }
         return (
           <>
-            <Window title="Imports" className="dg-window">
+            <Window title="Imports" toolbar={<Icon name="more" size={16} />} className="dg-window">
               {LAYERS.map((name, i) => (
-                <div key={name} className="dg-chip" data-active={i === 0 || undefined} style={{ left: pos(i).x - 12, top: pos(i).y - 38, width: CHIP.w, height: CHIP.h }}>
+                <div key={name} className="dg-chip" data-target={`layer-${i}`} data-active={i === 0 || undefined} style={{ left: pos(i).x, top: pos(i).y, width: CHIP.w, height: CHIP.h }}>
                   <Text>{name}</Text>
-                  {i === 0 ? <Icon name="check" size={12} /> : <Bar w={22} h={5} tone={2} />}
                 </div>
               ))}
             </Window>
             {LAYERS.slice(0, -1).map((_, i) => {
-              const a = pos(i)
-              const b = pos(i + 1)
-              const from = compact ? (i % 2 === 0 ? { x: a.x + CHIP.w + 8, y: a.y + 22 } : { x: a.x + CHIP.w / 2, y: a.y + CHIP.h + 8 }) : { x: a.x + CHIP.w + 4, y: a.y + 22 }
-              const to = compact ? (i % 2 === 0 ? { x: b.x - 8, y: b.y + 22 } : { x: b.x + CHIP.w / 2, y: b.y - 8 }) : { x: b.x - 4, y: b.y + 22 }
-              if (compact && i % 2 === 1) return null
-              return <Connector key={i} from={from} to={to} show arrow dots="none" route="straight" />
+              const link = dependencyConnector(rect(`layer-${i + 1}`), rect(`layer-${i}`), compact)
+              return link ? <Connector key={i} {...link} show arrow dots="none" route="straight" /> : null
             })}
           </>
         )
       }}
     </Stage>
+    </div>
   )
 }
 
