@@ -1653,7 +1653,15 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly mode?: "parallel" | "contour" | "swarf"
         readonly top: number
         readonly angle?: number
-        readonly toolAxis?: "normal" | "lead"
+        readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"
+        readonly axisPoint?: { readonly x: number; readonly y: number; readonly z: number }
+        readonly axisLine?: {
+          readonly a: { readonly x: number; readonly y: number; readonly z: number }
+          readonly b: { readonly x: number; readonly y: number; readonly z: number }
+        }
+        readonly axisCurve?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+        readonly maxTilt?: number
+        readonly holderDiameter?: number
         readonly lead?: number
         readonly tilt?: number
         readonly walls?: ReadonlyArray<{
@@ -2118,7 +2126,15 @@ export type ToolpathGeneratorPlanPayload = {
         readonly mode?: "parallel" | "contour" | "swarf"
         readonly top: number
         readonly angle?: number
-        readonly toolAxis?: "normal" | "lead"
+        readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"
+        readonly axisPoint?: { readonly x: number; readonly y: number; readonly z: number }
+        readonly axisLine?: {
+          readonly a: { readonly x: number; readonly y: number; readonly z: number }
+          readonly b: { readonly x: number; readonly y: number; readonly z: number }
+        }
+        readonly axisCurve?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+        readonly maxTilt?: number
+        readonly holderDiameter?: number
         readonly lead?: number
         readonly tilt?: number
         readonly walls?: ReadonlyArray<{
@@ -2641,7 +2657,15 @@ export type ToolpathGeneratorJobPayload = {
           readonly mode?: "parallel" | "contour" | "swarf"
           readonly top: number
           readonly angle?: number
-          readonly toolAxis?: "normal" | "lead"
+          readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"
+          readonly axisPoint?: { readonly x: number; readonly y: number; readonly z: number }
+          readonly axisLine?: {
+            readonly a: { readonly x: number; readonly y: number; readonly z: number }
+            readonly b: { readonly x: number; readonly y: number; readonly z: number }
+          }
+          readonly axisCurve?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly maxTilt?: number
+          readonly holderDiameter?: number
           readonly lead?: number
           readonly tilt?: number
           readonly walls?: ReadonlyArray<{
