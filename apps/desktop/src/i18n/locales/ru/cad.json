@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Толщина узора",
   "cad.template.honeycombPattern.thickness.label": "Толщина",
   "cad.template.honeycombPattern.color.description": "Цвет узора",
-  "cad.template.honeycombPattern.color.label": "Цвет"
+  "cad.template.honeycombPattern.color.label": "Цвет",
+  "cad.param.refLost": "Ссылка потеряна",
+  "cad.param.refLostBy": "удалено элементом {feature}",
+  "cad.param.refLostSummary": "Выборок, указывающих на несуществующие грани или рёбра: {count}; эти элементы не построены"
 }

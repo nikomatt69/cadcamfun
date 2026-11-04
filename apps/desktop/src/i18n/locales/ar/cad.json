@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "سماكة النمط",
   "cad.template.honeycombPattern.thickness.label": "السماكة",
   "cad.template.honeycombPattern.color.description": "لون النمط",
-  "cad.template.honeycombPattern.color.label": "اللون"
+  "cad.template.honeycombPattern.color.label": "اللون",
+  "cad.param.refLost": "فُقد المرجع",
+  "cad.param.refLostBy": "أزاله {feature}",
+  "cad.param.refLostSummary": "{count} تحديدات تشير إلى أوجه أو حواف لم تعد موجودة: تلك الميزات لم تُبنَ"
 }

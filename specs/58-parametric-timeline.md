@@ -161,3 +161,9 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
   (meshes, issues in order, states, lineage, planes, sketches), and the two caches together equal the full exact result.
   Open: the sidecar does not yet hold a per-part `RebuildCache` (adapter work for lane D: one cache per open part, passed to
   `rebuild` and `rebuildExact`).
+- 2026-11-04 (desktop lane): lost persistent references are badged on the timeline (spec 41 N7/N8, desktop side, row 1.4 of spec 72).
+  `apps/desktop/src/features/cad/lib/ref-loss.ts` reads the kernel's `reference lost: <ref>: ... removed by '<feature>'` issue;
+  `ParametricPanel` shows a "Reference lost" badge on the failing feature (the reference in `data-ref`/title), a link that focuses the
+  feature that removed the entity, and a timeline-level count. Test: `apps/desktop/test/parametric-panel-ref-loss.test.ts` (a split
+  removes the plate top that a fillet's edge ref names). Cross-lane need: the core `Issue` carries no `code`/`lostBy` field, so the
+  desktop reads the message prefix; a typed `{ code: "ref-lost", ref, lostBy }` on `Issue` would remove that coupling.

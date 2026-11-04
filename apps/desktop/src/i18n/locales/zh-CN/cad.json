@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "图案厚度",
   "cad.template.honeycombPattern.thickness.label": "厚度",
   "cad.template.honeycombPattern.color.description": "图案颜色",
-  "cad.template.honeycombPattern.color.label": "颜色"
+  "cad.template.honeycombPattern.color.label": "颜色",
+  "cad.param.refLost": "引用丢失",
+  "cad.param.refLostBy": "被 {feature} 移除",
+  "cad.param.refLostSummary": "{count} 个选择指向已不存在的面或边：这些特征未构建"
 }
