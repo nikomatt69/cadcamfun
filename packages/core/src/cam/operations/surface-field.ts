@@ -15,6 +15,7 @@ import type { Vec2 } from "../../cad/vec.ts"
 import type { Grid } from "../model/dexel.ts"
 import { toolModel } from "../verify/tool-model.ts"
 import type { Tool } from "../tool.ts"
+import { MeshDropCutter, type DropMesh } from "./mesh-drop-cutter.ts"
 import { OperationBudgetError } from "./common.ts"
 
 /**
@@ -39,6 +40,13 @@ export const cutterOf = (tool: Tool, allowance = 0): Cutter => {
     const m = toolModel({ kind: tool.kind, diameter: tool.diameter, ...(tool.angle !== undefined ? { angle: tool.angle } : {}) })
     return { radius: m.radius, profile: m.profile, flat: false, lift: 0 }
   }
+  if (tool.profile !== undefined && tool.profile.length >= 2) {
+    // A swept-profile cutter: its own envelope. The grown body (stock to leave) is bounded by the envelope shifted out by `a`, which
+    // keeps at least `a` of clearance everywhere (conservative where the real offset is rounder).
+    const m = toolModel({ kind: tool.kind, diameter: tool.diameter, profile: tool.profile })
+    const a = Math.max(0, allowance)
+    return { radius: m.radius + a, flat: false, lift: a, profile: (r) => m.profile(Math.max(0, r - a)) }
+  }
   const corner = tool.kind === "ballnose" ? R : Math.min(tool.tipRadius ?? 0, R)
   const a = Math.max(0, allowance)
   const Rg = R + a, c = corner + a
@@ -59,6 +67,22 @@ export class Surface {
   private samples = 0
 
   constructor(readonly grid: Grid, /** Top of the part per column, -Infinity where there is none. */ readonly height: Float64Array, private readonly sampleLimit: number = MAX_SURFACE_SAMPLES) {}
+
+  private exact: { readonly mesh: DropMesh; readonly byCutter: WeakMap<Cutter, MeshDropCutter> } | undefined
+  /**
+   * Contact against the part's triangles (spec 69 F1, `mesh-drop-cutter.ts`) instead of the sampled columns: exact on the mesh, with no
+   * half-cell safety margin, and an overhang is never entered. The meshes are merged once.
+   */
+  withMesh(meshes: ReadonlyArray<DropMesh>): this {
+    const positions: number[] = [], indices: number[] = []
+    for (const m of meshes) {
+      const base = positions.length / 3
+      for (let i = 0; i < m.positions.length; i++) positions.push(m.positions[i]!)
+      for (let i = 0; i < m.indices.length; i++) indices.push(m.indices[i]! + base)
+    }
+    this.exact = { mesh: { positions, indices }, byCutter: new WeakMap() }
+    return this
+  }
 
   private box: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } | undefined
   /** Extent in XY of the columns that hold material (undefined when there is none). */
@@ -99,6 +123,12 @@ export class Surface {
   tip(cutter: Cutter, x: number, y: number): number {
     if (++this.samples > this.sampleLimit) {
       throw new OperationBudgetError(`The surface pass asked for more than ${this.sampleLimit.toLocaleString("en-US")} cutter-contact samples: raise the stepover, the tolerance or the scallop, or finish a smaller region`)
+    }
+    if (this.exact !== undefined) {
+      let dc = this.exact.byCutter.get(cutter)
+      if (dc === undefined) { dc = new MeshDropCutter(this.exact.mesh, cutter); this.exact.byCutter.set(cutter, dc) }
+      const z = dc.drop(x, y)
+      return z === -Infinity ? z : z + cutter.lift
     }
     const { nx, ny, minX, minY, cellX, cellY } = this.grid
     // Nothing of the part within reach of this position: no need to look at a single column.

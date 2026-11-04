@@ -16,6 +16,11 @@ export interface PartModel {
    */
   readonly conservative?: Dexels
   readonly grid: Grid
+  /**
+   * The triangle meshes the part was built from (booleans already resolved into `dexels`; a part built from booleans carries only the
+   * plain operands, so the exact contact of `SurfaceParams.contact: "mesh"` is offered for plain solids and refused otherwise).
+   */
+  readonly meshes?: ReadonlyArray<Mesh64>
   /** Elements that are not plain solids and so are not part of the model (type + name). */
   readonly skipped: ReadonlyArray<string>
   readonly warnings: ReadonlyArray<string>
@@ -121,7 +126,8 @@ export const buildPartModel = (elements: ReadonlyArray<Element>, options: ModelO
   const dexels = roots.map((n) => fill(n, grid)).reduce((acc, d) => acc.union(d))
   // Booleans are done on the sample columns first, then pooled: a pocket is not widened by pooling its operands.
   const conservative = roots.map((n) => fill(n, fine, NODE_JITTER)).reduce((acc, d) => acc.union(d)).pool(grid, r)
-  return { dexels, conservative, grid, skipped, warnings, bounds: { min, max } }
+  const plain = roots.every((n) => "mesh" in n)
+  return { dexels, conservative, grid, skipped, warnings, bounds: { min, max }, ...(plain ? { meshes } : {}) }
 }
 
 /**
@@ -154,5 +160,5 @@ export const buildPartModelFromMeshes = (
     .reduce((acc, d) => acc.union(d))
   const r = refineFactor(grid), fine = nodeSampleGrid(grid, r)
   const conservative = wide.map((m) => Dexels.fromMesh(m, fine, NODE_JITTER).dexels).reduce((acc, d) => acc.union(d)).pool(grid, r)
-  return { dexels, conservative, grid, skipped: [], warnings, bounds: { min, max } }
+  return { dexels, conservative, grid, skipped: [], warnings, bounds: { min, max }, meshes: wide }
 }
