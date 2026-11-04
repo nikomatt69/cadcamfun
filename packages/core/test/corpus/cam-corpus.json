@@ -1,0 +1,132 @@
+{
+  "$comment": "CAM program entries of the corpus (spec 55 set (d), spec 72 P0-8). Expectations are written by hand from the job's definition: release level, the claims the job decides, and the part volume against the analytic volume. `hash` is over the job; when a fixture changes it, re-derive the expectation before updating the hash.",
+  "entries": [
+    {
+      "id": "d-block-outline",
+      "set": "d",
+      "kind": "cam-program",
+      "licence": "project",
+      "source": {
+        "job": "block-outline"
+      },
+      "hash": "sha256:3135e05dd3f63a6fa1bdc2d0680c341891b4581c8c1fa61427b719e62044659e",
+      "budgetMs": 15000,
+      "capabilities": [
+        "cam.release-3axis"
+      ],
+      "expected": {
+        "release": "verified-program",
+        "claims": {
+          "no-gouge": "passed",
+          "material-removed": "passed",
+          "nc-replay": "passed",
+          "holder-clearance": "passed"
+        },
+        "partVolume": 24000,
+        "formula": "60*40*10",
+        "partVolumeRelTol": 0.01
+      }
+    },
+    {
+      "id": "d-block-outline-jaw",
+      "set": "d",
+      "kind": "cam-program",
+      "licence": "project",
+      "source": {
+        "job": "block-outline-jaw"
+      },
+      "hash": "sha256:62eda977a16af4030de7f62362c7b4831bebd17a56685a9f8666cc9059f186cb",
+      "budgetMs": 15000,
+      "capabilities": [
+        "cam.release-3axis",
+        "cam.fixtures"
+      ],
+      "expected": {
+        "release": "verified-program",
+        "claims": {
+          "setup-workholding": "passed",
+          "machine-clearance": "passed",
+          "no-gouge": "passed"
+        },
+        "partVolume": 24000,
+        "formula": "60*40*10",
+        "partVolumeRelTol": 0.01
+      }
+    },
+    {
+      "id": "d-block-outline-clamp-collision",
+      "set": "d",
+      "kind": "cam-program",
+      "licence": "project",
+      "source": {
+        "job": "block-outline-clamp"
+      },
+      "hash": "sha256:adc4d4dc5be6c393e570b7833791af2b44f90989d5fc93cfb0f2e37114229a56",
+      "budgetMs": 15000,
+      "capabilities": [
+        "cam.fixtures"
+      ],
+      "expected": {
+        "release": "blocked",
+        "claims": {
+          "setup-workholding": "failed",
+          "machine-clearance": "failed"
+        },
+        "partVolume": 24000,
+        "formula": "60*40*10",
+        "partVolumeRelTol": 0.01
+      }
+    },
+    {
+      "id": "d-side-hole-fixtured",
+      "set": "d",
+      "kind": "cam-program",
+      "licence": "project",
+      "source": {
+        "job": "side-hole-fixtured"
+      },
+      "hash": "sha256:e7e892a09694b94ff0e47ccc0d5cfefbec6cba5627bb7e20bd35a19ce8ff94f8",
+      "budgetMs": 15000,
+      "capabilities": [
+        "cam.release-orientation",
+        "cam.fixtures"
+      ],
+      "expected": {
+        "release": "verified-program",
+        "claims": {
+          "setup-workholding": "passed",
+          "no-gouge": "passed",
+          "material-removed": "passed"
+        },
+        "partVolume": 3124.602,
+        "formula": "20*16*10 - pi*2^2*6",
+        "partVolumeRelTol": 0.01
+      }
+    },
+    {
+      "id": "d-side-hole-unfixtured",
+      "set": "d",
+      "kind": "cam-program",
+      "licence": "project",
+      "source": {
+        "job": "side-hole-unfixtured"
+      },
+      "hash": "sha256:663dc00d877f2589a9e1eb054eb0a8c0fd16aeb6d6b1b107d4a4ca27201d6983",
+      "budgetMs": 15000,
+      "capabilities": [
+        "cam.release-orientation"
+      ],
+      "expected": {
+        "release": "preview",
+        "claims": {
+          "setup-workholding": "unresolved",
+          "part-coverage": "unresolved",
+          "no-gouge": "passed"
+        },
+        "partVolume": 3124.602,
+        "formula": "20*16*10 - pi*2^2*6",
+        "partVolumeRelTol": 0.01
+      }
+    }
+  ]
+}

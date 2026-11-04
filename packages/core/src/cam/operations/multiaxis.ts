@@ -257,6 +257,44 @@ export const reachOf = (p: Vec3, axis: Vec3, holderRadius: number, from: number,
 const tiltFromZ = (axis: Vec3): number => Math.acos(Math.max(-1, Math.min(1, axis.z))) / RAD
 
 /**
+ * The full tool assembly and the static bodies of the fixing, in part coordinates (spec 72 P0-6). With it a lean is only accepted when
+ * the flutes, the shank and the holder stay clear of the part and of every box (fixture bodies turn with the part on a table machine,
+ * so they are static here). Without it only the cutter envelope is checked, as before.
+ */
+export interface GenerationAssembly {
+  readonly fluteLength: number
+  readonly shankDiameter: number
+  readonly stickout: number
+  readonly holder?: { readonly diameter: number; readonly length: number }
+  readonly boxes?: ReadonlyArray<{ readonly min: Vec3; readonly max: Vec3 }>
+}
+
+const inBox = (q: Vec3, b: { readonly min: Vec3; readonly max: Vec3 }): boolean =>
+  q.x > b.min.x && q.x < b.max.x && q.y > b.min.y && q.y < b.max.y && q.z > b.min.z && q.z < b.max.z
+
+/** Points on the shank and holder above the contact point `p` (rings every <= 4 mm), and the flutes, for the assembly check. */
+const assemblyPoints = (p: Vec3, axis: Vec3, a: GenerationAssembly): { shank: Vec3[]; holder: Vec3[] } => {
+  const seed: Vec3 = Math.abs(axis.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+  const u = unit(cross(axis, seed))
+  const v = cross(axis, u)
+  const rings = (from: number, to: number, radius: number, into: Vec3[]): void => {
+    const n = Math.max(1, Math.ceil((to - from) / 4))
+    for (let i = 0; i <= n; i++) {
+      const centre = add(p, scale(axis, from + ((to - from) * i) / n))
+      into.push(centre)
+      for (let k = 0; k < 8; k++) {
+        const t = (k * Math.PI) / 4
+        into.push(add(centre, add(scale(u, radius * Math.cos(t)), scale(v, radius * Math.sin(t)))))
+      }
+    }
+  }
+  const shank: Vec3[] = [], holder: Vec3[] = []
+  rings(a.fluteLength, a.stickout, a.shankDiameter / 2, shank)
+  if (a.holder !== undefined) rings(a.stickout, a.stickout + a.holder.length, a.holder.diameter / 2, holder)
+  return { shank, holder }
+}
+
+/**
  * The sample for a contact point: the first lean (the base, then steeper ones in both directions) whose cutter stays
  * clear of the part and whose table angles the machine can reach. `undefined` when none does.
  */
@@ -267,7 +305,8 @@ const sampleAt = (
   tool: Tool,
   soup: TriangleSoup,
   k: FiveAxisKinematic,
-  guide?: TriangleSoup
+  guide?: TriangleSoup,
+  assembly?: GenerationAssembly
 ): Sample | undefined => {
   const usable = (axis: Vec3): Sample | undefined => {
     if (params.maxTilt !== undefined && tiltFromZ(axis) > params.maxTilt + 1e-9) return undefined
@@ -275,7 +314,14 @@ const sampleAt = (
     if (angles === undefined) return undefined
     const env = envelopeOf(hit.point, axis, tool, params.flute)
     const free = env.cut.every((q) => !soup.inside(q)) && env.body.every((q) => soup.isClear(q, params.gougeClearance))
-    return free ? { point: hit.point, angles, tip: tipPosition(hit.point, angles, k), leaned: false } : undefined
+    if (!free) return undefined
+    if (assembly !== undefined) {
+      const boxes = assembly.boxes ?? []
+      const above = assemblyPoints(hit.point, axis, assembly)
+      const clear = [...above.shank, ...above.holder].every((q) => soup.isClear(q, params.gougeClearance) && boxes.every((b) => !inBox(q, b)))
+      if (!clear || [...env.cut, ...env.body].some((q) => boxes.some((b) => inBox(q, b)))) return undefined
+    }
+    return { point: hit.point, angles, tip: tipPosition(hit.point, angles, k), leaned: false }
   }
   if (params.toolAxis === "point" || params.toolAxis === "line" || params.toolAxis === "curve" || params.toolAxis === "surface") {
     const base = guideAxis(params, hit.point, guide)
@@ -321,6 +367,12 @@ const sampleAt = (
     const env = envelopeOf(hit.point, axis, tool, params.flute)
     const free = env.cut.every((q) => !soup.inside(q)) && env.body.every((q) => soup.isClear(q, params.gougeClearance))
     if (!free) continue
+    if (assembly !== undefined) {
+      const boxes = assembly.boxes ?? []
+      const above = assemblyPoints(hit.point, axis, assembly)
+      const clear = [...above.shank, ...above.holder].every((q) => soup.isClear(q, params.gougeClearance) && boxes.every((b) => !inBox(q, b)))
+      if (!clear || [...env.cut, ...env.body].some((q) => boxes.some((b) => inBox(q, b)))) continue
+    }
     return { point: hit.point, angles, tip: tipPosition(hit.point, angles, k), leaned: index > 0 }
   }
   return undefined
@@ -328,7 +380,7 @@ const sampleAt = (
 
 // ---------------------------------------------------------------- the operation
 
-export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>, cutter?: SwarfCutter, guide?: TriangleSoup): MultiaxisResult => {
+export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>, cutter?: SwarfCutter, guide?: TriangleSoup, assembly?: GenerationAssembly): MultiaxisResult => {
   const warnings: string[] = []
   const bounds = soup.bounds
   const topZ = bounds.max[2]
@@ -382,7 +434,7 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
         // Revisit the first point to cut the closing leg, but never bridge an unreachable interval.
         for (const xy of [...loop, loop[0]!]) {
           const hit = soup.down(xy.x, xy.y, topZ + 1)
-          const sample = take(hit === undefined ? undefined : sampleAt(hit, travelOf(loop, xy), params, tool, soup, k, guide))
+          const sample = take(hit === undefined ? undefined : sampleAt(hit, travelOf(loop, xy), params, tool, soup, k, guide, assembly))
           if (sample === undefined) {
             if (run.length > 0) sections.push(run)
             run = []
@@ -430,7 +482,7 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
     let run: Sample[] = []
     for (const p of line) {
       const hit = soup.down(p.x, p.y, topZ + 1)
-      const sample = hit === undefined ? undefined : take(sampleAt(hit, travel, params, tool, soup, k, guide))
+      const sample = hit === undefined ? undefined : take(sampleAt(hit, travel, params, tool, soup, k, guide, assembly))
       if (sample === undefined) {
         if (run.length > 0) sections.push(run)
         run = []
