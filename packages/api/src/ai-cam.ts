@@ -1,3 +1,4 @@
+import { CamProbeApplyInput, CamProbeInput, CamProbeRunInput } from "./ai-cam-probe.ts"
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
 import { CamMachineConfig } from "./cam-machine-config.ts"
@@ -205,5 +206,8 @@ export const CAM_ACTION_INPUTS = {
   "cam_edit.stock_set": CamStockSetInput,
   "cam_edit.setup_save": CamSetupSaveInput,
   "cam_edit.manufacture": CamManufactureOperationInput,
-  "cam_edit.export": CamExportInput
+  "cam_edit.export": CamExportInput,
+  "cam_edit.probe": CamProbeInput,
+  "cam_edit.probe_run": CamProbeRunInput,
+  "cam_edit.probe_apply": CamProbeApplyInput
 } as const

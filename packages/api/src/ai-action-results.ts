@@ -249,6 +249,15 @@ const generated = Schema.Struct({
 /** A verification is a verdict: `ok` is false when the replay finds a collision or gouge. */
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
 /** An export is a stored file: its name, key, size and hash, plus what went into it. The bytes are never in the answer. */
+/** A probe operation stored with its program (spec 73 §3.3). */
+const probeStored = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), operationId: str, cycle: str, programHash: str, lines: int, dialect: str, revision: str, warnings: strings }), [record])
+/** A kept probe report. `ok` is the verdict (a failed inspection is an answer, not a refusal). */
+const probeReported = Schema.StructWithRest(Schema.Struct({
+  ok: Schema.Boolean, reportId: str, operationId: str, kind: str,
+  verdict: Schema.Literals(["pass", "warn", "fail", "missed", "incomplete"]), checks: int, failed: int, offsetsUpdated: Schema.Boolean
+}), [record])
+/** What `probe_apply` wrote into the machine: the rows, or the rotary calibration. */
+const probeApplied = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), machineConfigId: str, updatedAt: str, applied: strings }), [record])
 const exported = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), format: str, file: ExportedFile, warnings: strings }), [record])
 /** A simulation answers with its numbers and findings, never with whole fields. */
 const simulated = Schema.StructWithRest(Schema.Struct({ ok: Schema.Literal(true), op: Schema.Literals(["run", "converge", "materials", "library"]) }), [record])
@@ -444,6 +453,9 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.stock_set": write(["stock"], stockSet),
   "cam_edit.setup_save": write(["operation"], setupSaved),
   "cam_edit.export": write(["file"], exported),
+  "cam_edit.probe": write(["operation", "program"], probeStored),
+  "cam_edit.probe_run": write(["report"], probeReported),
+  "cam_edit.probe_apply": write(["library"], probeApplied),
 
   "library.component_list": read(componentList),
   "library.lookup_component": read(rows()),

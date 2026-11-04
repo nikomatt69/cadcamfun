@@ -156,13 +156,14 @@ export const LibraryMachineConfigInput = Schema.Struct({
     }),
     Schema.Array(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]))
   ])),
-  /** The touch probe: what it can measure and how. */
-  probing: Schema.optionalKey(Schema.Struct({
-    cycles: Schema.optionalKey(Schema.Array(Schema.String)),
-    stylusRadius: Schema.optionalKey(positive),
-    feed: Schema.optionalKey(positive),
-    dialect: Schema.optionalKey(Schema.Literals(["linuxcnc", "fanuc"]))
-  })),
+  /** The touch probe: stylus, feeds, calibration, what the control offers (spec 73, the core machine-profile shape; degrees). */
+  probing: Schema.optionalKey(cam.kernel.MachineProbingSchema),
+  /** The tool setter on the table, machine coordinates. */
+  toolSetter: Schema.optionalKey(cam.kernel.MachineToolSetterSchema),
+  /** The work offsets the machine holds, per machine and per setup. */
+  workOffsetTable: Schema.optionalKey(cam.kernel.MachineWorkOffsetTableSchema),
+  /** What the last rotary calibration measured (kept with the rotary axis). */
+  rotaryCalibration: Schema.optionalKey(cam.kernel.MachineRotaryCalibrationSchema),
   /** The tool changer: what it holds and how long a change takes. */
   toolChanger: Schema.optionalKey(Schema.Struct({
     type: Schema.optionalKey(Schema.Literals(["manual", "carousel", "chain", "umbrella", "rack"])),
