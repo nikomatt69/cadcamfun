@@ -73,6 +73,9 @@ const selectedRef = (g: ReadonlyArray<number>, p: number | undefined): WorkOffse
   return undefined
 }
 
+/** Okuma `G15 H<n>`: H1..H6 are G54..G59, above them the extended offsets. */
+const okumaRef = (h: number): WorkOffsetRef => (h <= 6 ? { kind: "g5x", code: `G${53 + h}` as "G54" } : { kind: "extended", p: h - 6 })
+
 /** The machine under the macro runtime: `expand` is what `expandMacros` takes, `finish` reads the outcome once the program has run. */
 export interface NcProbeHost {
   readonly expand: ExpandOptions
@@ -335,7 +338,8 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
       else if (code === 21) unit = 1
       else if (code === 69) frame = undefined
     }
-    const sel = selectedRef(g, words.get("P"))
+    // On Okuma G56 is the tool length: only G15 selects an offset.
+    const sel = family === "okuma" ? (g.includes(15) && words.has("H") ? okumaRef(words.get("H")!) : undefined) : selectedRef(g, words.get("P"))
     if (sel !== undefined) active = sel
     if (g.includes(68.2)) { frame = frameOfG682((l) => words.get(l), unit); return true }
     if (g.includes(68)) { frame = frameOfG68((words.get("X") ?? 0) * unit, (words.get("Y") ?? 0) * unit, words.get("R") ?? 0); return true }
@@ -422,6 +426,8 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
       const key = (["x", "y", "z"] as const)[i]!
       return (Number(pos[1]) >= 5061 ? skip[key] : machineToProg(here())[key]) / unit
     }
+    const ok = /^(VSKP|VPPA)([XYZ])$/.exec(name)
+    if (ok !== null) return (ok[1] === "VSKP" ? skip : machineToProg(here()))[ok[2]!.toLowerCase() as "x" | "y" | "z"] / unit
     const mw = /^\$AA_MW\[([XYZ])\]$/.exec(name)
     if (mw !== null) return skip[mw[1]!.toLowerCase() as "x" | "y" | "z"] / unit
     if (name === "#5070" || name === "$AC_MEA[1]") return touched

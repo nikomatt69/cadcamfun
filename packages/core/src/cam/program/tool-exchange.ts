@@ -34,13 +34,14 @@ export const toIso13399 = (cutters: ReadonlyArray<Cutter>): string => {
     if (c.tipDiameter !== undefined) props.push(["CAD_TIP_DIAMETER", n(c.tipDiameter), "mm"])
     if (c.neckDiameter !== undefined) props.push(["CAD_NECK_DIAMETER", n(c.neckDiameter), "mm"])
     if (c.headHeight !== undefined) props.push(["CAD_HEAD_HEIGHT", n(c.headHeight), "mm"])
+    if (c.formRadius !== undefined) props.push(["CAD_FORM_RADIUS", n(c.formRadius), "mm"])
     if (c.maxRpm !== undefined) props.push(["CAD_MAX_RPM", n(c.maxRpm)])
     return `  <ToolItem id="${esc(c.id)}" name="${esc(c.name)}">\n${props.map(([code, v, unit]) => `    <Property code="${code}"${unit !== undefined ? ` unit="${unit}"` : ""}>${esc(v)}</Property>`).join("\n")}\n  </ToolItem>`
   })
   return `<?xml version="1.0" encoding="UTF-8"?>\n<Iso13399 version="1">\n${items.join("\n")}\n</Iso13399>\n`
 }
 
-const KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail"]
+const KINDS = ["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail", "tapered", "lollipop", "barrel", "lens", "probe"]
 
 /** Reads `toIso13399` output. Throws a RangeError naming the tool and the missing/invalid property. */
 export const fromIso13399 = (xml: string): ReadonlyArray<Cutter> => {
@@ -64,7 +65,7 @@ export const fromIso13399 = (xml: string): ReadonlyArray<Cutter> => {
       fluteLength: need("APMX"), shankDiameter: need("DCONMS"), stickout: need("LF"),
       ...(opt("RE") !== undefined ? { cornerRadius: opt("RE")! } : {}), ...(opt("CAD_ANGLE") !== undefined ? { angle: opt("CAD_ANGLE")! } : {}),
       ...(opt("CAD_PITCH") !== undefined ? { pitch: opt("CAD_PITCH")! } : {}), ...(opt("CAD_TIP_DIAMETER") !== undefined ? { tipDiameter: opt("CAD_TIP_DIAMETER")! } : {}),
-      ...(opt("CAD_NECK_DIAMETER") !== undefined ? { neckDiameter: opt("CAD_NECK_DIAMETER")! } : {}), ...(opt("CAD_HEAD_HEIGHT") !== undefined ? { headHeight: opt("CAD_HEAD_HEIGHT")! } : {}),
+      ...(opt("CAD_NECK_DIAMETER") !== undefined ? { neckDiameter: opt("CAD_NECK_DIAMETER")! } : {}), ...(opt("CAD_HEAD_HEIGHT") !== undefined ? { headHeight: opt("CAD_HEAD_HEIGHT")! } : {}), ...(opt("CAD_FORM_RADIUS") !== undefined ? { formRadius: opt("CAD_FORM_RADIUS")! } : {}),
       ...(opt("CAD_MAX_RPM") !== undefined ? { maxRpm: opt("CAD_MAX_RPM")! } : {})
     }
     out.push(c)

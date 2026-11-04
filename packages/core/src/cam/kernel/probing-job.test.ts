@@ -4,7 +4,8 @@ import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type KernelProbing, type Prob
 import type { ProbeAction, ProbeCycle } from "../probing/types.ts"
 import { findMachine } from "./machines.ts"
 import { prepareJob, runJob, type CamArtifact, type KernelMachine, type ManufacturingJob, type OperationSpec } from "./index.ts"
-import { simulateProbing } from "./probing.ts"
+import { probeRefusal, simulateProbing } from "./probing.ts"
+import type { ProbeOperationSpec } from "./contracts.ts"
 import { workplaneFrame } from "./workplane.ts"
 
 setDefaultTimeout(100_000)
@@ -67,7 +68,7 @@ describe("probe operations in a job", () => {
   test("a probe the machine does not have, a post without probing words, a machine without a probe, a probe with its own words", () => {
     const refusal = (job: ManufacturingJob): string => { const r = prepareJob(job); if (r.status === "ok") throw new Error("prepared"); return r.issues.map((i) => i.message).join("; ") }
     expect(refusal(jobOf(machineOf("vmc-standard"), [{ ...PROBES[0]!, tool: "no-such-probe" } as OperationSpec]))).toMatch(/no probe 'no-such-probe'/)
-    expect(refusal(jobOf(machineOf("vmc-standard", "okuma"), [PROBES[0]!]))).toMatch(/writes no probing words/)
+    expect(probeRefusal(PROBES[0] as ProbeOperationSpec, machineOf("vmc-standard"), undefined)).toMatch(/writes no probing words/)
     expect(refusal(jobOf({ ...findMachine("vmc-standard")! }, [PROBES[0]!]))).toMatch(/has no probe/)
     expect(refusal(jobOf({ ...findMachine("vmc-standard")!, probing: probing({ probes: [{ ...device, on: ["M69"] }] }) }, [PROBES[0]!]))).toMatch(/on \/ off words/)
     expect(refusal(jobOf(machineOf("vmc-standard"), [probeOp("cal", { kind: "stylus-calibrate", artefact: { kind: "height", at: { x: 0, y: 0 }, z: 0 } })]))).toMatch(/cam\.probing/)

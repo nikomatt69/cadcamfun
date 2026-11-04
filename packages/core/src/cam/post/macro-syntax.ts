@@ -66,7 +66,10 @@ export class MacroEmitter {
     if (have !== undefined) return { index: have, fresh: false }
     const base = NAMED_BASE[this.family as keyof typeof NAMED_BASE]
     if (base === undefined) return refuse(this.family, `the named variable '${name}'`)
-    const index = this.family === "heidenhain" ? base - this.names.size : base + this.names.size
+    const n = this.names.size
+    // Fanuc common variables stop at #199 and go on at #500; Klartext's free parameters end at Q0.
+    if (this.family === "heidenhain" && n > base) throw new RangeError(`The program needs more than ${base + 1} parameters: Klartext has no more free Q numbers below Q${base}`)
+    const index = this.family === "heidenhain" ? base - n : this.family === "fanuc" && base + n >= 200 ? 500 + (base + n - 200) : base + n
     this.names.set(name, index)
     return { index, fresh: true }
   }

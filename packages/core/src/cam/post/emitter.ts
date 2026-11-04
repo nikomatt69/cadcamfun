@@ -30,7 +30,7 @@ import {
   isProbingMove,
   moveTarget
 } from "../ir.ts"
-import { type ArcMode, type Dialect, type PlaneCall, type PostOptions, type TiltedPlane, defaultPostOptions } from "./types.ts"
+import { type ArcMode, type Dialect, type PlaneCall, type PostOptions, type ProbeSyntax, type TiltedPlane, defaultPostOptions } from "./types.ts"
 import { prepareFiveAxis, tipMinutesOf } from "./five-axis-frame.ts"
 import { frameMatrix, isIdentityPlane } from "./workplane.ts"
 import { angleText } from "./spindle-orient.ts"
@@ -41,9 +41,11 @@ import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
 import { alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
 import { addressOf } from "../work-offset.ts"
 import { isKlartextProbeCycle, klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
-import type { WordExpr } from "../macro.ts"
+import { lowerExprDepth, type WordExpr } from "../macro.ts"
 
 const MM_PER_INCH = 25.4
+/** Nesting a control takes in one formula, one level left for the brackets of the whole right-hand side (Fanuc five, Klartext's own limit). */
+const PROBE_EXPR_DEPTH: Readonly<Partial<Record<ProbeSyntax, number>>> = { fanuc: 4, linuxcnc: 4, okuma: 4, heidenhain: 6 }
 
 /** Fixed-decimal number; `-0.000` becomes `0.000`; zero decimals keep a trailing dot (control convention). */
 export const formatNumber = (value: number, decimals: number): string => {
@@ -1155,6 +1157,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   const planes = planesOf(program, userOptions, dialect)
   const prepared = prepareFiveAxis(program, userOptions, dialect)
   program = prepared.program
+  const exprDepth = dialect.probing === undefined ? undefined : PROBE_EXPR_DEPTH[dialect.probing.syntax]
+  // A probe program computes its results on the control, which limits how deep brackets nest: deep formulas go through scratch variables.
+  if (exprDepth !== undefined) program = { ...program, toolpaths: program.toolpaths.map((tp) => (tp.moves.some((m) => m._tag === "Probe") ? { ...tp, moves: lowerExprDepth(tp.moves, exprDepth, (i) => ({ name: `pzt${i}` })) } : tp)) }
   const options: PostOptions = { ...defaultPostOptions, ...prepared.options }
   const w = new Writer(options, dialect, resolveArcMode(options.arcMode, dialect), program.units)
   const numbers = toolNumbers(program, options.toolNumbers)

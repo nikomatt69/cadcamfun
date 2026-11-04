@@ -87,6 +87,19 @@ class Builder {
     this.at = to
   }
 
+  /**
+   * Off a contact, the way the probe came: a plain feed move. The stylus is still deflected, and a control refuses or ends at once an armed
+   * move that starts with the probe triggered (Fanuc skips at the first servo cycle, LinuxCNC errors, Siemens alarms).
+   */
+  leave(to: Vec3, set: Partial<Record<Axis, Expr>>): void {
+    const expr = this.exprOf(to, set)
+    this.moves.push({ _tag: "Linear", to, feed: this.ctx.probe.feeds.positioning, ...(expr !== undefined ? { expr } : {}) })
+    const next: Partial<Record<Axis, Expr>> = {}
+    for (const a of ["x", "y", "z"] as const) if (expr?.[a] !== undefined) next[a] = expr[a]
+    this.computed = next
+    this.at = to
+  }
+
   /** Up to the safe height, staying over the point the probe is at. */
   up(): void {
     if (this.at === undefined) return
@@ -115,7 +128,7 @@ class Builder {
       for (const a of ["x", "y", "z"] as const) if (!moving.includes(a) && startComputed[a] !== undefined) set[a] = startComputed[a]!
       this.at = expected
       this.computed = {}
-      this.go(back, set)
+      this.leave(back, set)
       this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed: p.feeds.touch, kind: "touch", onMiss: "alarm", store: storeOf(name, store) })
     } else {
       this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed: p.feeds.touch, kind: "touch", onMiss: "alarm", store: storeOf(name, store) })
@@ -125,7 +138,7 @@ class Builder {
     // Back to the start along the touch (the way the probe came is free).
     this.at = expected
     this.computed = {}
-    this.go(start, startComputed)
+    this.leave(start, startComputed)
     const read = (a: Axis): Expr => (store.includes(a) ? this.e(`${name}${a}`) : startComputed[a] ?? start[a])
     return { x: read("x"), y: read("y"), z: read("z") }
   }

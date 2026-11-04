@@ -9,8 +9,9 @@
  */
 import { binary, call, num, type Condition, type Expr } from "../macro.ts"
 import type { Move } from "../ir.ts"
-import { policyCondition, policyProblem, type OffsetAxis } from "../work-offset.ts"
-import type { Characteristic, ProbeAction, ProbeContext, ProbeRoutine } from "./types.ts"
+import { policyCondition, policyProblem, type OffsetAxis, type WorkOffsetRef } from "../work-offset.ts"
+import type { Characteristic, ProbeAction, ProbeContext, ProbeCycle, ProbeRoutine } from "./types.ts"
+import { planProbeCycle } from "./cycles.ts"
 import { characteristicProblem } from "./simulate.ts"
 
 const DEG = Math.PI / 180
@@ -153,3 +154,31 @@ export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<Pro
 /** The corrections the host would apply for `set-offset` actions given the results (core units), for comparing with the IR run. */
 export const offsetDeltas = (routine: ProbeRoutine, results: Readonly<Record<string, number>>, action: Extract<ProbeAction, { readonly kind: "set-offset" }>): Partial<Record<OffsetAxis, number>> =>
   Object.fromEntries((Object.entries(action.axes) as Array<[OffsetAxis, string]>).map(([axis, r]) => [axis, (results[r] ?? NaN) - (routine.units[r] === "deg" ? (routine.nominal[r] ?? 0) * DEG : routine.nominal[r] ?? 0)]))
+
+/**
+ * The one probing a control without variables can do (GRBL): touch a surface once and make the tip read what the drawing says there
+ * (`G10 L20`, spec 73 §5.3: `set` only, no policy, no result to read). A face along an axis or the top of a part; anything that needs a
+ * computed value is refused.
+ */
+export const grblTouchOff = (cycle: ProbeCycle, ref: WorkOffsetRef, ctx: ProbeContext): Move[] | { readonly refused: string } => {
+  if (cycle.kind !== "z-surface" && cycle.kind !== "edge") return { refused: `a ${cycle.kind} needs computed results, which a control without variables cannot hold` }
+  const p = ctx.probe
+  const single: ProbeContext = { ...ctx, probe: { ...p, doubleTouch: false } }
+  const r = planProbeCycle(cycle, single)
+  if ("refused" in r) return r
+  const touch = r.contacts[0]!
+  const axis = cycle.kind === "z-surface" ? "Z" : Math.abs(touch.direction.x) > 0.999999 ? "X" : Math.abs(touch.direction.y) > 0.999999 ? "Y" : undefined
+  if (axis === undefined) return { refused: "G10 L20 sets one axis: an angled face needs computed results" }
+  const key = axis.toLowerCase() as "x" | "y" | "z"
+  const moves: Move[] = []
+  for (const m of r.moves) {
+    if (m._tag === "Assign") continue
+    if (m._tag === "Probe" && m.kind === "touch") {
+      const { store: _store, ...bare } = m
+      moves.push(bare, { _tag: "OffsetUpdate", target: { kind: "work", ref }, axis, mode: "set", reads: true, value: touch.expected[key] })
+      continue
+    }
+    moves.push(m)
+  }
+  return moves
+}

@@ -329,7 +329,8 @@ export const runProbeMoves = (moves: ReadonlyArray<Move>, world: ProbeWorld3, ma
           const key = ENTRY[m.axis]
           const before = (entry[key] as number | undefined) ?? 0
           const value = angular(m.axis) ? v * DEG : v
-          const after = m.mode === "set" ? value : before + value
+          // "The tip reads v": the offset is the machine position less v, whatever it was.
+          const after = m.reads === true ? at[m.axis.toLowerCase() as "x" | "y" | "z"] - value : m.mode === "set" ? value : before + value
           table = withOffset(table, ref, { ...entry, [key]: after })
           updates.push({ ref, axis: m.axis, before, after })
         } else {

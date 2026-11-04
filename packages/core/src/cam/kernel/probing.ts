@@ -68,7 +68,7 @@ export const probeRefusal = (op: ProbeOperationSpec, machine: KernelMachine, dia
   const device = resolveProbe(machine.probing, op.tool)
   if (device === undefined) return `Machine ${machine.id} has no probe '${op.tool}' (it has ${machine.probing.probes.map((p) => p.id).join(", ") || "none"})`
   if (device.on !== undefined || device.off !== undefined) return `The probe ${device.id} needs its own on / off words (${[...(device.on ?? []), ...(device.off ?? [])].join(" ")}): the post does not write them, put them in the tool-change macro and remove them from the device`
-  if (dialect?.probing === undefined) return `Post ${machine.post} writes no probing words: use a post that does (fanuc, haas, mazak, mitsubishi, brother, generic, linuxcnc, siemens, heidenhain) or a machine with one`
+  if (dialect?.probing === undefined) return `Post ${machine.post} writes no probing words: use a post that does (fanuc, haas, mazak, mitsubishi, brother, generic, okuma, linuxcnc, siemens, heidenhain) or a machine with one`
   if (tilted && machine.probing.tiltedPlane !== true) return `The setup is a tilted plane and the machine's probing does not say the control probes inside one (probing.tiltedPlane): the touches would be read in the wrong frame`
   if (op.native === true) {
     const family = machine.probing.macroStyle === "heidenhain-ts" ? "heidenhain" : machine.probing.macroStyle === "siemens-cycles" ? "siemens" : machine.probing.macroStyle === "renishaw" ? "fanuc" : undefined

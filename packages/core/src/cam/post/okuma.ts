@@ -27,6 +27,7 @@ export const okumaDialect: Dialect = {
   dwellWord: "F",
   uppercaseComments: true,
   rotary: true,
+  probing: { syntax: "okuma", offsets: "okuma" },
   spindleOrient: isoSpindleOrient,
   cutterComp: isoCutterComp,
   workOffset: (offset) => `G15 H${Number(offset.slice(1)) - 53}`,

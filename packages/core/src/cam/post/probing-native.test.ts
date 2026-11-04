@@ -98,3 +98,19 @@ describe("native probe cycles", () => {
     refused({ kind: "pocket", centre: { x: 0, y: 0 }, width: 20, angle: 0.5, depth: 3 }, [], "siemens-cycles", /axis/)
   })
 })
+
+describe("formula depth on the control", () => {
+  const depthOf = (line: string): number => { let d = 0, m = 0; for (const c of line.replace(/\([^)]*\)/g, "")) { if (c === "[") m = Math.max(m, ++d); else if (c === "]") d-- } return m }
+  test("no Fanuc or LinuxCNC line nests brackets deeper than five, on the deepest cycles", () => {
+    const cycles: ReadonlyArray<ProbeCycle> = [
+      { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, angles: [0, 1, 2, 3, 4, 5] },
+      { kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 },
+      { kind: "plane", points: [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 90, y: 50 }, { x: 55, y: 50 }], expectedZ: 0 },
+      { kind: "sphere", centre: { x: 20, y: 30, z: 5 }, diameter: 25 }
+    ]
+    for (const id of ["fanuc", "linuxcnc"] as const) for (const c of cycles) {
+      const lines = write(id, inlineOf(c, []).moves, false).split("\n")
+      expect(Math.max(...lines.map(depthOf))).toBeLessThanOrEqual(5)
+    }
+  })
+})

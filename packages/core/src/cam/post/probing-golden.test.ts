@@ -10,6 +10,8 @@ import { makeProgram, type Move, type Program } from "../ir.ts"
 import { formatOffsetRef, type WorkOffsetRef } from "../work-offset.ts"
 import { simulateNc } from "../testing/probe-machine.ts"
 import { dialectOf, posts } from "./index.ts"
+import { emitProgram } from "./emitter.ts"
+import { grblTouchOff } from "../probing/actions.ts"
 import type { PostId } from "./types.ts"
 
 /**
@@ -29,6 +31,7 @@ const DIALECTS: ReadonlyArray<Dialect> = [
   { id: "mitsubishi", second: { kind: "extended", p: 3 }, report: true, alarmCode: false },
   { id: "brother", second: { kind: "extended", p: 3 }, report: true, alarmCode: false },
   { id: "generic", second: { kind: "extended", p: 3 }, report: true, alarmCode: false },
+  { id: "okuma", second: { kind: "extended", p: 3 }, report: false, alarmCode: true },
   { id: "linuxcnc", second: { kind: "linuxcnc", p: 8 }, report: true, alarmCode: true },
   { id: "siemens", second: { kind: "frame", n: 5 }, report: false, alarmCode: true }
 ]
@@ -69,7 +72,9 @@ const agree = (id: PostId, dialect: Dialect, moves: ReadonlyArray<Move>, ref: Wo
   for (const axis of ["x", "y", "z"] as const) near(nc.offsets[key]![axis], ir.offsets[key]![axis])
   expect(nc.updates.map((u) => `${formatOffsetRef(u.ref)}:${u.axis}`)).toEqual(ir.updates.map((u) => `${formatOffsetRef(u.ref)}:${u.axis}`))
   nc.updates.forEach((u, i) => near(u.after, ir.updates[i]!.after))
-  expect(nc.alarms.map((a) => a.text.toUpperCase())).toEqual(ir.alarms.map((a) => a.text.toUpperCase()))
+  // OSP's alarm message holds 16 characters.
+  const message = (t: string): string => (id === "okuma" ? t.toUpperCase().slice(0, 16) : t.toUpperCase())
+  expect(nc.alarms.map((a) => message(a.text))).toEqual(ir.alarms.map((a) => message(a.text)))
   expect(Boolean(nc.stopped)).toBe(Boolean(ir.stopped))
   return { ir, nc, text }
 }
@@ -90,7 +95,7 @@ describe("probe goldens replay to the IR's results", () => {
       near(nc.offsets["G54"]!.x, BASE.x + 0.7, 2e-3)
       near(nc.offsets["G54"]!.y, BASE.y - 0.4, 2e-3)
       expect(nc.updates.length).toBe(2)
-      expect(text).toContain("G54")
+      expect(text).toContain(id === "okuma" ? "G15 H1" : "G54")
       if (dialect.report) {
         expect(nc.reports.length).toBe(ir.reports.length)
         const want = ir.reports[0]!.values
@@ -114,11 +119,11 @@ describe("probe goldens replay to the IR's results", () => {
       const { nc, text } = agree(id, dialect, moves, dialect.second, cornerWorld(0.3, 0.2), "corner")
       near(nc.offsets[formatOffsetRef(dialect.second)]!.x, 150.3, 2e-3)
       near(nc.offsets[formatOffsetRef(dialect.second)]!.y, 250.2, 2e-3)
-      const select = id === "siemens" ? "G505" : id === "linuxcnc" ? "G59.2" : id === "haas" ? "G154 P3" : "G54.1 P3"
+      const select = id === "siemens" ? "G505" : id === "linuxcnc" ? "G59.2" : id === "haas" ? "G154 P3" : id === "okuma" ? "G15 H9" : "G54.1 P3"
       expect(text.split("\n").some((l) => l.includes(select))).toBe(true)
     })
 
-    test(`${id}: a tool length on the setter goes into the tool table`, () => {
+    if (id !== "okuma") test(`${id}: a tool length on the setter goes into the tool table`, () => {
       const setter = { kind: "contact" as const, position: { x: 400, y: 150, z: -150 }, triggerZ: -290, discDiameter: 12, maxToolDiameter: 40, feeds: { fast: 800, touch: 60 }, brokenTolerance: 0.1 }
       const sctx = { ...ctx, safeZ: 200, setter, workOrigin: BASE }
       const r0 = planProbeCycle({ kind: "tool-length", tool: 5, nominalLength: 80 }, sctx)
@@ -149,10 +154,56 @@ describe("probe goldens replay to the IR's results", () => {
     })
   }
 
-  test("a machine without probing words refuses the program, never writes it without them", () => {
+  test("okuma refuses what it has no words for: a tool-table write, a report", () => {
+    const setter = { kind: "contact" as const, position: { x: 400, y: 150, z: -150 }, triggerZ: -290, discDiameter: 12, maxToolDiameter: 40, feeds: { fast: 800, touch: 60 }, brokenTolerance: 0.1 }
+    const r0 = planProbeCycle({ kind: "tool-length", tool: 5, nominalLength: 80 }, { ...ctx, safeZ: 200, setter, workOrigin: BASE })
+    if ("refused" in r0) throw new Error(r0.refused)
+    const tool = compileActions(r0, [{ kind: "tool-offset", tool: 5, quantity: "length", result: "length", part: "geometry" }], ctx)
+    expect(() => posts["okuma"].emit(programOf("p", tool, G54), { header: false })).toThrow(/tool length/)
     const r = routineOf({ kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 })
-    const program = programOf("p", r.moves, G54)
-    expect(() => posts["okuma"].emit(program, { header: false })).toThrow(/writes no probing/)
+    expect(() => posts["okuma"].emit(programOf("p", compileActions(r, [{ kind: "report", results: ["z"] }], ctx), G54), { header: false })).toThrow(/report/)
+  })
+
+  test("heidenhain: a bore with its inspection replays, one axis per touch", () => {
+    const r = routineOf({ kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5 })
+    const moves = compileActions(r, [{ kind: "inspect", characteristics: chars, onFail: "alarm" }], ctx)
+    const machine = machineFor(G54, { kind: "g5x", code: "G55" })
+    const world = boreWorld(0.7, -0.4)
+    const ir = runProbeMoves(moves, world, machine)
+    const text = posts["heidenhain"].emit(programOf("probe heidenhain", moves, G54), { header: false })
+    expectGolden("probing/heidenhain-bore.nc", text)
+    const nc = simulateNc(text, { world, machine, codes: dialectOf("heidenhain")!.probing! })
+    expect(nc.errors).toEqual([])
+    expect(nc.contacts.length).toBe(ir.contacts.length)
+    ir.contacts.forEach((c, i) => { near(nc.contacts[i]!.tip.x, c.tip.x); near(nc.contacts[i]!.tip.y, c.tip.y) })
+    expect(nc.alarms.length).toBe(0)
+  })
+
+  test("grbl: a surface touched off with G10 L20 replays to the IR's offset, what needs variables is refused", () => {
+    const moves = grblTouchOff({ kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 }, G54, ctx)
+    if ("refused" in moves) throw new Error(moves.refused)
+    const machine = machineFor(G54, { kind: "g5x", code: "G55" })
+    const world = boreWorld(0, 0)
+    const shifted = plateWorld({ min: { x: 0, y: 0, z: -20 }, max: { x: 100, y: 60, z: 0 } }, { translate: { x: BASE.x, y: BASE.y, z: BASE.z + 0.25 } })
+    const ir = runProbeMoves(moves, shifted, machine)
+    near(ir.offsets["G54"]!.z, BASE.z + 0.25, 1e-9)
+    const text = posts["grbl"].emit(programOf("probe grbl", moves, G54), { header: false })
+    expectGolden("probing/grbl-z-surface.nc", text)
+    expect(text).toContain("G10 L20 P1 Z0.000")
+    const nc = simulateNc(text, { world: shifted, machine, codes: dialectOf("grbl")!.probing! })
+    expect(nc.errors).toEqual([])
+    near(nc.updates.find((u) => u.axis === "Z")!.after, BASE.z + 0.25)
+    void world
+    expect(() => posts["grbl"].emit(programOf("p", routineOf({ kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 }).moves, G54), { header: false })).toThrow(/no variables/)
+    const edge = grblTouchOff({ kind: "edge", at: { x: 0, y: 20, z: -5 }, normal: { x: -1, y: 0 } }, G54, ctx)
+    if ("refused" in edge) throw new Error(edge.refused)
+    expect(grblTouchOff({ kind: "bore", centre: { x: 0, y: 0 }, diameter: 20, depth: 3 }, G54, ctx)).toHaveProperty("refused")
+  })
+
+  test("a program of the kernel's own probing words on a post without them is refused", () => {
+    const r = routineOf({ kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 })
+    const generic = { ...dialectOf("fanuc")!, probing: undefined }
+    expect(() => emitProgram(programOf("p", r.moves, G54), { header: false }, generic)).toThrow(/writes no probing/)
   })
 
   test("heidenhain writes a touch and refuses a step-level preset write with the reason", () => {

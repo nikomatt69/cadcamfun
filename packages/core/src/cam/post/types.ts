@@ -147,7 +147,7 @@ export interface SwivelSettings {
 }
 
 /** The probing syntax family of a dialect (`probing-writer.ts`). */
-export type ProbeSyntax = "fanuc" | "linuxcnc" | "siemens" | "heidenhain" | "grbl"
+export type ProbeSyntax = "fanuc" | "okuma" | "linuxcnc" | "siemens" | "heidenhain" | "grbl"
 
 /** The control's probing words (spec 73 §5.8). A dialect without it refuses every probing move. */
 export interface ProbingCodes {

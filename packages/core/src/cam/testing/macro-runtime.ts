@@ -216,6 +216,14 @@ class Parser {
         return call(a[0]!, a[1])
       }
       if (/^(?:R|Q[LR]?|VC|VL|VS)\d+$/.test(up)) return this.read(up)
+      // OSP system variables: the skip position, the programmed position, a work offset by number.
+      if (/^(?:VSKP|VPPA)[XYZ]$/.test(up)) return this.read(up)
+      if (/^VZOF[XYZ]$/.test(up)) {
+        if (this.eat(/\[/y) === undefined) throw new Failure(`${up} needs its work coordinate number`)
+        const n = this.or()
+        if (this.eat(/\]/y) === undefined) throw new Failure(`missing ] in '${this.s}'`)
+        return this.read(`${up}[${Math.round(n)}]`)
+      }
       return this.read(up.toLowerCase())
     }
     throw new Failure(`cannot read '${this.s.slice(this.i)}' as a value`)
@@ -541,6 +549,15 @@ export const expandMacros = (source: string, options: ExpandOptions = {}): Expan
         if (al3[1] === "3000") alarm(val(al3[2]!, line), text.trim(), line)
         else { fail(line, "#3006 stops with a message: the program stops"); stopped = true }
         return
+      }
+      if (family === "okuma") {
+        // OSP's user alarm: the text, then the output that raises it. Written offsets are system variables with an index.
+        const msg = /^VUACM\[1\]\s*=\s*'([^']*)'$/i.exec(code)
+        if (msg !== null) { lastMessage = msg[1]!; pc++; return }
+        const raise = /^VDOUT\[99\d\]\s*=\s*(.+)$/i.exec(code)
+        if (raise !== null) { alarm(val(raise[1]!, line), lastMessage, line); return }
+        const zo = /^(VZOF[XYZ]\[\d+\])\s*=\s*(.+)$/i.exec(code)
+        if (zo !== null) { write(zo[1]!.toUpperCase(), val(zo[2]!, line)); pc++; return }
       }
       const as = /^((?:#\s*(?:<[^>]+>|\d+|\[[^\]]+\])|VC\d+|VL\d+|VS\d+))\s*=\s*(.+)$/i.exec(code)
       if (as !== null) { const n = targetName(as[1]!, line); if (n === undefined) fail(line, `cannot assign to '${as[1]}'`); else write(n, val(as[2]!, line)); pc++; return }

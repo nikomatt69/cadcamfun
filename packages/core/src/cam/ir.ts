@@ -191,7 +191,9 @@ export const OffsetUpdateSchema = Schema.TaggedStruct("OffsetUpdate", {
   ]),
   axis: Schema.Literals(OFFSET_AXES),
   mode: Schema.Literals(["set", "add"]),
-  value: ExprSchema
+  value: ExprSchema,
+  /** `set` only: the offset becomes whatever makes the tip, where it stands now, read `value` (GRBL `G10 L20`, a control without variables). */
+  reads: Schema.optionalKey(Schema.Boolean)
 })
 
 /** The program stops with an alarm (`#3000`, `SETAL`, `FN 14`, LinuxCNC `(abort, ..)`): a probe missed, a part out of tolerance. */

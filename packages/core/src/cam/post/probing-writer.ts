@@ -6,6 +6,7 @@
  *                                                                  offsets `#5221+20(n-1)+axis`, alarm `#3000=n(TEXT)`, report `DPRNT[..]`
  *   linuxcnc   LinuxCNC                                           `G38.2` (a miss aborts) / `G38.3` + `#5070`, contact `#5061..`, offsets `G10 L2 P`, `(abort, ..)`, `(LOG, ..)`
  *   siemens    Siemens 840D sl                                    `MEAS=1 G1 G91 X..`, `$AC_MEA[1]`, contact `$AA_MW[X]`, offsets `$P_UIFR[n,X,TR]` and the frame selected again
+ *   okuma      Okuma OSP                                          `G91 G31 X.. F..`, skip position `VSKPX`, position `VPPAX`, offsets `VZOFX[n]`, alarm `VUACM[1]='..'` + `VDOUT[992]=n`
  *   heidenhain Klartext                                           `TCH PROBE 0.0 REF. PLANE Q94 X-` / `TCH PROBE 0.1 X+..`, one axis per touch; the TNC stops with its own error on a miss
  *   grbl       GRBL                                               `G38.2`, no variables: a touch that stores nothing; an offset is `G10 L20` ("the tip reads ...")
  *
@@ -56,6 +57,7 @@ const alarmNumber = (code: number, max: number): number => (code <= max ? code :
 export const contactWord = (io: ProbeIo, axis: "x" | "y" | "z"): string => {
   switch (io.codes.syntax) {
     case "fanuc": case "linuxcnc": return `#${5061 + AXES.indexOf(axis)}`
+    case "okuma": return `VSKP${LETTER[axis]}`
     case "siemens": return `$AA_MW[${LETTER[axis]}]`
     case "heidenhain": return `Q94`
     case "grbl": return refuse(io, "a contact position (GRBL has no variables)")
@@ -114,6 +116,20 @@ export const touchLines = (m: ProbeMove, start: Vec3, io: ProbeIo): string[] => 
       stores()
       return out
     }
+    case "okuma": {
+      // OSP has no one-line IF .. THEN: the difference goes to a variable and the structured If tests it.
+      const k = dominant(v)
+      const L = LETTER[k]
+      const near: VarRef = { name: "pmissd" }
+      out.push(assignRaw(io, { name: "pmiss" }, `VPPA${L}`))
+      out.push(`G91 ${io.options?.skipCode ?? "G31"} ${words} ${feed}`, "G90")
+      out.push(assignRaw(io, near, `ABS[VSKP${L}-[${varText(io, { name: "pmiss" })}${v[k] < 0 ? "-" : "+"}${io.num(Math.abs(v[k]))}]]`))
+      const miss = { cmp: "lt" as const, a: { var: near }, b: MISS_EPS * io.scale }
+      if (m.onMiss === "alarm") out.push(...io.macro.node({ _tag: "If", condition: miss }), ...alarmLines(MISS_CODE, "THE PROBE DID NOT TOUCH", io), ...io.macro.node({ _tag: "EndIf" }))
+      else if (m.flag !== undefined) { out.push(assignRaw(io, m.flag, "0"), ...io.macro.node({ _tag: "If", condition: miss }), assignRaw(io, m.flag, "1"), ...io.macro.node({ _tag: "EndIf" })) }
+      stores()
+      return out
+    }
     case "linuxcnc": {
       out.push("G91", `${m.onMiss === "alarm" ? "G38.2" : "G38.3"} ${words} ${feed}`, "G90")
       if (m.onMiss === "flag") flagLine("[1-#5070]")
@@ -162,6 +178,14 @@ export const protectedLines = (m: ProbeMove, wordsText: ReadonlyArray<string>, t
       const sum = AXES.map((a, i) => `ABS[#${5061 + i}-${targets[a].startsWith("-") ? `[${targets[a]}]` : targets[a]}]`).join("+")
       return { before: [], block: `${sk} ${w} ${feed}`, after: [`IF [${sum} GT ${(0.002 * io.scale).toFixed(4)}] THEN #3000=${alarmNumber(HIT_CODE, io.codes.alarmMax ?? 200)}(THE PROBE TOUCHED DURING A PROTECTED MOVE)`] }
     }
+    case "okuma": {
+      const near: VarRef = { name: "pmissd" }
+      const sum = AXES.map((a) => `ABS[VSKP${LETTER[a]}-${targets[a].startsWith("-") || targets[a].startsWith("=") ? `[${targets[a].replace(/^=/, "")}]` : targets[a]}]`).join("+")
+      return {
+        before: [], block: `${io.options?.skipCode ?? "G31"} ${w} ${feed}`,
+        after: [assignRaw(io, near, sum), ...io.macro.node({ _tag: "If", condition: { cmp: "gt", a: { var: near }, b: 0.002 * io.scale } }), ...alarmLines(HIT_CODE, "THE PROBE TOUCHED DURING A PROTECTED MOVE", io), ...io.macro.node({ _tag: "EndIf" })]
+      }
+    }
     case "linuxcnc":
       return {
         before: [], block: `G38.3 ${w} ${feed}`,
@@ -182,6 +206,7 @@ export const alarmLines = (code: number, text: string, io: ProbeIo): string[] =>
   const t = cleanText(text)
   switch (io.codes.syntax) {
     case "fanuc": return [`#3000=${alarmNumber(code, io.codes.alarmMax ?? 200)}(${t})`]
+    case "okuma": return [`VUACM[1]='${t.slice(0, 16)}'`, `VDOUT[992]=${code}`]
     case "linuxcnc": return [`(abort, ${code} ${t})`]
     case "siemens": return [`MSG("${t}")`, `SETAL(${61000 + code})`, "M0"]
     case "heidenhain": return [`${KT};ALARM ${code} ${t}`, `${KT}FN 14: ERROR = ${code}`]
@@ -285,6 +310,7 @@ export const offsetLines = (m: OffsetUpdateMove, io: ProbeIo): string[] => {
     return [m.mode === "set" ? `${address}=${io.macro.expression(m.value, true)}` : `${address}=${sumWith(io, address, m.value)}`]
   }
   const ref = m.target.ref
+  if (m.reads === true && io.codes.syntax !== "grbl") return refuse(io, `a write that makes the tip read a value (the program computes the offset here)`)
   const capacity: OffsetCapacity | undefined = io.options?.offsets
   const a = addressOf(ref, io.codes.offsets, capacity)
   if ("refused" in a) throw new RangeError(a.refused)
@@ -298,7 +324,7 @@ const writeWork = (m: OffsetUpdateMove, a: OffsetAddress, io: ProbeIo): string[]
   switch (a.write) {
     case "native-only": return refuse(io, `a step-level write to ${named} (its probing cycles set the preset: use the native cycle)`)
     case "l20-only": {
-      if (m.mode !== "set" || typeof m.value !== "number") return refuse(io, `a write to ${named} that is not a number (G10 L20 makes the position the tip is at read a value)`)
+      if (m.reads !== true || typeof m.value !== "number") return refuse(io, `a write to ${named} other than "the tip reads a number" (G10 L20 is all GRBL has)`)
       if (axis !== "X" && axis !== "Y" && axis !== "Z") return refuse(io, `a write to the ${axis} of ${named}`)
       return [`G10 L20 P${a.g10P ?? 1} ${axis}${io.num(m.value)}`]
     }
