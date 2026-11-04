@@ -39,7 +39,7 @@ export type ProbeOperation =
   | { readonly cycle: "boss"; readonly centre: Vec2; readonly diameter: number; readonly depth: number; readonly top: number }
 
 export type ProbeStep =
-  | { readonly kind: "rapid"; readonly x?: number; readonly y?: number; readonly z?: number }
+  | { readonly kind: "rapid"; readonly x?: number; readonly y?: number; readonly z?: number; /** A move near the part: written with the probe armed, so a contact stops the program instead of crashing the stylus. */ readonly guard?: true }
   /** Move `axis` to the midpoint of two stored touches (re-centres the probe in a bore or on a boss before the next pair). */
   | { readonly kind: "rapid-mid"; readonly axis: "X" | "Y"; readonly store: number; readonly store2: number }
   /** Feed along `axis` by `distance` (signed) until contact; the contact is stored as register `store`. Missing contact is an alarm. */
@@ -70,7 +70,7 @@ export const planProbe = (op: ProbeOperation, s: ProbeSettings): ProbePlan => {
   switch (op.cycle) {
     case "z-surface": {
       steps.push({ kind: "rapid", z: s.safeZ }, { kind: "rapid", x: op.at.x, y: op.at.y })
-      steps.push({ kind: "rapid", z: op.expectedZ + Math.min(search, 5) }, { kind: "touch", axis: "Z", distance: -(Math.min(search, 5) + search), store: 0 })
+      steps.push({ kind: "rapid", z: op.expectedZ + Math.min(search, 5), guard: true }, { kind: "touch", axis: "Z", distance: -(Math.min(search, 5) + search), store: 0 })
       steps.push({ kind: "set-offset", axis: "Z", store: 0, radius: 0, sign: 1, value: op.zero ?? 0 }, { kind: "rapid", z: s.safeZ })
       return { steps, notes }
     }
@@ -78,7 +78,7 @@ export const planProbe = (op: ProbeOperation, s: ProbeSettings): ProbePlan => {
       const along = op.axis
       const startAt = op.expectedEdge - op.direction * (r + Math.min(search, 5))
       steps.push({ kind: "rapid", z: s.safeZ }, along === "X" ? { kind: "rapid", x: startAt, y: op.at.y } : { kind: "rapid", x: op.at.x, y: startAt })
-      steps.push({ kind: "rapid", z: -op.depth }, { kind: "touch", axis: along, distance: op.direction * (Math.min(search, 5) + search), store: 0 })
+      steps.push({ kind: "rapid", z: -op.depth, guard: true }, { kind: "touch", axis: along, distance: op.direction * (Math.min(search, 5) + search), store: 0 })
       steps.push({ kind: "set-offset", axis: along, store: 0, radius: r, sign: op.direction, value: op.zero ?? 0 }, { kind: "rapid", z: s.safeZ })
       return { steps, notes }
     }
@@ -95,7 +95,7 @@ export const planProbe = (op: ProbeOperation, s: ProbeSettings): ProbePlan => {
       const reach = inside ? nominalR - r + search : search + 5
       const z = -op.depth
       steps.push({ kind: "rapid", z: s.safeZ }, { kind: "rapid", x: op.centre.x, y: op.centre.y })
-      if (inside) steps.push({ kind: "rapid", z })
+      if (inside) steps.push({ kind: "rapid", z, guard: true })
       // X pair, re-centre X, Y pair, re-centre Y, X pair again: the sizes are then measured through the true centre, not along a chord.
       const pair = (axis: "X" | "Y", a: number): void => {
         for (const [k, dir] of [[a, -1], [a + 1, 1]] as const) {
@@ -109,7 +109,7 @@ export const planProbe = (op: ProbeOperation, s: ProbeSettings): ProbePlan => {
             const offset = nominalR + r + 5
             steps.push({ kind: "rapid", z: s.safeZ })
             steps.push(axis === "X" ? { kind: "rapid", x: op.centre.x - dir * offset } : { kind: "rapid", y: op.centre.y - dir * offset })
-            steps.push({ kind: "rapid", z })
+            steps.push({ kind: "rapid", z, guard: true })
             steps.push({ kind: "touch", axis, distance: dir * reach, store: k })
           }
         }
@@ -185,35 +185,48 @@ export type ProbeDialect = "fanuc" | "linuxcnc" | "siemens"
 
 const OFFSET_N: Readonly<Record<string, number>> = { G54: 1, G55: 2, G56: 3, G57: 4, G58: 5, G59: 6 }
 const FANUC_BASE: Readonly<Record<string, number>> = { G54: 5221, G55: 5241, G56: 5261, G57: 5281, G58: 5301, G59: 5321 }
-const SIEMENS_FRAME: Readonly<Record<string, string>> = { G54: "$P_UIFR[1]", G55: "$P_UIFR[2]", G56: "$P_UIFR[3]", G57: "$P_UIFR[4]", G58: "$P_UIFR[5]", G59: "$P_UIFR[6]" }
 const n3 = (v: number): string => (Math.round(v * 1000) / 1000).toFixed(3)
 const AXIS_INDEX: Readonly<Record<ProbeAxis, number>> = { X: 0, Y: 1, Z: 2 }
 
-/** The registers hold contacts in the current work coordinates: #5061.. (Fanuc, LinuxCNC), $AA_MW[axis] (Siemens). */
+/**
+ * The text of the steps for a control (the spec 73 posts write the same words from the IR; this is the legacy neutral-step form). The
+ * registers hold contacts in the current work coordinates: #520.. (Fanuc, LinuxCNC), R10.. (Siemens). Fixed in spec 73: the midpoint
+ * is bracketed as a whole (`X[[#524+#525]/2]`, `X=(R14+R15)/2`), the Siemens frame is written as `$P_UIFR[n,X,TR]` and selected again,
+ * a Fanuc touch that finds nothing raises an alarm, a descent near the part is armed (a contact stops the program), and a size is stored in a
+ * register as well as written as a comment.
+ */
 export const emitProbeSteps = (steps: ReadonlyArray<ProbeStep>, s: ProbeSettings, dialect: ProbeDialect): string => {
   const reg = (store: number): string => dialect === "siemens" ? `R${10 + store}` : `#${520 + store}`
   const contactOf = (axis: ProbeAxis): string => dialect === "siemens" ? `$AA_MW[${axis}]` : `#${5061 + AXIS_INDEX[axis]}`
+  const here = (axis: ProbeAxis): string => `#${5041 + AXIS_INDEX[axis]}`
+  const mid = (a: number, b: number): string => (dialect === "siemens" ? `(${reg(a)}+${reg(b)})/2` : `[[${reg(a)}+${reg(b)}]/2]`)
   const lines: string[] = []
   lines.push("G90 G21 G17", s.workOffset, "M5 ; the spindle stays off: a probe is a sensor, not a cutter")
+  let sizes = 0
   for (const st of steps) {
     switch (st.kind) {
       case "rapid": {
         const w = [st.x !== undefined ? `X${n3(st.x)}` : "", st.y !== undefined ? `Y${n3(st.y)}` : "", st.z !== undefined ? `Z${n3(st.z)}` : ""].filter(Boolean).join(" ")
-        lines.push(`G0 ${w}`)
+        if (st.guard !== true || st.z === undefined) { lines.push(`G0 ${w}`); break }
+        // Armed descent: a contact on the way is a crash avoided.
+        if (dialect === "fanuc") lines.push(`G31 ${w} F${s.feed}`, `IF [ABS[#5063-${st.z < 0 ? `[${n3(st.z)}]` : n3(st.z)}] GT 0.002] THEN #3000=192 (PROBE TOUCHED ON A PROTECTED MOVE)`)
+        else if (dialect === "linuxcnc") lines.push(`G38.3 ${w} F${s.feed}`, "o9001 if [#5070 EQ 1]", "(abort, probe touched on a protected move)", "o9001 endif")
+        else lines.push(`MEAS=1 G1 ${w} F${s.feed}`, "STOPRE", "IF $AC_MEA[1]==1 GOTOF PROBEHIT")
         break
       }
       case "rapid-mid":
-        lines.push(`G0 ${st.axis}${dialect === "siemens" ? "(" : "["}${reg(st.store)} + ${reg(st.store2)}${dialect === "siemens" ? ")" : "]"} / 2`)
+        lines.push(`G0 ${st.axis}${dialect === "siemens" ? "=" : ""}${mid(st.store, st.store2)}`)
         break
       case "touch": {
-        if (dialect === "fanuc") lines.push(`G91 G31 ${st.axis}${n3(st.distance)} F${s.feed}`, "G90")
+        // The start is read before the move: the touch missed when the skip position is the end of the search.
+        if (dialect === "fanuc") lines.push(`#530=${here(st.axis)}`, `G91 G31 ${st.axis}${n3(st.distance)} F${s.feed}`, "G90", `IF [ABS[${contactOf(st.axis)}-[#530${st.distance < 0 ? "-" : "+"}${n3(Math.abs(st.distance))}]] LT 0.001] THEN #3000=191 (PROBE MISS)`)
         else if (dialect === "linuxcnc") lines.push(`G91`, `G38.2 ${st.axis}${n3(st.distance)} F${s.feed}`, "G90")
         else lines.push("MEAS=1 G91 G1 " + `${st.axis}${n3(st.distance)} F${s.feed}`, "G90", "STOPRE", `IF $AC_MEA[1]==0 GOTOF PROBEMISS`)
         lines.push(`${reg(st.store)} = ${contactOf(st.axis)} ; contact ${st.store}`)
         break
       }
       case "set-offset": {
-        const centre = st.store2 === undefined ? `${reg(st.store)} + ${st.sign * st.radius}` : `${dialect === "siemens" ? "(" : "["}${reg(st.store)} + ${reg(st.store2)}${dialect === "siemens" ? ")" : "]"} / 2`
+        const centre = st.store2 === undefined ? `${reg(st.store)} + ${st.sign * st.radius}` : mid(st.store, st.store2)
         const value = n3(st.value)
         if (dialect === "linuxcnc") {
           // G10 L2 sets the origin of the coordinate system in machine coordinates; #5221.. hold the current G54.. origin (X, Y, Z in steps of 1)
@@ -223,18 +236,26 @@ export const emitProbeSteps = (steps: ReadonlyArray<ProbeStep>, s: ProbeSettings
           const v = (FANUC_BASE[s.workOffset] ?? 5221) + AXIS_INDEX[st.axis]
           lines.push(`#${v} = #${v} + ${centre} - ${value} ; ${s.workOffset} ${st.axis}: the touched surface reads ${value}`)
         } else {
-          lines.push(`${SIEMENS_FRAME[s.workOffset] ?? "$P_UIFR[1]"}:${st.axis} = ${SIEMENS_FRAME[s.workOffset] ?? "$P_UIFR[1]"}:${st.axis} + ${centre} - ${value}`)
+          // The frame of G54..G57 is $P_UIFR[1..4]; it takes effect when it is selected again.
+          const n = OFFSET_N[s.workOffset] ?? 1
+          if (n > 4) throw new RangeError(`siemens: ${s.workOffset} is a programmable offset on the 840D, not a settable frame: use G54..G57`)
+          const f = `$P_UIFR[${n},${st.axis},TR]`
+          lines.push(`${f}=${f}+${centre}-${value}`, s.workOffset)
         }
         break
       }
       case "report-size": {
         const gap = `ABS[${reg(st.store2)} - ${reg(st.store)}]`
-        lines.push(`; ${st.label} = ${gap} ${st.inside ? "+" : "-"} ${n3(st.stylus)}`)
+        const size = `${dialect === "siemens" ? "ABS(" : "ABS["}${reg(st.store2)} - ${reg(st.store)}${dialect === "siemens" ? ")" : "]"} ${st.inside ? "+" : "-"} ${n3(st.stylus)}`
+        const target = dialect === "siemens" ? `R${30 + sizes}` : `#${540 + sizes}`
+        sizes++
+        lines.push(`${target} = ${size} ; ${st.label}`)
+        void gap
         break
       }
     }
   }
-  if (dialect === "siemens") lines.push("M30", "PROBEMISS: MSG(\"probe did not touch\")", "M0")
+  if (dialect === "siemens") lines.push("M30", "PROBEMISS: MSG(\"probe did not touch\")", "M0", "PROBEHIT: MSG(\"probe touched on a protected move\")", "M0")
   else lines.push("M30")
   return lines.join("\n") + "\n"
 }

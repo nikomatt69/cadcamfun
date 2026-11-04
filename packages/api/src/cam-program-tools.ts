@@ -29,7 +29,7 @@ export const CamProbeOperation = Schema.Union([
 ])
 
 export const CamProbeStep = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("rapid"), x: Schema.optionalKey(num), y: Schema.optionalKey(num), z: Schema.optionalKey(num) }),
+  Schema.Struct({ kind: Schema.Literal("rapid"), x: Schema.optionalKey(num), y: Schema.optionalKey(num), z: Schema.optionalKey(num), guard: Schema.optionalKey(Schema.Literal(true)) }),
   Schema.Struct({ kind: Schema.Literal("rapid-mid"), axis: Schema.Literals(["X", "Y"]), store: int, store2: int }),
   Schema.Struct({ kind: Schema.Literal("touch"), axis: Schema.Literals(["X", "Y", "Z"]), distance: num, store: int }),
   Schema.Struct({ kind: Schema.Literal("set-offset"), axis: Schema.Literals(["X", "Y", "Z"]), store: int, store2: Schema.optionalKey(int), radius: num, sign, value: num }),

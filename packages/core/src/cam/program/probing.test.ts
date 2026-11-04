@@ -92,7 +92,16 @@ describe("probing emission", () => {
   test("Fanuc uses G31 and writes the work offset variable", () => {
     const nc = emitProbeSteps(plan.steps, settings, "fanuc")
     expect(nc).toContain("G91 G31 X-")
-    expect(nc).toMatch(/#5221 = #5221 \+ \[#524 \+ #525\] \/ 2 - 30\.000/)
+    // The midpoint is bracketed as a whole: `[a+b]/2 - 30` would be read as a half of the sum less 30 only by luck of precedence.
+    expect(nc).toMatch(/#5221 = #5221 \+ \[\[#524\+#525\]\/2\] - 30\.000/)
+    expect(nc).not.toMatch(/\[#524 \+ #525\] \/ 2/)
+    // A touch that finds nothing is an alarm, and the descent near the part is armed.
+    expect(nc).toMatch(/IF \[ABS\[#5061-\[#530\+/)
+    expect(nc).toContain("THEN #3000=191 (PROBE MISS)")
+    expect(nc).toMatch(/G31 Z-4\.000 F100\nIF \[ABS\[#5063-\[-4\.000\]\] GT 0\.002\] THEN #3000=192/)
+    expect(nc).not.toMatch(/\nG0 Z-4\.000/)
+    // The size is in a register, not only a comment.
+    expect(nc).toMatch(/#540 = ABS\[#525 - #524\] \+ 6\.000 ; bore diameter X/)
     expect(nc).toContain("M5")
     expect(nc).not.toMatch(/\bM3\b/)
     expect(axes.length).toBe(2)
@@ -102,7 +111,10 @@ describe("probing emission", () => {
     expect(emitProbeSteps(plan.steps, settings, "linuxcnc")).toMatch(/G10 L2 P1 X\[#5221 \+/)
     const s = emitProbeSteps(plan.steps, settings, "siemens")
     expect(s).toContain("MEAS=1 G91 G1")
-    expect(s).toContain("$P_UIFR[1]:X")
+    expect(s).toContain("$P_UIFR[1,X,TR]=$P_UIFR[1,X,TR]+(R14+R15)/2-30.000")
+    expect(s).toMatch(/\$P_UIFR\[1,Y,TR\]=[^\n]*\nG54/)
+    expect(s).not.toContain("$P_UIFR[1]:X")
+    expect(s).toContain("G0 X=(R10+R11)/2")
     expect(s).toContain("PROBEMISS")
   })
 })
