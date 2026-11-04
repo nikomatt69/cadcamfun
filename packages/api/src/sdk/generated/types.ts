@@ -1792,6 +1792,12 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly feed: number
             readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
           }
+        | {
+            readonly _tag: "Spline"
+            readonly to: { readonly x: number; readonly y: number; readonly z: number }
+            readonly controls: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly feed: number
+          }
         | { readonly _tag: "Dwell"; readonly seconds: number }
         | { readonly _tag: "Comment"; readonly text: string }
         | {
@@ -8273,6 +8279,12 @@ export type ToolpathsRegenerateOutput = {
                     feed: number
                     comp?: { mode: "left" | "right" | "off"; register?: number }
                   }
+                | {
+                    _tag: "Spline"
+                    to: { x: number; y: number; z: number }
+                    controls: Array<{ x: number; y: number }>
+                    feed: number
+                  }
                 | { _tag: "Dwell"; seconds: number }
                 | { _tag: "Comment"; text: string }
                 | {
@@ -8978,6 +8990,12 @@ export type ToolpathGeneratorManufactureOutput =
                   feed: number
                   comp?: { mode: "left" | "right" | "off"; register?: number }
                 }
+              | {
+                  _tag: "Spline"
+                  to: { x: number; y: number; z: number }
+                  controls: Array<{ x: number; y: number }>
+                  feed: number
+                }
               | { _tag: "Dwell"; seconds: number }
               | { _tag: "Comment"; text: string }
               | {
@@ -9257,6 +9275,12 @@ export type ToolpathGeneratorParseOutput = {
             clockwise: boolean
             feed: number
             comp?: { mode: "left" | "right" | "off"; register?: number }
+          }
+        | {
+            _tag: "Spline"
+            to: { x: number; y: number; z: number }
+            controls: Array<{ x: number; y: number }>
+            feed: number
           }
         | { _tag: "Dwell"; seconds: number }
         | { _tag: "Comment"; text: string }
@@ -9855,6 +9879,12 @@ export type CamSetupGenerateOutput = {
               clockwise: boolean
               feed: number
               comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Spline"
+              to: { x: number; y: number; z: number }
+              controls: Array<{ x: number; y: number }>
+              feed: number
             }
           | { _tag: "Dwell"; seconds: number }
           | { _tag: "Comment"; text: string }
@@ -10826,6 +10856,12 @@ export type CamSetupGenerateSavedOutput = {
               clockwise: boolean
               feed: number
               comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Spline"
+              to: { x: number; y: number; z: number }
+              controls: Array<{ x: number; y: number }>
+              feed: number
             }
           | { _tag: "Dwell"; seconds: number }
           | { _tag: "Comment"; text: string }

@@ -66,6 +66,12 @@ export interface SetupSheetData {
   readonly notes: ReadonlyArray<string>
   readonly issues: ReadonlyArray<{ readonly severity: string; readonly message: string }>
   readonly identity: CamArtifact["identity"]
+  /** Present when the job asked for `process` (spec 61): tool life used, indicative stability and the modelled cycle time, all labelled uncalibrated. */
+  readonly process?: {
+    readonly label: string
+    readonly modelledCycleSeconds: number
+    readonly tools: ReadonlyArray<{ readonly number: number; readonly name: string; readonly lifeUsed: number | undefined; readonly lifeStatus: string; readonly changeBefore: ReadonlyArray<string>; readonly stableDepth: number | undefined; readonly stabilityNote: string }>
+  }
   /** The title block of the drawing the program belongs to: printed at the bottom right of the sheet, as on the drawing. */
   readonly titleBlock?: CompleteTitleBlock
 }
@@ -106,9 +112,23 @@ export const setupSheetData = (a: CamArtifact, options: SetupSheetOptions = {}):
       cuttingSeconds: operations.reduce((s, o) => s + o.seconds, 0), removedVolume: operations.reduce((s, o) => s + o.removedVolume, 0)
     },
     claims: a.claims, notes: a.notes, issues: a.issues.map((i) => ({ severity: i.severity, message: i.message })), identity: a.identity,
+    ...(a.process !== undefined ? { process: processOf(a, a.process) } : {}),
     ...(options.titleBlock !== undefined ? { titleBlock: options.titleBlock } : {})
   }
 }
+
+const processOf = (a: CamArtifact, p: NonNullable<CamArtifact["process"]>): NonNullable<SetupSheetData["process"]> => ({
+  label: p.label,
+  modelledCycleSeconds: p.cycleTime.withToolChangesSeconds,
+  tools: [...a.tools].sort((x, y) => x.number - y.number).map((t) => {
+    const life = p.toolLife.find((l) => l.toolId === t.id)
+    const stab = p.stability.find((s) => s.toolId === t.id)
+    return {
+      number: t.number, name: t.name, lifeUsed: life?.lifeUsed, lifeStatus: life?.status ?? "not used", changeBefore: life?.changeBefore ?? [],
+      stableDepth: stab?.result.aLimMin, stabilityNote: stab?.result.status ?? "none"
+    }
+  })
+})
 
 const ESC: Readonly<Record<string, string>> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }
 const esc = (value: unknown): string => String(value).replace(/[&<>"']/g, (c) => ESC[c]!)
@@ -170,6 +190,7 @@ export const setupSheetHtml = (d: SetupSheetData): string => {
     `<h2>Tools</h2><table><tr><th>Tool</th><th></th><th>Cutter</th><th class="n">Ø mm</th><th class="n">Flutes</th><th class="n">Flute mm</th><th class="n">Stick-out mm</th><th>Operations</th><th class="n">Cutting</th></tr>${tools}</table>` +
     `<h2>Operations</h2><table><tr><th class="n">#</th><th>Operation</th><th>Strategy</th><th>Tool</th><th class="n">rpm</th><th class="n">Feed</th><th class="n">ap</th><th class="n">ae</th><th class="n">Time</th><th class="n">Cut mm</th><th class="n">Removed mm³</th><th>Status</th><th>Warnings</th></tr>${ops}</table>` +
     `<h2>Evidence</h2><table><tr><th>Claim</th><th>Status</th><th>Detail</th></tr>${claims}</table>` +
+    (d.process !== undefined ? `<h2>Process (uncalibrated)</h2><p>${esc(d.process.label)}. Modelled cycle time ${time(d.process.modelledCycleSeconds)}.</p><table><tr><th>Tool</th><th>Cutter</th><th class="n">Life used</th><th>Life</th><th class="n">Chatter-free depth mm (indicative)</th></tr>${d.process.tools.map((t) => `<tr><td class="n">T${t.number}</td><td>${esc(t.name)}</td><td class="n">${t.lifeUsed === undefined ? "-" : f(t.lifeUsed * 100, 1) + " %"}</td><td>${esc(t.lifeStatus)}${t.changeBefore.length > 0 ? ` (change before ${esc(t.changeBefore.join(", "))})` : ""}</td><td class="n">${t.stableDepth === undefined ? "-" : f(t.stableDepth, 2)} (${esc(t.stabilityNote)})</td></tr>`).join("")}</table>` : "") +
     (d.notes.length > 0 ? `<h2>Notes</h2><ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : "") +
     (d.issues.length > 0 ? `<h2>Issues</h2><ul>${d.issues.map((i) => `<li>${esc(i.severity)}: ${esc(i.message)}</li>`).join("")}</ul>` : "") +
     `<h2>Identity</h2><p>Job <code>${esc(d.identity.job)}</code><br>Part <code>${esc(d.identity.part)}</code><br>NC <code>${esc(d.identity.nc)}</code><br>${esc(d.identity.algorithm)}</p>${d.titleBlock !== undefined ? titleBlockHtml(d.titleBlock) : ""}</body></html>`

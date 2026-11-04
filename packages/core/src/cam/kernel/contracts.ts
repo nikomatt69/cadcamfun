@@ -9,6 +9,7 @@ import type { Coolant, Program, Toolpath, WorkOffset } from "../ir.ts"
 import type { PostId, PostOptions } from "../post/types.ts"
 import type { Cutter } from "./cutters.ts"
 import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
+import type { ProcessReport, ProcessRequest } from "./process-report.ts"
 import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
 import type { SwarfWall } from "../operations/swarf.ts"
 
@@ -387,6 +388,8 @@ export interface ManufacturingJob {
   readonly post?: { readonly options?: Partial<PostOptions>; readonly definition?: unknown }
   /** How a printer job is sliced (only read when the machine is a `printer`). */
   readonly print?: PrintRequirement
+  /** Process physics (spec 61): per-move feed optimisation and the `process` evidence; absent = no change to the program or the artifact. */
+  readonly process?: ProcessRequest
 }
 
 // ---------------------------------------------------------------- results
@@ -539,6 +542,8 @@ export interface CamArtifact {
   /** Notes of the planner (features it could not machine and why). */
   readonly notes: ReadonlyArray<string>
   readonly tolerance?: ToleranceBudget
+  /** Present when the job asked for `process`: feed optimisation per operation, dynamic cycle time, tool life, indicative stability; all uncalibrated. */
+  readonly process?: ProcessReport
   /**
    * Tool-centre-point output only (spec 69 B6): the largest distance of the tool tip the emitted NC makes (replayed, carried to machine
    * coordinates) from the planned path, mm, with the declared limit it is held to (post splitting tolerance plus angle rounding).
