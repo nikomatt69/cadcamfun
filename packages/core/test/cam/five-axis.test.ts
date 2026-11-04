@@ -255,8 +255,8 @@ describe("simultaneous 5-axis operation", () => {
     const assembly = { fluteLength: 15, shankDiameter: 6, stickout: 30, holder: { diameter: 30, length: 40 } }
     // A clamp 25 mm above the plate over its middle: the shank and holder of a vertical tool reach it, the flutes do not.
     const clamp = { min: { x: 10, y: -5, z: 25 }, max: { x: 30, y: 45, z: 45 } }
-    const free = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, { ...assembly, boxes: [] })
-    const blocked = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, { ...assembly, boxes: [clamp] })
+    const free = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, undefined, { ...assembly, boxes: [] })
+    const blocked = generateMultiaxis(params({ toolAxis: "normal" }), plate, endmill, umc, undefined, undefined, undefined, { ...assembly, boxes: [clamp] })
     expect(free.stats.skipped).toBe(0)
     expect(blocked.stats.skipped).toBeGreaterThan(0)
     expect(blocked.stats.points).toBeLessThan(free.stats.points)

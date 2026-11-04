@@ -4,6 +4,7 @@ import type { AssistantDefaults, AssistantPreferences } from "./assistant-prefer
 import { DEFAULT_ASSISTANT_DEFAULTS, resolveAssistantPreferences } from "./assistant-preferences"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { DEFAULT_SECURITY, mergePersistedUI, type SecurityPreferences } from "./ui-preferences"
+import { moveComposerDraft } from "./composer"
 
 /**
  * UI preferences, persisted locally. Not the pairing — that lives in the Keychain.
@@ -38,6 +39,10 @@ export interface UIState {
    * fills it so the user can confirm before anything is sent.
    */
   assistantDraft: AssistantDraft | null
+  /** Unsent composer text, isolated by desktop, project and conversation; memory only. */
+  composerDrafts: Record<string, string>
+  /** Explicit drawing targets for the current conversation; memory only. */
+  composerTargets: Record<string, { id: string; name: string }>
   /**
    * The conversation the user opened from the conversation list. Not persisted: the assistant reads
    * its stored history once, so a reopened conversation shows the desktop's own past.
@@ -59,6 +64,10 @@ export interface UIState {
   startAssistantConversation: (projectId: string) => void
   setAssistantDraft: (draft: AssistantDraft) => void
   clearAssistantDraft: () => void
+  setComposerDraft: (scope: string, value: string | ((previous: string) => string)) => void
+  moveComposerDraft: (from: string, to: string) => void
+  setComposerTarget: (scope: string, target: { id: string; name: string } | undefined) => void
+  moveComposerTarget: (from: string, to: string) => void
   openAssistantConversation: (projectId: string, sessionId: string | null) => void
   setOfflineQueue: (count: number) => void
   setUnreadCount: (count: number) => void
@@ -72,6 +81,8 @@ export interface AssistantDraft {
   readonly projectId: string
   readonly text: string
   readonly mode: AssistantDraftMode
+  readonly drawingId?: string
+  readonly drawingName?: string
 }
 
 export interface AssistantOpened {
@@ -101,6 +112,8 @@ export const useUIStore = create<UIState>()(
       offlineQueueRevision: 0,
       unreadCount: 0,
       assistantDraft: null,
+      composerDrafts: {},
+      composerTargets: {},
       assistantOpened: null,
       tabBarHidden: false,
       setThemeMode: (themeMode) => set({ themeMode }),
@@ -126,6 +139,24 @@ export const useUIStore = create<UIState>()(
       startAssistantConversation: (projectId) => set((state) => ({ assistantSessions: Object.fromEntries(Object.entries(state.assistantSessions).filter(([id]) => id !== projectId)) })),
       setAssistantDraft: (assistantDraft) => set({ assistantDraft, assistantProjectId: assistantDraft.projectId }),
       clearAssistantDraft: () => set({ assistantDraft: null }),
+      setComposerDraft: (scope, value) => set((state) => {
+        const text = typeof value === "function" ? value(state.composerDrafts[scope] ?? "") : value
+        const { [scope]: _old, ...rest } = state.composerDrafts
+        return { composerDrafts: text ? { ...rest, [scope]: text } : rest }
+      }),
+      moveComposerDraft: (from, to) => set((state) => {
+        const drafts = moveComposerDraft(state.composerDrafts, from, to)
+        return drafts === state.composerDrafts ? state : { composerDrafts: drafts }
+      }),
+      setComposerTarget: (scope, target) => set((state) => {
+        const { [scope]: _old, ...rest } = state.composerTargets
+        return { composerTargets: target ? { ...rest, [scope]: target } : rest }
+      }),
+      moveComposerTarget: (from, to) => set((state) => {
+        if (from === to || !state.composerTargets[from]) return state
+        const { [from]: target, ...rest } = state.composerTargets
+        return { composerTargets: { ...rest, [to]: target! } }
+      }),
       openAssistantConversation: (projectId, sessionId) =>
         set((state) => ({ assistantOpened: { projectId, sessionId, token: (state.assistantOpened?.token ?? 0) + 1 } })),
       setOfflineQueue: (offlineQueueCount) =>

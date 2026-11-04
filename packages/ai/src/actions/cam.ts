@@ -233,5 +233,17 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cam.chain_status", kind: "read", replaces: "cam_chain_status",
     parameters: CAM_ACTION_INPUTS["cam.chain_status"],
     run: ({ operationId }, { handlers, projectId }) => handlers.chainStatus({ projectId, operationId })
+  }),
+  defineWireAction({
+    // Pure planning over the setup in the request (spec 14): the same core functions the sidecar's `camSetup` group answers with.
+    id: "cam.setup_plan", kind: "read", parameters: CAM_ACTION_INPUTS["cam.setup_plan"],
+    run: ({ setup }) => {
+      const issues = cam.program.validateSetup(setup)
+      return { ok: true, mutated: false, valid: issues.length === 0, plan: cam.program.planPrograms(setup), issues }
+    }
+  }),
+  defineWireAction({
+    id: "cam.setup_list", kind: "read", parameters: CAM_ACTION_INPUTS["cam.setup_list"],
+    run: (_input, { handlers, projectId }) => handlers.setupList?.(projectId) ?? { ok: false, error: "Saved setups are unavailable in this host." }
   })
 ]

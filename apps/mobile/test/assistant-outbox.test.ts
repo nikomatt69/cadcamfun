@@ -30,6 +30,40 @@ test("offline delivery checkpoints before posting, keeps order and continues the
   expect(state.queue).toEqual([])
 })
 
+test("offline drawing requests retain their explicit target when replayed", async () => {
+  const { state, deps } = harness([{ ...entry("edit"), drawingId: "drawing-selected" }])
+  let received: ChatRequest | undefined
+  await deliverOutbox([...state.queue], { ...deps, client: { promptSession: async (body) => {
+    received = body
+    return { sessionId: "session", seq: 1 }
+  } } })
+  expect(received?.projectId).toBe("p")
+  expect(received?.drawingId).toBe("drawing-selected")
+})
+
+test("a queued drawing request stays in its original conversation after the user switches sessions", async () => {
+  const { state, deps } = harness([{ ...entry("edit"), drawingId: "drawing-selected", sessionId: "original-session" }])
+  state.sessionId = "another-session"
+  let received: ChatRequest | undefined
+  await deliverOutbox([...state.queue], { ...deps, client: { promptSession: async (body) => {
+    received = body
+    return { sessionId: "original-session", seq: 1 }
+  } } })
+  expect(received?.sessionId).toBe("original-session")
+  expect(received?.drawingId).toBe("drawing-selected")
+  expect(state.sessionId).toBe("another-session")
+})
+
+test("delivery does not change a conversation selected while a queued request was starting", async () => {
+  const { state, deps } = harness([{ ...entry("edit"), sessionId: "original-session" }])
+  state.sessionId = "original-session"
+  await deliverOutbox([...state.queue], { ...deps, client: { promptSession: async () => {
+    state.sessionId = "another-session"
+    return { sessionId: "original-session", seq: 1 }
+  } } })
+  expect(state.sessionId).toBe("another-session")
+})
+
 test("an uncertain delivery is never posted again and holds back the messages after it", async () => {
   const { state, deps } = harness([entry("first"), entry("second")])
   const posts: string[] = []

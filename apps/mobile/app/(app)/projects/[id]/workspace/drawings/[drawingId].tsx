@@ -5,7 +5,7 @@ import { useResource, useRetained } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
 import { useCommitRevision } from "@/lib/use-commit-revision"
 import { haptic } from "@/lib/haptics"
-import { defineComponentPrompt } from "@/lib/preview-math"
+import { defineComponentPrompt, editDesignPrompt } from "@/lib/preview-math"
 import { MeshReview } from "@/components/workspace/MeshReview"
 import { routeParam } from "@/components/workspace/route"
 import { ScreenFrame } from "@/components/project/ScreenFrame"
@@ -36,6 +36,8 @@ export default function DrawingPreviewScreen() {
     haptic("selection")
     setAssistantDraft({
       projectId: id,
+      drawingId,
+      drawingName: name,
       mode: "cad",
       text: defineComponentPrompt({ id: drawingId, name }, selected ? [selected] : []),
     })
@@ -55,6 +57,10 @@ export default function DrawingPreviewScreen() {
         onSelectPart={setSelected}
         actionLabel="Define with the assistant"
         onAction={defineWithAssistant}
+        secondaryAction={{ label: "Edit design with assistant", onPress: () => {
+          setAssistantDraft({ projectId: id, drawingId, drawingName: name, mode: "cad", text: editDesignPrompt({ id: drawingId, name }, selected) })
+          router.navigate("/assistant/chat")
+        } }}
       />
     </ScreenFrame>
   )
