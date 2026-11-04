@@ -46,3 +46,4 @@ bun run --filter @cadcamfun/desktop build
 - 2026-10-16: marketplace removed from the product; the marketplace screen deliverable and its mention in the fake-screens list are gone.
 
 - v1: replace fake screens after their HTTP groups exist.
+- 2026-11-04: deliverable 2 (CAM setup UI bound to the RM-02 store) built: the multi-toolpath panel's `SetupPanel` saves, lists, loads and deletes project setups over the saved cam-setups routes with expected-revision writes and a 409 conflict choice, and shows the planned tool table and tool changes (RM-02 change log, PR #42). Assistant tool rows now show the evidence of each result (release level, failed/undecided claims, NC/rebuild verdicts, write receipts) and each answer its weakest release (RM-07 change log).

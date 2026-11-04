@@ -23,6 +23,7 @@ import { toolTitle } from "../lib/tools.ts"
 import { isProviderError } from "../lib/error-kind.ts"
 import { TaskCard } from "./TaskCard.tsx"
 import { ToolRow } from "./ToolRow.tsx"
+import { TurnEvidence } from "./ToolEvidence.tsx"
 import { isTaskStart } from "../lib/task-card.ts"
 import { useAiStore } from "../store/context.tsx"
 import type { AiEvent as StreamEvent, AiMessage } from "../lib/types.ts"
@@ -163,6 +164,9 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             }}</Show>
           }}
         </Index>
+        <Show when={!isUser() && props.message.status !== "streaming"}>
+          <TurnEvidence calls={timeline().flatMap((segment) => (segment.kind === "tool" ? [ai.toolCalls()[segment.callId]] : []))} />
+        </Show>
         <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
           <p class="assistant-turn-footer" data-testid="ai-turn-footer">
             {turnFooter().join(" · ")}
