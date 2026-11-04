@@ -14,8 +14,8 @@ Actions and Parameters (mm, mm/min, rpm)
 - vision: focus; viewport/toolpath image and line-numbered program sheet (sent whenever the editor shows code).
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- setup_plan: setup {id,name,machineType,workOffset,post,grouping single|perTool|perOperation,retractBeforeToolChange,operations[{id,name,elementIds,params,tool,enabled,fromPreviousStock}],stock?}; programs, tool table (pockets), tool changes and issues row by row. No geometry needed, nothing stored.
-- setup_list: saved multi-operation setups of the project (id, name, updatedAt, operations).
+- setup_plan: setup {id,name,machineType,workOffset,post,grouping,retractBeforeToolChange,operations[{id,name,elementIds,params,tool,enabled,fromPreviousStock}]}; programs, tool table, changes, issues. Stores nothing.
+- setup_list: saved setups (id, name, updatedAt).
 - materials: query; cutting grades and FFF filaments (densityGcm3, nozzleTemperature, bedTemperature, fan, maxVolumetricFlow, qualification basis). Machines: kind, post, limits, fiveAxis/turning/printer profiles (printers: bed, buildHeight, nozzle, thermal/speed limits) and saved config:<id> rows.
 - cutting_data: material, cut, tool, machine, depth/ae/ap/scallop; material-based feeds bounded by machine limits.
 - lathe: stock, contour|bore, tools, operations, material, post; NC, stock replay.
