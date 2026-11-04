@@ -262,6 +262,9 @@
     },
     "packages/vcs": {
       "name": "@cadcamfun/vcs",
+      "dependencies": {
+        "effect": "4.0.0-rc.112",
+      },
     },
     "packages/web": {
       "name": "@cadcamfun/web",
