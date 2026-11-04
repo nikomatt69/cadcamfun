@@ -147,6 +147,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     return { status: "failed", issues: [issue("InvalidInput", "prepare", "Stock placement needs finite coordinates and positive finite dimensions")] }
   }
   if (job.setupOrientation !== undefined && !SETUP_ORIENTATIONS.includes(job.setupOrientation)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "Unknown manual setup orientation")] }
+  if (job.setups !== undefined) return { status: "failed", issues: [issue("InvalidInput", "prepare", "The job lists setups: one NC cannot hold several fixings. Run it with runSetups (one program per setup), or give the job its own fields for a single setup")] }
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return { status: "failed", issues: [issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`)] }
   const material = findMaterial(job.material)
   if (material === undefined) issues.push(issue("UnknownMaterial", "prepare", `Unknown material '${job.material}'`))
