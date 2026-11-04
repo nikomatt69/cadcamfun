@@ -61,11 +61,16 @@ test("probe configuration: read, slices replace, null removes, 409 on a stale ba
   const path = `/api/machine-configs/${machineId}/probe`
   const first = Schema.decodeUnknownSync(MachineProbeConfigDocument)((await app.call(path)).body)
   expect(first).toMatchObject({ probing: { stylusRadius: 1, feed: 100 }, toolSetter: null, rotaryCalibration: null, isOwner: true })
-  const put = await app.call(path, { method: "PUT", json: { toolSetter: { kind: "contact", triggerZ: -420.5 }, baseUpdatedAt: first.updatedAt } })
+  const put = await app.call(path, { method: "PUT", json: { toolSetter: { kind: "contact", position: { x: 400, y: -200, z: -350 }, triggerZ: -420.5, maxToolDiameter: 30, feeds: { fast: 500, touch: 20 }, brokenTolerance: 0.2 }, baseUpdatedAt: first.updatedAt } })
   expect(put.status).toBe(200)
   expect(put.body).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: { kind: "contact", triggerZ: -420.5 } })
   expect((await app.call(path, { method: "PUT", json: { probing: { stylusRadius: 2 }, baseUpdatedAt: first.updatedAt } })).status).toBe(409)
   expect((await app.call(path, { method: "PUT", json: {} })).status).toBe(400)
+  // The slices are the core shapes: a tool setter without its position, or a negative stylus, is refused.
+  expect((await app.call(path, { method: "PUT", json: { toolSetter: { kind: "contact", triggerZ: -400 } } })).status).toBe(400)
+  expect((await app.call(path, { method: "PUT", json: { probing: { stylusDiameter: -2 } } })).status).toBe(400)
+  const extended = await app.call(path, { method: "PUT", json: { probing: { stylusRadius: 1, stylusDiameter: 2, toolNumber: 99, feeds: { touch: 50, fast: 800 }, orientSpindle: 90 } } })
+  expect(extended.body.probing).toMatchObject({ stylusDiameter: 2, toolNumber: 99, feeds: { touch: 50, fast: 800 }, orientSpindle: 90 })
   const removed = await app.call(path, { method: "PUT", json: { toolSetter: null } })
   expect(removed.body.toolSetter).toBeNull()
   // The work-offset table written by the other route is untouched by a probe-config write.

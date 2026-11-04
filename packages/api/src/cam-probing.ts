@@ -1,14 +1,15 @@
+import { cam } from "@cadcamfun/core"
 import { Schema } from "effect"
 
 /*
  * Probing, work offsets and in-process inspection (spec 73 §3.1): the transport shapes of the `camProbing` group. Lengths are
- * millimetres; angles on the wire are degrees (spec 73 §1), work-offset rotations radians as the machine table stores them.
+ * millimetres; angles on the wire are degrees (spec 73 §1), as the machine configuration stores them.
  */
 
 const finite = Schema.Finite
 const iso = Schema.String.annotate({ description: "ISO-8601 timestamp" })
 
-/** One work-offset row as the machine holds it (mm; `rotation` in radians about the tool axis). */
+/** One work-offset row as the machine holds it: mm, and degrees for `a` / `b` / `c` and the `rotation` about the tool axis. */
 export const CamOffsetEntry = Schema.Struct({
   x: finite, y: finite, z: finite,
   a: Schema.optionalKey(finite), b: Schema.optionalKey(finite), c: Schema.optionalKey(finite),
@@ -21,17 +22,13 @@ export type CamOffsetEntry = typeof CamOffsetEntry.Type
  * core offset grammar and answers 400 for one it does not know.
  */
 export const CamOffsetKey = Schema.String.check(Schema.isMinLength(2), Schema.isMaxLength(24), Schema.isPattern(/^[A-Za-z][A-Za-z0-9 .]*$/))
-/**
- * The same rule as a predicate, for record keys: a record whose key schema refuses a key drops that entry on decode instead of
- * failing, which would silently empty a table, so tables take any string key and the sidecar refuses a bad one by name.
- */
-export const isCamOffsetKey = (key: string): boolean => key.length >= 2 && key.length <= 24 && /^[A-Za-z][A-Za-z0-9 .]*$/.test(key)
 
-/** At most this many rows in one table (G54..G59 plus a full extended range is well under it). */
+/** At most this many rows in one table (G54..G59 plus a full extended range is well under it); the sidecar refuses more. */
 export const WORK_OFFSET_ROWS_MAX = 320
 
-const entries = Schema.Record(Schema.String, CamOffsetEntry).check(Schema.makeFilter((record) =>
-  Object.keys(record).length <= WORK_OFFSET_ROWS_MAX || `at most ${WORK_OFFSET_ROWS_MAX} work offsets`))
+// Any string key: a record whose key schema refuses a key drops that entry on decode instead of failing, which would silently
+// empty a table, so the sidecar checks every key with the core offset grammar and refuses a bad one by name.
+const entries = Schema.Record(Schema.String, CamOffsetEntry)
 
 export const WorkOffsetTableQuery = { setupId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))) }
 
@@ -53,25 +50,27 @@ export const WorkOffsetTableDocument = Schema.Struct({
 })
 export type WorkOffsetTableDocument = typeof WorkOffsetTableDocument.Type
 
-const slice = Schema.Record(Schema.String, Schema.Unknown)
+const k = cam.kernel
 
 /**
  * `PUT /api/machine-configs/:id/probe`: each given slice replaces the stored one (`config.probing`, `config.toolSetter`,
- * `config.rotaryCalibration`), `null` removes it, an omitted one is kept.
+ * `config.rotaryCalibration`), `null` removes it, an omitted one is kept. The slices are the core machine-profile shapes
+ * (degrees for angles); the legacy `probing {cycles, stylusRadius, feed, dialect}` keys stay valid.
  */
 export const MachineProbeConfigBody = Schema.Struct({
-  probing: Schema.optionalKey(Schema.NullOr(slice)),
-  toolSetter: Schema.optionalKey(Schema.NullOr(slice)),
-  rotaryCalibration: Schema.optionalKey(Schema.NullOr(slice)),
+  probing: Schema.optionalKey(Schema.NullOr(k.MachineProbingSchema)),
+  toolSetter: Schema.optionalKey(Schema.NullOr(k.MachineToolSetterSchema)),
+  rotaryCalibration: Schema.optionalKey(Schema.NullOr(k.MachineRotaryCalibrationSchema)),
   baseUpdatedAt: Schema.optionalKey(iso)
 })
 export type MachineProbeConfigBody = typeof MachineProbeConfigBody.Type
 
+/** What the machine stores, read field by field: a stored field that does not read is left out, never guessed. */
 export const MachineProbeConfigDocument = Schema.Struct({
   machineConfigId: Schema.String,
-  probing: Schema.NullOr(slice),
-  toolSetter: Schema.NullOr(slice),
-  rotaryCalibration: Schema.NullOr(slice),
+  probing: Schema.NullOr(k.MachineProbingSchema),
+  toolSetter: Schema.NullOr(k.MachineToolSetterSchema),
+  rotaryCalibration: Schema.NullOr(k.MachineRotaryCalibrationSchema),
   updatedAt: iso,
   isOwner: Schema.Boolean
 })

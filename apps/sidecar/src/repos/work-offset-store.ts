@@ -1,3 +1,4 @@
+import { cam } from "@cadcamfun/core"
 import { DatabaseError } from "@cadcamfun/db"
 import { Context, Effect, Layer } from "effect"
 import { MachineConfigRepo } from "./machine-config-repo.ts"
@@ -13,7 +14,11 @@ export type OffsetEntries = Record<string, OffsetEntryValue>
 export interface StoredWorkOffsetTable { entries: OffsetEntries; bySetup: Record<string, OffsetEntries> }
 
 /** The machine's probing configuration: `config.probing`, `config.toolSetter`, `config.rotaryCalibration` (spec 73 §1). */
-export interface StoredProbeConfig { probing: Record<string, unknown> | null; toolSetter: Record<string, unknown> | null; rotaryCalibration: Record<string, unknown> | null }
+export interface StoredProbeConfig {
+  probing: cam.kernel.MachineProbing | null
+  toolSetter: cam.kernel.MachineToolSetter | null
+  rotaryCalibration: cam.kernel.MachineRotaryCalibration | null
+}
 
 export interface WorkOffsetsView { machineConfigId: string; setupId: string | null; entries: OffsetEntries; updatedAt: string; isOwner: boolean }
 export interface ProbeConfigView extends StoredProbeConfig { machineConfigId: string; updatedAt: string; isOwner: boolean }
@@ -46,9 +51,9 @@ export const workOffsetTableOf = (config: unknown): StoredWorkOffsetTable => {
 export const probeConfigOf = (config: unknown): StoredProbeConfig => {
   const c = isObj(config) ? config : {}
   return {
-    probing: isObj(c.probing) ? c.probing : null,
-    toolSetter: isObj(c.toolSetter) ? c.toolSetter : null,
-    rotaryCalibration: isObj(c.rotaryCalibration) ? c.rotaryCalibration : null
+    probing: cam.kernel.probingOfConfig(c.probing) ?? null,
+    toolSetter: cam.kernel.toolSetterOfConfig(c.toolSetter) ?? null,
+    rotaryCalibration: cam.kernel.rotaryCalibrationOfConfig(c.rotaryCalibration) ?? null
   }
 }
 
@@ -67,7 +72,7 @@ export class WorkOffsetStore extends Context.Service<WorkOffsetStore, {
   put(userId: string, machineConfigId: string, input: { entries: OffsetEntries | null; setupId?: string | undefined; baseUpdatedAt?: string | undefined }, by?: string): Effect.Effect<WorkOffsetsView | StoreRefusal, DatabaseError>
   getProbeConfig(userId: string, machineConfigId: string): Effect.Effect<ProbeConfigView | StoreRefusal, DatabaseError>
   /** Each given key replaces that slice; `null` removes it; an omitted key is kept. */
-  putProbeConfig(userId: string, machineConfigId: string, input: { probing?: Record<string, unknown> | null | undefined; toolSetter?: Record<string, unknown> | null | undefined; rotaryCalibration?: Record<string, unknown> | null | undefined; baseUpdatedAt?: string | undefined }, by?: string): Effect.Effect<ProbeConfigView | StoreRefusal, DatabaseError>
+  putProbeConfig(userId: string, machineConfigId: string, input: { [K in keyof StoredProbeConfig]?: StoredProbeConfig[K] | undefined } & { baseUpdatedAt?: string | undefined }, by?: string): Effect.Effect<ProbeConfigView | StoreRefusal, DatabaseError>
 }>()("cadcamfun/WorkOffsetStore") {
   static readonly layer = Layer.effect(WorkOffsetStore, Effect.gen(function*() {
     const machines = yield* MachineConfigRepo

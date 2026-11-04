@@ -1,4 +1,5 @@
-import { BadRequest, Conflict, isCamOffsetKey, Forbidden, InternalError, NotFound, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
+import { BadRequest, Conflict, WORK_OFFSET_ROWS_MAX, Forbidden, InternalError, NotFound, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
 import { Context, Effect, Layer } from "effect"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
 import { ProbeReportRepo } from "../repos/probe-report-repo.ts"
@@ -65,8 +66,10 @@ export class Probing extends Context.Service<Probing, {
           return "refused" in view ? yield* readRefusal(view) : view
         }),
         put: Effect.fn("Probing.workOffsets.put")(function*(userId, id, input, by) {
-          const bad = Object.keys(input.entries).filter((key) => !isCamOffsetKey(key))
-          if (bad.length > 0) return yield* new BadRequest({ message: `Not a work offset: ${bad.slice(0, 5).join(", ")}` })
+          // Keys must be the canonical spelling of an offset the core can address (`G54`, `G54.1 P3`, `G505`, `G59.1`, `preset 4`).
+          const problems = cam.probing.tableProblems({ entries: input.entries })
+          if (problems.length > 0) return yield* new BadRequest({ message: problems.slice(0, 5).join("; ") })
+          if (Object.keys(input.entries).length > WORK_OFFSET_ROWS_MAX) return yield* new BadRequest({ message: `At most ${WORK_OFFSET_ROWS_MAX} work offsets` })
           const view = yield* store.put(userId, id, input, by).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to save the work offsets")))
           return "refused" in view ? yield* refusal(view) : view
         })

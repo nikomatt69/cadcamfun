@@ -11,6 +11,8 @@ const layer = () => WorkOffsetStore.layer.pipe(
   Layer.provideMerge(Database.layer({ path: ":memory:", migrationsFolder }))
 )
 
+const SETTER = { kind: "contact" as const, position: { x: 400, y: -200, z: -350 }, triggerZ: -400, maxToolDiameter: 30, feeds: { fast: 500, touch: 20 }, brokenTolerance: 0.2 }
+
 const seed = Effect.gen(function*() {
   const { query } = yield* Database
   const [owner, stranger] = yield* query("users", (db) => db.insert(schema.userTable).values([{ email: "o@example.com" }, { email: "s@example.com" }]).returning())
@@ -78,7 +80,7 @@ test("probe config: slices replace, null removes, omitted keeps", async () => {
     const ids = yield* seed
     const store = yield* WorkOffsetStore
     const first = yield* store.getProbeConfig(ids.owner, ids.machine)
-    const put = yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: { kind: "contact", triggerZ: -400 }, rotaryCalibration: { at: "2026-11-04" } })
+    const put = yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: SETTER, rotaryCalibration: { at: "2026-11-04" } })
     const removed = yield* store.putProbeConfig(ids.owner, ids.machine, { probing: null })
     return { first, put, removed }
   }).pipe(Effect.provide(layer())))
@@ -97,7 +99,7 @@ test("a work-offset write announces resources.changed to the owner; a refused on
     const collected = yield* Effect.forkDetach(Stream.runCollect(source.pipe(Stream.interruptWhen(Effect.sleep("400 millis")))))
     yield* store.put(ids.stranger, ids.machine, { entries: {} })
     yield* store.put(ids.owner, ids.machine, { entries: { G55: { x: 1, y: 2, z: 3 } } })
-    yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: { kind: "laser" } })
+    yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: { ...SETTER, kind: "laser" } })
     return { got: yield* Fiber.join(collected), owner: ids.owner }
   }).pipe(Effect.provide(layer()), Effect.provide(LiveEvents.layer))))
   expect(frames.got).toHaveLength(4)
