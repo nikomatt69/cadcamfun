@@ -1,8 +1,9 @@
 /** Work offsets and probe configuration of a machine over HTTP (spec 73 §3.1/§3.2): round trip, setup scope, 403/404/409, history. */
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { MachineProbeConfigDocument, WorkOffsetTableDocument } from "@cadcamfun/api"
-import { Schema } from "effect"
+import { Context, Effect, Fiber, Schema, Stream } from "effect"
 import { makeApp } from "./helpers.ts"
+import { LiveEvents } from "../src/services/live-events.ts"
 
 setDefaultTimeout(60_000)
 let app: Awaited<ReturnType<typeof makeApp>>
@@ -84,4 +85,17 @@ test("access: unknown machine is 404, a stranger's read and write are 403", asyn
   expect((await app.call(`/api/machine-configs/${machineId}/work-offsets`, { headers })).status).toBe(403)
   expect((await app.call(`/api/machine-configs/${machineId}/work-offsets`, { method: "PUT", headers, json: { entries: {} } })).status).toBe(403)
   expect((await app.call(`/api/machine-configs/${machineId}/probe`, { method: "PUT", headers, json: { probing: {} } })).status).toBe(403)
+})
+
+test("a write to the table announces resources.changed, so a second window reloads", async () => {
+  const events = Context.get(await app.services(), LiveEvents)
+  const path = `/api/machine-configs/${machineId}/work-offsets`
+  const current = (await app.call(path)).body
+  const seen = await Effect.runPromise(Effect.scoped(Effect.gen(function*() {
+    const stream = yield* events.subscribe({})
+    const collected = yield* Stream.runCollect(Stream.filter(stream, (e) => e.type === "resources.changed").pipe(Stream.take(1))).pipe(Effect.forkChild)
+    yield* Effect.promise(() => app.call(path, { method: "PUT", json: { entries: current.entries, baseUpdatedAt: current.updatedAt } }))
+    return yield* Fiber.join(collected)
+  })))
+  expect([...seen].map((e) => e.type)).toEqual(["resources.changed"])
 })
