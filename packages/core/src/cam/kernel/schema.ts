@@ -33,7 +33,7 @@ const ring = Schema.Array(point).check(Schema.isMinLength(3), Schema.isMaxLength
 
 export const CutterSchema = Schema.Struct({
   id, name: Schema.String.check(Schema.isMaxLength(120)),
-  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail", "tapered", "lollipop", "barrel", "lens"]),
+  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer", "countersink", "boringbar", "tslot", "dovetail", "tapered", "lollipop", "barrel", "lens", "probe"]),
   diameter: positive, flutes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
   material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),

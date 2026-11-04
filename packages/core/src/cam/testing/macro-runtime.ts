@@ -254,14 +254,17 @@ export interface ExpandOptions {
   readonly variables?: Readonly<Record<string, number>>
   /** The value of a control variable the host owns (a position, a skip flag); consulted before the variable store. */
   readonly systemRead?: (name: string) => number | undefined
-  /** Called for every block that goes to the output (and for `DPRNT`): return true when the host ran it, so it is not written. */
+  /**
+   * Called for every block that goes to the output (and for `DPRNT`): return true when the host ran it, so it is not written, or a
+   * string to write in its place (a probing block rewritten to end where the probe touched); false leaves the block as it is.
+   */
   readonly onBlock?: (block: {
     readonly text: string
     readonly line: number
     readonly stop: (reason: string) => void
     readonly read: (name: string) => number
     readonly write: (name: string, value: number) => void
-  }) => boolean
+  }) => boolean | string
   /** Called after a variable is written. */
   readonly onWrite?: (name: string, value: number, line: number) => void
   /** Called when the program raises an alarm (`#3000`, `SETAL`, `FN 14`, `(abort, ..)`); the run stops. */
@@ -284,9 +287,15 @@ export const expandMacros = (source: string, options: ExpandOptions = {}): Expan
   const warned = new Set<string>()
   const fail = (line: number, message: string): void => { errors.push(`line ${line}: ${message}`) }
   let lastMessage = ""
-  const hostRan = (text: string, line: number): boolean =>
+  const hostRan = (text: string, line: number): boolean | string =>
     options.onBlock !== undefined && options.onBlock({ text, line, stop: (reason) => { fail(line, reason); stopped = true }, read: (n) => read(line)(n), write })
-  const emit = (text: string, line: number): void => { if (text.trim() !== "" && !hostRan(text, line)) { out.push(text); map.push(line) } }
+  const emit = (text: string, line: number): void => {
+    if (text.trim() === "") return
+    const ran = hostRan(text, line)
+    if (ran === true) return
+    out.push(typeof ran === "string" ? ran : text)
+    map.push(line)
+  }
   const alarm = (code: number, text: string, line: number): void => {
     options.onAlarm?.({ code, text, line })
     fail(line, `alarm ${code}${text !== "" ? `: ${text}` : ""}: the program stops`)
@@ -618,6 +627,8 @@ export const expandMacros = (source: string, options: ExpandOptions = {}): Expan
       const wasContinued = cycleContinues
       cycleContinues = continues
       if (/^(BEGIN|END) PGM\b/.test(upper)) { emit(rawLine, line); pc++; return }
+      // A probing row names its result parameter (`TCH PROBE 0.0 REF. PLANE Q94 X-`): it is a name there, not a value to put in.
+      if (/^TCH PROBE\b/.test(upper)) { emit(rawLine.replace(/^\d+\s+/, ""), line); pc++; return }
       // Cycle parameters (`Q200=2` under `CYCL DEF 200 ~`) belong to the cycle: kept, with their values.
       if (wasContinued || continues) { emit(substitute(rawLine.replace(/^\d+\s+/, ""), line), line); pc++; return }
       const fn = /^FN\s*(\d+)\s*:\s*(.*)$/.exec(upper)

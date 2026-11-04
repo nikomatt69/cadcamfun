@@ -52,6 +52,7 @@ const cuttingZone = (c: Cutter, steps: number): ProfilePoint[] => {
   const R = c.diameter / 2
   const top = Math.max(c.fluteLength, 1e-3)
   switch (c.kind) {
+    case "probe":
     case "ball": {
       const pts = arc(0, R, R, -Math.PI / 2, 0, steps)
       return [...pts, { r: R, z: Math.max(top, R) }]

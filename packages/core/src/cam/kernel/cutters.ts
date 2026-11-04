@@ -47,6 +47,8 @@ export type CutterKind =
   | "barrel"
   /** A lens cutter: two arcs from the tip point to the top of `headHeight`, widest (`diameter`) at mid-height. */
   | "lens"
+  /** A spindle touch probe (spec 73): `diameter` is the stylus ball. Never cuts; the record gives the probe its tool number and its shape for the clearance checks. */
+  | "probe"
 
 export type ToolMaterial = "hss" | "hss-co" | "carbide" | "pcd"
 
@@ -119,7 +121,8 @@ const LEGACY_KIND: Readonly<Record<CutterKind, Tool["kind"]>> = {
   tapered: "endmill",
   lollipop: "ballnose",
   barrel: "endmill",
-  lens: "endmill"
+  lens: "endmill",
+  probe: "ballnose"
 }
 
 /** The legacy record the operations take (`cam/tool.ts`). */

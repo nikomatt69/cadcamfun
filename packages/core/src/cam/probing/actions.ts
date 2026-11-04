@@ -49,7 +49,7 @@ const deviationOf = (c: Characteristic, routine: ProbeRoutine): { readonly dev: 
  * The routine's moves followed by the moves of its actions. A result an action names that the cycle does not have, a policy that is
  * not valid or a rotation the IR cannot write (`g68`) is refused with a RangeError.
  */
-export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<ProbeAction>, ctx: Pick<ProbeContext, "prefix">): Move[] => {
+export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<ProbeAction>, ctx: Pick<ProbeContext, "prefix" | "frame">): Move[] => {
   const out: Move[] = [...routine.moves]
   const name = (n: string) => ({ name: `${ctx.prefix}${n}` })
   const read = (n: string): Expr => { const e = routine.results[n]; if (e === undefined) throw new RangeError(`the cycle has no result '${n}' (it has ${Object.keys(routine.results).join(", ")})`); return e }
@@ -75,7 +75,15 @@ export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<Pro
           const policy = deg ? { ...a.policy, ...(a.policy.limit !== undefined ? {} : {}), deadband: undefined, limit: undefined } : a.policy
           const c = policyCondition(policy as typeof a.policy, { var: m }, tolerance)
           if (c.alarm !== undefined) out.push(...guarded(c.alarm, [{ _tag: "Alarm", code: OFFSET_ALARM, text: `${tag === "a" ? "ROTATION" : "OFFSET"} CORRECTION OUT OF RANGE` }]))
-          out.push(...guarded(c.write, deltas.map((d) => ({ _tag: "OffsetUpdate" as const, target: { kind: "work" as const, ref: a.ref }, axis: d.axis, mode: "add" as const, value: d.value }))))
+          // Under a tilted plane the measured deltas are in the plane's axes and the offset is in the machine's: each machine axis takes the
+          // sum of the plane deltas along it (the frame's axes are its columns), so the offset moves the way the part is displaced.
+          const frame = deg ? undefined : ctx.frame
+          const written = frame === undefined ? deltas : (["X", "Y", "Z"] as const).flatMap((base) => {
+            const key = base.toLowerCase() as "x" | "y" | "z"
+            const terms = deltas.flatMap((d) => { const k = (d.axis === "X" ? frame.xAxis : d.axis === "Y" ? frame.yAxis : frame.zAxis)[key]; return Math.abs(k) < 1e-12 ? [] : [binary("*", num(k), d.value)] })
+            return terms.length === 0 ? [] : [{ axis: base, value: terms.reduce((sum, t) => binary("+", sum, t)) }]
+          })
+          out.push(...guarded(c.write, written.map((d) => ({ _tag: "OffsetUpdate" as const, target: { kind: "work" as const, ref: a.ref }, axis: d.axis, mode: "add" as const, value: d.value }))))
         }
         group(linear, "l", a.policy.tolerance, false)
         group(angular, "a", a.policy.angleTolerance === undefined ? undefined : a.policy.angleTolerance / DEG, true)

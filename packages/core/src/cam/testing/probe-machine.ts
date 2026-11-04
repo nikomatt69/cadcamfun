@@ -20,12 +20,17 @@ import { frameToWork, tablePose, workToFrame, type SimMachine } from "../probing
 import type { ProbeSimContact, ProbeSimOutcome, ProbeSimToolUpdate, ProbeSimUpdate } from "../probing/types.ts"
 import type { ProbeWorld3 } from "../probing/world.ts"
 import type { WorkFrame } from "../setup.ts"
-import { expandMacros, type Expanded } from "./macro-runtime.ts"
+import { expandMacros, type Expanded, type ExpandOptions } from "./macro-runtime.ts"
 import { frameOfCycle800, frameOfG68, frameOfG682, frameOfPlaneSpatial, type Frame } from "./frames.ts"
 
 const DEG = Math.PI / 180
 
 export interface NcSimOptions {
+  /**
+   * Rewrite instead of consume: every block stays in the text as it is, except a probing block, which is written as a plain move that
+   * ends where the probe touched (absolute program coordinates). The text then replays in `interpretGcode` as the path the probe took.
+   */
+  readonly rewrite?: boolean
   readonly world: ProbeWorld3
   readonly machine: SimMachine
   /** The control the text is for: its offset addresses and probing syntax. */
@@ -68,7 +73,18 @@ const selectedRef = (g: ReadonlyArray<number>, p: number | undefined): WorkOffse
   return undefined
 }
 
+/** The machine under the macro runtime: `expand` is what `expandMacros` takes, `finish` reads the outcome once the program has run. */
+export interface NcProbeHost {
+  readonly expand: ExpandOptions
+  readonly finish: (expanded: Expanded) => NcSimOutcome
+}
+
 export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome => {
+  const host = createNcProbeHost(options)
+  return host.finish(expandMacros(text, host.expand))
+}
+
+export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
   const { world, machine, codes } = options
   const family: OffsetFamily = codes.offsets
   const capacity = options.probing?.offsets
@@ -225,7 +241,7 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
     return progToMachine({ x: v("X", p.x), y: v("Y", p.y), z: v("Z", p.z) })
   }
 
-  const handle = (block: { readonly text: string; readonly line: number; readonly stop: (reason: string) => void; readonly read: (name: string) => number; readonly write: (name: string, value: number) => void }): boolean => {
+  const handleInner = (block: { readonly text: string; readonly line: number; readonly stop: (reason: string) => void; readonly read: (name: string) => number; readonly write: (name: string, value: number) => void }): boolean | string => {
     rd = block.read
     blockCount++
     if (stopped !== undefined) return true
@@ -264,18 +280,20 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
         const m = /^REF\. PLANE\s+(Q\d+)\s+([XYZ])([+-])$/.exec(tch[2]!)
         if (m === null) { errors.push(`line ${line}: cannot read '${t}'`); return true }
         pending = { axis: m[2]!.toLowerCase() as "x" | "y" | "z", sign: m[3] === "+" ? 1 : -1, result: m[1]! }
-        return true
+        return ";TCH PROBE 0.0"
       }
       if (pending === undefined) { errors.push(`line ${line}: TCH PROBE 0.1 without 0.0`); return true }
-      const m = /^([XYZ])([+-]\d+\.?\d*)/.exec(tch[2]!)
+      const m = /^([XYZ])([+-]\d+\.?\d*)(?:\s+F(\d+\.?\d*))?/.exec(tch[2]!)
       if (m === null) { errors.push(`line ${line}: cannot read '${t}'`); return true }
       const p = machineToProg(here())
       const target = { ...p, [pending.axis]: Number(m[2]) * unit }
       const before = pending
+      const words0Feed = Number(m[3] ?? 0)
       pending = undefined
       touch(progToMachine(target), line, "g38.2", block.stop)
       if (stopped === undefined) block.write(before.result, machineToProg(here())[before.axis] / unit)
-      return true
+      const e = machineToProg(here())
+      return `L X${e.x < 0 ? "-" : "+"}${Math.abs(e.x / unit).toFixed(4)} Y${e.y < 0 ? "-" : "+"}${Math.abs(e.y / unit).toFixed(4)} Z${e.z < 0 ? "-" : "+"}${Math.abs(e.z / unit).toFixed(4)} R0 F${Math.round(words0Feed)}`
     }
     if (/^(L\s|CC\s|C\s)/.test(t)) {
       const kl = /^L\s+(.*)$/.exec(t)
@@ -362,6 +380,8 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
       }
       return true
     }
+    // Homing and the like end where the control puts the tool: nothing the probe tracker reads follows from them.
+    if (g.includes(28) || g.includes(30) || g.includes(53.1)) return true
     // motion
     let motion: "rapid" | "feed" | "g31" | "g38.2" | "g38.3" | "meas" | undefined
     if (g.includes(31)) motion = "g31"
@@ -370,7 +390,8 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
     else if (meas) motion = "meas"
     else if (g.includes(0)) motion = "rapid"
     else if (g.includes(1)) motion = "feed"
-    else if (g.some((x) => x === 2 || x === 3) && (words.has("X") || words.has("Y"))) { fail(`line ${line}: an arc in a probe program is not replayed`, block.stop); return true }
+    // An arc is followed to its end point (the tracker needs where the tool is, not the path); a probe program has none.
+    else if (g.some((x) => x === 2 || x === 3) && (words.has("X") || words.has("Y"))) motion = "feed"
     // rotary words position the table before the move
     if (kin !== undefined && (words.has("A") || words.has("B") || words.has("C"))) pose = { a: words.has("A") ? words.get("A")! * DEG : pose.a, b: words.has("B") ? words.get("B")! * DEG : pose.b, c: words.has("C") ? words.get("C")! * DEG : pose.c }
     const target = readTarget(words, g.includes(53) || supa)
@@ -384,7 +405,14 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
       return true
     }
     touch(target, line, motion, block.stop)
-    return true
+    const e = machineToProg(here())
+    const f = words.get("F")
+    return `G90 G1 X${(e.x / unit).toFixed(4)} Y${(e.y / unit).toFixed(4)} Z${(e.z / unit).toFixed(4)}${f !== undefined ? ` F${f}` : ""}`
+  }
+  const handle = (block: Parameters<typeof handleInner>[0]): boolean | string => {
+    const r = handleInner(block)
+    if (options.rewrite === true) return typeof r === "string" ? r : false
+    return typeof r === "string" ? true : r
   }
 
   const systemRead = (name: string): number | undefined => {
@@ -400,7 +428,7 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
     return undefined
   }
 
-  const expanded = expandMacros(text, {
+  const expand: ExpandOptions = {
     variables: seed,
     systemRead,
     onBlock: handle,
@@ -424,16 +452,18 @@ export const simulateNc = (text: string, options: NcSimOptions): NcSimOutcome =>
       void line
     },
     onAlarm: (a) => { alarms.push({ code: a.code, text: a.text, moveIndex: blockCount, line: a.line }); stopped = `alarm ${a.code}: ${a.text}` }
-  })
-
-  // The offsets after the run: the control's variables read back.
-  rd = (name) => expanded.variables[name] ?? seed[name] ?? 0
-  const offsets: Record<string, OffsetEntry> = { ...machine.offsets.entries }
-  for (const ref of refs) offsets[offsetKey(ref)] = entryOf(ref)
-  // Updates of the final value only: a variable written twice is one change per write, in order (as the IR run lists them).
-  return {
-    contacts, variables: expanded.variables, results: {}, offsets, updates, tools: toolUpdates, inspections: [], alarms, reports,
-    ...(stopped !== undefined ? { stopped } : {}),
-    path, expanded, errors: [...errors, ...expanded.errors.filter((e) => !/: alarm \d+|the program stops|program stop/.test(e))]
   }
+
+  const finish = (expanded: Expanded): NcSimOutcome => {
+    // The offsets after the run: the control's variables read back.
+    rd = (name) => expanded.variables[name] ?? seed[name] ?? 0
+    const offsets: Record<string, OffsetEntry> = { ...machine.offsets.entries }
+    for (const ref of refs) offsets[offsetKey(ref)] = entryOf(ref)
+    return {
+      contacts, variables: expanded.variables, results: {}, offsets, updates, tools: toolUpdates, inspections: [], alarms, reports,
+      ...(stopped !== undefined ? { stopped } : {}),
+      path, expanded, errors: [...errors, ...expanded.errors.filter((e) => !/: alarm \d+|the program stops|program stop/.test(e))]
+    }
+  }
+  return { expand, finish }
 }

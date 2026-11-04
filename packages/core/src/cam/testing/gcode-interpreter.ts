@@ -31,7 +31,7 @@
 import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
 import { headerTools } from "./header-tools.ts"
 import { nameTools, usesToolChangeWord } from "./tool-words.ts"
-import { expandMacros, hasMacroSyntax } from "./macro-runtime.ts"
+import { expandMacros, hasMacroSyntax, type ExpandOptions } from "./macro-runtime.ts"
 import { decodeKlartext } from "./heidenhain.ts"
 import { compose, frameOfCycle800, frameOfG68, frameOfG682, frameOfPlaneSpatial, mul3, mulT3, type Frame, type P3 } from "./frames.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
@@ -76,6 +76,11 @@ export interface InterpretOptions {
    * stylus touches is not known before the machine runs). Off by default: the verifier and the evidence never see them as cuts.
    */
   readonly probeMoves?: boolean
+  /**
+   * The machine under the macro runtime (`createNcProbeHost(..).expand`): a probe program reads the positions the probe touched at, so
+   * its macros cannot run without a part to touch. With `rewrite` the probing blocks come back as moves that end at the contact.
+   */
+  readonly macroHost?: ExpandOptions
   /**
    * The radius of the cutter compensated by `G41` / `G42 D<d>` (the control's D register for the tool in the spindle).
    * Without it the radius comes from `G10 L12` in the program or its header comments (`T1 D=6.`, `Tool: … Ø6mm`).
@@ -221,8 +226,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   const unsupported: Array<{ line: number; word: string }> = []
   // Variables, expressions, jumps, loops and macro calls run first, as the control would: the replay then sees the program it cuts.
   let lineMap: ReadonlyArray<number> | undefined
-  if (hasMacroSyntax(text)) {
-    const expanded = expandMacros(text)
+  if (options.macroHost !== undefined || hasMacroSyntax(text)) {
+    const expanded = expandMacros(text, options.macroHost)
     text = expanded.text
     lineMap = expanded.lines
     for (const message of expanded.errors) {

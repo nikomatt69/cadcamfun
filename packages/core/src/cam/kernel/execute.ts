@@ -50,6 +50,7 @@ import { genericPost } from "../post/generic.ts"
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
 import { carryTipControl, type TipKinematic } from "../testing/tip-control.ts"
 import type { Stock } from "../tool.ts"
+import type { ProbeRoutine } from "../probing/types.ts"
 import { HeightField } from "../verify/heightfield.ts"
 import { forEachSample, pathFromProgram, type PathSegment } from "../verify/path.ts"
 import { toolModel, type ToolModel } from "../verify/tool-model.ts"
@@ -66,6 +67,7 @@ import {
   type ManufacturingJob,
   type OperationOutcome,
   type OperationSpec,
+  type ProbeOperationSpec,
   type CuttingOperationSpec,
   type ReleaseLevel,
   type ResidualStock,
@@ -84,6 +86,7 @@ import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } fro
 import { planPrintJob, runPrintJob } from "./print.ts"
 import { resolveOperations } from "./operation-model.ts"
 import { jobTransform, workplaneFrame, workplaneTransform } from "./workplane.ts"
+import { probeCutterOf, probeRefusal, probeReplayHost, probeToolpath, probingEvidence, type ProbingEvidence } from "./probing.ts"
 import { cadStockOf, carriedColumns, transposeOf } from "./carry.ts"
 import { holdingOf } from "./fixtures.ts"
 import { limitToolpath } from "./limits.ts"
@@ -363,13 +366,18 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     ids.add(op.id)
     if (op.limits !== undefined && op.strategy === "multiaxis") issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: machining limits are planar regions and the five-axis moves are in machine coordinates (the table has turned), so they are not clipped; limit the surface the operation is given instead`, { operationId: op.id }))
     if (op.strategy === "probe") {
-      issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: probe operations are not run by this kernel version (spec 73 §5.12 is not built yet): plan and simulate them with cam.probing`, { operationId: op.id }))
+      const refusal = probeRefusal(op, machine, definition?.ok === true ? definition.dialect : dialectOf(machine.post), job.workplane !== undefined)
+      if (refusal !== undefined) issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: ${refusal}`, { operationId: op.id }))
       continue
     }
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), ...(stockColumns !== undefined ? { stockColumns } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
+  // A probe is a tool in the magazine with a number and a shape: the probes the operations use join the library.
+  const probesUsed = [...new Set(operations.filter((op) => op.strategy === "probe").map((op) => op.tool))]
+  const probeCutters = probesUsed.flatMap((id) => { const d = machine.probing?.probes.find((p) => p.id === id); return d === undefined || tools.some((t) => t.id === id) ? [] : [probeCutterOf(d)] })
+  const libraryTools = probeCutters.length === 0 ? tools : [...tools, ...probeCutters]
+  return { status: "ok", value: { job, material, tools: libraryTools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), ...(stockColumns !== undefined ? { stockColumns } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -629,13 +637,34 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const outcomes: OperationOutcome[] = []
   const feedReports: FeedOperationReport[] = []
   const toolpaths: Toolpath[] = []
+  /** The probe operations as planned: what the `probing` claim replays. */
+  const probePlans: Array<{ readonly op: ProbeOperationSpec; readonly moves: ReadonlyArray<Move>; readonly routine: ProbeRoutine; readonly toolpath: Toolpath }> = []
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
 
   const runOperation = (op: OperationSpec, opIndex: number): void => {
     checkpoint({ stage: "operations", operation: { id: op.id, index: opIndex, count: operations.length } })
-    // prepareJob refuses probe operations; nothing below is for a sensor.
-    if (op.strategy === "probe") return
+    // A probe is a sensor: spindle off, nothing cut, no stock removed (spec 73 §5.12).
+    if (op.strategy === "probe") {
+      const planned = probeToolpath(op, { machine, stockTop: sMax.z, origin: o, job, index: outcomes.filter((x) => x.strategy === "probe").length })
+      const device = machine.probing?.probes.find((p) => p.id === op.tool)
+      if ("refused" in planned || device === undefined) {
+        const reason = "refused" in planned ? planned.refused : `no probe '${op.tool}'`
+        issues.push(issue("GenerationFailed", "generate", `${op.id}: ${reason}`, { operationId: op.id, severity: "warning" }))
+        outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: "probe", toolId: op.tool, cut: "probe", status: "failed", parameters: {}, overridden: [], warnings: [reason], startZ: 0, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
+        return
+      }
+      const marked: Toolpath = { ...planned.toolpath, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, { _tag: "Comment", text: "PROBE: THE SPINDLE STAYS OFF" } as Move, ...planned.toolpath.moves] }
+      toolpaths.push(marked)
+      opOfToolpath.push(outcomes.length)
+      probePlans.push({ op, moves: planned.moves, routine: planned.routine, toolpath: planned.toolpath })
+      outcomes.push({
+        id: op.id, name: op.name ?? op.id, strategy: "probe", toolId: op.tool, cut: "probe", status: "ok", probe: planned.summary,
+        parameters: { search: op.search ?? 6, clearance: op.clearance ?? 3 }, overridden: [], warnings: [...planned.routine.notes], startZ: sMax.z + 15, cutLength: 0,
+        timeSeconds: estimateTime(marked, machine.rapidFeed ?? 10000), removedVolume: 0
+      })
+      return
+    }
     const tool = toolOf(op.tool)
     const cut = cutOf(op, tool)
     const legacy = legacyTool(tool, machine.limits.maxRpm)
@@ -1066,7 +1095,10 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       ? { on: tools.map((n) => `${code} H${n}`), off: tools.map((n) => `G43 H${n}`) }
       : { on: tools.map((n) => code.on(n, job.post?.options?.tcpTransformation)), off: tools.flatMap((n) => [code.off(n), ...(code.end !== undefined ? [code.end(n)] : [])]) }
   })()
-  const read = nc === "" ? undefined : interpretGcode(nc, { start: initial, toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
+  // A probe program reads where the probe touched: its macros run against the part as drawn, and its touches come back as moves ending at the contact.
+  const probeDevice = probePlans.length === 0 ? undefined : machine.probing?.probes.find((p) => p.id === probePlans[0]!.op.tool)
+  const probeHost = probeDevice === undefined ? undefined : probeReplayHost(prepared, postDialect, job.post?.options?.probing, probeDevice)
+  const read = nc === "" ? undefined : interpretGcode(nc, { start: initial, ...(probeHost !== undefined ? { probeMoves: true, macroHost: probeHost.expand } : {}), toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
   // Spec 72 step 0.2: motions read under the control's tool-centre-point mode are the tip in part coordinates. Every check below reads machine
   // coordinates with the angles in force, so they are carried across once, here, through the machine's table (or the caller's kinematics).
   const carryKinematic: TipKinematic | undefined = machine.fiveAxis ?? (tcpKinematics !== undefined ? { layout: tcpKinematics.layout, pivot: tcpKinematics.pivot } : undefined)
@@ -1411,7 +1443,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // interpreter's own compensation tests; here the claim says it is only bounded.
   const compensatedTools = new Set(toolpaths.filter((t) => t.moves.some((m) => m._tag === "CutterComp")).map((t) => t.toolId))
   const compSlack = compensatedTools.size === 0 ? 0 : Math.max(...[...compensatedTools].map((id) => toolOf(id).diameter / 2))
-  const extentAgrees = replayedExtent.length === plannedExtent.length && plannedExtent.every((v, i) => Math.abs(v - replayedExtent[i]!) <= rounding + (i < 4 ? compSlack : 0))
+  // A probe stops where it touches the part, which is where the model says to within its tessellation: the planned touch is the nominal one.
+  const probeSlack = probePlans.some((p) => toolpaths.some((tp) => tp.id === p.op.id)) ? Math.max(0.05, 6 * prepared.tolerance) : 0
+  const extentAgrees = replayedExtent.length === plannedExtent.length && plannedExtent.every((v, i) => Math.abs(v - replayedExtent[i]!) <= rounding + probeSlack + (i < 4 ? compSlack : 0))
   if (interpreted !== undefined && interpreted.errors.length > 0) issues.push(issue("ReplayMismatch", "replay", `The NC interpreter could not model: ${interpreted.errors.slice(0, 3).join("; ")}`))
   if (interpreted !== undefined && !extentAgrees) issues.push(issue("ReplayMismatch", "replay", `The replayed NC reaches [${replayedExtent.map((v) => v.toFixed(3)).join(", ")}], the planned motion [${plannedExtent.map((v) => v.toFixed(3)).join(", ")}]`))
 
@@ -1592,6 +1626,13 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
   )
   const hardFailure = issues.some((i) => i.severity === "error")
+  // The probe operations: found on the part as drawn, and the NC text replayed to the same contacts and offsets as the IR it came from.
+  let probeEvidence: ProbingEvidence | undefined
+  const livePlans = probePlans.filter((p) => toolpaths.some((tp) => tp.id === p.op.id))
+  if (livePlans.length > 0) {
+    probeEvidence = probingEvidence({ prepared, planned: livePlans, emit: (tp) => emitProgram(makeProgram(job.name, [tp], programOptions)), dialect: postDialect, decimals, ...(job.post?.options?.probing !== undefined ? { probing: job.post.options.probing } : {}) })
+    claims.push(probeEvidence.claim)
+  }
   let release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
 
   const toolChanges = usedTools.length
@@ -1640,6 +1681,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
       ...(job.workplane !== undefined ? { workplane: job.workplane } : {}),
       origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
+      ...(probeEvidence !== undefined ? { probing: { operations: livePlans.map((p) => p.op.id), textReplay: probeEvidence.textReplay } } : {}),
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume() - stockAir), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}), ...(triVerdict !== undefined ? { triDexel: { complete: triVerdict.complete, cell: Math.round(triVerdict.cell * 1000) / 1000, errorBound: Math.round(triVerdict.errorBound * 1e4) / 1e4, poses: triVerdict.poses, gouge: { volume: Math.round(triVerdict.gouge.volume * 10) / 10, depth: Math.round(triVerdict.gouge.depth * 1000) / 1000 }, left: { volume: Math.round(triVerdict.left.volume * 10) / 10, depth: Math.round(triVerdict.left.depth * 1000) / 1000, detached: Math.round(triVerdict.detached * 10) / 10 } } } : {}) },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
