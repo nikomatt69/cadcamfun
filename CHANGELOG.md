@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.95 (November 2026)
+
+## Sidecar
+
+- Enhance probing functionalities by adding new probe operation handlers and integrating rotary calibration checks; update action catalog to include CAM probe actions
+
+## API
+
+- Introduce probing functionalities with new schemas and actions for probe operations, including probe storage, reporting, and application; update existing schemas and integrate into cam editing actions
+
 ## v0.1.94 (November 2026)
 
 ## Sidecar
