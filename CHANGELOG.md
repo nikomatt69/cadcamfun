@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.94 (November 2026)
+
+## Sidecar
+
+- Correct option handling in CamProbePlanInput to maintain spindle orientation without scaling; update documentation references in specs
+
 ## v0.1.93 (November 2026)
 
 ## Core
