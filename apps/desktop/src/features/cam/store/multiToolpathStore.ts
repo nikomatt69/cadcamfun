@@ -34,7 +34,8 @@ interface MultiToolpathStore extends MultiToolpathState {
   getToolpathById(id: string): ElementToolpath | undefined
   getVisibleToolpaths(): ElementToolpath[]
   getSelectedToolpaths(): ElementToolpath[]
-  generateCombinedGCode(): string
+  /** Replaces every toolpath (a loaded setup); the selection and the active toolpath reset. */
+  replaceToolpaths(toolpaths: ReadonlyArray<ElementToolpath>): void
   clearAllToolpaths(): void
   updateGlobalSettings(settings: Partial<ToolpathSettings>): void
   applyGlobalSettingsToSelected(): void
@@ -95,7 +96,7 @@ export const useMultiToolpathStore = create<MultiToolpathStore>((set, get) => {
     getToolpathById: id => get().toolpaths.find(toolpath => toolpath.id === id),
     getVisibleToolpaths: () => get().toolpaths.filter(toolpath => toolpath.visible),
     getSelectedToolpaths: () => get().toolpaths.filter(toolpath => toolpath.selected),
-    generateCombinedGCode: () => model.combineGCode(get().toolpaths),
+    replaceToolpaths: toolpaths => apply(state => ({ ...state, toolpaths: [...toolpaths], selectedToolpathIds: [], activeToolpathId: null })),
 
     clearAllToolpaths: () => apply(state => ({ ...state, toolpaths: [], selectedToolpathIds: [], activeToolpathId: null })),
 
