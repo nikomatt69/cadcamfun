@@ -78,7 +78,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       // 4 550 since cad_edit parametric_edit (structural edits of a stored part: parameters, any dimension, features) joined cad_edit.
       // 4 850 since cam verify_nc (foreign NC replayed on the tri-dexel stock, spec 72 step 0.6) joined the cam tool; the detail lives in the cam-post skill.
       // 5 000 since cam regenerate (preview of a fresh program with its diff, spec 59 A3, A4).
-      expect(text.length, id).toBeLessThan(5000)
+      // 5 300 since cam setup_plan / setup_list and cam_edit setup_save (saved multi-operation setups, RM-02).
+      expect(text.length, id).toBeLessThan(5300)
       // An exposure's prompt is read only by the specialist it is granted to, never with the main catalogue.
       if (!Object.hasOwn(ACTION_EXPOSURES, id)) total += text.length
     }
@@ -99,7 +100,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +200: cad pmi_list / pmi_validate and cad_edit pmi_set (spec 49 P1).
     // +300: cad_edit parametric_edit (set_parameter ... ungroup_features) and the hole thread / tolerance / fit fields.
     // Aligned with `BUDGETS.descriptions` in corpus.ts (35 600): the merged cam job and five-axis actions put main at 34 396, above the old 34 100.
-    expect(total).toBeLessThan(35_600)
+    // +300: cam setup_plan / setup_list and cam_edit setup_save (saved multi-operation setups, RM-02).
+    expect(total).toBeLessThan(35_900)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })
