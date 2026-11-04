@@ -1741,6 +1741,18 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly flow?: number
     readonly relativeExtrusion?: boolean
   }
+  readonly enforceTolerance?: boolean
+  readonly process?: {
+    readonly feedOptimisation?: "off" | "chip" | "power"
+    readonly dynamics?: {
+      readonly preset?: "economy" | "standard" | "high-speed"
+      readonly acceleration?: number
+      readonly jerk?: number
+      readonly lookAhead?: number
+    }
+    readonly taylor?: { readonly [x: string]: { readonly n: number; readonly c: number } }
+    readonly lifeLimit?: number
+  }
   readonly progress?: { readonly projectId: string; readonly runId: string }
 }
 
@@ -2192,6 +2204,18 @@ export type ToolpathGeneratorPlanPayload = {
     readonly zHop?: number
     readonly flow?: number
     readonly relativeExtrusion?: boolean
+  }
+  readonly enforceTolerance?: boolean
+  readonly process?: {
+    readonly feedOptimisation?: "off" | "chip" | "power"
+    readonly dynamics?: {
+      readonly preset?: "economy" | "standard" | "high-speed"
+      readonly acceleration?: number
+      readonly jerk?: number
+      readonly lookAhead?: number
+    }
+    readonly taylor?: { readonly [x: string]: { readonly n: number; readonly c: number } }
+    readonly lifeLimit?: number
   }
   readonly progress?: { readonly projectId: string; readonly runId: string }
 }
@@ -9432,6 +9456,7 @@ export type ToolpathsRegenerateOutput = {
               | "machine-clearance"
               | "setup-workholding"
               | "part-coverage"
+              | "tolerance"
             status: "passed" | "failed" | "unsupported" | "unresolved"
             detail: string
           }>
@@ -9527,6 +9552,69 @@ export type ToolpathsRegenerateOutput = {
             unbounded: Array<string>
             met: boolean
           }
+          process?: {
+            feedOptimisation: {
+              mode: "off" | "chip" | "power"
+              operations: Array<{
+                operation: string
+                report: {
+                  mode: "off" | "chip" | "power"
+                  changed: number
+                  pieces: number
+                  unresolved: number
+                  airPieces: number
+                  entryPieces: number
+                  feedMin: number
+                  feedMax: number
+                  chip: number
+                  bound: { [x: string]: number }
+                  belowFloor: number
+                  cutSecondsBefore: number
+                  cutSecondsAfter: number
+                  totalSecondsBefore: number
+                  totalSecondsAfter: number
+                  cutTimeSaved: number
+                  claimBefore: "passed" | "failed" | "unresolved"
+                  claimAfter: "passed" | "failed" | "unresolved"
+                  worstRatioBefore: number
+                  worstRatioAfter: number
+                  aeBound: number
+                }
+              }>
+            }
+            cycleTime: {
+              seconds: number
+              kinematicSeconds: number
+              blocks: number
+              calibrated: false
+              basis: string
+              withToolChangesSeconds: number
+            }
+            toolLife: Array<{
+              toolId: string
+              tool: number
+              lifeUsed: number
+              perOperation: Array<{ operation: string; lifeUsed: number }>
+              status: "ok" | "change" | "exceeded"
+              changeBefore: Array<string>
+              calibrated: false
+            }>
+            stability: Array<{
+              toolId: string
+              result: {
+                status: "measured" | "indicative"
+                aLimMin: number
+                chatterHz: number
+                curve: Array<{ rpm: number; aLim: number; lobe: number }>
+                windows: Array<{ fromRpm: number; toRpm: number; aLim: number }>
+                calibrated: false
+                note: string
+              }
+            }>
+            calibrated: false
+            label: string
+          }
+          tipError?: { max: number; mean: number; samples: number; limit: number; line?: number }
         }
         diff: {
           same: boolean
@@ -9871,6 +9959,8 @@ export type ToolpathGeneratorManufactureInput = {
   readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]
   readonly print?: ToolpathGeneratorManufacturePayload["print"]
+  readonly enforceTolerance?: ToolpathGeneratorManufacturePayload["enforceTolerance"]
+  readonly process?: ToolpathGeneratorManufacturePayload["process"]
   readonly progress?: ToolpathGeneratorManufacturePayload["progress"]
 }
 
@@ -10140,6 +10230,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "machine-clearance"
             | "setup-workholding"
             | "part-coverage"
+            | "tolerance"
           status: "passed" | "failed" | "unsupported" | "unresolved"
           detail: string
         }>
@@ -10235,6 +10326,69 @@ export type ToolpathGeneratorManufactureOutput =
           unbounded: Array<string>
           met: boolean
         }
+        process?: {
+          feedOptimisation: {
+            mode: "off" | "chip" | "power"
+            operations: Array<{
+              operation: string
+              report: {
+                mode: "off" | "chip" | "power"
+                changed: number
+                pieces: number
+                unresolved: number
+                airPieces: number
+                entryPieces: number
+                feedMin: number
+                feedMax: number
+                chip: number
+                bound: { [x: string]: number }
+                belowFloor: number
+                cutSecondsBefore: number
+                cutSecondsAfter: number
+                totalSecondsBefore: number
+                totalSecondsAfter: number
+                cutTimeSaved: number
+                claimBefore: "passed" | "failed" | "unresolved"
+                claimAfter: "passed" | "failed" | "unresolved"
+                worstRatioBefore: number
+                worstRatioAfter: number
+                aeBound: number
+              }
+            }>
+          }
+          cycleTime: {
+            seconds: number
+            kinematicSeconds: number
+            blocks: number
+            calibrated: false
+            basis: string
+            withToolChangesSeconds: number
+          }
+          toolLife: Array<{
+            toolId: string
+            tool: number
+            lifeUsed: number
+            perOperation: Array<{ operation: string; lifeUsed: number }>
+            status: "ok" | "change" | "exceeded"
+            changeBefore: Array<string>
+            calibrated: false
+          }>
+          stability: Array<{
+            toolId: string
+            result: {
+              status: "measured" | "indicative"
+              aLimMin: number
+              chatterHz: number
+              curve: Array<{ rpm: number; aLim: number; lobe: number }>
+              windows: Array<{ fromRpm: number; toRpm: number; aLim: number }>
+              calibrated: false
+              note: string
+            }
+          }>
+          calibrated: false
+          label: string
+        }
+        tipError?: { max: number; mean: number; samples: number; limit: number; line?: number }
       }
     }
   | {
@@ -10291,6 +10445,8 @@ export type ToolpathGeneratorPlanInput = {
   readonly smoothing?: ToolpathGeneratorPlanPayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorPlanPayload["postDefinition"]
   readonly print?: ToolpathGeneratorPlanPayload["print"]
+  readonly enforceTolerance?: ToolpathGeneratorPlanPayload["enforceTolerance"]
+  readonly process?: ToolpathGeneratorPlanPayload["process"]
   readonly progress?: ToolpathGeneratorPlanPayload["progress"]
 }
 

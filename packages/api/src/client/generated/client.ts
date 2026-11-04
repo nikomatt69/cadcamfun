@@ -3242,6 +3242,8 @@ type Endpoint29_0Input = {
   readonly smoothing?: Endpoint29_0Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint29_0Request["payload"]["postDefinition"]
   readonly print?: Endpoint29_0Request["payload"]["print"]
+  readonly enforceTolerance?: Endpoint29_0Request["payload"]["enforceTolerance"]
+  readonly process?: Endpoint29_0Request["payload"]["process"]
   readonly progress?: Endpoint29_0Request["payload"]["progress"]
 }
 const Endpoint29_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_0Input) =>
@@ -3273,6 +3275,8 @@ const Endpoint29_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],
+      enforceTolerance: input["enforceTolerance"],
+      process: input["process"],
       progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))
@@ -3305,6 +3309,8 @@ type Endpoint29_1Input = {
   readonly smoothing?: Endpoint29_1Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint29_1Request["payload"]["postDefinition"]
   readonly print?: Endpoint29_1Request["payload"]["print"]
+  readonly enforceTolerance?: Endpoint29_1Request["payload"]["enforceTolerance"]
+  readonly process?: Endpoint29_1Request["payload"]["process"]
   readonly progress?: Endpoint29_1Request["payload"]["progress"]
 }
 const Endpoint29_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_1Input) =>
@@ -3336,6 +3342,8 @@ const Endpoint29_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],
+      enforceTolerance: input["enforceTolerance"],
+      process: input["process"],
       progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))

@@ -3,7 +3,7 @@ import { Api, BadRequest, type CamJobResult, isOnePartSource, type CamKernelPlan
 import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { runKernelRequest } from "../services/cam-program.ts"
+import { jobOfRequest, runKernelRequest } from "../services/cam-program.ts"
 import { camProgressReporter } from "../services/cam-progress.ts"
 import { explainKernelFailure, kernelRun } from "../services/kernel-errors.ts"
 import { LiveEvents } from "../services/live-events.ts"
@@ -38,8 +38,7 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
     }))
     .handle("plan", ({ payload }) => Effect.gen(function*() {
       // The same snapshot adapter as `manufacture`, then only the planner (`cam.kernel.planOnly`) in a worker: no strategy, post or replay runs.
-      const { progress: _progress, ...snapshot } = payload
-      const job = cam.kernel.jobOfSnapshot(snapshot)
+      const job = jobOfRequest(payload)
       if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
       const plan = yield* kernelRun("cam-plan", job.value, "Failed to plan the kernel job")
       if (plan.status === "failed") return { status: "failed" as const, issues: plan.issues } as CamKernelPlanResult
