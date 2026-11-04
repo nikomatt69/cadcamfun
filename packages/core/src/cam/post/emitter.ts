@@ -13,6 +13,7 @@ import { arcSegmentCount } from "../../cad/arc-math.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import {
   type ArcMove,
+  type SplineMove,
   type Compensation,
   type CycleMove,
   type Move,
@@ -33,6 +34,7 @@ import { prepareFiveAxis, tipMinutesOf } from "./five-axis-frame.ts"
 import { frameMatrix, isIdentityPlane } from "./workplane.ts"
 import { angleText } from "./spindle-orient.ts"
 import { assertCycleSafe } from "../cycle-safety.ts"
+import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
 import { klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
@@ -624,6 +626,49 @@ class Writer {
     this.emitArc(move, from, sweep, compWord)
   }
 
+  /** A spline: the control's own words where it has them and the move is planar, else its flattening within the post tolerance. */
+  spline(move: SplineMove): void {
+    this.endCycle()
+    this.restartSpindle()
+    this.leaveInverse()
+    const from = this.ir
+    if (from === undefined) throw new RangeError("Spline requires a known start position")
+    if (![from.x, from.y, from.z, move.to.x, move.to.y, move.to.z, move.feed, ...move.controls.flatMap((c) => [c.x, c.y])].every(Number.isFinite) || move.feed <= 0) {
+      throw new RangeError("Spline requires finite geometry and a positive feed")
+    }
+    const kind = this.dialect.splines?.kind
+    const planar = Math.abs(move.to.z - from.z) < 1e-9 && Number(this.num(move.to.z)) === (this.pz ?? Number(this.num(from.z)))
+    if (kind === undefined || !planar) {
+      for (const to of flattenSpline(from, move, this.options.tolerance)) this.linear(to, move.feed)
+      return
+    }
+    const sx = this.px ?? from.x * this.scale
+    const sy = this.py ?? from.y * this.scale
+    const f = (v: number): string => formatNumber(v, this.options.decimals)
+    const a = this.axes(move.to)
+    const c1 = move.controls[0]!
+    const c2 = move.controls[1]
+    if (kind === "bezier") {
+      const code = c2 === undefined ? "G5.1" : "G5"
+      const words = c2 === undefined
+        ? [`I${f(c1.x * this.scale - sx)}`, `J${f(c1.y * this.scale - sy)}`]
+        : [`I${f(c1.x * this.scale - sx)}`, `J${f(c1.y * this.scale - sy)}`, `P${f(c2.x * this.scale - move.to.x * this.scale)}`, `Q${f(c2.y * this.scale - move.to.y * this.scale)}`]
+      this.block(this.motion === code ? undefined : code, ...a.words, ...words, this.feedWord(move.feed))
+      this.motion = code
+      this.commit(move.to, a.x, a.y, a.z)
+      return
+    }
+    // NURBS: a Bezier of order p is the clamped knot vector 0 (p times), 1 (p times); the first control point is the start.
+    const order = c2 === undefined ? 3 : 4
+    const ctrl = [{ x: from.x, y: from.y }, c1, ...(c2 === undefined ? [] : [c2]), { x: move.to.x, y: move.to.y }]
+    const xy = (p: { x: number; y: number }): string[] => [`X${f(p.x * this.scale)}`, `Y${f(p.y * this.scale)}`]
+    this.block("G6.2", `P${order}`, "K0", ...xy(ctrl[0]!), this.feedWord(move.feed))
+    for (let i = 1; i < ctrl.length; i++) this.block("K0", ...xy(ctrl[i]!))
+    for (let i = 0; i < order; i++) this.block("K1")
+    this.motion = "G6.2"
+    this.commit(move.to, a.x, a.y, a.z)
+  }
+
   private emitArc(move: ArcMove, from: Vec3, sweep: number, compWord?: string): void {
     const a = this.axes(move.to, true)
     const code = move.clockwise ? "G2" : "G3"
@@ -792,6 +837,9 @@ class Writer {
         break
       case "Arc":
         this.arc(move)
+        break
+      case "Spline":
+        this.spline(move)
         break
       case "Dwell":
         this.dwell(move.seconds)
@@ -1078,7 +1126,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     w.smoothing(true)
     const call = plan?.callOf.get(ti)
     if (call === undefined) {
-      for (const move of tp.moves) {
+      const fitStart = w.ir ?? tp.moves.map(moveTarget).find((p) => p !== undefined)
+      const fitted = options.splines !== undefined && dialect.splines !== undefined && fitStart !== undefined
+      for (const move of fitted ? fitSplineMoves(tp.moves, fitStart!, { tolerance: options.splines!.tolerance, degree: options.splines!.degree ?? 3 }) : tp.moves) {
         w.move(move)
         const to = moveTarget(move)
         if (to !== undefined && to.z > zMax) zMax = to.z

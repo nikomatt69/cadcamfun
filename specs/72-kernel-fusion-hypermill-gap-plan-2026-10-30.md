@@ -451,3 +451,41 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   the pocket roughing and finishing, so a pocket with sharp corners can never reach `verified-program`; hyperMILL and Fusion add a rest-machining pass with a smaller tool. The pieces exist (rest machining from
   the carried stock, spec 53 V6, `cam.rest-machining` L1); the planner step does not. Open: choose the smallest tool the corner radius allows from the crib, add a rest operation after `finish-pocket`, gate on the
   replayed leftover. Not started.
+- 2026-11-04 (lane 4: output, turning, process physics; branch `cam/lane4-output-turning`): what is now built, and what is not.
+  **Built:** `kernel/process.ts` (spec 61 Z4 to Z6: single-DOF stability lobes with the closed-form minimum depth and lobe speeds, estimate path `indicative` and never a pass; Taylor tool life with `lifeUsed` and change-or-report; `ProcessCalibration` and `applyCalibration`, all `calibrated: false` outside a record's range);
+  `kernel/cycle-time.ts` (Z7, spec 69 G2: acceleration, S-curve jerk, look-ahead window, corner junction speeds, centripetal arc limit; equals the analytic trapezoid; the same model runs over the IR and over interpreted NC);
+  `kernel/process-report.ts` and `ManufacturingJob.process` (G0b wired: per-move feed optimisation on the carried height field in `execute.ts` for plain 3-axis operations, `off` byte-identical; the artifact's additive `process` evidence with the cycle time, tool life, stability and the optimiser's before/after report per operation; setup-sheet section);
+  `cam/spline.ts` and the IR `Spline` move (G3: Bezier flattening, polyline fit within a chordal tolerance, `G5`/`G5.1` for LinuxCNC, `G6.2` NURBS for Fanuc, flattening elsewhere, interpreter replay of all three);
+  `kernel/turning-job.ts` (`runTurningJob`, I1: the lathe planner of spec 52 run as a kernel job with claims, release level and the turned-stock replay; the milling `runJob` still refuses a lathe).
+  **Found already built (code wins over the specs):** A2 cutter compensation output, the turning planner/posts/replay (`cam/turning/*`), CYCLE800 and PLANE SPATIAL writers (`post/workplane.ts`), Mitsubishi/Brother/Okuma/Mazak posts, the post tester, `programOfNc` (NC import for re-verification), the setup sheet.
+  **Honest limits / open:** the `cutting-data` claim is not yet replaced by the per-move measured claim (the optimiser's `claimBefore`/`claimAfter` are in the `process` report only); the optimiser skips operations with canned cycles, compensation or rotary moves; the load ratio is not fed to tool life; splines are planar XY only (Siemens `BSPLINE`/`ASPLINE`, Klartext `SPL` flatten); `runTurningJob` has no API, sidecar or desktop surface yet and only Fanuc and Siemens lathe dialects; mill-turn (I2/I3), kernel probing operations (G5), Siemens ShopMill, Mori/DMG and the post tester CLI are not started; nothing is calibrated.
+- 2026-11-04 (lane 1 proof, branch cam/lane1-proof): **spec 69 B6 built for tool-centre-point output.** `kernel/tip-error.ts` measures the tip the emitted NC makes (replay carried to machine coordinates) against the planned path, point by point (piece ends and middles), and `CamArtifact.tipError` {max, mean, samples, limit, line} carries the figure; above the declared limit (post splitting tolerance + angle rounding) a `ReplayMismatch` error blocks `verified-program`. Measured with `post.options.tolerance` 0.005 mm (`kernel/tip-error.test.ts`): Fanuc / Siemens / Heidenhain dome 0.00103 mm max (4976 points), swarf cone 0.00067 mm max (804 points), limit 0.007 mm; a post with the pivot 2 mm wrong is caught (error far over the limit). Not measured: Haas G234 (turning rapids are written as feed moves, indistinguishable from cuts in the replay; no figure), arcs, rapids. **A5 finding:** the default plain-plate job leaves 13-30 mm3 of corner slivers (`material-removed` fails at the fine cell, lane 3 planner) and the degraded coarse replay cannot see slivers narrower than its cell, so the old A5 gate compared a failed fine run with a passed coarse run; the gate now uses an explicit clean fixture and adds a proof that a real overcut stays failed at a coarse cell. Contract note for lane 5: `tipError` is an optional superset field on `CamArtifact`.
+- 2026-11-04 (lane cad, cc/cad-1): **P1-6 / step 2.4 closed in core.** The mesh replay now resumes from the first dirty feature too
+  (`rebuild(history, { cache: newRebuildCache() })`, see spec 58 change log); with `ExactStageCache` both replays resume, and every
+  resumed result deep-equals the full replay. Open: a per-part cache in the sidecar (lane D).
+- 2026-11-04 (lane cad, cc/cad-2): **P2-10 sketch half partly closed**: 2D fillet, mirror, linear/circular pattern, offset and project-edges tools in
+  `cad/sketch-tools.ts` (spec 45 change log). Still open in P2-10: 3D sketch, blocks, delete/replace/split face and extrude until-next/to-body history operations.
+- 2026-11-04 (lane API, kernel reachability, branch cc/api-1): **every kernel job is classified and the four with no route have one.**
+  `apps/sidecar/test/kernel-reachability.test.ts` holds a `satisfies Record<KernelJobName, ...>` map: each worker job names its typed HTTP
+  route (checked against the OpenAPI document of `Api`) or the assistant action that is its only caller, with the reason; a new job fails the
+  typecheck and the test until it is classified. New routes, all run in the kernel worker queue (bounded slots, queue limit, deadline,
+  cancelled with the request; the job history is asserted): `POST /api/cad/sheet` (`cad-sheet`: production drawing sheet of an inline history
+  or of a stored parametric element, the drawing's title block completed under the request's options; a sheet option the projection refuses is
+  a 400 with the reason), `POST /api/toolpaths/plan` (`cam-plan`: what `manufacture` would run, no strategy, post or replay), `POST /api/cam/jobs`
+  (`cam-job`: multi-setup plan/run with every claim; `CamJobResult` is now shared with the assistant's `cam.job` contract; the part's one-of
+  check moved to the route because the generated clients cannot port a filter) and `POST /api/cam/lathe` (`cam-lathe`; a refused plan is a 400).
+  Clients and the API reference regenerated. **Open, needs the AI lane (`packages/ai/src/kernel-jobs.ts`, not this lane):** no kernel job yet for
+  `cam.kernel.runTurningJob` (spec 69 I1), `applyTemplate` (spec 60), the operation model (`resolveOperations`, `transformJob`) or the
+  `process` evidence of a job (`ManufacturingJob.process` is not in `jobOfSnapshot`/`CamKernelRequest`); `POST /api/cam/setups/generate` and the
+  saved-setup `generate` still run `generateSetup` on the request thread (no `cam-setup` job).
+- 2026-11-04 (lane cad, cc/cad-3): **P4-2 partly closed**: annotations anchor to entity refs and follow the geometry (spec 49 change log); the PDF writer
+  row of P4-2 was stale (`drawing/pdf.ts`, vector, Helvetica, exists). Open: ref-driven dimensions, view kinds, BOM table.
+- 2026-11-04 (lane API, branch cc/api-2): **process physics and the tolerance gate reach HTTP; a dropped request is proven to cancel its
+  worker.** `CamKernelRequest` takes `process` (`CamProcessRequest`: feed optimisation `off|chip|power`, machine dynamics preset/overrides,
+  Taylor constants, life limit) and `enforceTolerance`; one adapter (`jobOfRequest`, `apps/sidecar/src/services/cam-program.ts`) adds them to
+  core's `jobOfSnapshot` job for `manufacture`, `plan`, the revalidation of a saved program and the assistant's `cam regenerate`. The artifact
+  contract (`CamKernelArtifact`, a `Codec<CamArtifact>`, so the core type is enforced) now carries `process` (`CamProcessReport`, every figure
+  `calibrated: false`), `tipError`, and the `tolerance` claim id it was missing (an artifact with that claim would have been an "invalid
+  artifact" 400 at decode). Tests (`apps/sidecar/test/cam-process.test.ts`): the report and its absence, schema refusals, the gate failing an
+  impossible tolerance without releasing `verified-program`, and a client abort on a seconds-long `manufacture` ending the job as `cancelled`
+  with no worker left running. Open: `programStatus` does not count `process` / `enforceTolerance` among a program's inputs (core).

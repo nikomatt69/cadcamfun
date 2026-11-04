@@ -1,11 +1,12 @@
 import { saveFile } from "../../../../shared/lib/save-file.ts"
 /**
  * Multi-toolpath generator (legacy `MultiToolpathGenerator.tsx`): one toolpath per CAD element, an execution order,
- * and one combined program.
+ * and one setup: the programs the sidecar's `camSetup` group writes from them, with the tool changes inside.
  *
  * Left, the element selector (create / order / remove toolpaths). Right, the full generator panel to configure the
  * element being edited. "Genera Tutti" generates every toolpath that has no G-code yet through the sidecar,
- * "View" sends the combined program to the CAM viewport and "Download G-code" downloads it.
+ * "View" sends the toolpaths to the CAM viewport and "Download G-code" downloads the setup's programs (the sidecar
+ * generates every enabled operation, so a loaded setup needs no G-code on the panel first).
  */
 import { Show, createSignal, onMount, type JSX } from "solid-js"
 import { Box, Download, Eye, EyeOff, Layers, Play, X, Zap } from "lucide-solid"
@@ -28,6 +29,7 @@ import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import ToolpathGenerator from "../ToolpathGenerator.tsx"
 import { assignmentOf, materialOf, toolOf } from "./assignments.ts"
 import ElementSelector from "./ElementSelector.tsx"
+import SetupPanel from "./SetupPanel.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 export interface MultiToolpathGeneratorProps {
@@ -196,7 +198,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
 
             <button type="button"
               onClick={downloadCombinedGCode}
-              disabled={stats().generatedToolpaths === 0}
+              data-testid="cam-setup-download"
+              disabled={stats().totalToolpaths === 0}
               class="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-2"
             >
               <Download size={16} />
@@ -228,6 +231,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
           </div>
         </div>
       </div>
+
+      <SetupPanel />
 
       {/* Main content */}
       <div class="flex-1 flex overflow-hidden">

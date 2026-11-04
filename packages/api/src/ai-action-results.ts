@@ -15,6 +15,7 @@ import { CamTurningPlan } from "./ai-cam.ts"
 import { CamProgramDiff, CamProgramStatus } from "./cam-kernel.ts"
 import { CamLatheResult, CamPostTestResult, CamProcessResult, CamVerifyNcActionResult } from "./ai-cam-breadth.ts"
 import { ExportedFile } from "./ai-export.ts"
+import { CamJobResult } from "./ai-cam-job.ts"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -222,7 +223,7 @@ const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.L
  * A multi-setup job planned or run in process (`cam.job`): nothing is stored. A run states each setup's release, every claim with its
  * detail, the tolerance budget (the declared bounds) and the job's coverage; a failed claim carries the reason in its detail.
  */
-const jobResult = Schema.Struct({ ok: Schema.Boolean, op: Schema.Literals(["plan", "run"]), release: Schema.optionalKey(str), setups: Schema.optionalKey(Schema.Array(record)), claims: Schema.optionalKey(Schema.Array(record)), failed: Schema.optionalKey(Schema.Array(record)), coverage: Schema.optionalKey(record), notes: Schema.optionalKey(strings), issues: Schema.optionalKey(Schema.Array(record)), error: Schema.optionalKey(str) })
+const jobResult = CamJobResult
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
 
 // ---------------------------------------------------------------- `cam_edit` (writes)

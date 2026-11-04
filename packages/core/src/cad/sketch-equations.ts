@@ -227,6 +227,23 @@ const symmetricPerpendicular: EqFn = (x, v, g) => {
   return m / len
 }
 
+/**
+ * (T - C) . (F - T) / |F - T| on [tx, ty, cx, cy, fx, fy]: the radius from centre C to the shared end T of an arc is square to the
+ * line from T to its far end F (tangency at the end point).
+ */
+const tangentAtEnd: EqFn = (x, v, g) => {
+  const tx = x[v[0]!]!, ty = x[v[1]!]!, cx = x[v[2]!]!, cy = x[v[3]!]!, fx = x[v[4]!]!, fy = x[v[5]!]!
+  const dx = fx - tx, dy = fy - ty, wx = tx - cx, wy = ty - cy
+  const L = Math.max(Math.hypot(dx, dy), TINY), p = wx * dx + wy * dy
+  if (g !== null) {
+    const k = p / (L * L * L)
+    g[0] = dx / L - wx / L + k * dx; g[1] = dy / L - wy / L + k * dy
+    g[2] = -dx / L; g[3] = -dy / L
+    g[4] = wx / L - k * dx; g[5] = wy / L - k * dy
+  }
+  return p / L
+}
+
 // ------------------------------------------------------------------------------------------------ radius sources
 
 /** A circle's radius is an unknown of its own; an arc's is the distance of its start from its centre. */
@@ -395,6 +412,17 @@ export const compileSketch = (sketch: Sketch): CompiledEquations => {
         break
       }
       case "tangentLineCircle": {
+        // An arc that shares an end point with the line (a fillet, a slot end) touches it there: the radius to that point is
+        // square to the line. The distance form below is degenerate in that case (the shared point keeps the centre at most
+        // one radius from the line, so the equation sits at an extremum and its gradient vanishes, which the rank analysis
+        // reports as a redundant constraint); this form has a full-rank gradient and the same solutions.
+        const arc = byId.get(c.circle), ends = lineEnds(c.line)
+        const shared = arc?.kind === "arc" ? [arc.start, arc.end].find((p) => p === ends.a || p === ends.b) : undefined
+        if (arc?.kind === "arc" && shared !== undefined) {
+          const far = shared === ends.a ? ends.b : ends.a
+          add([px(shared), py(shared), px(arc.center), py(arc.center), px(far), py(far)], tangentAtEnd)
+          break
+        }
         const l = lineVars(c.line), r = round(c.circle), n = r.radius.vars.length
         const vars = [px(r.center), py(r.center), l[0]!, l[1]!, l[2]!, l[3]!, ...radVars(r.radius)]
         add(vars, (x, v, g) => {

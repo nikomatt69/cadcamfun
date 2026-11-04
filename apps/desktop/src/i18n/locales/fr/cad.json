@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Épaisseur du motif",
   "cad.template.honeycombPattern.thickness.label": "Épaisseur",
   "cad.template.honeycombPattern.color.description": "Couleur du motif",
-  "cad.template.honeycombPattern.color.label": "Couleur"
+  "cad.template.honeycombPattern.color.label": "Couleur",
+  "cad.param.refLost": "Référence perdue",
+  "cad.param.refLostBy": "supprimé par {feature}",
+  "cad.param.refLostSummary": "{count} sélections désignent des faces ou arêtes qui n'existent plus : ces fonctions ne sont pas construites"
 }

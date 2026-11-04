@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "パターンの厚さ",
   "cad.template.honeycombPattern.thickness.label": "厚さ",
   "cad.template.honeycombPattern.color.description": "パターンの色",
-  "cad.template.honeycombPattern.color.label": "色"
+  "cad.template.honeycombPattern.color.label": "色",
+  "cad.param.refLost": "参照が失われました",
+  "cad.param.refLostBy": "{feature} により削除",
+  "cad.param.refLostSummary": "{count} 件の選択が存在しない面またはエッジを指しています。それらのフィーチャは構築されません"
 }

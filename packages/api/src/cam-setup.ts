@@ -20,6 +20,13 @@ export const CamSetupGenerateRequest = Schema.Struct({
 })
 export type CamSetupGenerateRequest = typeof CamSetupGenerateRequest.Type
 
+/** Generate from a saved setup: the stored setup is the program, so the request carries only the geometry its operations name. */
+export const CamSetupGenerateSavedRequest = Schema.Struct({
+  elements: CamSetupGenerateRequest.fields.elements,
+  stock: Schema.optionalKey(cam.generator.StockSchema)
+})
+export type CamSetupGenerateSavedRequest = typeof CamSetupGenerateSavedRequest.Type
+
 export const CamSetupToolTableEntry = Schema.Struct({ pocket: int, tool: cam.ToolSchema, operationIds: Schema.Array(Schema.String) })
 
 export const CamSetupPlannedProgram = Schema.Struct({

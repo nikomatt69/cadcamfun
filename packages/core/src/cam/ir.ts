@@ -19,6 +19,7 @@ import { Vec2Schema, Vec3Schema } from "../cad/entities.ts"
 import { TAU, type Vec2, type Vec3 } from "../cad/vec.ts"
 import type { Tool } from "./tool.ts"
 import { assertCycleSafe } from "./cycle-safety.ts"
+import { flattenSpline, splineLength } from "./spline.ts"
 
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const NonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
@@ -74,6 +75,17 @@ export const ArcSchema = Schema.TaggedStruct("Arc", {
   clockwise: Schema.Boolean,
   feed: Positive,
   comp: Schema.optionalKey(CompensationSchema)
+})
+
+/**
+ * Planar Bezier spline (spec 69 G3): from the current position to `to` through one (quadratic, `G5.1`) or two (cubic, `G5`, `G6.2`)
+ * absolute XY control points. Z stays constant. A post whose control has no spline words writes the flattening within its tolerance.
+ */
+export const SplineSchema = Schema.TaggedStruct("Spline", {
+  to: Vec3Schema,
+  controls: Schema.Array(Vec2Schema).check(Schema.isMinLength(1), Schema.isMaxLength(2)),
+  /** mm/min. */
+  feed: Positive
 })
 
 export const DwellSchema = Schema.TaggedStruct("Dwell", { seconds: NonNegative })
@@ -143,6 +155,7 @@ export const MoveSchema = Schema.Union([
   RapidSchema,
   LinearSchema,
   ArcSchema,
+  SplineSchema,
   DwellSchema,
   CommentSchema,
   CycleSchema,
@@ -166,6 +179,7 @@ export const MoveSchema = Schema.Union([
 export type RapidMove = typeof RapidSchema.Type
 export type LinearMove = typeof LinearSchema.Type
 export type ArcMove = typeof ArcSchema.Type
+export type SplineMove = typeof SplineSchema.Type
 export type DwellMove = typeof DwellSchema.Type
 export type CommentMove = typeof CommentSchema.Type
 export type OrientMove = typeof OrientSchema.Type
@@ -189,6 +203,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
     case "Rapid":
     case "Linear":
     case "Arc":
+    case "Spline":
       return move.to
     case "Cycle":
       return { x: move.to.x, y: move.to.y, z: move.retractHeight }
@@ -203,7 +218,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
 
 /** Feed of a cutting move; rapids, dwells and comments have none. */
 export const moveFeed = (move: Move): number | undefined =>
-  move._tag === "Linear" || move._tag === "Arc" || move._tag === "Cycle" ? move.feed : undefined
+  move._tag === "Linear" || move._tag === "Arc" || move._tag === "Spline" || move._tag === "Cycle" ? move.feed : undefined
 
 /**
  * Unsigned XY sweep of an arc about `center` from `from` to `to`. Equal
@@ -251,6 +266,8 @@ export const moveLength = (move: Move, from: Vec3): number => {
       const planar = r * arcSweepBetween(from, move.to, move.center, move.clockwise)
       return Math.hypot(planar, move.to.z - from.z)
     }
+    case "Spline":
+      return splineLength(from, move)
     case "Cycle":
     case "Dwell":
     case "Comment":
@@ -347,11 +364,19 @@ export const expandCycle = (cycle: CycleMove, from: Vec3): ReadonlyArray<Move> =
   return out
 }
 
-/** Flattens a move list, replacing every `Cycle` by its expansion. */
+/** Chordal tolerance, mm, of the line segments a `Spline` becomes wherever a consumer walks plain moves (`expandMoves`). */
+export const SPLINE_FLATTEN_TOLERANCE = 0.005
+
+/** Flattens a move list, replacing every `Cycle` by its expansion and every `Spline` by line segments within `SPLINE_FLATTEN_TOLERANCE`. */
 export const expandMoves = (moves: ReadonlyArray<Move>, start: Vec3): Move[] => {
   const out: Move[] = []
   let at = start
   for (const move of moves) {
+    if (move._tag === "Spline") {
+      for (const to of flattenSpline(at, move, SPLINE_FLATTEN_TOLERANCE)) out.push({ _tag: "Linear", to, feed: move.feed })
+      at = move.to
+      continue
+    }
     if (move._tag === "Cycle") {
       const expanded = expandCycle(move, at)
       out.push(...expanded)

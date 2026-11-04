@@ -5,9 +5,9 @@
  */
 import { SETUP_ORIENTATIONS } from "../setup.ts"
 import { Schema } from "effect"
-import { CoolantSchema } from "../ir.ts"
+import { CoolantSchema, WorkOffsetSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
-import { PROFILE_LEAD_INS, SURFACE_MODES, type OperationSpec, type PrintRequirement } from "./contracts.ts"
+import { PROFILE_LEAD_INS, SURFACE_MODES, type JobSetup, type OperationSpec, type PrintRequirement } from "./contracts.ts"
 import { MultiaxisStrategySchema } from "../operations/multiaxis.ts"
 
 export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
@@ -54,8 +54,15 @@ export const HoleCycleSchema = Schema.Union([
   })
 ])
 
+/** Boundary and avoid regions of an operation (`MachiningLimits`, spec 69 C7). */
+export const MachiningLimitsSchema = Schema.Struct({
+  boundary: Schema.optionalKey(ring), avoid: Schema.optionalKey(Schema.Array(ring).check(Schema.isMaxLength(200))),
+  containment: Schema.optionalKey(Schema.Literals(["edge", "centre"]))
+})
+
 const overrides = {
-  id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))), tool: id,
+  id, enabled: Schema.optionalKey(Schema.Boolean), dependsOn: Schema.optionalKey(Schema.Array(id).check(Schema.isMaxLength(200))),
+  limits: Schema.optionalKey(MachiningLimitsSchema), name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))), tool: id,
   rpm: Schema.optionalKey(positive), feed: Schema.optionalKey(positive), plungeFeed: Schema.optionalKey(positive),
   stepdown: Schema.optionalKey(positive), stepover: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
   coolant: Schema.optionalKey(CoolantSchema), radialEngagement: Schema.optionalKey(positive)
@@ -132,3 +139,28 @@ export const PrintRequirementSchema = Schema.Struct({
 })
 const _print: [typeof PrintRequirementSchema.Type] extends [PrintRequirement] ? true : never = true
 void _print
+
+/** A workholding body (`FixtureBody`): an axis-aligned box in CAD world coordinates. */
+export const FixtureBodySchema = Schema.Struct({ id, min: vec3, max: vec3 })
+
+/** A stock that is not a box (`StockModel`): a vertical bar or a closed mesh in CAD world coordinates. */
+export const StockModelSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("cylinder"), center: point, radius: positive, z0: Schema.Finite, z1: Schema.Finite, segments: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 512 }))) }),
+  Schema.Struct({
+    kind: Schema.Literal("mesh"),
+    mesh: Schema.Struct({ positions: Schema.Array(Schema.Finite).check(Schema.isMaxLength(3_000_000)), indices: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))).check(Schema.isMaxLength(3_000_000)) })
+  })
+])
+
+const stockBox = Schema.Struct({ min: vec3, max: vec3 })
+
+/** One fixing of the part (`JobSetup`, spec 69 C1). */
+export const JobSetupSchema = Schema.Struct({
+  id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))),
+  orientation: Schema.optionalKey(SetupOrientationSchema), origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
+  workOffset: Schema.optionalKey(WorkOffsetSchema), stock: Schema.optionalKey(stockBox), stockModel: Schema.optionalKey(StockModelSchema),
+  fixtures: Schema.optionalKey(Schema.Array(FixtureBodySchema).check(Schema.isMaxLength(64))),
+  operations: Schema.optionalKey(Schema.Array(OperationSpecSchema).check(Schema.isMaxLength(2000)))
+})
+const _setup: [typeof JobSetupSchema.Type] extends [JobSetup] ? true : never = true
+void _setup

@@ -1,11 +1,11 @@
 import { Api, BadRequest, type CadImportStepReport, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
-import { cad } from "@cadcamfun/core"
-import { decodeHistory, decodeStartHistory, featureEditOf } from "@cadcamfun/ai"
+import { cad, drawing as sheets } from "@cadcamfun/core"
+import { KernelJobError, decodeHistory, decodeStartHistory, featureEditOf, runKernelJobEffect } from "@cadcamfun/ai"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { elementsOf } from "../services/ai-elements.ts"
-import { kernelRun } from "../services/kernel-errors.ts"
+import { explainKernelFailure, kernelRun } from "../services/kernel-errors.ts"
 
 type Element = Record<string, unknown>
 
@@ -18,17 +18,23 @@ const guarded = <A>(label: string, run: () => A) =>
 export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(function*(handlers) {
   const drawings = yield* DrawingRepo
 
-  /** The scene of a request: its own elements, or those of a stored drawing under the drawing access rule (owner or organisation member). */
-  const sceneOf = Effect.fn("cadExact.scene")(function*(source: { readonly elements?: ReadonlyArray<Element> | undefined; readonly drawingId?: string | undefined }) {
-    if (source.elements !== undefined) return source.elements as ReadonlyArray<Element>
-    if (source.drawingId === undefined) return yield* new BadRequest({ message: "Send the elements to analyse, or the id of a stored drawing" })
+  /** A stored drawing under the drawing access rule (owner or organisation member). */
+  const storedDrawing = Effect.fn("cadExact.drawing")(function*(drawingId: string) {
     const user = yield* CurrentUser
-    const drawing = yield* drawings.find(user.id, source.drawingId).pipe(
+    const drawing = yield* drawings.find(user.id, drawingId).pipe(
       Effect.catchTag("DatabaseError", (e) => Effect.logError("cadExact: drawing lookup failed", e).pipe(Effect.andThen(Effect.fail(new InternalError({ message: "Failed to fetch drawing" })))))
     )
     if (!drawing) return yield* new NotFound({ message: "Drawing not found" })
     const hasAccess = drawing.project.ownerId === user.id || (!!drawing.project.organization && drawing.project.organization.users.length > 0)
     if (!hasAccess) return yield* new Forbidden({ message: "You do not have permission to access this drawing" })
+    return { drawing, user }
+  })
+
+  /** The scene of a request: its own elements, or those of a stored drawing the caller can open. */
+  const sceneOf = Effect.fn("cadExact.scene")(function*(source: { readonly elements?: ReadonlyArray<Element> | undefined; readonly drawingId?: string | undefined }) {
+    if (source.elements !== undefined) return source.elements as ReadonlyArray<Element>
+    if (source.drawingId === undefined) return yield* new BadRequest({ message: "Send the elements to analyse, or the id of a stored drawing" })
+    const { drawing } = yield* storedDrawing(source.drawingId)
     const elements = elementsOf(drawing.data)
     if (elements.length === 0) return yield* new BadRequest({ message: "The drawing has no elements" })
     return elements as ReadonlyArray<Element>
@@ -81,7 +87,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         // The history is checked here, at the boundary, so a malformed one is a 400 that names each refused field and not a worker fault.
         const decoded = decodeHistory(payload.history)
         if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
-        return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
+        let baseline: unknown
+        if (payload.baseline !== undefined) {
+          const before = decodeHistory(payload.baseline)
+          if (!before.success) return yield* new BadRequest({ message: `Invalid baseline history: ${before.problems.slice(0, 8).join("; ")}` })
+          baseline = before.data
+        }
+        return yield* kernelRun("cad-rebuild", { history: decoded.data, ...(baseline !== undefined ? { baseline } : {}), ...(payload.budgetMs !== undefined ? { budgetMs: payload.budgetMs } : {}) }, "Failed to rebuild the history")
       }))
     .handle("importStep", ({ payload }) =>
       Effect.gen(function*() {
@@ -96,6 +108,39 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
           step: payload.step, ...(history !== undefined ? { history } : {}), ...(payload.idPrefix !== undefined ? { idPrefix: payload.idPrefix } : {}),
           ...(payload.tolerance !== undefined ? { tolerance: payload.tolerance } : {}), ...(payload.keepAccepted !== undefined ? { keepAccepted: payload.keepAccepted } : {})
         }, "Failed to import the STEP file").pipe(Effect.map((report) => report as unknown as CadImportStepReport))
+      }))
+    .handle("sheet", ({ payload }) =>
+      Effect.gen(function*() {
+        const stored = payload.drawingId !== undefined || payload.elementId !== undefined
+        if ((payload.history !== undefined) === stored) return yield* new BadRequest({ message: "Send the history, or the drawingId and elementId of a stored parametric part" })
+        let raw: unknown = payload.history
+        let block: sheets.SheetOptions = {}
+        if (stored) {
+          if (payload.drawingId === undefined || payload.elementId === undefined) return yield* new BadRequest({ message: "A stored part needs both drawingId and elementId" })
+          const { drawing, user } = yield* storedDrawing(payload.drawingId)
+          const element = elementsOf(drawing.data).find((e) => e["id"] === payload.elementId)
+          if (element === undefined) return yield* new NotFound({ message: "Element not found in the drawing" })
+          if (element["history"] === undefined) return yield* new BadRequest({ message: "The element is not a parametric part: it has no history to draw" })
+          raw = element["history"]
+          // The title block the drawing is stored with, completed the way every screen completes it; the request's options win over it.
+          const data = (drawing.data ?? {}) as { readonly titleBlock?: unknown }
+          block = sheets.sheetOptionsOfTitleBlock(sheets.completeTitleBlock(data.titleBlock, { name: drawing.name, ...(user.name ? { author: user.name } : {}) }))
+        }
+        const decoded = decodeHistory(raw)
+        if (!decoded.success) return yield* new BadRequest({ message: `Invalid parametric history: ${decoded.problems.slice(0, 8).join("; ")}` })
+        // In the kernel worker like the other exact work: the projection of a large part never stops the sidecar's other requests.
+        const sheet = yield* runKernelJobEffect("cad-sheet", { history: decoded.data, options: { ...block, ...(payload.options ?? {}) } as sheets.SheetOptions }).pipe(
+          // The sheet refuses options it cannot draw (a section plane outside the part, a detail circle off every view) with a reason.
+          Effect.catch((cause) => cause instanceof KernelJobError && cause.reason === "failed"
+            ? Effect.fail(new BadRequest({ message: `The sheet could not be drawn: ${cause.message}` }))
+            : explainKernelFailure("Failed to draw the sheet")(cause))
+        )
+        // An absent section or measured value is left out of the answer, never written as null.
+        const { section, ...rest } = sheet
+        return {
+          ...rest, ...(section !== undefined ? { section } : {}),
+          dimensions: sheet.dimensions.map(({ value, ...d }) => ({ ...d, ...(value !== undefined ? { value } : {}) }))
+        }
       }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {

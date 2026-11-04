@@ -1,9 +1,9 @@
 import { runKernelJobEffect } from "@cadcamfun/ai"
-import { Api, BadRequest, CurrentUser, InternalError } from "@cadcamfun/api"
+import { Api, BadRequest, type CamJobResult, isOnePartSource, type CamKernelPlanResult, CurrentUser, InternalError } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { runKernelRequest } from "../services/cam-program.ts"
+import { jobOfRequest, runKernelRequest } from "../services/cam-program.ts"
 import { camProgressReporter } from "../services/cam-progress.ts"
 import { explainKernelFailure, kernelRun } from "../services/kernel-errors.ts"
 import { LiveEvents } from "../services/live-events.ts"
@@ -35,6 +35,25 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
       const target = payload.progress
       if (target !== undefined) yield* progressTarget(target.projectId)
       return yield* runKernelRequest(payload, target === undefined ? undefined : camProgressReporter(events, target.projectId, target.runId))
+    }))
+    .handle("plan", ({ payload }) => Effect.gen(function*() {
+      // The same snapshot adapter as `manufacture`, then only the planner (`cam.kernel.planOnly`) in a worker: no strategy, post or replay runs.
+      const job = jobOfRequest(payload)
+      if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
+      const plan = yield* kernelRun("cam-plan", job.value, "Failed to plan the kernel job")
+      if (plan.status === "failed") return { status: "failed" as const, issues: plan.issues } as CamKernelPlanResult
+      return { status: "ok" as const, value: { operations: plan.value.operations as unknown as ReadonlyArray<Record<string, unknown>>, notes: plan.value.notes, unmachined: plan.value.unmachined } }
+    }))
+    // A multi-setup job (plan, or run with every claim): the computation the assistant's `cam.job` runs, in the same worker queue.
+    .handle("job", ({ payload }) => Effect.gen(function*() {
+      if (!isOnePartSource(payload.part)) return yield* new BadRequest({ message: "Send exactly one of part.elements or part.meshes" })
+      return (yield* kernelRun("cam-job", payload, "Failed to run the CAM job")) as unknown as CamJobResult
+    }))
+    .handle("lathe", ({ payload }) => Effect.gen(function*() {
+      const result = yield* kernelRun("cam-lathe", payload, "Failed to run the lathe job")
+      // A plan the turning planner refuses (a profile outside the bar, a tool that cannot reach) is the request's fault: 400 with its reasons.
+      if (result.ok === false) return yield* new BadRequest({ message: result.error ?? "The lathe job was refused" })
+      return result as never
     }))
     .handle("generate", ({ payload }) =>
       Effect.gen(function*() {

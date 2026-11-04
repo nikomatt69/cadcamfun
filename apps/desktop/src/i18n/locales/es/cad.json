@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Grosor del patrón",
   "cad.template.honeycombPattern.thickness.label": "Grosor",
   "cad.template.honeycombPattern.color.description": "Color del patrón",
-  "cad.template.honeycombPattern.color.label": "Color"
+  "cad.template.honeycombPattern.color.label": "Color",
+  "cad.param.refLost": "Referencia perdida",
+  "cad.param.refLostBy": "eliminado por {feature}",
+  "cad.param.refLostSummary": "{count} selecciones apuntan a caras o aristas que ya no existen: esas operaciones no se construyen"
 }

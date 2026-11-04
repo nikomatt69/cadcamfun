@@ -18,26 +18,31 @@ import { setupTransform, type SetupOrientation } from "../setup.ts"
 import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
-import type { CamArtifact, CamIssue, CamResult, Claim, FixtureBody, ManufacturingJob, OperationSpec, ReleaseLevel, StockBox, StockModel, WorkOrigin } from "./contracts.ts"
+import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel } from "./contracts.ts"
 import { runJob, type RunOptions } from "./execute.ts"
 
-/** One setup of a multi-setup job: everything that can differ between the fixings of the same part. */
-export interface JobSetup {
-  readonly id: string
-  readonly name?: string
-  /** CAD direction facing the spindle (default `+Z`). */
-  readonly orientation?: SetupOrientation
-  readonly origin?: WorkOrigin
-  readonly workOffset?: WorkOffset
-  readonly stock?: StockBox
-  readonly stockModel?: StockModel
-  readonly fixtures?: ReadonlyArray<FixtureBody>
-  /** Operations of this setup in its oriented coordinates; planned from the part when absent. */
-  readonly operations?: ReadonlyArray<OperationSpec>
-}
+export type { JobSetup }
 
-export interface MultiSetupJob extends Omit<ManufacturingJob, "setupOrientation" | "origin" | "workOffset" | "stock" | "stockModel" | "fixtures" | "operations"> {
-  readonly setups: ReadonlyArray<JobSetup>
+/** A job that lists its setups (`ManufacturingJob.setups`); kept as a name for callers that build one explicitly. */
+export type MultiSetupJob = ManufacturingJob & { readonly setups: ReadonlyArray<JobSetup> }
+
+/**
+ * The setups of a job (spec 69 C1). A job without `setups` is one setup made of its own fields, so a stored v1 job loads as a
+ * one-setup job; `synthesised` says so, because that single setup runs as the job itself (same id, name and datum), which keeps its NC
+ * byte-identical to `runJob`.
+ */
+export const setupsOf = (job: ManufacturingJob): { readonly setups: ReadonlyArray<JobSetup>; readonly synthesised: boolean } => {
+  if (job.setups !== undefined) return { setups: job.setups, synthesised: false }
+  return {
+    synthesised: true,
+    setups: [{
+      id: "setup-1",
+      ...(job.setupOrientation !== undefined ? { orientation: job.setupOrientation } : {}), ...(job.origin !== undefined ? { origin: job.origin } : {}),
+      ...(job.workOffset !== undefined ? { workOffset: job.workOffset } : {}), ...(job.stock !== undefined ? { stock: job.stock } : {}),
+      ...(job.stockModel !== undefined ? { stockModel: job.stockModel } : {}), ...(job.fixtures !== undefined ? { fixtures: job.fixtures } : {}),
+      ...(job.operations !== undefined ? { operations: job.operations } : {})
+    }]
+  }
 }
 
 export interface SetupRun {
@@ -107,19 +112,22 @@ const failed = (message: string, tag: CamIssue["tag"] = "InvalidInput"): CamResu
 const rank: Readonly<Record<ReleaseLevel, number>> = { blocked: 0, preview: 1, "verified-program": 2 }
 
 /** Runs every setup and states what the whole job guarantees. See the module note. */
-export const runSetups = (job: MultiSetupJob, options: RunOptions = {}): CamResult<SetupsArtifact> => {
-  if (job.setups.length === 0) return failed("A multi-setup job needs at least one setup")
+export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamResult<SetupsArtifact> => {
+  const { setups, synthesised } = setupsOf(job)
+  if (setups.length === 0) return failed("A multi-setup job needs at least one setup")
   const ids = new Set<string>()
-  for (const s of job.setups) {
+  for (const s of setups) {
     if (ids.has(s.id)) return failed(`Duplicate setup id '${s.id}'`)
     ids.add(s.id)
   }
-  const offsets: WorkOffset[] = []
-  const used = new Set<WorkOffset>(job.setups.flatMap((s) => (s.workOffset !== undefined ? [s.workOffset] : [])))
-  const named = job.setups.filter((s) => s.workOffset !== undefined).map((s) => s.workOffset!)
+  const offsets: Array<WorkOffset | undefined> = []
+  const used = new Set<WorkOffset>(setups.flatMap((s) => (s.workOffset !== undefined ? [s.workOffset] : [])))
+  const named = setups.filter((s) => s.workOffset !== undefined).map((s) => s.workOffset!)
   if (new Set(named).size !== named.length) return failed("Two setups name the same work offset: each fixing needs its own datum")
-  for (const s of job.setups) {
+  for (const s of setups) {
     if (s.workOffset !== undefined) { offsets.push(s.workOffset); continue }
+    // The single setup of a v1 job keeps the job's datum as it is (none named: the post's default), so its NC is the job's NC.
+    if (synthesised) { offsets.push(undefined); continue }
     const free = WORK_OFFSETS.find((w) => !used.has(w))
     if (free === undefined) return failed(`More than ${WORK_OFFSETS.length} setups: the control has no further work offset`)
     used.add(free)
@@ -128,17 +136,19 @@ export const runSetups = (job: MultiSetupJob, options: RunOptions = {}): CamResu
   const runs: SetupRun[] = []
   const issues: CamIssue[] = []
   const { setups: _setups, ...base } = job
-  for (let k = 0; k < job.setups.length; k++) {
-    const s = job.setups[k]!
+  for (let k = 0; k < setups.length; k++) {
+    const s = setups[k]!
     const orientation = s.orientation ?? "+Z"
-    const one: ManufacturingJob = {
-      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation, workOffset: offsets[k]!,
+    const offset = offsets[k]
+    const one: ManufacturingJob = synthesised ? base : {
+      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation,
+      ...(offset !== undefined ? { workOffset: offset } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.stock !== undefined ? { stock: s.stock } : {}), ...(s.stockModel !== undefined ? { stockModel: s.stockModel } : {}),
       ...(s.fixtures !== undefined ? { fixtures: s.fixtures } : {}), ...(s.operations !== undefined ? { operations: s.operations } : {})
     }
     const r = runJob(one, options)
     if (r.status === "failed") return { status: "failed", issues: r.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })) }
-    runs.push({ id: s.id, orientation, workOffset: offsets[k]!, artifact: r.value })
+    runs.push({ id: s.id, orientation, workOffset: offset ?? "G54", artifact: r.value })
     issues.push(...r.value.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })))
   }
 

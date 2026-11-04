@@ -184,3 +184,13 @@ test("a history that holds only an imported body is accepted, rebuilt, stored an
   expect(empty.success).toBe(false)
   if (!empty.success) expect(empty.problems.join(" ")).toContain("at least one feature or one imported body")
 })
+
+test("the rebuild route reports the healing state of each imported base and the state of the features on it", async () => {
+  const report = await imported()
+  const rebuilt = Schema.decodeUnknownSync(CadRebuildReport)((await post("rebuild", { history: report.history })).body)
+  expect(rebuilt.healing).toHaveLength(1)
+  expect(rebuilt.healing[0]).toMatchObject({ id: "imported1", name: "bracket", faces: 6, loose: false })
+  expect(rebuilt.healing[0]!.maxTolerance).toBeLessThanOrEqual(rebuilt.healing[0]!.limit)
+  expect(rebuilt.healing[0]!.healed!.verticesWelded).toBeGreaterThan(0)
+  expect(rebuilt.features).toEqual([{ id: "h1", type: "hole", state: "ok" }])
+})
