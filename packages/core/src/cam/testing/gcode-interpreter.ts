@@ -259,6 +259,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   let pos: P3 = options.start ?? { x: 0, y: 0, z: 0 }
   let unit = 1
   let motion = -1
+  /** G6.2 NURBS being read: the order (P), the knots (K) and the control points of the blocks so far. */
+  let nurbs: { order: number; knots: number[]; pts: P3[] } | undefined
   let feed = 0
   let retractMode = 98
   let ended = false
@@ -698,6 +700,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       if (w.letter === "G") {
         const g = Math.round(w.value * 10) / 10
         if (latheContext && [70, 71, 72, 73, 74, 75, 76].includes(g)) lathe = g
+        else if (g === 5 || (g === 5.1 && get("Q") === undefined)) motion = g
+        else if (g === 6.2) { motion = 6.2; nurbs = { order: Math.max(2, Math.round(get("P") ?? 4)), knots: [], pts: [] } }
         else if ([0, 1, 2, 3, 73, 74, 76, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89].includes(g)) {
           motion = g
           if (g === 73 || g === 74 || g === 76 || (g >= 81 && g <= 89)) cycleStarted = true
@@ -928,6 +932,49 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else go({ ...pos, z: target.z }, motion === 0, rate, lineNo)
       }
       progPos = target
+    } else if ((motion === 5 || motion === 5.1) && hasAxis) {
+      // Bezier spline (LinuxCNC): G5 I J P Q (offsets of the first control from the start, of the second from the end), G5.1 I J.
+      const c1 = { x: start.x + (get("I") ?? 0) * unit, y: start.y + (get("J") ?? 0) * unit }
+      const c2 = motion === 5 ? { x: target.x + (get("P") ?? 0) * unit, y: target.y + (get("Q") ?? 0) * unit } : undefined
+      const n = 400
+      const rate = feedNow(false)
+      for (let k = 1; k <= n; k++) {
+        const t = k / n
+        const u = 1 - t
+        const pt = c2 === undefined
+          ? { x: u * u * start.x + 2 * u * t * c1.x + t * t * target.x, y: u * u * start.y + 2 * u * t * c1.y + t * t * target.y }
+          : { x: u * u * u * start.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * target.x, y: u * u * u * start.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * target.y }
+        linear({ x: pt.x, y: pt.y, z: start.z + (target.z - start.z) * t }, lineNo, rate)
+      }
+    } else if (motion === 6.2 && nurbs !== undefined && get("K") !== undefined) {
+      // NURBS (Fanuc G6.2): knot blocks, the first n carry a control point, the last `order` carry knots only.
+      nurbs.knots.push(get("K")!)
+      if (hasAxis || nurbs.pts.length === 0) nurbs.pts.push(nurbs.pts.length === 0 && !hasAxis ? { ...start } : { ...target })
+      if (nurbs.knots.length === nurbs.pts.length + nurbs.order && nurbs.knots.length > nurbs.order) {
+        const { order, knots, pts } = nurbs
+        const deg = order - 1
+        const lo = knots[deg]!
+        const hi = knots[pts.length]!
+        const rate = feedNow(false)
+        const at = (u: number): P3 => {
+          let span = deg
+          while (span < pts.length - 1 && u >= knots[span + 1]!) span++
+          const d = pts.slice(span - deg, span + 1).map((p) => ({ ...p }))
+          for (let r = 1; r <= deg; r++) {
+            for (let j = deg; j >= r; j--) {
+              const a = knots[span - deg + j]!
+              const b = knots[span + 1 + j - r]!
+              const w = b - a < 1e-12 ? 0 : (u - a) / (b - a)
+              d[j] = { x: (1 - w) * d[j - 1]!.x + w * d[j]!.x, y: (1 - w) * d[j - 1]!.y + w * d[j]!.y, z: (1 - w) * d[j - 1]!.z + w * d[j]!.z }
+            }
+          }
+          return d[deg]!
+        }
+        const n = 400
+        for (let k = 1; k <= n; k++) linear(at(lo + ((hi - lo) * k) / n - (k === n ? 1e-12 : 0)), lineNo, rate)
+        nurbs = undefined
+        motion = 1
+      }
     } else if (motion === 0 && hasAxis) rapid(target, lineNo)
     else if (motion === 1 && hasAxis) linear(target, lineNo, inverse ? feed * dist(start, target) : feedNow(false))
     else if (motion === 32 && hasAxis) linear(target, lineNo, feedNow(true))

@@ -48,6 +48,8 @@ export const fanucDialect: Dialect = {
   inverseTime: { on: "G93", off: "G94" },
   // AI contour control (AICC II / AI APC): the precision level and tolerance are the machine's parameters, not words of the block.
   smoothing: { on: () => ["G5.1 Q1"], off: ["G5.1 Q0"] },
+  // NURBS interpolation (G6.2): a Bezier segment is a clamped knot vector, written as knot blocks.
+  splines: { kind: "nurbs" },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
   subprograms: fanucSubprograms,
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],

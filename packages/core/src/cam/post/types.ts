@@ -69,6 +69,13 @@ export interface PostOptions {
    */
   readonly smoothing?: number
   /**
+   * Spline output (spec 69 G3): on a dialect with spline words, runs of short line moves of one feed are fitted to planar Bezier curves
+   * within `tolerance` mm (chordal, both directions) and written as `G5.1` / `G5` or `G6.2` blocks; `degree` 2 = quadratic, 3 = cubic
+   * (default). Ignored, with the lines kept, on a dialect without spline words. Absent by default so existing output stays byte-identical.
+   * A `Spline` move already in the IR is written natively where the control has the words and flattened where it has not.
+   */
+  readonly splines?: { readonly tolerance: number; readonly degree?: 2 | 3 }
+  /**
    * Feed (mm/min) of a rapid that turns a rotary axis inside a tool-centre-point section, on a control that keeps the tip only on
    * feed moves (`Dialect.tcpLimits.noRapidRotary`, Haas). Default 5000; the control clamps it to its own maximum cutting feed.
    */
@@ -249,6 +256,11 @@ export interface Dialect {
    * and those that switch it off (empty when the control keeps it until the program ends).
    */
   readonly smoothing?: { readonly on: (tolerance: string) => ReadonlyArray<string>; readonly off: ReadonlyArray<string> }
+  /**
+   * Spline words: `bezier` = `G5.1 X Y I J` (quadratic) and `G5 X Y I J P Q` (cubic) with offsets from the start and end point
+   * (LinuxCNC); `nurbs` = `G6.2 P<order> K.. X Y` knot blocks (Fanuc). Absent: splines are written as line segments.
+   */
+  readonly splines?: { readonly kind: "bezier" | "nurbs" }
   /** The block that selects the program's work offset (default the offset's own code, `G54`; Okuma `G15 H1`). */
   readonly workOffset?: (offset: WorkOffset) => string
   /** Canned-cycle codes that differ from the ISO ones (Mazak synchronous tapping `G84.2`). */

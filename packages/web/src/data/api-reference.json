@@ -57764,6 +57764,69 @@
                                                     "_tag": {
                                                       "type": "string",
                                                       "enum": [
+                                                        "Spline"
+                                                      ]
+                                                    },
+                                                    "to": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        },
+                                                        "z": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "controls": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "x": {
+                                                            "type": "number"
+                                                          },
+                                                          "y": {
+                                                            "type": "number"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "x",
+                                                          "y"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      "minItems": 1,
+                                                      "maxItems": 2
+                                                    },
+                                                    "feed": {
+                                                      "type": "number",
+                                                      "exclusiveMinimum": 0
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "to",
+                                                    "controls",
+                                                    "feed"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
                                                         "Dwell"
                                                       ]
                                                     },
@@ -62859,6 +62922,69 @@
                                                 "_tag": {
                                                   "type": "string",
                                                   "enum": [
+                                                    "Spline"
+                                                  ]
+                                                },
+                                                "to": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "x": {
+                                                      "type": "number"
+                                                    },
+                                                    "y": {
+                                                      "type": "number"
+                                                    },
+                                                    "z": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "x",
+                                                    "y",
+                                                    "z"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                "controls": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "x": {
+                                                        "type": "number"
+                                                      },
+                                                      "y": {
+                                                        "type": "number"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "x",
+                                                      "y"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "minItems": 1,
+                                                  "maxItems": 2
+                                                },
+                                                "feed": {
+                                                  "type": "number",
+                                                  "exclusiveMinimum": 0
+                                                }
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "to",
+                                                "controls",
+                                                "feed"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
                                                     "Dwell"
                                                   ]
                                                 },
@@ -66900,6 +67026,69 @@
                                         "_tag": {
                                           "type": "string",
                                           "enum": [
+                                            "Spline"
+                                          ]
+                                        },
+                                        "to": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            },
+                                            "z": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                            "z"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "controls": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "minItems": 1,
+                                          "maxItems": 2
+                                        },
+                                        "feed": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "to",
+                                        "controls",
+                                        "feed"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
                                             "Dwell"
                                           ]
                                         },
@@ -70073,6 +70262,69 @@
                                         "_tag": {
                                           "type": "string",
                                           "enum": [
+                                            "Spline"
+                                          ]
+                                        },
+                                        "to": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            },
+                                            "z": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                            "z"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "controls": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "minItems": 1,
+                                          "maxItems": 2
+                                        },
+                                        "feed": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "to",
+                                        "controls",
+                                        "feed"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
                                             "Dwell"
                                           ]
                                         },
@@ -71435,6 +71687,69 @@
                                       "to",
                                       "center",
                                       "clockwise",
+                                      "feed"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Spline"
+                                        ]
+                                      },
+                                      "to": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "controls": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "minItems": 1,
+                                        "maxItems": 2
+                                      },
+                                      "feed": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "to",
+                                      "controls",
                                       "feed"
                                     ],
                                     "additionalProperties": false
@@ -78734,6 +79049,69 @@
                                               "to",
                                               "center",
                                               "clockwise",
+                                              "feed"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Spline"
+                                                ]
+                                              },
+                                              "to": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "x": {
+                                                    "type": "number"
+                                                  },
+                                                  "y": {
+                                                    "type": "number"
+                                                  },
+                                                  "z": {
+                                                    "type": "number"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "x",
+                                                  "y",
+                                                  "z"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              "controls": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "x": {
+                                                      "type": "number"
+                                                    },
+                                                    "y": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "x",
+                                                    "y"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                "minItems": 1,
+                                                "maxItems": 2
+                                              },
+                                              "feed": {
+                                                "type": "number",
+                                                "exclusiveMinimum": 0
+                                              }
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "to",
+                                              "controls",
                                               "feed"
                                             ],
                                             "additionalProperties": false
