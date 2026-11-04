@@ -44,6 +44,8 @@ export interface ClearanceFinding {
   /** The spindle nose at the point where the move was found to overlap, machine (= work) coordinates. */
   readonly point: Vec3
   readonly clearance: number
+  /** The colliding pair, `<tool part> x <obstacle>`: `holder x table`, `shank x fixture vise`, `housing x fixture clamp`. */
+  readonly pair?: string
 }
 
 export interface ClearanceResult {
@@ -97,12 +99,13 @@ export const checkNcClearance = (
   segments: ReadonlyArray<GSegment>,
   cutterOf: (line: number) => Cutter | undefined,
   table: TableGeometry,
-  options: { readonly maxDepth?: number; readonly rotary?: RotaryClearance; readonly fixtures?: ReadonlyArray<TableBody> } = {}
+  options: { readonly maxDepth?: number; readonly rotary?: RotaryClearance; readonly fixtures?: ReadonlyArray<TableBody>; readonly housing?: { readonly radius: number; readonly height: number } } = {}
 ): ClearanceResult => {
   const fixtures = options.fixtures ?? []
-  const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200), ...fixtures.map((f) => boxSolid(f.centre, f.half, (p) => p))]
-  const body: TableBody = { centre: { x: table.cx, y: table.cy, z: table.top - 100 }, half: { x: table.length / 2, y: table.width / 2, z: 100 } }
-  const bodies: TableBody[] = [body, ...fixtures, ...(options.rotary?.bodies ?? [])]
+  const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200), ...fixtures.map((f) => boxSolid(f.centre, f.half, (p) => p, `fixture ${f.name ?? "body"}`))]
+  const body: TableBody = { name: "table", centre: { x: table.cx, y: table.cy, z: table.top - 100 }, half: { x: table.length / 2, y: table.width / 2, z: 100 } }
+  const bodies: TableBody[] = [body, ...fixtures.map((f) => ({ ...f, name: `fixture ${f.name ?? "body"}` })), ...(options.rotary?.bodies ?? [])]
+  const housing = options.housing !== undefined ? { housing: options.housing } : {}
   const depth = options.maxDepth !== undefined ? { maxDepth: options.maxDepth } : {}
   let checked = 0, rotaryMoves = 0, rotaryChecked = 0, unresolved = 0
   let minClearance: number | undefined
@@ -123,13 +126,13 @@ export const checkNcClearance = (
       const layout = options.rotary.layout
       const tilt = (a: { a?: number; b?: number }): number => (layout === "table-AC" ? a.a : a.b) ?? 0
       const pose = (p: Vec3, a: { a?: number; b?: number; c?: number }): Pose => ({ tilt: tilt(a), c: a.c ?? 0, nose: { x: p.x, y: p.y, z: p.z + cutter.stickout } })
-      const scene = rotatingTableScene(cutter, layout, options.rotary.pivot, bodies)
+      const scene = rotatingTableScene(cutter, layout, options.rotary.pivot, bodies, housing)
       const m = checkMotion(scene, pose(s.from, before), pose(s.to, angles), { margin: 0, ...depth })
       checked++
       rotaryChecked++
       if (m.verdict === "collision") {
         const at = m.at ?? 0
-        first ??= { line: s.line, point: { x: s.from.x + (s.to.x - s.from.x) * at, y: s.from.y + (s.to.y - s.from.y) * at, z: s.from.z + (s.to.z - s.from.z) * at }, clearance: m.clearance }
+        first ??= { line: s.line, point: { x: s.from.x + (s.to.x - s.from.x) * at, y: s.from.y + (s.to.y - s.from.y) * at, z: s.from.z + (s.to.z - s.from.z) * at }, clearance: m.clearance, ...(m.pair !== undefined ? { pair: m.pair } : {}) }
       } else if (m.verdict === "unresolved") unresolved++
       else minClearance = minClearance === undefined ? m.clearance : Math.min(minClearance, m.clearance)
       continue
@@ -138,7 +141,7 @@ export const checkNcClearance = (
     if (turned) { rotaryMoves++; continue }
     const cutter = cutterOf(s.line)
     if (cutter === undefined) continue
-    const scene = linearScene(cutter, obstacles)
+    const scene = linearScene(cutter, obstacles, housing)
     const nose = (p: Vec3): Pose => ({ tilt: 0, c: 0, nose: { x: p.x, y: p.y, z: p.z + cutter.stickout } })
     // A chord is checked with the spindle nose at the stick-out above its tip; the arc's sagitta is the margin it must keep.
     const margin = s.kind === "arc" ? ARC_SAGITTA : 0
@@ -150,7 +153,7 @@ export const checkNcClearance = (
       if (r.verdict === "collision") {
         const at = r.at ?? 0
         const point = { x: from.x + (to.x - from.x) * at, y: from.y + (to.y - from.y) * at, z: from.z + (to.z - from.z) * at }
-        first ??= { line: s.line, point, clearance: r.clearance }
+        first ??= { line: s.line, point, clearance: r.clearance, ...(r.pair !== undefined ? { pair: r.pair } : {}) }
       } else if (r.verdict === "unresolved") unresolved++
       else minClearance = minClearance === undefined ? r.clearance : Math.min(minClearance, r.clearance)
     }

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { cutterIssues, legacyTool, sweptProfile, verifyTool, type Cutter } from "./cutters.ts"
+import { DEFAULT_CUTTERS, cutterIssues, legacyTool, sweptProfile, verifyTool, type Cutter } from "./cutters.ts"
 import { TriDexel, toolSolid } from "./tridexel.ts"
+import { cutterProfile } from "./engagement.ts"
+import { cutterOf } from "../operations/surface-field.ts"
 import { toolModel } from "../verify/tool-model.ts"
 import { toolModelFromCutter } from "../tool-model.ts"
 import { CutterSchema } from "./schema.ts"
@@ -156,5 +158,22 @@ describe("swept-profile cutters (spec 69 D1): the profile is the analytic envelo
     const decoded = Schema.decodeUnknownSync(CutterSchema)(barrel())
     expect(decoded.kind).toBe("barrel")
     expect(decoded.formRadius).toBe(30)
+  })
+
+  test("the legacy tool, the surface strategies, the engagement replay and the default library all see the swept profile", () => {
+    const c = lollipop()
+    const legacy = legacyTool(c)
+    expect(legacy.profile?.length).toBeGreaterThan(10)
+    const f = cutterOf(legacy)
+    expect(f.radius).toBeCloseTo(5, 3)
+    for (const r of [0, 2, 4]) expect(Math.abs(f.profile(r) - (5 - Math.sqrt(25 - r * r)))).toBeLessThan(2 * UM)
+    // Stock to leave: a grown body stays at least `a` clear (never lower than the exact one shifted out).
+    const grown = cutterOf(legacy, 0.5)
+    expect(grown.radius).toBeCloseTo(5.5, 3)
+    expect(grown.lift).toBe(0.5)
+    expect(cutterProfile(c).profile(3)).toBeCloseTo(5 - 4, 2)
+    expect(cutterProfile(c).flat).toBe(false)
+    for (const d of DEFAULT_CUTTERS) expect(cutterIssues(d)).toEqual([])
+    expect(DEFAULT_CUTTERS.filter((d) => ["tapered", "lollipop", "barrel", "lens"].includes(d.kind)).length).toBe(4)
   })
 })

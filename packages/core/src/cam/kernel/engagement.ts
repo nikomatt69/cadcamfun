@@ -18,7 +18,8 @@
 import { arcSweepBetween, expandMoves, isFullCircle, type Move } from "../ir.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import { EPS, HeightField, type CuttingProfile } from "../verify/heightfield.ts"
-import type { Cutter } from "./cutters.ts"
+import { verifyTool, type Cutter } from "./cutters.ts"
+import { toolModel } from "../verify/tool-model.ts"
 import { deflection, effectiveDiameter, millingLoad, powerLimitAt, type Load, type MachineLimits } from "./cutting-data.ts"
 import type { WorkpieceMaterial } from "./materials.ts"
 
@@ -37,6 +38,10 @@ export const cutterProfile = (c: Cutter): CuttingProfile => {
     const slope = Math.tan(((c.angle ?? 90) * Math.PI) / 360)
     const tip = (c.tipDiameter ?? 0) / 2
     return { radius, flat: false, profile: (r) => Math.max(0, r - tip) / slope }
+  }
+  if (c.kind === "tapered" || c.kind === "lollipop" || c.kind === "barrel" || c.kind === "lens") {
+    const m = toolModel(verifyTool(c))
+    return { radius: m.radius, flat: false, profile: m.profile }
   }
   return { radius, flat: true, profile: () => 0 }
 }

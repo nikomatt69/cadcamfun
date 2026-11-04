@@ -30,6 +30,8 @@ import {
   pointInRing,
   regionOf,
 } from "../geometry.ts"
+import { OrderingSchema, type Ordering } from "./ordering.ts"
+import { planLinks, type LinkChain } from "../kernel/linking.ts"
 import { OperationFields, Positive, NonNegative, heightsOrdered, levelsOf, withDefault, type Levels } from "../params.ts"
 import { type Path, longestSegmentMidpoint, pathFromPoints, pathLength, rotateClosedPath, startTangent } from "../path.ts"
 import { MoveBuilder, approach, descendAlong, finish, followPath, helixDown, liftTo } from "./common.ts"
@@ -51,6 +53,8 @@ export class PocketParams extends Schema.Class<PocketParams>("cam/PocketParams")
     climb: withDefault(Schema.Boolean, true),
     entry: withDefault(PocketEntrySchema, "helix" as const),
     order: withDefault(PocketOrderSchema, "insideOut" as const),
+    /** Visit order of the chains of one level: `shortest` (2-opt / or-opt over the links, spec 69 F11) or the greedy nearest-first `input`. */
+    ordering: withDefault(OrderingSchema, "shortest" as const),
     helixPitch: withDefault(Positive, 1),
     /** Tool-centre helix radius, mm; `0` = the tool radius. */
     helixRadius: withDefault(NonNegative, 0),
@@ -124,8 +128,26 @@ const startNear = (path: Path, from: Vec2): Path => {
   return rotateClosedPath(path, best, 0)
 }
 
+const pathEnd = (p: Path): Vec2 => (p.closed ? p.start : p.segs[p.segs.length - 1]?.to ?? p.start)
+
+/**
+ * Orders the chains of a level by 2-opt / or-opt over the links (spec 69 F11, `kernel/linking.ts`): a closed loop is entered at the
+ * vertex nearest the previous exit, an open chain keeps its direction. Falls back to the greedy order for fewer than three chains.
+ */
+const sequenceShortest = (chains: ReadonlyArray<Path>, from: Vec2): Path[] => {
+  const link: LinkChain[] = chains.map((c) => c.closed && c.segs.length >= 2
+    ? { start: c.start, end: c.start, reversible: false, loop: [c.start, ...c.segs.slice(0, -1).map((s) => s.to)] }
+    : { start: c.start, end: pathEnd(c), reversible: false })
+  const plan = planLinks(link, { from })
+  return plan.steps.map((s) => {
+    const c = chains[s.chain]!
+    return c.closed && c.segs.length >= 2 ? rotateClosedPath(c, s.entry, 0) : c
+  })
+}
+
 /** Orders chains greedily by distance from the previous end, rotating loops to start near it. */
-const sequence = (chains: ReadonlyArray<Path>, from: Vec2 | undefined): Path[] => {
+const sequence = (chains: ReadonlyArray<Path>, from: Vec2 | undefined, ordering: Ordering = "shortest"): Path[] => {
+  if (ordering === "shortest" && from !== undefined && chains.length >= 3) return sequenceShortest(chains, from)
   const remaining = [...chains]
   const out: Path[] = []
   let at = from
@@ -255,7 +277,7 @@ export const generatePocket = (
   const seq: Path[] = []
   let at: Vec2 | undefined
   for (const level of ordered) {
-    const paths = sequence(level.map((c) => toPath(c, params.climb)), at)
+    const paths = sequence(level.map((c) => toPath(c, params.climb)), at, params.ordering)
     seq.push(...paths)
     const lastPath = paths[paths.length - 1]
     if (lastPath !== undefined) at = lastPath.closed ? lastPath.start : lastPath.segs[lastPath.segs.length - 1]?.to ?? lastPath.start
@@ -299,7 +321,7 @@ export const generatePocket = (
   if (params.finishPass && params.allowance > 0 && !params.toolCentre) {
     const z = levels.bottomZ
     const finishFeasible = makeFeasible(region, r)
-    const chains = sequence(chainsAt(region, r).map((c) => toPath(c, params.climb)), b.started ? b.pos : undefined)
+    const chains = sequence(chainsAt(region, r).map((c) => toPath(c, params.climb)), b.started ? b.pos : undefined, params.ordering)
     chains.forEach((path) => {
       const Q = path.start
       const E = b.pos

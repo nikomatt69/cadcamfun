@@ -132,6 +132,7 @@ export const legacyTool = (c: Cutter, fallbackMaxRpm = 24000): Tool => ({
   maxRpm: c.maxRpm ?? fallbackMaxRpm,
   stickout: c.stickout,
   ...(c.angle !== undefined && LEGACY_KIND[c.kind] === "vbit" ? { angle: c.angle } : {}),
+  ...(SWEPT.has(c.kind) ? { profile: sweptProfile(c) } : {}),
   ...(c.kind === "ball" || c.kind === "lollipop" ? { tipRadius: c.diameter / 2 } : c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })
 
@@ -302,6 +303,10 @@ export const DEFAULT_CUTTERS: ReadonlyArray<Cutter> = [
   { id: "boringbar-b16", name: "Back-boring bar Ø16 on Ø6 body", kind: "boringbar", diameter: 16, flutes: 1, material: "carbide", coating: "tin", neckDiameter: 6, headHeight: 3, fluteLength: 40, shankDiameter: 6, stickout: 60, holder: HOLDER },
   { id: "tslot-12x4", name: "T-slot cutter Ø12 x 4", kind: "tslot", diameter: 12, flutes: 4, material: "carbide", coating: "altin", neckDiameter: 5, headHeight: 4, fluteLength: 12, shankDiameter: 6, stickout: 30, holder: HOLDER },
   { id: "tslot-20x6", name: "T-slot cutter Ø20 x 6", kind: "tslot", diameter: 20, flutes: 6, material: "carbide", coating: "altin", neckDiameter: 8, headHeight: 6, fluteLength: 16, shankDiameter: 10, stickout: 40, holder: HOLDER },
+  { id: "tapered-ball-8-2-12", name: "Tapered ball Ø8 tip Ø2 12° carbide", kind: "tapered", diameter: 8, flutes: 3, material: "carbide", coating: "altin", tipDiameter: 2, angle: 12, fluteLength: 40, shankDiameter: 8, stickout: 60, holder: HOLDER },
+  { id: "lollipop-10-4", name: "Lollipop Ø10 on Ø4 neck", kind: "lollipop", diameter: 10, flutes: 2, material: "carbide", coating: "altin", neckDiameter: 4, fluteLength: 20, shankDiameter: 8, stickout: 40, holder: HOLDER },
+  { id: "barrel-10-r30", name: "Barrel Ø10 R30 circle segment", kind: "barrel", diameter: 10, flutes: 4, material: "carbide", coating: "altin", formRadius: 30, headHeight: 8, fluteLength: 12, shankDiameter: 10, stickout: 40, holder: HOLDER },
+  { id: "lens-10", name: "Lens cutter Ø10", kind: "lens", diameter: 10, flutes: 4, material: "carbide", coating: "altin", headHeight: 16, neckDiameter: 4, fluteLength: 20, shankDiameter: 8, stickout: 40, holder: HOLDER },
   { id: "dovetail-12-60", name: "Dovetail cutter Ø12 60°", kind: "dovetail", diameter: 12, flutes: 4, material: "carbide", coating: "altin", angle: 60, neckDiameter: 6, headHeight: 4, fluteLength: 10, shankDiameter: 8, stickout: 30, holder: HOLDER }
 ]
 

@@ -351,6 +351,7 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
 }
 
 const shift2 = (p: Vec2, o: Vec3): Vec2 => ({ x: p.x - o.x, y: p.y - o.y })
+const shift3 = (p: Vec3, o: Vec3): Vec3 => ({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z })
 
 /** The five-axis removal bracket on the voxel stock: removed and remaining volumes, each between a lower and an upper bound. */
 const fiveAxisBracket = (vs: VoxelStock): NonNullable<StockSummary["fiveAxis"]> => {
@@ -785,7 +786,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           const soup = new TriangleSoup(workMeshes, Math.max(0.5, cell))
           const params = decode(MultiaxisParams, {
             ...common, strategy: op.mode ?? "parallel", stepover: Math.max(1, Math.min(100, op.stepover)), angle: op.angle ?? 0,
-            toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance
+            toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance,
+            ...(op.axisPoint !== undefined ? { axisPoint: shift3(op.axisPoint, o) } : {}),
+            ...(op.axisLine !== undefined ? { axisLine: { a: shift3(op.axisLine.a, o), b: shift3(op.axisLine.b, o) } } : {}),
+            ...(op.axisCurve !== undefined ? { axisCurve: op.axisCurve.map((q) => shift3(q, o)) } : {}),
+            ...(op.maxTilt !== undefined ? { maxTilt: op.maxTilt } : {}), ...(op.holderDiameter !== undefined ? { holderDiameter: op.holderDiameter } : {})
           })
           const kin = fiveAxisKinematic({
             layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) },
@@ -810,7 +815,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (op.restFrom !== undefined && restTool === undefined) { fail("UnknownTool", `${op.id}: rest-from cutter '${op.restFrom}' is not in the library`, data); return }
           const params = decode(SurfaceParams, {
             ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" || op.mode === "rest" ? 0 : (op.scallop ?? prepared.scallop),
-            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
+            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), ...(op.contact !== undefined ? { contact: op.contact } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
             rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), clearing: op.clearing ?? "adaptive", engagement: Math.max(1, Math.min(50, stepover)),
             ...(restTool !== undefined ? { restFrom: { diameter: restTool.diameter, kind: legacyTool(restTool).kind, ...(restTool.kind === "bull" && restTool.cornerRadius !== undefined ? { tipRadius: restTool.cornerRadius } : {}) } } : {})
           })
@@ -1363,13 +1368,14 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const clearance = interpreted !== undefined && clearTable !== undefined
     ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, clearTable, {
         ...(machine.fiveAxis === undefined ? {} : { rotary: { layout: machine.fiveAxis.layout, pivot: machine.fiveAxis.pivot } }),
-        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => f.body) } : {})
+        ...(fixtureBodies.length > 0 ? { fixtures: fixtureBodies.map((f) => ({ ...f.body, name: f.id })) } : {}),
+        ...(machine.spindleHousing !== undefined ? { housing: machine.spindleHousing } : {})
       })
     : undefined
   if (clearance?.first !== undefined) {
     const f = clearance.first
     const cutter = cutterByNumber.get(toolAtLine[f.line] ?? -1)
-    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
+    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table or a fixture body at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm${f.pair !== undefined ? `, pair ${f.pair}` : ""})`, { line: f.line, point: f.point }))
   }
 
   // ------------------------------------------------------------ evidence
@@ -1546,7 +1552,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       machine: { id: machine.id, name: machine.name, post: post.id },
       ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
       origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
-      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}) },
+      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}), ...(triVerdict !== undefined ? { triDexel: { complete: triVerdict.complete, cell: Math.round(triVerdict.cell * 1000) / 1000, errorBound: Math.round(triVerdict.errorBound * 1e4) / 1e4, poses: triVerdict.poses, gouge: { volume: Math.round(triVerdict.gouge.volume * 10) / 10, depth: Math.round(triVerdict.gouge.depth * 1000) / 1000 }, left: { volume: Math.round(triVerdict.left.volume * 10) / 10, depth: Math.round(triVerdict.left.depth * 1000) / 1000, detached: Math.round(triVerdict.detached * 10) / 10 } } } : {}) },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...planNotes(prepared), ...subprogramNotes(nc)],
