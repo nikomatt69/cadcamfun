@@ -5,7 +5,7 @@ import { BadRequest, InternalError } from "../errors.ts"
 import { CamKernelPlanResult, CamKernelRequest, CamKernelResult, CamProgressTarget } from "../cam-kernel.ts"
 import { CamJobRequest, CamJobResult } from "../ai-cam-job.ts"
 import { CamLatheInput, CamLatheResult } from "../ai-cam-breadth.ts"
-import { CamVerifyNcRequest, CamVerifyNcResult } from "../cam-verify-nc.ts"
+import { CamCollisionsReport, CamCollisionsRequest, CamVerifyNcRequest, CamVerifyNcResult } from "../cam-verify-nc.ts"
 
 const g = cam.generator
 const v = cam.verify
@@ -47,6 +47,9 @@ export class ToolpathGeneratorGroup extends HttpApiGroup.make("toolpathGenerator
     }),
     HttpApiEndpoint.post("verifyNc", "/api/toolpaths/verify-nc", {
       payload: CamVerifyNcRequest, success: CamVerifyNcResult, error: [BadRequest, InternalError]
+    }),
+    HttpApiEndpoint.post("collisions", "/api/toolpaths/collisions", {
+      payload: CamCollisionsRequest, success: CamCollisionsReport, error: [BadRequest, InternalError]
     })
   )
 {}

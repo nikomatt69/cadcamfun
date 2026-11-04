@@ -553,6 +553,8 @@ import type {
   ToolpathGeneratorVerifyOutput,
   ToolpathGeneratorVerifyNcInput,
   ToolpathGeneratorVerifyNcOutput,
+  ToolpathGeneratorCollisionsInput,
+  ToolpathGeneratorCollisionsOutput,
   CadExactAnalyzeInput,
   CadExactAnalyzeOutput,
   CadExactStepInput,
@@ -575,6 +577,14 @@ import type {
   CamSetupValidateOutput,
   CamSetupGenerateInput,
   CamSetupGenerateOutput,
+  CamSetupProbePlanInput,
+  CamSetupProbePlanOutput,
+  CamSetupProbeEmitInput,
+  CamSetupProbeEmitOutput,
+  CamSetupLinkReportInput,
+  CamSetupLinkReportOutput,
+  CamSetupLinkOrderInput,
+  CamSetupLinkOrderOutput,
   CamSetupListInput,
   CamSetupListOutput,
   CamSetupSaveInput,
@@ -4795,6 +4805,18 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      collisions: (input: ToolpathGeneratorCollisionsInput, requestOptions?: RequestOptions) =>
+        request<ToolpathGeneratorCollisionsOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/collisions`,
+            body: { gcode: input["gcode"], params: input["params"], tool: input["tool"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
     },
     cadExact: {
       analyze: (input?: CadExactAnalyzeInput, requestOptions?: RequestOptions) =>
@@ -4972,6 +4994,54 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/cam/setups/generate`,
             body: { setup: input["setup"], elements: input["elements"], stock: input["stock"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      probePlan: (input: CamSetupProbePlanInput, requestOptions?: RequestOptions) =>
+        request<CamSetupProbePlanOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/probe/plan`,
+            body: { operation: input["operation"], settings: input["settings"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      probeEmit: (input: CamSetupProbeEmitInput, requestOptions?: RequestOptions) =>
+        request<CamSetupProbeEmitOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/probe/emit`,
+            body: { operation: input["operation"], settings: input["settings"], dialect: input["dialect"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      linkReport: (input: CamSetupLinkReportInput, requestOptions?: RequestOptions) =>
+        request<CamSetupLinkReportOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/linking/report`,
+            body: { toolpaths: input["toolpaths"], lowSafeZ: input["lowSafeZ"], rapidRate: input["rapidRate"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      linkOrder: (input: CamSetupLinkOrderInput, requestOptions?: RequestOptions) =>
+        request<CamSetupLinkOrderOutput>(
+          {
+            method: "POST",
+            path: `/api/cam/linking/order`,
+            body: { items: input["items"], from: input["from"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

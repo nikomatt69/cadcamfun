@@ -3024,6 +3024,12 @@ export type ToolpathGeneratorVerifyNcPayload = {
   readonly start?: { readonly x: number; readonly y: number; readonly z: number }
 }
 
+export type ToolpathGeneratorCollisionsPayload = {
+  readonly gcode: string
+  readonly params?: { readonly [x: string]: JsonValue }
+  readonly tool?: { readonly [x: string]: JsonValue }
+}
+
 export type CadExactAnalyzePayload = {
   readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
   readonly drawingId?: string
@@ -3776,6 +3782,228 @@ export type CamSetupGeneratePayload = {
     readonly material?: string
     readonly elementId?: string
   }
+}
+
+export type CamSetupProbePlanPayload = {
+  readonly operation:
+    | {
+        readonly cycle: "z-surface"
+        readonly at: { readonly x: number; readonly y: number }
+        readonly expectedZ: number
+        readonly zero?: number
+      }
+    | {
+        readonly cycle: "edge"
+        readonly axis: "X" | "Y"
+        readonly direction: 1 | -1
+        readonly at: { readonly x: number; readonly y: number }
+        readonly depth: number
+        readonly expectedEdge: number
+        readonly zero?: number
+      }
+    | {
+        readonly cycle: "corner"
+        readonly corner: { readonly x: number; readonly y: number }
+        readonly sx: 1 | -1
+        readonly sy: 1 | -1
+        readonly depth: number
+        readonly zero?: { readonly x: number; readonly y: number }
+      }
+    | {
+        readonly cycle: "bore"
+        readonly centre: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly depth: number
+      }
+    | {
+        readonly cycle: "boss"
+        readonly centre: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly depth: number
+        readonly top: number
+      }
+  readonly settings: {
+    readonly stylusDiameter: number
+    readonly feed: number
+    readonly search: number
+    readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    readonly safeZ: number
+  }
+}
+
+export type CamSetupProbeEmitPayload = {
+  readonly operation:
+    | {
+        readonly cycle: "z-surface"
+        readonly at: { readonly x: number; readonly y: number }
+        readonly expectedZ: number
+        readonly zero?: number
+      }
+    | {
+        readonly cycle: "edge"
+        readonly axis: "X" | "Y"
+        readonly direction: 1 | -1
+        readonly at: { readonly x: number; readonly y: number }
+        readonly depth: number
+        readonly expectedEdge: number
+        readonly zero?: number
+      }
+    | {
+        readonly cycle: "corner"
+        readonly corner: { readonly x: number; readonly y: number }
+        readonly sx: 1 | -1
+        readonly sy: 1 | -1
+        readonly depth: number
+        readonly zero?: { readonly x: number; readonly y: number }
+      }
+    | {
+        readonly cycle: "bore"
+        readonly centre: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly depth: number
+      }
+    | {
+        readonly cycle: "boss"
+        readonly centre: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly depth: number
+        readonly top: number
+      }
+  readonly settings: {
+    readonly stylusDiameter: number
+    readonly feed: number
+    readonly search: number
+    readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    readonly safeZ: number
+  }
+  readonly dialect: "fanuc" | "linuxcnc" | "siemens"
+}
+
+export type CamSetupLinkReportPayload = {
+  readonly toolpaths: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly toolId: string
+    readonly spindleRpm: number
+    readonly coolant: "off" | "flood" | "mist"
+    readonly moves: ReadonlyArray<
+      | {
+          readonly _tag: "Rapid"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
+          readonly expr?: {
+            readonly x?: JsonValue
+            readonly y?: JsonValue
+            readonly z?: JsonValue
+            readonly feed?: JsonValue
+          }
+          readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
+        }
+      | {
+          readonly _tag: "Linear"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly feed: number
+          readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
+          readonly expr?: {
+            readonly x?: JsonValue
+            readonly y?: JsonValue
+            readonly z?: JsonValue
+            readonly feed?: JsonValue
+          }
+          readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
+        }
+      | {
+          readonly _tag: "Arc"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly center: { readonly x: number; readonly y: number }
+          readonly clockwise: boolean
+          readonly feed: number
+          readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
+        }
+      | {
+          readonly _tag: "Spline"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly controls: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly feed: number
+        }
+      | { readonly _tag: "Dwell"; readonly seconds: number }
+      | { readonly _tag: "Comment"; readonly text: string }
+      | {
+          readonly _tag: "Cycle"
+          readonly cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
+          readonly to: { readonly x: number; readonly y: number; readonly z: number }
+          readonly feed: number
+          readonly peckDepth: number
+          readonly dwellSeconds: number
+          readonly retractHeight: number
+          readonly pitch?: number
+        }
+      | { readonly _tag: "Orient"; readonly a?: number; readonly b?: number; readonly c?: number }
+      | { readonly _tag: "SpindleOrient"; readonly angle?: number }
+      | { readonly _tag: "CutterComp"; readonly side: "left" | "right" | "off"; readonly register?: number }
+      | {
+          readonly _tag: "Assign"
+          readonly variable:
+            | { readonly scope: "local" | "global" | "system"; readonly index: number }
+            | { readonly name: string }
+          readonly value: JsonValue
+        }
+      | { readonly _tag: "MacroCall"; readonly name: string; readonly args: { readonly [x: string]: JsonValue } }
+      | {
+          readonly _tag: "If"
+          readonly condition: {
+            readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+            readonly a: JsonValue
+            readonly b: JsonValue
+          }
+        }
+      | { readonly _tag: "Else" }
+      | { readonly _tag: "EndIf" }
+      | {
+          readonly _tag: "While"
+          readonly condition: {
+            readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+            readonly a: JsonValue
+            readonly b: JsonValue
+          }
+        }
+      | { readonly _tag: "EndWhile" }
+      | { readonly _tag: "Label"; readonly name: string }
+      | {
+          readonly _tag: "Goto"
+          readonly label: string
+          readonly direction?: "auto" | "forward" | "backward"
+          readonly condition?: {
+            readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+            readonly a: JsonValue
+            readonly b: JsonValue
+          }
+        }
+      | {
+          readonly _tag: "CycleBegin"
+          readonly family: "heidenhain"
+          readonly number: number
+          readonly name: string
+          readonly params: { readonly [x: string]: number }
+        }
+      | { readonly _tag: "CycleEnd" }
+      | { readonly _tag: "Message"; readonly text: string }
+    >
+    readonly operation?: { readonly id: string; readonly name: string }
+  }>
+  readonly lowSafeZ: number
+  readonly rapidRate?: number
+}
+
+export type CamSetupLinkOrderPayload = {
+  readonly items: ReadonlyArray<{
+    readonly id: string
+    readonly tool: string
+    readonly start: { readonly x: number; readonly y: number }
+    readonly end: { readonly x: number; readonly y: number }
+    readonly reorderable?: boolean
+  }>
+  readonly from?: { readonly x: number; readonly y: number }
 }
 
 export type CamSetupSavePayload = {
@@ -10751,6 +10979,37 @@ export type ToolpathGeneratorVerifyNcOutput = {
   verdict: "clean" | "faults" | "incomplete"
 }
 
+export type ToolpathGeneratorCollisionsInput = {
+  readonly gcode: ToolpathGeneratorCollisionsPayload["gcode"]
+  readonly params?: ToolpathGeneratorCollisionsPayload["params"]
+  readonly tool?: ToolpathGeneratorCollisionsPayload["tool"]
+}
+
+export type ToolpathGeneratorCollisionsOutput = {
+  duration: number
+  moves: number
+  collisions: Array<{
+    code: string
+    severity: "error" | "warning"
+    line?: number
+    count: number
+    message: string
+    seconds: number
+  }>
+  limits: Array<{ code: string; severity: "error" | "warning"; line?: number; count: number; message: string }>
+  findings: Array<{
+    code: string
+    severity: "error" | "warning"
+    line?: number
+    count: number
+    message: string
+    assumed: boolean
+  }>
+  setupProblems: Array<string>
+  unsupported: Array<string>
+  clear: boolean
+}
+
 export type CadExactAnalyzeInput = {
   readonly elements?: CadExactAnalyzePayload["elements"]
   readonly drawingId?: CadExactAnalyzePayload["drawingId"]
@@ -11303,6 +11562,164 @@ export type CamSetupGenerateOutput = {
   warnings: Array<string>
   issues: Array<{ operationId?: string; message: string }>
 }
+
+export type CamSetupProbePlanInput = {
+  readonly operation: CamSetupProbePlanPayload["operation"]
+  readonly settings: CamSetupProbePlanPayload["settings"]
+}
+
+export type CamSetupProbePlanOutput = {
+  steps: Array<
+    | { kind: "rapid"; x?: number; y?: number; z?: number }
+    | { kind: "rapid-mid"; axis: "X" | "Y"; store: number; store2: number }
+    | { kind: "touch"; axis: "X" | "Y" | "Z"; distance: number; store: number }
+    | {
+        kind: "set-offset"
+        axis: "X" | "Y" | "Z"
+        store: number
+        store2?: number
+        radius: number
+        sign: 1 | -1
+        value: number
+      }
+    | {
+        kind: "report-size"
+        axis: "X" | "Y" | "Z"
+        store: number
+        store2: number
+        stylus: number
+        inside: boolean
+        label: string
+      }
+  >
+  notes: Array<string>
+}
+
+export type CamSetupProbeEmitInput = {
+  readonly operation: CamSetupProbeEmitPayload["operation"]
+  readonly settings: CamSetupProbeEmitPayload["settings"]
+  readonly dialect: CamSetupProbeEmitPayload["dialect"]
+}
+
+export type CamSetupProbeEmitOutput = {
+  gcode: string
+  steps: Array<
+    | { kind: "rapid"; x?: number; y?: number; z?: number }
+    | { kind: "rapid-mid"; axis: "X" | "Y"; store: number; store2: number }
+    | { kind: "touch"; axis: "X" | "Y" | "Z"; distance: number; store: number }
+    | {
+        kind: "set-offset"
+        axis: "X" | "Y" | "Z"
+        store: number
+        store2?: number
+        radius: number
+        sign: 1 | -1
+        value: number
+      }
+    | {
+        kind: "report-size"
+        axis: "X" | "Y" | "Z"
+        store: number
+        store2: number
+        stylus: number
+        inside: boolean
+        label: string
+      }
+  >
+  notes: Array<string>
+}
+
+export type CamSetupLinkReportInput = {
+  readonly toolpaths: CamSetupLinkReportPayload["toolpaths"]
+  readonly lowSafeZ: CamSetupLinkReportPayload["lowSafeZ"]
+  readonly rapidRate?: CamSetupLinkReportPayload["rapidRate"]
+}
+
+export type CamSetupLinkReportOutput = {
+  toolpaths: Array<{
+    id: string
+    name: string
+    toolId: string
+    spindleRpm: number
+    coolant: "off" | "flood" | "mist"
+    moves: Array<
+      | {
+          _tag: "Rapid"
+          to: { x: number; y: number; z: number }
+          rotary?: { a?: number; b?: number; c?: number }
+          expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+          comp?: { mode: "left" | "right" | "off"; register?: number }
+        }
+      | {
+          _tag: "Linear"
+          to: { x: number; y: number; z: number }
+          feed: number
+          rotary?: { a?: number; b?: number; c?: number }
+          expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+          comp?: { mode: "left" | "right" | "off"; register?: number }
+        }
+      | {
+          _tag: "Arc"
+          to: { x: number; y: number; z: number }
+          center: { x: number; y: number }
+          clockwise: boolean
+          feed: number
+          comp?: { mode: "left" | "right" | "off"; register?: number }
+        }
+      | {
+          _tag: "Spline"
+          to: { x: number; y: number; z: number }
+          controls: Array<{ x: number; y: number }>
+          feed: number
+        }
+      | { _tag: "Dwell"; seconds: number }
+      | { _tag: "Comment"; text: string }
+      | {
+          _tag: "Cycle"
+          cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
+          to: { x: number; y: number; z: number }
+          feed: number
+          peckDepth: number
+          dwellSeconds: number
+          retractHeight: number
+          pitch?: number
+        }
+      | { _tag: "Orient"; a?: number; b?: number; c?: number }
+      | { _tag: "SpindleOrient"; angle?: number }
+      | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
+      | {
+          _tag: "Assign"
+          variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
+          value: JsonValue
+        }
+      | { _tag: "MacroCall"; name: string; args: { [x: string]: JsonValue } }
+      | { _tag: "If"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+      | { _tag: "Else" }
+      | { _tag: "EndIf" }
+      | { _tag: "While"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+      | { _tag: "EndWhile" }
+      | { _tag: "Label"; name: string }
+      | {
+          _tag: "Goto"
+          label: string
+          direction?: "auto" | "forward" | "backward"
+          condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+        }
+      | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+      | { _tag: "CycleEnd" }
+      | { _tag: "Message"; text: string }
+    >
+    operation?: { id: string; name: string }
+  }>
+  report: { airBefore: number; airAfter: number; reduction: number; rewrittenLinks: number }
+}
+
+export type CamSetupLinkOrderInput = {
+  readonly items: CamSetupLinkOrderPayload["items"]
+  readonly from?: CamSetupLinkOrderPayload["from"]
+}
+
+export type CamSetupLinkOrderOutput = { order: Array<string>; before: number; after: number }
 
 export type CamSetupListInput = { readonly id: { readonly id: string }["id"] }
 

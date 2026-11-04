@@ -87,3 +87,31 @@ export const CamVerifyNcResult = Schema.Struct({
   verdict: Schema.Literals(["clean", "faults", "incomplete"])
 })
 export type CamVerifyNcResult = typeof CamVerifyNcResult.Type
+
+/**
+ * The collision report of a mill program: the G-code, optionally the generator settings (workholding, machine preset, tool diameters)
+ * and the cutter in the spindle. The stock is `params.stock` or a box round the cutting moves. Mill programs only.
+ */
+export const CamCollisionsRequest = Schema.Struct({
+  gcode: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(20_000_000)),
+  /** Generator settings laid over the machine's defaults; `stock` is `{ width, height, depth, x?, y?, topZ? }`, `machinePreset` a machine preset id. */
+  params: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  /** The cutter as a tool resource (type, diameter, lengths, holder); the settings' tool when absent. */
+  tool: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json))
+})
+export type CamCollisionsRequest = typeof CamCollisionsRequest.Type
+
+const finding = Schema.Struct({ code: Schema.String, severity: Schema.Literals(["error", "warning"]), line: Schema.optionalKey(Schema.Int), count: Schema.Int, message: Schema.String })
+export const CamCollisionsReport = Schema.Struct({
+  duration: Schema.Finite, moves: Schema.Int,
+  /** Stock, shank, holder, machine-body collisions and near misses, with the first contact's time and NC line. */
+  collisions: Schema.Array(Schema.Struct({ ...finding.fields, seconds: Schema.Finite })),
+  /** Travel and rotary-limit findings of the machine model. */
+  limits: Schema.Array(finding),
+  /** Set-up findings (vise jaws, bed, stock); `assumed` marks a finding that rests on a default the request did not state. */
+  findings: Schema.Array(Schema.Struct({ ...finding.fields, assumed: Schema.Boolean })),
+  setupProblems: Schema.Array(Schema.String),
+  unsupported: Schema.Array(Schema.String),
+  clear: Schema.Boolean
+})
+export type CamCollisionsReport = typeof CamCollisionsReport.Type
