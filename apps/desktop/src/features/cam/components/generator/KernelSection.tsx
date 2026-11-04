@@ -30,7 +30,9 @@ type Cutter = cam.kernel.Cutter
 const KINDS: Readonly<Record<Operation["strategy"], ReadonlyArray<Cutter["kind"]>>> = {
   face: ["facemill", "flat", "bull"], adaptive: ["flat", "bull", "ball"], pocket: ["flat", "bull", "ball"], profile: ["flat", "bull", "ball"],
   bore: ["flat", "bull"], drill: ["drill", "spot", "chamfer"], thread: ["threadmill"], engrave: ["engraver", "chamfer", "spot", "ball"],
-  chamfer: ["chamfer", "spot", "engraver"], surface: ["flat", "bull", "ball"], multiaxis: ["ball", "bull", "flat"]
+  chamfer: ["chamfer", "spot", "engraver"], surface: ["flat", "bull", "ball"], multiaxis: ["ball", "bull", "flat"],
+  // A probe operation runs the machine's probe device, not a cutter (spec 73 §5.12): it is planned in the probing panel.
+  probe: []
 }
 const OVERRIDES = ["rpm", "feed", "stepdown", "stepover"] as const
 
