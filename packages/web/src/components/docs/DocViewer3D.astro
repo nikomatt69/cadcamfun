@@ -61,31 +61,3 @@ const scene = JSON.stringify({ solids, paths, labels, animate })
   {caption && <figcaption class="doc-viewer3d-caption">{caption}</figcaption>}
 </figure>
 
-<style is:global>
-  .doc-viewer3d.ss-stage {
-    --ss-surface: rgb(var(--terminal-panel));
-    --ss-chrome: rgb(var(--terminal-panel));
-    --ss-canvas: rgb(var(--terminal-bg));
-    --ss-text: rgb(var(--terminal-muted));
-    --ss-text-strong: rgb(var(--terminal-text));
-    --ss-line: rgb(var(--terminal-border) / 0.5);
-    --ss-shadow-window: var(--shadow-soft);
-    position: relative;
-    top: auto;
-    left: auto;
-    width: 100%;
-    height: auto;
-    color: rgb(var(--terminal-text));
-    font: inherit;
-    user-select: text;
-  }
-  .doc-viewer3d .doc-viewer3d-window { height: auto; background: var(--ss-surface); }
-  .doc-viewer3d .ss-window__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-viewer3d astro-slot { display: contents; }
-  .doc-viewer3d-help { padding: 0.7rem 0.75rem 0; color: var(--ss-text); font-size: 0.75rem; line-height: 1.4; }
-  .doc-viewer3d-actions { padding: 0 0.75rem 0.75rem; }
-  .doc-viewer3d-play { padding: 0.35rem 0.65rem; border: 1px solid var(--ss-line); border-radius: 6px; background: var(--ss-canvas); color: var(--ss-text-strong); font: inherit; font-size: 0.75rem; cursor: pointer; }
-  .doc-viewer3d-play:focus-visible { outline: 2px solid rgb(var(--terminal-accent)); outline-offset: 2px; }
-  .doc-viewer3d-caption { padding: 0.65rem 0.15rem 0; color: var(--ss-text); font-size: 0.8125rem; line-height: 1.45; }
-</style>
-
