@@ -479,6 +479,20 @@ export interface StockSummary {
     readonly remainingLower: number
     readonly remainingUpper: number
   }
+  /**
+   * The tri-dexel replay of a program with turned moves (spec 69 B2): its verdict as figures, true within `errorBound` mm.
+   * `complete` false means the replay did not see every move or the part is open, and the claims stay unresolved.
+   */
+  readonly triDexel?: {
+    readonly complete: boolean
+    readonly cell: number
+    readonly errorBound: number
+    readonly poses: number
+    /** Part material the program removed (gouge): volume mm³, deepest mm. */
+    readonly gouge: { readonly volume: number; readonly depth: number }
+    /** Material left beyond the part plus allowance: volume mm³, deepest mm; `detached` is uncut stock beside the part, mm³. */
+    readonly left: { readonly volume: number; readonly depth: number; readonly detached: number }
+  }
 }
 
 /** One term of the tolerance budget: what it bounds, in mm, and where the bound comes from. */
