@@ -41,8 +41,14 @@ describe("J3 scale fixtures", () => {
   test("a stock of 10^7 replay cells is replayed at a coarser, declared cell, not halted", () => {
     // 600 x 400 mm at 0.15 mm would be 10.7 million columns; the kernel coarsens the cell and says so.
     const t0 = performance.now()
+    Bun.gc(true)
+    const before = process.memoryUsage()
     const r = runJob(bigPlate(grid(4, 20, 30), 600, 400, 0.15))
     const seconds = (performance.now() - t0) / 1000
+    // Memory budget: resident growth over the run (the replay height field and part raster are the big arrays).
+    const grewMb = (process.memoryUsage().rss - before.rss) / 1048576
+    console.log(`J3 10^7-cell stock memory: rss grew ${grewMb.toFixed(0)} MB`)
+    expect(grewMb).toBeLessThan(1500)
     if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
     const cells = (600 / r.value.stock.cellSize) * (400 / r.value.stock.cellSize)
     console.log(`J3 10^7-cell stock: asked 0.15 mm (10.7e6 cells), ran at ${r.value.stock.cellSize} mm (${(cells / 1e6).toFixed(2)}e6 cells), ${seconds.toFixed(1)} s`)
