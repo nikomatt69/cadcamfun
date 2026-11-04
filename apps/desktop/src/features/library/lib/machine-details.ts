@@ -70,9 +70,25 @@ export const machineSections = (profile: MachineProfile): ReadonlyArray<MachineS
   ])
   add(t("library.detail.coolant"), profile.coolant === undefined ? [] : fact(t("library.machine.modes"), profile.coolant.modes.length === 0 ? t("library.machine.none") : profile.coolant.modes.join(", ")))
   const probing = profile.probing
-  add(t("library.machine.section.probing"), probing === undefined ? [] : [
-    ...fact(t("library.machine.cycles"), probing.cycles === undefined || probing.cycles.length === 0 ? undefined : probing.cycles.join(", ")),
-    ...fact(t("library.machine.stylus"), unit(probing.stylusRadius, "mm")), ...fact(t("library.machine.probeFeed"), unit(probing.feed, "mm/min")), ...fact(t("library.machine.dialect"), probing.dialect)
+  const setter = profile.toolSetter
+  const calibration = profile.rotary?.calibration
+  // The stylus is shown as its diameter (spec 73 §1): a legacy radius reads as twice itself.
+  const stylus = cam.probing.stylusDiameterOf(probing)
+  add(t("library.machine.section.probing"), [
+    ...(probing === undefined ? [] : [
+      ...fact(t("library.machine.cycles"), probing.cycles === undefined || probing.cycles.length === 0 ? undefined : probing.cycles.join(", ")),
+      ...fact(t("library.machine.stylusDiameter"), stylus === undefined ? undefined : `Ø${trim(stylus)} mm`),
+      ...fact(t("library.machine.probeTool"), probing.toolNumber === undefined ? undefined : `T${probing.toolNumber}`),
+      ...fact(t("library.machine.probeFeed"), unit(probing.feeds?.touch ?? probing.feed, "mm/min")), ...fact(t("library.machine.dialect"), probing.dialect),
+      ...fact(t("library.machine.probeCalibrated"), probing.calibration === undefined ? undefined : `r ${trim(probing.calibration.effectiveRadius)} mm`)
+    ]),
+    ...(setter === undefined ? [] : [
+      ...fact(t("library.machine.toolSetter"), `${words(setter.kind)} · X${trim(setter.position.x)} Y${trim(setter.position.y)} Z${trim(setter.position.z)}`)
+    ]),
+    ...(calibration === undefined ? [] : [
+      ...fact(t("library.machine.rotaryCalibrated"), calibration.at),
+      ...fact(t("library.machine.rotaryAxisError"), unit(calibration.axisError, "°"))
+    ])
   ])
   const accuracy = profile.accuracy
   add(t("library.machine.section.accuracy"), accuracy === undefined ? [] : [...fact(t("library.machine.positioning"), unit(accuracy.positioningMm, "mm")), ...fact(t("library.machine.repeatability"), unit(accuracy.repeatabilityMm, "mm")), ...fact(t("library.machine.runout"), unit(accuracy.runoutMm, "mm"))])

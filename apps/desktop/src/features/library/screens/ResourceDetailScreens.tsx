@@ -23,6 +23,7 @@ import { ResourceGeometryPreview, resourceElements } from "../components/Resourc
 import { ToolPreview3D, toolResourceOf } from "../components/ToolPreview3D.tsx"
 import { MaterialPreview3D, densityKgM3 } from "../components/MaterialPreview3D.tsx"
 import { MachinePreview3D } from "../components/MachinePreview3D.tsx"
+import { MachineProbingFields } from "../components/MachineProbingFields.tsx"
 import { machineEnvelope, machineSections } from "../lib/machine-details.ts"
 import { PropertyBar, StatGrid } from "../components/ResourceStats.tsx"
 import { hexColor } from "../lib/preview-scene.ts"
@@ -489,6 +490,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     </Show>
     <Show when={props.kind === "machines"}>
       <MachineProfileFields form={props.form} onPatchConfig={props.onPatchConfig} />
+      <MachineProbingFields form={props.form} onPatchConfig={props.onPatchConfig} />
     </Show>
     <Show when={props.kind !== "materials"}>
       <div class="md:col-span-2">
