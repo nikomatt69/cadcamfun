@@ -56,4 +56,6 @@ export { checkNcClearance, ARC_SAGITTA, type ClearanceFinding, type ClearanceRes
 export { hullDistance, cylinderPrism, boxVertices, type HullDistance } from "./convex.ts"
 export * from "./engagement.ts"
 export * from "./feed-optimise.ts"
+export * from "./process.ts"
+export * from "./cycle-time.ts"
 export * from "./setups.ts"
