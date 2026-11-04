@@ -9,7 +9,7 @@ import { Context } from "effect"
 import type { cad, cam, drawing } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
 import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted, CadExchangeInput } from "@cadcamfun/api"
-import type { CamManufactureOperationInput, CamSetupSaveInput, CamTurningOperationInput } from "@cadcamfun/api"
+import type { CamManufactureOperationInput, CamProbeApplyInput, CamProbeInput, CamProbeRunInput, CamSetupSaveInput, CamTurningOperationInput } from "@cadcamfun/api"
 
 /** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
 export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
@@ -49,6 +49,12 @@ export interface ToolHandlersShape {
   /** Previews regenerating a saved kernel program from the drawing now: the new program's release, claims and the diff against the stored one. Nothing is stored. */
   regenerateOperation?(projectId: string, operationId: string, scope: "program" | "drawing", signal?: AbortSignal): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
+  /** Plans a probe cycle (a feature of the drawing, or given) and stores it as a probe operation with its program (spec 73). */
+  probeOperation?(projectId: string, input: CamProbeInput): Promise<unknown>
+  /** Simulates a stored probe operation on the part and keeps the report. */
+  probeRun?(projectId: string, input: CamProbeRunInput, signal?: AbortSignal): Promise<unknown>
+  /** Writes what a report measured (or the rows given) into the machine's work offsets, or a rotary calibration into the machine. */
+  probeApply?(projectId: string, input: CamProbeApplyInput): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
   /** The multi-operation setups saved in the project (spec 14), without their operations. */
   setupList?(projectId: string): Promise<unknown>

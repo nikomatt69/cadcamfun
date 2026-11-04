@@ -18,6 +18,7 @@ import { CAD_EDIT_ACTIONS } from "./cad-edit.ts"
 import { CAM_ACTIONS } from "./cam.ts"
 import { CAM_BREADTH_ACTIONS } from "./cam-breadth-process.ts"
 import { CAM_EDIT_ACTIONS } from "./cam-edit.ts"
+import { CAM_PROBE_ACTIONS } from "./cam-probe.ts"
 import { LIBRARY_ACTIONS, LIBRARY_EDIT_ACTIONS, PARTS_ACTIONS } from "./library.ts"
 import { MEMORY_ACTIONS, MEMORY_EDIT_ACTIONS } from "./memory.ts"
 import { MOD_ACTIONS, MOD_EDIT_ACTIONS } from "./mods.ts"
@@ -28,7 +29,7 @@ import { PMI_READ_ACTIONS, PMI_WRITE_ACTIONS } from "./pmi.ts"
 
 /** Every action, in the order the model meets them: CAD first, then CAM, then the libraries, memory and delegation. */
 export const ACTION_CATALOGUE: ReadonlyArray<ActionSpec> = [
-  ...CAD_ACTIONS, ...PMI_READ_ACTIONS, ...CAD_EDIT_ACTIONS, ...PMI_WRITE_ACTIONS, ...CAM_ACTIONS, ...CAM_BREADTH_ACTIONS, ...CAM_EDIT_ACTIONS,
+  ...CAD_ACTIONS, ...PMI_READ_ACTIONS, ...CAD_EDIT_ACTIONS, ...PMI_WRITE_ACTIONS, ...CAM_ACTIONS, ...CAM_BREADTH_ACTIONS, ...CAM_EDIT_ACTIONS, ...CAM_PROBE_ACTIONS,
   ...LIBRARY_ACTIONS, ...PARTS_ACTIONS, ...LIBRARY_EDIT_ACTIONS,
   ...MEMORY_ACTIONS, ...MEMORY_EDIT_ACTIONS, ...RESEARCH_ACTIONS, ...VCS_ACTIONS, ...VCS_EDIT_ACTIONS, ...AGENT_ACTIONS,
   ...MOD_ACTIONS, ...MOD_EDIT_ACTIONS

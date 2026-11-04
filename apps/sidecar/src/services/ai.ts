@@ -1513,7 +1513,11 @@ const toolHandlers = Effect.gen(function*() {
       // The configuration is written as the machine profile: the fields the model sent, in the canonical shape, plus the
       // legacy spellings it may still use. The kernel reads it back through the same profile, so what is written is what
       // the program is planned against.
-      const config = cam.kernel.configOfProfile(cam.kernel.profileOfConfig(input, String(input["kind"])))
+      // A rotary calibration is kept with the axis it calibrates (spec 73 §5.4).
+      const { rotaryCalibration, ...fields } = input
+      if (rotaryCalibration !== undefined && (fields["rotary"] === null || typeof fields["rotary"] !== "object")) return { ok: false, error: "A rotary calibration needs the rotary block of the machine in the same call." }
+      const profiled = rotaryCalibration === undefined ? fields : { ...fields, rotary: { ...record(fields["rotary"]), calibration: rotaryCalibration } }
+      const config = cam.kernel.configOfProfile(cam.kernel.profileOfConfig(profiled, String(input["kind"])))
       const type = String(input["kind"])
       if (id !== undefined) {
         const existing = await run(machines.find(acting().id, id))

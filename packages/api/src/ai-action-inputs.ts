@@ -7,6 +7,7 @@
  * The derived schema is the encoded side: a field that trims, defaults or reads `"true"` as a flag shows the model what it
  * may send, and the decode applies the rest.
  */
+import { cam } from "@cadcamfun/core"
 import { Effect, Schema, SchemaTransformation } from "effect"
 import { EmptyActionInput as empty } from "./ai-cam.ts"
 
