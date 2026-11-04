@@ -111,6 +111,11 @@ export interface KernelMachine {
    */
   readonly table?: { readonly length: number; readonly width: number; readonly gap: number }
   /**
+   * The spindle housing above the tool holder, a cylinder (mm) from the spindle nose upwards. When present it is one more body of the
+   * collision check, against the table and every fixture body (`machine-clearance`, spec 69 B5). Absent: the housing is not modelled.
+   */
+  readonly spindleHousing?: { readonly radius: number; readonly height: number }
+  /**
    * The work offsets the control has, and the one the machine starts in. A program that names an offset the machine does
    * not have is refused (`machine-limits`): the offset is where the part sits, and an unknown one is a wrong datum.
    */
@@ -257,7 +262,7 @@ export type OperationSpec =
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
    */
-  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
+  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"; readonly axisPoint?: Vec3; readonly axisLine?: { readonly a: Vec3; readonly b: Vec3 }; readonly axisCurve?: ReadonlyArray<Vec3>; readonly maxTilt?: number; readonly holderDiameter?: number; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
 
 export type Strategy = OperationSpec["strategy"]
 
@@ -473,6 +478,20 @@ export interface StockSummary {
     readonly removedUpper: number
     readonly remainingLower: number
     readonly remainingUpper: number
+  }
+  /**
+   * The tri-dexel replay of a program with turned moves (spec 69 B2): its verdict as figures, true within `errorBound` mm.
+   * `complete` false means the replay did not see every move or the part is open, and the claims stay unresolved.
+   */
+  readonly triDexel?: {
+    readonly complete: boolean
+    readonly cell: number
+    readonly errorBound: number
+    readonly poses: number
+    /** Part material the program removed (gouge): volume mm³, deepest mm. */
+    readonly gouge: { readonly volume: number; readonly depth: number }
+    /** Material left beyond the part plus allowance: volume mm³, deepest mm; `detached` is uncut stock beside the part, mm³. */
+    readonly left: { readonly volume: number; readonly depth: number; readonly detached: number }
   }
 }
 
