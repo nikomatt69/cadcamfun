@@ -1744,6 +1744,967 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly progress?: { readonly projectId: string; readonly runId: string }
 }
 
+export type ToolpathGeneratorPlanPayload = {
+  readonly setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
+  readonly material: string
+  readonly machine?: string
+  readonly machineConfig?: {
+    readonly id: string
+    readonly name: string
+    readonly type: string
+    readonly description?: string | null
+    readonly config: { readonly [x: string]: JsonValue }
+  }
+  readonly origin?: "stock-center" | "stock-corner"
+  readonly finishAllowance?: number
+  readonly scallop?: number
+  readonly schemaVersion: 1
+  readonly id: string
+  readonly name: string
+  readonly elements: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly stock?: {
+    readonly width: number
+    readonly height: number
+    readonly depth: number
+    readonly radius?: number
+    readonly x?: number
+    readonly y?: number
+    readonly topZ?: number
+    readonly allowance?: number
+    readonly material?: string
+    readonly elementId?: string
+  }
+  readonly tolerance?: number
+  readonly resolution?: number
+  readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+  readonly operations?: ReadonlyArray<
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "face"
+        readonly bottom: number
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "adaptive"
+        readonly region: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "pocket"
+        readonly region: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+        readonly finish?: boolean
+        readonly within?: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "profile"
+        readonly loop: ReadonlyArray<{ readonly x: number; readonly y: number }>
+        readonly side: "outside" | "inside"
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+        readonly finish?: boolean
+        readonly tabs?: ReadonlyArray<{ readonly position: number; readonly width: number; readonly height: number }>
+        readonly leadIn?: "direct" | "arc" | "ramp" | "helix"
+        readonly leadRadius?: number
+        readonly compensation?: "none" | "controller"
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "bore"
+        readonly center: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "drill"
+        readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+        readonly top: number
+        readonly bottom: number
+        readonly cut?: "drill" | "spot" | "tap" | "ream"
+        readonly cycle?:
+          | { readonly kind: "countersink"; readonly diameter: number }
+          | {
+              readonly kind: "deep"
+              readonly peck: number
+              readonly retract: "full" | "chip-break"
+              readonly peckReduction?: number
+              readonly minPeck?: number
+              readonly chipBreakRetract?: number
+              readonly fullRetractEvery?: number
+              readonly dwell?: number
+            }
+          | {
+              readonly kind: "back-bore"
+              readonly diameter: number
+              readonly pilotDiameter: number
+              readonly face: number
+            }
+          | {
+              readonly kind: "tilted"
+              readonly peck?: number
+              readonly chipBreak?: boolean
+              readonly sites: ReadonlyArray<{
+                readonly entry: { readonly x: number; readonly y: number; readonly z: number }
+                readonly direction: { readonly x: number; readonly y: number; readonly z: number }
+                readonly depth: number
+              }>
+            }
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "thread"
+        readonly center: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly pitch: number
+        readonly internal: boolean
+        readonly top: number
+        readonly length: number
+        readonly rightHand?: boolean
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "engrave"
+        readonly paths: ReadonlyArray<{
+          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly closed: boolean
+        }>
+        readonly top: number
+        readonly depth: number
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "chamfer"
+        readonly loops: ReadonlyArray<{
+          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly side: "outside" | "inside"
+        }>
+        readonly top: number
+        readonly width: number
+        readonly tipOffset?: number
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "surface"
+        readonly mode:
+          | "roughing"
+          | "rest"
+          | "parallel"
+          | "waterline"
+          | "steep-shallow"
+          | "scallop"
+          | "spiral"
+          | "radial"
+          | "flat"
+        readonly slopeAngle?: number
+        readonly allowance?: number
+        readonly scallop?: number
+        readonly clearing?: "contour" | "adaptive"
+        readonly angle?: number
+        readonly restFrom?: string
+        readonly center?: { readonly x: number; readonly y: number }
+      }
+    | {
+        readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "multiaxis"
+        readonly mode?: "parallel" | "contour" | "swarf"
+        readonly top: number
+        readonly angle?: number
+        readonly toolAxis?: "normal" | "lead"
+        readonly lead?: number
+        readonly tilt?: number
+        readonly walls?: ReadonlyArray<{
+          readonly bottom: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly top: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly normal: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly concaveRadius?: number
+        }>
+        readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+      }
+  >
+  readonly tools?: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly kind:
+      | "flat"
+      | "ball"
+      | "bull"
+      | "chamfer"
+      | "spot"
+      | "drill"
+      | "facemill"
+      | "threadmill"
+      | "engraver"
+      | "tap"
+      | "reamer"
+      | "countersink"
+      | "boringbar"
+      | "tslot"
+      | "dovetail"
+      | "tapered"
+      | "lollipop"
+      | "barrel"
+      | "lens"
+    readonly diameter: number
+    readonly flutes: number
+    readonly material: "hss" | "hss-co" | "carbide" | "pcd"
+    readonly coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+    readonly cornerRadius?: number
+    readonly angle?: number
+    readonly tipDiameter?: number
+    readonly pitch?: number
+    readonly neckDiameter?: number
+    readonly formRadius?: number
+    readonly headHeight?: number
+    readonly fluteLength: number
+    readonly shankDiameter: number
+    readonly stickout: number
+    readonly holder?: {
+      readonly diameter: number
+      readonly length: number
+      readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
+    }
+    readonly maxRpm?: number
+    readonly number?: number
+  }>
+  readonly deburr?: number
+  readonly tabs?: { readonly count: number; readonly width: number; readonly height: number }
+  readonly breadth?: { readonly holeCycles?: boolean; readonly tilted?: boolean; readonly namedFeatures?: boolean }
+  readonly subprograms?: boolean
+  readonly nativeCycles?: boolean
+  readonly tcp?: boolean
+  readonly smoothing?: number
+  readonly postDefinition?: JsonValue
+  readonly print?: {
+    readonly layerHeight?: number
+    readonly firstLayerHeight?: number
+    readonly walls?: number
+    readonly topLayers?: number
+    readonly bottomLayers?: number
+    readonly infillDensity?: number
+    readonly infillPattern?: "lines" | "grid" | "triangles" | "honeycomb" | "gyroid" | "concentric"
+    readonly supports?: "none" | "buildplate" | "everywhere"
+    readonly supportAngle?: number
+    readonly adhesion?: "none" | "skirt" | "brim" | "raft"
+    readonly brimWidth?: number
+    readonly printSpeed?: number
+    readonly nozzleTemperature?: number
+    readonly bedTemperature?: number
+    readonly fan?: number
+    readonly vase?: boolean
+    readonly orientation?: "as-designed" | "auto"
+    readonly seam?: "nearest" | "aligned" | "random"
+    readonly retractionDistance?: number
+    readonly zHop?: number
+    readonly flow?: number
+    readonly relativeExtrusion?: boolean
+  }
+  readonly progress?: { readonly projectId: string; readonly runId: string }
+}
+
+export type ToolpathGeneratorJobPayload = {
+  readonly op: "plan" | "run"
+  readonly material: string
+  readonly machine?: string
+  readonly part: {
+    readonly elements?: ReadonlyArray<{ readonly [x: string]: any }>
+    readonly meshes?: ReadonlyArray<{
+      readonly positions: ReadonlyArray<number>
+      readonly indices: ReadonlyArray<number>
+    }>
+  }
+  readonly tools?: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly kind:
+      | "flat"
+      | "ball"
+      | "bull"
+      | "chamfer"
+      | "spot"
+      | "drill"
+      | "facemill"
+      | "threadmill"
+      | "engraver"
+      | "tap"
+      | "reamer"
+      | "countersink"
+      | "boringbar"
+      | "tslot"
+      | "dovetail"
+      | "tapered"
+      | "lollipop"
+      | "barrel"
+      | "lens"
+    readonly diameter: number
+    readonly flutes: number
+    readonly material: "hss" | "hss-co" | "carbide" | "pcd"
+    readonly coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+    readonly cornerRadius?: number
+    readonly angle?: number
+    readonly tipDiameter?: number
+    readonly pitch?: number
+    readonly neckDiameter?: number
+    readonly formRadius?: number
+    readonly headHeight?: number
+    readonly fluteLength: number
+    readonly shankDiameter: number
+    readonly stickout: number
+    readonly holder?: {
+      readonly diameter: number
+      readonly length: number
+      readonly steps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
+    }
+    readonly maxRpm?: number
+    readonly number?: number
+  }>
+  readonly quality?: {
+    readonly resolution?: number
+    readonly tolerance?: number
+    readonly finishAllowance?: number
+    readonly scallop?: number
+    readonly enforceTolerance?: boolean
+  }
+  readonly setups: ReadonlyArray<{
+    readonly id: string
+    readonly name?: string
+    readonly orientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
+    readonly origin?: "stock-center" | "stock-corner"
+    readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    readonly stock?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly stockModel?:
+      | {
+          readonly kind: "cylinder"
+          readonly center: { readonly x: number; readonly y: number }
+          readonly radius: number
+          readonly z0: number
+          readonly z1: number
+          readonly segments?: number
+        }
+      | {
+          readonly kind: "mesh"
+          readonly mesh: { readonly positions: ReadonlyArray<number>; readonly indices: ReadonlyArray<number> }
+        }
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly operations?: ReadonlyArray<
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "face"
+          readonly bottom: number
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "adaptive"
+          readonly region: {
+            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          }
+          readonly top: number
+          readonly bottom: number
+          readonly allowance?: number
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "pocket"
+          readonly region: {
+            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          }
+          readonly top: number
+          readonly bottom: number
+          readonly allowance?: number
+          readonly finish?: boolean
+          readonly within?: {
+            readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          }
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "profile"
+          readonly loop: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly side: "outside" | "inside"
+          readonly top: number
+          readonly bottom: number
+          readonly allowance?: number
+          readonly finish?: boolean
+          readonly tabs?: ReadonlyArray<{ readonly position: number; readonly width: number; readonly height: number }>
+          readonly leadIn?: "direct" | "arc" | "ramp" | "helix"
+          readonly leadRadius?: number
+          readonly compensation?: "none" | "controller"
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "bore"
+          readonly center: { readonly x: number; readonly y: number }
+          readonly diameter: number
+          readonly top: number
+          readonly bottom: number
+          readonly allowance?: number
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "drill"
+          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly top: number
+          readonly bottom: number
+          readonly cut?: "drill" | "spot" | "tap" | "ream"
+          readonly cycle?:
+            | { readonly kind: "countersink"; readonly diameter: number }
+            | {
+                readonly kind: "deep"
+                readonly peck: number
+                readonly retract: "full" | "chip-break"
+                readonly peckReduction?: number
+                readonly minPeck?: number
+                readonly chipBreakRetract?: number
+                readonly fullRetractEvery?: number
+                readonly dwell?: number
+              }
+            | {
+                readonly kind: "back-bore"
+                readonly diameter: number
+                readonly pilotDiameter: number
+                readonly face: number
+              }
+            | {
+                readonly kind: "tilted"
+                readonly peck?: number
+                readonly chipBreak?: boolean
+                readonly sites: ReadonlyArray<{
+                  readonly entry: { readonly x: number; readonly y: number; readonly z: number }
+                  readonly direction: { readonly x: number; readonly y: number; readonly z: number }
+                  readonly depth: number
+                }>
+              }
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "thread"
+          readonly center: { readonly x: number; readonly y: number }
+          readonly diameter: number
+          readonly pitch: number
+          readonly internal: boolean
+          readonly top: number
+          readonly length: number
+          readonly rightHand?: boolean
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "engrave"
+          readonly paths: ReadonlyArray<{
+            readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly closed: boolean
+          }>
+          readonly top: number
+          readonly depth: number
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "chamfer"
+          readonly loops: ReadonlyArray<{
+            readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly side: "outside" | "inside"
+          }>
+          readonly top: number
+          readonly width: number
+          readonly tipOffset?: number
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover?: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "surface"
+          readonly mode:
+            | "roughing"
+            | "rest"
+            | "parallel"
+            | "waterline"
+            | "steep-shallow"
+            | "scallop"
+            | "spiral"
+            | "radial"
+            | "flat"
+          readonly slopeAngle?: number
+          readonly allowance?: number
+          readonly scallop?: number
+          readonly clearing?: "contour" | "adaptive"
+          readonly angle?: number
+          readonly restFrom?: string
+          readonly center?: { readonly x: number; readonly y: number }
+        }
+      | {
+          readonly id: string
+          readonly enabled?: boolean
+          readonly dependsOn?: ReadonlyArray<string>
+          readonly limits?: {
+            readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+            readonly containment?: "edge" | "centre"
+          }
+          readonly name?: string
+          readonly tool: string
+          readonly rpm?: number
+          readonly feed?: number
+          readonly plungeFeed?: number
+          readonly stepdown?: number
+          readonly stepover: number
+          readonly coolant?: "off" | "flood" | "mist"
+          readonly radialEngagement?: number
+          readonly strategy: "multiaxis"
+          readonly mode?: "parallel" | "contour" | "swarf"
+          readonly top: number
+          readonly angle?: number
+          readonly toolAxis?: "normal" | "lead"
+          readonly lead?: number
+          readonly tilt?: number
+          readonly walls?: ReadonlyArray<{
+            readonly bottom: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+            readonly top: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+            readonly normal: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+            readonly concaveRadius?: number
+          }>
+          readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+        }
+    >
+  }>
+  readonly nc?: number
+}
+
+export type ToolpathGeneratorLathePayload = {
+  readonly stock: {
+    readonly diameter: number
+    readonly length: number
+    readonly bore?: number
+    readonly faceAllowance?: number
+  }
+  readonly contour?: ReadonlyArray<{ readonly diameter: number; readonly z: number }>
+  readonly bore?: ReadonlyArray<{ readonly diameter: number; readonly z: number }>
+  readonly tools: ReadonlyArray<{
+    readonly id: string
+    readonly number: number
+    readonly kind: "turning" | "boring" | "grooving" | "threading" | "parting"
+    readonly insert?: string
+    readonly noseRadius?: number
+    readonly approach?: number
+    readonly bladeWidth?: number
+    readonly bladeLength?: number
+  }>
+  readonly operations: ReadonlyArray<
+    | { readonly kind: "face"; readonly tool: string; readonly depth?: number; readonly feed?: number }
+    | {
+        readonly kind: "rough"
+        readonly tool: string
+        readonly side?: "external" | "internal"
+        readonly depth?: number
+        readonly feed?: number
+        readonly retract?: number
+        readonly allowance?: { readonly x?: number; readonly z?: number }
+      }
+    | {
+        readonly kind: "finish"
+        readonly tool: string
+        readonly side?: "external" | "internal"
+        readonly feed?: number
+        readonly springPasses?: number
+      }
+    | {
+        readonly kind: "groove"
+        readonly tool: string
+        readonly side?: "external" | "internal"
+        readonly z: number
+        readonly width: number
+        readonly diameter: number
+        readonly peck?: number
+        readonly feed?: number
+      }
+    | {
+        readonly kind: "thread"
+        readonly tool: string
+        readonly side?: "external" | "internal"
+        readonly standard?: "metric" | "whitworth" | "trapezoidal"
+        readonly diameter: number
+        readonly pitch: number
+        readonly zStart: number
+        readonly zEnd: number
+        readonly starts?: number
+        readonly infeed?: "radial" | "flank" | "alternating"
+        readonly springPasses?: number
+        readonly firstDepth?: number
+        readonly minDepth?: number
+      }
+    | {
+        readonly kind: "part"
+        readonly tool: string
+        readonly z: number
+        readonly stubDiameter?: number
+        readonly peck?: number
+        readonly feed?: number
+      }
+  >
+  readonly material?: string
+  readonly post?: "fanuc" | "siemens"
+}
+
 export type ToolpathGeneratorParsePayload = { readonly gcode: string; readonly name?: string }
 
 export type ToolpathGeneratorVerifyPayload = {
@@ -2101,6 +3062,83 @@ export type CadExactImportStepPayload = {
   readonly idPrefix?: string
   readonly tolerance?: number
   readonly keepAccepted?: boolean
+}
+
+export type CadExactSheetPayload = {
+  readonly history?: JsonValue
+  readonly drawingId?: string
+  readonly elementId?: string
+  readonly options?: {
+    readonly size?: "A4" | "A3" | "A2"
+    readonly projection?: "first" | "third"
+    readonly title?: string
+    readonly drawingNumber?: string
+    readonly material?: string
+    readonly colour?: string
+    readonly finish?: string
+    readonly standard?: string
+    readonly revision?: string
+    readonly sheet?: string
+    readonly date?: string
+    readonly author?: string
+    readonly notes?: ReadonlyArray<string>
+    readonly views?: ReadonlyArray<"front" | "top" | "right">
+    readonly iso?: boolean
+    readonly scale?: number
+    readonly section?: {
+      readonly axis: "x" | "y" | "z"
+      readonly at: number
+      readonly from?: "+" | "-"
+      readonly letter?: string
+      readonly parent?: "front" | "top" | "right"
+    }
+    readonly detail?: {
+      readonly view?: "front" | "top" | "right"
+      readonly centre: { readonly x: number; readonly y: number; readonly z: number }
+      readonly radius: number
+      readonly factor: number
+      readonly letter?: string
+    }
+    readonly flatness?: { readonly value: number; readonly view?: "front" | "top" | "right" }
+    readonly gdt?: ReadonlyArray<{
+      readonly spec: {
+        readonly kind:
+          | "straightness"
+          | "flatness"
+          | "circularity"
+          | "cylindricity"
+          | "profile-line"
+          | "profile-surface"
+          | "parallelism"
+          | "perpendicularity"
+          | "angularity"
+          | "position"
+          | "concentricity"
+          | "symmetry"
+          | "runout"
+          | "total-runout"
+        readonly value: number
+        readonly diameter?: boolean
+        readonly modifier?: "M" | "L"
+        readonly datums?: ReadonlyArray<string>
+      }
+      readonly at: { readonly x: number; readonly y: number; readonly z: number }
+      readonly view?: "front" | "top" | "right"
+      readonly offset?: { readonly x: number; readonly y: number }
+    }>
+    readonly datums?: ReadonlyArray<{
+      readonly letter: string
+      readonly at: { readonly x: number; readonly y: number; readonly z: number }
+      readonly view?: "front" | "top" | "right"
+      readonly side?: "up" | "down" | "left" | "right"
+    }>
+    readonly balloons?: ReadonlyArray<{
+      readonly text: string
+      readonly at: { readonly x: number; readonly y: number; readonly z: number }
+      readonly view?: "front" | "top" | "right"
+      readonly offset?: { readonly x: number; readonly y: number }
+    }>
+  }
 }
 
 export type CamSetupPlanPayload = {
@@ -9226,6 +10264,118 @@ export type ToolpathGeneratorManufactureOutput =
       }>
     }
 
+export type ToolpathGeneratorPlanInput = {
+  readonly setupOrientation?: ToolpathGeneratorPlanPayload["setupOrientation"]
+  readonly material: ToolpathGeneratorPlanPayload["material"]
+  readonly machine?: ToolpathGeneratorPlanPayload["machine"]
+  readonly machineConfig?: ToolpathGeneratorPlanPayload["machineConfig"]
+  readonly origin?: ToolpathGeneratorPlanPayload["origin"]
+  readonly finishAllowance?: ToolpathGeneratorPlanPayload["finishAllowance"]
+  readonly scallop?: ToolpathGeneratorPlanPayload["scallop"]
+  readonly schemaVersion: ToolpathGeneratorPlanPayload["schemaVersion"]
+  readonly id: ToolpathGeneratorPlanPayload["id"]
+  readonly name: ToolpathGeneratorPlanPayload["name"]
+  readonly elements: ToolpathGeneratorPlanPayload["elements"]
+  readonly stock?: ToolpathGeneratorPlanPayload["stock"]
+  readonly tolerance?: ToolpathGeneratorPlanPayload["tolerance"]
+  readonly resolution?: ToolpathGeneratorPlanPayload["resolution"]
+  readonly workOffset?: ToolpathGeneratorPlanPayload["workOffset"]
+  readonly operations?: ToolpathGeneratorPlanPayload["operations"]
+  readonly tools?: ToolpathGeneratorPlanPayload["tools"]
+  readonly deburr?: ToolpathGeneratorPlanPayload["deburr"]
+  readonly tabs?: ToolpathGeneratorPlanPayload["tabs"]
+  readonly breadth?: ToolpathGeneratorPlanPayload["breadth"]
+  readonly subprograms?: ToolpathGeneratorPlanPayload["subprograms"]
+  readonly nativeCycles?: ToolpathGeneratorPlanPayload["nativeCycles"]
+  readonly tcp?: ToolpathGeneratorPlanPayload["tcp"]
+  readonly smoothing?: ToolpathGeneratorPlanPayload["smoothing"]
+  readonly postDefinition?: ToolpathGeneratorPlanPayload["postDefinition"]
+  readonly print?: ToolpathGeneratorPlanPayload["print"]
+  readonly progress?: ToolpathGeneratorPlanPayload["progress"]
+}
+
+export type ToolpathGeneratorPlanOutput =
+  | {
+      status: "ok"
+      value: { operations: Array<{ [x: string]: any }>; notes: Array<string>; unmachined: Array<string> }
+    }
+  | {
+      status: "failed"
+      issues: Array<{
+        tag:
+          | "InvalidInput"
+          | "UnknownMaterial"
+          | "UnknownTool"
+          | "NoSuitableTool"
+          | "UnsupportedCapability"
+          | "GenerationFailed"
+          | "EmptyToolpath"
+          | "MachineLimit"
+          | "RapidInStock"
+          | "HolderCollision"
+          | "Gouge"
+          | "RemainingStock"
+          | "ReplayMismatch"
+          | "Cancelled"
+        severity: "error" | "warning"
+        stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
+        message: string
+        operationId?: string
+        line?: number
+        point?: { x: number; y: number; z: number }
+      }>
+    }
+
+export type ToolpathGeneratorJobInput = {
+  readonly op: ToolpathGeneratorJobPayload["op"]
+  readonly material: ToolpathGeneratorJobPayload["material"]
+  readonly machine?: ToolpathGeneratorJobPayload["machine"]
+  readonly part: ToolpathGeneratorJobPayload["part"]
+  readonly tools?: ToolpathGeneratorJobPayload["tools"]
+  readonly quality?: ToolpathGeneratorJobPayload["quality"]
+  readonly setups: ToolpathGeneratorJobPayload["setups"]
+  readonly nc?: ToolpathGeneratorJobPayload["nc"]
+}
+
+export type ToolpathGeneratorJobOutput = {
+  ok: boolean
+  op: "plan" | "run"
+  release?: string
+  setups?: Array<{ [x: string]: any }>
+  claims?: Array<{ [x: string]: any }>
+  failed?: Array<{ [x: string]: any }>
+  unresolved?: Array<{ [x: string]: any }>
+  coverage?: { [x: string]: any }
+  notes?: Array<string>
+  issues?: Array<{ [x: string]: any }>
+  cycleTimeSeconds?: number
+  error?: string
+}
+
+export type ToolpathGeneratorLatheInput = {
+  readonly stock: ToolpathGeneratorLathePayload["stock"]
+  readonly contour?: ToolpathGeneratorLathePayload["contour"]
+  readonly bore?: ToolpathGeneratorLathePayload["bore"]
+  readonly tools: ToolpathGeneratorLathePayload["tools"]
+  readonly operations: ToolpathGeneratorLathePayload["operations"]
+  readonly material?: ToolpathGeneratorLathePayload["material"]
+  readonly post?: ToolpathGeneratorLathePayload["post"]
+}
+
+export type ToolpathGeneratorLatheOutput = {
+  ok: true
+  post: string
+  operations: Array<{ id: string; name: string; kind: string; tool: string; moves: number; notes: Array<string> }>
+  warnings: Array<string>
+  analytic: { stockVolume: number; partVolume: number; removedVolume: number }
+  cycles: Array<string>
+  explicit: Array<{ operation: string; reason: string }>
+  lines: number
+  preview: string
+  verification?: unknown
+  release: "preview"
+}
+
 export type ToolpathGeneratorParseInput = {
   readonly gcode: ToolpathGeneratorParsePayload["gcode"]
   readonly name: ToolpathGeneratorParsePayload["name"]
@@ -9805,6 +10955,37 @@ export type CadExactImportStepOutput = {
   history?: JsonValue
   problems: Array<string>
   warnings: Array<string>
+}
+
+export type CadExactSheetInput = {
+  readonly history?: CadExactSheetPayload["history"]
+  readonly drawingId?: CadExactSheetPayload["drawingId"]
+  readonly elementId?: CadExactSheetPayload["elementId"]
+  readonly options?: CadExactSheetPayload["options"]
+}
+
+export type CadExactSheetOutput = {
+  svg: string
+  size: { width: number; height: number }
+  scale: number
+  views: Array<{
+    name: string
+    label: string
+    scale: number
+    kind: "principal" | "iso" | "section" | "detail"
+    bounds: { minX: number; minY: number; maxX: number; maxY: number }
+  }>
+  dimensions: Array<{
+    view: string
+    kind: "linear" | "radius" | "diameter" | "angular" | "callout"
+    text: string
+    value?: number
+  }>
+  callouts: Array<string>
+  section?: { loops: number; hatchLines: number }
+  warnings: Array<string>
+  edgeSource: "exact" | "mesh"
+  drawing: unknown
 }
 
 export type CamSetupPlanInput = { readonly setup: CamSetupPlanPayload["setup"] }

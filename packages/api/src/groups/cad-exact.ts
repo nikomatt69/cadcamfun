@@ -1,12 +1,12 @@
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, Forbidden, InternalError, NotFound } from "../errors.ts"
-import { CadAssemblyReport, CadAssemblyRequest, CadExactAnalysis, CadExactRequest, CadExactStep, CadExactStepRequest, CadHoleReport, CadHoleRequest, CadImportStepReport, CadImportStepRequest, CadRebuildReport, CadRebuildRequest, CadSetupsReport, CadSetupsRequest } from "../cad-exact.ts"
+import { CadAssemblyReport, CadAssemblyRequest, CadExactAnalysis, CadExactRequest, CadExactStep, CadExactStepRequest, CadHoleReport, CadHoleRequest, CadImportStepReport, CadImportStepRequest, CadRebuildReport, CadRebuildRequest, CadSetupsReport, CadSetupsRequest, CadSheetReport, CadSheetRequest } from "../cad-exact.ts"
 
 /**
  * The exact B-rep kernel (`@cadcamfun/core` `brep`) behind HTTP, so the sidecar, plugins and the assistant read the drawing the
  * way the CAD canvas and the CAM planner do: exact mass properties, validity, recognised holes and how a solid will be machined
  * (`analyze`), the drawing as one STEP AP214 file (`step`), and interference, bill of materials, joints and missing fasteners
- * of the assembly (`assembly`), the manual three-axis setups each solid needs (`setups`), a preview of resizing or filling one recognised hole (`hole`), the rebuild of a parametric history (`rebuild`), and a STEP file imported as base bodies of a history (`importStep`). Each takes the elements in the body or the id of a stored drawing.
+ * of the assembly (`assembly`), the manual three-axis setups each solid needs (`setups`), a preview of resizing or filling one recognised hole (`hole`), the rebuild of a parametric history (`rebuild`), a STEP file imported as base bodies of a history (`importStep`), and the production drawing sheet of a parametric part (`sheet`). Each takes the elements in the body or the id of a stored drawing.
  */
 export class CadExactGroup extends HttpApiGroup.make("cadExact")
   .add(
@@ -16,6 +16,7 @@ export class CadExactGroup extends HttpApiGroup.make("cadExact")
     HttpApiEndpoint.post("setups", "/api/cad/exact/setups", { payload: CadSetupsRequest, success: CadSetupsReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.post("hole", "/api/cad/exact/hole", { payload: CadHoleRequest, success: CadHoleReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.post("rebuild", "/api/cad/exact/rebuild", { payload: CadRebuildRequest, success: CadRebuildReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
-    HttpApiEndpoint.post("importStep", "/api/cad/exact/import-step", { payload: CadImportStepRequest, success: CadImportStepReport, error: [BadRequest, Forbidden, NotFound, InternalError] })
+    HttpApiEndpoint.post("importStep", "/api/cad/exact/import-step", { payload: CadImportStepRequest, success: CadImportStepReport, error: [BadRequest, Forbidden, NotFound, InternalError] }),
+    HttpApiEndpoint.post("sheet", "/api/cad/sheet", { payload: CadSheetRequest, success: CadSheetReport, error: [BadRequest, Forbidden, NotFound, InternalError] })
   )
 {}

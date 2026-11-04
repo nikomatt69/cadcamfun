@@ -465,3 +465,16 @@ Per the owner's rule, the following were **not** opened in this audit. They are 
   resumed result deep-equals the full replay. Open: a per-part cache in the sidecar (lane D).
 - 2026-11-04 (lane cad, cc/cad-2): **P2-10 sketch half partly closed**: 2D fillet, mirror, linear/circular pattern, offset and project-edges tools in
   `cad/sketch-tools.ts` (spec 45 change log). Still open in P2-10: 3D sketch, blocks, delete/replace/split face and extrude until-next/to-body history operations.
+- 2026-11-04 (lane API, kernel reachability, branch cc/api-1): **every kernel job is classified and the four with no route have one.**
+  `apps/sidecar/test/kernel-reachability.test.ts` holds a `satisfies Record<KernelJobName, ...>` map: each worker job names its typed HTTP
+  route (checked against the OpenAPI document of `Api`) or the assistant action that is its only caller, with the reason; a new job fails the
+  typecheck and the test until it is classified. New routes, all run in the kernel worker queue (bounded slots, queue limit, deadline,
+  cancelled with the request; the job history is asserted): `POST /api/cad/sheet` (`cad-sheet`: production drawing sheet of an inline history
+  or of a stored parametric element, the drawing's title block completed under the request's options; a sheet option the projection refuses is
+  a 400 with the reason), `POST /api/toolpaths/plan` (`cam-plan`: what `manufacture` would run, no strategy, post or replay), `POST /api/cam/jobs`
+  (`cam-job`: multi-setup plan/run with every claim; `CamJobResult` is now shared with the assistant's `cam.job` contract; the part's one-of
+  check moved to the route because the generated clients cannot port a filter) and `POST /api/cam/lathe` (`cam-lathe`; a refused plan is a 400).
+  Clients and the API reference regenerated. **Open, needs the AI lane (`packages/ai/src/kernel-jobs.ts`, not this lane):** no kernel job yet for
+  `cam.kernel.runTurningJob` (spec 69 I1), `applyTemplate` (spec 60), the operation model (`resolveOperations`, `transformJob`) or the
+  `process` evidence of a job (`ManufacturingJob.process` is not in `jobOfSnapshot`/`CamKernelRequest`); `POST /api/cam/setups/generate` and the
+  saved-setup `generate` still run `generateSetup` on the request thread (no `cam-setup` job).
