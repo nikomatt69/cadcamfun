@@ -149,3 +149,15 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
   12 holes, edit of the last hole, load 0.77 per CPU, 7 runs): **349 ms full, 52.6 ms resumed (6.6x)**; budgets 1000 / 250 ms.
   Not done: the **mesh** replay (`rebuild()`) still runs in full and is now the dominant cost of an edit (it needs the `ReplayState`
   refactor of the T4 row); a per-part cache is not yet held by the sidecar (adapter work).
+
+- 2026-11-04 (lane cad, branch cc/cad-1): **T4 mesh half built.** `rebuild(history, { cache })` with `RebuildCache` / `newRebuildCache()`
+  (`cad/history.ts`): the mesh replay state (bodies, sketches, work planes, the tool/extrusion/revolution/sweep tables later features read,
+  states, lineage, last writers, looks, failure roots and the features' own issues) is checkpointed at every feature boundary under
+  `meshStageFingerprints` (bases + feature JSON + parameter values and errors each feature reads + timeline state; `cad/history-brep.ts`,
+  shared `resumableBoundary` with the exact chain). The exact models the mesh replay asks for (refs, named faces, curved fillets) resume from
+  `RebuildCache.exact`. Tests (`history-incremental.test.ts`, 5 new): edit of the last of 14 features evaluates 1 feature (`lastReplayed`),
+  an unchanged history evaluates 0; middle, parameter, suppress and release edits resume at the first dirty feature; a failed feature's
+  issues are restored; a fillet by edge refs after the edit resumes its inner exact replay too; every case deep-equals the full replay
+  (meshes, issues in order, states, lineage, planes, sketches), and the two caches together equal the full exact result.
+  Open: the sidecar does not yet hold a per-part `RebuildCache` (adapter work for lane D: one cache per open part, passed to
+  `rebuild` and `rebuildExact`).

@@ -36,7 +36,7 @@ export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
 import { blendEdges, blendEdgesVariable, findEdges, selectEdges, variableCollisions } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
-import { exactReplay, type ExactReplay } from "./history-brep.ts"
+import { exactReplay, meshStageFingerprints, newExactStageCache, resumableBoundary, type ExactReplay, type ExactStageCache } from "./history-brep.ts"
 import { bodyCreator, bodyRefs, declaredNeeds, timelinePlan } from "./history-timeline.ts"
 import type { Brep } from "./brep/topology.ts"
 import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, planarFaceFrame, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
@@ -948,8 +948,48 @@ export const cornersOf = (line: ReadonlyArray<Vec2>): Vec2[] => {
 /** The message of a feature that found no body to act on. */
 const NO_BODY = "There is no body for this operation to act on"
 
-/** Replays the history from the top. Never throws: what cannot be built is in `issues`. */
-export const rebuild = (history: History): RebuildResult => {
+/**
+ * Incremental mesh replay (spec 58 T4, the mesh half; the exact half is `ExactStageCache`). The replay is sequential, so its state
+ * before feature k (bodies, sketches, work planes, the tools and profiles later features read, states, lineage and the features'
+ * issues) is a pure function of the imported bases, features 0..k-1 and the parameter values they read. The cache keeps that state at
+ * every feature boundary under the fingerprint chain `meshStageFingerprints`; the next `rebuild(history, { cache })` of an edited
+ * history restores the longest boundary whose chain still matches from the start and replays only from the first dirty feature.
+ * The result is the same as the full replay's (same bodies and meshes, issues in the same order, states, lineage). The exact
+ * models the mesh replay asks for (named faces, references, curved fillets) resume from `exact`, a cache of their own.
+ * The caller owns the cache (one per open part); the replay that uses it updates it in place.
+ */
+export interface RebuildCache {
+  /** `fingerprints[k]` identifies the bases and the first k features with everything they read. */
+  fingerprints: string[]
+  /** `states[k]` is the replay state before feature k runs (`states[n]` the state after the last one). */
+  states: Array<MeshReplayState | undefined>
+  /** The cache of the exact replay the mesh replay runs for the features that need an exact model. */
+  readonly exact: ExactStageCache
+  /** Boundary the last replay resumed from, and how many features it evaluated (reports and tests). */
+  lastResumedAt?: number
+  lastReplayed?: number
+}
+export const newRebuildCache = (): RebuildCache => ({ fingerprints: [], states: [], exact: newExactStageCache() })
+
+/** What the mesh replay holds at a feature boundary; opaque to callers. */
+export interface MeshReplayState {
+  readonly bodies: ReadonlyArray<Body>
+  readonly issues: ReadonlyArray<Issue>
+  readonly records: ReadonlyArray<ReadonlyArray<readonly [string, unknown]>>
+  readonly maps: ReadonlyArray<ReadonlyArray<readonly [string, unknown]>>
+}
+
+export interface RebuildOptions {
+  /** Resume from, and update, this cache (spec 58 T4). */
+  readonly cache?: RebuildCache
+}
+
+/**
+ * Replays the history from the top, or with `options.cache` from the first feature that changed since the cached replay. Never
+ * throws: what cannot be built is in `issues`.
+ */
+export const rebuild = (history: History, options: RebuildOptions = {}): RebuildResult => {
+  const cache = options.cache
   const issues: Issue[] = []
   const { values, errors } = resolveParameters(history.parameters)
   for (const [name, message] of Object.entries(errors)) issues.push({ feature: `parameter ${name}`, severity: "error", message })
@@ -986,7 +1026,7 @@ export const rebuild = (history: History): RebuildResult => {
   // such features replays each exact feature once instead of the whole prefix every time.
   let exactSoFar: ExactReplay | undefined
   const exactAt = (index: number) => {
-    exactSoFar ??= exactReplay(history, { bodies, parameters: values, sketches, flatPatterns, get planes() { return Object.fromEntries(planes) }, issues, states, lineage })
+    exactSoFar ??= exactReplay(history, { bodies, parameters: values, sketches, flatPatterns, get planes() { return Object.fromEntries(planes) }, issues, states, lineage }, cache === undefined ? {} : { cache: cache.exact })
     return exactSoFar.at(index, [...bodies], { budgetMs: 10_000 })
   }
   const tools = new Map<string, { readonly meshes: ReadonlyArray<Mesh>; readonly operation: Operation; readonly targets?: ReadonlyArray<string> }>()
@@ -1105,7 +1145,40 @@ export const rebuild = (history: History): RebuildResult => {
   const looks = new Map<string, Appearance>()
   // Failed and skipped features, each with the failed feature at its root.
   const broken = new Map<string, string>()
-  for (const [featureIndex, f] of history.features.entries()) {
+  // Everything a feature can leave behind for the ones after it: what a checkpoint keeps (of the issues, only the features' own).
+  const header = issues.length
+  const records: ReadonlyArray<Record<string, unknown>> = [sketches, flatPatterns, states, lineage]
+  const maps: ReadonlyArray<Map<string, unknown>> = [planes, tools, extrusions, revolutions, sweeps, lastWriter, looks, broken]
+  const saveState = (): MeshReplayState => ({
+    bodies: [...bodies], issues: issues.slice(header), records: records.map((r) => Object.entries(r)), maps: maps.map((m) => [...m])
+  })
+  const restoreState = (st: MeshReplayState): void => {
+    bodies.length = 0
+    bodies.push(...st.bodies)
+    issues.length = header
+    issues.push(...st.issues)
+    records.forEach((r, i) => {
+      for (const key of Object.keys(r)) delete r[key]
+      for (const [key, value] of st.records[i]!) r[key] = value
+    })
+    maps.forEach((m, i) => {
+      m.clear()
+      for (const [key, value] of st.maps[i]!) m.set(key, value)
+    })
+  }
+  let start = 0
+  if (cache !== undefined) {
+    const fingerprints = meshStageFingerprints(history, values, errors, plan.states)
+    start = resumableBoundary(cache.fingerprints, fingerprints, (k) => cache.states[k] !== undefined)
+    if (start > 0) restoreState(cache.states[start]!)
+    cache.fingerprints = fingerprints
+    cache.states = cache.states.slice(0, start + 1)
+    cache.lastResumedAt = start
+    cache.lastReplayed = 0
+  }
+  for (let featureIndex = start; featureIndex < history.features.length; featureIndex++) {
+    const f = history.features[featureIndex]!
+    if (cache !== undefined) { cache.states[featureIndex] = saveState(); cache.lastReplayed = (cache.lastReplayed ?? 0) + 1 }
     const planned = plan.states[f.id]!
     if (planned.state !== "active") { states[f.id] = planned.state === "suppressed-by" ? planned : { state: planned.state }; continue }
     // A feature that names a failed (or skipped) one is not built: its input is not what was designed (spec 58 T5).
@@ -2137,6 +2210,7 @@ export const rebuild = (history: History): RebuildResult => {
       if (failed) broken.set(f.id, f.id)
     }
   }
+  if (cache !== undefined) cache.states[history.features.length] = saveState()
   const dressed = bodies.map((b): Body => {
     const own = history.appearances?.[b.id], inherited = looks.get(b.id)
     const merged = own === undefined && inherited === undefined ? undefined : { ...inherited, ...own }

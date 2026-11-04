@@ -6,7 +6,8 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Feature, History } from "./history.ts"
 import { newExactStageCache, rebuildExact, type ExactRebuild } from "./history-brep.ts"
-import { rebuild } from "./history.ts"
+import { newRebuildCache, rebuild, type RebuildResult } from "./history.ts"
+import { entityRefs } from "./history-naming.ts"
 import { massProperties } from "./brep/mass.ts"
 import { topologyKeys } from "./brep/naming-keys.ts"
 import { withSuppressed } from "./history-timeline.ts"
@@ -107,5 +108,109 @@ describe("incremental exact rebuild", () => {
     const r = run(other, cache)
     expect(cache.lastResumedAt).toBe(1)
     expect(massProperties(r.exact.bodies[0]!.brep!).volume).toBeCloseTo(120 * 80 * 3, 6)
+  })
+})
+
+/** Everything a mesh rebuild returns, in a form `toEqual` compares exactly (meshes as plain arrays). */
+const meshDigest = (r: RebuildResult) => ({
+  bodies: r.bodies.map((b) => ({ id: b.id, feature: b.feature, appearance: b.appearance, positions: Array.from(b.mesh.positions), indices: Array.from(b.mesh.indices) })),
+  issues: r.issues, states: r.states, lineage: r.lineage, planes: r.planes, flatPatterns: r.flatPatterns, parameters: r.parameters,
+  sketches: Object.fromEntries(Object.entries(r.sketches).map(([id, s]) => [id, { plane: s.plane, offset: s.offset, frame: s.frame, status: s.solve.status }]))
+})
+
+describe("incremental mesh rebuild (spec 58 T4, mesh half)", () => {
+  test("editing the last hole of 14 features evaluates one feature and equals the full replay", () => {
+    const cache = newRebuildCache()
+    rebuild(model(), { cache })
+    expect(cache.lastResumedAt).toBe(0)
+    expect(cache.lastReplayed).toBe(14)
+    const edited = model({ lastDiameter: 6 })
+    const t0 = performance.now()
+    const full = rebuild(edited)
+    const t1 = performance.now()
+    const resumed = rebuild(edited, { cache })
+    const t2 = performance.now()
+    expect(cache.lastResumedAt).toBe(13)
+    expect(cache.lastReplayed).toBe(1)
+    expect(meshDigest(resumed)).toEqual(meshDigest(full))
+    console.log(`T4 mesh 14 features: full ${(t1 - t0).toFixed(0)} ms, resumed ${(t2 - t1).toFixed(0)} ms`)
+    // The same history again: nothing is evaluated.
+    const again = rebuild(edited, { cache })
+    expect(cache.lastResumedAt).toBe(14)
+    expect(cache.lastReplayed).toBe(0)
+    expect(meshDigest(again)).toEqual(meshDigest(full))
+  })
+
+  test("a middle edit, a parameter edit, a suppression and a release each resume at the first dirty feature", () => {
+    const cache = newRebuildCache()
+    rebuild(model(), { cache })
+    const cases: Array<readonly [History, number]> = [
+      [model({ midDiameter: 7 }), 7],
+      [model({ midDiameter: 7, thick: 12 }), 1],
+      [withSuppressed(model({ midDiameter: 7, thick: 12 }), ["h10"]), 12],
+      [model({ midDiameter: 7, thick: 12 }), 12]
+    ]
+    for (const [h, at] of cases) {
+      const resumed = rebuild(h, { cache })
+      expect(cache.lastResumedAt).toBe(at)
+      expect(cache.lastReplayed).toBe(14 - at)
+      expect(meshDigest(resumed)).toEqual(meshDigest(rebuild(h)))
+    }
+  })
+
+  test("failed features are restored with their issues: the resumed report equals the full one", () => {
+    // A fillet too large for the plate fails; the holes after it still build; then the last hole is edited.
+    const failing = (d: number): History => {
+      const h = model({ lastDiameter: d })
+      const f = [...h.features]
+      f.splice(2, 0, { id: "round", type: "fillet", radius: 90, edges: { parallel: "z" } } as Feature)
+      return { ...h, features: f }
+    }
+    const cache = newRebuildCache()
+    const first = rebuild(failing(4), { cache })
+    expect(first.states["round"]).toEqual({ state: "failed" })
+    const edited = failing(5)
+    const resumed = rebuild(edited, { cache })
+    expect(cache.lastResumedAt).toBe(14)
+    expect(cache.lastReplayed).toBe(1)
+    expect(resumed.issues.some((i) => i.feature === "round" && i.severity === "error")).toBe(true)
+    expect(meshDigest(resumed)).toEqual(meshDigest(rebuild(edited)))
+  })
+
+  test("a fillet by persistent reference after the edit: the inner exact replay resumes too, and the result is the full one", () => {
+    const base = model()
+    const prefix: History = { ...base, features: base.features.slice(0, 2) }
+    const refs = entityRefs(rebuildExact(prefix), "plate", ["edge"])
+      .filter((r) => /^edge\(plate\.side0\.\d,plate\.side0\.\d\)$/.test(r.key)).slice(0, 2).map((r) => `edge:${r.body}|${r.key}`)
+    expect(refs).toHaveLength(2)
+    const h = (d: number): History => ({
+      ...base,
+      features: [
+        ...base.features.slice(0, 2),
+        { id: "h0", type: "hole", plane: "XY", offset: "thick", at: [30, 40], diameter: 6, depth: "thick" } as Feature,
+        { id: "h1", type: "hole", plane: "XY", offset: "thick", at: [90, 40], diameter: d, depth: "thick" } as Feature,
+        { id: "round", type: "fillet", radius: 3, edges: { refs } } as Feature
+      ]
+    })
+    const cache = newRebuildCache()
+    const first = rebuild(h(6), { cache })
+    expect(first.issues.filter((i) => i.severity === "error")).toEqual([])
+    const resumed = rebuild(h(8), { cache })
+    expect(cache.lastResumedAt).toBe(3)
+    expect(cache.lastReplayed).toBe(2)
+    // The fillet asked for the exact model before it: that replay resumed after the unchanged prefix as well.
+    expect(cache.exact.lastResumedAt).toBe(3)
+    expect(meshDigest(resumed)).toEqual(meshDigest(rebuild(h(8))))
+  })
+
+  test("both halves together: a cached edit gives the exact result of the full replay", () => {
+    const mesh = newRebuildCache(), exact = newExactStageCache()
+    rebuildExact(model(), rebuild(model(), { cache: mesh }), { cache: exact })
+    const edited = model({ lastDiameter: 6 })
+    const resumedMesh = rebuild(edited, { cache: mesh })
+    const resumedExact = rebuildExact(edited, resumedMesh, { cache: exact })
+    expect(mesh.lastReplayed).toBe(1)
+    expect(exact.lastReplayed).toBe(1)
+    expect(digest(resumedExact)).toEqual(digest(rebuildExact(edited)))
   })
 })
