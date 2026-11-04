@@ -77,6 +77,7 @@ import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } from "./planner.ts"
 import { planPrintJob, runPrintJob } from "./print.ts"
+import { resolveOperations } from "./operation-model.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
 
@@ -303,7 +304,11 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
         rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}), ...(job.quality?.tabs !== undefined ? { tabs: job.quality.tabs } : {}), ...(breadth !== undefined ? { breadth } : {})
       })
     : undefined
-  const operations = job.operations ?? plan!.operations
+  // Disabled operations are left out and dependencies order the rest (spec 69 C6); a job that sets neither runs its list as it is.
+  const listed = job.operations ?? plan!.operations
+  const resolved = listed.some((op) => op.enabled === false || op.dependsOn !== undefined) ? resolveOperations(listed) : undefined
+  if (resolved?.status === "failed") return resolved
+  const operations = resolved?.value ?? listed
   if (operations.length === 0) return { status: "failed", issues: [issue("InvalidInput", "plan", "No operation to run: the part needs no machining or no feature could be planned"), ...(plan?.unmachined ?? []).map((m) => issue("UnsupportedCapability", "plan", m))] }
   const ids = new Set<string>()
   for (const op of operations) {

@@ -54,8 +54,15 @@ export const HoleCycleSchema = Schema.Union([
   })
 ])
 
+/** Boundary and avoid regions of an operation (`MachiningLimits`, spec 69 C7). */
+export const MachiningLimitsSchema = Schema.Struct({
+  boundary: Schema.optionalKey(ring), avoid: Schema.optionalKey(Schema.Array(ring).check(Schema.isMaxLength(200))),
+  containment: Schema.optionalKey(Schema.Literals(["edge", "centre"]))
+})
+
 const overrides = {
-  id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))), tool: id,
+  id, enabled: Schema.optionalKey(Schema.Boolean), dependsOn: Schema.optionalKey(Schema.Array(id).check(Schema.isMaxLength(200))),
+  limits: Schema.optionalKey(MachiningLimitsSchema), name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))), tool: id,
   rpm: Schema.optionalKey(positive), feed: Schema.optionalKey(positive), plungeFeed: Schema.optionalKey(positive),
   stepdown: Schema.optionalKey(positive), stepover: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
   coolant: Schema.optionalKey(CoolantSchema), radialEngagement: Schema.optionalKey(positive)

@@ -173,8 +173,26 @@ export interface ProcessOverrides {
   readonly radialEngagement?: number
 }
 
+/**
+ * Machining limits of an operation (spec 69 C7), planar regions in the coordinates the operation is given in. The toolpath is clipped
+ * after the strategy made it: a cut outside `boundary` or inside an `avoid` region becomes a lift over it, so the stock there stays.
+ * `containment` says which part of the cutter obeys the region: `edge` (default) the cutter's side, so the tool centre stays one
+ * radius inside the boundary and one radius off the avoid region; `centre` only the tool centre.
+ */
+export interface MachiningLimits {
+  readonly boundary?: ReadonlyArray<Vec2>
+  readonly avoid?: ReadonlyArray<ReadonlyArray<Vec2>>
+  readonly containment?: "edge" | "centre"
+}
+
 interface OperationBase extends ProcessOverrides {
   readonly id: string
+  /** `false` leaves the operation out of the job (spec 69 C6); absent means on. */
+  readonly enabled?: boolean
+  /** Ids of operations that must run before this one (spec 69 C6). */
+  readonly dependsOn?: ReadonlyArray<string>
+  /** Boundary and avoid regions (spec 69 C7). */
+  readonly limits?: MachiningLimits
   readonly name?: string
   /** Cutter id in the job's library. */
   readonly tool: string
