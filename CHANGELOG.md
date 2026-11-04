@@ -3,6 +3,42 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.89 (November 2026)
+
+## Core
+
+- Enhance editor synchronization and tool schemas for improved functionality
+- Blends run along rim arcs (tangent chains of lines and corner arcs)
+- Tilted work plane (3+2) per job and per setup (spec 69 C1)
+- 3+2 workplane
+- Fixture builders and the holding decision (spec 69 C3)
+- Stock carried between setups (spec 69 C4)
+- Fixture-aware non-+Z release, CAM program corpus, assembly check in 5-axis generation
+
+## Desktop
+
+- Rename features and group the timeline in the parametric panel
+
+## Sidecar
+
+- Collision report, probing and linking routes
+
+## Mobile
+
+- Implement local conversation handling for offline messages
+- Enhance assistant functionality with improved session handling and draft management
+
+## API
+
+- Update OpenAPI snapshot after merging main
+- Regenerate SDK types after merging main
+- Regenerate SDK types after main drifted
+- Regenerate SDK types (drift on main)
+
+## Documentation
+
+- Lane 2 job model status (69 C1-C7, 72 wave 1)
+
 ## v0.1.88 (November 2026)
 
 ## Core
