@@ -50,6 +50,24 @@ export interface FixtureBody {
 export type WorkOrigin = "stock-center" | "stock-corner"
 
 /**
+ * One fixing of the part inside a job (spec 69 C1): everything that can differ between the setups of the same part. `orientation` is
+ * the CAD direction facing the spindle (default `+Z`); every field but `id` is optional and means what the same field of the job means.
+ * A job without `setups` is one setup made of its own fields (`setupsOf`), so a stored v1 job loads and runs as before.
+ */
+export interface JobSetup {
+  readonly id: string
+  readonly name?: string
+  readonly orientation?: SetupOrientation
+  readonly origin?: WorkOrigin
+  readonly workOffset?: WorkOffset
+  readonly stock?: StockBox
+  readonly stockModel?: StockModel
+  readonly fixtures?: ReadonlyArray<FixtureBody>
+  /** Operations of this setup in its oriented coordinates; planned from the part when absent. */
+  readonly operations?: ReadonlyArray<OperationSpec>
+}
+
+/**
  * What a filament printer is (the fields a slicer needs): the plate, the build height, the nozzle and filament it takes, how hot
  * and how fast it goes, and the dialect of its firmware. A printer has no spindle: its `limits` carry the speed ceiling as `maxFeed`
  * (mm/min) and a spindle of 0 rpm.
@@ -155,8 +173,26 @@ export interface ProcessOverrides {
   readonly radialEngagement?: number
 }
 
+/**
+ * Machining limits of an operation (spec 69 C7), planar regions in the coordinates the operation is given in. The toolpath is clipped
+ * after the strategy made it: a cut outside `boundary` or inside an `avoid` region becomes a lift over it, so the stock there stays.
+ * `containment` says which part of the cutter obeys the region: `edge` (default) the cutter's side, so the tool centre stays one
+ * radius inside the boundary and one radius off the avoid region; `centre` only the tool centre.
+ */
+export interface MachiningLimits {
+  readonly boundary?: ReadonlyArray<Vec2>
+  readonly avoid?: ReadonlyArray<ReadonlyArray<Vec2>>
+  readonly containment?: "edge" | "centre"
+}
+
 interface OperationBase extends ProcessOverrides {
   readonly id: string
+  /** `false` leaves the operation out of the job (spec 69 C6); absent means on. */
+  readonly enabled?: boolean
+  /** Ids of operations that must run before this one (spec 69 C6). */
+  readonly dependsOn?: ReadonlyArray<string>
+  /** Boundary and avoid regions (spec 69 C7). */
+  readonly limits?: MachiningLimits
   readonly name?: string
   /** Cutter id in the job's library. */
   readonly tool: string
@@ -333,6 +369,13 @@ export interface ManufacturingJob {
   readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
+  /**
+   * Several fixings of the same part (spec 69 C1), each with its own orientation, work offset, stock, fixtures and operations. Run them with
+   * `runSetups` (`kernel/setups.ts`): `runJob` refuses a job that lists setups, because one NC cannot hold several fixings. The job's own
+   * `setupOrientation`, `origin`, `workOffset`, `stock`, `stockModel`, `fixtures` and `operations` are the one setup of a job without this list;
+   * with a list they are the defaults of a setup that does not name its own (`workOffset` and `setupOrientation` are always the setup's).
+   */
+  readonly setups?: ReadonlyArray<JobSetup>
   /** Cutter library; default `DEFAULT_CUTTERS`. */
   readonly tools?: ReadonlyArray<Cutter>
   readonly machine?: KernelMachine
