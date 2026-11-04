@@ -11,7 +11,7 @@
  * No validation properties are written. The file has not been read by a third-party AP242 reader in this repository's tests.
  */
 import { writeStepBreps, type StepWriteOptions } from "../brep/step.ts"
-import type { Brep } from "../brep/brep.ts"
+import type { Brep } from "../brep/topology.ts"
 import { pmiToStep } from "../../pmi/step-pmi.ts"
 import type { PmiSet } from "../../pmi/pmi.ts"
 
