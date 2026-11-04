@@ -1068,7 +1068,14 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   // ------------------------------------------------------------ replay of the emitted NC
   checkpoint({ stage: "replay" })
-  const lines = nc.split("\n")
+  // The vendor's cycle is not replayed: the path, stock and travel evidence reads the inline expansion in its place, and the `probing` claim says so.
+  const replayNc = ((): string => {
+    if (nativeProbes.length === 0 || nc === "") return nc
+    // Klartext has no step-level preset write and its touches read one axis: the expansion is written for its motion, and a touch it cannot word leaves the replay unresolved.
+    const motionOnly = (moves: ReadonlyArray<Move>): ReadonlyArray<Move> => (postDialect?.probing?.syntax === "heidenhain" ? moves.filter((m) => m._tag !== "OffsetUpdate") : moves)
+    try { return emitProgram({ ...program, toolpaths: program.toolpaths.map((tp) => (nativeProbes.includes(tp.id) ? { ...tp, moves: motionOnly(withoutNativeMarks(tp.moves)) } : tp)) }) } catch { return "" }
+  })()
+  const lines = replayNc.split("\n")
   const toolAtLine: Array<number | undefined> = new Array(lines.length + 2)
   const opAtLine: Array<number | undefined> = new Array(lines.length + 2)
   let activeTool: number | undefined, activeOp: number | undefined
@@ -1101,8 +1108,6 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // A probe program reads where the probe touched: its macros run against the part as drawn, and its touches come back as moves ending at the contact.
   const probeDevice = probePlans.length === 0 ? undefined : machine.probing?.probes.find((p) => p.id === probePlans[0]!.op.tool)
   const probeHost = probeDevice === undefined ? undefined : probeReplayHost(prepared, postDialect, job.post?.options?.probing, probeDevice)
-  // The vendor's cycle is not replayed: the path, stock and travel evidence reads the inline expansion in its place, and the `probing` claim says so.
-  const replayNc = nativeProbes.length === 0 || nc === "" ? nc : emitProgram({ ...program, toolpaths: program.toolpaths.map((tp) => nativeProbes.includes(tp.id) ? { ...tp, moves: withoutNativeMarks(tp.moves) } : tp) })
   const read = replayNc === "" ? undefined : interpretGcode(replayNc, { start: initial, ...(probeHost !== undefined ? { probeMoves: true, macroHost: probeHost.expand } : {}), toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: postDialect?.dwell ?? "seconds", okuma: post.id === "okuma", ...(tipWords !== undefined ? { tipControl: tipWords } : {}) })
   // Spec 72 step 0.2: motions read under the control's tool-centre-point mode are the tip in part coordinates. Every check below reads machine
   // coordinates with the angles in force, so they are carried across once, here, through the machine's table (or the caller's kinematics).

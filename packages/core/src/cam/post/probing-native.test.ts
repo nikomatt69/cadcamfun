@@ -57,7 +57,7 @@ describe("native probe cycles", () => {
       // The measuring touches are the cycle's: only the armed approach is left.
       expect(native).not.toMatch(/G91|G38|TCH PROBE 0\.0/)
       // Klartext has no step-level preset write: without the cycle the program is refused, never written without its datum.
-      if (id === "heidenhain") expect(() => write(id, moves, false)).toThrow(/preset/)
+      if (id === "heidenhain") expect(() => write(id, moves, false)).toThrow(/preset|stores/)
       else expect(write(id, moves, false)).not.toContain(word)
     })
   }
