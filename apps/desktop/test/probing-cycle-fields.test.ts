@@ -25,5 +25,5 @@ test("angles are degrees in the editor and radians in the core; a round trip kee
 test("the core refuses what it refuses: a negative diameter, a missing figure", () => {
   expect(cycleOfSpec(setPath(defaultSpecOf("bore"), "diameter", -5)).ok).toBe(false)
   expect(cycleOfSpec(setPath(defaultSpecOf("bore"), "depth", undefined)).ok).toBe(false)
-  expect(setPath({ a: { b: 1 } }, "a.c", 2)).toEqual({ a: { b: 1, c: 2 } })
+  expect(setPath<Record<string, unknown>>({ a: { b: 1 } }, "a.c", 2)).toEqual({ a: { b: 1, c: 2 } })
 })
