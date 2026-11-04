@@ -10,6 +10,7 @@ import { ProjectToolpathsGroup, ToolpathExtrasGroup, ToolpathsGroup } from "./gr
 import { ToolpathGeneratorGroup } from "./groups/toolpath-generator.ts"
 import { CadExactGroup } from "./groups/cad-exact.ts"
 import { CamSetupGroup } from "./groups/cam-setup.ts"
+import { CamProbingGroup } from "./groups/cam-probing.ts"
 import { LibraryGroup } from "./groups/library.ts"
 import { ProjectsGroup } from "./projects.ts"
 import { HealthGroup, SystemGroup } from "./system.ts"
@@ -86,6 +87,8 @@ export * from "./groups/toolpaths.ts"
 export * from "./groups/toolpath-generator.ts"
 export * from "./groups/cad-exact.ts"
 export * from "./groups/cam-setup.ts"
+export * from "./groups/cam-probing.ts"
+export * from "./cam-probing.ts"
 export * from "./groups/library.ts"
 export * from "./component-data.ts"
 export * from "./groups/machine-configs.ts"
@@ -125,6 +128,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(ToolpathGeneratorGroup.middleware(Authorization))
   .add(CadExactGroup.middleware(Authorization))
   .add(CamSetupGroup.middleware(Authorization))
+  .add(CamProbingGroup.middleware(Authorization))
   .add(LibraryGroup.middleware(Authorization))
   .add(ProjectToolpathsGroup.middleware(Authorization))
   .add(VcsGroup.middleware(Authorization))
