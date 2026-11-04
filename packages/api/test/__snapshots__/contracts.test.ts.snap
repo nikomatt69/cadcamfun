@@ -20705,69 +20705,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "properties": {
                                               "_tag": {
                                                 "enum": [
-                                                  "Spline",
-                                                ],
-                                                "type": "string",
-                                              },
-                                              "controls": {
-                                                "items": {
-                                                  "additionalProperties": false,
-                                                  "properties": {
-                                                    "x": {
-                                                      "type": "number",
-                                                    },
-                                                    "y": {
-                                                      "type": "number",
-                                                    },
-                                                  },
-                                                  "required": [
-                                                    "x",
-                                                    "y",
-                                                  ],
-                                                  "type": "object",
-                                                },
-                                                "maxItems": 2,
-                                                "minItems": 1,
-                                                "type": "array",
-                                              },
-                                              "feed": {
-                                                "exclusiveMinimum": 0,
-                                                "type": "number",
-                                              },
-                                              "to": {
-                                                "additionalProperties": false,
-                                                "properties": {
-                                                  "x": {
-                                                    "type": "number",
-                                                  },
-                                                  "y": {
-                                                    "type": "number",
-                                                  },
-                                                  "z": {
-                                                    "type": "number",
-                                                  },
-                                                },
-                                                "required": [
-                                                  "x",
-                                                  "y",
-                                                  "z",
-                                                ],
-                                                "type": "object",
-                                              },
-                                            },
-                                            "required": [
-                                              "_tag",
-                                              "to",
-                                              "controls",
-                                              "feed",
-                                            ],
-                                            "type": "object",
-                                          },
-                                          {
-                                            "additionalProperties": false,
-                                            "properties": {
-                                              "_tag": {
-                                                "enum": [
                                                   "Dwell",
                                                 ],
                                                 "type": "string",
@@ -66804,69 +66741,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "properties": {
                                               "_tag": {
                                                 "enum": [
-                                                  "Spline",
-                                                ],
-                                                "type": "string",
-                                              },
-                                              "controls": {
-                                                "items": {
-                                                  "additionalProperties": false,
-                                                  "properties": {
-                                                    "x": {
-                                                      "type": "number",
-                                                    },
-                                                    "y": {
-                                                      "type": "number",
-                                                    },
-                                                  },
-                                                  "required": [
-                                                    "x",
-                                                    "y",
-                                                  ],
-                                                  "type": "object",
-                                                },
-                                                "maxItems": 2,
-                                                "minItems": 1,
-                                                "type": "array",
-                                              },
-                                              "feed": {
-                                                "exclusiveMinimum": 0,
-                                                "type": "number",
-                                              },
-                                              "to": {
-                                                "additionalProperties": false,
-                                                "properties": {
-                                                  "x": {
-                                                    "type": "number",
-                                                  },
-                                                  "y": {
-                                                    "type": "number",
-                                                  },
-                                                  "z": {
-                                                    "type": "number",
-                                                  },
-                                                },
-                                                "required": [
-                                                  "x",
-                                                  "y",
-                                                  "z",
-                                                ],
-                                                "type": "object",
-                                              },
-                                            },
-                                            "required": [
-                                              "_tag",
-                                              "to",
-                                              "controls",
-                                              "feed",
-                                            ],
-                                            "type": "object",
-                                          },
-                                          {
-                                            "additionalProperties": false,
-                                            "properties": {
-                                              "_tag": {
-                                                "enum": [
                                                   "Dwell",
                                                 ],
                                                 "type": "string",
@@ -79842,69 +79716,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "properties": {
                                         "_tag": {
                                           "enum": [
-                                            "Spline",
-                                          ],
-                                          "type": "string",
-                                        },
-                                        "controls": {
-                                          "items": {
-                                            "additionalProperties": false,
-                                            "properties": {
-                                              "x": {
-                                                "type": "number",
-                                              },
-                                              "y": {
-                                                "type": "number",
-                                              },
-                                            },
-                                            "required": [
-                                              "x",
-                                              "y",
-                                            ],
-                                            "type": "object",
-                                          },
-                                          "maxItems": 2,
-                                          "minItems": 1,
-                                          "type": "array",
-                                        },
-                                        "feed": {
-                                          "exclusiveMinimum": 0,
-                                          "type": "number",
-                                        },
-                                        "to": {
-                                          "additionalProperties": false,
-                                          "properties": {
-                                            "x": {
-                                              "type": "number",
-                                            },
-                                            "y": {
-                                              "type": "number",
-                                            },
-                                            "z": {
-                                              "type": "number",
-                                            },
-                                          },
-                                          "required": [
-                                            "x",
-                                            "y",
-                                            "z",
-                                          ],
-                                          "type": "object",
-                                        },
-                                      },
-                                      "required": [
-                                        "_tag",
-                                        "to",
-                                        "controls",
-                                        "feed",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "_tag": {
-                                          "enum": [
                                             "Dwell",
                                           ],
                                           "type": "string",
@@ -80947,18 +80758,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -80967,65 +80766,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -81090,18 +80830,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -81110,65 +80838,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -81293,18 +80962,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -81316,65 +80973,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -81561,18 +81159,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -81597,65 +81183,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "leadRadius": {
                               "exclusiveMinimum": 0,
                               "type": "number",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "loop": {
                               "items": {
@@ -81798,21 +81325,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
                             "diameter": {
                               "exclusiveMinimum": 0,
                               "type": "number",
-                            },
-                            "enabled": {
-                              "type": "boolean",
                             },
                             "feed": {
                               "exclusiveMinimum": 0,
@@ -81822,65 +81337,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -82140,18 +81596,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 },
                               ],
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -82160,65 +81604,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -82318,21 +81703,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
                             "diameter": {
                               "exclusiveMinimum": 0,
                               "type": "number",
-                            },
-                            "enabled": {
-                              "type": "boolean",
                             },
                             "feed": {
                               "exclusiveMinimum": 0,
@@ -82349,65 +81722,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "length": {
                               "exclusiveMinimum": 0,
                               "type": "number",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -82480,21 +81794,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
                             "depth": {
                               "exclusiveMinimum": 0,
                               "type": "number",
-                            },
-                            "enabled": {
-                              "type": "boolean",
                             },
                             "feed": {
                               "exclusiveMinimum": 0,
@@ -82504,65 +81806,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "name": {
                               "maxLength": 120,
@@ -82663,18 +81906,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -82683,65 +81914,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "loops": {
                               "items": {
@@ -82885,18 +82057,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -82905,65 +82065,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maxLength": 80,
                               "minLength": 1,
                               "type": "string",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "mode": {
                               "enum": [
@@ -83052,18 +82153,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
-                            "dependsOn": {
-                              "items": {
-                                "maxLength": 80,
-                                "minLength": 1,
-                                "type": "string",
-                              },
-                              "maxItems": 200,
-                              "type": "array",
-                            },
-                            "enabled": {
-                              "type": "boolean",
-                            },
                             "feed": {
                               "exclusiveMinimum": 0,
                               "type": "number",
@@ -83077,65 +82166,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "maximum": 85,
                               "minimum": -85,
                               "type": "number",
-                            },
-                            "limits": {
-                              "additionalProperties": false,
-                              "properties": {
-                                "avoid": {
-                                  "items": {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "x": {
-                                          "type": "number",
-                                        },
-                                        "y": {
-                                          "type": "number",
-                                        },
-                                      },
-                                      "required": [
-                                        "x",
-                                        "y",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "maxItems": 20000,
-                                    "minItems": 3,
-                                    "type": "array",
-                                  },
-                                  "maxItems": 200,
-                                  "type": "array",
-                                },
-                                "boundary": {
-                                  "items": {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "x": {
-                                        "type": "number",
-                                      },
-                                      "y": {
-                                        "type": "number",
-                                      },
-                                    },
-                                    "required": [
-                                      "x",
-                                      "y",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  "maxItems": 20000,
-                                  "minItems": 3,
-                                  "type": "array",
-                                },
-                                "containment": {
-                                  "enum": [
-                                    "edge",
-                                    "centre",
-                                  ],
-                                  "type": "string",
-                                },
-                              },
-                              "type": "object",
                             },
                             "mode": {
                               "enum": [
@@ -83639,10 +82669,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "minimum": 1,
                           "type": "integer",
                         },
-                        "formRadius": {
-                          "exclusiveMinimum": 0,
-                          "type": "number",
-                        },
                         "headHeight": {
                           "exclusiveMinimum": 0,
                           "type": "number",
@@ -83708,10 +82734,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "boringbar",
                             "tslot",
                             "dovetail",
-                            "tapered",
-                            "lollipop",
-                            "barrel",
-                            "lens",
                           ],
                           "type": "string",
                         },
@@ -84893,69 +83915,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                 "to",
                                                 "center",
                                                 "clockwise",
-                                                "feed",
-                                              ],
-                                              "type": "object",
-                                            },
-                                            {
-                                              "additionalProperties": false,
-                                              "properties": {
-                                                "_tag": {
-                                                  "enum": [
-                                                    "Spline",
-                                                  ],
-                                                  "type": "string",
-                                                },
-                                                "controls": {
-                                                  "items": {
-                                                    "additionalProperties": false,
-                                                    "properties": {
-                                                      "x": {
-                                                        "type": "number",
-                                                      },
-                                                      "y": {
-                                                        "type": "number",
-                                                      },
-                                                    },
-                                                    "required": [
-                                                      "x",
-                                                      "y",
-                                                    ],
-                                                    "type": "object",
-                                                  },
-                                                  "maxItems": 2,
-                                                  "minItems": 1,
-                                                  "type": "array",
-                                                },
-                                                "feed": {
-                                                  "exclusiveMinimum": 0,
-                                                  "type": "number",
-                                                },
-                                                "to": {
-                                                  "additionalProperties": false,
-                                                  "properties": {
-                                                    "x": {
-                                                      "type": "number",
-                                                    },
-                                                    "y": {
-                                                      "type": "number",
-                                                    },
-                                                    "z": {
-                                                      "type": "number",
-                                                    },
-                                                  },
-                                                  "required": [
-                                                    "x",
-                                                    "y",
-                                                    "z",
-                                                  ],
-                                                  "type": "object",
-                                                },
-                                              },
-                                              "required": [
-                                                "_tag",
-                                                "to",
-                                                "controls",
                                                 "feed",
                                               ],
                                               "type": "object",
@@ -86534,69 +85493,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "to",
                                         "center",
                                         "clockwise",
-                                        "feed",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "_tag": {
-                                          "enum": [
-                                            "Spline",
-                                          ],
-                                          "type": "string",
-                                        },
-                                        "controls": {
-                                          "items": {
-                                            "additionalProperties": false,
-                                            "properties": {
-                                              "x": {
-                                                "type": "number",
-                                              },
-                                              "y": {
-                                                "type": "number",
-                                              },
-                                            },
-                                            "required": [
-                                              "x",
-                                              "y",
-                                            ],
-                                            "type": "object",
-                                          },
-                                          "maxItems": 2,
-                                          "minItems": 1,
-                                          "type": "array",
-                                        },
-                                        "feed": {
-                                          "exclusiveMinimum": 0,
-                                          "type": "number",
-                                        },
-                                        "to": {
-                                          "additionalProperties": false,
-                                          "properties": {
-                                            "x": {
-                                              "type": "number",
-                                            },
-                                            "y": {
-                                              "type": "number",
-                                            },
-                                            "z": {
-                                              "type": "number",
-                                            },
-                                          },
-                                          "required": [
-                                            "x",
-                                            "y",
-                                            "z",
-                                          ],
-                                          "type": "object",
-                                        },
-                                      },
-                                      "required": [
-                                        "_tag",
-                                        "to",
-                                        "controls",
                                         "feed",
                                       ],
                                       "type": "object",
@@ -88608,69 +87504,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "properties": {
                                       "_tag": {
                                         "enum": [
-                                          "Spline",
-                                        ],
-                                        "type": "string",
-                                      },
-                                      "controls": {
-                                        "items": {
-                                          "additionalProperties": false,
-                                          "properties": {
-                                            "x": {
-                                              "type": "number",
-                                            },
-                                            "y": {
-                                              "type": "number",
-                                            },
-                                          },
-                                          "required": [
-                                            "x",
-                                            "y",
-                                          ],
-                                          "type": "object",
-                                        },
-                                        "maxItems": 2,
-                                        "minItems": 1,
-                                        "type": "array",
-                                      },
-                                      "feed": {
-                                        "exclusiveMinimum": 0,
-                                        "type": "number",
-                                      },
-                                      "to": {
-                                        "additionalProperties": false,
-                                        "properties": {
-                                          "x": {
-                                            "type": "number",
-                                          },
-                                          "y": {
-                                            "type": "number",
-                                          },
-                                          "z": {
-                                            "type": "number",
-                                          },
-                                        },
-                                        "required": [
-                                          "x",
-                                          "y",
-                                          "z",
-                                        ],
-                                        "type": "object",
-                                      },
-                                    },
-                                    "required": [
-                                      "_tag",
-                                      "to",
-                                      "controls",
-                                      "feed",
-                                    ],
-                                    "type": "object",
-                                  },
-                                  {
-                                    "additionalProperties": false,
-                                    "properties": {
-                                      "_tag": {
-                                        "enum": [
                                           "Dwell",
                                         ],
                                         "type": "string",
@@ -89873,28 +88706,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "facemill",
                         ],
                         "type": "string",
-                      },
-                      "profile": {
-                        "items": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "r": {
-                              "minimum": 0,
-                              "type": "number",
-                            },
-                            "z": {
-                              "type": "number",
-                            },
-                          },
-                          "required": [
-                            "r",
-                            "z",
-                          ],
-                          "type": "object",
-                        },
-                        "maxItems": 20000,
-                        "minItems": 2,
-                        "type": "array",
                       },
                       "shankDiameter": {
                         "exclusiveMinimum": 0,
@@ -93326,69 +92137,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                     "to",
                                                     "center",
                                                     "clockwise",
-                                                    "feed",
-                                                  ],
-                                                  "type": "object",
-                                                },
-                                                {
-                                                  "additionalProperties": false,
-                                                  "properties": {
-                                                    "_tag": {
-                                                      "enum": [
-                                                        "Spline",
-                                                      ],
-                                                      "type": "string",
-                                                    },
-                                                    "controls": {
-                                                      "items": {
-                                                        "additionalProperties": false,
-                                                        "properties": {
-                                                          "x": {
-                                                            "type": "number",
-                                                          },
-                                                          "y": {
-                                                            "type": "number",
-                                                          },
-                                                        },
-                                                        "required": [
-                                                          "x",
-                                                          "y",
-                                                        ],
-                                                        "type": "object",
-                                                      },
-                                                      "maxItems": 2,
-                                                      "minItems": 1,
-                                                      "type": "array",
-                                                    },
-                                                    "feed": {
-                                                      "exclusiveMinimum": 0,
-                                                      "type": "number",
-                                                    },
-                                                    "to": {
-                                                      "additionalProperties": false,
-                                                      "properties": {
-                                                        "x": {
-                                                          "type": "number",
-                                                        },
-                                                        "y": {
-                                                          "type": "number",
-                                                        },
-                                                        "z": {
-                                                          "type": "number",
-                                                        },
-                                                      },
-                                                      "required": [
-                                                        "x",
-                                                        "y",
-                                                        "z",
-                                                      ],
-                                                      "type": "object",
-                                                    },
-                                                  },
-                                                  "required": [
-                                                    "_tag",
-                                                    "to",
-                                                    "controls",
                                                     "feed",
                                                   ],
                                                   "type": "object",
