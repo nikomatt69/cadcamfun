@@ -71,6 +71,8 @@ import {
 } from "./contracts.ts"
 import { DEFAULT_CUTTERS, cutterIssues, legacyTool, verifyTool, type Cutter } from "./cutters.ts"
 import { cuttingData, type CutClass, type CuttingData } from "./cutting-data.ts"
+import { optimizeFeeds } from "./feed-optimise.ts"
+import { buildProcessReport, type FeedOperationReport } from "./process-report.ts"
 import { digestOf, sha256 } from "./identity.ts"
 import { DEFAULT_MACHINE } from "./machines.ts"
 import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
@@ -548,6 +550,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   /** Material the program leaves standing on purpose (profile tabs): within `radius` of the stretch of path, up to `z` (work Z). */
   const declaredLeft: Array<{ readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>; readonly radius: number; readonly z: number }> = []
   const outcomes: OperationOutcome[] = []
+  const feedReports: FeedOperationReport[] = []
   const toolpaths: Toolpath[] = []
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
@@ -822,7 +825,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     }
     if (tp === undefined || !cuts(tp)) { fail("EmptyToolpath", `${op.id}: the strategy produced no cutting move${generated.warnings.length > 0 ? ` (${generated.warnings.join("; ")})` : ""}`, data); return }
     // The marker comment ties every NC block to its operation in the replay.
-    const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...tp.moves] }
+    // Per-move feed optimisation (spec 61 Z3) on the stock the earlier operations left: plain 3-axis motion only, never rotary moves or canned cycles.
+    let cutMoves = tp.moves
+    const feedMode = job.process?.feedOptimisation ?? "off"
+    if (feedMode !== "off") {
+      if (tp.moves.some((m) => m._tag === "Cycle" || m._tag === "CycleBegin" || ((m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined) || m._tag === "CutterComp")) {
+        warnings.push(`${op.id}: feed optimisation skipped (canned cycles, compensation or rotary moves in this operation)`)
+      } else {
+        const optimised = optimizeFeeds({ moves: tp.moves, stock: provisional, cutter: tool, material, machine: machine.limits, rpm, mode: feedMode })
+        cutMoves = optimised.moves
+        feedReports.push({ operation: op.id, report: optimised.report })
+      }
+    }
+    const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...cutMoves] }
     // Provisional stock: what this operation removes, so the next one enters from the right height.
     const replay = pathFromProgram(makeProgram("provisional", [marked]), { x: 0, y: 0, z: CLEARANCE })
     if (marked.moves.some((m) => (m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined)) {
@@ -1510,7 +1525,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...planNotes(prepared), ...subprogramNotes(nc)],
-      tolerance
+      tolerance,
+      ...(job.process !== undefined ? { process: buildProcessReport({ request: job.process, program, operations: finalOutcomes, tools: usedTools, material, rapidFeed: machine.rapidFeed ?? 10000, toolChangeSeconds: machine.toolChangeSeconds ?? 8, feedReports }) } : {})
     }
   }
 }

@@ -57,5 +57,6 @@ export { hullDistance, cylinderPrism, boxVertices, type HullDistance } from "./c
 export * from "./engagement.ts"
 export * from "./feed-optimise.ts"
 export * from "./process.ts"
+export * from "./process-report.ts"
 export * from "./cycle-time.ts"
 export * from "./setups.ts"
