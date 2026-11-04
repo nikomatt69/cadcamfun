@@ -69,8 +69,11 @@ export class ProbeReportRepo extends Context.Service<ProbeReportRepo, {
   /** Newest first; `before` is an ISO `createdAt` cursor (exclusive). */
   list(projectId: string, f: { toolpathId?: string | undefined; limit: number; before?: string | undefined }): Effect.Effect<ProbeReportSummaryRow[], DatabaseError>
   get(projectId: string, reportId: string): Effect.Effect<ProbeReportRow | undefined, DatabaseError>
-  /** Writes the report and prunes that operation's history down to `PROBE_REPORTS_KEPT`, in one transaction. */
-  create(projectId: string, userId: string, input: NewProbeReportRow): Effect.Effect<ProbeReportRow, DatabaseError>
+  /**
+   * Writes the report and prunes that operation's history down to `PROBE_REPORTS_KEPT`, in one transaction. A toolpath or drawing
+   * of another project is refused (nothing written): a report must not point across projects.
+   */
+  create(projectId: string, userId: string, input: NewProbeReportRow): Effect.Effect<ProbeReportRow | { refused: string }, DatabaseError>
   remove(projectId: string, reportId: string): Effect.Effect<boolean, DatabaseError>
   /** The latest report of a probe operation (what `cam review` and the panel show as its verdict). */
   latestFor(projectId: string, toolpathId: string): Effect.Effect<ProbeReportRow | undefined, DatabaseError>
@@ -94,6 +97,15 @@ export class ProbeReportRepo extends Context.Service<ProbeReportRepo, {
         return row ? rowOf(row) : undefined
       }),
       create: (projectId, userId, input) => query("probeReports.create", (db) => commitMutation(db, "probeReports.create", (tx) => {
+        const refused = (reason: string) => ({ result: { refused: reason } as ProbeReportRow | { refused: string }, changed: false })
+        if (input.toolpathId) {
+          const owner = tx.select({ projectId: schema.toolpathTable.projectId }).from(schema.toolpathTable).where(eq(schema.toolpathTable.id, input.toolpathId)).get()
+          if (owner?.projectId !== projectId) return refused(`Probe operation ${input.toolpathId} is not in this project`)
+        }
+        if (input.drawingId) {
+          const owner = tx.select({ projectId: schema.drawingTable.projectId }).from(schema.drawingTable).where(eq(schema.drawingTable.id, input.drawingId)).get()
+          if (owner?.projectId !== projectId) return refused(`Drawing ${input.drawingId} is not in this project`)
+        }
         // createdAt is strictly increasing per project so the list order and the `before` cursor never tie.
         const last = tx.select({ at: T.createdAt }).from(T).where(eq(T.projectId, projectId)).orderBy(desc(T.createdAt)).limit(1).get()
         const createdAt = new Date(Math.max(Date.now(), (last?.at.getTime() ?? 0) + 1))
@@ -110,8 +122,8 @@ export class ProbeReportRepo extends Context.Service<ProbeReportRepo, {
             .orderBy(desc(T.createdAt), desc(T.id)).limit(PROBE_REPORTS_KEPT).all().map((r) => r.id)
           tx.delete(T).where(and(eq(T.projectId, projectId), eq(T.toolpathId, saved.toolpathId), notInArray(T.id, keep))).run()
         }
-        return { result: rowOf(saved), resourceId: saved.id, revision: saved.createdAt.toISOString() }
-      })).pipe(Effect.tap(() => announce(projectId))),
+        return { result: rowOf(saved) as ProbeReportRow | { refused: string }, resourceId: saved.id, revision: saved.createdAt.toISOString() }
+      })).pipe(Effect.tap((row) => "refused" in row ? Effect.void : announce(projectId))),
       remove: (projectId, reportId) => query("probeReports.remove", (db) => commitMutation(db, "probeReports.remove", (tx) => {
         const row = tx.delete(T).where(and(eq(T.projectId, projectId), inArray(T.id, [reportId]))).returning({ id: T.id }).get()
         return { result: row !== undefined, resourceId: reportId, changed: row !== undefined }

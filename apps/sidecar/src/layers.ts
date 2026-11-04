@@ -24,6 +24,8 @@ import { ToolpathLibrary } from "./repos/toolpath-library.ts"
 import { ToolpathGeneratorHandlers } from "./http/toolpath-generator.ts"
 import { CadExactHandlers } from "./http/cad-exact.ts"
 import { CamSetupHandlers } from "./http/cam-setup.ts"
+import { CamProbingHandlers } from "./http/cam-probing.ts"
+import { Probing } from "./services/probing.ts"
 import { ToolpathRepo } from "./repos/toolpath-repo.ts"
 import { LibraryHandlers } from "./http/library.ts"
 import { LibraryRepo } from "./repos/library-repo.ts"
@@ -100,7 +102,7 @@ const AccountHandlers = Layer.mergeAll(AuthHandlers, UserHandlers, Organizations
 const ProjectHandlers = Layer.mergeAll(ProjectsHandlers, AnalyticsHandlers, ProductionCostsHandlers)
 const ResourceHandlers = Layer.mergeAll(MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, LibraryHandlers)
 const CadHandlers = Layer.mergeAll(DrawingsHandlers, PmiHandlers, ComponentsHandlers, CadExactHandlers)
-const CamHandlers = Layer.mergeAll(ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CamSetupHandlers, ProjectToolpathsHandlers)
+const CamHandlers = Layer.mergeAll(ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CamSetupHandlers, CamProbingHandlers, ProjectToolpathsHandlers)
 const IntegrationHandlers = Layer.mergeAll(PluginsHandlers, McpHandlers, AiHandlers, CompanionHandlers, VcsHandlers, CloudHandlers)
 
 /** Every group handler. */
@@ -155,9 +157,11 @@ const IdentityLive = Identity.layer.pipe(Layer.provide(AuthRepo.layer))
 
 const AccountServices = Layer.mergeAll(AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, IdentityLive, UserRepo.layer, OrganizationRepo.layer, ConversationRepo.layer, NotificationRepo.layer, BillingRepo.layer, PaymentProvider.layer)
 const ProjectServices = Layer.mergeAll(ProjectRepo.layer, AnalyticsRepo.layer, ProductionCostRepo.layer, CostService.layer)
-const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, CamSetupRepo.layer, ProbeReportRepo.layer,
-  // Work offsets and probe configuration are slices of the machine configuration (spec 73), over the same repository.
-  WorkOffsetStore.layer.pipe(Layer.provide(MachineConfigRepo.layer)))
+/** Work offsets and probe configuration are slices of the machine configuration (spec 73), over the same repository. */
+const WorkOffsetStoreLive = WorkOffsetStore.layer.pipe(Layer.provide(MachineConfigRepo.layer))
+/** The probing service the HTTP group and the assistant share; its repositories are the app's own (layers are memoised). */
+const ProbingLive = Probing.layer.pipe(Layer.provide(Layer.mergeAll(WorkOffsetStoreLive, ProbeReportRepo.layer, ProjectRepo.layer, MachineConfigRepo.layer)))
+const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, CamSetupRepo.layer, ProbeReportRepo.layer, WorkOffsetStoreLive, ProbingLive)
 const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
 const PlatformServices = Layer.mergeAll(StorageService.layer, FileRepo.layer, MiscRepo.layer, KvStore.layer, LiveEvents.layer, AssistantTurns.layer)
 const IntegrationServices = Layer.mergeAll(
@@ -184,7 +188,7 @@ export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(L
 export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
-  Api.groups.drawings, Api.groups.pmi, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.camSetup, Api.groups.projectToolpaths, Api.groups.library,
+  Api.groups.drawings, Api.groups.pmi, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.camSetup, Api.groups.camProbing, Api.groups.projectToolpaths, Api.groups.library,
   Api.groups.organizations, Api.groups.conversations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace, Api.groups.cloud
 ) {}
 

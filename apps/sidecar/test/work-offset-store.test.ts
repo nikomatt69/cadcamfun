@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Database, schema } from "@cadcamfun/db"
-import { Effect, Layer } from "effect"
+import { Effect, Fiber, Layer, Stream } from "effect"
+import { LiveEvents } from "../src/services/live-events.ts"
 import { MachineConfigRepo } from "../src/repos/machine-config-repo.ts"
 import { WorkOffsetStore, workOffsetTableOf } from "../src/repos/work-offset-store.ts"
 
@@ -84,4 +85,21 @@ test("probe config: slices replace, null removes, omitted keeps", async () => {
   expect(out.first).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: null, rotaryCalibration: null })
   expect(out.put).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: { kind: "contact", triggerZ: -400 }, rotaryCalibration: { at: "2026-11-04" } })
   expect(out.removed).toMatchObject({ probing: null, toolSetter: { kind: "contact" } })
+})
+
+test("a work-offset write announces resources.changed to the owner; a refused one announces nothing", async () => {
+  const frames = await Effect.runPromise(Effect.scoped(Effect.gen(function*() {
+    const ids = yield* seed
+    const store = yield* WorkOffsetStore
+    const events = yield* LiveEvents
+    // The bus replays recent frames to a new subscriber: the two machines the seed created are frames 1 and 2.
+    const source = yield* events.subscribe({ types: ["resources.changed"] })
+    const collected = yield* Effect.forkDetach(Stream.runCollect(source.pipe(Stream.interruptWhen(Effect.sleep("400 millis")))))
+    yield* store.put(ids.stranger, ids.machine, { entries: {} })
+    yield* store.put(ids.owner, ids.machine, { entries: { G55: { x: 1, y: 2, z: 3 } } })
+    yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: { kind: "laser" } })
+    return { got: yield* Fiber.join(collected), owner: ids.owner }
+  }).pipe(Effect.provide(layer()), Effect.provide(LiveEvents.layer))))
+  expect(frames.got).toHaveLength(4)
+  expect(frames.got.every((f) => f.type === "resources.changed" && f.userId === frames.owner)).toBe(true)
 })
