@@ -82,7 +82,7 @@ export const OperationSpecSchema = Schema.Union([
     ...overrides, strategy: Schema.Literal("surface"), mode: Schema.Literals(SURFACE_MODES),
     slopeAngle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 }))),
     allowance: Schema.optionalKey(nonNegative), scallop: Schema.optionalKey(positive), clearing: Schema.optionalKey(Schema.Literals(["contour", "adaptive"])),
-    angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id), center: Schema.optionalKey(point)
+    angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id), center: Schema.optionalKey(point), contact: Schema.optionalKey(Schema.Literals(["heightfield", "mesh"]))
   }),
   Schema.Struct({
     ...overrides, strategy: Schema.Literal("multiaxis"), mode: Schema.optionalKey(MultiaxisStrategySchema), top: Schema.Finite, stepover: positive,

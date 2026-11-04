@@ -798,7 +798,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (op.restFrom !== undefined && restTool === undefined) { fail("UnknownTool", `${op.id}: rest-from cutter '${op.restFrom}' is not in the library`, data); return }
           const params = decode(SurfaceParams, {
             ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" || op.mode === "rest" ? 0 : (op.scallop ?? prepared.scallop),
-            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
+            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), ...(op.contact !== undefined ? { contact: op.contact } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
             rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), clearing: op.clearing ?? "adaptive", engagement: Math.max(1, Math.min(50, stepover)),
             ...(restTool !== undefined ? { restFrom: { diameter: restTool.diameter, kind: legacyTool(restTool).kind, ...(restTool.kind === "bull" && restTool.cornerRadius !== undefined ? { tipRadius: restTool.cornerRadius } : {}) } } : {})
           })

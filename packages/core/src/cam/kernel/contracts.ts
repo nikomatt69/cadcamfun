@@ -215,7 +215,7 @@ export type OperationSpec =
    * 3D strategies over the part's surface. Finishing: `parallel` raster, `waterline` constant Z, `steep-shallow` (waterline on walls,
    * raster on flats), `scallop` (constant 3D stepover), `spiral` / `radial` about `center`, `flat` (horizontal faces at their height).
    */
-  | (OperationBase & { readonly strategy: "surface"; readonly mode: SurfaceMode; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string; readonly center?: Vec2 })
+  | (OperationBase & { readonly strategy: "surface"; readonly mode: SurfaceMode; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string; readonly center?: Vec2; /** Tool contact: the sampled height field (default) or exact contact against the part triangles (spec 69 F1). */ readonly contact?: "heightfield" | "mesh" })
   /**
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.

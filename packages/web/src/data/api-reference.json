@@ -65836,6 +65836,13 @@
                                 "y"
                               ],
                               "additionalProperties": false
+                            },
+                            "contact": {
+                              "type": "string",
+                              "enum": [
+                                "heightfield",
+                                "mesh"
+                              ]
                             }
                           },
                           "required": [
@@ -66096,7 +66103,11 @@
                             "countersink",
                             "boringbar",
                             "tslot",
-                            "dovetail"
+                            "dovetail",
+                            "tapered",
+                            "lollipop",
+                            "barrel",
+                            "lens"
                           ]
                         },
                         "diameter": {
@@ -66148,6 +66159,10 @@
                           "exclusiveMinimum": 0
                         },
                         "neckDiameter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "formRadius": {
                           "type": "number",
                           "exclusiveMinimum": 0
                         },
@@ -72126,6 +72141,28 @@
                       "tipRadius": {
                         "type": "number",
                         "exclusiveMinimum": 0
+                      },
+                      "profile": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "r": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "r",
+                            "z"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 2,
+                        "maxItems": 20000
                       }
                     },
                     "required": [
@@ -76626,6 +76663,26 @@
                               "tipRadius": {
                                 "type": "number",
                                 "exclusiveMinimum": 0
+                              },
+                              "profile": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "r": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                }
                               }
                             },
                             "required": [
@@ -77453,6 +77510,26 @@
                                 "tipRadius": {
                                   "type": "number",
                                   "exclusiveMinimum": 0
+                                },
+                                "profile": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "r": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -78335,6 +78412,26 @@
                                 "tipRadius": {
                                   "type": "number",
                                   "exclusiveMinimum": 0
+                                },
+                                "profile": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "r": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -79494,6 +79591,26 @@
                               "tipRadius": {
                                 "type": "number",
                                 "exclusiveMinimum": 0
+                              },
+                              "profile": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "r": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                }
                               }
                             },
                             "required": [
@@ -80365,6 +80482,26 @@
                                 "tipRadius": {
                                   "type": "number",
                                   "exclusiveMinimum": 0
+                                },
+                                "profile": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "r": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -81256,6 +81393,26 @@
                                     "tipRadius": {
                                       "type": "number",
                                       "exclusiveMinimum": 0
+                                    },
+                                    "profile": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "r": {
+                                            "type": "number",
+                                            "minimum": 0
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "r",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      }
                                     }
                                   },
                                   "required": [
@@ -82142,6 +82299,26 @@
                                   "tipRadius": {
                                     "type": "number",
                                     "exclusiveMinimum": 0
+                                  },
+                                  "profile": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "r": {
+                                          "type": "number",
+                                          "minimum": 0
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -82998,6 +83175,26 @@
                                 "tipRadius": {
                                   "type": "number",
                                   "exclusiveMinimum": 0
+                                },
+                                "profile": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "r": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -83843,6 +84040,26 @@
                                   "tipRadius": {
                                     "type": "number",
                                     "exclusiveMinimum": 0
+                                  },
+                                  "profile": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "r": {
+                                          "type": "number",
+                                          "minimum": 0
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -84736,6 +84953,26 @@
                                   "tipRadius": {
                                     "type": "number",
                                     "exclusiveMinimum": 0
+                                  },
+                                  "profile": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "r": {
+                                          "type": "number",
+                                          "minimum": 0
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -85612,6 +85849,26 @@
                                 "tipRadius": {
                                   "type": "number",
                                   "exclusiveMinimum": 0
+                                },
+                                "profile": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "r": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [

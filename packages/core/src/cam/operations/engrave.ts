@@ -12,12 +12,15 @@ import type { Toolpath } from "../ir.ts"
 import { type GeometryInput, type Source, sourcesOf } from "../geometry.ts"
 import { OperationFields, Positive, heightsOrdered, levelsOf, withDefault } from "../params.ts"
 import { type Path, circlePath, pathFromPoints, reversePath } from "../path.ts"
+import { OrderingSchema, orderChains } from "./ordering.ts"
 import { MoveBuilder, approach, finish, followPath, liftTo } from "./common.ts"
 
 export class EngraveParams extends Schema.Class<EngraveParams>("cam/EngraveParams")(
   Schema.Struct({
     ...OperationFields,
-    tolerance: withDefault(Positive, 0.01)
+    tolerance: withDefault(Positive, 0.01),
+    /** Visit order of the paths: `shortest` (2-opt / or-opt over the links, spec 69 F11) or the order given. */
+    ordering: withDefault(OrderingSchema, "shortest" as const)
   }).check(heightsOrdered)
 ) {}
 
@@ -43,9 +46,15 @@ export const generateEngrave = (params: EngraveParams, geometry: GeometryInput, 
   const levels = levelsOf(params, stock.origin.z)
   const b = new MoveBuilder()
   b.comment(`Engrave: ${params.name}`)
+  const paths: Path[] = []
   for (const source of sourcesOf(geometry, params.tolerance)) {
-    const path = pathOf(source)
-    if (path === undefined || path.segs.length === 0) continue
+    const p = pathOf(source)
+    if (p !== undefined && p.segs.length > 0) paths.push(p)
+  }
+  // An open stroke may be run either way, a closed one starts where it starts.
+  const ordered = orderChains(paths, params.ordering, (p) => ({ start: p.start, end: p.closed ? p.start : p.segs[p.segs.length - 1]?.to ?? p.start, reversible: !p.closed }))
+  for (const { item, reversed } of ordered) {
+    const path = reversed ? reversePath(item) : item
     approach(b, path.start, levels)
     b.rapid({ x: path.start.x, y: path.start.y, z: levels.entryZ })
     let forward = true

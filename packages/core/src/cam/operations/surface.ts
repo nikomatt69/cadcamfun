@@ -92,7 +92,12 @@ export class SurfaceParams extends Schema.Class<SurfaceParams>("cam/SurfaceParam
     /** `steep-shallow`: degrees both passes extend past `slopeAngle`, so they overlap instead of leaving a seam. */
     overlap: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 20 })), 3),
     /** `spiral` / `radial`: the centre of the pattern in XY (default: the middle of the part's extent). */
-    center: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite }))
+    center: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite })),
+    /**
+     * How the tool touches the part: `heightfield` (the sampled columns, the default) or `mesh` (exact contact against the part's
+     * triangles, spec 69 F1; needs a part built from plain solids, otherwise the height field is used and a warning says so).
+     */
+    contact: withDefault(Schema.Literals(["heightfield", "mesh"]), "heightfield" as const)
   }).check(heightsOrdered)
 ) {}
 
@@ -210,7 +215,12 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   const levels = levelsOf(params, stock.origin.z)
   const warnings: string[] = [...part.warnings]
   let b = new MoveBuilder()
-  let surface = new Surface(part.grid, (part.conservative ?? part.dexels).top(-Infinity))
+  const makeSurface = (): Surface => {
+    const s = new Surface(part.grid, (part.conservative ?? part.dexels).top(-Infinity))
+    return params.contact === "mesh" && part.meshes !== undefined && part.meshes.length > 0 ? s.withMesh(part.meshes) : s
+  }
+  if (params.contact === "mesh" && (part.meshes === undefined || part.meshes.length === 0)) warnings.push("mesh contact was asked for but the part carries no plain triangle mesh (a boolean result): the height field is used")
+  let surface = makeSurface()
   const cutter = cutterOf(tool, params.allowance)
   let stats = { levels: 0, lines: 0, loops: 0, points: 0 }
   const done = (moves: ReadonlyArray<Move>): SurfaceResult => ({
@@ -876,7 +886,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
       warnings.push(`The ${params.strategy} pass on this part would ask the drop-cutter more times than it can: ${describeWidening()}, so the operation is in the program`)
       b = new MoveBuilder()
       b.comment(`Surface ${params.strategy}: ${params.name}`)
-      surface = new Surface(part.grid, (part.conservative ?? part.dexels).top(-Infinity))
+      surface = makeSurface()
       stats = { levels: 0, lines: 0, loops: 0, points: 0 }
     }
   }

@@ -26,7 +26,9 @@ export const ToolSchema = Schema.Struct({
   /** Included angle of a `vbit`, degrees. */
   angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 180 }))),
   /** Tip radius of a `ballnose`, mm. */
-  tipRadius: Schema.optionalKey(Positive)
+  tipRadius: Schema.optionalKey(Positive),
+  /** Exact half-section `(r, z)` of a swept-profile cutter (tapered, lollipop, barrel, lens; spec 69 D1); the 3D strategies read its lower envelope. */
+  profile: Schema.optionalKey(Schema.Array(Schema.Struct({ r: NonNegative, z: Schema.Finite })))
 })
 export type Tool = typeof ToolSchema.Type
 
