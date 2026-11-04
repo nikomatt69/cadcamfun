@@ -257,7 +257,7 @@ export type OperationSpec =
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
    */
-  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
+  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead" | "point" | "line" | "curve" | "shortest"; readonly axisPoint?: Vec3; readonly axisLine?: { readonly a: Vec3; readonly b: Vec3 }; readonly axisCurve?: ReadonlyArray<Vec3>; readonly maxTilt?: number; readonly holderDiameter?: number; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
 
 export type Strategy = OperationSpec["strategy"]
 

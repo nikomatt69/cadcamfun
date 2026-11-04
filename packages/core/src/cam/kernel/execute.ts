@@ -351,6 +351,7 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
 }
 
 const shift2 = (p: Vec2, o: Vec3): Vec2 => ({ x: p.x - o.x, y: p.y - o.y })
+const shift3 = (p: Vec3, o: Vec3): Vec3 => ({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z })
 
 /** The five-axis removal bracket on the voxel stock: removed and remaining volumes, each between a lower and an upper bound. */
 const fiveAxisBracket = (vs: VoxelStock): NonNullable<StockSummary["fiveAxis"]> => {
@@ -785,7 +786,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           const soup = new TriangleSoup(workMeshes, Math.max(0.5, cell))
           const params = decode(MultiaxisParams, {
             ...common, strategy: op.mode ?? "parallel", stepover: Math.max(1, Math.min(100, op.stepover)), angle: op.angle ?? 0,
-            toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance
+            toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance,
+            ...(op.axisPoint !== undefined ? { axisPoint: shift3(op.axisPoint, o) } : {}),
+            ...(op.axisLine !== undefined ? { axisLine: { a: shift3(op.axisLine.a, o), b: shift3(op.axisLine.b, o) } } : {}),
+            ...(op.axisCurve !== undefined ? { axisCurve: op.axisCurve.map((q) => shift3(q, o)) } : {}),
+            ...(op.maxTilt !== undefined ? { maxTilt: op.maxTilt } : {}), ...(op.holderDiameter !== undefined ? { holderDiameter: op.holderDiameter } : {})
           })
           const kin = fiveAxisKinematic({
             layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) },

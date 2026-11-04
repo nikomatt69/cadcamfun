@@ -68367,8 +68367,116 @@
                               "type": "string",
                               "enum": [
                                 "normal",
-                                "lead"
+                                "lead",
+                                "point",
+                                "line",
+                                "curve",
+                                "shortest"
                               ]
+                            },
+                            "axisPoint": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "axisLine": {
+                              "type": "object",
+                              "properties": {
+                                "a": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "b": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "a",
+                                "b"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "axisCurve": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "minItems": 2,
+                              "maxItems": 20000
+                            },
+                            "maxTilt": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 180
+                            },
+                            "holderDiameter": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
                             },
                             "lead": {
                               "type": "number",
@@ -71611,8 +71719,116 @@
                               "type": "string",
                               "enum": [
                                 "normal",
-                                "lead"
+                                "lead",
+                                "point",
+                                "line",
+                                "curve",
+                                "shortest"
                               ]
+                            },
+                            "axisPoint": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "axisLine": {
+                              "type": "object",
+                              "properties": {
+                                "a": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "b": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "a",
+                                "b"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "axisCurve": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "minItems": 2,
+                              "maxItems": 20000
+                            },
+                            "maxTilt": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 180
+                            },
+                            "holderDiameter": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
                             },
                             "lead": {
                               "type": "number",
@@ -75133,8 +75349,116 @@
                                     "type": "string",
                                     "enum": [
                                       "normal",
-                                      "lead"
+                                      "lead",
+                                      "point",
+                                      "line",
+                                      "curve",
+                                      "shortest"
                                     ]
+                                  },
+                                  "axisPoint": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "axisLine": {
+                                    "type": "object",
+                                    "properties": {
+                                      "a": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "b": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "a",
+                                      "b"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "axisCurve": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 20000
+                                  },
+                                  "maxTilt": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 180
+                                  },
+                                  "holderDiameter": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
                                   },
                                   "lead": {
                                     "type": "number",
