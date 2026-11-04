@@ -1328,6 +1328,13 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly operations?: ReadonlyArray<
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1342,6 +1349,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1362,6 +1376,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1387,6 +1408,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1410,6 +1438,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1428,6 +1463,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1473,6 +1515,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1493,6 +1542,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1512,6 +1568,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1532,6 +1595,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1562,6 +1632,13 @@ export type ToolpathGeneratorManufacturePayload = {
       }
     | {
         readonly id: string
+        readonly enabled?: boolean
+        readonly dependsOn?: ReadonlyArray<string>
+        readonly limits?: {
+          readonly boundary?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly avoid?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+          readonly containment?: "edge" | "centre"
+        }
         readonly name?: string
         readonly tool: string
         readonly rpm?: number
@@ -1606,6 +1683,10 @@ export type ToolpathGeneratorManufacturePayload = {
       | "boringbar"
       | "tslot"
       | "dovetail"
+      | "tapered"
+      | "lollipop"
+      | "barrel"
+      | "lens"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -1615,6 +1696,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly tipDiameter?: number
     readonly pitch?: number
     readonly neckDiameter?: number
+    readonly formRadius?: number
     readonly headHeight?: number
     readonly fluteLength: number
     readonly shankDiameter: number
@@ -1796,6 +1878,7 @@ export type ToolpathGeneratorVerifyPayload = {
     readonly holderSteps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
     readonly angle?: number
     readonly tipRadius?: number
+    readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
   }
   readonly fixtures?: ReadonlyArray<{
     readonly id: string
