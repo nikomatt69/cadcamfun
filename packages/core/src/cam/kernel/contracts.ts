@@ -111,6 +111,11 @@ export interface KernelMachine {
    */
   readonly table?: { readonly length: number; readonly width: number; readonly gap: number }
   /**
+   * The spindle housing above the tool holder, a cylinder (mm) from the spindle nose upwards. When present it is one more body of the
+   * collision check, against the table and every fixture body (`machine-clearance`, spec 69 B5). Absent: the housing is not modelled.
+   */
+  readonly spindleHousing?: { readonly radius: number; readonly height: number }
+  /**
    * The work offsets the control has, and the one the machine starts in. A program that names an offset the machine does
    * not have is refused (`machine-limits`): the offset is where the part sits, and an unknown one is a wrong datum.
    */
