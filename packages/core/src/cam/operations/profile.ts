@@ -56,6 +56,7 @@ import {
   rotateClosedPath,
   startTangent
 } from "../path.ts"
+import { OrderingSchema, orderChains } from "./ordering.ts"
 import {
   MoveBuilder,
   type TabWindow,
@@ -109,7 +110,9 @@ export class ProfileParams extends Schema.Class<ProfileParams>("cam/ProfileParam
     /** Replace circular runs of a polyline by arcs (circles and arcs always stay arcs). */
     arcFit: withDefault(Schema.Boolean, false),
     /** Tessellation / arc-fit tolerance, mm. */
-    tolerance: withDefault(Positive, 0.01)
+    tolerance: withDefault(Positive, 0.01),
+    /** Visit order of the contours of one source list: `shortest` (2-opt / or-opt over the links, spec 69 F11) or the order given. */
+    ordering: withDefault(OrderingSchema, "shortest" as const)
   }).check(heightsOrdered)
 ) {}
 
@@ -457,6 +460,7 @@ export const generateProfile = (
   const b = new MoveBuilder()
   b.comment(`Profile ${params.side}: ${params.name}`)
   const d = toolRadius(tool) + params.allowance
+  const pending: ProfilePlan[] = []
   for (const source of sourcesOf(geometry, params.tolerance)) {
     if (params.compensation === "controller") {
       if (params.side === "onLine") throw new RangeError("Controller compensation needs a side: an onLine profile is the programmed contour already")
@@ -468,8 +472,10 @@ export const generateProfile = (
       }
       continue
     }
-    for (const plan of planSource(source, params, tool)) emitPlan(b, within === undefined ? plan : keepWithin(plan, within, d), params, tool, levels)
+    for (const plan of planSource(source, params, tool)) pending.push(plan)
   }
+  const ordered = orderChains(pending, params.ordering, (p) => ({ start: p.path.start, end: p.path.closed ? p.path.start : p.path.segs[p.path.segs.length - 1]?.to ?? p.path.start, reversible: false }))
+  for (const { item: plan } of ordered) emitPlan(b, within === undefined ? plan : keepWithin(plan, within, d), params, tool, levels)
   if (!b.started) b.comment("nothing to cut: the offset contour collapsed")
   finish(b, levels)
   return {
