@@ -80,6 +80,8 @@ import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } from "./planner.ts"
 import { planPrintJob, runPrintJob } from "./print.ts"
+import { resolveOperations } from "./operation-model.ts"
+import { limitToolpath } from "./limits.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
 
@@ -150,6 +152,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     return { status: "failed", issues: [issue("InvalidInput", "prepare", "Stock placement needs finite coordinates and positive finite dimensions")] }
   }
   if (job.setupOrientation !== undefined && !SETUP_ORIENTATIONS.includes(job.setupOrientation)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "Unknown manual setup orientation")] }
+  if (job.setups !== undefined) return { status: "failed", issues: [issue("InvalidInput", "prepare", "The job lists setups: one NC cannot hold several fixings. Run it with runSetups (one program per setup), or give the job its own fields for a single setup")] }
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return { status: "failed", issues: [issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`)] }
   const material = findMaterial(job.material)
   if (material === undefined) issues.push(issue("UnknownMaterial", "prepare", `Unknown material '${job.material}'`))
@@ -305,12 +308,17 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
         rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}), ...(job.quality?.tabs !== undefined ? { tabs: job.quality.tabs } : {}), ...(breadth !== undefined ? { breadth } : {})
       })
     : undefined
-  const operations = job.operations ?? plan!.operations
+  // Disabled operations are left out and dependencies order the rest (spec 69 C6); a job that sets neither runs its list as it is.
+  const listed = job.operations ?? plan!.operations
+  const resolved = listed.some((op) => op.enabled === false || op.dependsOn !== undefined) ? resolveOperations(listed) : undefined
+  if (resolved?.status === "failed") return resolved
+  const operations = resolved?.value ?? listed
   if (operations.length === 0) return { status: "failed", issues: [issue("InvalidInput", "plan", "No operation to run: the part needs no machining or no feature could be planned"), ...(plan?.unmachined ?? []).map((m) => issue("UnsupportedCapability", "plan", m))] }
   const ids = new Set<string>()
   for (const op of operations) {
     if (ids.has(op.id)) issues.push(issue("InvalidInput", "prepare", `Duplicate operation id '${op.id}'`))
     ids.add(op.id)
+    if (op.limits !== undefined && op.strategy === "multiaxis") issues.push(issue("UnsupportedCapability", "prepare", `Operation ${op.id}: machining limits are planar regions and the five-axis moves are in machine coordinates (the table has turned), so they are not clipped; limit the surface the operation is given instead`, { operationId: op.id }))
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
@@ -817,7 +825,17 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       fail("GenerationFailed", `${op.id}: ${error instanceof Error ? error.message : String(error)}`, data)
       return
     }
-    const tp = generated.toolpath
+    let tp = generated.toolpath
+    // Machining limits (spec 69 C7): the strategy plans freely, the limits clip what it made (regions are in the operation's coordinates).
+    if (tp !== undefined && op.limits !== undefined) {
+      const shift = (r: ReadonlyArray<{ readonly x: number; readonly y: number }>) => r.map((p) => ({ x: p.x - o.x, y: p.y - o.y }))
+      const limited = limitToolpath(tp, {
+        ...(op.limits.boundary !== undefined ? { boundary: shift(op.limits.boundary) } : {}), ...(op.limits.avoid !== undefined ? { avoid: op.limits.avoid.map(shift) } : {}),
+        ...(op.limits.containment !== undefined ? { containment: op.limits.containment } : {})
+      }, radius, CLEARANCE)
+      if (limited.clipped > 0) warnings.push(`Machining limits clipped ${limited.clipped} cutting moves: the stock outside the boundary or inside the avoid regions is left`)
+      tp = limited.toolpath
+    }
     // A rest pass over stock the earlier operations already cleared is a checked "nothing left", not a failed operation.
     if (op.strategy === "surface" && op.mode === "rest" && (tp === undefined || !cuts(tp))) {
       warnings.push("No material left for the rest tool: the operation was skipped", ...generated.warnings)
