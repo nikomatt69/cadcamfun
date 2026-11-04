@@ -49,7 +49,10 @@ const REACH = {
   "cad-export": { assistant: "export to a stored file (cam_edit.export)" },
   "cad-export-bodies": { assistant: "export to a stored file (cam_edit.export)" },
   "cam-export-stock": { assistant: "export of the simulated stock to a stored file (cam_edit.export)" },
-  "cad-scene": { assistant: "shell, offset, distance, motion study and fastening edits of the assistant's scene (cad_edit), stored through its write path" }
+  "cad-scene": { assistant: "shell, offset, distance, motion study and fastening edits of the assistant's scene (cad_edit), stored through its write path" },
+  "cam-probe-plan": { route: "POST /api/cam/probing/plan" },
+  "cam-probe-simulate": { route: "POST /api/cam/probing/simulate" },
+  "cam-probe-calibrate": { route: "POST /api/cam/probing/calibrate-rotary" }
 } satisfies Record<KernelJobName, Reach>
 
 let app: Awaited<ReturnType<typeof makeApp>>

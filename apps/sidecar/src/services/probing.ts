@@ -1,10 +1,16 @@
-import { BadRequest, Conflict, WORK_OFFSET_ROWS_MAX, Forbidden, InternalError, NotFound, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
+import { BadRequest, Conflict, WORK_OFFSET_ROWS_MAX, Forbidden, InternalError, NotFound, type CamProbeReportData, type CamProbingEmitRequest, type CamProbingFrame, type CamProbingPlan, type CamProbingPlanRequest, type CamProbingProgram, type CamProbingSettings, type CamProbingSettingsInput, type CamProbingSimulation, type CamProbingSimulateRequest, type CamRotaryCalibrationRequest, type CamRotaryCalibrationResult, type MachineProbeConfigBody, type MachineProbeConfigDocument, type ProbeReportDocument, type ProbeReportRunBody, type ProbeReportSaveBody, type ProbeReportSummary, type WorkOffsetTableDocument } from "@cadcamfun/api"
+import { camProbePlan, runKernelJobEffect, type CamProbeCalibrateInput, type CamProbePlanInput, type CamProbeRefusal, type CamProbeSimulateInput } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
+import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
 import { ProbeReportRepo } from "../repos/probe-report-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
+import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { WorkOffsetStore, type OffsetEntries, type StoreRefusal } from "../repos/work-offset-store.ts"
+import { elementsOf } from "./ai-elements.ts"
+import { explainKernelFailure } from "./kernel-errors.ts"
+import type { ProbeRunProgress } from "./probe-progress.ts"
 
 export type ProbingError = BadRequest | Forbidden | NotFound | Conflict | InternalError
 /** A read of machine state: never a conflict. */
@@ -27,12 +33,67 @@ const readRefusal = (r: StoreRefusal): Forbidden | NotFound | InternalError =>
 const dbFault = (message: string) => (cause: unknown) =>
   Effect.logError(message, cause).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
 
+const DEG = Math.PI / 180
+const recordOf = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+
+/** The setup a request plans with, resolved (spec 73 §3.2): the request's settings over the machine's probe over the core defaults. */
+interface ResolvedSetup {
+  readonly settings: cam.probing.ProbeSettings
+  readonly device?: cam.probing.ProbeDevice
+  readonly setter?: cam.probing.ToolSetter
+  readonly frame?: cam.WorkFrame
+  /** What the named machine's configuration says its rotary table is (the calibration's default `assumed`). */
+  readonly assumed?: cam.probing.RotaryAssumption
+}
+
+const setupInput = (setup: ResolvedSetup) => ({
+  settings: setup.settings,
+  ...(setup.device !== undefined ? { device: setup.device } : {}),
+  ...(setup.setter !== undefined ? { setter: setup.setter } : {}),
+  ...(setup.frame !== undefined ? { frame: setup.frame } : {})
+})
+
+/** The settings a plan was made with, on the wire: the offset as its key, `orientSpindle` in degrees. */
+const settingsWire = (s: cam.probing.ProbeSettings): CamProbingSettings => ({
+  stylusDiameter: s.stylusDiameter, feed: s.feed, fastFeed: s.fastFeed, positioningFeed: s.positioningFeed, search: s.search,
+  clearance: s.clearance, safeZ: s.safeZ, overtravel: s.overtravel, backoff: s.backoff, doubleTouch: s.doubleTouch,
+  workOffset: cam.probing.formatOffsetRef(s.workOffset),
+  ...(s.toolNumber !== undefined ? { toolNumber: s.toolNumber } : {}),
+  ...(s.effectiveRadius !== undefined ? { effectiveRadius: s.effectiveRadius } : {}),
+  ...(s.orientSpindle !== undefined ? { orientSpindle: s.orientSpindle / DEG } : {})
+})
+
+/** A kernel refusal is the caller's to fix (400), or names an element that is not there (404). */
+const refusalError = (r: CamProbeRefusal): BadRequest | NotFound => r.status === 404 ? new NotFound({ message: r.error }) : new BadRequest({ message: r.error })
+
+/** The cycle a stored probe operation carries, decoded from its row data (wire degrees), or why it cannot be simulated. */
+const storedCycleOf = (data: unknown): { readonly cycle: cam.probing.ProbeCycle; readonly checks?: ReadonlyArray<cam.probing.Characteristic>; readonly actions?: ReadonlyArray<cam.probing.ProbeAction> } | string => {
+  const record = recordOf(data)
+  const wire = record["operation"] ?? record["cycle"]
+  if (wire === undefined) return "The stored probe operation carries no cycle to simulate (its data holds no operation or cycle)."
+  try {
+    const cycle = Schema.decodeUnknownSync(cam.kernel.ProbeCycleSchema)(wire)
+    const checks = record["checks"] === undefined ? undefined : Schema.decodeUnknownSync(Schema.Array(cam.kernel.CharacteristicSchema))(record["checks"])
+    const actions = record["actions"] === undefined ? undefined : Schema.decodeUnknownSync(Schema.Array(cam.kernel.ProbeActionSchema))(record["actions"])
+    return { cycle, ...(checks !== undefined && checks.length > 0 ? { checks } : {}), ...(actions !== undefined && actions.length > 0 ? { actions } : {}) }
+  } catch {
+    return "The stored probe operation does not read as a probe cycle."
+  }
+}
+
 /**
  * Probing, work offsets and inspection reports (spec 73 §3.2): one service the HTTP group and the assistant's `cam_edit` probe
  * actions share, so both refuse the same things with the same reasons. Work offsets and the probe configuration are machine
  * state (`WorkOffsetStore`); reports are project state (`ProbeReportRepo`) and need access to the project.
  */
 export class Probing extends Context.Service<Probing, {
+  readonly plan: {
+    /** A cycle planned (and its moves written): an explicit cycle runs inline, a feature resolves in a kernel job. */
+    plan(userId: string, payload: CamProbingPlanRequest): Effect.Effect<CamProbingPlan, ReadError>
+    emit(userId: string, payload: CamProbingEmitRequest): Effect.Effect<CamProbingProgram, ReadError>
+    simulate(userId: string, payload: CamProbingSimulateRequest, report?: (progress: ProbeRunProgress) => void): Effect.Effect<CamProbingSimulation, ReadError>
+    calibrateRotary(userId: string, payload: CamRotaryCalibrationRequest, report?: (progress: ProbeRunProgress) => void): Effect.Effect<CamRotaryCalibrationResult, ReadError>
+  }
   readonly workOffsets: {
     get(userId: string, machineConfigId: string, setupId?: string | undefined): Effect.Effect<WorkOffsetTableDocument, ReadError>
     put(userId: string, machineConfigId: string, input: { entries: OffsetEntries; setupId?: string | undefined; baseUpdatedAt?: string | undefined }, by?: string): Effect.Effect<WorkOffsetTableDocument, ProbingError>
@@ -46,6 +107,8 @@ export class Probing extends Context.Service<Probing, {
     get(userId: string, projectId: string, reportId: string): Effect.Effect<ProbeReportDocument, ProjectError>
     /** The latest report of a probe operation, if any (the verdict `cam review` and the panel show). */
     latest(userId: string, projectId: string, toolpathId: string): Effect.Effect<ProbeReportDocument | undefined, ProjectError>
+    /** Simulates a stored probe operation (a `Toolpath` row) against its drawing and keeps the report. */
+    run(userId: string, projectId: string, body: ProbeReportRunBody, report?: (progress: ProbeRunProgress) => void): Effect.Effect<ProbeReportDocument, ProjectError | Forbidden>
     save(userId: string, projectId: string, body: ProbeReportSaveBody): Effect.Effect<ProbeReportDocument, ProjectError | Forbidden>
     remove(userId: string, projectId: string, reportId: string): Effect.Effect<void, ProjectError>
   }
@@ -55,11 +118,137 @@ export class Probing extends Context.Service<Probing, {
     const reports = yield* ProbeReportRepo
     const projects = yield* ProjectRepo
     const machines = yield* MachineConfigRepo
+    const toolpaths = yield* ToolpathRepo
+    const drawings = yield* DrawingRepo
     const projectAccess = Effect.fn("Probing.projectAccess")(function*(userId: string, projectId: string) {
       const found = yield* projects.find(userId, projectId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the project")))
       if (!found) return yield* new NotFound({ message: "Project not found or access denied" })
     })
+    /** Request settings over the named machine's probe over the core defaults; the tilted frame's angles arrive in degrees. */
+    const resolveSetup = Effect.fn("Probing.resolveSetup")(function*(userId: string, input: CamProbingSettingsInput | undefined, frameInput: CamProbingFrame | undefined) {
+      const machineId = input?.machineConfig
+      let profile: Parameters<typeof cam.probing.settingsFromMachine>[0] = undefined
+      let setter: cam.probing.ToolSetter | undefined
+      let assumed: cam.probing.RotaryAssumption | undefined
+      if (machineId !== undefined) {
+        const found = yield* machines.find(userId, machineId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the machine configuration")))
+        if (!found) return yield* new NotFound({ message: "Machine configuration not found" })
+        if (!found.permission.hasAccess) return yield* new Forbidden({ message: "You do not have permission to access this machine configuration" })
+        const view = yield* store.getProbeConfig(userId, machineId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the probe configuration")))
+        if ("refused" in view) return yield* readRefusal(view)
+        profile = { ...(view.probing !== null ? { probing: view.probing } : {}), ...(view.toolSetter !== null ? { toolSetter: view.toolSetter } : {}) }
+        setter = view.toolSetter ?? undefined
+        const rotary = recordOf(recordOf(found.row.config)["rotary"])
+        const layout = rotary["layout"]
+        const pivot = recordOf(rotary["pivot"] ?? recordOf(rotary["calibration"])["pivotMeasured"])
+        if ((layout === "table-AC" || layout === "table-BC") && typeof pivot.x === "number" && typeof pivot.y === "number" && typeof pivot.z === "number") {
+          assumed = { layout, pivot: { x: pivot.x, y: pivot.y, z: pivot.z } }
+        }
+      }
+      const overrides: { -readonly [K in keyof cam.probing.ProbeSettings]?: cam.probing.ProbeSettings[K] } = {}
+      if (input !== undefined) {
+        if (input.stylusDiameter !== undefined) overrides.stylusDiameter = input.stylusDiameter
+        if (input.feed !== undefined) overrides.feed = input.feed
+        if (input.fastFeed !== undefined) overrides.fastFeed = input.fastFeed
+        if (input.positioningFeed !== undefined) overrides.positioningFeed = input.positioningFeed
+        if (input.search !== undefined) overrides.search = input.search
+        if (input.clearance !== undefined) overrides.clearance = input.clearance
+        if (input.safeZ !== undefined) overrides.safeZ = input.safeZ
+        if (input.overtravel !== undefined) overrides.overtravel = input.overtravel
+        if (input.backoff !== undefined) overrides.backoff = input.backoff
+        if (input.doubleTouch !== undefined) overrides.doubleTouch = input.doubleTouch
+        if (input.toolNumber !== undefined) overrides.toolNumber = input.toolNumber
+        if (input.effectiveRadius !== undefined) overrides.effectiveRadius = input.effectiveRadius
+        if (input.orientSpindle !== undefined) overrides.orientSpindle = input.orientSpindle * DEG
+        if (input.workOffset !== undefined) {
+          const ref = cam.probing.parseOffsetRef(input.workOffset)
+          if (ref === undefined) return yield* new BadRequest({ message: `'${input.workOffset}' is not a work offset` })
+          overrides.workOffset = ref
+        }
+      }
+      const settings = cam.probing.settingsFromMachine(profile, overrides)
+      const device = profile === undefined ? undefined : cam.probing.probeDeviceOfProfile(profile)
+      const frame = frameInput === undefined ? undefined : cam.probing.workFrameOfAngles({
+        ...(frameInput.a !== undefined ? { a: frameInput.a * DEG } : {}),
+        ...(frameInput.b !== undefined ? { b: frameInput.b * DEG } : {}),
+        ...(frameInput.c !== undefined ? { c: frameInput.c * DEG } : {})
+      })
+      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
+    })
+    /** The kernel input of a plan or emit request: the cycle as given, or the feature an element resolves to. */
+    const planInputOf = (setup: ResolvedSetup, payload: CamProbingPlanRequest | CamProbingEmitRequest): CamProbePlanInput => ({
+      ...setupInput(setup),
+      ...(payload.operation !== undefined ? { cycle: payload.operation } : {}),
+      ...(payload.feature !== undefined ? { feature: { elements: payload.feature.elements, elementId: payload.feature.elementId, ...(payload.feature.ref !== undefined ? { ref: payload.feature.ref } : {}), ...(payload.feature.hint !== undefined ? { hint: payload.feature.hint } : {}) } } : {}),
+      ...(payload.checks !== undefined ? { checks: payload.checks } : {}),
+      ...(payload.actions !== undefined ? { actions: payload.actions } : {})
+    })
     return Probing.of({
+      plan: {
+        plan: Effect.fn("Probing.plan.plan")(function*(userId, payload) {
+          const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
+          const input = planInputOf(setup, payload)
+          // An explicit cycle is cheap and runs inline; resolving a feature reads the element's exact solid, in a worker.
+          const out = payload.feature !== undefined
+            ? yield* runKernelJobEffect("cam-probe-plan", input).pipe(Effect.catch(explainKernelFailure("Failed to plan the probing")))
+            : camProbePlan(input)
+          if ("error" in out) return yield* refusalError(out)
+          return {
+            operation: out.cycle, cycle: out.cycle.kind, ...(out.chosenBecause !== undefined ? { chosenBecause: out.chosenBecause } : {}),
+            settings: settingsWire(out.settings), steps: out.steps, moves: out.moves, checks: out.checks, nominal: out.nominal, notes: out.notes, warnings: out.warnings
+          }
+        }),
+        emit: Effect.fn("Probing.plan.emit")(function*(userId, payload) {
+          const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
+          const input: CamProbePlanInput = {
+            ...planInputOf(setup, payload), dialect: payload.dialect,
+            ...(payload.options !== undefined ? { options: { ...(payload.options.orientSpindle !== undefined ? { orientSpindle: payload.options.orientSpindle * DEG } : {}), ...(payload.options.programNumber !== undefined ? { programNumber: payload.options.programNumber } : {}), ...(payload.options.lineNumbers !== undefined ? { lineNumbers: payload.options.lineNumbers } : {}) } } : {})
+          }
+          const out = payload.feature !== undefined
+            ? yield* runKernelJobEffect("cam-probe-plan", input).pipe(Effect.catch(explainKernelFailure("Failed to write the probing program")))
+            : camProbePlan(input)
+          if ("error" in out) return yield* refusalError(out)
+          if (out.program === undefined) return yield* new InternalError({ message: "Failed to write the probing program" })
+          return { dialect: payload.dialect, nc: out.program.nc, identity: out.program.identity, lines: out.program.lines, steps: out.steps, notes: out.notes, warnings: out.warnings }
+        }),
+        simulate: Effect.fn("Probing.plan.simulate")(function*(userId, payload, report) {
+          const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
+          const m = payload.misplacement
+          const input: CamProbeSimulateInput = {
+            ...setupInput(setup), elements: payload.elements,
+            operations: payload.operations.map((op) => ({ cycle: op.operation, ...(op.id !== undefined ? { id: op.id } : {}), ...(op.checks !== undefined ? { checks: op.checks } : {}), ...(op.actions !== undefined ? { actions: op.actions } : {}) })),
+            ...(payload.workOffsets !== undefined ? { workOffsets: Object.fromEntries(Object.entries(payload.workOffsets).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)])) } : {}),
+            ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
+          }
+          const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to simulate the probing")))
+          if ("error" in out) return yield* refusalError(out)
+          return {
+            report: cam.probing.probeReportToWire(out.report) as CamProbeReportData,
+            offsetTable: Object.fromEntries(Object.entries(out.offsetTable).map(([k, e]) => [k, cam.probing.offsetEntryToWire(e)])),
+            identity: out.identity
+          }
+        }),
+        calibrateRotary: Effect.fn("Probing.plan.calibrateRotary")(function*(userId, payload, report) {
+          const setup = yield* resolveSetup(userId, payload.settings, undefined)
+          const assumed = payload.assumed ?? setup.assumed
+          if (assumed === undefined) return yield* new BadRequest({ message: "Send what the control believes about the table (assumed), or name a machine configuration with a rotary table." })
+          const input: CamProbeCalibrateInput = {
+            ...setupInput(setup), axis: payload.axis, sphere: payload.sphere, angles: payload.angles.map((a) => a * DEG), assumed,
+            ...(payload.truth !== undefined ? { truth: { ...(payload.truth.pivot !== undefined ? { pivot: payload.truth.pivot } : {}), ...(payload.truth.tilt !== undefined ? { tilt: payload.truth.tilt * DEG } : {}) } } : {}),
+            ...(payload.measured !== undefined ? { measured: payload.measured } : {}),
+            ...(payload.dialect !== undefined ? { dialect: payload.dialect } : {})
+          }
+          const out = yield* runKernelJobEffect("cam-probe-calibrate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to calibrate the rotary axis")))
+          if ("error" in out) return yield* refusalError(out)
+          return {
+            axis: out.axis, centres: out.centres,
+            ...(out.calibration !== undefined ? { calibration: { pivot: out.calibration.pivot, axisDirection: out.calibration.axisDirection, pivotError: out.calibration.pivotError, axisTilt: out.calibration.axisTilt / DEG, radius: out.calibration.radius, rms: out.calibration.rms } } : {}),
+            ...(out.refused !== undefined ? { refused: out.refused } : {}),
+            ...(out.nc !== undefined ? { nc: out.nc } : {}),
+            notes: out.notes
+          }
+        })
+      },
       workOffsets: {
         get: Effect.fn("Probing.workOffsets.get")(function*(userId, id, setupId) {
           const view = yield* store.get(userId, id, setupId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the work offsets")))
@@ -104,6 +293,44 @@ export class Probing extends Context.Service<Probing, {
         latest: Effect.fn("Probing.reports.latest")(function*(userId, projectId, toolpathId) {
           yield* projectAccess(userId, projectId)
           return yield* reports.latestFor(projectId, toolpathId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the probe report")))
+        }),
+        run: Effect.fn("Probing.reports.run")(function*(userId, projectId, body, report) {
+          yield* projectAccess(userId, projectId)
+          const found = yield* toolpaths.find(userId, body.operationId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the probe operation")))
+          if (!found || found.project.id !== projectId) return yield* new NotFound({ message: "Probe operation not found" })
+          const row = found.row
+          const stored = storedCycleOf(row.data)
+          if (typeof stored === "string") return yield* new BadRequest({ message: stored })
+          if (row.drawingId === null) return yield* new BadRequest({ message: "The stored probe operation has no drawing to simulate against" })
+          const drawing = yield* drawings.find(userId, row.drawingId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the drawing")))
+          if (!drawing) return yield* new NotFound({ message: "Drawing not found" })
+          const elements = elementsOf(drawing.data) as unknown as ReadonlyArray<Record<string, unknown>>
+          if (elements.length === 0) return yield* new BadRequest({ message: "The drawing of the stored probe operation carries no elements to simulate against" })
+          const machineId = body.machineConfig ?? row.machineConfigId ?? undefined
+          const setup = yield* resolveSetup(userId, machineId !== undefined ? { machineConfig: machineId } : undefined, undefined)
+          // The offsets the control holds before the run are the machine's table (of the setup, when one is named).
+          let workOffsets: Record<string, cam.probing.OffsetEntry> | undefined
+          if (machineId !== undefined) {
+            const view = yield* store.get(userId, machineId, body.setupId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the work offsets")))
+            if (!("refused" in view)) workOffsets = Object.fromEntries(Object.entries(view.entries).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)]))
+          }
+          const m = body.misplacement
+          const input: CamProbeSimulateInput = {
+            ...setupInput(setup), elements,
+            operations: [{ id: body.operationId, cycle: stored.cycle, ...(stored.checks !== undefined ? { checks: stored.checks } : {}), ...(stored.actions !== undefined ? { actions: stored.actions } : {}) }],
+            ...(workOffsets !== undefined ? { workOffsets } : {}),
+            ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
+          }
+          const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to run the probe operation")))
+          if ("error" in out) return yield* refusalError(out)
+          const wire = cam.probing.probeReportToWire(out.report) as CamProbeReportData
+          const saved = yield* reports.create(projectId, userId, {
+            name: row.name, kind: stored.cycle.kind === "rotary-axis" ? "rotary" : "part", source: "simulated", verdict: wire.verdict, data: wire,
+            toolpathId: body.operationId, drawingId: row.drawingId, machineConfigId: machineId ?? null, setupId: body.setupId ?? null, runId: body.runId ?? null,
+            workOffset: cam.probing.formatOffsetRef(setup.settings.workOffset)
+          }).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to save the probe report")))
+          if ("refused" in saved) return yield* new BadRequest({ message: saved.refused })
+          return saved
         }),
         save: Effect.fn("Probing.reports.save")(function*(userId, projectId, body) {
           yield* projectAccess(userId, projectId)

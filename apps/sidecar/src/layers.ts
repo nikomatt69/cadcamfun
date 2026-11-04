@@ -160,7 +160,7 @@ const ProjectServices = Layer.mergeAll(ProjectRepo.layer, AnalyticsRepo.layer, P
 /** Work offsets and probe configuration are slices of the machine configuration (spec 73), over the same repository. */
 const WorkOffsetStoreLive = WorkOffsetStore.layer.pipe(Layer.provide(MachineConfigRepo.layer))
 /** The probing service the HTTP group and the assistant share; its repositories are the app's own (layers are memoised). */
-const ProbingLive = Probing.layer.pipe(Layer.provide(Layer.mergeAll(WorkOffsetStoreLive, ProbeReportRepo.layer, ProjectRepo.layer, MachineConfigRepo.layer)))
+const ProbingLive = Probing.layer.pipe(Layer.provide(Layer.mergeAll(WorkOffsetStoreLive, ProbeReportRepo.layer, ProjectRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, DrawingRepo.layer)))
 const ResourceServices = Layer.mergeAll(MaterialRepo.layer, ToolRepo.layer, LibraryRepo.layer, MachineConfigRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, CamSetupRepo.layer, ProbeReportRepo.layer, WorkOffsetStoreLive, ProbingLive)
 const CadServices = Layer.mergeAll(DrawingRepo.layer, ComponentRepo.layer)
 const PlatformServices = Layer.mergeAll(StorageService.layer, FileRepo.layer, MiscRepo.layer, KvStore.layer, LiveEvents.layer, AssistantTurns.layer)

@@ -14,6 +14,7 @@ import { camJob } from "./cam-job.ts"
 import { camLathe } from "./cam-lathe.ts"
 import { camVerifyNc } from "./cam-verify-nc.ts"
 import { machineRun, type MachineRunInput } from "./machine-run.ts"
+import { camProbeCalibrate, camProbePlan, camProbeSimulate, type CamProbeCalibrateInput, type CamProbeCalibrateOutput, type CamProbePlanInput, type CamProbePlanOutput, type CamProbeRefusal, type CamProbeSimulateInput, type CamProbeSimulateOutput, type ProbeJobProgress } from "./cam-probe.ts"
 import { normalizeElement } from "./element-catalog.ts"
 import { groupIntoComponents } from "./component-grouping.ts"
 
@@ -273,13 +274,17 @@ export interface KernelJobs {
   /** The collision report of a mill program (`camCollisions`); not cached: the input is the program. */
   readonly "cam-collisions": { readonly input: Parameters<typeof camCollisions>[0]; readonly output: ReturnType<typeof camCollisions> }
   readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
+  /** Probing (spec 73 §3.2): plan a cycle (a feature resolves against the element's exact solid), simulate touches against the part, calibrate a rotary axis. */
+  readonly "cam-probe-plan": { readonly input: CamProbePlanInput; readonly output: CamProbePlanOutput | CamProbeRefusal }
+  readonly "cam-probe-simulate": { readonly input: CamProbeSimulateInput; readonly output: CamProbeSimulateOutput | CamProbeRefusal }
+  readonly "cam-probe-calibrate": { readonly input: CamProbeCalibrateInput; readonly output: CamProbeCalibrateOutput | CamProbeRefusal }
 }
 
 /** Progress a job may report while it runs (only the CAM jobs do): a kernel stage or a generator step. */
 /** A job that has to wait for one of the workers says so, with the number of jobs ahead of it. */
 export interface QueuedProgress { readonly stage: "queued"; readonly ahead: number }
 
-export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.GenerateProgress | QueuedProgress
+export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.GenerateProgress | QueuedProgress | ProbeJobProgress
 
 export type KernelJobName = keyof KernelJobs
 
@@ -314,5 +319,8 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "cam-lathe": camLathe,
   "cad-rebuild": cadRebuild,
   "cad-import-step": cadImportStep,
-  "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)
+  "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options),
+  "cam-probe-plan": (input, report) => camProbePlan(input, report),
+  "cam-probe-simulate": (input, report) => camProbeSimulate(input, report),
+  "cam-probe-calibrate": (input, report) => camProbeCalibrate(input, report)
 }
