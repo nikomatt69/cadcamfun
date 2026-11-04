@@ -14,6 +14,20 @@ const guarded = <A>(label: string, run: () => A) =>
   )
 
 /**
+ * A probing computation: bad settings and an operation the probe cannot do (the planner throws a `RangeError`) are the caller's
+ * request and answer 400 with the reason; anything else is a server fault.
+ */
+const probing = <A>(label: string, settings: Parameters<typeof p.validateProbeSettings>[0], run: () => A): Effect.Effect<A, BadRequest | InternalError> => {
+  const problems = p.validateProbeSettings(settings)
+  if (problems.length > 0) return Effect.fail(new BadRequest({ message: `probing: ${problems.join("; ")}` }))
+  return Effect.try({ try: run, catch: (e) => e }).pipe(
+    Effect.catch((e): Effect.Effect<never, BadRequest | InternalError> => e instanceof RangeError
+      ? Effect.fail(new BadRequest({ message: e.message }))
+      : Effect.logError(label, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message: label })))))
+  )
+}
+
+/**
  * Multi-operation setups (spec 14 §4, RM-02): the HTTP face of `cam.program`. Planning and validation are pure and cheap; generation
  * resolves each operation's elements from the request, then runs the same generator and post as a single operation, once per program.
  */
@@ -39,6 +53,17 @@ export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(
       const missing = payload.setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
       if (missing.length > 0) return yield* new BadRequest({ message: `The request carries no element for ${missing.join(", ")}` })
       return yield* guarded("Failed to generate the setup", () => p.generateSetup(payload.setup, (op) => p.geometryFor(op, payload.elements, payload.stock)))
+    }))
+    .handle("probePlan", ({ payload }) => probing("Failed to plan the probing", payload.settings, () => p.planProbe(payload.operation, payload.settings)))
+    .handle("probeEmit", ({ payload }) => probing("Failed to write the probing program", payload.settings, () => {
+      const plan = p.planProbe(payload.operation, payload.settings)
+      return { gcode: p.emitProbeSteps(plan.steps, payload.settings, payload.dialect), steps: plan.steps, notes: plan.notes }
+    }))
+    .handle("linkReport", Effect.fn("http.camSetup.linkReport")(function*({ payload }) {
+      return yield* guarded("Failed to measure the links", () => p.linkReport(payload.toolpaths, { lowSafeZ: payload.lowSafeZ, ...(payload.rapidRate !== undefined ? { rapidRate: payload.rapidRate } : {}) }))
+    }))
+    .handle("linkOrder", Effect.fn("http.camSetup.linkOrder")(function*({ payload }) {
+      return yield* guarded("Failed to order the operations", () => p.orderForLinking(payload.items, payload.from))
     }))
     .handle("list", ({ params }) => Effect.gen(function*() {
       yield* projectAccess(params.id)

@@ -83373,6 +83373,233 @@
         }
       }
     },
+    "/api/toolpaths/collisions": {
+      "post": {
+        "tags": [
+          "toolpathGenerator"
+        ],
+        "operationId": "toolpathGenerator.collisions",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "duration": {
+                      "type": "number"
+                    },
+                    "moves": {
+                      "type": "integer"
+                    },
+                    "collisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning"
+                            ]
+                          },
+                          "line": {
+                            "type": "integer"
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "seconds": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "count",
+                          "message",
+                          "seconds"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "limits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning"
+                            ]
+                          },
+                          "line": {
+                            "type": "integer"
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "count",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning"
+                            ]
+                          },
+                          "line": {
+                            "type": "integer"
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "assumed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "count",
+                          "message",
+                          "assumed"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "setupProblems": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "unsupported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "clear": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "duration",
+                    "moves",
+                    "collisions",
+                    "limits",
+                    "findings",
+                    "setupProblems",
+                    "unsupported",
+                    "clear"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gcode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000000
+                  },
+                  "params": {
+                    "type": "object"
+                  },
+                  "tool": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "gcode"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/cad/exact/analyze": {
       "post": {
         "tags": [
@@ -91495,6 +91722,3270 @@
                 "required": [
                   "setup",
                   "elements"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cam/probe/plan": {
+      "post": {
+        "tags": [
+          "camSetup"
+        ],
+        "operationId": "camSetup.probePlan",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rapid"
+                                ]
+                              },
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              },
+                              "z": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rapid-mid"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "store2"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "touch"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "distance": {
+                                "type": "number"
+                              },
+                              "store": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "distance",
+                              "store"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "set-offset"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              },
+                              "radius": {
+                                "type": "number"
+                              },
+                              "sign": {
+                                "type": "number",
+                                "enum": [
+                                  1,
+                                  -1
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "radius",
+                              "sign",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "report-size"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              },
+                              "stylus": {
+                                "type": "number"
+                              },
+                              "inside": {
+                                "type": "boolean"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "store2",
+                              "stylus",
+                              "inside",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "steps",
+                    "notes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "z-surface"
+                            ]
+                          },
+                          "at": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "expectedZ": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "at",
+                          "expectedZ"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "edge"
+                            ]
+                          },
+                          "axis": {
+                            "type": "string",
+                            "enum": [
+                              "X",
+                              "Y"
+                            ]
+                          },
+                          "direction": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "at": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "expectedEdge": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "axis",
+                          "direction",
+                          "at",
+                          "depth",
+                          "expectedEdge"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "corner"
+                            ]
+                          },
+                          "corner": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "sx": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "sy": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "corner",
+                          "sx",
+                          "sy",
+                          "depth"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "bore"
+                            ]
+                          },
+                          "centre": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "diameter": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "depth": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "centre",
+                          "diameter",
+                          "depth"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "boss"
+                            ]
+                          },
+                          "centre": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "diameter": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "top": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "centre",
+                          "diameter",
+                          "depth",
+                          "top"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "stylusDiameter": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "feed": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "search": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "workOffset": {
+                        "type": "string",
+                        "enum": [
+                          "G54",
+                          "G55",
+                          "G56",
+                          "G57",
+                          "G58",
+                          "G59"
+                        ]
+                      },
+                      "safeZ": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "stylusDiameter",
+                      "feed",
+                      "search",
+                      "workOffset",
+                      "safeZ"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "operation",
+                  "settings"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cam/probe/emit": {
+      "post": {
+        "tags": [
+          "camSetup"
+        ],
+        "operationId": "camSetup.probeEmit",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gcode": {
+                      "type": "string"
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rapid"
+                                ]
+                              },
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              },
+                              "z": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rapid-mid"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "store2"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "touch"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "distance": {
+                                "type": "number"
+                              },
+                              "store": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "distance",
+                              "store"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "set-offset"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              },
+                              "radius": {
+                                "type": "number"
+                              },
+                              "sign": {
+                                "type": "number",
+                                "enum": [
+                                  1,
+                                  -1
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "radius",
+                              "sign",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "report-size"
+                                ]
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": [
+                                  "X",
+                                  "Y",
+                                  "Z"
+                                ]
+                              },
+                              "store": {
+                                "type": "integer"
+                              },
+                              "store2": {
+                                "type": "integer"
+                              },
+                              "stylus": {
+                                "type": "number"
+                              },
+                              "inside": {
+                                "type": "boolean"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "axis",
+                              "store",
+                              "store2",
+                              "stylus",
+                              "inside",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "gcode",
+                    "steps",
+                    "notes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "z-surface"
+                            ]
+                          },
+                          "at": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "expectedZ": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "at",
+                          "expectedZ"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "edge"
+                            ]
+                          },
+                          "axis": {
+                            "type": "string",
+                            "enum": [
+                              "X",
+                              "Y"
+                            ]
+                          },
+                          "direction": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "at": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "expectedEdge": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "axis",
+                          "direction",
+                          "at",
+                          "depth",
+                          "expectedEdge"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "corner"
+                            ]
+                          },
+                          "corner": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "sx": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "sy": {
+                            "type": "number",
+                            "enum": [
+                              1,
+                              -1
+                            ]
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "zero": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "corner",
+                          "sx",
+                          "sy",
+                          "depth"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "bore"
+                            ]
+                          },
+                          "centre": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "diameter": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "depth": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "centre",
+                          "diameter",
+                          "depth"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "string",
+                            "enum": [
+                              "boss"
+                            ]
+                          },
+                          "centre": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "diameter": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "top": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "centre",
+                          "diameter",
+                          "depth",
+                          "top"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "stylusDiameter": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "feed": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "search": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "workOffset": {
+                        "type": "string",
+                        "enum": [
+                          "G54",
+                          "G55",
+                          "G56",
+                          "G57",
+                          "G58",
+                          "G59"
+                        ]
+                      },
+                      "safeZ": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "stylusDiameter",
+                      "feed",
+                      "search",
+                      "workOffset",
+                      "safeZ"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "dialect": {
+                    "type": "string",
+                    "enum": [
+                      "fanuc",
+                      "linuxcnc",
+                      "siemens"
+                    ]
+                  }
+                },
+                "required": [
+                  "operation",
+                  "settings",
+                  "dialect"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cam/linking/report": {
+      "post": {
+        "tags": [
+          "camSetup"
+        ],
+        "operationId": "camSetup.linkReport",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "toolpaths": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "toolId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "spindleRpm": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "coolant": {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "flood",
+                              "mist"
+                            ]
+                          },
+                          "moves": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Rapid"
+                                      ]
+                                    },
+                                    "to": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "rotary": {
+                                      "type": "object",
+                                      "properties": {
+                                        "a": {
+                                          "type": "number"
+                                        },
+                                        "b": {
+                                          "type": "number"
+                                        },
+                                        "c": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "expr": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {},
+                                        "y": {},
+                                        "z": {},
+                                        "feed": {}
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "comp": {
+                                      "type": "object",
+                                      "properties": {
+                                        "mode": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "mode"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "to"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Linear"
+                                      ]
+                                    },
+                                    "to": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "feed": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "rotary": {
+                                      "type": "object",
+                                      "properties": {
+                                        "a": {
+                                          "type": "number"
+                                        },
+                                        "b": {
+                                          "type": "number"
+                                        },
+                                        "c": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "expr": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {},
+                                        "y": {},
+                                        "z": {},
+                                        "feed": {}
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "comp": {
+                                      "type": "object",
+                                      "properties": {
+                                        "mode": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "mode"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "to",
+                                    "feed"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Arc"
+                                      ]
+                                    },
+                                    "to": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "center": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "clockwise": {
+                                      "type": "boolean"
+                                    },
+                                    "feed": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "comp": {
+                                      "type": "object",
+                                      "properties": {
+                                        "mode": {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right",
+                                            "off"
+                                          ]
+                                        },
+                                        "register": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "mode"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "to",
+                                    "center",
+                                    "clockwise",
+                                    "feed"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Spline"
+                                      ]
+                                    },
+                                    "to": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "controls": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "minItems": 1,
+                                      "maxItems": 2
+                                    },
+                                    "feed": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "to",
+                                    "controls",
+                                    "feed"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Dwell"
+                                      ]
+                                    },
+                                    "seconds": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "seconds"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Comment"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Cycle"
+                                      ]
+                                    },
+                                    "cycle": {
+                                      "type": "string",
+                                      "enum": [
+                                        "drill",
+                                        "dwell",
+                                        "peck",
+                                        "chipBreak",
+                                        "tap",
+                                        "ream",
+                                        "bore"
+                                      ]
+                                    },
+                                    "to": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "feed": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "peckDepth": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "dwellSeconds": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "retractHeight": {
+                                      "type": "number"
+                                    },
+                                    "pitch": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "cycle",
+                                    "to",
+                                    "feed",
+                                    "peckDepth",
+                                    "dwellSeconds",
+                                    "retractHeight"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Orient"
+                                      ]
+                                    },
+                                    "a": {
+                                      "type": "number"
+                                    },
+                                    "b": {
+                                      "type": "number"
+                                    },
+                                    "c": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "SpindleOrient"
+                                      ]
+                                    },
+                                    "angle": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "CutterComp"
+                                      ]
+                                    },
+                                    "side": {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right",
+                                        "off"
+                                      ]
+                                    },
+                                    "register": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "side"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Assign"
+                                      ]
+                                    },
+                                    "variable": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "scope": {
+                                              "type": "string",
+                                              "enum": [
+                                                "local",
+                                                "global",
+                                                "system"
+                                              ]
+                                            },
+                                            "index": {
+                                              "type": "integer",
+                                              "minimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "scope",
+                                            "index"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                            }
+                                          },
+                                          "required": [
+                                            "name"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "value": {}
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "variable",
+                                    "value"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "MacroCall"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "args": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^[A-Za-z]$": {}
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "name",
+                                    "args"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "If"
+                                      ]
+                                    },
+                                    "condition": {
+                                      "type": "object",
+                                      "properties": {
+                                        "cmp": {
+                                          "type": "string",
+                                          "enum": [
+                                            "eq",
+                                            "ne",
+                                            "lt",
+                                            "le",
+                                            "gt",
+                                            "ge"
+                                          ]
+                                        },
+                                        "a": {},
+                                        "b": {}
+                                      },
+                                      "required": [
+                                        "cmp",
+                                        "a",
+                                        "b"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "condition"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Else"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "EndIf"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "While"
+                                      ]
+                                    },
+                                    "condition": {
+                                      "type": "object",
+                                      "properties": {
+                                        "cmp": {
+                                          "type": "string",
+                                          "enum": [
+                                            "eq",
+                                            "ne",
+                                            "lt",
+                                            "le",
+                                            "gt",
+                                            "ge"
+                                          ]
+                                        },
+                                        "a": {},
+                                        "b": {}
+                                      },
+                                      "required": [
+                                        "cmp",
+                                        "a",
+                                        "b"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "condition"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "EndWhile"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Label"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9_]+$"
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "name"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Goto"
+                                      ]
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9_]+$"
+                                    },
+                                    "direction": {
+                                      "type": "string",
+                                      "enum": [
+                                        "auto",
+                                        "forward",
+                                        "backward"
+                                      ]
+                                    },
+                                    "condition": {
+                                      "type": "object",
+                                      "properties": {
+                                        "cmp": {
+                                          "type": "string",
+                                          "enum": [
+                                            "eq",
+                                            "ne",
+                                            "lt",
+                                            "le",
+                                            "gt",
+                                            "ge"
+                                          ]
+                                        },
+                                        "a": {},
+                                        "b": {}
+                                      },
+                                      "required": [
+                                        "cmp",
+                                        "a",
+                                        "b"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "CycleBegin"
+                                      ]
+                                    },
+                                    "family": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "heidenhain"
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "number": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "params": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "family",
+                                    "number",
+                                    "name",
+                                    "params"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "CycleEnd"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Message"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "operation": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "toolId",
+                          "spindleRpm",
+                          "coolant",
+                          "moves"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "report": {
+                      "type": "object",
+                      "properties": {
+                        "airBefore": {
+                          "type": "number"
+                        },
+                        "airAfter": {
+                          "type": "number"
+                        },
+                        "reduction": {
+                          "type": "number"
+                        },
+                        "rewrittenLinks": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "airBefore",
+                        "airAfter",
+                        "reduction",
+                        "rewrittenLinks"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "toolpaths",
+                    "report"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "toolpaths": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "toolId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "spindleRpm": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "coolant": {
+                          "type": "string",
+                          "enum": [
+                            "off",
+                            "flood",
+                            "mist"
+                          ]
+                        },
+                        "moves": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Rapid"
+                                    ]
+                                  },
+                                  "to": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "rotary": {
+                                    "type": "object",
+                                    "properties": {
+                                      "a": {
+                                        "type": "number"
+                                      },
+                                      "b": {
+                                        "type": "number"
+                                      },
+                                      "c": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "expr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {},
+                                      "y": {},
+                                      "z": {},
+                                      "feed": {}
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "comp": {
+                                    "type": "object",
+                                    "properties": {
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off"
+                                        ]
+                                      },
+                                      "register": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "mode"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "to"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Linear"
+                                    ]
+                                  },
+                                  "to": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "feed": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "rotary": {
+                                    "type": "object",
+                                    "properties": {
+                                      "a": {
+                                        "type": "number"
+                                      },
+                                      "b": {
+                                        "type": "number"
+                                      },
+                                      "c": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "expr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {},
+                                      "y": {},
+                                      "z": {},
+                                      "feed": {}
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "comp": {
+                                    "type": "object",
+                                    "properties": {
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off"
+                                        ]
+                                      },
+                                      "register": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "mode"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "to",
+                                  "feed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Arc"
+                                    ]
+                                  },
+                                  "to": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "center": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "clockwise": {
+                                    "type": "boolean"
+                                  },
+                                  "feed": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "comp": {
+                                    "type": "object",
+                                    "properties": {
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "left",
+                                          "right",
+                                          "off"
+                                        ]
+                                      },
+                                      "register": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "mode"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "to",
+                                  "center",
+                                  "clockwise",
+                                  "feed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Spline"
+                                    ]
+                                  },
+                                  "to": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "controls": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 2
+                                  },
+                                  "feed": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "to",
+                                  "controls",
+                                  "feed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Dwell"
+                                    ]
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "seconds"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Comment"
+                                    ]
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Cycle"
+                                    ]
+                                  },
+                                  "cycle": {
+                                    "type": "string",
+                                    "enum": [
+                                      "drill",
+                                      "dwell",
+                                      "peck",
+                                      "chipBreak",
+                                      "tap",
+                                      "ream",
+                                      "bore"
+                                    ]
+                                  },
+                                  "to": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      },
+                                      "z": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "feed": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "peckDepth": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "dwellSeconds": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "retractHeight": {
+                                    "type": "number"
+                                  },
+                                  "pitch": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "cycle",
+                                  "to",
+                                  "feed",
+                                  "peckDepth",
+                                  "dwellSeconds",
+                                  "retractHeight"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Orient"
+                                    ]
+                                  },
+                                  "a": {
+                                    "type": "number"
+                                  },
+                                  "b": {
+                                    "type": "number"
+                                  },
+                                  "c": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "SpindleOrient"
+                                    ]
+                                  },
+                                  "angle": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "CutterComp"
+                                    ]
+                                  },
+                                  "side": {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "right",
+                                      "off"
+                                    ]
+                                  },
+                                  "register": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "side"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Assign"
+                                    ]
+                                  },
+                                  "variable": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "scope": {
+                                            "type": "string",
+                                            "enum": [
+                                              "local",
+                                              "global",
+                                              "system"
+                                            ]
+                                          },
+                                          "index": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "scope",
+                                          "index"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                          }
+                                        },
+                                        "required": [
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "value": {}
+                                },
+                                "required": [
+                                  "_tag",
+                                  "variable",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MacroCall"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "args": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^[A-Za-z]$": {}
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "name",
+                                  "args"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "If"
+                                    ]
+                                  },
+                                  "condition": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cmp": {
+                                        "type": "string",
+                                        "enum": [
+                                          "eq",
+                                          "ne",
+                                          "lt",
+                                          "le",
+                                          "gt",
+                                          "ge"
+                                        ]
+                                      },
+                                      "a": {},
+                                      "b": {}
+                                    },
+                                    "required": [
+                                      "cmp",
+                                      "a",
+                                      "b"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "condition"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Else"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "EndIf"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "While"
+                                    ]
+                                  },
+                                  "condition": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cmp": {
+                                        "type": "string",
+                                        "enum": [
+                                          "eq",
+                                          "ne",
+                                          "lt",
+                                          "le",
+                                          "gt",
+                                          "ge"
+                                        ]
+                                      },
+                                      "a": {},
+                                      "b": {}
+                                    },
+                                    "required": [
+                                      "cmp",
+                                      "a",
+                                      "b"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "condition"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "EndWhile"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Label"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "^[A-Za-z0-9_]+$"
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Goto"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "^[A-Za-z0-9_]+$"
+                                  },
+                                  "direction": {
+                                    "type": "string",
+                                    "enum": [
+                                      "auto",
+                                      "forward",
+                                      "backward"
+                                    ]
+                                  },
+                                  "condition": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cmp": {
+                                        "type": "string",
+                                        "enum": [
+                                          "eq",
+                                          "ne",
+                                          "lt",
+                                          "le",
+                                          "gt",
+                                          "ge"
+                                        ]
+                                      },
+                                      "a": {},
+                                      "b": {}
+                                    },
+                                    "required": [
+                                      "cmp",
+                                      "a",
+                                      "b"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "CycleBegin"
+                                    ]
+                                  },
+                                  "family": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "heidenhain"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "number": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "params": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "number"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "family",
+                                  "number",
+                                  "name",
+                                  "params"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "CycleEnd"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "_tag"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Message"
+                                    ]
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "_tag",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "operation": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "toolId",
+                        "spindleRpm",
+                        "coolant",
+                        "moves"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 500
+                  },
+                  "lowSafeZ": {
+                    "type": "number"
+                  },
+                  "rapidRate": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "toolpaths",
+                  "lowSafeZ"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/cam/linking/order": {
+      "post": {
+        "tags": [
+          "camSetup"
+        ],
+        "operationId": "camSetup.linkOrder",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "before": {
+                      "type": "number"
+                    },
+                    "after": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "start": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "end": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "reorderable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "tool",
+                        "start",
+                        "end"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 2000
+                  },
+                  "from": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "items"
                 ],
                 "additionalProperties": false
               }
