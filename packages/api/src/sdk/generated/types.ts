@@ -1629,6 +1629,7 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly angle?: number
         readonly restFrom?: string
         readonly center?: { readonly x: number; readonly y: number }
+        readonly contact?: "heightfield" | "mesh"
       }
     | {
         readonly id: string
@@ -2093,6 +2094,7 @@ export type ToolpathGeneratorPlanPayload = {
         readonly angle?: number
         readonly restFrom?: string
         readonly center?: { readonly x: number; readonly y: number }
+        readonly contact?: "heightfield" | "mesh"
       }
     | {
         readonly id: string
@@ -2615,6 +2617,7 @@ export type ToolpathGeneratorJobPayload = {
           readonly angle?: number
           readonly restFrom?: string
           readonly center?: { readonly x: number; readonly y: number }
+          readonly contact?: "heightfield" | "mesh"
         }
       | {
           readonly id: string
@@ -3357,6 +3360,7 @@ export type CamSetupPlanPayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
       readonly enabled: boolean
@@ -3557,6 +3561,7 @@ export type CamSetupValidatePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
       readonly enabled: boolean
@@ -3757,6 +3762,7 @@ export type CamSetupGeneratePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
       readonly enabled: boolean
@@ -3971,6 +3977,7 @@ export type CamSetupSavePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
       readonly enabled: boolean
@@ -4172,6 +4179,7 @@ export type CamSetupUpdatePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
       readonly enabled: boolean
@@ -11160,6 +11168,7 @@ export type CamSetupPlanOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
   }>
@@ -11289,6 +11298,7 @@ export type CamSetupGenerateOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
   }>
@@ -11495,6 +11505,7 @@ export type CamSetupListOutput = Array<{
         stickout?: number
         angle?: number
         tipRadius?: number
+        profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
       enabled: boolean
@@ -11700,6 +11711,7 @@ export type CamSetupSaveOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
       enabled: boolean
@@ -11904,6 +11916,7 @@ export type CamSetupGetOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
       enabled: boolean
@@ -12111,6 +12124,7 @@ export type CamSetupUpdateOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
       enabled: boolean
@@ -12140,6 +12154,7 @@ export type CamSetupPlanSavedOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
   }>
@@ -12266,6 +12281,7 @@ export type CamSetupGenerateSavedOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
   }>
