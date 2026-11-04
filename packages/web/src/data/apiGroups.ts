@@ -261,6 +261,13 @@ export const apiGroups: readonly ApiGroupCopy[] = [
     "guide": "/docs/cad"
   },
   {
+    "tag": "camProbing",
+    "slug": "cam-probing",
+    "title": "CAM probing",
+    "summary": "Work-offset tables, machine probe configuration and in-process inspection reports.",
+    "guide": "/docs/setups"
+  },
+  {
     "tag": "camSetup",
     "slug": "cam-setups",
     "title": "CAM setups",
