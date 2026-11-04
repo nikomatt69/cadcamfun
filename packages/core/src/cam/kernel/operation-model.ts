@@ -205,6 +205,7 @@ const moveStockModel = (m: StockModel, t: Transform2): StockModel => {
 
 /** A setup moved with the part: its operations, stock and fixtures follow; the orientation and the datum stay (they are the fixing's). */
 export const transformSetup = (setup: JobSetup, t: Transform2, options: TransformOptions & { readonly id?: string } = {}): CamResult<JobSetup> => {
+  if (setup.workplane !== undefined && t.kind !== "translate") return refuse(`Setup ${setup.id}: a tilted work plane is not ${t.kind === "mirror" ? "mirrored" : "rotated"} here; define the plane again for the new place`)
   const ops = setup.operations === undefined ? undefined : all(setup.operations, (op) => transformOperation(op, t, options.rename === undefined ? {} : { rename: options.rename }))
   if (ops !== undefined && ops.status === "failed") return ops
   const { workOffset: _w, ...rest } = setup
@@ -252,6 +253,7 @@ const partMeshesOf = (job: ManufacturingJob): ReadonlyArray<Mesh64> => {
 export const transformJob = (job: ManufacturingJob, t: Transform2, options: { readonly id?: string; readonly name?: string } = {}): CamResult<ManufacturingJob> => {
   const meshes = partMeshesOf(job)
   if (meshes.length === 0) return refuse("The part has no solid to move")
+  if (job.workplane !== undefined && t.kind !== "translate") return refuse(`A tilted work plane is not ${t.kind === "mirror" ? "mirrored" : "rotated"} here; define the plane again for the new place`)
   const ops = job.operations === undefined ? undefined : all(job.operations, (op) => transformOperation(op, t))
   if (ops !== undefined && ops.status === "failed") return ops
   const setups: JobSetup[] = []

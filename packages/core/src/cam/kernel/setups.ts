@@ -14,11 +14,12 @@
  */
 import { applyPoint } from "../../cad/brep/math.ts"
 import type { WorkOffset } from "../ir.ts"
-import { setupTransform, type SetupOrientation } from "../setup.ts"
+import type { SetupOrientation } from "../setup.ts"
+import { jobTransform } from "./workplane.ts"
 import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
-import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel } from "./contracts.ts"
+import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel, Workplane } from "./contracts.ts"
 import { residualOf, runJob, type RunOptions } from "./execute.ts"
 
 export type { JobSetup }
@@ -87,8 +88,8 @@ const VERTICAL = 1e-3
  * Part surface area that some setup faces, by first setup, over the triangles of `meshes` (CAD world coordinates). A triangle of zero
  * area is ignored. Exact in the area sums; the "faces the spindle" test is the normal's sign in each setup's frame.
  */
-export const coverageOf = (meshes: ReadonlyArray<Mesh64>, setups: ReadonlyArray<{ readonly id: string; readonly orientation: SetupOrientation }>): Coverage => {
-  const frames = setups.map((s) => setupTransform(s.orientation))
+export const coverageOf = (meshes: ReadonlyArray<Mesh64>, setups: ReadonlyArray<{ readonly id: string; readonly orientation: SetupOrientation; readonly workplane?: Workplane }>): Coverage => {
+  const frames = setups.map((s) => jobTransform({ setupOrientation: s.orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}) }))
   const by: Record<string, number> = Object.fromEntries(setups.map((s) => [s.id, 0]))
   let total = 0, covered = 0
   for (const m of meshes) {
@@ -146,7 +147,7 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
     const orientation = s.orientation ?? "+Z"
     const offset = offsets[k]
     const one: ManufacturingJob = synthesised ? base : {
-      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation,
+      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}),
       ...(offset !== undefined ? { workOffset: offset } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.stock !== undefined ? { stock: s.stock } : {}), ...(s.stockModel !== undefined ? { stockModel: s.stockModel } : {}),
       ...(s.fixtures !== undefined ? { fixtures: s.fixtures } : {}), ...(s.operations !== undefined ? { operations: s.operations } : {})
@@ -167,7 +168,7 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
     const built = partMeshes((job.part.elements as ReadonlyArray<CadElement>).filter((e) => e["type"] !== "workpiece") as never, { tolerance: job.quality?.tolerance ?? 0.01 })
     if (built !== undefined) meshes = [...built.meshes]
   } else meshes = job.part.meshes.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
-  const coverage = coverageOf(meshes, runs.map((r) => ({ id: r.id, orientation: r.orientation })))
+  const coverage = coverageOf(meshes, runs.map((r, i) => ({ id: r.id, orientation: r.orientation, ...(setups[i]!.workplane !== undefined ? { workplane: setups[i]!.workplane! } : {}) })))
   const complete = coverage.total > 0 && coverage.uncovered <= coverage.total * 1e-6
   const pct = (x: number): string => `${((100 * x) / Math.max(coverage.total, 1e-12)).toFixed(1)} %`
 
