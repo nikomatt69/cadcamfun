@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "نقطة التلامس {index}: {name} عند X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "الانحراف {deviation} مم",
   "cam.probing.pick.none": "لا يوجد معلم قرب النقطة المختارة.",
-  "cam.probing.contacts": "اللمسات"
+  "cam.probing.contacts": "اللمسات",
+  "cam.probing.remote.result": "انتهى تشغيل سبر: {verdict}، فشل {failed} من {checks} فحوصات.",
+  "cam.probing.remote.open": "فتح التقرير",
+  "cam.probing.remote.dismiss": "تجاهل"
 }

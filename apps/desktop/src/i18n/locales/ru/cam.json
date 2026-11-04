@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "Касание {index}: {name} в X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "отклонение {deviation} мм",
   "cam.probing.pick.none": "Рядом с выбранной точкой нет элементов.",
-  "cam.probing.contacts": "Касания"
+  "cam.probing.contacts": "Касания",
+  "cam.probing.remote.result": "Измерение завершено: {verdict}, брак по {failed} из {checks} проверок.",
+  "cam.probing.remote.open": "Открыть отчёт",
+  "cam.probing.remote.dismiss": "Скрыть"
 }

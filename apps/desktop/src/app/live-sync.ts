@@ -4,6 +4,8 @@ import type { AppState } from "../shared/state/context.ts"
 import { captureEditorOwner, reconcileCoalesced } from "../features/ai/index.ts"
 import { reconcileSavedProgram } from "../features/cam/lib/saved-program.ts"
 import { useCamStore } from "../features/cam/store/camStore.ts"
+import { applyProbeEvent } from "../features/cam/lib/probing/live.ts"
+import { useWorkOffsetStore } from "../features/cam/store/workOffsetStore.ts"
 import { isTauri } from "./sidecar.ts"
 
 /** Renew the native App Nap lease during quiet phases of a long kernel run. */
@@ -55,6 +57,10 @@ export function startLiveSync(app: AppState): () => void {
     if (event.type === "server.heartbeat") return
     // Kernel progress only moves a label: it must not reload the project the way a saved change does.
     if (event.type === "cam.progress") { useCamStore.getState().setKernelProgress(event); trackNativeJob(event); return }
+    // Probing frames move the probing panel's own state; they are not a project change.
+    if (applyProbeEvent(event)) return
+    // The machine configuration may have changed (the assistant applied a probe result): the offsets table read in the panel is stale.
+    if (event.type === "resources.changed") useWorkOffsetStore.getState().markStale()
     app.notifications.handleLiveEvent(event)
     if (event.type === "server.connected") void app.notifications.refresh()
     if (event.type === "organizations.changed") app.cache.invalidate()

@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "संपर्क {index}: {name}, X{x} Y{y} Z{z} पर",
   "cam.probe3d.readoutDeviation": "विचलन {deviation} mm",
   "cam.probing.pick.none": "चुने गए बिंदु के पास कोई फ़ीचर नहीं।",
-  "cam.probing.contacts": "स्पर्श"
+  "cam.probing.contacts": "स्पर्श",
+  "cam.probing.remote.result": "एक प्रोबिंग रन पूरा हुआ: {verdict}, {checks} में से {failed} जाँच फ़ेल।",
+  "cam.probing.remote.open": "रिपोर्ट खोलें",
+  "cam.probing.remote.dismiss": "खारिज करें"
 }

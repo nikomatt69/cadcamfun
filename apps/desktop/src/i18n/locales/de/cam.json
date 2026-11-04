@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "Kontakt {index}: {name} bei X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "Abweichung {deviation} mm",
   "cam.probing.pick.none": "Kein Merkmal in der Nähe des gewählten Punkts.",
-  "cam.probing.contacts": "Antastungen"
+  "cam.probing.contacts": "Antastungen",
+  "cam.probing.remote.result": "Ein Antastlauf ist beendet: {verdict}, {failed} von {checks} Prüfungen nicht bestanden.",
+  "cam.probing.remote.open": "Bericht öffnen",
+  "cam.probing.remote.dismiss": "Schließen"
 }

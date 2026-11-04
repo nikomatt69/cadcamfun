@@ -31,6 +31,8 @@ interface WorkOffsetStore {
   readonly error: string | undefined
   /** The table changed on the machine since this editor read it (HTTP 409): reload to see theirs, or keep editing. */
   readonly conflict: boolean
+  /** The machine's configuration changed elsewhere (a live event) since the table was read. */
+  readonly stale: boolean
   setScope(scope: OffsetScope): void
   /** Replaces both the saved and the edited rows with the machine's answer (rows of the profile first, then every stored one). */
   load(profile: MachineProfile, loaded: LoadedOffsets): void
@@ -43,12 +45,13 @@ interface WorkOffsetStore {
   setSaving(saving: boolean): void
   setError(error: string | undefined): void
   setConflict(conflict: boolean): void
+  markStale(): void
   reset(): void
   readonly changes: () => ReadonlyArray<OffsetChange>
   readonly entries: () => Record<string, OffsetRow["entry"]>
 }
 
-const INITIAL = { machineConfigId: undefined, setupId: undefined, scope: "machine" as OffsetScope, saved: [] as ReadonlyArray<OffsetRow>, rows: [] as ReadonlyArray<OffsetRow>, updatedAt: undefined, isOwner: false, loading: false, saving: false, error: undefined, conflict: false }
+const INITIAL = { machineConfigId: undefined, setupId: undefined, scope: "machine" as OffsetScope, saved: [] as ReadonlyArray<OffsetRow>, rows: [] as ReadonlyArray<OffsetRow>, updatedAt: undefined, isOwner: false, loading: false, saving: false, error: undefined, conflict: false, stale: false }
 
 export const useWorkOffsetStore = create<WorkOffsetStore>((set, get) => ({
   ...INITIAL,
@@ -57,7 +60,7 @@ export const useWorkOffsetStore = create<WorkOffsetStore>((set, get) => ({
     // The profile gives the rows the control has; the GET gives the stored values: the table the user edits is both.
     const stored = { ...profile, workOffsetTable: loaded.setupId === null ? { entries: loaded.entries } : { entries: {}, bySetup: { [loaded.setupId]: loaded.entries } } }
     const rows = offsetRowsOf(stored, loaded.setupId ?? undefined)
-    set({ machineConfigId: loaded.machineConfigId, setupId: loaded.setupId ?? undefined, scope: loaded.setupId === null ? "machine" : "setup", saved: rows, rows, updatedAt: loaded.updatedAt, isOwner: loaded.isOwner, loading: false, error: undefined, conflict: false })
+    set({ machineConfigId: loaded.machineConfigId, setupId: loaded.setupId ?? undefined, scope: loaded.setupId === null ? "machine" : "setup", saved: rows, rows, updatedAt: loaded.updatedAt, isOwner: loaded.isOwner, loading: false, error: undefined, conflict: false, stale: false })
   },
   edit: (key, axis, value) => set((state) => ({ rows: withRowValue(state.rows, key, axis, value, state.scope) })),
   addRow: (key) => set((state) => state.rows.some((row) => row.key === key) ? {} : { rows: [...state.rows, { key, entry: { x: 0, y: 0, z: 0 }, source: state.scope }] }),
@@ -67,6 +70,7 @@ export const useWorkOffsetStore = create<WorkOffsetStore>((set, get) => ({
   setSaving: (saving) => set({ saving }),
   setError: (error) => set({ error }),
   setConflict: (conflict) => set({ conflict }),
+  markStale: () => set((state) => (state.machineConfigId === undefined ? {} : { stale: true })),
   reset: () => set({ ...INITIAL }),
   changes: () => diffRows(get().saved, get().rows),
   entries: () => entriesOfRows(get().rows, get().scope)

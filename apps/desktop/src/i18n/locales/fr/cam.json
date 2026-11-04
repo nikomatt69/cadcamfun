@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "Contact {index} : {name} en X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "écart {deviation} mm",
   "cam.probing.pick.none": "Aucun élément près du point choisi.",
-  "cam.probing.contacts": "Touches"
+  "cam.probing.contacts": "Touches",
+  "cam.probing.remote.result": "Un palpage est terminé : {verdict}, {failed} contrôles non conformes sur {checks}.",
+  "cam.probing.remote.open": "Ouvrir le rapport",
+  "cam.probing.remote.dismiss": "Ignorer"
 }

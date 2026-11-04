@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "接触点 {index}：{name}，位于 X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "偏差 {deviation} mm",
   "cam.probing.pick.none": "所选点附近没有特征。",
-  "cam.probing.contacts": "触碰点"
+  "cam.probing.contacts": "触碰点",
+  "cam.probing.remote.result": "一次探测已完成：{verdict}，{checks} 项检测中 {failed} 项不合格。",
+  "cam.probing.remote.open": "打开报告",
+  "cam.probing.remote.dismiss": "忽略"
 }

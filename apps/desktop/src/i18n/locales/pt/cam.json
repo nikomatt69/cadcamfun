@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "Contato {index}: {name} em X{x} Y{y} Z{z}",
   "cam.probe3d.readoutDeviation": "desvio {deviation} mm",
   "cam.probing.pick.none": "Nenhum elemento perto do ponto escolhido.",
-  "cam.probing.contacts": "Toques"
+  "cam.probing.contacts": "Toques",
+  "cam.probing.remote.result": "Uma apalpação terminou: {verdict}, {failed} de {checks} verificações reprovadas.",
+  "cam.probing.remote.open": "Abrir relatório",
+  "cam.probing.remote.dismiss": "Dispensar"
 }

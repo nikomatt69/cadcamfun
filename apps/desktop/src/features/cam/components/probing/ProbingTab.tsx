@@ -94,6 +94,13 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
     if (open && id !== undefined && stored === true && offsets.machineConfigId !== id) void c.loadOffsets()
   }))
 
+  // The machine's table changed elsewhere (a live event): read it again unless the user has unsaved edits, which then see a conflict.
+  createEffect(on(() => offsets.stale, (stale) => {
+    if (!stale || machine()?.stored !== true || offsets.machineConfigId === undefined) return
+    if (offsets.changes().length === 0) void c.loadOffsets(offsets.setupId)
+    else offsets.setConflict(true)
+  }))
+
   return (
     <div class="panel probing-tab" data-testid="probing-tab">
       <header class="panel-header">
@@ -103,6 +110,15 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
         </div>
         <Show when={probing.progress?.phase === "running"}><Badge tone="warn" testId="probing-progress">{t("cam.probing.running", { index: probing.progress?.index ?? 0, count: probing.progress?.count ?? 0 })}</Badge></Show>
       </header>
+      <Show when={probing.remote}>{(remote) => (
+        <Note kind={remote().verdict === "fail" || remote().verdict === "missed" ? "warn" : "info"} testId="probing-remote">
+          <p>{t("cam.probing.remote.result", { verdict: t(`cam.probing.status.${remote().verdict}` as never), failed: remote().failed, checks: remote().checks })}</p>
+          <div class="probing-row-actions">
+            <Show when={remote().reportId}>{(id) => <button type="button" class="panel-btn panel-btn--fit" data-testid="probing-remote-open" onClick={() => { void c.openReport(id()); probing.setRemote(undefined) }}>{t("cam.probing.remote.open")}</button>}</Show>
+            <button type="button" class="panel-btn panel-btn--fit" data-testid="probing-remote-dismiss" onClick={() => probing.setRemote(undefined)}>{t("cam.probing.remote.dismiss")}</button>
+          </div>
+        </Note>
+      )}</Show>
       <Show when={probing.error}>{(message) => <Note kind="bad" role="alert" testId="probing-error">{message()}</Note>}</Show>
 
       <PanelSection id="probing-cycles" icon={SECTION_ICON.cycles} title={t("cam.probing.section.cycles")} open={probing.open.cycles} onToggle={toggle("cycles")} testId="probing-section-cycles"

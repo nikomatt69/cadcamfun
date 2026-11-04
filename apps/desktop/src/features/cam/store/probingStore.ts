@@ -34,6 +34,19 @@ export interface ProbeRunProgress {
   readonly count?: number
 }
 
+/** A finished run announced by the sidecar (`probe.result`): the assistant's, or this window's own. */
+export interface ProbeRunSummary {
+  readonly runId: string
+  readonly reportId?: string
+  readonly operationId?: string
+  readonly verdict: string
+  readonly checks: number
+  readonly failed: number
+  readonly maxDeviationMm?: number
+  readonly offsetsUpdated: boolean
+  readonly kind: string
+}
+
 export interface PickedPoint { readonly point: { readonly x: number; readonly y: number; readonly z: number }; readonly normal: { readonly x: number; readonly y: number; readonly z: number } }
 
 interface ProbingStore {
@@ -44,6 +57,8 @@ interface ProbingStore {
   readonly programs: Readonly<Record<string, ProbeProgram>>
   readonly results: Readonly<Record<string, ProbeRunResult>>
   readonly progress: ProbeRunProgress | undefined
+  /** The last finished run somebody else started (the assistant): offered as "Open report" until dismissed. */
+  readonly remote: ProbeRunSummary | undefined
   readonly busy: ProbingBusy | undefined
   readonly error: string | undefined
   /** The user is picking a feature on the model; the next surface hit fills the selected cycle. */
@@ -60,6 +75,7 @@ interface ProbingStore {
   setResult(result: ProbeRunResult): void
   forget(operationId: string): void
   setProgress(progress: ProbeRunProgress | undefined): void
+  setRemote(remote: ProbeRunSummary | undefined): void
   setBusy(busy: ProbingBusy | undefined): void
   setError(error: string | undefined): void
   setPicking(picking: boolean): void
@@ -71,7 +87,7 @@ interface ProbingStore {
 
 const INITIAL = {
   selectedId: undefined, open: { cycles: true, offsets: false, inspection: true, program: true } as const, dialect: undefined,
-  programs: {}, results: {}, progress: undefined, busy: undefined, error: undefined, picking: false, lastPick: undefined, showIn3d: true, highlight: undefined
+  programs: {}, results: {}, progress: undefined, remote: undefined, busy: undefined, error: undefined, picking: false, lastPick: undefined, showIn3d: true, highlight: undefined
 }
 
 export const useProbingStore = create<ProbingStore>((set) => ({
@@ -87,6 +103,7 @@ export const useProbingStore = create<ProbingStore>((set) => ({
     return { programs, results, selectedId: state.selectedId === operationId ? undefined : state.selectedId }
   }),
   setProgress: (progress) => set({ progress }),
+  setRemote: (remote) => set({ remote }),
   setBusy: (busy) => set({ busy }),
   setError: (error) => set({ error }),
   setPicking: (picking) => set({ picking }),

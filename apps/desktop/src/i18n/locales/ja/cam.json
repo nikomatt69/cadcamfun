@@ -1677,5 +1677,8 @@
   "cam.probe3d.readout": "接触点 {index}：{name}（X{x} Y{y} Z{z}）",
   "cam.probe3d.readoutDeviation": "偏差 {deviation} mm",
   "cam.probing.pick.none": "選択した点の近くにフィーチャがありません。",
-  "cam.probing.contacts": "タッチ"
+  "cam.probing.contacts": "タッチ",
+  "cam.probing.remote.result": "プロービングが完了しました：{verdict}、{checks} 件中 {failed} 件が不合格。",
+  "cam.probing.remote.open": "レポートを開く",
+  "cam.probing.remote.dismiss": "閉じる"
 }

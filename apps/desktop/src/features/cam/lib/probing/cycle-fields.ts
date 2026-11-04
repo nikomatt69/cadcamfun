@@ -33,8 +33,8 @@ const FIELDS: Readonly<Record<ProbeCycleKind, ReadonlyArray<CycleField>>> = {
   plane: [L("expectedZ"), { path: "points", kind: "points" }],
   sphere: [...xy("centre"), L("centre.z"), L("diameter"), { path: "touches", kind: "choice", choices: [5, 9], optional: true }],
   "tool-length": [{ path: "tool", kind: "int" }, L("nominalLength", true)],
-  "tool-radius": [{ path: "tool", kind: "int" }, L("nominalRadius", true)],
-  "broken-tool": [{ path: "tool", kind: "int" }, L("nominalLength", true)],
+  "tool-radius": [{ path: "tool", kind: "int" }, L("nominalRadius")],
+  "broken-tool": [{ path: "tool", kind: "int" }, L("nominalLength")],
   "stylus-calibrate": [{ path: "artefact.kind", kind: "choice", choices: ["ring", "sphere", "height"] }, ...xy("artefact.centre"), L("artefact.diameter"), L("artefact.depth", true), { path: "directions", kind: "choice", choices: [4, 8, 16], optional: true }],
   "rotary-axis": [{ path: "axis", kind: "choice", choices: ["A", "B", "C"] }, ...xy("sphere.centre"), L("sphere.centre.z"), L("sphere.diameter"), { path: "angles", kind: "numbers" }]
 }
@@ -75,8 +75,10 @@ export const defaultSpecOf = (kind: ProbeCycleKind, at: { readonly x: number; re
     case "edge-angle": return { kind, start: centre, alongAngle: 0, pitch: 20, normalAngle: -90, depth: 3 }
     case "plane": return { kind, points: [{ x: at.x, y: at.y }, { x: at.x + 20, y: at.y }, { x: at.x, y: at.y + 20 }], expectedZ: 0 }
     case "sphere": return { kind, centre: { ...centre, z: 0 }, diameter: 25 }
-    case "tool-length": case "broken-tool": return { kind, tool: 1 }
-    case "tool-radius": return { kind, tool: 1 }
+    case "tool-length": return { kind, tool: 1 }
+    // The core cannot judge a radius or a broken tool without the tool's nominal size: placeholders in mm the user edits.
+    case "broken-tool": return { kind, tool: 1, nominalLength: 100 }
+    case "tool-radius": return { kind, tool: 1, nominalRadius: 5 }
     case "stylus-calibrate": return { kind, artefact: { kind: "ring", centre, diameter: 25, depth: 5 } }
     case "rotary-axis": return { kind, axis: "A", sphere: { centre: { ...centre, z: 50 }, diameter: 25 }, angles: [0, 30, 60, 90] }
   }

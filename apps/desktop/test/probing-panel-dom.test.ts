@@ -280,3 +280,20 @@ test("the inspection list: failures first, a warning near the limit, CSV through
     root.remove()
   }
 })
+
+test("live frames: progress moves the badge, a result is kept for Open report and a moved offset marks the table stale; foreign frames are ignored", async () => {
+  const { applyProbeEvent } = await import("../src/features/cam/lib/probing/live.ts")
+  const fake = fakeService()
+  await loadOffsets(fake.service, run, profile(), "m1")
+  expect(applyProbeEvent({ type: "cam.progress", phase: "running" })).toBe(false)
+  expect(applyProbeEvent({ type: "probe.progress", runId: "r1", phase: "running", stage: "touch", index: 2, count: 8 })).toBe(true)
+  expect(useProbingStore.getState().progress).toEqual({ runId: "r1", phase: "running", stage: "touch", index: 2, count: 8 })
+  expect(applyProbeEvent({ type: "probe.progress", runId: "r1", phase: "sideways" })).toBe(false)
+  expect(useWorkOffsetStore.getState().stale).toBe(false)
+  expect(applyProbeEvent({ type: "probe.result", runId: "r1", reportId: "rep1", verdict: "pass", checks: 3, failed: 0, offsetsUpdated: true, kind: "part" })).toBe(true)
+  expect(useProbingStore.getState().remote).toMatchObject({ reportId: "rep1", verdict: "pass", offsetsUpdated: true })
+  expect(useWorkOffsetStore.getState().stale).toBe(true)
+  // Reading the table again clears the flag.
+  await loadOffsets(fake.service, run, profile(), "m1")
+  expect(useWorkOffsetStore.getState().stale).toBe(false)
+})
