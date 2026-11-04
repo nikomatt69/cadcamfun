@@ -16,13 +16,13 @@ type ProjectError = BadRequest | NotFound | InternalError
 const LIST_DEFAULT = 50
 const LIST_MAX = 200
 
-function refusal(r: StoreRefusal): Forbidden | NotFound | Conflict {
-  return r.refused === "not-found" ? new NotFound({ message: r.message }) : r.refused === "forbidden" ? new Forbidden({ message: r.message }) : new Conflict({ message: r.message })
+function refusal(r: StoreRefusal): BadRequest | Forbidden | NotFound | Conflict {
+  return r.refused === "invalid" ? new BadRequest({ message: r.message }) : r.refused === "not-found" ? new NotFound({ message: r.message }) : r.refused === "forbidden" ? new Forbidden({ message: r.message }) : new Conflict({ message: r.message })
 }
 
 /** A read never races: a conflict there would be a store bug, reported as a server fault. */
 const readRefusal = (r: StoreRefusal): Forbidden | NotFound | InternalError =>
-  r.refused === "conflict" ? new InternalError({ message: r.message }) : refusal(r) as Forbidden | NotFound
+  r.refused === "conflict" || r.refused === "invalid" ? new InternalError({ message: r.message }) : refusal(r) as Forbidden | NotFound
 
 const dbFault = (message: string) => (cause: unknown) =>
   Effect.logError(message, cause).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))

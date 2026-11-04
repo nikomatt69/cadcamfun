@@ -13,7 +13,10 @@ export type OffsetEntries = Record<string, OffsetEntryValue>
  */
 export interface StoredWorkOffsetTable { entries: OffsetEntries; bySetup: Record<string, OffsetEntries> }
 
-/** The machine's probing configuration: `config.probing`, `config.toolSetter`, `config.rotaryCalibration` (spec 73 §1). */
+/**
+ * The machine's probing configuration (spec 73 §1, core names): `config.probing`, `config.toolSetter`, and the rotary calibration,
+ * which the core keeps with the rotary axis it calibrates (`config.rotary.calibration`, read by the kernel as the measured pivot).
+ */
 export interface StoredProbeConfig {
   probing: cam.kernel.MachineProbing | null
   toolSetter: cam.kernel.MachineToolSetter | null
@@ -23,7 +26,7 @@ export interface StoredProbeConfig {
 export interface WorkOffsetsView { machineConfigId: string; setupId: string | null; entries: OffsetEntries; updatedAt: string; isOwner: boolean }
 export interface ProbeConfigView extends StoredProbeConfig { machineConfigId: string; updatedAt: string; isOwner: boolean }
 
-export type StoreRefusal = { refused: "not-found" | "forbidden" | "conflict"; message: string }
+export type StoreRefusal = { refused: "not-found" | "forbidden" | "conflict" | "invalid"; message: string }
 
 type Mutated = { config: Record<string, unknown>; updatedAt: string }
 
@@ -53,7 +56,7 @@ export const probeConfigOf = (config: unknown): StoredProbeConfig => {
   return {
     probing: cam.kernel.probingOfConfig(c.probing) ?? null,
     toolSetter: cam.kernel.toolSetterOfConfig(c.toolSetter) ?? null,
-    rotaryCalibration: cam.kernel.rotaryCalibrationOfConfig(c.rotaryCalibration) ?? null
+    rotaryCalibration: cam.kernel.rotaryCalibrationOfConfig(isObj(c.rotary) ? c.rotary.calibration : undefined) ?? null
   }
 }
 
@@ -84,13 +87,15 @@ export class WorkOffsetStore extends Context.Service<WorkOffsetStore, {
       return found
     })
     /** Applies `edit` to the stored config as one compare-and-set; retries a lost race only when the caller gave no base. */
-    const mutate = Effect.fn("WorkOffsetStore.mutate")(function*(userId: string, id: string, base: string | undefined, by: string | undefined, edit: (config: Record<string, unknown>) => Record<string, unknown>) {
+    const mutate = Effect.fn("WorkOffsetStore.mutate")(function*(userId: string, id: string, base: string | undefined, by: string | undefined, edit: (config: Record<string, unknown>) => Record<string, unknown>, abort: () => StoreRefusal | undefined = () => undefined) {
       for (let attempt = 0; attempt < RETRIES; attempt++) {
         const found = yield* load(userId, id, true)
         if ("refused" in found) return found as Mutated | StoreRefusal
         const row = found.row
         const expected = base ?? row.updatedAt.toISOString()
         const config = edit({ ...configOf(row) })
+        const refused = abort()
+        if (refused !== undefined) return refused as Mutated | StoreRefusal
         const saved = yield* machines.updateIfCurrent(id, { name: row.name, description: row.description, type: row.type, config, isPublic: row.isPublic }, expected, by ?? userId)
         if (saved !== "conflict") return { config, updatedAt: saved.view.updatedAt } as Mutated | StoreRefusal
         if (base !== undefined) break
@@ -113,16 +118,29 @@ export class WorkOffsetStore extends Context.Service<WorkOffsetStore, {
       }).pipe(Effect.map((r) => "refused" in r ? r : offsetsView(id, r.config, r.updatedAt, true, input.setupId))),
       getProbeConfig: (userId, id) => load(userId, id, false).pipe(Effect.map((found) => "refused" in found ? found
         : { machineConfigId: id, updatedAt: found.view.updatedAt, isOwner: found.permission.isOwner, ...probeConfigOf(found.row.config) })),
-      putProbeConfig: (userId, id, input, by) => mutate(userId, id, input.baseUpdatedAt, by, (config) => {
-        const next = { ...config }
-        for (const key of ["probing", "toolSetter", "rotaryCalibration"] as const) {
-          const value = input[key]
-          if (value === undefined) continue
-          if (value === null) delete next[key]
-          else next[key] = value
-        }
-        return next
-      }).pipe(Effect.map((r) => "refused" in r ? r : { machineConfigId: id, updatedAt: r.updatedAt, isOwner: true, ...probeConfigOf(r.config) }))
+      putProbeConfig: (userId, id, input, by) => {
+        let invalid: StoreRefusal | undefined
+        return mutate(userId, id, input.baseUpdatedAt, by, (config) => {
+          const next = { ...config }
+          for (const key of ["probing", "toolSetter"] as const) {
+            const value = input[key]
+            if (value === undefined) continue
+            if (value === null) delete next[key]
+            else next[key] = value
+          }
+          if (input.rotaryCalibration !== undefined) {
+            if (!isObj(next.rotary)) {
+              invalid = { refused: "invalid", message: "This machine has no rotary axis to calibrate" }
+              return config
+            }
+            const rotary = { ...next.rotary }
+            if (input.rotaryCalibration === null) delete rotary.calibration
+            else rotary.calibration = input.rotaryCalibration
+            next.rotary = rotary
+          }
+          return next
+        }, () => invalid).pipe(Effect.map((r) => "refused" in r ? r : { machineConfigId: id, updatedAt: r.updatedAt, isOwner: true, ...probeConfigOf(r.config) }))
+      }
     })
   }))
 }

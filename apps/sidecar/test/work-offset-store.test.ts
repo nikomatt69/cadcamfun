@@ -17,7 +17,7 @@ const seed = Effect.gen(function*() {
   const { query } = yield* Database
   const [owner, stranger] = yield* query("users", (db) => db.insert(schema.userTable).values([{ email: "o@example.com" }, { email: "s@example.com" }]).returning())
   const machines = yield* MachineConfigRepo
-  const machine = yield* machines.create(owner!.id, { name: "VMC", type: "mill", isPublic: false, config: { maxSpindleSpeed: 12000, maxFeedRate: 10000, workVolume: { x: 800, y: 500, z: 500 }, probing: { stylusRadius: 1 } } })
+  const machine = yield* machines.create(owner!.id, { name: "VMC", type: "mill", isPublic: false, config: { maxSpindleSpeed: 12000, maxFeedRate: 10000, workVolume: { x: 800, y: 500, z: 500 }, probing: { stylusRadius: 1 }, rotary: { layout: "table-AC", tilt: { min: -120, max: 120 } } } })
   const shared = yield* machines.create(owner!.id, { name: "Shared", type: "mill", isPublic: true, config: { maxSpindleSpeed: 12000 } })
   return { owner: owner!.id, stranger: stranger!.id, machine: machine.id, shared: shared.id }
 })
@@ -80,12 +80,14 @@ test("probe config: slices replace, null removes, omitted keeps", async () => {
     const ids = yield* seed
     const store = yield* WorkOffsetStore
     const first = yield* store.getProbeConfig(ids.owner, ids.machine)
-    const put = yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: SETTER, rotaryCalibration: { at: "2026-11-04" } })
+    const put = yield* store.putProbeConfig(ids.owner, ids.machine, { toolSetter: SETTER, rotaryCalibration: { at: "2026-11-04", axisError: 0.01 } })
     const removed = yield* store.putProbeConfig(ids.owner, ids.machine, { probing: null })
-    return { first, put, removed }
+    const noRotary = yield* store.putProbeConfig(ids.owner, ids.shared, { rotaryCalibration: { at: "2026-11-04" } })
+    return { first, put, removed, noRotary }
   }).pipe(Effect.provide(layer())))
   expect(out.first).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: null, rotaryCalibration: null })
-  expect(out.put).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: { kind: "contact", triggerZ: -400 }, rotaryCalibration: { at: "2026-11-04" } })
+  expect(out.put).toMatchObject({ probing: { stylusRadius: 1 }, toolSetter: { kind: "contact", triggerZ: -400 }, rotaryCalibration: { at: "2026-11-04", axisError: 0.01 } })
+  expect(out.noRotary).toMatchObject({ refused: "invalid" })
   expect(out.removed).toMatchObject({ probing: null, toolSetter: { kind: "contact" } })
 })
 
