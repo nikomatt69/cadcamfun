@@ -3,6 +3,43 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.93 (November 2026)
+
+## Core
+
+- Extend camProbing service with new handlers for plan, emit, simulate, and calibrate-rotary operations; integrate progress reporting and event publishing; update schemas and API reference (spec 73 §3.1)
+- CamProbing plan, emit, simulate, calibrate-rotary and reports run routes with their schemas, probe.progress and probe.result events, deprecated camSetup probe routes, regenerated clients (spec 73 §3.1)
+- Legacy probe emission: bracketed midpoint, Siemens frame as $P_UIFR[n,X,TR] and selected again, Fanuc miss alarm, armed descent, size in a register (spec 73 §5.0)
+- Probe operations in a manufacturing job: probe toolpaths, the probing claim, NC replay on the part, closed loop and tilted-plane probing (spec 73 §5.12)
+- Rotary axis calibration by probing a sphere and feature to probe cycle (spec 73 §5.13, §5.14)
+- Probe golden program helper takes a start (spec 73 §5.8)
+- Tool setter cycles (tool length, radius, broken tool) and tool-table writes replayed on the NC text (spec 73 §5.6, §5.8)
+- Posts write probing (touch, protected move, offsets, alarm, report, G53) and the NC replay runs it against a modelled part (spec 73 §5.8, §5.11)
+- Probe executor: control flow, offsets and tools, tilted plane, rotary pivot error, inspection verdicts (spec 73 §5.10)
+- Probe worlds: placements, analytic parts, unions, mesh vs surface (spec 73 §5.10)
+- Sphere-cast sweeps, nearest points, unions and mesh BVH (spec 73 §5.10)
+- Remove stale execute.ts.probe copy (spec 73)
+
+## Desktop
+
+- Every default probe cycle the editor creates is planned by the core (spec 73 §4)
+- Probe.progress / probe.result frames and stale offset table; tool radius and broken tool defaults the core can plan (spec 73 §4)
+- Probing tab: palette, cycle editor, work-offset table, inspection list, program preview, 3D probe overlay and surface pick (spec 73 §4)
+- Probing cycles as toolpaths, resolve order, operations and actions, targets, stores, API client, overlay model, probe colours, locales (spec 73 §4)
+- Probing contract exports ProbeContact, routine and context types (spec 73 §4)
+
+## Sidecar
+
+- A work-offset write announces resources.changed (spec 73 §3.2)
+
+## Web
+
+- CamProbing API group in the reference and the sidebar (spec 73 §3.1)
+
+## Documentation
+
+- Spec 73 change log, desktop probing panel (spec 73 §4)
+
 ## v0.1.92 (November 2026)
 
 - No notable changes
