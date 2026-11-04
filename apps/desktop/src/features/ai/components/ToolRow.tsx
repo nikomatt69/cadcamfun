@@ -4,8 +4,8 @@
  * still being written or running); a block has a title and a body (the elements that were built, the findings of a check, the
  * G-code with line numbers, the report of a specialist). The exact input and output stay one click away under every view.
  *
- * Who ran it (a specialist's name), how it ended (finished, failed, refused) and the facts of version control and workflows are
- * part of the row. Version-control tools link to the project's version-control screen.
+ * Who ran it (a specialist's name), how it ended (finished, failed, refused), the evidence of the result (release level, claims,
+ * verdicts, write receipts: `ToolEvidence.tsx`) and the facts of version control and workflows are part of the row. Version-control tools link to the project's version-control screen.
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
@@ -38,6 +38,8 @@ import X from "lucide-solid/icons/x"
 import { currentLocale, t } from "../../../i18n/index.ts"
 import type { AiToolCall } from "../lib/types.ts"
 import { isVcsTool, toolFacts } from "../lib/tool-facts.ts"
+import { evidenceOf } from "../lib/tool-evidence.ts"
+import { EvidenceBlock } from "./ToolEvidence.tsx"
 import { actionOf } from "../lib/tool-schemas.ts"
 import { canonicalTool, toolTitle } from "../lib/tools.ts"
 
@@ -427,6 +429,8 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
   const tone = (): Tone => (failure() !== undefined ? "error" : view().tone ?? "ok")
   const agent = (): string | undefined => props.call?.agent
   const facts = createMemo(() => toolFacts(props.tool, props.call?.input, props.call?.output))
+  // A refused call already says why in its error line; evidence is what a finished result proves (or fails to).
+  const evidence = createMemo(() => (status() === "ok" ? evidenceOf(props.call?.output) : undefined))
   const block = (): boolean => done() && failure() === undefined && view().detail !== undefined
   const pendingText = (): string => (status() === "preparing" && props.call?.chars !== undefined ? `${view().pending} (${kb(props.call.chars)})` : view().pending)
 
@@ -465,6 +469,7 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
         <Show when={block()}>
           <div class="assistant-tool-detail" data-testid="tool-detail">{view().detail!()}</div>
         </Show>
+        <Show when={evidence()}>{(shown) => <EvidenceBlock evidence={shown()} />}</Show>
         <Show when={facts().length > 0}>
           <ul class="assistant-tool-facts" data-testid="tool-facts"><For each={facts()}>{(line) => <li>{line}</li>}</For></ul>
         </Show>
