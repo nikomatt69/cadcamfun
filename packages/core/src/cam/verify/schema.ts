@@ -35,7 +35,12 @@ export const VerifyToolSchema = Schema.Struct({
   /** Included angle of a `vbit`, degrees (default 60). */
   angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 179 }))),
   /** Corner radius of an `endmill` (bull-nose), mm; a `ballnose` always uses its full radius. */
-  tipRadius: Schema.optionalKey(Positive)
+  tipRadius: Schema.optionalKey(Positive),
+  /**
+   * Exact half-section of the cutting zone for swept-profile cutters (tapered, lollipop, barrel, lens; spec 69 D1): `(r, z)` points
+   * from the tip on the axis upward. The height-field replay reads its lower envelope; it replaces the `kind` / `tipRadius` profile.
+   */
+  profile: Schema.optionalKey(Schema.Array(Schema.Struct({ r: NonNegative, z: Schema.Finite })).check(Schema.isMinLength(2), Schema.isMaxLength(20_000)))
 })
 export type VerifyTool = typeof VerifyToolSchema.Type
 

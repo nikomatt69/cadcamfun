@@ -245,7 +245,9 @@ export const CadRebuildRequest = Schema.Struct({
   /** The history as the editor stores it; the kernel job decodes it against `ParametricHistory` (its checks are not portable to the generated clients) and answers 400 with the problems. */
   history: Schema.Json,
   /** Time the exact work may take, ms (default 60 000); a body it did not reach says so. */
-  budgetMs: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 120_000 })))
+  budgetMs: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 120_000 }))),
+  /** The history before the edit (same checks as `history`): the exact replay of `history` resumes from the last feature the edit did not touch, and `incremental` says how much was reused. */
+  baseline: Schema.optionalKey(Schema.Json)
 })
 export type CadRebuildRequest = typeof CadRebuildRequest.Type
 
@@ -259,7 +261,18 @@ export const CadRebuildReport = Schema.Struct({
   })),
   digest: Schema.String,
   issues: Schema.Array(Schema.Struct({ feature: Schema.String, severity: Schema.Literals(["error", "warning"]), message: Schema.String, remedy: Schema.optionalKey(Schema.String) })),
-  warnings: Schema.Array(Schema.String)
+  warnings: Schema.Array(Schema.String),
+  /** The state of every feature after the rebuild (`ok`, `failed`, `suppressed`, `rolled-back`, `suppressed-by` or `skipped`; `by` names the feature behind the last two). */
+  features: Schema.Array(Schema.Struct({ id: Schema.String, type: Schema.String, state: Schema.String, by: Schema.optionalKey(Schema.String) })),
+  /** The exact replay's warnings by the kind of feature that raised them: a blend that could not be made, a shell, a boolean. */
+  reports: Schema.Array(Schema.Struct({ feature: Schema.String, kind: Schema.Literals(["blend", "shell", "boolean", "feature"]), message: Schema.String })),
+  /** The healing state of each imported base body: its largest tolerance against the limit, and what the import welded. */
+  healing: Schema.Array(Schema.Struct({
+    id: Schema.String, name: Schema.optionalKey(Schema.String), faces: int, maxTolerance: num, limit: num, loose: Schema.Boolean,
+    healed: Schema.optionalKey(Schema.Struct({ verticesWelded: int, edgesWelded: int, verticesTightened: int, maxMove: num }))
+  })),
+  /** With a `baseline`: the feature boundary the replay resumed from, how many features it replayed and how many the history has. */
+  incremental: Schema.optionalKey(Schema.Struct({ resumedAt: int, replayed: int, features: int }))
 })
 export type CadRebuildReport = typeof CadRebuildReport.Type
 

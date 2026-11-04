@@ -501,6 +501,11 @@ export interface CamArtifact {
   readonly tolerance?: ToleranceBudget
   /** Present when the job asked for `process`: feed optimisation per operation, dynamic cycle time, tool life, indicative stability; all uncalibrated. */
   readonly process?: ProcessReport
+  /**
+   * Tool-centre-point output only (spec 69 B6): the largest distance of the tool tip the emitted NC makes (replayed, carried to machine
+   * coordinates) from the planned path, mm, with the declared limit it is held to (post splitting tolerance plus angle rounding).
+   */
+  readonly tipError?: { readonly max: number; readonly mean: number; readonly samples: number; readonly limit: number; readonly line?: number }
   /** Present when the machine is a printer: what was printed and how it was measured. */
   readonly print?: PrintReport
 }

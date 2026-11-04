@@ -18,7 +18,7 @@
  * is code the user chose to switch on; a `write` tool is asked about before every call. A mod is stronger still — it hooks the
  * whole host — which is why it is its own capability and why only enabled plugins' mods are ever declared.
  */
-import { definePluginTool, type ContributedMode, type PluginToolListing } from "@cadcamfun/ai"
+import { definePluginTool, pluginParameters, type ContributedMode, type PluginToolListing } from "@cadcamfun/ai"
 import type { ToolDefinition } from "@cadcamfun/ai"
 import { parseManifest, PluginManifestSchema, type PluginManifest } from "@cadcamfun/plugin-sdk"
 import { Cause, Context, Data, Effect, Layer, Schema, Semaphore } from "effect"
@@ -34,6 +34,13 @@ export const SUPPORTED_PLUGIN_CAPABILITIES: ReadonlyArray<string> = ["ai:tool", 
 
 export class AiPluginError extends Data.TaggedError("AiPluginError")<{ readonly message: string }> {}
 
+/**
+ * Why an HTTP invocation of a plugin tool did not run: `unknown` (no running plugin offers it), `invalid` (the arguments do not fit the
+ * tool's schema, or a `write` tool was not confirmed), `forbidden` (the host refused the call: capability not granted), `failed`
+ * (the call timed out, crashed or was rate limited).
+ */
+export class AiPluginInvokeError extends Data.TaggedError("AiPluginInvokeError")<{ readonly kind: "unknown" | "invalid" | "forbidden" | "failed"; readonly message: string }> {}
+
 export class AiPlugins extends Context.Service<AiPlugins, {
   /** The tools of the plugins that are running now, as host tools; read on every call, so a plugin switched on later shows. */
   readonly installed: Effect.Effect<ReadonlyArray<{ id: string; name: string; version: string; enabled: boolean; tools: number; mods: number; modes: number }>, AiPluginError>
@@ -42,6 +49,12 @@ export class AiPlugins extends Context.Service<AiPlugins, {
   readonly toggle: (id: string, enabled: boolean) => Effect.Effect<void, AiPluginError>
   readonly tools: () => ReadonlyArray<ToolDefinition>
   readonly listing: () => ReadonlyArray<PluginToolListing & { readonly toolId: string }>
+  /**
+   * Runs one tool of a running plugin for a client that is not the assistant (spec 72 P1-11): the same host RPC the assistant's tools use,
+   * so the capability check (`ai:tool`), the rate limit and the deadline are the host's. The arguments are validated against the tool's
+   * schema first; a `write` tool needs `confirm`, the HTTP counterpart of the approval the assistant asks for.
+   */
+  readonly invoke: (pluginId: string, toolId: string, args: unknown, confirm: boolean) => Effect.Effect<unknown, AiPluginInvokeError>
   /** The `file://` specs of the enabled plugins' mods, read on every configuration publication, so a toggle applies. */
   readonly modSpecs: () => ReadonlyArray<string>
   /** The mods the enabled plugins ship, for the Extensions panel. */
@@ -262,6 +275,20 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
       } finally { await rm(temp, { force: true }) }
     })),
     listing,
+    invoke: (pluginId, toolId, args, confirm) => Effect.gen(function*() {
+      const entry = listing().find((tool) => tool.pluginId === pluginId && tool.id === toolId)
+      if (entry === undefined) return yield* new AiPluginInvokeError({ kind: "unknown", message: `No running plugin "${pluginId}" offers the tool "${toolId}"` })
+      if (entry.kind === "write" && !confirm) return yield* new AiPluginInvokeError({ kind: "invalid", message: `"${toolId}" changes something: send confirm: true to run it` })
+      const parsed = pluginParameters(entry.parameters).safeParse(args ?? {})
+      if (!parsed.success) return yield* new AiPluginInvokeError({ kind: "invalid", message: `Invalid arguments: ${parsed.error.issues.slice(0, 4).map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`).join("; ")}` })
+      return yield* Effect.tryPromise({
+        try: () => runHost(host.callTool(pluginId, toolId, parsed.data)),
+        catch: (cause) => {
+          const tag = typeof cause === "object" && cause !== null && "_tag" in cause ? String((cause as { _tag: unknown })._tag) : ""
+          return new AiPluginInvokeError({ kind: tag === "PluginCapabilityError" ? "forbidden" : "failed", message: toolFailure(cause).error })
+        }
+      })
+    }),
     modSpecs: () => pluginModSpecs(root),
     modList: () => pluginModList(root),
     modes: () => pluginModes(root),

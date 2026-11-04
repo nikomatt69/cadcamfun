@@ -90,6 +90,10 @@ export type TokenBadRequest = { readonly _tag: "TokenBadRequest"; readonly error
 export const isTokenBadRequest = (value: unknown): value is TokenBadRequest =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "TokenBadRequest"
 
+export type Forbidden = { readonly _tag: "Forbidden"; readonly message: string }
+export const isForbidden = (value: unknown): value is Forbidden =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Forbidden"
+
 export type AiBadRequest = { readonly _tag: "AiBadRequest"; readonly error: string }
 export const isAiBadRequest = (value: unknown): value is AiBadRequest =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AiBadRequest"
@@ -232,10 +236,6 @@ export const isDesktopConflict = (value: unknown): value is DesktopConflict =>
 export type DesktopNotFound = { readonly _tag: "DesktopNotFound"; readonly success: false; readonly error: string }
 export const isDesktopNotFound = (value: unknown): value is DesktopNotFound =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "DesktopNotFound"
-
-export type Forbidden = { readonly _tag: "Forbidden"; readonly message: string }
-export const isForbidden = (value: unknown): value is Forbidden =>
-  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Forbidden"
 
 export type PluginBadRequest = {
   readonly _tag: "PluginBadRequest"
@@ -447,6 +447,11 @@ export type AiInstallExtensionPluginPayload = {
   readonly manifest: string
   readonly source: string
   readonly files?: { readonly [x: string]: string } | undefined
+}
+
+export type AiInvokeExtensionPluginToolPayload = {
+  readonly args?: JsonValue | undefined
+  readonly confirm?: boolean | undefined
 }
 
 export type AiToggleExtensionPluginPayload = { readonly enabled: boolean }
@@ -1601,6 +1606,10 @@ export type ToolpathGeneratorManufacturePayload = {
       | "boringbar"
       | "tslot"
       | "dovetail"
+      | "tapered"
+      | "lollipop"
+      | "barrel"
+      | "lens"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -1610,6 +1619,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly tipDiameter?: number
     readonly pitch?: number
     readonly neckDiameter?: number
+    readonly formRadius?: number
     readonly headHeight?: number
     readonly fluteLength: number
     readonly shankDiameter: number
@@ -1705,6 +1715,12 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly feed: number
             readonly comp?: { readonly mode: "left" | "right" | "off"; readonly register?: number }
           }
+        | {
+            readonly _tag: "Spline"
+            readonly to: { readonly x: number; readonly y: number; readonly z: number }
+            readonly controls: ReadonlyArray<{ readonly x: number; readonly y: number }>
+            readonly feed: number
+          }
         | { readonly _tag: "Dwell"; readonly seconds: number }
         | { readonly _tag: "Comment"; readonly text: string }
         | {
@@ -1791,6 +1807,7 @@ export type ToolpathGeneratorVerifyPayload = {
     readonly holderSteps?: ReadonlyArray<{ readonly diameter: number; readonly length: number }>
     readonly angle?: number
     readonly tipRadius?: number
+    readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
   }
   readonly fixtures?: ReadonlyArray<{
     readonly id: string
@@ -1995,7 +2012,11 @@ export type CadExactHolePayload = {
   readonly fill?: boolean
 }
 
-export type CadExactRebuildPayload = { readonly history: JsonValue; readonly budgetMs?: number }
+export type CadExactRebuildPayload = {
+  readonly history: JsonValue
+  readonly budgetMs?: number
+  readonly baseline?: JsonValue
+}
 
 export type CadExactImportStepPayload = {
   readonly step: string
@@ -3021,6 +3042,22 @@ export type CamSetupUpdatePayload = {
   readonly baseUpdatedAt?: string
 }
 
+export type CamSetupGenerateSavedPayload = {
+  readonly elements: { readonly [x: string]: { readonly [x: string]: JsonValue } }
+  readonly stock?: {
+    readonly width: number
+    readonly height: number
+    readonly depth: number
+    readonly radius?: number
+    readonly x?: number
+    readonly y?: number
+    readonly topZ?: number
+    readonly allowance?: number
+    readonly material?: string
+    readonly elementId?: string
+  }
+}
+
 export type LibraryCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -4040,6 +4077,26 @@ export type AiInstallExtensionPluginOutput = {
     modes: number
   }>
 }
+
+export type AiExtensionPluginToolsOutput = {
+  tools: Array<{
+    pluginId: string
+    pluginName: string
+    id: string
+    description: string
+    kind: "read" | "write"
+    parameters: { [x: string]: JsonValue }
+  }>
+}
+
+export type AiInvokeExtensionPluginToolInput = {
+  readonly id: { readonly id: string; readonly toolId: string }["id"]
+  readonly toolId: { readonly id: string; readonly toolId: string }["toolId"]
+  readonly args?: AiInvokeExtensionPluginToolPayload["args"]
+  readonly confirm?: AiInvokeExtensionPluginToolPayload["confirm"]
+}
+
+export type AiInvokeExtensionPluginToolOutput = { pluginId: string; toolId: string; result: JsonValue }
 
 export type AiToggleExtensionPluginInput = {
   readonly id: { readonly id: string }["id"]
@@ -8145,6 +8202,12 @@ export type ToolpathsRegenerateOutput = {
                     feed: number
                     comp?: { mode: "left" | "right" | "off"; register?: number }
                   }
+                | {
+                    _tag: "Spline"
+                    to: { x: number; y: number; z: number }
+                    controls: Array<{ x: number; y: number }>
+                    feed: number
+                  }
                 | { _tag: "Dwell"; seconds: number }
                 | { _tag: "Comment"; text: string }
                 | {
@@ -8850,6 +8913,12 @@ export type ToolpathGeneratorManufactureOutput =
                   feed: number
                   comp?: { mode: "left" | "right" | "off"; register?: number }
                 }
+              | {
+                  _tag: "Spline"
+                  to: { x: number; y: number; z: number }
+                  controls: Array<{ x: number; y: number }>
+                  feed: number
+                }
               | { _tag: "Dwell"; seconds: number }
               | { _tag: "Comment"; text: string }
               | {
@@ -9129,6 +9198,12 @@ export type ToolpathGeneratorParseOutput = {
             clockwise: boolean
             feed: number
             comp?: { mode: "left" | "right" | "off"; register?: number }
+          }
+        | {
+            _tag: "Spline"
+            to: { x: number; y: number; z: number }
+            controls: Array<{ x: number; y: number }>
+            feed: number
           }
         | { _tag: "Dwell"; seconds: number }
         | { _tag: "Comment"; text: string }
@@ -9583,6 +9658,7 @@ export type CadExactHoleOutput =
 export type CadExactRebuildInput = {
   readonly history: CadExactRebuildPayload["history"]
   readonly budgetMs?: CadExactRebuildPayload["budgetMs"]
+  readonly baseline?: CadExactRebuildPayload["baseline"]
 }
 
 export type CadExactRebuildOutput = {
@@ -9605,6 +9681,18 @@ export type CadExactRebuildOutput = {
   digest: string
   issues: Array<{ feature: string; severity: "error" | "warning"; message: string; remedy?: string }>
   warnings: Array<string>
+  features: Array<{ id: string; type: string; state: string; by?: string }>
+  reports: Array<{ feature: string; kind: "blend" | "shell" | "boolean" | "feature"; message: string }>
+  healing: Array<{
+    id: string
+    name?: string
+    faces: number
+    maxTolerance: number
+    limit: number
+    loose: boolean
+    healed?: { verticesWelded: number; edgesWelded: number; verticesTightened: number; maxMove: number }
+  }>
+  incremental?: { resumedAt: number; replayed: number; features: number }
 }
 
 export type CadExactImportStepInput = {
@@ -9714,6 +9802,12 @@ export type CamSetupGenerateOutput = {
               clockwise: boolean
               feed: number
               comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Spline"
+              to: { x: number; y: number; z: number }
+              controls: Array<{ x: number; y: number }>
+              feed: number
             }
           | { _tag: "Dwell"; seconds: number }
           | { _tag: "Comment"; text: string }
@@ -10611,6 +10705,166 @@ export type CamSetupUpdateOutput = {
   }
   createdAt: string
   updatedAt: string
+}
+
+export type CamSetupPlanSavedInput = {
+  readonly id: { readonly id: string; readonly setupId: string }["id"]
+  readonly setupId: { readonly id: string; readonly setupId: string }["setupId"]
+}
+
+export type CamSetupPlanSavedOutput = {
+  programs: Array<{ name: string; programNumber: number; toolNumbers: Array<number>; operations: Array<string> }>
+  toolTable: Array<{
+    pocket: number
+    tool: {
+      id: string
+      name: string
+      kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+      diameter: number
+      flutes: number
+      maxRpm: number
+      stickout?: number
+      angle?: number
+      tipRadius?: number
+    }
+    operationIds: Array<string>
+  }>
+  toolLoads: number
+  toolChanges: number
+  warnings: Array<string>
+}
+
+export type CamSetupGenerateSavedInput = {
+  readonly id: { readonly id: string; readonly setupId: string }["id"]
+  readonly setupId: { readonly id: string; readonly setupId: string }["setupId"]
+  readonly elements: CamSetupGenerateSavedPayload["elements"]
+  readonly stock?: CamSetupGenerateSavedPayload["stock"]
+}
+
+export type CamSetupGenerateSavedOutput = {
+  programs: Array<{
+    name: string
+    programNumber: number
+    gcode: string
+    program: {
+      name: string
+      units: "mm" | "inch"
+      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      toolpaths: Array<{
+        id: string
+        name: string
+        toolId: string
+        spindleRpm: number
+        coolant: "off" | "flood" | "mist"
+        moves: Array<
+          | {
+              _tag: "Rapid"
+              to: { x: number; y: number; z: number }
+              rotary?: { a?: number; b?: number; c?: number }
+              expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+              comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Linear"
+              to: { x: number; y: number; z: number }
+              feed: number
+              rotary?: { a?: number; b?: number; c?: number }
+              expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+              comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Arc"
+              to: { x: number; y: number; z: number }
+              center: { x: number; y: number }
+              clockwise: boolean
+              feed: number
+              comp?: { mode: "left" | "right" | "off"; register?: number }
+            }
+          | {
+              _tag: "Spline"
+              to: { x: number; y: number; z: number }
+              controls: Array<{ x: number; y: number }>
+              feed: number
+            }
+          | { _tag: "Dwell"; seconds: number }
+          | { _tag: "Comment"; text: string }
+          | {
+              _tag: "Cycle"
+              cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
+              to: { x: number; y: number; z: number }
+              feed: number
+              peckDepth: number
+              dwellSeconds: number
+              retractHeight: number
+              pitch?: number
+            }
+          | { _tag: "Orient"; a?: number; b?: number; c?: number }
+          | { _tag: "SpindleOrient"; angle?: number }
+          | { _tag: "CutterComp"; side: "left" | "right" | "off"; register?: number }
+          | {
+              _tag: "Assign"
+              variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
+              value: JsonValue
+            }
+          | { _tag: "MacroCall"; name: string; args: { [x: string]: JsonValue } }
+          | { _tag: "If"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+          | { _tag: "Else" }
+          | { _tag: "EndIf" }
+          | { _tag: "While"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+          | { _tag: "EndWhile" }
+          | { _tag: "Label"; name: string }
+          | {
+              _tag: "Goto"
+              label: string
+              direction?: "auto" | "forward" | "backward"
+              condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+            }
+          | { _tag: "CycleBegin"; family: "heidenhain"; number: number; name: string; params: { [x: string]: number } }
+          | { _tag: "CycleEnd" }
+          | { _tag: "Message"; text: string }
+        >
+        operation?: { id: string; name: string }
+      }>
+      metadata?: { [x: string]: string }
+    }
+    stats: {
+      lines: number
+      cutLength: number
+      rapidLength: number
+      minZ: number
+      maxZ: number
+      estimatedSeconds: number
+      bounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    }
+    warnings: Array<string>
+    operationIds: Array<string>
+    toolNumbers: Array<number>
+  }>
+  toolTable: Array<{
+    pocket: number
+    tool: {
+      id: string
+      name: string
+      kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+      diameter: number
+      flutes: number
+      maxRpm: number
+      stickout?: number
+      angle?: number
+      tipRadius?: number
+    }
+    operationIds: Array<string>
+  }>
+  totals: {
+    programs: number
+    toolLoads: number
+    toolChanges: number
+    cutLength: number
+    rapidLength: number
+    estimatedSeconds: number
+  }
+  warnings: Array<string>
+  issues: Array<{ operationId?: string; message: string }>
 }
 
 export type CamSetupRemoveInput = {
