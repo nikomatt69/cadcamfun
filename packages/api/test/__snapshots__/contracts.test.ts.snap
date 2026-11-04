@@ -22334,6 +22334,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "string",
                                   },
+                                  "contact": {
+                                    "enum": [
+                                      "heightfield",
+                                      "mesh",
+                                    ],
+                                    "type": "string",
+                                  },
                                   "coolant": {
                                     "enum": [
                                       "off",
@@ -22501,6 +22508,101 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "angle": {
                                     "type": "number",
                                   },
+                                  "axisCurve": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 20000,
+                                    "minItems": 2,
+                                    "type": "array",
+                                  },
+                                  "axisLine": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "a": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                          "z": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "b": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                          "z": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                        ],
+                                        "type": "object",
+                                      },
+                                    },
+                                    "required": [
+                                      "a",
+                                      "b",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "axisPoint": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
                                   "coolant": {
                                     "enum": [
                                       "off",
@@ -22522,6 +22624,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "type": "boolean",
                                   },
                                   "feed": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                  "holderDiameter": {
                                     "exclusiveMinimum": 0,
                                     "type": "number",
                                   },
@@ -22593,6 +22699,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                     },
                                     "type": "object",
+                                  },
+                                  "maxTilt": {
+                                    "maximum": 180,
+                                    "minimum": 0,
+                                    "type": "number",
                                   },
                                   "mode": {
                                     "enum": [
@@ -22671,6 +22782,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "enum": [
                                       "normal",
                                       "lead",
+                                      "point",
+                                      "line",
+                                      "curve",
+                                      "shortest",
                                     ],
                                     "type": "string",
                                   },
@@ -27808,6 +27923,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "name": {
                                   "type": "string",
                                 },
+                                "profile": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r": {
+                                        "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
                                 "stickout": {
                                   "exclusiveMinimum": 0,
                                   "type": "number",
@@ -29216,6 +29351,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "name": {
                                 "type": "string",
                               },
+                              "profile": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "r": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
                               "stickout": {
                                 "exclusiveMinimum": 0,
                                 "type": "number",
@@ -29948,6 +30103,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "name": {
                                   "type": "string",
                                 },
+                                "profile": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r": {
+                                        "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
                                 "stickout": {
                                   "exclusiveMinimum": 0,
                                   "type": "number",
@@ -30239,6 +30414,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               },
                               "name": {
                                 "type": "string",
+                              },
+                              "profile": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "r": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
                               },
                               "stickout": {
                                 "exclusiveMinimum": 0,
@@ -30939,6 +31134,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 },
                                 "name": {
                                   "type": "string",
+                                },
+                                "profile": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r": {
+                                        "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
                                 },
                                 "stickout": {
                                   "exclusiveMinimum": 0,
@@ -69410,6 +69625,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "name": {
                                       "type": "string",
                                     },
+                                    "profile": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "r": {
+                                            "minimum": 0,
+                                            "type": "number",
+                                          },
+                                          "z": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "r",
+                                          "z",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": "array",
+                                    },
                                     "stickout": {
                                       "exclusiveMinimum": 0,
                                       "type": "number",
@@ -70287,6 +70522,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "name": {
                                   "type": "string",
                                 },
+                                "profile": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r": {
+                                        "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
                                 "stickout": {
                                   "exclusiveMinimum": 0,
                                   "type": "number",
@@ -71102,6 +71357,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   },
                                   "name": {
                                     "type": "string",
+                                  },
+                                  "profile": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "r": {
+                                          "minimum": 0,
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "type": "array",
                                   },
                                   "stickout": {
                                     "exclusiveMinimum": 0,
@@ -72088,6 +72363,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "name": {
                                     "type": "string",
                                   },
+                                  "profile": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "r": {
+                                          "minimum": 0,
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "type": "array",
+                                  },
                                   "stickout": {
                                     "exclusiveMinimum": 0,
                                     "type": "number",
@@ -72974,6 +73269,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "name": {
                                   "type": "string",
                                 },
+                                "profile": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r": {
+                                        "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "r",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
                                 "stickout": {
                                   "exclusiveMinimum": 0,
                                   "type": "number",
@@ -73785,6 +74100,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   },
                                   "name": {
                                     "type": "string",
+                                  },
+                                  "profile": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "r": {
+                                          "minimum": 0,
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "r",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "type": "array",
                                   },
                                   "stickout": {
                                     "exclusiveMinimum": 0,
@@ -75315,6 +75650,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "name": {
                                 "type": "string",
                               },
+                              "profile": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "r": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
                               "stickout": {
                                 "exclusiveMinimum": 0,
                                 "type": "number",
@@ -75563,6 +75918,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               },
                               "name": {
                                 "type": "string",
+                              },
+                              "profile": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "r": {
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "r",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
                               },
                               "stickout": {
                                 "exclusiveMinimum": 0,
@@ -90783,6 +91158,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
+                            "contact": {
+                              "enum": [
+                                "heightfield",
+                                "mesh",
+                              ],
+                              "type": "string",
+                            },
                             "coolant": {
                               "enum": [
                                 "off",
@@ -90950,6 +91332,101 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "angle": {
                               "type": "number",
                             },
+                            "axisCurve": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 20000,
+                              "minItems": 2,
+                              "type": "array",
+                            },
+                            "axisLine": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "a": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "b": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                              },
+                              "required": [
+                                "a",
+                                "b",
+                              ],
+                              "type": "object",
+                            },
+                            "axisPoint": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                                "z": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z",
+                              ],
+                              "type": "object",
+                            },
                             "coolant": {
                               "enum": [
                                 "off",
@@ -90971,6 +91448,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "type": "boolean",
                             },
                             "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "holderDiameter": {
                               "exclusiveMinimum": 0,
                               "type": "number",
                             },
@@ -91042,6 +91523,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 },
                               },
                               "type": "object",
+                            },
+                            "maxTilt": {
+                              "maximum": 180,
+                              "minimum": 0,
+                              "type": "number",
                             },
                             "mode": {
                               "enum": [
@@ -91120,6 +91606,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "enum": [
                                 "normal",
                                 "lead",
+                                "point",
+                                "line",
+                                "curve",
+                                "shortest",
                               ],
                               "type": "string",
                             },
@@ -98027,6 +98517,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "string",
                             },
+                            "contact": {
+                              "enum": [
+                                "heightfield",
+                                "mesh",
+                              ],
+                              "type": "string",
+                            },
                             "coolant": {
                               "enum": [
                                 "off",
@@ -98194,6 +98691,101 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "angle": {
                               "type": "number",
                             },
+                            "axisCurve": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 20000,
+                              "minItems": 2,
+                              "type": "array",
+                            },
+                            "axisLine": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "a": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "b": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                              },
+                              "required": [
+                                "a",
+                                "b",
+                              ],
+                              "type": "object",
+                            },
+                            "axisPoint": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                                "z": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z",
+                              ],
+                              "type": "object",
+                            },
                             "coolant": {
                               "enum": [
                                 "off",
@@ -98215,6 +98807,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "type": "boolean",
                             },
                             "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "holderDiameter": {
                               "exclusiveMinimum": 0,
                               "type": "number",
                             },
@@ -98286,6 +98882,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 },
                               },
                               "type": "object",
+                            },
+                            "maxTilt": {
+                              "maximum": 180,
+                              "minimum": 0,
+                              "type": "number",
                             },
                             "mode": {
                               "enum": [
@@ -98364,6 +98965,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "enum": [
                                 "normal",
                                 "lead",
+                                "point",
+                                "line",
+                                "curve",
+                                "shortest",
                               ],
                               "type": "string",
                             },
