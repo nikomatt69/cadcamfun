@@ -38,6 +38,7 @@ export { prepareJob, executeJob, runJob, planOnly, KERNEL_ALGORITHM, type Prepar
 export * from "./compat.ts"
 export * from "./assembly.ts"
 export * from "./holders.ts"
+export * from "./tool-io.ts"
 export * from "./linking.ts"
 export * from "./setup-sheet.ts"
 export { SETUP_ORIENTATIONS, setupTransform, type SetupOrientation } from "../setup.ts"
