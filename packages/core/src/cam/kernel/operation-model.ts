@@ -197,6 +197,8 @@ const moveMesh = (m: { readonly positions: ArrayLike<number>; readonly indices: 
 
 const moveStockModel = (m: StockModel, t: Transform2): StockModel => {
   if (m.kind === "mesh") return { kind: "mesh", mesh: moveMesh(m.mesh, t) }
+  // A carried stock is made by a run (runSetups) and is in the frame of the setup that left it: it is not moved with the job.
+  if (m.kind === "residual") return m
   const c = mapPoint(t)(m.center)
   return { ...m, center: c, z0: m.z0 + (t.kind === "translate" ? (t.dz ?? 0) : 0), z1: m.z1 + (t.kind === "translate" ? (t.dz ?? 0) : 0) }
 }

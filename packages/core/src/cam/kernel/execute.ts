@@ -67,6 +67,7 @@ import {
   type OperationOutcome,
   type OperationSpec,
   type ReleaseLevel,
+  type ResidualStock,
   type StockBox,
   type StockSummary
 } from "./contracts.ts"
@@ -81,6 +82,7 @@ import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { horizontalFaces, offsetRing, planJob, type Plan, type PlanBreadth } from "./planner.ts"
 import { planPrintJob, runPrintJob } from "./print.ts"
 import { resolveOperations } from "./operation-model.ts"
+import { carriedColumns, transposeOf } from "./carry.ts"
 import { limitToolpath } from "./limits.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
@@ -100,6 +102,12 @@ export interface PreparedJob {
   readonly stock: StockBox
   /** The stock when it is not a box (bar, casting, previous setup), oriented setup coordinates; the box `stock` is its bounds. */
   readonly stockMesh?: ReadonlyArray<Mesh64>
+  /**
+   * The stock an earlier setup left, read through this setup's frame (spec 69 C4): for the column at oriented `(x, y)` the highest solid
+   * z in `[zLow, zHigh]` (`-Infinity` when the column is empty) and the solid length along it, mm. The height field starts at that top;
+   * the air below it (what the earlier setup removed from the other side) is taken off the stock volumes.
+   */
+  readonly stockColumns?: (x: number, y: number, zLow: number, zHigh: number) => { readonly top: number; readonly solid: number }
   /** Work zero in oriented setup coordinates. */
   readonly origin: Vec3
   readonly operations: ReadonlyArray<OperationSpec>
@@ -197,9 +205,22 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
   }
 
   let stockMeshes: Mesh64[] | undefined
+  let residual: ResidualStock | undefined
   if (job.stockModel !== undefined) {
     const model = job.stockModel
-    if (model.kind === "cylinder") {
+    if (model.kind === "residual") {
+      // The stock an earlier setup left: its box in CAD world is the bounds of this stock, the columns are read through this setup's frame below.
+      const r = model.residual
+      if (!(r.nx > 0 && r.ny > 0) || r.top.length !== r.nx * r.ny || !r.top.every(Number.isFinite)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "A carried stock needs the height field of the setup that left it")] }
+      residual = r
+      const back = transposeOf(setupTransform(r.orientation))
+      const topMax = r.top.reduce((a, b) => Math.max(a, b), r.floor)
+      const corners = [0, r.nx * r.cellX].flatMap((dx) => [0, r.ny * r.cellY].flatMap((dy) => [r.floor, topMax].map((z) => applyPoint(back, { x: r.minX + dx + r.origin.x, y: r.minY + dy + r.origin.y, z: z + r.origin.z }))))
+      job = { ...job, stock: {
+        min: { x: Math.min(...corners.map((c) => c.x)), y: Math.min(...corners.map((c) => c.y)), z: Math.min(...corners.map((c) => c.z)) },
+        max: { x: Math.max(...corners.map((c) => c.x)), y: Math.max(...corners.map((c) => c.y)), z: Math.max(...corners.map((c) => c.z)) }
+      } }
+    } else if (model.kind === "cylinder") {
       const n = Math.max(16, Math.min(512, Math.round(model.segments ?? 128)))
       if (!(model.radius > 0) || !(model.z1 > model.z0) || ![model.center.x, model.center.y, model.radius, model.z0, model.z1].every(Number.isFinite)) {
         return { status: "failed", issues: [issue("InvalidInput", "prepare", "A cylinder stock needs a finite centre and a positive radius and height")] }
@@ -223,10 +244,13 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
       if (m.indices.length < 12 || !m.positions.every(Number.isFinite)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "A mesh stock needs a closed solid with finite coordinates")] }
       stockMeshes = [m]
     }
-    const b = boundsOf(stockMeshes)
-    job = { ...job, stock: { min: { x: b.min[0], y: b.min[1], z: b.min[2] }, max: { x: b.max[0], y: b.max[1], z: b.max[2] } } }
+    if (stockMeshes !== undefined) {
+      const b = boundsOf(stockMeshes)
+      job = { ...job, stock: { min: { x: b.min[0], y: b.min[1], z: b.min[2] }, max: { x: b.max[0], y: b.max[1], z: b.max[2] } } }
+    }
   }
   const transform = setupTransform(job.setupOrientation ?? "+Z")
+  const stockColumns = residual === undefined ? undefined : carriedColumns(residual, transform)
   if (stockMeshes !== undefined && job.setupOrientation !== undefined && job.setupOrientation !== "+Z") stockMeshes = stockMeshes.map((mesh) => {
     const positions = new Float64Array(mesh.positions.length)
     for (let i = 0; i < positions.length; i += 3) {
@@ -322,7 +346,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     if (!tools.some((t) => t.id === op.tool)) issues.push(issue("UnknownTool", "prepare", `Operation ${op.id}: cutter '${op.tool}' is not in the library`, { operationId: op.id }))
   }
   if (issues.length > 0) return { status: "failed", issues }
-  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
+  return { status: "ok", value: { job, material, tools, machine, meshes, bounds, stock, ...(stockMeshes !== undefined ? { stockMesh: stockMeshes } : {}), ...(stockColumns !== undefined ? { stockColumns } : {}), origin, operations, plan, breadthNotes, finishAllowance, scallop, tolerance: chordTolerance(job) } }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -536,7 +560,21 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     for (let k = 0; k < p.length; k += 3) { p[k] = p[k]! - o.x; p[k + 1] = p[k + 1]! - o.y; p[k + 2] = p[k + 2]! - o.z }
     return { positions: p, indices: m.indices }
   })
+  // Air volume (mm³) under the seeded tops of a carried stock: solid is only what the earlier setup left in the column.
+  let stockAir = 0
   const seedStock = (f: HeightField): HeightField => {
+    if (prepared.stockColumns !== undefined) {
+      let air = 0
+      for (let j = 0; j < f.ny; j++) for (let i = 0; i < f.nx; i++) {
+        const c = prepared.stockColumns(f.centreX(i) + o.x, f.centreY(j) + o.y, f.floor + o.z, f.ceiling + o.z)
+        const k = j * f.nx + i
+        if (c.top === -Infinity) { f.top[k] = f.floor; continue }
+        f.top[k] = Math.max(f.floor, Math.min(f.ceiling, c.top - o.z))
+        air += Math.max(0, f.top[k]! - f.floor - c.solid)
+      }
+      stockAir = air * f.cellArea
+      return f
+    }
     if (stockShape === undefined) return f
     const t = f.rasterise(stockShape as unknown as ReadonlyArray<Mesh>)
     for (let k = 0; k < f.top.length; k++) f.top[k] = Math.min(f.top[k]!, Math.max(f.floor, t[k]!))
@@ -1021,7 +1059,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   if (replayFactor > 1) issues.push(issue("UnsupportedCapability", "replay", `The stock replay of this program would pass its work budget at ${cell.toFixed(3)} mm: it ran at ${replayCellSize.toFixed(3)} mm (cell x ${replayFactor}), so the stock-replay term of the tolerance budget grew to ${(replayCellSize / 2).toFixed(3)} mm`, { severity: "warning" }))
   const rnx = Math.max(1, Math.ceil(width / replayCellSize)), rny = Math.max(1, Math.ceil(depthY / replayCellSize))
   const hf = seedStock(new HeightField(rnx, rny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z))
-  const initialVolume = hf.volume()
+  const initialVolume = hf.volume() - stockAir
   const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
   for (let k = 0; k < target.length; k++) if (target[k]! <= hf.floor + 1e-9) target[k] = Math.max(hf.floor, partBottom)
   // Lowest the cutter may go: the part, except below blind drilled holes where the point cone is the hole's bottom.
@@ -1538,24 +1576,32 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     })
     if (!met && release === "verified-program") release = "preview"
   }
-  return {
-    status: "ok",
-    value: {
+  const artifact: CamArtifact = {
       schemaVersion: KERNEL_SCHEMA_VERSION, jobId: job.id,
       material: { id: material.id, name: material.name, iso: material.iso },
       machine: { id: machine.id, name: machine.name, post: post.id },
       ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
       origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
-      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}) },
+      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume() - stockAir), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}) },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...planNotes(prepared), ...subprogramNotes(nc)],
       tolerance,
       ...(job.process !== undefined ? { process: buildProcessReport({ request: job.process, program, operations: finalOutcomes, tools: usedTools, material, rapidFeed: machine.rapidFeed ?? 10000, toolChangeSeconds: machine.toolChangeSeconds ?? 8, feedReports }) } : {}),
       ...(tipErr !== undefined ? { tipError: tipErr } : {})
-    }
   }
+  // The stock this program leaves, for the next setup (spec 69 C4); kept beside the artifact so the artifact stays small plain data.
+  RESIDUALS.set(artifact, { orientation: job.setupOrientation ?? "+Z", origin, nx: hf.nx, ny: hf.ny, minX: hf.minX, minY: hf.minY, cellX: hf.cellX, cellY: hf.cellY, floor: hf.floor, top: Float64Array.from(hf.top) })
+  return { status: "ok", value: artifact }
 }
+
+const RESIDUALS = new WeakMap<CamArtifact, ResidualStock>()
+
+/**
+ * The stock a run left, as a height field in the setup's work frame (spec 69 C4), or `undefined` for an artifact that did not come from
+ * a milling run. Exact for the three-axis cuts the height field carries; the five-axis removal is bracketed on the voxel stock instead.
+ */
+export const residualOf = (artifact: CamArtifact): ResidualStock | undefined => RESIDUALS.get(artifact)
 
 /** One note when the NC calls subprograms (`post.options.subprograms`): how many, how many calls, how many blocks they save. */
 const subprogramNotes = (nc: string): ReadonlyArray<string> => {

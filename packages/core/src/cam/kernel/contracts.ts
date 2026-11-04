@@ -33,8 +33,29 @@ export interface StockBox {
  * moves reads a mesh stock by its top surface (a hollow stock is not modelled).
  */
 export type StockModel =
+  /** What an earlier setup left (spec 69 C4); built by `runSetups` with `carryStock`, never typed by a person. See `ResidualStock`. */
+  | { readonly kind: "residual"; readonly residual: ResidualStock }
   | { readonly kind: "cylinder"; readonly center: Vec2; readonly radius: number; readonly z0: number; readonly z1: number; readonly segments?: number }
   | { readonly kind: "mesh"; readonly mesh: { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> } }
+
+/**
+ * The stock a replayed setup left (spec 69 C4): the final height field of the setup, in the setup's oriented work coordinates. Solid
+ * from `floor` up to `top[j * nx + i]` in column `(i, j)` of the grid that starts at `(minX, minY)` with cells `cellX` x `cellY`; the
+ * work frame is the oriented setup frame (`orientation`) shifted by `origin`. The next setup reads it through its own frame.
+ * A height field is exact for the three-axis work that made it; five-axis removal is not in it (the setup's artifact says so).
+ */
+export interface ResidualStock {
+  readonly orientation: SetupOrientation
+  readonly origin: Vec3
+  readonly nx: number
+  readonly ny: number
+  readonly minX: number
+  readonly minY: number
+  readonly cellX: number
+  readonly cellY: number
+  readonly floor: number
+  readonly top: Float64Array
+}
 
 /**
  * A workholding body (spec 69 C3): a vise jaw, clamp, parallel or fixture block, as an axis-aligned box in CAD world coordinates (the
@@ -377,6 +398,11 @@ export interface ManufacturingJob {
    * with a list they are the defaults of a setup that does not name its own (`workOffset` and `setupOrientation` are always the setup's).
    */
   readonly setups?: ReadonlyArray<JobSetup>
+  /**
+   * `runSetups` hands each setup the stock the previous one left, not the raw stock again (spec 69 C4): a setup rest-machines what the
+   * earlier ones left, and the removal of the setups adds up. Off by default (a stored multi-setup job keeps its figures).
+   */
+  readonly carryStock?: boolean
   /** Cutter library; default `DEFAULT_CUTTERS`. */
   readonly tools?: ReadonlyArray<Cutter>
   readonly machine?: KernelMachine
