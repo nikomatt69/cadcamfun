@@ -165,9 +165,12 @@ describe("exact replay of a parametric history", () => {
     expect(rounded.bodies[0]!.reason).toBeUndefined()
     expect(validateBrep(rounded.bodies[0]!.brep!).issues).toEqual([])
     expect(rel(massProperties(rounded.bodies[0]!.brep!).volume, meshVolume(rounded.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
-    // A rounded profile corner's arc is not a rim the exact blend takes: the reason, not an approximation.
+    // A rounded profile corner's arc is an arc of a rim: the exact blend takes it (cones at the corners), as the mesh rebuild does.
     const both = { ...plate(), features: plate().features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 }, edge: { style: "chamfer" as const, size: 1 } } : f)) }
-    expect(rebuildExact(both).bodies[0]!.reason).toContain("straight edges and full circles only")
+    const roundedPlate = rebuildExact(both)
+    expect(roundedPlate.bodies[0]!.reason).toBeUndefined()
+    expect(validateBrep(roundedPlate.bodies[0]!.brep!).issues).toEqual([])
+    expect(rel(massProperties(roundedPlate.bodies[0]!.brep!).volume, meshVolume(roundedPlate.result.bodies[0]!.mesh))).toBeLessThan(5e-3)
   }, 180_000)
 
   test("a drafted extrusion leans its walls exactly: planes tilt, arcs become cones, holes widen towards the top", () => {
