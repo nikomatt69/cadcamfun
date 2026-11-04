@@ -141,7 +141,7 @@ const _print: [typeof PrintRequirementSchema.Type] extends [PrintRequirement] ? 
 void _print
 
 /** A workholding body (`FixtureBody`): an axis-aligned box in CAD world coordinates. */
-export const FixtureBodySchema = Schema.Struct({ id, min: vec3, max: vec3 })
+export const FixtureBodySchema = Schema.Struct({ id, min: vec3, max: vec3, role: Schema.optionalKey(Schema.Literals(["jaw", "clamp", "support"])) })
 
 /** A stock that is not a box (`StockModel`): a vertical bar or a closed mesh in CAD world coordinates. */
 export const StockModelSchema = Schema.Union([
@@ -154,10 +154,13 @@ export const StockModelSchema = Schema.Union([
 
 const stockBox = Schema.Struct({ min: vec3, max: vec3 })
 
+/** A tilted work plane for a 3+2 setup (`Workplane`, spec 69 C1). */
+export const WorkplaneSchema = Schema.Struct({ normal: vec3, xHint: Schema.optionalKey(vec3) })
+
 /** One fixing of the part (`JobSetup`, spec 69 C1). */
 export const JobSetupSchema = Schema.Struct({
   id, name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(120))),
-  orientation: Schema.optionalKey(SetupOrientationSchema), origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
+  orientation: Schema.optionalKey(SetupOrientationSchema), workplane: Schema.optionalKey(WorkplaneSchema), origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
   workOffset: Schema.optionalKey(WorkOffsetSchema), stock: Schema.optionalKey(stockBox), stockModel: Schema.optionalKey(StockModelSchema),
   fixtures: Schema.optionalKey(Schema.Array(FixtureBodySchema).check(Schema.isMaxLength(64))),
   operations: Schema.optionalKey(Schema.Array(OperationSpecSchema).check(Schema.isMaxLength(2000)))

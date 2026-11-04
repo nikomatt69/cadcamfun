@@ -14,12 +14,13 @@
  */
 import { applyPoint } from "../../cad/brep/math.ts"
 import type { WorkOffset } from "../ir.ts"
-import { setupTransform, type SetupOrientation } from "../setup.ts"
+import type { SetupOrientation } from "../setup.ts"
+import { jobTransform } from "./workplane.ts"
 import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
-import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel } from "./contracts.ts"
-import { runJob, type RunOptions } from "./execute.ts"
+import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel, Workplane } from "./contracts.ts"
+import { residualOf, runJob, type RunOptions } from "./execute.ts"
 
 export type { JobSetup }
 
@@ -72,6 +73,10 @@ export interface SetupsArtifact {
   readonly issues: ReadonlyArray<CamIssue>
   readonly notes: ReadonlyArray<string>
   readonly cycleTimeSeconds: number
+  /** Each setup started from the stock the one before left (`ManufacturingJob.carryStock`). */
+  readonly stockCarried?: boolean
+  /** Volume the setups removed together, mm³: the sum of each setup's initial less final stock volume. Additive only when `stockCarried`. */
+  readonly removedVolume?: number
 }
 
 const WORK_OFFSETS: ReadonlyArray<WorkOffset> = ["G54", "G55", "G56", "G57", "G58", "G59"]
@@ -83,8 +88,8 @@ const VERTICAL = 1e-3
  * Part surface area that some setup faces, by first setup, over the triangles of `meshes` (CAD world coordinates). A triangle of zero
  * area is ignored. Exact in the area sums; the "faces the spindle" test is the normal's sign in each setup's frame.
  */
-export const coverageOf = (meshes: ReadonlyArray<Mesh64>, setups: ReadonlyArray<{ readonly id: string; readonly orientation: SetupOrientation }>): Coverage => {
-  const frames = setups.map((s) => setupTransform(s.orientation))
+export const coverageOf = (meshes: ReadonlyArray<Mesh64>, setups: ReadonlyArray<{ readonly id: string; readonly orientation: SetupOrientation; readonly workplane?: Workplane }>): Coverage => {
+  const frames = setups.map((s) => jobTransform({ setupOrientation: s.orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}) }))
   const by: Record<string, number> = Object.fromEntries(setups.map((s) => [s.id, 0]))
   let total = 0, covered = 0
   for (const m of meshes) {
@@ -136,29 +141,34 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
   const runs: SetupRun[] = []
   const issues: CamIssue[] = []
   const { setups: _setups, ...base } = job
+  const carried = job.carryStock === true && setups.length > 1
   for (let k = 0; k < setups.length; k++) {
     const s = setups[k]!
     const orientation = s.orientation ?? "+Z"
     const offset = offsets[k]
     const one: ManufacturingJob = synthesised ? base : {
-      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation,
+      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}),
       ...(offset !== undefined ? { workOffset: offset } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.stock !== undefined ? { stock: s.stock } : {}), ...(s.stockModel !== undefined ? { stockModel: s.stockModel } : {}),
       ...(s.fixtures !== undefined ? { fixtures: s.fixtures } : {}), ...(s.operations !== undefined ? { operations: s.operations } : {})
     }
-    const r = runJob(one, options)
+    // Stock carried between setups (spec 69 C4): this setup starts from what the one before left.
+    const left = carried && k > 0 ? residualOf(runs[k - 1]!.artifact) : undefined
+    const job1: ManufacturingJob = left === undefined ? one : { ...one, stockModel: { kind: "residual", residual: left } }
+    const r = runJob(job1, options)
     if (r.status === "failed") return { status: "failed", issues: r.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })) }
     runs.push({ id: s.id, orientation, workOffset: offset ?? "G54", artifact: r.value })
     issues.push(...r.value.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })))
   }
 
+  const removed = runs.reduce((s, r) => s + (r.artifact.stock.initialVolume - r.artifact.stock.finalVolume), 0)
   // The part in CAD world coordinates, for the coverage.
   let meshes: Mesh64[] = []
   if (job.part.kind === "elements") {
     const built = partMeshes((job.part.elements as ReadonlyArray<CadElement>).filter((e) => e["type"] !== "workpiece") as never, { tolerance: job.quality?.tolerance ?? 0.01 })
     if (built !== undefined) meshes = [...built.meshes]
   } else meshes = job.part.meshes.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
-  const coverage = coverageOf(meshes, runs.map((r) => ({ id: r.id, orientation: r.orientation })))
+  const coverage = coverageOf(meshes, runs.map((r, i) => ({ id: r.id, orientation: r.orientation, ...(setups[i]!.workplane !== undefined ? { workplane: setups[i]!.workplane! } : {}) })))
   const complete = coverage.total > 0 && coverage.uncovered <= coverage.total * 1e-6
   const pct = (x: number): string => `${((100 * x) / Math.max(coverage.total, 1e-12)).toFixed(1)} %`
 
@@ -179,10 +189,13 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
     value: {
       jobId: job.id, setups: runs, claims, coverage, release, issues,
       notes: [
-        "The stock of every setup is its own raw stock: what an earlier setup removed is not carried into the next one, so the removal figures of the setups are not additive.",
+        carried
+          ? `The stock is carried: each setup starts from the stock the one before left (read through its own frame, within the cell of the earlier replay), so the removal of the setups adds up to ${Math.round(removed).toLocaleString("en-US")} mm³.`
+          : "The stock of every setup is its own raw stock: what an earlier setup removed is not carried into the next one, so the removal figures of the setups are not additive (set carryStock to carry it).",
         ...(runs.length > 1 ? [`Work offsets: ${runs.map((r) => `${r.id} ${r.workOffset}`).join(", ")}; each setup is its own program (refixture and touch off between them).`] : [])
       ],
-      cycleTimeSeconds: runs.reduce((s, r) => s + r.artifact.cycleTimeSeconds, 0)
+      cycleTimeSeconds: runs.reduce((s, r) => s + r.artifact.cycleTimeSeconds, 0),
+      stockCarried: carried, removedVolume: Math.round(removed)
     }
   }
 }
