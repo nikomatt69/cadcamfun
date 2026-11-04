@@ -42,8 +42,8 @@ const BASE = { x: 100, y: 200, z: -300 }
 const machineFor = (active: WorkOffsetRef, second: WorkOffsetRef): SimMachine => ({
   offsets: { entries: { G54: BASE, [formatOffsetRef(second)]: { x: 150, y: 250, z: -310 } } }, active, probe, start: { x: 0, y: 0, z: 30 }
 })
-const programOf = (name: string, moves: ReadonlyArray<Move>, ref: WorkOffsetRef): Program => ({
-  ...makeProgram(name, [{ id: "p", name: "probe", toolId: "probe", spindleRpm: 0, coolant: "off", moves: [{ _tag: "Rapid", to: { x: 0, y: 0, z: 30 } }, ...moves] }]),
+const programOf = (name: string, moves: ReadonlyArray<Move>, ref: WorkOffsetRef, start = { x: 0, y: 0, z: 30 }): Program => ({
+  ...makeProgram(name, [{ id: "p", name: "probe", toolId: "probe", spindleRpm: 0, coolant: "off", moves: [{ _tag: "Rapid", to: start }, ...moves] }]),
   ...(ref.kind === "g5x" ? {} : { workOffsetRef: ref })
 })
 const near = (a: number, b: number, eps = 3e-3): void => { expect(Math.abs(a - b)).toBeLessThanOrEqual(eps) }
@@ -127,9 +127,7 @@ describe("probe goldens replay to the IR's results", () => {
       const world = planeWorld({ x: 0, y: 0, z: setter.triggerZ + 7.25 }, { x: 0, y: 0, z: 1 })
       const machine: SimMachine = { ...machineFor(G54, dialect.second), start: { x: 300, y: -50, z: 200 } }
       const ir = runProbeMoves(moves, world, machine)
-      const program = { ...programOf(`probe ${id}`, moves, G54) }
-      program.toolpaths[0]!.moves = [{ _tag: "Rapid", to: { x: 300, y: -50, z: 200 } }, ...moves]
-      const text = posts[id].emit(program, { header: false })
+      const text = posts[id].emit(programOf(`probe ${id}`, moves, G54, { x: 300, y: -50, z: 200 }), { header: false })
       expectGolden(`probing/${id}-tool-length.nc`, text)
       const nc = simulateNc(text, { world, machine, codes: dialectOf(id)!.probing! })
       expect(nc.errors).toEqual([])
