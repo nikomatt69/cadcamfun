@@ -64,3 +64,14 @@ K6, K2, K3, K1 (needs spec 41 N3), D1–D3, K7, K8, K4, K5, D4, D5.
   reference (`driven`) dimensions. Bench `sketch.solve-529` 4-5 ms (529 constraints), `sketch.drag-200` 0.3 ms median (199 entities; target 8 ms), budgets in `bench.config.json`.
   AI: `cad.workflow` op `sketch` (solve, diagnose, drag). Still open: K1 (needs spec 41 refs), K2 NURBS/fit splines, K3 offset/fillet/patterns as relations, K4 3D sketch, K5 blocks,
   K8 desktop sketcher (adapter work), D1-D5.
+- 2026-11-04 (lane cad, branch cc/cad-2): **K3 core built, K1 projection built (not associative).** `cad/sketch-tools.ts` (exported from `@cadcamfun/core`):
+  `filletCorner(sketch, lineA, lineB, r)` (true arc, lines cut back to the tangent points, `tangentLineCircle` x2 + `radius`), `mirrorEntities(sketch, ids, axisLine)`
+  (`symmetric` per point, shared on-axis points, `equalRadius` for circles, arcs reversed), `patternEntities(sketch, ids, {kind: linear, count, step} | {kind: circular, count,
+  center, angle?})` (linear copies tied by `distanceX/Y` + `equalRadius` and follow edits; circular copies carry the rotation-invariant shape constraints and are placed by
+  distance/angle values frozen at creation), `offsetEntities(sketch, ids, d)` (closed chain: positive outward; open chain: positive left; circles; arcs keep the centre point,
+  lines `parallel`; sharp corners at the carriers' crossing, tangent joints stay joined), `projectEdges(sketch, brep, edgeIndices, frame)` (lines, end-on lines as points,
+  parallel circles/arcs, tilted full circles as ellipses; every point `fixed`; per-edge refusals with reasons: arcs of tilted circles, edge-on circles, ellipse/NURBS edges).
+  Solver: `tangentLineCircle` between a line and an arc that share an end point now uses the radius-square-to-the-line equation (the distance form is degenerate there and
+  made every fillet report as over-constrained). Tests `sketch-tools.test.ts` (13: analytic areas of filleted and offset rectangles, mirror follows an edit, linear pattern
+  fully constrained and following a radius edit, circular placement, projection of box and cylinder edges, every refusal). Not done: chamfer 2D, path patterns, offsets of
+  splines/ellipses, associative projection (re-project on rebuild by edge refs), intersect-with-sketch-plane, 3D sketch (K4), blocks (K5). API/AI exposure is lane C/D work.

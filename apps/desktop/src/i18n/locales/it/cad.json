@@ -1249,5 +1249,8 @@
   "cad.template.honeycombPattern.thickness.description": "Spessore del motivo",
   "cad.template.honeycombPattern.thickness.label": "Spessore",
   "cad.template.honeycombPattern.color.description": "Colore del motivo",
-  "cad.template.honeycombPattern.color.label": "Colore"
+  "cad.template.honeycombPattern.color.label": "Colore",
+  "cad.param.refLost": "Riferimento perso",
+  "cad.param.refLostBy": "rimosso da {feature}",
+  "cad.param.refLostSummary": "{count} selezioni puntano a facce o spigoli che non esistono più: quelle feature non sono costruite"
 }

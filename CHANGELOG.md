@@ -3,6 +3,58 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.87 (November 2026)
+
+- No notable changes
+
+## v0.1.86 (November 2026)
+
+## Core
+
+- Annotations attach to model entities by persistent reference (spec 49, spec 41 N6, P4-2)
+- Sketch fillet, mirror, pattern, offset and project-edges tools (spec 45 K3/K1, P2-10)
+- Incremental mesh rebuild resumes from the first dirty feature (spec 58 T4, P1-6)
+
+## Desktop
+
+- Show tool-result evidence and an answer's weakest release in the assistant
+- Save and load multi-operation setups with tool table and conflict UI
+
+## Sidecar
+
+- Process physics and tolerance gate over HTTP, cancellation proven end to end
+- Kernel reachability gate and routes for sheet, plan, multi-setup job and lathe
+
+## Web
+
+- Remove inline styles and import external CSS for better maintainability
+
+## v0.1.85 (November 2026)
+
+## Core
+
+- B6 tip-error gate for tool-centre-point output
+- Machining limits - boundary and avoid regions (spec 69 C7)
+- Effect v4 integration checkpoint
+- Operation model - enable/disable, dependencies, copy/mirror/pattern (spec 69 C6)
+- ManufacturingJob.setups[] with a v1 job as one setup (spec 69 C1)
+- A5 gate uses a fixture that is clean at the fine cell, add the degraded-gouge soundness gate
+
+## Sidecar
+
+- Rebuild reports (feature states, blend/shell/boolean, healing, incremental baseline) and posting of saved setups
+- HTTP invocation of plugin AI tools with capability checks (P1-11)
+
+## API
+
+- Regenerate clients for CAM job model
+
+## v0.1.84 (November 2026)
+
+## Core
+
+- Templates, roughing breadth, probing, link optimisation (spec 60, 72 P2-3/P3-2/P3-4/P4-7) (#34)
+
 ## v0.1.83 (November 2026)
 
 ## Web

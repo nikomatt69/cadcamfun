@@ -1722,6 +1722,19 @@
   font-size: 11px;
 }
 
+/* The evidence of a result: the release level, the claims, a verdict, a write receipt (`ToolEvidence.tsx`). */
+.assistant-tool-evidence {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.assistant-tool-chip[data-tone="ok"] { border-color: var(--assistant-ok); color: var(--assistant-ok); }
+.assistant-tool-chip[data-tone="warn"] { border-color: var(--assistant-warn); color: var(--assistant-warn); }
+.assistant-tool-chip[data-tone="error"] { border-color: var(--assistant-coral); color: var(--assistant-coral); }
+
 .assistant-tool-lines,
 .assistant-tool-issues {
   display: flex;

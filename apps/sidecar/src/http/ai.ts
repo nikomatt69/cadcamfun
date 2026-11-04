@@ -1,6 +1,6 @@
 import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, isolatedPaths, readModIndex, removeMod, replyHostPermission, setModEnabled, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
-  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError, MAX_SESSION_PAGE, StreamChatBody
+  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, Forbidden, NotFound, GcodeActionError, GcodeActionFailure, InternalError, MAX_SESSION_PAGE, StreamChatBody
 } from "@cadcamfun/api"
 import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -490,6 +490,24 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return yield* pluginList
     }))
     .handle("extensionPlugins", () => Effect.gen(function*() { yield* extensionAccess; return yield* pluginList }))
+    .handle("extensionPluginTools", () => Effect.gen(function*() {
+      yield* extensionAccess
+      return { tools: plugins.listing().map((tool) => ({ pluginId: tool.pluginId, pluginName: tool.pluginName, id: tool.id, description: tool.description, kind: tool.kind, parameters: tool.parameters as never })) }
+    }))
+    .handle("invokeExtensionPluginTool", ({ params, payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      const result = yield* plugins.invoke(params.id, params.toolId, payload.args, payload.confirm === true).pipe(
+        Effect.mapError((error) => {
+          switch (error.kind) {
+            case "unknown": return new NotFound({ message: error.message })
+            case "invalid": return new BadRequest({ message: error.message })
+            case "forbidden": return new Forbidden({ message: error.message })
+            case "failed": return new InternalError({ message: error.message })
+          }
+        })
+      )
+      return { pluginId: params.id, toolId: params.toolId, result: (result ?? null) as never }
+    }))
     .handle("installExtensionPlugin", ({ payload }) => Effect.gen(function*() {
       yield* extensionAccess
       yield* plugins.install(payload.manifest, payload.source, payload.files).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))

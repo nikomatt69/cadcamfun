@@ -8,7 +8,7 @@ import { meshBounds } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
-import { KERNEL_SCHEMA_VERSION, type CamResult, type JobBreadth, type ManufacturingJob, type OperationSpec, type PrintRequirement, type TabRequirement, type WorkOrigin } from "./contracts.ts"
+import { KERNEL_SCHEMA_VERSION, type CamResult, type JobBreadth, type JobSetup, type ManufacturingJob, type OperationSpec, type PrintRequirement, type TabRequirement, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
 import { findMachine, MACHINE_CATALOGUE } from "./machines.ts"
 import { kernelMachineOfConfig, machineRefusal, type MachineConfigRow } from "./machine-config.ts"
@@ -49,6 +49,8 @@ export interface KernelSnapshot {
   /** The editor's stock: centre X/Y and size; its bottom is the part's lowest point. */
   readonly stock?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth: number }
   readonly operations?: ReadonlyArray<OperationSpec>
+  /** Several fixings of the part (spec 69 C1); run with `runSetups`. The snapshot's own orientation, stock, offset and operations are the defaults of a setup that names none. */
+  readonly setups?: ReadonlyArray<JobSetup>
   readonly tools?: ReadonlyArray<Cutter>
 }
 
@@ -81,7 +83,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       part: { kind: "elements", elements: s.elements }, ...(machine !== undefined ? { machine } : {}), ...(stock !== undefined ? { stock } : {}),
       ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
-      ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
+      ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.setups !== undefined ? { setups: s.setups } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
       ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true || s.postDefinition !== undefined
         ? { post: {
           ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}), ...(s.nativeCycles === true ? { nativeCycles: true } : {}), ...(s.tcp === true ? { tcp: true } : {}) } } : {}),

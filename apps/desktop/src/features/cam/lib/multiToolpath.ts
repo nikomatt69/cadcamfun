@@ -1,6 +1,7 @@
 /**
  * The multi-toolpath model (legacy `multiToolpathStore.ts`): one toolpath per CAD element, an execution order, a
- * colour, visibility and a combined program.
+ * colour and visibility. The panel's program is the setup's (`lib/setup.ts` -> `camSetup.generate`, one program with the tool
+ * changes inside it), never a concatenation of the toolpaths' texts.
  *
  * Pure reducers over a state snapshot; the Solid store (`cam/store/multiToolpathStore.ts`) wires them to signals and
  * persistence. Everything is immutable (the legacy store sorted and mutated arrays in place).
@@ -240,30 +241,6 @@ export const applyGlobalSettingsToSelected = (state: MultiToolpathState): MultiT
       : toolpath
   )
 })
-
-/**
- * One text from every generated toolpath, in execution order (legacy `generateCombinedGCode`).
- *
- * @deprecated Not a program: every block keeps its own header, `M30` and `%`, and no tool change is written (spec 14 §1). The panel
- * downloads through the setup path (`lib/setup.ts` -> `camSetup.generate`); this stays only for the legacy text view and its test.
- */
-export const combineGCode = (toolpaths: ReadonlyArray<ElementToolpath>, stamp: string = new Date().toISOString()): string => {
-  const ordered = byOrder(toolpaths)
-  let text = "; Combined G-Code from Multiple Toolpaths\n"
-  text += `; Generated: ${stamp}\n`
-  text += `; Total toolpaths: ${ordered.length}\n\n`
-  ordered.forEach((toolpath, index) => {
-    if (!toolpath.gcode) return
-    text += `\n; ===== Toolpath ${index + 1}: ${toolpath.elementName} =====\n`
-    text += `; Element Type: ${toolpath.elementType}\n`
-    text += `; Tool: Ø${toolpath.toolpathSettings.toolDiameter}mm\n`
-    text += `; Color: ${toolpath.color}\n\n`
-    text += toolpath.gcode
-    text += "\n"
-  })
-  text += "\n; ===== End of Combined G-Code =====\n"
-  return text
-}
 
 export const statistics = (toolpaths: ReadonlyArray<ElementToolpath>) => ({
   totalToolpaths: toolpaths.length,
