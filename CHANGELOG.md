@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.90 (November 2026)
+
+## Core
+
+- Remove trailing whitespace in BoundedCacheOptions interface
+
 ## v0.1.89 (November 2026)
 
 ## Core
