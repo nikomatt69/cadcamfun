@@ -33,7 +33,7 @@ const DIALECTS: ReadonlyArray<Dialect> = [
   { id: "generic", second: { kind: "extended", p: 3 }, report: true, alarmCode: false },
   { id: "okuma", second: { kind: "extended", p: 3 }, report: false, alarmCode: true },
   { id: "linuxcnc", second: { kind: "linuxcnc", p: 8 }, report: true, alarmCode: true },
-  { id: "siemens", second: { kind: "frame", n: 5 }, report: false, alarmCode: true }
+  { id: "siemens", second: { kind: "frame", n: 5 }, report: true, alarmCode: true }
 ]
 
 const routineOf = (cycle: ProbeCycle) => {

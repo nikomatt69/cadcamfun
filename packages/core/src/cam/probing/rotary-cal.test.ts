@@ -88,3 +88,39 @@ describe("rotary axis calibration", () => {
     expect("refused" in calibrateRotary([{ x: 0, y: 0, z: 0 }], [0], assumed, "C")).toBe(true)
   })
 })
+
+describe("the pivot on the control, for the symmetric patterns", () => {
+  const DEG2 = Math.PI / 180
+  const probeDev = deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: 4 })
+  const ctx2: ProbeContext = { probe: probeDev, safeZ: 300, clearance: 3, search: 6, prefix: "cal" }
+  const sphere = { centre: { x: 80, y: 50, z: 60 }, diameter: 25 }
+  const assumed = { layout: "table-AC" as const, pivot: { x: 10, y: 20, z: 5 } }
+  const truePivot = { x: 10.03, y: 19.98, z: 5.05 }
+  const run = (axis: "A" | "C", angles: ReadonlyArray<number>) => {
+    const r = rotaryRoutine({ kind: "rotary-axis", axis, sphere, angles }, ctx2, assumed)
+    if ("refused" in r) throw new Error(r.refused)
+    const out = runProbeMoves(r.moves, sphereWorld(sphere.centre, 12.5), { offsets: { entries: {} }, active: { kind: "g5x", code: "G54" }, probe: probeDev, start: { x: 0, y: 0, z: 300 }, kinematics: { layout: "table-AC", pivot: assumed.pivot, truePivot } }, { results: r.results, units: r.units })
+    expect(out.stopped).toBeUndefined()
+    const centres = angles.map((_, i) => ({ x: out.results[`x${i}`]!, y: out.results[`y${i}`]!, z: out.results[`z${i}`]! }))
+    const fit = calibrateRotary(centres, angles, assumed, axis)
+    if ("refused" in fit) throw new Error(fit.refused)
+    return { results: out.results, fit, routine: r }
+  }
+  test("C at equally spaced angles: the mean is the host's fit", () => {
+    const { results, fit, routine } = run("C", [0, 72, 144, 216, 288].map((d) => d * DEG2))
+    expect(results["pivotX"]!).toBeCloseTo(fit.pivot.x, 9)
+    expect(results["pivotY"]!).toBeCloseTo(fit.pivot.y, 9)
+    expect(results["pivotX"]!).toBeCloseTo(truePivot.x, 9)
+    expect(routine.moves.some((m) => m._tag === "Report" && m.values.some((v) => v.name === "pivotX"))).toBe(true)
+  })
+  test("A at 0, +a, -a: the circle through three points is the host's fit", () => {
+    const { results, fit } = run("A", [0, 20, -20].map((d) => d * DEG2))
+    expect(results["pivotY"]!).toBeCloseTo(fit.pivot.y, 8)
+    expect(results["pivotZ"]!).toBeCloseTo(fit.pivot.z, 8)
+    expect(results["pivotY"]!).toBeCloseTo(truePivot.y, 8)
+    expect(results["pivotZ"]!).toBeCloseTo(truePivot.z, 8)
+  })
+  test("any other pattern leaves it to the host", () => {
+    expect(run("C", [0, 40, 100].map((d) => d * DEG2)).results["pivotX"]).toBeUndefined()
+  })
+})

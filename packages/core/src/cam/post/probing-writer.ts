@@ -219,12 +219,15 @@ export const alarmBlocks = (m: AlarmMove, io: ProbeIo): string[] => alarmLines(m
 export const stopBlock = (optional: boolean): string => (optional ? "M1" : "M0")
 
 /** Report values to the control's output channel: one line per value, the label and the name in the text. */
+/** The declaration a Siemens program with a report starts with. */
+export const SIEMENS_REPORT_DEF = "DEF INT PERR"
+
 export const reportLines = (m: ReportMove, io: ProbeIo): string[] => {
   for (const v of m.values) {
     const p = exprProblem(v.value)
     if (p !== undefined) throw new RangeError(`Bad expression in a report: ${p}`)
   }
-  const label = cleanText(m.label).replace(/[^A-Z0-9 ]/g, "").replace(/ +/g, "*")
+  const label = cleanText(m.label).replace(/[^A-Z0-9 ]/g, "").replace(/ +/g, io.codes.syntax === "siemens" ? "_" : "*")
   switch (io.codes.syntax) {
     case "fanuc": {
       const lines: string[] = ["POPEN"]
@@ -245,6 +248,18 @@ export const reportLines = (m: ReportMove, io: ProbeIo): string[] => {
       })
       return lines
     }
+    case "siemens": {
+      // `DEF INT PERR` is written at the head of the program (`SIEMENS_REPORT_DEF`): WRITE needs its error variable declared.
+      const lines: string[] = []
+      m.values.forEach((v, i) => {
+        const ref: VarRef = { name: `prt${i}` }
+        lines.push(...io.macro.node({ _tag: "Assign", variable: ref, value: v.value }))
+        lines.push(`WRITE(PERR,"PROBE_REPORT","${label} ${v.name.toUpperCase().replace(/[^A-Z0-9]/g, "")}="<<${varText(io, ref)})`)
+      })
+      return lines
+    }
+    case "heidenhain":
+      return refuse(io, "a report (FN 16 prints through a format file that must stand on the control beside the program: read the result parameters instead)")
     default:
       return refuse(io, "a report (no output channel the writer can set up on this control: read the result variables instead)")
   }

@@ -9,6 +9,7 @@
  * fit. Nothing here writes a machine parameter: the result is reported (the control's own cycle 451 / CYCLE996 writes it).
  */
 import type { Vec3 } from "../../cad/vec.ts"
+import { binary, call, type Expr, type VarRef } from "../macro.ts"
 import type { Move } from "../ir.ts"
 import type { RotaryLayout } from "../indexing.ts"
 import { fitCircle3, isRefused } from "./fit.ts"
@@ -64,10 +65,58 @@ export const rotaryRoutine = (cycle: Extract<ProbeCycle, { readonly kind: "rotar
     }
     contacts.push(...r.contacts.map((c) => ({ ...c, name: `c${i}_${c.name}` })))
   }
+  // A symmetric pattern has a closed form the control computes itself: the same axis the host's fit finds when the axis is not leaning.
+  const symmetric = symmetricPivot(cycle, results, `${ctx.prefix}`)
+  if (symmetric !== undefined) {
+    const planar = cycle.axis === "C" ? (["x", "y"] as const) : cycle.axis === "A" ? (["y", "z"] as const) : (["x", "z"] as const)
+    moves.push(...symmetric.moves)
+    for (const [k, axis] of planar.entries()) {
+      const name = `pivot${axis.toUpperCase()}`
+      results[name] = symmetric.pivot[k]!
+      nominal[name] = assumed.pivot[axis]
+      units[name] = "mm"
+      values.push({ name, value: symmetric.pivot[k]! })
+    }
+    notes.push(cycle.axis === "C" ? "the control computes the pivot as the mean of the equally spaced centres" : "the control computes the pivot as the circle through the centres at 0 and plus and minus the angle")
+  }
   // The table goes back: what follows in the program is written for it at zero.
   moves.push({ _tag: "Orient", ...(cycle.axis === "A" ? { a: 0 } : cycle.axis === "B" ? { b: 0 } : { c: 0 }) })
   moves.push({ _tag: "Report", label: "ROTARY", values })
   return { cycle, moves, contacts, results, nominal, units, notes }
+}
+
+/**
+ * The pivot in the plane of the axis, as moves on the control, for the two patterns with a closed form: C at N equally spaced angles round
+ * the circle (the mean of the centres), A or B at 0, +a, -a (the circle through three points, the middle one on its axis of symmetry).
+ * Undefined for any other pattern: the host's fit then is the only result.
+ */
+const symmetricPivot = (cycle: Extract<ProbeCycle, { readonly kind: "rotary-axis" }>, results: Readonly<Record<string, Expr>>, prefix: string): { readonly moves: ReadonlyArray<Move>; readonly pivot: readonly [Expr, Expr] } | undefined => {
+  const n = cycle.angles.length
+  const v = (name: string): VarRef => ({ name: `${prefix}${name}` })
+  const set = (out: Move[], name: string, value: Expr): Expr => { out.push({ _tag: "Assign", variable: v(name), value }); return { var: v(name) } }
+  if (cycle.axis === "C") {
+    const sorted = [...cycle.angles].sort((a, b) => a - b)
+    const step = (2 * Math.PI) / n
+    if (!sorted.every((a, i) => i === 0 || Math.abs(a - sorted[i - 1]! - step) < 1e-9)) return undefined
+    const moves: Move[] = []
+    const mean = (k: "x" | "y"): Expr => set(moves, `pv${k}`, binary("/", cycle.angles.map((_, i) => results[`${k}${i}`]!).reduce((s, e) => binary("+", s, e)), n))
+    return { moves, pivot: [mean("x"), mean("y")] }
+  }
+  if (n !== 3) return undefined
+  const zero = cycle.angles.findIndex((a) => Math.abs(a) < 1e-9)
+  const others = [0, 1, 2].filter((i) => i !== zero)
+  if (zero < 0 || Math.abs(cycle.angles[others[0]!]! + cycle.angles[others[1]!]!) > 1e-9) return undefined
+  const u = cycle.axis === "A" ? "y" : "x"
+  const at = (i: number, k: string): Expr => results[`${k}${i}`]!
+  const moves: Move[] = []
+  const [p, m] = others as [number, number]
+  // M: the middle of the two turned centres; the circle's centre lies on the line from the centre at zero through M.
+  const mu = set(moves, "pvmu", binary("*", binary("+", at(p, u), at(m, u)), 0.5)), mz = set(moves, "pvmz", binary("*", binary("+", at(p, "z"), at(m, "z")), 0.5))
+  const du = set(moves, "pvdu", binary("-", mu, at(zero, u))), dz = set(moves, "pvdz", binary("-", mz, at(zero, "z")))
+  const d = set(moves, "pvd", call("hypot", du, dz))
+  const h = set(moves, "pvh", binary("*", call("hypot", binary("-", at(p, u), at(m, u)), binary("-", at(p, "z"), at(m, "z"))), 0.5))
+  const k = set(moves, "pvk", binary("/", binary("+", binary("*", d, d), binary("*", h, h)), binary("*", binary("*", 2, d), d)))
+  return { moves, pivot: [set(moves, "pvu", binary("+", at(zero, u), binary("*", du, k))), set(moves, "pvz", binary("+", at(zero, "z"), binary("*", dz, k)))] }
 }
 
 export interface RotaryCalibration {

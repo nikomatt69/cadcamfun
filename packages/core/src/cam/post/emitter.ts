@@ -38,7 +38,7 @@ import { assertCycleSafe } from "../cycle-safety.ts"
 import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
-import { alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, rotationLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
+import { SIEMENS_REPORT_DEF, alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, rotationLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
 import { addressOf } from "../work-offset.ts"
 import { isKlartextProbeCycle, klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import { lowerExprDepth, type WordExpr } from "../macro.ts"
@@ -1207,6 +1207,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     })
     for (const g of plan?.groups ?? []) w.comment(`SUBPROGRAM O${g.number}: ${program.toolpaths[g.leader]!.name} X${g.members.length}`)
   }
+  if (dialect.probing?.syntax === "siemens" && program.toolpaths.some((tp) => tp.moves.some((m) => m._tag === "Report"))) w.block(SIEMENS_REPORT_DEF)
   w.block(program.units === "inch" ? (dialect.unitCodes?.inch ?? "G20") : (dialect.unitCodes?.mm ?? "G21"), ...dialect.setup)
   w.block(selectOffset(program, options, dialect))
 

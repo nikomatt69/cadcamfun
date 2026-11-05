@@ -628,6 +628,8 @@ export const expandMacros = (source: string, options: ExpandOptions = {}): Expan
       const setal = /^SETAL\s*\(\s*(\d+)/i.exec(code)
       if (setal !== null) { const n = Number(setal[1]); alarm(n >= 61000 ? n - 61000 : n, lastMessage, line); return }
       if (/^SETAL\b/i.test(code)) { alarm(0, lastMessage, line); return }
+      const wr = /^WRITE\s*\(\s*\w+\s*,\s*"[^"]*"\s*,\s*"([^"=]*?)\s+([^"= ]+)="\s*<<\s*(.+)\)$/i.exec(code)
+      if (wr !== null) { hostRan(`DPRNT[${wr[1]}*${wr[2]}*${val(wr[3]!, line)}]`, line); pc++; return }
       if (/^(MSG|STOPRE)\b/i.test(code)) { lastMessage = /MSG\s*\(\s*"([^"]*)"/i.exec(rawLine)?.[1] ?? lastMessage; pc++; return }
       const sys = /^(\$[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?)\s*=\s*(.+)$/.exec(code)
       if (sys !== null) { write(sys[1]!.toUpperCase().replace(/\s+/g, ""), val(sys[2]!, line)); pc++; return }
