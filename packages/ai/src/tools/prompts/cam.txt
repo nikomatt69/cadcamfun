@@ -3,7 +3,7 @@ Call with action and its fields; previews persist nothing.
 
 Actions and Parameters (mm, mm/min, rpm)
 - machine: machineType (mill|lathe|3dprinter), gcode or operationId, params, at (seconds). Viewer timeline, tooling, B/C poses, limits.
-- operations, stock: no parameters; saved operations, configured stock.
+- operations, stock: no parameters.
 - plan_check: operations (1-8 of {type, params}), expectedRevision. A pass checks the plan, not the machined part.
 - regenerate: operationId, scope program|drawing; preview of a fresh program with diff, safe flag.
 - setup_sheet: operationId; tools, operations, times of a kernel program.
@@ -11,7 +11,7 @@ Actions and Parameters (mm, mm/min, rpm)
 - suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material).
 - compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}).
 - analyze: operationId (full stored NC) or gcode; machineType adds axis checks. Empty findings never mean safe.
-- vision: focus; viewport/toolpath image and line-numbered program sheet (sent whenever the editor shows code).
+- vision: focus; viewport/toolpath image and line-numbered program sheet.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
 - setup_plan: setup {id,name,machineType,workOffset,post,grouping,retractBeforeToolChange,operations[{id,name,elementIds,params,tool,enabled,fromPreviousStock,workpieceIds?}],workpieces?[{id,name,workOffset,placement?}],workpieceOrder?}; programs, tools, changes, issues. Workpieces: parts of one fixture, one offset each.
@@ -22,8 +22,8 @@ Actions and Parameters (mm, mm/min, rpm)
 - process: gcode|operationId, tool, material, machine, rpm, stock, mode engagement|chip|power, post; load per move, optimised feeds.
 - post_test: post, gcode?, expected?; replay checks.
 - verify_nc: gcode|operationId, part {elements|meshes}, origin (work zero), stock {minX..maxZ} (work frame), tools [{number,diameter,flutes,kind?,holderDiameter?,holderLength?}], machine, tolerance, allowance, cell; replays foreign NC on the tri-dexel stock: gouge with NC line, rapids in stock, travel. clean|faults|incomplete; clean is not controller acceptance.
-- manufacture: material, machine, machineConfig, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, tabs {count,width,height}, breadth {holeCycles,tilted,namedFeatures}, operations, tools, subprograms, nativeCycles, tcp (five-axis machine, post with a tip-control word; else refused), smoothing (mm contour tolerance), postDefinitionId (library post) or postDefinition, planOnly. A cone or cylinder wall is flank-cut on a 5-axis machine by an operation {strategy:multiaxis, mode:swarf, near:[a point on the wall]} (cad exact lists swarfWalls with their near points; plan the roughing first). Library machineConfig (workVolume, maxSpindleSpeed, maxFeedRate, controller, axes, rotary) wins over machine. Manual setups use workOffset, no invented rotary motion. Printers (printer-* or printer machineConfig): material=filament; print sets layerHeight, walls, infillDensity, infillPattern, supports, adhesion, vase, printSpeed, nozzleTemperature, bedTemperature, fan, orientation (auto|as-designed).
-- job: op plan|run, material, machine, part {elements|meshes}, tools, quality {resolution,tolerance,enforceTolerance,...}, setups (1-6 of {id,orientation,workOffset,stock,stockModel,fixtures,operations}), nc (lines). Read release, failed/unresolved claims and reasons, coverage, tolerance terms (skill cam-five-axis).
+- manufacture: material, machine, machineConfig, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), setups (1-6, own program and datum each; pattern {count,dx,dy}=N parts), carryStock, finishAllowance, scallop, deburr, tabs {count,width,height}, breadth {holeCycles,tilted,namedFeatures}, operations, tools, subprograms, nativeCycles, tcp (five-axis machine, post with a tip-control word; else refused), smoothing (mm contour tolerance), postDefinitionId (library post) or postDefinition, planOnly. A cone or cylinder wall is flank-cut on a 5-axis machine by an operation {strategy:multiaxis, mode:swarf, near:[a point on the wall]} (cad exact lists swarfWalls with their near points; plan the roughing first). Library machineConfig (workVolume, maxSpindleSpeed, maxFeedRate, controller, axes, rotary) wins over machine. Manual setups use workOffset, no invented rotary motion. Printers (printer-* or printer machineConfig): material=filament; print sets layerHeight, walls, infillDensity, infillPattern, supports, adhesion, vase, printSpeed, nozzleTemperature, bedTemperature, fan, orientation (auto|as-designed).
+- job: op plan|run, material, machine, part {elements|meshes}, tools, quality {resolution,tolerance,enforceTolerance,...}, setups (1-6 of {id,orientation,workOffset,stock,stockModel,fixtures,operations}), nc (lines). Read release, failed/unresolved claims and reasons, coverage, tolerance terms.
 - turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm, machine, machineConfig. Z0 at face, negative towards chuck, X diameter. External rough/finish, stock profiles, G18/G94/G97 NC; machine bounds bar and spindle. stock = part + unmachined tail + removed. Point-tool preview; save via cam_edit turn. Mill-turn uses B head and positioned C spindle.
 
 Result (JSON)

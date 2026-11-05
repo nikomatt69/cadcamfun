@@ -244,7 +244,9 @@ const setupGenerated = Schema.Struct({
 })
 const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })
 
-const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, ...drawingRef })
+/** A job of several setups stores one program per setup: `operationId` is the first; `programIds`, `workOffsets` and `releases` map each setup id to its program, datum and own release. */
+const bySetup = Schema.Record(Schema.String, Schema.String)
+const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, programIds: Schema.optionalKey(bySetup), workOffsets: Schema.optionalKey(bySetup), releases: Schema.optionalKey(bySetup), ...drawingRef })
 const operationCreated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, name: str, drawing: str, elements: int })
 const operationUpdated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, settings: record, note: str })
 /** A generated program: its statistics and the first lines. A failed generation is a refusal, never an empty preview. */

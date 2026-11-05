@@ -4691,6 +4691,7 @@ export type CamSetupPlanPayload = {
         | { readonly kind: "linuxcnc"; readonly p: number }
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+      readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -4915,6 +4916,7 @@ export type CamSetupValidatePayload = {
         | { readonly kind: "linuxcnc"; readonly p: number }
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+      readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -5139,6 +5141,7 @@ export type CamSetupGeneratePayload = {
         | { readonly kind: "linuxcnc"; readonly p: number }
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+      readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -5672,6 +5675,7 @@ export type CamSetupSavePayload = {
         | { readonly kind: "linuxcnc"; readonly p: number }
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+      readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -5897,6 +5901,7 @@ export type CamSetupUpdatePayload = {
         | { readonly kind: "linuxcnc"; readonly p: number }
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+      readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -13899,6 +13904,7 @@ export type CamSetupListOutput = Array<{
         | { kind: "linuxcnc"; p: number }
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
+      index?: { a?: number; b?: number; c?: number }
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -14122,6 +14128,7 @@ export type CamSetupSaveOutput = {
         | { kind: "linuxcnc"; p: number }
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
+      index?: { a?: number; b?: number; c?: number }
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -14344,6 +14351,7 @@ export type CamSetupGetOutput = {
         | { kind: "linuxcnc"; p: number }
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
+      index?: { a?: number; b?: number; c?: number }
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -14569,6 +14577,7 @@ export type CamSetupUpdateOutput = {
         | { kind: "linuxcnc"; p: number }
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
+      index?: { a?: number; b?: number; c?: number }
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number

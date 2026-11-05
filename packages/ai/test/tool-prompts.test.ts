@@ -104,7 +104,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +400: cam_edit probe / probe_run / probe_apply and the machine probing fields of library_edit (spec 73).
     // +150: cam setup_plan workpieces (several parts on one fixture, one work offset each).
     // +100: cam_edit setup_generate (the programs of a saved setup).
-    expect(total).toBeLessThan(36_550)
+    // +100: cam / cam_edit manufacture setups, carryStock and the per-setup result.
+    expect(total).toBeLessThan(36_650)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

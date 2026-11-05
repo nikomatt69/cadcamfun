@@ -170,6 +170,49 @@ describe("export through the bridge", () => {
     expect(html).toContain("Setup")
   }, 60_000)
 
+  test("a job of several setups is stored as one program per setup, each with its datum, and the job's release rides on every one", async () => {
+    const { invoke } = await setup("write")
+    const preview = await invoke("cam", { action: "manufacture", material: "6061", setups: [{ id: "top" }, { id: "back", orientation: "-Z" }] })
+    expect(preview.body.result).toMatchObject({ ok: true, mutated: false, setups: [expect.objectContaining({ id: "top", workOffset: "G54", orientation: "+Z" }), expect.objectContaining({ id: "back", workOffset: "G55", orientation: "-Z" })] })
+    expect(preview.body.result.claims.some((c: { id: string; setup?: string }) => c.id === "part-coverage" && c.setup === undefined)).toBe(true)
+    // One NC cannot hold two fixings: planOnly names the route that plans a job.
+    expect((await invoke("cam", { action: "manufacture", material: "6061", setups: [{ id: "top" }, { id: "back", orientation: "-Z" }], planOnly: true })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("one setup") })
+
+    const made = await invoke("cam_edit", { action: "manufacture", material: "6061", setups: [{ id: "top" }, { id: "back", orientation: "-Z" }] })
+    expect(made.body.result, JSON.stringify(made.body.result).slice(0, 400)).toMatchObject({ ok: true, workOffsets: { top: "G54", back: "G55" } })
+    const ids = made.body.result.programIds as Record<string, string>, top = { programId: ids["top"]! }, back = { programId: ids["back"]! }
+    expect(top.programId).toBeString()
+    expect(top.programId).not.toBe(back.programId)
+
+    // Two rows, two NC texts, each on its own register.
+    const rowTop = (await app.call(`/api/toolpaths/${top.programId}`)).body, rowBack = (await app.call(`/api/toolpaths/${back.programId}`)).body
+    expect(rowTop.gcode).not.toBe(rowBack.gcode)
+    expect(rowTop.gcode).toMatch(/\bG54\b/)
+    expect(rowBack.gcode).toMatch(/\bG55\b/)
+    expect(rowBack.data.kernelRequest).toMatchObject({ setupId: "back" })
+
+    // Review and the setup sheet answer for the setup, with the job beside it; a job short of full coverage is a preview for every setup.
+    const review = (await invoke("cam", { action: "review", operationId: back.programId })).body.result
+    expect(review).toMatchObject({ setupId: "back", job: { setups: ["top", "back"], release: made.body.result.release } })
+    if (made.body.result.release !== "verified-program") expect(review.release).not.toBe("verified-program")
+    const sheet = (await invoke("cam", { action: "setup_sheet", operationId: back.programId })).body.result
+    expect(sheet).toMatchObject({ ok: true, setup: expect.objectContaining({ workOffset: "G55", orientation: "-Z" }), job: { setupId: "back" } })
+  }, 120_000)
+
+  test("a pattern of three is three programs on G54, G55 and G56; a seventh copy, or a setup that clashes, stores nothing", async () => {
+    const { invoke } = await setup("write")
+    const made = await invoke("cam_edit", { action: "manufacture", material: "6061", setups: [{ id: "part", pattern: { count: 3, dx: 140, dy: 0 } }] })
+    expect(made.body.result, JSON.stringify(made.body.result).slice(0, 300)).toMatchObject({ ok: true })
+    expect(made.body.result.workOffsets).toEqual({ part: "G54", "part.1": "G55", "part.2": "G56" })
+    const listed = async () => ((await invoke("cam", { action: "operations" })).body.result as unknown[]).length
+    const before = await listed()
+    const tooMany = await invoke("cam_edit", { action: "manufacture", material: "6061", setups: [{ id: "part", pattern: { count: 7, dx: 1, dy: 0 } }] })
+    expect(tooMany.body.result).toMatchObject({ ok: false })
+    const clash = await invoke("cam_edit", { action: "manufacture", material: "6061", setups: [{ id: "a", workOffset: "G55" }, { id: "b", workOffset: "G55" }] })
+    expect(clash.body.result).toMatchObject({ ok: false })
+    expect(await listed()).toBe(before)
+  }, 180_000)
+
   test("fasten inserts the screws, washers and nuts the shared holes need, once, and the assembly exports with them", async () => {
     const { model } = await import("@cadcamfun/core")
     const block = (h: number, d: number, depth: number) => {

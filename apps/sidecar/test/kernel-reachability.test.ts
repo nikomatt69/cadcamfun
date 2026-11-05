@@ -20,6 +20,7 @@ type Reach = { readonly route: string } | { readonly assistant: string }
 /** Every kernel job, exhaustively (a job added to `KernelJobs` without an entry here is a type error and a test failure). */
 const REACH = {
   "cam-manufacture": { route: "POST /api/toolpaths/manufacture" },
+  "cam-setups": { route: "POST /api/toolpaths/manufacture" },
   "cam-plan": { route: "POST /api/toolpaths/plan" },
   "cam-generate": { route: "POST /api/toolpaths/generate" },
   "cam-parse": { route: "POST /api/toolpaths/parse" },
@@ -147,6 +148,21 @@ describe("POST /api/toolpaths/plan", () => {
     const response = await post({ ...snapshot, material: "missing" })
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({ status: "failed", issues: expect.arrayContaining([expect.objectContaining({ tag: "UnknownMaterial" })]) })
+  })
+})
+
+describe("POST /api/toolpaths/manufacture with setups", () => {
+  const post = (json: unknown) => app.call("/api/toolpaths/manufacture", { method: "POST", json })
+  const two = { ...snapshot, id: "two-setups", setups: [{ id: "top" }, { id: "back", orientation: "-Z" }], resolution: 0.5 }
+  test("a request that lists several setups answers with the one it names, in the setups worker; unnamed or unknown is refused", async () => {
+    expect((await post(two)).status).toBe(400)
+    expect((await post({ ...two, setupId: "nope" })).body).toMatchObject({ status: "failed", issues: [expect.objectContaining({ message: expect.stringContaining("no setup 'nope'") })] })
+    clearKernelJobCache()
+    const before = mark()
+    const response = await post({ ...two, setupId: "back" })
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ status: "ok", value: { setupOrientation: "-Z", jobId: "two-setups/back" } })
+    expect(ranSince(before)).toContainEqual({ job: "cam-setups", outcome: "completed" })
   })
 })
 
