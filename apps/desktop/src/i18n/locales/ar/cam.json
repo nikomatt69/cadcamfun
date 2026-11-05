@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "تتطلب المعايرة آلة محفوظة: انسخ الإعداد المسبق في المكتبة أولًا.",
   "cam.probing.calibration.savedToast": "كُتبت المعايرة إلى الآلة",
   "cam.probing.program.native": "استخدام الدورة الخاصة بوحدة التحكم",
-  "cam.probing.program.nativeClaim": "{word}: تشغّل وحدة التحكم دورتها الخاصة. تعيد المحاكاة تشغيل اللمسات المضمنة لا هذا الاستدعاء، لذا يبقى ادعاء التحسس غير محسوم."
+  "cam.probing.program.nativeClaim": "{word}: تشغّل وحدة التحكم دورتها الخاصة. تعيد المحاكاة تشغيل اللمسات المضمنة لا هذا الاستدعاء، لذا يبقى ادعاء التحسس غير محسوم.",
+  "cam.workpieces.title": "القطع على التثبيت",
+  "cam.workpieces.add": "إضافة قطعة",
+  "cam.workpieces.remove": "إزالة القطعة",
+  "cam.workpieces.name": "اسم القطعة",
+  "cam.workpieces.offset": "إزاحة الصفر",
+  "cam.workpieces.order": "الترتيب",
+  "cam.workpieces.order.toolFirst": "الأداة أولًا: تبديل واحد لكل أداة",
+  "cam.workpieces.order.partFirst": "القطعة أولًا: إنهاء قطعة ثم التالية",
+  "cam.workpieces.hint": "إزاحة صفر واحدة لكل قطعة، من G54 إلى G59. تُنفَّذ كل عملية على كل قطعة.",
+  "cam.workpieces.defaultName": "القطعة {n}"
 }

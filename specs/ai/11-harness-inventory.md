@@ -26,7 +26,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- |
 | `cad` | read | 35 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 4471 |
 | `cad_edit` | destructive | 22 | primary:build, editor, modeler | 4536 |
-| `cam` | read | 24 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 5227 |
+| `cam` | read | 24 | primary:build, primary:plan, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 5297 |
 | `cam_edit` | write | 12 | primary:build, machinist, optimizer | 3884 |
 | `library` | read | 5 | primary:build, primary:plan, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1445 |
 | `parts` | destructive | 3 | primary:build, editor, modeler | 1230 |
@@ -285,7 +285,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1770 | ai-specialists.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 4471 | ai-specialists.test.ts, auto-mode.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompt-families.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 4536 | auto-mode.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 5227 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, skills.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 5297 | auto-mode.test.ts, modes.test.ts, prompt-assembly.test.ts, prompt-corpus.test.ts, prompts.test.ts, skills.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3884 | auto-mode.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1577 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1445 | prompt-corpus.test.ts |
@@ -349,7 +349,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad-workflow` | cad | 6222 | cad, cad_edit, parts |
 | `parametric-design` | cad | 11656 | cad, cad_edit, parts, memory |
 | `fusion-360-modelling` | cad | 15322 | cad, cad_edit, cam, parts |
-| `composed-cam-programs` | cam | 7810 | cad, cam, cam_edit, library, parts |
+| `composed-cam-programs` | cam | 8663 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 2104 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1736 | cam, cam_edit, library |

@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "A calibration needs a saved machine: duplicate the preset in the library first.",
   "cam.probing.calibration.savedToast": "Calibration written to the machine",
   "cam.probing.program.native": "Use the control's own cycle",
-  "cam.probing.program.nativeClaim": "{word}: the control runs its own cycle. The simulation replays the inline touches, not this call, so the probing claim stays unresolved."
+  "cam.probing.program.nativeClaim": "{word}: the control runs its own cycle. The simulation replays the inline touches, not this call, so the probing claim stays unresolved.",
+  "cam.workpieces.title": "Workpieces on the fixture",
+  "cam.workpieces.add": "Add workpiece",
+  "cam.workpieces.remove": "Remove workpiece",
+  "cam.workpieces.name": "Workpiece name",
+  "cam.workpieces.offset": "Work offset",
+  "cam.workpieces.order": "Order",
+  "cam.workpieces.order.toolFirst": "Tool first: one tool change per tool",
+  "cam.workpieces.order.partFirst": "Part first: finish one part, then the next",
+  "cam.workpieces.hint": "One work offset per part, G54 to G59. Every operation runs on each workpiece.",
+  "cam.workpieces.defaultName": "Part {n}"
 }

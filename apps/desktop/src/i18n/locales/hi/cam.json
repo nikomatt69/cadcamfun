@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "कैलिब्रेशन के लिए सहेजी गई मशीन चाहिए: पहले लाइब्रेरी में प्रीसेट की प्रति बनाएँ।",
   "cam.probing.calibration.savedToast": "कैलिब्रेशन मशीन में लिखा गया",
   "cam.probing.program.native": "कंट्रोल का अपना चक्र उपयोग करें",
-  "cam.probing.program.nativeClaim": "{word}: कंट्रोल अपना चक्र चलाता है। सिमुलेशन इस कॉल को नहीं, इनलाइन स्पर्शों को दोहराता है, इसलिए प्रोबिंग दावा अनिर्णीत रहता है।"
+  "cam.probing.program.nativeClaim": "{word}: कंट्रोल अपना चक्र चलाता है। सिमुलेशन इस कॉल को नहीं, इनलाइन स्पर्शों को दोहराता है, इसलिए प्रोबिंग दावा अनिर्णीत रहता है।",
+  "cam.workpieces.title": "फ़िक्स्चर पर वर्कपीस",
+  "cam.workpieces.add": "वर्कपीस जोड़ें",
+  "cam.workpieces.remove": "वर्कपीस हटाएँ",
+  "cam.workpieces.name": "वर्कपीस का नाम",
+  "cam.workpieces.offset": "वर्क ऑफ़सेट",
+  "cam.workpieces.order": "क्रम",
+  "cam.workpieces.order.toolFirst": "पहले टूल: हर टूल का एक ही बदलाव",
+  "cam.workpieces.order.partFirst": "पहले पुर्ज़ा: एक पूरा करके अगला",
+  "cam.workpieces.hint": "हर पुर्ज़े के लिए एक वर्क ऑफ़सेट, G54 से G59। हर ऑपरेशन हर वर्कपीस पर चलता है।",
+  "cam.workpieces.defaultName": "पुर्ज़ा {n}"
 }

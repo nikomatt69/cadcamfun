@@ -6,7 +6,7 @@
  * panel says so and the user chooses: load the stored one, or keep this one (written over the revision they have now seen).
  */
 import { For, Show, createEffect, createSignal, on, onCleanup, type JSX } from "solid-js"
-import { FolderOpen, ListOrdered, Save, Trash2 } from "lucide-solid"
+import { FolderOpen, ListOrdered, Plus, Save, Trash2, X } from "lucide-solid"
 import type { CamSetupDocument } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { t } from "../../../../i18n/index.ts"
@@ -15,11 +15,13 @@ import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useDocumentStore } from "../../../cad/store/documentStore.ts"
 import { makeSetupService, refOfDocument } from "../../api/setup.ts"
-import { choicesOfSetup, setupOfToolpaths, toolpathsOfSetup, type SetupChoices } from "../../lib/setup.ts"
+import { choicesOfSetup, nextWorkpiece, setupOfToolpaths, toolpathsOfSetup, type SetupChoices } from "../../lib/setup.ts"
 import { TOOLPATH_COLORS, useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
 
 const GROUPINGS: ReadonlyArray<SetupChoices["grouping"]> = ["single", "perTool", "perOperation"]
+const REGISTERS = ["G54", "G55", "G56", "G57", "G58", "G59"] as const
+const ORDERS: ReadonlyArray<SetupChoices["workpieceOrder"]> = ["toolFirst", "partFirst"]
 const FIELD = "w-full rounded-md border border-gray-600 bg-gray-900 px-2 py-1 text-sm text-white"
 const ROW = "grid grid-cols-[3rem_1fr_4rem_5rem] gap-2 py-0.5"
 const BUTTON ="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs rounded-md transition-colors flex items-center gap-1.5"
@@ -122,6 +124,20 @@ export default function SetupPanel(): JSX.Element {
       .catch((cause: unknown) => toast.error(messageOf(cause)))
   }
 
+  const workpieces = () => setup.choices.workpieces
+  const addWorkpiece = (): void => {
+    // The first press turns the one implicit part into a fixture of two: the part the setup already machines keeps its register.
+    const base = workpieces().length === 0 ? [{ id: "wp-1", name: t("cam.workpieces.defaultName", { n: 1 }), workOffset: setup.choices.workOffset }] : workpieces()
+    const next = nextWorkpiece(base, (n) => t("cam.workpieces.defaultName", { n }))
+    if (next !== undefined) useSetupStore.getState().setChoices({ workpieces: [...base, next] })
+  }
+  const patchWorkpiece = (id: string, patch: Partial<SetupChoices["workpieces"][number]>): void =>
+    useSetupStore.getState().setChoices({ workpieces: workpieces().map((wp) => (wp.id === id ? { ...wp, ...patch } : wp)) })
+  const removeWorkpiece = (id: string): void => {
+    const rest = workpieces().filter((wp) => wp.id !== id)
+    useSetupStore.getState().setChoices({ workpieces: rest.length === 1 ? [] : rest, ...(rest.length === 1 ? { workOffset: rest[0]!.workOffset } : {}) })
+  }
+
   // The saved list follows the open project; a setup saved in another project is not the one a save would replace.
   createEffect(on(projectId, (id) => {
     const saved = useSetupStore.getState().saved
@@ -150,6 +166,35 @@ export default function SetupPanel(): JSX.Element {
             onChange={(event) => useSetupStore.getState().setChoices({ retractBeforeToolChange: event.currentTarget.checked })} />
           <span>{t("cam.setupDoc.retract")}</span>
         </label>
+      </div>
+
+      <div class="space-y-1.5" data-testid="cam-setup-workpieces">
+        <div class="flex items-center justify-between gap-2 text-xs text-gray-400">
+          <span class="font-medium">{t("cam.workpieces.title")}</span>
+          <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-add" disabled={busy() || workpieces().length >= 6} onClick={addWorkpiece}>
+            <Plus size={12} />{t("cam.workpieces.add")}
+          </button>
+        </div>
+        <Show when={workpieces().length > 1} fallback={<p class="text-xs text-gray-500">{t("cam.workpieces.hint")}</p>}>
+          <For each={workpieces()}>{(wp) => (
+            <div class="grid grid-cols-[1fr_5rem_auto] items-center gap-2" data-testid="cam-setup-workpiece" data-id={wp.id}>
+              <input class={FIELD} name={`camWorkpieceName-${wp.id}`} value={wp.name} aria-label={t("cam.workpieces.name")} disabled={busy()}
+                onInput={(event) => patchWorkpiece(wp.id, { name: event.currentTarget.value })} />
+              <select class={FIELD} name={`camWorkpieceOffset-${wp.id}`} value={wp.workOffset} aria-label={t("cam.workpieces.offset")} disabled={busy()}
+                onChange={(event) => patchWorkpiece(wp.id, { workOffset: event.currentTarget.value as typeof REGISTERS[number] })}>
+                <For each={REGISTERS}>{(register) => <option value={register} disabled={register !== wp.workOffset && workpieces().some((other) => other.workOffset === register)}>{register}</option>}</For>
+              </select>
+              <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-remove" disabled={busy()} onClick={() => removeWorkpiece(wp.id)} aria-label={t("cam.workpieces.remove")} title={t("cam.workpieces.remove")}><X size={12} /></button>
+            </div>
+          )}</For>
+          <label class="flex items-center gap-2 text-xs text-gray-400">
+            <span>{t("cam.workpieces.order")}</span>
+            <select class={FIELD} name="camWorkpieceOrder" value={setup.choices.workpieceOrder} disabled={busy()}
+              onChange={(event) => useSetupStore.getState().setChoices({ workpieceOrder: event.currentTarget.value as SetupChoices["workpieceOrder"] })}>
+              <For each={ORDERS}>{(order) => <option value={order}>{t(`cam.workpieces.order.${order}`)}</option>}</For>
+            </select>
+          </label>
+        </Show>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">

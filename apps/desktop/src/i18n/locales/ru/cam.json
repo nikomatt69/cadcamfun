@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "Для калибровки нужен сохранённый станок: сначала продублируйте шаблон в библиотеке.",
   "cam.probing.calibration.savedToast": "Калибровка записана в станок",
   "cam.probing.program.native": "Использовать цикл системы ЧПУ",
-  "cam.probing.program.nativeClaim": "{word}: ЧПУ выполняет собственный цикл. Симуляция воспроизводит отдельные касания, а не этот вызов, поэтому проверка измерения остаётся неразрешённой."
+  "cam.probing.program.nativeClaim": "{word}: ЧПУ выполняет собственный цикл. Симуляция воспроизводит отдельные касания, а не этот вызов, поэтому проверка измерения остаётся неразрешённой.",
+  "cam.workpieces.title": "Заготовки в оснастке",
+  "cam.workpieces.add": "Добавить заготовку",
+  "cam.workpieces.remove": "Удалить заготовку",
+  "cam.workpieces.name": "Название заготовки",
+  "cam.workpieces.offset": "Смещение нуля",
+  "cam.workpieces.order": "Порядок",
+  "cam.workpieces.order.toolFirst": "Сначала инструмент: одна смена на инструмент",
+  "cam.workpieces.order.partFirst": "Сначала деталь: закончить одну, затем следующую",
+  "cam.workpieces.hint": "Одно смещение нуля на деталь, от G54 до G59. Каждая операция выполняется на каждой заготовке.",
+  "cam.workpieces.defaultName": "Деталь {n}"
 }

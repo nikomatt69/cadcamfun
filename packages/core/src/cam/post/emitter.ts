@@ -23,6 +23,7 @@ import {
   type SpindleOrientMove,
   type CutterCompMove,
   type Toolpath,
+  type WorkOffset,
   arcSweepBetween,
   expandCycle,
   isControlNode,
@@ -570,6 +571,21 @@ class Writer {
     this.ir = undefined
     for (const letter of Object.keys(this.rotary)) delete this.rotary[letter]
     for (const letter of call.rotaryAxes) this.rotary[letter] = formatNumber(0, this.options.decimals)
+  }
+
+  /**
+   * Selects another work offset between two toolpaths (several workpieces on one fixture): whatever modal motion is open is closed
+   * first, and every axis word is written again afterwards, because the control's position in the new frame is not the old one.
+   */
+  selectWorkOffset(block: string): void {
+    this.endCycle()
+    this.closeComp()
+    this.closeTcp()
+    this.leaveInverse()
+    this.finishMotion()
+    this.block(block)
+    this.forgetModalState()
+    this.ir = undefined
   }
 
   /** Rotary words of a move, only the axes whose rounded angle changed. */
@@ -1213,6 +1229,8 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
 
   let zMax = -Infinity
   let first = true
+  // The offset in force: the program's, until a toolpath names another (a workpiece of a multi-part fixture).
+  let offsetNow: WorkOffset | undefined = program.workOffsetRef === undefined ? program.workOffset : undefined
   // A subprogram body is written once, in its own incremental frame, from the motion of the toolpath that leads its group.
   // The first call needs only what it leaves the control in; the text is written after the main program, numbered on from it.
   const buildBody = (gi: number, blockStart: number): { readonly lines: ReadonlyArray<string>; readonly exit: SubprogramExit; readonly next: number } => {
@@ -1275,6 +1293,15 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       if (tp.coolant === "mist" && dialect.noMist === true) w.comment("MIST REQUESTED: THIS CONTROL HAS FLOOD COOLANT M8 ONLY")
       if (tp.coolant !== "off") w.block(tp.coolant === "flood" || dialect.noMist === true ? "M8" : "M7")
       w.coolant = tp.coolant
+    }
+    if (tp.workOffset !== undefined && tp.workOffset !== offsetNow) {
+      // The tool leaves the workpiece it was on in that workpiece's frame, then the new frame is selected.
+      if (w.plane !== undefined) { w.cancelPlane(); zMax = -Infinity }
+      if (w.ir !== undefined && Number.isFinite(zMax) && w.ir.z < zMax - 1e-9) w.rapid({ x: w.ir.x, y: w.ir.y, z: zMax })
+      w.comment(`WORK OFFSET: ${tp.workOffset}`)
+      w.selectWorkOffset(dialect.workOffset?.(tp.workOffset) ?? tp.workOffset)
+      offsetNow = tp.workOffset
+      zMax = -Infinity
     }
     const wantedPlane = planes.get(tp.id)
     if (planeKey(w.plane) !== planeKey(wantedPlane)) {

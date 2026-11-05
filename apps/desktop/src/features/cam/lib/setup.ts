@@ -32,10 +32,25 @@ export interface SetupChoices {
   readonly grouping: cam.program.SetupGrouping
   readonly retractBeforeToolChange: boolean
   readonly workOffset: Setup["workOffset"]
+  /** The parts of the fixture; empty = the setup's one workpiece under `workOffset`. */
+  readonly workpieces: ReadonlyArray<cam.program.Workpiece>
+  readonly workpieceOrder: cam.program.WorkpieceOrder
 }
 
 export const DEFAULT_SETUP_CHOICES: SetupChoices = {
-  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54"
+  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst"
+}
+
+const REGISTERS: ReadonlyArray<Setup["workOffset"]> = ["G54", "G55", "G56", "G57", "G58", "G59"]
+
+/** The next workpiece of the fixture: the first register no workpiece holds, or nothing once all six are taken. */
+export const nextWorkpiece = (existing: ReadonlyArray<cam.program.Workpiece>, name: (n: number) => string): cam.program.Workpiece | undefined => {
+  const taken = new Set(existing.map((wp) => wp.workOffset))
+  const workOffset = REGISTERS.find((r) => !taken.has(r))
+  if (workOffset === undefined) return undefined
+  let n = existing.length + 1
+  while (existing.some((wp) => wp.id === `wp-${n}`)) n++
+  return { id: `wp-${n}`, name: name(n), workOffset }
 }
 
 /** The setup of the panel's toolpaths, in execution order. A toolpath that is hidden is not machined. */
@@ -43,10 +58,13 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
   id: "desktop-setup",
   name: choices.name,
   machineType: "mill",
-  workOffset: choices.workOffset,
+  // A fixture of one part runs under that part's register.
+  workOffset: choices.workpieces.length === 1 ? choices.workpieces[0]!.workOffset : choices.workOffset,
   post: choices.post,
   grouping: choices.grouping,
   retractBeforeToolChange: choices.retractBeforeToolChange,
+  // One workpiece is the setup itself: the list is sent only when the fixture holds several, so a stored setup stays what it was.
+  ...(choices.workpieces.length > 1 ? { workpieces: choices.workpieces, workpieceOrder: choices.workpieceOrder } : {}),
   // A probe cycle is not a cutting operation: it has its own program (`camProbing.emit`) and never joins the cutting setup.
   operations: [...toolpaths].filter((toolpath) => toolpath.probe === undefined).sort((a, b) => a.order - b.order).map((toolpath): Operation => ({
     id: toolpath.id,
@@ -76,7 +94,8 @@ export const programFileName = (program: { readonly name: string; readonly progr
 
 /** The choices a saved setup was written with, so loading it puts the panel back as it was saved. */
 export const choicesOfSetup = (setup: Setup): SetupChoices => ({
-  name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset
+  name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset,
+  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst"
 })
 
 export interface RestoredToolpaths {

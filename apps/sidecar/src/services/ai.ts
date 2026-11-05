@@ -587,7 +587,7 @@ const toolHandlers = Effect.gen(function*() {
     setupList: async (projectId) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const saved = await run(camSetups.list(projectId))
-      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: doc.setup.operations.length, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
+      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: doc.setup.operations.length, workpieces: doc.setup.workpieces?.length ?? 1, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
     },
     setupSave: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }

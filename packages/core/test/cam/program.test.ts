@@ -127,3 +127,59 @@ describe("generating a setup: one program, one emit", () => {
     expect(generateSetup(s, geometryOf).programs[0]!.gcode).toBe(generateSetup(s, geometryOf).programs[0]!.gcode)
   })
 })
+
+describe("several workpieces on one fixture: one program, one work offset per part", () => {
+  const fixture: program.Setup["workpieces"] = [
+    { id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55" }, { id: "w3", name: "Part 3", workOffset: "G56" }
+  ]
+  const ops = [op("a", t6), op("b", t3)]
+  const nc = (over: Partial<program.Setup>) => generateSetup(setup(ops, { workpieces: fixture, ...over }), geometryOf).programs[0]!
+
+  test("tool first: each tool is loaded once and runs on all three parts, a G55 and a G56 block between them", () => {
+    const p = nc({})
+    const lines = p.gcode.split("\n")
+    expect(p.program.toolpaths.map((t) => [t.id, t.workOffset])).toEqual([
+      ["a@w1", "G54"], ["a@w2", "G55"], ["a@w3", "G56"], ["b@w1", "G54"], ["b@w2", "G55"], ["b@w3", "G56"]
+    ])
+    expect(p.gcode.match(/T\d+\s*M6/g)).toHaveLength(2)
+    // The datum blocks are real blocks: G54 once in the header and again for the second tool, G55 / G56 each time their part is reached.
+    expect(lines.filter((l) => /^G55\b/.test(l.trim()))).toHaveLength(2)
+    expect(lines.filter((l) => /^G56\b/.test(l.trim()))).toHaveLength(2)
+    expect(lines.filter((l) => /^G54\b/.test(l.trim()))).toHaveLength(2)
+    expect(p.operationIds).toEqual(["a", "b"])
+  })
+
+  test("part first repeats the tool changes: 5 against 1, and the plan says what ordering by tool would save", () => {
+    const part = planPrograms(setup(ops, { workpieces: fixture, workpieceOrder: "partFirst" }))
+    expect(part.toolChanges).toBe(5)
+    expect(part.warnings.join(" ")).toMatch(/saves 4 tool changes/)
+    expect(planPrograms(setup(ops, { workpieces: fixture })).toolChanges).toBe(1)
+  })
+
+  test("the moves of every part are the moves of the operation: only the register differs", () => {
+    const p = nc({})
+    const [a1, a2] = p.program.toolpaths
+    expect(a2!.moves).toEqual(a1!.moves)
+    expect(p.program.metadata?.["workpieces"]).toBe("Part 1=G54, Part 2=G55, Part 3=G56")
+  })
+
+  test("an operation limited to some parts runs only there", () => {
+    const g = generateSetup(setup([op("a", t6, { workpieceIds: ["w2"] }), op("b", t3)], { workpieces: fixture }), geometryOf).programs[0]!
+    expect(g.program.toolpaths.map((t) => t.id)).toEqual(["a@w2", "b@w1", "b@w2", "b@w3"])
+  })
+
+  test("two parts on one register, or a part that is not there, generate nothing and say why", () => {
+    const twice = generateSetup(setup(ops, { workpieces: [fixture![0]!, { id: "w2", name: "Part 2", workOffset: "G54" }] }), geometryOf)
+    expect(twice.programs).toHaveLength(0)
+    expect(twice.issues.map((i) => i.message).join(" ")).toMatch(/share G54/)
+    const missing = validateSetup(setup([op("a", t6, { workpieceIds: ["w9"] })], { workpieces: fixture }))
+    expect(missing.some((i) => i.operationId === "a" && /w9/.test(i.message))).toBe(true)
+  })
+
+  test("a setup without workpieces is unchanged: no register block, no suffix on ids", () => {
+    const p = generateSetup(setup(ops), geometryOf).programs[0]!
+    expect(p.program.toolpaths.map((t) => t.id)).toEqual(["a", "b"])
+    expect(p.program.toolpaths.every((t) => t.workOffset === undefined)).toBe(true)
+    expect(p.gcode.split("\n").filter((l) => /^G55\b/.test(l.trim()))).toHaveLength(0)
+  })
+})

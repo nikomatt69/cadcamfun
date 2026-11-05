@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "Una calibrazione richiede una macchina salvata: duplica prima il preset nella libreria.",
   "cam.probing.calibration.savedToast": "Calibrazione scritta nella macchina",
   "cam.probing.program.native": "Usa il ciclo proprio del controllo",
-  "cam.probing.program.nativeClaim": "{word}: il controllo esegue il proprio ciclo. La simulazione riproduce i contatti in linea, non questa chiamata, quindi la verifica di tastatura resta non risolta."
+  "cam.probing.program.nativeClaim": "{word}: il controllo esegue il proprio ciclo. La simulazione riproduce i contatti in linea, non questa chiamata, quindi la verifica di tastatura resta non risolta.",
+  "cam.workpieces.title": "Pezzi sull'attrezzatura",
+  "cam.workpieces.add": "Aggiungi pezzo",
+  "cam.workpieces.remove": "Rimuovi pezzo",
+  "cam.workpieces.name": "Nome del pezzo",
+  "cam.workpieces.offset": "Origine pezzo",
+  "cam.workpieces.order": "Ordine",
+  "cam.workpieces.order.toolFirst": "Prima l'utensile: un cambio utensile per utensile",
+  "cam.workpieces.order.partFirst": "Prima il pezzo: finisci un pezzo, poi il successivo",
+  "cam.workpieces.hint": "Un'origine pezzo per ogni pezzo, da G54 a G59. Ogni operazione gira su ciascun pezzo.",
+  "cam.workpieces.defaultName": "Pezzo {n}"
 }

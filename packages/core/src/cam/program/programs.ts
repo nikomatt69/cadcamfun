@@ -9,7 +9,7 @@ import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { getPost } from "../post/index.ts"
 import type { Operation } from "./op.ts"
 import { groupsOf, planPrograms, type SetupPlan } from "./plan.ts"
-import { validateSetup, type Setup, type SetupIssue } from "./setup.ts"
+import { runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue } from "./setup.ts"
 import { assignPockets, type ToolTableEntry } from "./tooltable.ts"
 
 export interface GeneratedProgram {
@@ -58,6 +58,8 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
   const blocked = new Set(issues.flatMap((i) => (i.operationId !== undefined ? [i.operationId] : [])))
   const post = getPost(setup.post.postId)
   if (post === undefined) return { programs: [], toolTable: plan.toolTable, totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [`The post ${setup.post.postId} is not implemented`], issues }
+  // Two workpieces on one register, or an operation on a workpiece that is not there, would cut the wrong part: nothing is generated.
+  if (workpieceIssues(setup).length > 0) return { programs: [], toolTable: plan.toolTable, totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [...warnings, "The fixture is inconsistent: no program was generated"], issues }
   const ordered = setup.operations.filter((op) => op.enabled)
   const pockets = assignPockets(ordered)
   const programs: GeneratedProgram[] = []
@@ -66,8 +68,12 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
     const programWarnings: string[] = []
     const toolpaths: Toolpath[] = []
     const used: Operation[] = []
-    for (const op of group.operations) {
-      if (blocked.has(op.id)) { programWarnings.push(`${op.name} is skipped: ${issues.filter((i) => i.operationId === op.id).map((i) => i.message).join("; ")}`); continue }
+    // An operation is generated once: its moves are the same on every workpiece, only the work offset differs.
+    const outcomes = new Map<string, Toolpath | undefined>()
+    const toolpathOf = (op: Operation): Toolpath | undefined => {
+      if (outcomes.has(op.id)) return outcomes.get(op.id)
+      outcomes.set(op.id, undefined)
+      if (blocked.has(op.id)) { programWarnings.push(`${op.name} is skipped: ${issues.filter((i) => i.operationId === op.id).map((i) => i.message).join("; ")}`); return undefined }
       const pocket = pockets.get(op.id)!
       // A rest pass that continues the operation before it cut with that operation's tool.
       const before = ordered[ordered.indexOf(op) - 1]
@@ -85,15 +91,29 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
           return { error: cause instanceof Error ? cause.message : String(cause) }
         }
       })()
-      if (outcome.error !== undefined || outcome.response === undefined) { programWarnings.push(`${op.name} produced nothing: ${outcome.error ?? "no result"}`); continue }
+      if (outcome.error !== undefined || outcome.response === undefined) { programWarnings.push(`${op.name} produced nothing: ${outcome.error ?? "no result"}`); return undefined }
       programWarnings.push(...outcome.response.warnings.map((w) => `${op.name}: ${w}`))
       const moves: Move[] = outcome.response.program.toolpaths.flatMap((t) => t.moves)
-      toolpaths.push({ id: op.id, name: op.name, toolId: op.tool.id, spindleRpm: Math.min(op.params.rpm, op.tool.maxRpm), coolant: op.params.coolant ? "flood" : "off", moves, operation: { id: op.id, name: op.name } })
-      used.push(op)
+      const made: Toolpath = { id: op.id, name: op.name, toolId: op.tool.id, spindleRpm: Math.min(op.params.rpm, op.tool.maxRpm), coolant: op.params.coolant ? "flood" : "off", moves, operation: { id: op.id, name: op.name } }
+      outcomes.set(op.id, made)
+      return made
     }
+    for (const { operation: op, workpiece, multi } of runsOf(setup, group.operations)) {
+      const made = toolpathOf(op)
+      if (made === undefined) continue
+      if (!used.includes(op)) used.push(op)
+      toolpaths.push(multi
+        ? { ...made, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
+        : made)
+    }
+    const first = toolpaths[0]?.workOffset ?? setup.workOffset
+    const fixture = workpiecesOf(setup)
     const program = makeProgram(planned.name, toolpaths, {
-      workOffset: setup.workOffset,
-      metadata: { programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}) }
+      workOffset: first,
+      metadata: {
+        programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}),
+        ...(fixture.length > 1 ? { workpieces: fixture.map((wp) => `${wp.name}=${wp.workOffset}`).join(", ") } : {})
+      }
     })
     const toolNumbers: Record<string, number> = {}
     for (const op of used) toolNumbers[op.tool.id] = pockets.get(op.id)!

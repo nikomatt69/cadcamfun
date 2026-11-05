@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "Una calibración necesita una máquina guardada: duplica antes el preajuste en la biblioteca.",
   "cam.probing.calibration.savedToast": "Calibración escrita en la máquina",
   "cam.probing.program.native": "Usar el ciclo propio del control",
-  "cam.probing.program.nativeClaim": "{word}: el control ejecuta su propio ciclo. La simulación reproduce los contactos en línea, no esta llamada, así que la verificación de palpado queda sin resolver."
+  "cam.probing.program.nativeClaim": "{word}: el control ejecuta su propio ciclo. La simulación reproduce los contactos en línea, no esta llamada, así que la verificación de palpado queda sin resolver.",
+  "cam.workpieces.title": "Piezas en la sujeción",
+  "cam.workpieces.add": "Añadir pieza",
+  "cam.workpieces.remove": "Quitar pieza",
+  "cam.workpieces.name": "Nombre de la pieza",
+  "cam.workpieces.offset": "Origen de pieza",
+  "cam.workpieces.order": "Orden",
+  "cam.workpieces.order.toolFirst": "Primero la herramienta: un cambio por herramienta",
+  "cam.workpieces.order.partFirst": "Primero la pieza: terminar una pieza y luego la siguiente",
+  "cam.workpieces.hint": "Un origen de pieza por cada pieza, de G54 a G59. Cada operación se ejecuta en todas las piezas.",
+  "cam.workpieces.defaultName": "Pieza {n}"
 }

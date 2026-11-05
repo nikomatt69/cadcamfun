@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "标定需要已保存的机床：请先在库中复制预设。",
   "cam.probing.calibration.savedToast": "标定已写入机床",
   "cam.probing.program.native": "使用控制器自带循环",
-  "cam.probing.program.nativeClaim": "{word}：控制器运行其自带循环。仿真回放的是展开的接触，而非此调用，因此探测结论仍未确认。"
+  "cam.probing.program.nativeClaim": "{word}：控制器运行其自带循环。仿真回放的是展开的接触，而非此调用，因此探测结论仍未确认。",
+  "cam.workpieces.title": "夹具上的工件",
+  "cam.workpieces.add": "添加工件",
+  "cam.workpieces.remove": "移除工件",
+  "cam.workpieces.name": "工件名称",
+  "cam.workpieces.offset": "工件坐标系",
+  "cam.workpieces.order": "顺序",
+  "cam.workpieces.order.toolFirst": "刀具优先：每把刀只换一次",
+  "cam.workpieces.order.partFirst": "工件优先：先完成一个工件再加工下一个",
+  "cam.workpieces.hint": "每个工件一个工件坐标系，G54 至 G59。每道工序在每个工件上运行。",
+  "cam.workpieces.defaultName": "工件 {n}"
 }

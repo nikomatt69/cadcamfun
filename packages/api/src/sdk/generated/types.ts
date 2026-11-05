@@ -2937,6 +2937,7 @@ export type ToolpathGeneratorVerifyPayload = {
           }
       >
       readonly operation?: { readonly id: string; readonly name: string }
+      readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
     }>
     readonly metadata?: { readonly [x: string]: string }
   }
@@ -3458,7 +3459,15 @@ export type CamSetupPlanPayload = {
       readonly pocket?: number
       readonly enabled: boolean
       readonly fromPreviousStock: boolean
+      readonly workpieceIds?: ReadonlyArray<string>
     }>
+    readonly workpieces?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly workpieceOrder?: "toolFirst" | "partFirst"
   }
 }
 
@@ -3659,7 +3668,15 @@ export type CamSetupValidatePayload = {
       readonly pocket?: number
       readonly enabled: boolean
       readonly fromPreviousStock: boolean
+      readonly workpieceIds?: ReadonlyArray<string>
     }>
+    readonly workpieces?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly workpieceOrder?: "toolFirst" | "partFirst"
   }
 }
 
@@ -3860,7 +3877,15 @@ export type CamSetupGeneratePayload = {
       readonly pocket?: number
       readonly enabled: boolean
       readonly fromPreviousStock: boolean
+      readonly workpieceIds?: ReadonlyArray<string>
     }>
+    readonly workpieces?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly workpieceOrder?: "toolFirst" | "partFirst"
   }
   readonly elements: { readonly [x: string]: { readonly [x: string]: JsonValue } }
   readonly stock?: {
@@ -4149,6 +4174,7 @@ export type CamSetupLinkReportPayload = {
         }
     >
     readonly operation?: { readonly id: string; readonly name: string }
+    readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
   }>
   readonly lowSafeZ: number
   readonly rapidRate?: number
@@ -4363,7 +4389,15 @@ export type CamSetupSavePayload = {
       readonly pocket?: number
       readonly enabled: boolean
       readonly fromPreviousStock: boolean
+      readonly workpieceIds?: ReadonlyArray<string>
     }>
+    readonly workpieces?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly workpieceOrder?: "toolFirst" | "partFirst"
   }
 }
 
@@ -4565,7 +4599,15 @@ export type CamSetupUpdatePayload = {
       readonly pocket?: number
       readonly enabled: boolean
       readonly fromPreviousStock: boolean
+      readonly workpieceIds?: ReadonlyArray<string>
     }>
+    readonly workpieces?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly workpieceOrder?: "toolFirst" | "partFirst"
   }
   readonly baseUpdatedAt?: string
 }
@@ -10012,6 +10054,7 @@ export type ToolpathsRegenerateOutput = {
                 | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
               >
               operation?: { id: string; name: string }
+              workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
             }>
             metadata?: { [x: string]: string }
           }
@@ -10860,6 +10903,7 @@ export type ToolpathGeneratorManufactureOutput =
               | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
             >
             operation?: { id: string; name: string }
+            workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
           }>
           metadata?: { [x: string]: string }
         }
@@ -11342,6 +11386,7 @@ export type ToolpathGeneratorParseOutput = {
         | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
       >
       operation?: { id: string; name: string }
+      workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
     }>
     metadata?: { [x: string]: string }
   }
@@ -12060,6 +12105,7 @@ export type CamSetupGenerateOutput = {
           | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
         >
         operation?: { id: string; name: string }
+        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
       }>
       metadata?: { [x: string]: string }
     }
@@ -12296,6 +12342,7 @@ export type CamSetupLinkReportOutput = {
       | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
     >
     operation?: { id: string; name: string }
+    workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
   }>
   report: { airBefore: number; airAfter: number; reduction: number; rewrittenLinks: number }
 }
@@ -12503,7 +12550,15 @@ export type CamSetupListOutput = Array<{
       pocket?: number
       enabled: boolean
       fromPreviousStock: boolean
+      workpieceIds?: Array<string>
     }>
+    workpieces?: Array<{
+      id: string
+      name: string
+      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      placement?: { x: number; y: number; z: number }
+    }>
+    workpieceOrder?: "toolFirst" | "partFirst"
   }
   createdAt: string
   updatedAt: string
@@ -12709,7 +12764,15 @@ export type CamSetupSaveOutput = {
       pocket?: number
       enabled: boolean
       fromPreviousStock: boolean
+      workpieceIds?: Array<string>
     }>
+    workpieces?: Array<{
+      id: string
+      name: string
+      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      placement?: { x: number; y: number; z: number }
+    }>
+    workpieceOrder?: "toolFirst" | "partFirst"
   }
   createdAt: string
   updatedAt: string
@@ -12914,7 +12977,15 @@ export type CamSetupGetOutput = {
       pocket?: number
       enabled: boolean
       fromPreviousStock: boolean
+      workpieceIds?: Array<string>
     }>
+    workpieces?: Array<{
+      id: string
+      name: string
+      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      placement?: { x: number; y: number; z: number }
+    }>
+    workpieceOrder?: "toolFirst" | "partFirst"
   }
   createdAt: string
   updatedAt: string
@@ -13122,7 +13193,15 @@ export type CamSetupUpdateOutput = {
       pocket?: number
       enabled: boolean
       fromPreviousStock: boolean
+      workpieceIds?: Array<string>
     }>
+    workpieces?: Array<{
+      id: string
+      name: string
+      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+      placement?: { x: number; y: number; z: number }
+    }>
+    workpieceOrder?: "toolFirst" | "partFirst"
   }
   createdAt: string
   updatedAt: string
@@ -13297,6 +13376,7 @@ export type CamSetupGenerateSavedOutput = {
           | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
         >
         operation?: { id: string; name: string }
+        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
       }>
       metadata?: { [x: string]: string }
     }

@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, nextWorkpiece, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -95,5 +95,37 @@ describe("the setup store", () => {
     expect(useSetupStore.getState().plan).toBeUndefined()
     expect(useSetupStore.getState().choices.grouping).toBe("perTool")
     store.setChoices({ grouping: DEFAULT_SETUP_CHOICES.grouping })
+  })
+})
+
+describe("several workpieces on the fixture", () => {
+  const name = (n: number) => `Part ${n}`
+  test("the fixture grows on the first free register and stops at six", () => {
+    let parts: cam.program.Workpiece[] = [{ id: "wp-1", name: "Part 1", workOffset: "G54" }]
+    for (let i = 0; i < 5; i++) parts = [...parts, nextWorkpiece(parts, name)!]
+    expect(parts.map((p) => p.workOffset)).toEqual(["G54", "G55", "G56", "G57", "G58", "G59"])
+    expect(nextWorkpiece(parts, name)).toBeUndefined()
+    // A register freed in the middle is the next one handed out.
+    expect(nextWorkpiece(parts.filter((p) => p.workOffset !== "G56"), name)).toMatchObject({ workOffset: "G56" })
+  })
+
+  test("the setup carries the list only for two parts or more; one part runs under its own register", () => {
+    const one = setupOfToolpaths(panel().toolpaths, { ...DEFAULT_SETUP_CHOICES, workpieces: [{ id: "wp-1", name: "Part 1", workOffset: "G57" }] })
+    expect(one.workOffset).toBe("G57")
+    expect(one.workpieces).toBeUndefined()
+    const parts = [{ id: "wp-1", name: "Part 1", workOffset: "G54" as const }, { id: "wp-2", name: "Part 2", workOffset: "G55" as const }]
+    const many = setupOfToolpaths(panel().toolpaths, { ...DEFAULT_SETUP_CHOICES, workpieces: parts, workpieceOrder: "partFirst" })
+    expect(many.workpieces).toEqual(parts)
+    expect(many.workpieceOrder).toBe("partFirst")
+    expect(() => cam.program.decodeSetup(JSON.parse(JSON.stringify(many)))).not.toThrow()
+    // The planner agrees with the panel: three tools' worth of operations on two parts, part first.
+    expect(cam.program.planPrograms(many).toolChanges).toBeGreaterThan(cam.program.planPrograms({ ...many, workpieceOrder: "toolFirst" }).toolChanges)
+  })
+
+  test("a saved fixture comes back onto the panel as it was saved", () => {
+    const parts = [{ id: "wp-1", name: "Part 1", workOffset: "G54" as const }, { id: "wp-2", name: "Part 2", workOffset: "G58" as const }]
+    const saved = setupOfToolpaths(panel().toolpaths, { ...DEFAULT_SETUP_CHOICES, workpieces: parts, workpieceOrder: "partFirst" })
+    expect(choicesOfSetup(saved)).toMatchObject({ workpieces: parts, workpieceOrder: "partFirst" })
+    expect(choicesOfSetup(setupOfToolpaths(panel().toolpaths))).toMatchObject({ workpieces: [], workpieceOrder: "toolFirst" })
   })
 })

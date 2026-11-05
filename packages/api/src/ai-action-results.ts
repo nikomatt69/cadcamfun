@@ -230,7 +230,7 @@ const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, 
 const setupPlan = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue) })
 const setupList = Schema.Struct({
   ok: Schema.Literal(true), projectId: str,
-  setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, grouping: str, machineType: str }))
+  setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, workpieces: int, grouping: str, machineType: str }))
 })
 
 // ---------------------------------------------------------------- `cam_edit` (writes)

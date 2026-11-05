@@ -18,6 +18,8 @@ export const OperationSchema = Schema.Struct({
   pocket: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   enabled: Schema.Boolean,
   /** Continue the previous operation: a rest pass takes that operation's tool diameter as the tool that already cut. */
-  fromPreviousStock: Schema.Boolean
+  fromPreviousStock: Schema.Boolean,
+  /** The workpieces of the setup this operation runs on (their ids); absent = every one of them. */
+  workpieceIds: Schema.optionalKey(Schema.Array(Schema.String))
 })
 export type Operation = typeof OperationSchema.Type

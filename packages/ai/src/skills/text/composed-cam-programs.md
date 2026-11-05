@@ -38,6 +38,8 @@ Use library action lookup_tool. Confirm the cutter radius fits the smallest insi
 
 A flip is a new setup with its own stock, origin, work offset, fixtures and tools. Never reuse the first setup's depths.
 
+Several parts on one fixture (a vise with four blanks, a plate, a tombstone face) are `workpieces` of one setup, not copies of its operations: `[{id,name,workOffset}]`, one register each from G54 to G59, never two on one register. Every operation runs on each workpiece under that workpiece's offset; `workpieceIds` on an operation limits it to some. `workpieceOrder` `toolFirst` (default) loads each tool once and cuts all the parts with it; `partFirst` finishes one part before the next and repeats every tool change, so use it only when a part must be complete first (the plan names the changes it costs). The operator holds each datum in the control's register; `placement` is only where it lies from the first part's, for the preview, never written to the NC. The program converter refuses several offsets by design: keep the setup as the source.
+
 ## Verifying each operation
 
 For legacy operations: cam action plan_check with the current revision, create/update, generate, analyze the full stored NC, verify and cam action review. A dedicated verifier uses cam_verify action generate/verify. For manufacture/turn, use the matching preview/store route and returned identity/claims; never regenerate its NC with legacy generate. Diagnose before changing input, retain successful work and respect the returned refinement limit (at most three per drawing/stock revision). Report modelled coverage and unresolved findings; never write "safe".

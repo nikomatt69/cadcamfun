@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "校正には保存済みの機械が必要です。先にライブラリでプリセットを複製してください。",
   "cam.probing.calibration.savedToast": "校正を機械に書き込みました",
   "cam.probing.program.native": "制御装置の専用サイクルを使う",
-  "cam.probing.program.nativeClaim": "{word}: 制御装置が専用サイクルを実行します。シミュレーションはこの呼び出しではなく展開した接触を再生するため、プロービングの判定は未確定のままです。"
+  "cam.probing.program.nativeClaim": "{word}: 制御装置が専用サイクルを実行します。シミュレーションはこの呼び出しではなく展開した接触を再生するため、プロービングの判定は未確定のままです。",
+  "cam.workpieces.title": "治具上のワーク",
+  "cam.workpieces.add": "ワークを追加",
+  "cam.workpieces.remove": "ワークを削除",
+  "cam.workpieces.name": "ワーク名",
+  "cam.workpieces.offset": "ワーク座標系",
+  "cam.workpieces.order": "順序",
+  "cam.workpieces.order.toolFirst": "工具優先：工具ごとに1回交換",
+  "cam.workpieces.order.partFirst": "ワーク優先：1個仕上げてから次へ",
+  "cam.workpieces.hint": "ワークごとに1つの座標系（G54〜G59）。各工程はすべてのワークで実行されます。",
+  "cam.workpieces.defaultName": "ワーク {n}"
 }

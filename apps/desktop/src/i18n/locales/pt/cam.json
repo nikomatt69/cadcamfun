@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "Uma calibração precisa de uma máquina guardada: duplique primeiro a predefinição na biblioteca.",
   "cam.probing.calibration.savedToast": "Calibração gravada na máquina",
   "cam.probing.program.native": "Usar o ciclo próprio do comando",
-  "cam.probing.program.nativeClaim": "{word}: o comando executa o seu próprio ciclo. A simulação reproduz os toques em linha, não esta chamada, por isso a verificação de apalpação fica por resolver."
+  "cam.probing.program.nativeClaim": "{word}: o comando executa o seu próprio ciclo. A simulação reproduz os toques em linha, não esta chamada, por isso a verificação de apalpação fica por resolver.",
+  "cam.workpieces.title": "Peças na fixação",
+  "cam.workpieces.add": "Adicionar peça",
+  "cam.workpieces.remove": "Remover peça",
+  "cam.workpieces.name": "Nome da peça",
+  "cam.workpieces.offset": "Zero peça",
+  "cam.workpieces.order": "Ordem",
+  "cam.workpieces.order.toolFirst": "Ferramenta primeiro: uma troca por ferramenta",
+  "cam.workpieces.order.partFirst": "Peça primeiro: terminar uma peça e depois a seguinte",
+  "cam.workpieces.hint": "Um zero peça por peça, de G54 a G59. Cada operação roda em todas as peças.",
+  "cam.workpieces.defaultName": "Peça {n}"
 }

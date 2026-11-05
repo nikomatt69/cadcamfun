@@ -1691,5 +1691,15 @@
   "cam.probing.calibration.storedOnly": "Eine Kalibrierung braucht eine gespeicherte Maschine: Vorlage zuerst in der Bibliothek duplizieren.",
   "cam.probing.calibration.savedToast": "Kalibrierung in die Maschine geschrieben",
   "cam.probing.program.native": "Eigenen Zyklus der Steuerung verwenden",
-  "cam.probing.program.nativeClaim": "{word}: Die Steuerung führt ihren eigenen Zyklus aus. Die Simulation spielt die Einzelantastungen ab, nicht diesen Aufruf; die Antast-Aussage bleibt daher ungeklärt."
+  "cam.probing.program.nativeClaim": "{word}: Die Steuerung führt ihren eigenen Zyklus aus. Die Simulation spielt die Einzelantastungen ab, nicht diesen Aufruf; die Antast-Aussage bleibt daher ungeklärt.",
+  "cam.workpieces.title": "Werkstücke in der Aufspannung",
+  "cam.workpieces.add": "Werkstück hinzufügen",
+  "cam.workpieces.remove": "Werkstück entfernen",
+  "cam.workpieces.name": "Name des Werkstücks",
+  "cam.workpieces.offset": "Nullpunktverschiebung",
+  "cam.workpieces.order": "Reihenfolge",
+  "cam.workpieces.order.toolFirst": "Werkzeug zuerst: ein Werkzeugwechsel je Werkzeug",
+  "cam.workpieces.order.partFirst": "Teil zuerst: ein Teil fertig, dann das nächste",
+  "cam.workpieces.hint": "Eine Nullpunktverschiebung je Teil, G54 bis G59. Jede Operation läuft auf jedem Werkstück.",
+  "cam.workpieces.defaultName": "Teil {n}"
 }
