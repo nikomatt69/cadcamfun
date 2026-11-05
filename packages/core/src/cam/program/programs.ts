@@ -9,7 +9,7 @@ import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { getPost } from "../post/index.ts"
 import type { Operation } from "./op.ts"
 import { groupsOf, planPrograms, type SetupPlan } from "./plan.ts"
-import { runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue } from "./setup.ts"
+import { runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue, type WorkpieceOrder } from "./setup.ts"
 import { assignPockets, type ToolTableEntry } from "./tooltable.ts"
 
 export interface GeneratedProgram {
@@ -39,6 +39,10 @@ export interface GeneratedSetup {
   readonly issues: ReadonlyArray<SetupIssue>
 }
 
+/** What a tool change costs the cycle, seconds: a typical automatic changer. Indicative, never calibrated to a machine. */
+const TOOL_CHANGE_SECONDS = 6
+const toolChangesOf = (toolpaths: ReadonlyArray<Toolpath>): number => toolpaths.reduce((n, tp, i) => (i > 0 && toolpaths[i - 1]!.toolId !== tp.toolId ? n + 1 : n), 0)
+
 const round = (value: number): number => Math.round(value * 1000) / 1000
 
 /**
@@ -66,8 +70,6 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
   groupsOf(setup).forEach((group, index) => {
     const planned = plan.programs[index]!
     const programWarnings: string[] = []
-    const toolpaths: Toolpath[] = []
-    const used: Operation[] = []
     // An operation is generated once: its moves are the same on every workpiece, only the work offset differs.
     const outcomes = new Map<string, Toolpath | undefined>()
     const toolpathOf = (op: Operation): Toolpath | undefined => {
@@ -98,33 +100,50 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
       outcomes.set(op.id, made)
       return made
     }
-    for (const { operation: op, workpiece, multi } of runsOf(setup, group.operations)) {
-      const made = toolpathOf(op)
-      if (made === undefined) continue
-      if (!used.includes(op)) used.push(op)
-      toolpaths.push(multi
-        ? { ...made, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
-        : made)
-    }
-    const first = toolpaths[0]?.workOffset ?? setup.workOffset
-    const fixture = workpiecesOf(setup)
-    const program = makeProgram(planned.name, toolpaths, {
-      workOffset: first,
-      metadata: {
-        programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}),
-        ...(fixture.length > 1 ? { workpieces: fixture.map((wp) => `${wp.name}=${wp.workOffset}`).join(", ") } : {})
+    // The program of one order of the runs. The comparison below builds the other order from the same cached toolpaths.
+    const build = (order: WorkpieceOrder) => {
+      const toolpaths: Toolpath[] = []
+      const used: Operation[] = []
+      for (const { operation: op, workpiece, multi } of runsOf({ ...setup, workpieceOrder: order }, group.operations)) {
+        const made = toolpathOf(op)
+        if (made === undefined) continue
+        if (!used.includes(op)) used.push(op)
+        toolpaths.push(multi
+          ? { ...made, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, ...(workpiece.workOffsetRef !== undefined ? { workOffsetRef: workpiece.workOffsetRef } : {}), operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
+          : made)
       }
-    })
-    const toolNumbers: Record<string, number> = {}
-    for (const op of used) toolNumbers[op.tool.id] = pockets.get(op.id)!
-    const gcode = post.emit(program, {
-      decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
-      toolNumbers, retractBeforeToolChange: setup.retractBeforeToolChange,
-      ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
-      ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
-    })
+      const fixture = workpiecesOf(setup)
+      const program = makeProgram(planned.name, toolpaths, {
+        workOffset: toolpaths[0]?.workOffset ?? setup.workOffset,
+        ...(toolpaths[0]?.workOffsetRef !== undefined ? { workOffsetRef: toolpaths[0].workOffsetRef } : {}),
+        metadata: {
+          programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}),
+          ...(fixture.length > 1 ? { workpieces: fixture.map((wp) => `${wp.name}=${wp.workOffset}`).join(", ") } : {})
+        }
+      })
+      const toolNumbers: Record<string, number> = {}
+      for (const op of used) toolNumbers[op.tool.id] = pockets.get(op.id)!
+      const gcode = post.emit(program, {
+        decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
+        toolNumbers, retractBeforeToolChange: setup.retractBeforeToolChange,
+        ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
+        ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
+      })
+      const stats = analyseGcode(gcode, planned.name).stats
+      return { toolpaths, used, program, gcode, stats, seconds: stats.estimatedSeconds + toolChangesOf(toolpaths) * TOOL_CHANGE_SECONDS }
+    }
+    const order: WorkpieceOrder = setup.workpieceOrder ?? "toolFirst"
+    const { used, program, gcode, stats, seconds } = build(order)
+    if (workpiecesOf(setup).length > 1 && used.length > 0) {
+      const otherOrder: WorkpieceOrder = order === "toolFirst" ? "partFirst" : "toolFirst"
+      const other = build(otherOrder)
+      if (Math.abs(other.seconds - seconds) >= 1) {
+        const faster = other.seconds < seconds ? otherOrder : order
+        programWarnings.push(`${faster === "toolFirst" ? "Tool first" : "Part first"} runs about ${Math.round(Math.abs(other.seconds - seconds))} s faster than ${faster === "toolFirst" ? "part first" : "tool first"} (${TOOL_CHANGE_SECONDS} s per tool change, indicative, uncalibrated)`)
+      }
+    }
     programs.push({
-      name: planned.name, programNumber: planned.programNumber, gcode, program, stats: analyseGcode(gcode, planned.name).stats,
+      name: planned.name, programNumber: planned.programNumber, gcode, program, stats,
       warnings: programWarnings, operationIds: used.map((op) => op.id), toolNumbers: planned.toolNumbers
     })
     warnings.push(...programWarnings)

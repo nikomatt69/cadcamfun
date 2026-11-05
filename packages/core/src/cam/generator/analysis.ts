@@ -9,7 +9,7 @@
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
 import { headerTools } from "../testing/header-tools.ts"
 import { findOperationMarkers, findToolChanges, type ToolChange } from "../testing/tool-words.ts"
-import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
+import { makeProgram, type Move, type Program, type Toolpath, type WorkOffset } from "../ir.ts"
 import type { GcodeStats } from "./schema.ts"
 import { motionTrackOf, type MotionTrack } from "../viewer/motion-track.ts"
 
@@ -103,14 +103,18 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
     for (let k = 0; k < markers.length && markers[k]!.line <= line; k++) found = k
     return found
   }
+  // A program that moves to another work offset (the parts of a fixture) is a new toolpath there, under that offset.
+  const registerOf = (st: { readonly workOffset?: string }): string => st.workOffset ?? "G54"
   const groups: Array<{ readonly start: number; readonly end: number; readonly tool: number | undefined; readonly operation: number }> = []
   states.forEach((st, i) => {
     const last = groups[groups.length - 1]
     const op = operationAt(result.segments[i]?.line)
     if (last === undefined) groups.push({ start: 0, end: 1, tool: st.tool, operation: op })
-    else if ((st.tool !== undefined && last.tool !== undefined && st.tool !== last.tool) || (markers.length > 0 && op !== last.operation && op >= 0)) groups.push({ start: i, end: i + 1, tool: st.tool ?? last.tool, operation: op >= 0 ? op : last.operation })
+    else if ((st.tool !== undefined && last.tool !== undefined && st.tool !== last.tool) || (markers.length > 0 && op !== last.operation && op >= 0) || registerOf(st) !== registerOf(states[i - 1]!)) groups.push({ start: i, end: i + 1, tool: st.tool ?? last.tool, operation: op >= 0 ? op : last.operation })
     else groups[groups.length - 1] = { ...last, end: i + 1, tool: last.tool ?? st.tool }
   })
+  const registers = new Set(states.map(registerOf))
+  const workOffsetOf = (key: string): WorkOffset | undefined => (/^G5[4-9]$/.test(key) ? (key as WorkOffset) : undefined)
   const header = headerTools(gcode)
   const split = groups.length > 1 && moves.length === states.length
   const toolpaths: Toolpath[] = !split
@@ -127,7 +131,8 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
         toolId: g.tool !== undefined ? `T${g.tool}` : "tool",
         spindleRpm: own.find((st) => st.rpm > 0)?.rpm ?? 0,
         coolant: own.some((st) => st.coolant === "flood") ? "flood" : own.some((st) => st.coolant === "mist") ? "mist" : "off",
-        moves: moves.slice(g.start, g.end)
+        moves: moves.slice(g.start, g.end),
+        ...(workOffsetOf(registerOf(states[g.start]!)) !== undefined && registers.size > 1 ? { workOffset: workOffsetOf(registerOf(states[g.start]!))! } : {})
       }
     })
   return {
@@ -141,7 +146,7 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
       bounds: empty ? { min: zero, max: zero } : { min, max }
     },
     warnings: result.errors,
-    program: makeProgram(name || "Program", moves.length > 0 ? toolpaths : []),
+    program: makeProgram(name || "Program", moves.length > 0 ? toolpaths : [], { ...(states[0] !== undefined && workOffsetOf(registerOf(states[0])) !== undefined ? { workOffset: workOffsetOf(registerOf(states[0]))! } : {}) }),
     toolChanges: findToolChanges(gcode),
     operations: operationsOf(toolpaths),
     motion: moves.length > 0 ? motionTrackOf(states, result.unsupported, split ? groups.map((g) => g.end - g.start) : [states.length]) : { paths: [], unsupported: result.unsupported }

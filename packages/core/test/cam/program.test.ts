@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { DEFAULT_GEOMETRY, DEFAULT_SETTINGS, type GeometryInput } from "../../src/cam/generator/index.ts"
 import { program } from "../../src/cam/index.ts"
+import { analyseGcode } from "../../src/cam/generator/analysis.ts"
 
 const { assignPockets, buildToolTable, generateSetup, planPrograms, reorderByTool, validateSetup, DEFAULT_POST_CONFIG } = program
 
@@ -156,6 +157,14 @@ describe("several workpieces on one fixture: one program, one work offset per pa
     expect(planPrograms(setup(ops, { workpieces: fixture })).toolChanges).toBe(1)
   })
 
+  test("the program says how much faster the other order is, with the changer time it assumed", () => {
+    const part = generateSetup(setup(ops, { workpieces: fixture, workpieceOrder: "partFirst" }), geometryOf)
+    expect(part.programs[0]!.warnings.join(" ")).toMatch(/Tool first runs about \d+ s faster than part first \(6 s per tool change, indicative, uncalibrated\)/)
+    const tool = generateSetup(setup(ops, { workpieces: fixture }), geometryOf)
+    expect(tool.programs[0]!.warnings.join(" ")).not.toMatch(/Part first runs about/)
+    expect(generateSetup(setup(ops), geometryOf).programs[0]!.warnings.join(" ")).not.toMatch(/faster than/)
+  })
+
   test("the moves of every part are the moves of the operation: only the register differs", () => {
     const p = nc({})
     const [a1, a2] = p.program.toolpaths
@@ -174,6 +183,59 @@ describe("several workpieces on one fixture: one program, one work offset per pa
     expect(twice.issues.map((i) => i.message).join(" ")).toMatch(/share G54/)
     const missing = validateSetup(setup([op("a", t6, { workpieceIds: ["w9"] })], { workpieces: fixture }))
     expect(missing.some((i) => i.operationId === "a" && /w9/.test(i.message))).toBe(true)
+  })
+
+  test("the stored text read back keeps the part of every toolpath: the preview and a conversion see the same registers", () => {
+    const p = nc({})
+    const read = analyseGcode(p.gcode, "back").program
+    expect(read.toolpaths.map((t) => t.workOffset)).toEqual(p.program.toolpaths.map((t) => t.workOffset))
+    expect(read.workOffset).toBe("G54")
+  })
+
+  test("more than six parts: the extra ones sit on extended registers, G54.1 P1.., each selected before its toolpath", () => {
+    const many: program.Setup["workpieces"] = Array.from({ length: 8 }, (_, k) => k < 6
+      ? { id: `w${k + 1}`, name: `Part ${k + 1}`, workOffset: (["G54", "G55", "G56", "G57", "G58", "G59"] as const)[k]! }
+      : { id: `w${k + 1}`, name: `Part ${k + 1}`, workOffset: "G54" as const, workOffsetRef: { kind: "extended" as const, p: k - 5 } })
+    const p = generateSetup(setup([op("a", t6)], { workpieces: many }), geometryOf).programs[0]!
+    const lines = p.gcode.split("\n").map((l) => l.trim())
+    expect(lines.filter((l) => /^G54\.1 P[12]\b/.test(l))).toEqual(["G54.1 P1", "G54.1 P2"])
+    expect(p.program.toolpaths).toHaveLength(8)
+    // The same register twice is still refused, whichever way it is spelled.
+    const twice = [...many.slice(0, 6), { id: "x", name: "Dup", workOffset: "G54" as const, workOffsetRef: { kind: "g5x" as const, code: "G55" as const } }]
+    expect(generateSetup(setup([op("a", t6)], { workpieces: twice }), geometryOf).programs).toHaveLength(0)
+  })
+
+  test("placed parts whose blanks overlap generate nothing; touching blanks and different blanks are fine", () => {
+    const stock = { x: 50, y: 50, z: 10, origin: { x: 0, y: 0, z: 0 }, material: "aluminum" }
+    const at = (x: number) => ({ x, y: 0, z: 0 })
+    const parts = (gap: number): program.Setup["workpieces"] => [{ id: "w1", name: "Part 1", workOffset: "G54", placement: at(0) }, { id: "w2", name: "Part 2", workOffset: "G55", placement: at(gap) }]
+    expect(generateSetup(setup(ops, { stock, workpieces: parts(40) }), geometryOf).programs).toHaveLength(0)
+    expect(validateSetup(setup(ops, { stock, workpieces: parts(40) })).map((i) => i.message).join(" ")).toMatch(/Part 1 and Part 2 overlap/)
+    expect(generateSetup(setup(ops, { stock, workpieces: parts(50) }), geometryOf).programs).toHaveLength(1)
+    // A smaller blank of its own fits where the setup's would not.
+    const small = [{ id: "w1", name: "Part 1", workOffset: "G54" as const, placement: at(0) }, { id: "w2", name: "Part 2", workOffset: "G55" as const, placement: at(40), stock: { ...stock, x: 10 } }]
+    expect(validateSetup(setup(ops, { stock, workpieces: small })).filter((i) => /overlap/.test(i.message))).toHaveLength(1)
+    const apart = [small[0]!, { ...small[1]!, placement: at(60) }]
+    expect(validateSetup(setup(ops, { stock, workpieces: apart })).filter((i) => /overlap/.test(i.message))).toHaveLength(0)
+  })
+
+  test("an operation depends on one that runs before it; a missing, disabled or later one is an issue on that operation", () => {
+    const b = op("b", t3, { dependsOn: ["a"] })
+    expect(validateSetup(setup([op("a", t6), b])).filter((i) => /depends/.test(i.message))).toEqual([])
+    expect(validateSetup(setup([b, op("a", t6)])).find((i) => i.operationId === "b")!.message).toMatch(/runs after it/)
+    expect(validateSetup(setup([op("a", t6, { enabled: false }), b])).find((i) => i.operationId === "b")!.message).toMatch(/disabled/)
+    expect(validateSetup(setup([op("a", t6), op("b", t3, { dependsOn: ["zz"] })])).find((i) => i.operationId === "b")!.message).toMatch(/does not have/)
+    // The operation with the broken dependency is skipped, the other still makes its program.
+    const g = generateSetup(setup([b, op("a", t6)]), geometryOf).programs[0]!
+    expect(g.operationIds).toEqual(["a"])
+  })
+
+  test("a tool table larger than the magazine is an issue on the operations that do not fit", () => {
+    const three = [op("a", t6), op("b", t3), op("c", tool("t8", 8))]
+    expect(validateSetup(setup(three, { magazineSize: 3 })).filter((i) => /magazine/.test(i.message))).toEqual([])
+    const issues = validateSetup(setup(three, { magazineSize: 2 })).filter((i) => /magazine/.test(i.message))
+    expect(issues.map((i) => i.operationId)).toEqual(["c"])
+    expect(issues[0]!.message).toMatch(/T3, the magazine holds 2/)
   })
 
   test("a setup without workpieces is unchanged: no register block, no suffix on ids", () => {

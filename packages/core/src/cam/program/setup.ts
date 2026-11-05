@@ -6,7 +6,9 @@
 import { Schema } from "effect"
 import { StockSchema, type Tool } from "../tool.ts"
 import { WorkOffsetSchema } from "../ir.ts"
+import { WorkOffsetRefSchema, formatOffsetRef } from "../work-offset.ts"
 import { OperationSchema, type Operation } from "./op.ts"
+import { assignPockets } from "./tooltable.ts"
 
 export const PostConfigSchema = Schema.Struct({
   postId: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"]),
@@ -33,7 +35,11 @@ export const WorkpieceSchema = Schema.Struct({
   id: Schema.String.check(Schema.isMinLength(1)),
   name: Schema.String,
   workOffset: WorkOffsetSchema,
-  placement: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }))
+  /** An extended register (`G54.1 P3`, Haas `G154 P3`, Siemens `G505`) in place of `workOffset`: a fixture of more than six parts. */
+  workOffsetRef: Schema.optionalKey(WorkOffsetRefSchema),
+  placement: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+  /** This part's own blank when it is not the setup's (different blanks on one fixture); its corner is relative to the part's datum. */
+  stock: Schema.optionalKey(StockSchema)
 })
 export type Workpiece = typeof WorkpieceSchema.Type
 
@@ -55,8 +61,10 @@ export const SetupSchema = Schema.Struct({
   /** Raise Z to the highest point reached before every tool change (a changer cannot pull the tool out of the material). */
   retractBeforeToolChange: Schema.Boolean,
   operations: Schema.Array(OperationSchema),
-  /** The workpieces of the fixture, at most six (G54-G59). Absent = one workpiece under `workOffset`. */
-  workpieces: Schema.optionalKey(Schema.Array(WorkpieceSchema).check(Schema.isMaxLength(6))),
+  /** The workpieces of the fixture: six on G54-G59, more on extended registers. Absent = one workpiece under `workOffset`. */
+  workpieces: Schema.optionalKey(Schema.Array(WorkpieceSchema).check(Schema.isMaxLength(48))),
+  /** Pockets the tool magazine holds; a tool table that needs more is an issue. */
+  magazineSize: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   /** How operations and workpieces interleave; default `toolFirst`. */
   workpieceOrder: Schema.optionalKey(WorkpieceOrderSchema)
 })
@@ -78,13 +86,29 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
   for (const wp of workpieces) {
     if (wpIds.has(wp.id)) issues.push({ message: `Workpiece id ${wp.id} is used twice` })
     wpIds.add(wp.id)
-    const holder = wpOffsets.get(wp.workOffset)
-    if (holder !== undefined) issues.push({ message: `${wp.name} and ${holder} share ${wp.workOffset}: two workpieces need two work offsets` })
-    else wpOffsets.set(wp.workOffset, wp.name)
+    const key = wp.workOffsetRef !== undefined ? formatOffsetRef(wp.workOffsetRef) : wp.workOffset
+    const holder = wpOffsets.get(key)
+    if (holder !== undefined) issues.push({ message: `${wp.name} and ${holder} share ${key}: two workpieces need two work offsets` })
+    else wpOffsets.set(key, wp.name)
   }
   for (const op of setup.operations) {
     for (const id of op.workpieceIds ?? []) if (!wpIds.has(id)) issues.push({ operationId: op.id, message: `${op.name} names workpiece ${id}, which the setup does not have` })
     if (op.workpieceIds !== undefined && op.workpieceIds.length === 0) issues.push({ operationId: op.id, message: `${op.name} runs on no workpiece` })
+  }
+  // Parts that are placed must not occupy the same space: the blanks of two parts may touch, never overlap.
+  const boxes = workpieces.flatMap((wp) => {
+    const block = wp.stock ?? setup.stock
+    return wp.placement === undefined || block === undefined ? [] : [{
+      name: wp.name,
+      min: { x: wp.placement.x + block.origin.x, y: wp.placement.y + block.origin.y, z: wp.placement.z + block.origin.z - block.z },
+      max: { x: wp.placement.x + block.origin.x + block.x, y: wp.placement.y + block.origin.y + block.y, z: wp.placement.z + block.origin.z }
+    }]
+  })
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i]!, b = boxes[j]!, eps = 1e-6
+    if (a.min.x < b.max.x - eps && b.min.x < a.max.x - eps && a.min.y < b.max.y - eps && b.min.y < a.max.y - eps && a.min.z < b.max.z - eps && b.min.z < a.max.z - eps) {
+      issues.push({ message: `${a.name} and ${b.name} overlap: their blanks occupy the same space at the placements given` })
+    }
   }
   return issues
 }
@@ -111,6 +135,24 @@ export const validateSetup = (setup: Setup): ReadonlyArray<SetupIssue> => {
   }
   if (!setup.operations.some((op) => op.enabled)) issues.push({ message: "The setup has no enabled operation" })
   issues.push(...workpieceIssues(setup))
+  const enabledIds = new Set(setup.operations.filter((o) => o.enabled).map((o) => o.id))
+  const earlier = new Set<string>()
+  for (const op of setup.operations) {
+    for (const dep of op.dependsOn ?? []) {
+      if (!ids.has(dep)) issues.push({ operationId: op.id, message: `${op.name} depends on ${dep}, which the setup does not have` })
+      else if (!enabledIds.has(dep)) issues.push({ operationId: op.id, message: `${op.name} depends on ${dep}, which is disabled` })
+      else if (!earlier.has(dep)) issues.push({ operationId: op.id, message: `${op.name} depends on ${dep}, which runs after it` })
+    }
+    if (op.enabled) earlier.add(op.id)
+  }
+  if (setup.magazineSize !== undefined) {
+    const enabled = setup.operations.filter((o) => o.enabled)
+    const pockets = assignPockets(enabled)
+    for (const op of enabled) {
+      const pocket = pockets.get(op.id)!
+      if (pocket > setup.magazineSize) issues.push({ operationId: op.id, message: `${op.name} needs pocket T${pocket}, the magazine holds ${setup.magazineSize}` })
+    }
+  }
   return issues
 }
 

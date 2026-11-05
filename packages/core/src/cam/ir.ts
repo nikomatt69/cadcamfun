@@ -506,7 +506,9 @@ export const ToolpathSchema = Schema.Struct({
    * The work offset this toolpath runs in, when it is not the program's: the same moves on a second workpiece of the fixture are the
    * same toolpath under another offset. The post writes the selecting block (`G55`) before the toolpath and writes every axis word again.
    */
-  workOffset: Schema.optionalKey(WorkOffsetSchema)
+  workOffset: Schema.optionalKey(WorkOffsetSchema),
+  /** The register when it is not one of G54..G59 (`G54.1 P3`, `G505`): the post selects it instead of `workOffset`. */
+  workOffsetRef: Schema.optionalKey(WorkOffsetRefSchema)
 })
 export type Toolpath = typeof ToolpathSchema.Type
 

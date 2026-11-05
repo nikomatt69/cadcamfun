@@ -141,6 +141,8 @@ export interface MotionSample {
   readonly probe: boolean
   /** The spindle is stopped at an orientation (`M19`, `SPOS`) and has not been started since; absent otherwise. */
   readonly oriented?: boolean
+  /** The work offset in force (`offsetKey`: `G55`, `G54.1 P3`), when it is not G54. */
+  readonly workOffset?: string
 }
 
 /**
@@ -360,7 +362,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
   const sample = (line: number, at: P3): void => {
     if (states === undefined) return
-    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line, probe: motion === 38, ...(oriented ? { oriented: true } : {}) })
+    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line, probe: motion === 38, ...(oriented ? { oriented: true } : {}), ...(activeWork !== 54 ? { workOffset: offsetKeyOf(activeWork) } : {}) })
     retracted = false
     homed = false
   }

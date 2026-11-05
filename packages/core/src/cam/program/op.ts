@@ -20,6 +20,8 @@ export const OperationSchema = Schema.Struct({
   /** Continue the previous operation: a rest pass takes that operation's tool diameter as the tool that already cut. */
   fromPreviousStock: Schema.Boolean,
   /** The workpieces of the setup this operation runs on (their ids); absent = every one of them. */
-  workpieceIds: Schema.optionalKey(Schema.Array(Schema.String))
+  workpieceIds: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Operations (ids) that must run before this one in the machining order: a finish pass names its rough pass. */
+  dependsOn: Schema.optionalKey(Schema.Array(Schema.String))
 })
 export type Operation = typeof OperationSchema.Type

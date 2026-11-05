@@ -40,7 +40,7 @@ import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
 import { SIEMENS_REPORT_DEF, alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, rotationLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
-import { addressOf } from "../work-offset.ts"
+import { addressOf, formatOffsetRef } from "../work-offset.ts"
 import { isKlartextProbeCycle, klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import { lowerExprDepth, type WordExpr } from "../macro.ts"
 
@@ -1185,14 +1185,21 @@ const planesOf = (program: Program, options: Partial<PostOptions>, dialect: Dial
 const planeKey = (p: TiltedPlane | undefined): string | undefined =>
   p === undefined ? undefined : JSON.stringify([p.frame.origin, p.frame.xAxis, p.frame.yAxis, p.frame.zAxis, p.layout ?? null, p.solution ?? null, p.legacy === true])
 
-/** The block that selects the program's work offset: its `workOffsetRef` where the control addresses it (G54.1 P3, G505, G59.2), else the G54..G59 code. */
-const selectOffset = (program: Program, options: PostOptions, dialect: Dialect): string => {
-  if (program.workOffsetRef === undefined || (program.workOffsetRef.kind === "g5x" && program.workOffsetRef.code === program.workOffset)) return dialect.workOffset?.(program.workOffset) ?? program.workOffset
-  if (dialect.probing === undefined) throw new RangeError(`${dialect.id}: this post writes only G54..G59 as the work offset, not ${program.workOffsetRef.kind}`)
-  const a = addressOf(program.workOffsetRef, dialect.probing.offsets, options.probing?.offsets)
+/** The block that selects a work offset: its `ref` where the control addresses it (G54.1 P3, G505, G59.2), else the G54..G59 code. */
+const selectRegister = (code: WorkOffset, ref: WorkOffsetRefOf | undefined, options: PostOptions, dialect: Dialect): string => {
+  if (ref === undefined || (ref.kind === "g5x" && ref.code === code)) return dialect.workOffset?.(code) ?? code
+  if (dialect.probing === undefined) throw new RangeError(`${dialect.id}: this post writes only G54..G59 as the work offset, not ${ref.kind}`)
+  const a = addressOf(ref, dialect.probing.offsets, options.probing?.offsets)
   if ("refused" in a) throw new RangeError(a.refused)
   return a.select
 }
+type WorkOffsetRefOf = NonNullable<Program["workOffsetRef"]>
+
+/** The block that selects the program's work offset. */
+const selectOffset = (program: Program, options: PostOptions, dialect: Dialect): string => selectRegister(program.workOffset, program.workOffsetRef, options, dialect)
+
+/** What identifies the register a program or toolpath runs in. */
+const registerKey = (code: WorkOffset | undefined, ref: WorkOffsetRefOf | undefined): string | undefined => (ref !== undefined ? formatOffsetRef(ref) : code)
 
 export const emitProgram = (program: Program, userOptions: Partial<PostOptions>, dialect: Dialect): string => {
   rejectUnwritable(program, dialect)
@@ -1230,7 +1237,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   let zMax = -Infinity
   let first = true
   // The offset in force: the program's, until a toolpath names another (a workpiece of a multi-part fixture).
-  let offsetNow: WorkOffset | undefined = program.workOffsetRef === undefined ? program.workOffset : undefined
+  let offsetNow = registerKey(program.workOffset, program.workOffsetRef)
   // A subprogram body is written once, in its own incremental frame, from the motion of the toolpath that leads its group.
   // The first call needs only what it leaves the control in; the text is written after the main program, numbered on from it.
   const buildBody = (gi: number, blockStart: number): { readonly lines: ReadonlyArray<string>; readonly exit: SubprogramExit; readonly next: number } => {
@@ -1294,13 +1301,14 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       if (tp.coolant !== "off") w.block(tp.coolant === "flood" || dialect.noMist === true ? "M8" : "M7")
       w.coolant = tp.coolant
     }
-    if (tp.workOffset !== undefined && tp.workOffset !== offsetNow) {
+    const wantedOffset = registerKey(tp.workOffset, tp.workOffsetRef)
+    if (wantedOffset !== undefined && wantedOffset !== offsetNow) {
       // The tool leaves the workpiece it was on in that workpiece's frame, then the new frame is selected.
       if (w.plane !== undefined) { w.cancelPlane(); zMax = -Infinity }
       if (w.ir !== undefined && Number.isFinite(zMax) && w.ir.z < zMax - 1e-9) w.rapid({ x: w.ir.x, y: w.ir.y, z: zMax })
-      w.comment(`WORK OFFSET: ${tp.workOffset}`)
-      w.selectWorkOffset(dialect.workOffset?.(tp.workOffset) ?? tp.workOffset)
-      offsetNow = tp.workOffset
+      w.comment(`WORK OFFSET: ${wantedOffset}`)
+      w.selectWorkOffset(selectRegister(tp.workOffset ?? program.workOffset, tp.workOffsetRef, options, dialect))
+      offsetNow = wantedOffset
       zMax = -Infinity
     }
     const wantedPlane = planes.get(tp.id)
