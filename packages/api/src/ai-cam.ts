@@ -149,6 +149,8 @@ export const CamSetupSaveInput = Schema.Struct({
   setupId: Schema.optionalKey(id),
   baseUpdatedAt: Schema.optionalKey(revision)
 })
+/** Generates a saved setup's programs from the open drawing's elements and stores each as a program of the project. */
+export const CamSetupGenerateInput = Schema.Struct({ setupId: id, expectedRevision: Schema.optionalKey(revision) })
 export const CamStockSetInput = Schema.Struct({
   stock: Schema.Struct({
     ...cam.generator.StockSchema.fields,
@@ -205,6 +207,7 @@ export const CAM_ACTION_INPUTS = {
   "cam_edit.verify": CamVerifyInput,
   "cam_edit.stock_set": CamStockSetInput,
   "cam_edit.setup_save": CamSetupSaveInput,
+  "cam_edit.setup_generate": CamSetupGenerateInput,
   "cam_edit.manufacture": CamManufactureOperationInput,
   "cam_edit.export": CamExportInput,
   "cam_edit.probe": CamProbeInput,

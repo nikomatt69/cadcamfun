@@ -235,6 +235,13 @@ const setupList = Schema.Struct({
 
 // ---------------------------------------------------------------- `cam_edit` (writes)
 
+/** The programs a saved setup made, each stored as a program of the project; its tool table and the cost of its tool changes. */
+const setupGenerated = Schema.Struct({
+  ok: Schema.Literal(true), projectId: str, setupId: str,
+  programs: Schema.Array(Schema.Struct({ operationId: str, name: str, programNumber: int, toolNumbers: Schema.Array(int), operations: int, toolpaths: int, lines: int })),
+  totals: Schema.Struct({ programs: int, toolLoads: int, toolChanges: int, cutLength: num, rapidLength: num, estimatedSeconds: num }),
+  warnings: strings
+})
 const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })
 
 const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, ...drawingRef })
@@ -452,6 +459,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
   "cam_edit.setup_save": write(["operation"], setupSaved),
+  "cam_edit.setup_generate": write(["program"], setupGenerated),
   "cam_edit.export": write(["file"], exported),
   "cam_edit.probe": write(["operation", "program"], probeStored),
   "cam_edit.probe_run": write(["report"], probeReported),

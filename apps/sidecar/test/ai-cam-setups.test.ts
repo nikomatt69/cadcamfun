@@ -82,3 +82,41 @@ test("a fixture of three parts is planned, saved and read back with its work off
   expect(twice).toMatchObject({ ok: true, valid: false })
   expect(twice.issues.map((i: { message: string }) => i.message).join(" ")).toMatch(/share G54/)
 })
+
+test("cam_edit setup_generate turns a saved fixture of three parts into one stored multi-tool program with a register per part", async () => {
+  const id = (await app.call("/api/projects", { method: "POST", json: { name: "Vise" } })).body.id as string
+  const tools = buildTools(handlers, id)
+  const call = async (tool: string, input: unknown) => JSON.parse(await tools.find((t) => t.id === tool)!.execute(input, ctx))
+  const added = await call("cad_edit", { action: "add", elements: [{ type: "rectangle", x: 0, y: 0, width: 40, height: 30, depth: 5, name: "Plate" }, { type: "circle", x: 0, y: 0, radius: 4, depth: 5, name: "Hole" }] })
+  expect(added.ok).toBe(true)
+  const [plate, hole] = added.ids as string[]
+  const elementOp = (opId: string, elementId: string, t: ReturnType<typeof tool>) => ({ ...op(opId, t), elementIds: [elementId] })
+  const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55" }, { id: "w3", name: "Part 3", workOffset: "G56" }]
+  const fixture = setup([elementOp("a", plate!, tool("t6", 6)), elementOp("b", hole!, tool("t3", 3))], { workpieces: parts, stock: { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" } })
+  const saved = await call("cam_edit", { action: "setup_save", name: "Vise of three", setup: fixture })
+  expect(saved.ok).toBe(true)
+
+  const generated = await call("cam_edit", { action: "setup_generate", setupId: saved.setupId })
+  expect(generated).toMatchObject({ ok: true, setupId: saved.setupId, totals: { programs: 1, toolChanges: 1 } })
+  expect(generated.programs).toHaveLength(1)
+  expect(generated.programs[0]).toMatchObject({ operations: 2, toolpaths: 6, toolNumbers: [1, 2] })
+
+  // The program is a stored row of the project: one text with the registers in order, and the IR that carries them.
+  const row = (await app.call(`/api/toolpaths/${generated.programs[0].operationId}`)).body
+  expect(row.projectId).toBe(id)
+  const lines = String(row.gcode).split("\n").map((l) => l.trim())
+  expect(lines.filter((l) => /^G55\b/.test(l))).toHaveLength(2)
+  expect(lines.filter((l) => /^G56\b/.test(l))).toHaveLength(2)
+  expect(String(row.gcode).match(/T\d+\s*M6/g)).toHaveLength(2)
+  const document = row.data
+  expect(document.format).toBe("cadcamfun-cam")
+  expect(document.program.toolpaths.map((t: { workOffset?: string }) => t.workOffset)).toEqual(["G54", "G55", "G56", "G54", "G55", "G56"])
+  expect(document.setupId).toBe(saved.setupId)
+
+  // A setup that names an element the drawing does not have is refused with the element, nothing is stored.
+  const broken = await call("cam_edit", { action: "setup_save", name: "Broken", setup: setup([elementOp("a", "gone", tool("t6", 6))]) })
+  const refused = await call("cam_edit", { action: "setup_generate", setupId: broken.setupId })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toMatch(/gone/)
+  expect((await call("cam_edit", { action: "setup_generate", setupId: "missing" })).ok).toBe(false)
+})
