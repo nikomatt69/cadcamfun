@@ -164,18 +164,21 @@ these as Effect Schemas from `kernel/schema.ts`; the desktop shim `contract.ts` 
 radians (degrees only at emission and on the wire). Vendor syntax tables carry "read from the vendor manual, not run on a control".
 
 ### 5.0 Bugs in the existing module (fix, update the tests that pin them)
+**Status: done.** Bracketed midpoint, Siemens `$P_UIFR[n,X,TR]` + re-select, Fanuc miss alarm, armed descent, size in a register.
 - Fanuc/LinuxCNC `G0 X[#524 + #525] / 2` → `X[[#524+#525]/2]`; Siemens `X(R14 + R15) / 2` → `X=(R14+R15)/2`.
 - Siemens `$P_UIFR[1]:X` → `$P_UIFR[n,X,TR]`, then re-select the offset (G54) to activate.
 - Fanuc G31 that touches nothing is never detected; `report-size` is only a comment; the descent near the part is an
   unprotected G0 (`expectedZ+5`) → protected probe move.
 
 ### 5.1 Layout
+**Status: partial.** Every new file exists. `program/probing.ts` is not the thin adapter asked for: it keeps its own planner and text (its bugs fixed, §5.0), it does not go through the IR and the posts.
 New `packages/core/src/cam/probing/`: `device.ts`, `fit.ts`, `cycles.ts`, `actions.ts`, `native.ts`, `sphere-cast.ts`,
 `world.ts`, `simulate.ts`, `rotary-cal.ts`, `features.ts` (feature → cycle, see 5.13), `index.ts`. Plus `cam/work-offset.ts`,
 `testing/probe-machine.ts`, `testing/frames.ts` (frame builders extracted from the interpreter, no behaviour change),
 `kernel/probing.ts`. `program/probing.ts` becomes a thin adapter (names kept) over the new core and the real posts.
 
 ### 5.2 IR (`cam/ir.ts`, `cam/macro.ts`)
+**Status: done.** Also `OffsetUpdate.reads` (GRBL `G10 L20`). `lowerExprDepth` runs in the writer on toolpaths that probe (depth 4, Klartext 6); a test holds Fanuc and LinuxCNC to five brackets on the deepest cycles.
 - New moves: `Probe {to, direction (unit), overtravel, feed, kind touch|protected, onMiss alarm|flag, store? {x?,y?,z?: VarRef},
   flag?}`, `OffsetUpdate {target work{ref} | tool{tool, quantity length|radius, part geometry|wear}, axis X|Y|Z|A|B|C|R,
   mode set|add, value: Expr}`, `Alarm {code 1..999, text}`, `Report {label, values [{name, value: Expr}]}`, `Stop {optional}`.
@@ -185,6 +188,7 @@ New `packages/core/src/cam/probing/`: `device.ts`, `fit.ts`, `cycles.ts`, `actio
   heidenhain formula depth). Tests: value preserved under `evalExpr`, depth respected.
 
 ### 5.3 Work offsets (`cam/work-offset.ts`)
+**Status: done.** `policyCondition` returns `write?: Condition | true`. A set-offset is applied along the machine axes: an offset that carries its own rotation is not corrected through it (stated in `actions.ts`).
 ```ts
 type WorkOffsetRef = { kind: "g5x"; code: WorkOffset } | { kind: "extended"; p: number } | { kind: "frame"; n: number }
   | { kind: "linuxcnc"; p: 1..9 } | { kind: "preset"; row: number }
@@ -208,6 +212,7 @@ Tests: addresses per family, Siemens G58 refused, round trip with rotation, 4 mo
 `applyCorrection` on 1 000 seeded cases.
 
 ### 5.4 Devices and machine config (`probing/device.ts`, `kernel/machine-profile.ts`, `kernel/contracts.ts`)
+**Status: done.** Profile side in `kernel/machine-probing.ts`.
 `StylusCalibration {ballDiameter, effectiveRadius, directional? [{angle, radius}], zTrigger?, centreOffset?, artefact?,
 calibratedAt?}`, `ProbeDevice {id, toolNumber, stylus {ballDiameter, length, shankDiameter}, body {diameter, length},
 calibration?, overtravel {xy, z}, feeds {positioning, fast, touch, max}, backoff, doubleTouch, orientSpindle?, on?, off?}`,
@@ -220,10 +225,12 @@ scratch?, calibrationSource baked|variables}`; `effectiveRadius(device, dir)`, `
 {pivotMeasured?, axisError?, at}`. `probingOf` reads both shapes; `kernelMachineOfProfile` uses `pivotMeasured`.
 
 ### 5.5 Fits (`probing/fit.ts`)
+**Status: done.**
 `circleFrom3`, `fitCircle2` (Kasa + Gauss-Newton), `fitLine2` (PCA), `fitPlane` (Jacobi; flatness), `fitSphere`, `fitCircle3`,
 `solveLinear`. Tests: exact to 1e-9, σ=1 µm noise within 3σ, degenerate inputs refused.
 
 ### 5.6 Cycles (`probing/cycles.ts`)
+**Status: partial.** All kinds except: nine-touch sphere and stylus calibration on a sphere are refused with the reason. A touch retracts by a plain feed move: a control refuses an armed move that starts with the probe triggered. `skipFrame: "work"` under a tilted plane goes through the plane's axes.
 `ProbeCycle` kinds: `z-surface {at, expectedZ}`, `edge {at: Vec3, normal: Vec2}`, `corner {corner, inside, xSense, ySense,
 depth, inset?, touchesPerEdge? 1|2}`, `web|pocket {centre, width, angle, depth, top?}`, `rectangle {inside, centre, size, depth,
 top?}`, `bore|boss {centre, diameter, depth, angles?, top?}` (3 angles = 3-point), `edge-angle {start, along, pitch, normal,
@@ -240,6 +247,7 @@ Tests: every cycle reproduces `nominal` to 1e-9 on its analytic world; shifted/r
 probe compensated; refusals (stylus does not fit, < 3 points, collinear plane, missing setter).
 
 ### 5.7 Actions (`probing/actions.ts`)
+**Status: partial.** `rotation via g68` is refused (no IR move writes G68); `offset-r` and `table-c` are built. `grblTouchOff` is the path of a control without variables.
 `ProbeAction = set-offset {ref, axes, policy} | rotation {result, via g68|offset-r|table-c, ref?, policy} | tool-offset {tool,
 quantity, result, part} | inspect {characteristics, onFail alarm|stop|flag|continue, flag?} | wear-comp {tool, quantity, result,
 nominal, gain, deadband, limit, sense} | report {results}`; `Characteristic {name, kind size|position|true-position|flatness|angle,
@@ -248,6 +256,7 @@ InspectionVerdict[] {name, measured, deviation, pass}`. Test: IR run by `runProb
 `evaluateInspection`/`applyCorrection` on seeded cases.
 
 ### 5.8 Posts (`post/types.ts`, `emitter.ts`, `macro-syntax.ts`, dialects)
+**Status: done with limits.** Goldens for fanuc, haas, mazak, mitsubishi, brother, generic, okuma, linuxcnc, siemens, each replayed to the IR; heidenhain (bore + inspection, axis-parallel touches, no step-level preset write) and grbl (touch-off only) have their own. Report is written on the Fanuc family and LinuxCNC only, refused elsewhere; tool-table writes refused on okuma and heidenhain. Klartext protected moves are not armed: the TNC arms the probe only inside its cycles. Okuma variables (`VSKPX`, `VPPAX`, `VDOUT[992]`) are the shakiest of the tables: read from the manual as the author reads it, not run.
 `Dialect.probing? {touch, contact(axis), triggered?, machineRapid, alarm, report?, toolOffset}`. Writer emits Probe (G91 search
 vector), OffsetUpdate (variable / G10 L2 / refuse; Siemens re-select), Alarm (`#3000` / SETAL+MSG+M0 / FN 14 / abort), Report
 (DPRNT / WRITE / FN 16 / LOG), Stop, machine rapid. Miss detection per control (Fanuc compare `#5061` to target, LinuxCNC G38.2,
@@ -257,10 +266,12 @@ cannot write. Golden tests `post/probing-golden.test.ts` per dialect (bore + G54
 tool length), each replayed by `probe-machine` to the same results as `runProbeMoves`.
 
 ### 5.9 Native cycles (`probing/native.ts`)
+**Status: partial.** `nativeCycle(cycle, actions, style, inlineMoves, ctx)`: Heidenhain 408-413, 417, 419, 481, 482; Siemens CYCLE977 / 978 in the classic `_MVAR` parameter form; Renishaw P9811, P9812, P9814 with the approach in the program's own armed moves. `native: true` runs end to end in the kernel; `probing` stays `unresolved` ("native cycle not replayed"), the program stays at `preview`, and the path evidence reads the inline expansion in the cycle's place. A cycle takes at most one unconditional `set-offset`; any other action, a corner, a tilted plane or a Heidenhain inch program stays inline or is refused. Not built: 451 / CYCLE996, corners, 3-point macros. All syntax read from the vendor manuals, not run on a control.
 `nativeCycle(cycle, actions, style)` wraps the inline expansion in CycleBegin/End (as cycles 208/262): Heidenhain 4xx/48x/451,
 Siemens CYCLE97x/99x, Renishaw G65 P98xx. Claim `probing` is `unresolved` ("native cycle not replayed"). Lower priority.
 
 ### 5.10 World and executor (`probing/world.ts`, `sphere-cast.ts`, `simulate.ts`)
+**Status: done.**
 `ProbeWorld3.touch(from, to, stylus) -> {tip, normal} | undefined`; `meshWorld(meshes, placement?)` (BVH, swept sphere vs
 face/edge/vertex), `boxWorld`, `cylinderWorld`, `sphereWorld`, `planeWorld`, `unionWorld`; `Placement {translate, rotate?}`;
 `ProbeTruth {radius(dir), pretravel?, noise?}`; `SimMachine {offsets, active, tools?, kinematics? {layout, pivot, truePivot?},
@@ -271,6 +282,7 @@ assumed pivot. Tests: sphere-cast exact, mesh box ≡ box world, misplaced stock
 alarm, wear comp, broken tool.
 
 ### 5.11 NC text replay (`testing/macro-runtime.ts`, `testing/probe-machine.ts`, `gcode-interpreter.ts`)
+**Status: partial.** `simulateNc`, the macro host and the kernel replay are built, and every golden replays. The interpreter reads G54.1 / G154 / G505 / G59.x / G15 H1..50. Not built as written: `GSegment.probe`, `InterpretOptions.workOffsets`, `frame`, and MEAS / TCH PROBE without the host: probing blocks are replayed through `macroHost` only.
 `expandMacros(source, { system?: SystemVariables, onBlock? })`; parser learns `$NAME[...]`.
 `simulateNc(text, { world, machine }) -> ProbeSimOutcome & { expanded }`: modal tracker, writes skip variables, rewrites probe
 blocks to end at contact, offset writes go to the table (mirrored as G10 L2), alarms stop, reports collected. Interpreter:
@@ -279,6 +291,7 @@ Siemens MEAS/MEAW, Klartext TCH PROBE 0; byte-identical without the new options.
 `runProbeMoves`; interpreter suite unchanged.
 
 ### 5.12 Kernel operation (`kernel/contracts.ts`, `schema.ts`, `probing.ts`, `execute.ts`)
+**Status: done.** The closed loop, tilted plane and refusals are in `probing-job.test.ts`. Tool-setter cycles and calibrations are run through `cam.probing`, stylus and rotary calibration are refused as job operations.
 `ProbeOperationSpec {strategy: "probe", cycle, actions?, search?, clearance?, doubleTouch?, resultPrefix?, native?}` (`tool` =
 device id) in `OperationSpec`; `CuttingOperationSpec = Exclude<…>`; `OperationOutcome.cut |= "probe"`, `.probe?:
 ProbeOperationSummary {cycle, touches, device, nominal, variables, offsetTargets, native?}`; `CamArtifact.probing? {operations,
@@ -295,12 +308,14 @@ replay in machine frame does not gouge, without probing it does); 5-axis bore on
 PLANE SPATIAL; refusals.
 
 ### 5.13 Feature → cycle (`probing/features.ts`, needed by API/AI)
+**Status: done.**
 `planProbeForFeature(elements, { elementId, ref?, hint? }, ctx) -> { ok: true, cycle, chosenBecause } | { ok: false, reason }`:
 hole/bore → bore, cylindrical boss → boss, planar face normal to Z → z-surface, side face → edge, outside corner → corner,
 slot → pocket, rib → web, reference sphere → sphere; approaches from outside; refuses a stylus that does not fit. Also
 `previewMoves(moves) -> [{kind rapid|probe|retract, from, to}]` for the desktop.
 
 ### 5.14 Rotary calibration (`probing/rotary-cal.ts`)
+**Status: partial.** Routine and fit built. The result is always Report + host fit: the in-macro result for symmetric patterns and the native 451 / CYCLE996 are not built. Pivot and axis apply to one axis at a time; the model has one pivot for both axes.
 `rotaryRoutine(cycle, ctx)` (per angle: orient, machine rapid, 5-touch sphere centre into `cal_<i>_*`, no TCP/frame);
 `calibrateRotary(centres, assumed, axis) -> {pivot, axisDirection, pivotError, axisTilt, radius, rms} | {refused}`; in-macro
 result for symmetric patterns, otherwise Report + host fit. Never writes machine parameters (report only; native 451/CYCLE996).
@@ -313,3 +328,4 @@ Tests: truePivot = assumed + (0.03, −0.02, 0.05) and 0.01° tilt recovered to 
 
 - 2026-11-04: spec written from three plans; `ProbeReport` table built (7d8318a5).
 - 2026-11-04 (desktop, B): Probing tab (palette, cycle editor with NumberField only, target picker with pick-on-model, work-offset table with 409 handling, inspection list, program preview), probe cycles as `probing` toolpaths, stores, offset/report client over `camProbing`, `probe.progress` / `probe.result` / stale-table handling, 3D overlay + surface pick + probe colours in the visualizer, 11 locales, `camProbing` in the web reference; NOT built (waiting for the api schemas of plan / emit / simulate / calibrate-rotary / reports run, the events and the sidecar services behind them): the program calls (Write program, Simulate, Show in 3D data), calibration write-back.
+- 2026-11-05 (core, A): §5.0-5.14 built, status per subsection above. This round: native cycles (`probing/native.ts`, `klartext-cycles.ts`, `nativeProbeLines`, `native: true` in the kernel with `unresolved` evidence), Okuma probing words, GRBL `G10 L20` touch-off (`OffsetUpdate.reads`, `grblTouchOff`), `lowerExprDepth` in the writer, every dialect in the goldens, plain retract off a contact (armed moves off a triggered probe fail on a control), `workOffsetRef` reaches the program, `skipFrame: "work"` under a tilted plane, Fanuc named variables go on at #500, Klartext refuses past Q0. ISO 13399 exchange takes every cutter kind and `formRadius` (a failing test on main).
