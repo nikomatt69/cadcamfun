@@ -23,6 +23,7 @@ import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { gaugeOfTool, previewToolFor } from "../../../viewport/view3d/tool-models.ts"
+import { extraStocks } from "../lib/setup.ts"
 import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
 import "../../../styles/viewport-chrome.css"
 
@@ -47,6 +48,8 @@ export interface ToolpathVisualizerProps {
   readonly program: cam.Program
   readonly workpiece: Workpiece
   readonly stock?: cam.generator.Stock
+  /** The fixture of a multi-part program: the other parts' raw pieces are outlined where they lie. */
+  readonly workpieces?: ReadonlyArray<cam.program.Workpiece>
   readonly playing: boolean
   readonly playbackTime: number
   readonly playbackRate: number
@@ -360,6 +363,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackRate={props.playbackRate * rate()}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             stock={stock()}
+            extraStocks={extraStocks(stock(), props.workpieces ?? [])}
             {...(props.probe !== undefined && (showPart() || props.probe.picking) && props.probe.part !== undefined ? { solids: props.probe.part } : {})}
             {...(props.probe?.model !== undefined ? { probeOverlay: { model: props.probe.model, layers: probeLayers(), highlight: props.probe.highlight, triadLength: 20 } } : {})}
             {...(props.probe !== undefined ? { surfacePick: { active: props.probe.picking, onHit: (hit: SurfaceHit) => props.probe?.onPick?.(hit) }, onProbeContact: setProbeContact } : {})}

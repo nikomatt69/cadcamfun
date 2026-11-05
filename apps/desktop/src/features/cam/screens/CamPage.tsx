@@ -505,6 +505,7 @@ export default function CamPage(): JSX.Element {
                   dock={<TitleBlockOverlay mode="3d" cam />}
                   {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
                   {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
+                  {...(camStore.generatedProgram?.gcode === camStore.gcode ? { workpieces: camStore.generatedProgram.workpieces } : {})}
                   machine={previewMachine()} defaultToolModel={probeToolModel() ?? toolModel()} toolIssues={probePreview() !== undefined ? [] : toolIssues()}
                   operationTools={operationTools().length > 0 ? operationTools() : importedTools()}
                   {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})}

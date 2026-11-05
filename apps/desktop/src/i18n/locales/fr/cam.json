@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "Ouvrir dans l'éditeur",
   "cam.setupDoc.offsets": "Décalages d'origine : {offsets}",
   "cam.workpieces.placement": "Position par rapport à la première pièce, mm (X, Y, Z) : aperçu seulement, jamais dans le NC",
-  "cam.workpieces.orderChanges": "Changements d'outil : {toolFirst} outil d'abord, {partFirst} pièce d'abord"
+  "cam.workpieces.orderChanges": "Changements d'outil : {toolFirst} outil d'abord, {partFirst} pièce d'abord",
+  "cam.workpieces.runsOn": "S'exécute sur"
 }

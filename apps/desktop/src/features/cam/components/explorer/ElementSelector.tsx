@@ -8,6 +8,8 @@ import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import type { ToolpathSettings } from "../../lib/elementJob.ts"
 import { formatDuration } from "../../lib/multiToolpath.ts"
 import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
+import { useSetupStore } from "../../store/setupStore.ts"
+import { toggleToolpathWorkpiece } from "../../lib/setup.ts"
 import { t } from "../../../../i18n/index.ts"
 
 export interface ElementSelectorProps {
@@ -31,6 +33,8 @@ const icon = (type: string): JSX.Element => {
 export default function ElementSelector(props: ElementSelectorProps): JSX.Element {
   const elements = useElementsStore()
   const store = useMultiToolpathStore()
+  const setupChoices = useSetupStore()
+  const fixture = () => setupChoices.choices.workpieces
   const [selectedForGeneration, setSelectedForGeneration] = createSignal<ReadonlySet<string>>(new Set<string>())
 
   // Elements that can carry a toolpath.
@@ -188,6 +192,16 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                     <span>{toolpath.toolpathSettings.operationType}</span>
                     <Show when={toolpath.distance > 0}><span class="tabular-nums" title={t("cam.multi.statDistance")}>{(toolpath.distance / 1000).toFixed(2)} m</span></Show>
                     <Show when={toolpath.estimatedTime > 0}><span class="tabular-nums" title={t("cam.multi.statTime")}>{formatDuration(toolpath.estimatedTime)}</span></Show>
+                    <Show when={fixture().length > 1}>
+                      <span class="flex flex-wrap gap-1" role="group" aria-label={t("cam.workpieces.runsOn")} title={t("cam.workpieces.runsOn")} data-testid="toolpath-workpieces">
+                        <For each={fixture()}>{(wp) => {
+                          const on = () => toolpath.workpieceIds === undefined || toolpath.workpieceIds.includes(wp.id)
+                          return <button type="button" aria-pressed={on()} data-workpiece={wp.id}
+                            class={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${on() ? "bg-blue-700 text-white" : "bg-gray-700 text-gray-400"}`}
+                            onClick={() => store.updateToolpath(toolpath.id, { workpieceIds: toggleToolpathWorkpiece(fixture(), toolpath.workpieceIds, wp.id) })}>{wp.workOffset}</button>
+                        }}</For>
+                      </span>
+                    </Show>
                   </div>
 
                   {/* Progress bar once the G-code exists */}

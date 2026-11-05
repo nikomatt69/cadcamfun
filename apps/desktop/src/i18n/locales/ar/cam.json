@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "فتح في المحرر",
   "cam.setupDoc.offsets": "إزاحات الصفر: {offsets}",
   "cam.workpieces.placement": "الموضع بالنسبة للقطعة الأولى، مم (X، Y، Z): للمعاينة فقط، لا يُكتب في NC",
-  "cam.workpieces.orderChanges": "تبديلات الأداة: {toolFirst} الأداة أولًا، {partFirst} القطعة أولًا"
+  "cam.workpieces.orderChanges": "تبديلات الأداة: {toolFirst} الأداة أولًا، {partFirst} القطعة أولًا",
+  "cam.workpieces.runsOn": "تعمل على"
 }

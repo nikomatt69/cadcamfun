@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "在编辑器中打开",
   "cam.setupDoc.offsets": "工件坐标系：{offsets}",
   "cam.workpieces.placement": "相对第一个工件的位置，mm（X、Y、Z）：仅用于预览，不会写入 NC",
-  "cam.workpieces.orderChanges": "换刀次数：刀具优先 {toolFirst} 次，工件优先 {partFirst} 次"
+  "cam.workpieces.orderChanges": "换刀次数：刀具优先 {toolFirst} 次，工件优先 {partFirst} 次",
+  "cam.workpieces.runsOn": "运行于"
 }

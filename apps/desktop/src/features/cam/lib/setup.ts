@@ -74,7 +74,9 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
     params: toolpath.toolpathSettings,
     tool: toolOfToolpath(toolpath),
     enabled: toolpath.visible,
-    fromPreviousStock: false
+    fromPreviousStock: false,
+    // Only on a fixture of several parts, and only when the toolpath is limited to some of them.
+    ...(choices.workpieces.length > 1 && toolpath.workpieceIds !== undefined ? { workpieceIds: toolpath.workpieceIds.filter((id) => choices.workpieces.some((wp) => wp.id === id)) } : {})
   }))
 })
 
@@ -125,7 +127,8 @@ export const toolpathsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElemen
     toolpaths.push({
       id: op.id, elementId, elementType: String(element?.["type"] ?? ""), elementName: op.name,
       toolpathSettings: op.params, gcode: "", color: colors[toolpaths.length % Math.max(1, colors.length)] ?? "#888888",
-      visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0
+      visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0,
+      ...(op.workpieceIds !== undefined ? { workpieceIds: op.workpieceIds } : {})
     })
   }
   return { toolpaths, missingElementIds: missing, skippedOperationIds: skipped }
@@ -199,4 +202,24 @@ export const offsetsOf = (program: cam.Program): ReadonlyArray<string> => {
   const seen: string[] = []
   for (const tp of program.toolpaths) { const o = tp.workOffset ?? program.workOffset; if (!seen.includes(o)) seen.push(o) }
   return seen
+}
+
+/**
+ * The workpieces a toolpath runs on after one of them is switched: all of them is "unrestricted" (no list), and the last one cannot be
+ * switched off (an operation on no part cannot be generated).
+ */
+export const toggleToolpathWorkpiece = (fixture: ReadonlyArray<Workpiece>, current: ReadonlyArray<string> | undefined, id: string): ReadonlyArray<string> | undefined => {
+  const on = new Set(current ?? fixture.map((wp) => wp.id))
+  if (on.has(id)) on.delete(id)
+  else on.add(id)
+  if (on.size === 0) return current
+  const next = fixture.filter((wp) => on.has(wp.id)).map((wp) => wp.id)
+  return next.length === fixture.length ? undefined : next
+}
+
+/** A toolpath's list after a workpiece left the fixture: what is left of it, or unrestricted when nothing is left or one part remains. */
+export const withoutWorkpiece = (current: ReadonlyArray<string> | undefined, removed: string, remaining: number): ReadonlyArray<string> | undefined => {
+  if (current === undefined || remaining <= 1) return undefined
+  const next = current.filter((id) => id !== removed)
+  return next.length === 0 ? undefined : next
 }

@@ -41,6 +41,8 @@ export interface ElementToolpath {
   readonly distance: number
   /** A probing cycle (spec 73): set, the toolpath is a probe operation and `toolpathSettings.operationType` is "probing". */
   readonly probe?: ProbeOperation
+  /** The workpieces of the fixture this toolpath runs on (their ids); absent = every one of them. */
+  readonly workpieceIds?: ReadonlyArray<string>
 }
 
 export const TOOLPATH_COLORS = [

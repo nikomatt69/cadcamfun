@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "Открыть в редакторе",
   "cam.setupDoc.offsets": "Смещения нуля: {offsets}",
   "cam.workpieces.placement": "Положение относительно первой детали, мм (X, Y, Z): только предпросмотр, не попадает в УП",
-  "cam.workpieces.orderChanges": "Смены инструмента: {toolFirst} сначала инструмент, {partFirst} сначала деталь"
+  "cam.workpieces.orderChanges": "Смены инструмента: {toolFirst} сначала инструмент, {partFirst} сначала деталь",
+  "cam.workpieces.runsOn": "Выполняется на"
 }

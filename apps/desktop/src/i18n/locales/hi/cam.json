@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "एडिटर में खोलें",
   "cam.setupDoc.offsets": "वर्क ऑफ़सेट: {offsets}",
   "cam.workpieces.placement": "पहले पुर्ज़े से स्थिति, मिमी (X, Y, Z): केवल प्रीव्यू, NC में कभी नहीं",
-  "cam.workpieces.orderChanges": "टूल बदलाव: पहले टूल {toolFirst}, पहले पुर्ज़ा {partFirst}"
+  "cam.workpieces.orderChanges": "टूल बदलाव: पहले टूल {toolFirst}, पहले पुर्ज़ा {partFirst}",
+  "cam.workpieces.runsOn": "इन पर चलता है"
 }

@@ -18,7 +18,7 @@ import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useDocumentStore } from "../../../cad/store/documentStore.ts"
 import { makeSetupService, refOfDocument } from "../../api/setup.ts"
-import { choicesOfSetup, nextWorkpiece, offsetsOf, setupOfToolpaths, toolpathsOfSetup, type SetupChoices } from "../../lib/setup.ts"
+import { choicesOfSetup, nextWorkpiece, offsetsOf, setupOfToolpaths, toolpathsOfSetup, withoutWorkpiece, type SetupChoices } from "../../lib/setup.ts"
 import { TOOLPATH_COLORS, useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
 
@@ -151,6 +151,11 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
     useSetupStore.getState().setChoices({ workpieces: workpieces().map((wp) => (wp.id === id ? { ...wp, ...patch } : wp)) })
   const removeWorkpiece = (id: string): void => {
     const rest = workpieces().filter((wp) => wp.id !== id)
+    // A toolpath limited to the part that left, or to a fixture of one part, runs unrestricted again.
+    for (const toolpath of toolpaths.toolpaths) {
+      if (toolpath.workpieceIds === undefined) continue
+      toolpaths.updateToolpath(toolpath.id, { workpieceIds: withoutWorkpiece(toolpath.workpieceIds, id, rest.length) })
+    }
     useSetupStore.getState().setChoices({ workpieces: rest.length === 1 ? [] : rest, ...(rest.length === 1 ? { workOffset: rest[0]!.workOffset } : {}) })
   }
 

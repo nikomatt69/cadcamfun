@@ -86,6 +86,8 @@ export interface View3DProps {
   readonly axesVisible?: boolean
   readonly origin?: { readonly x: number; readonly y: number; readonly z: number }
   readonly stock?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
+  /** The raw pieces of the other workpieces on the fixture (the first is `stock`), drawn as outlines. */
+  readonly extraStocks?: ReadonlyArray<{ readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }>
   readonly showControls?: boolean
   /** Optional screen controls placed immediately before Fullscreen, including in fullscreen mode. */
   readonly controlsFooter?: JSX.Element
@@ -202,7 +204,7 @@ export function View3D(props: View3DProps) {
   const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -520,6 +522,14 @@ export function View3D(props: View3DProps) {
         const stock = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: props.toolpathDisplay?.stockOpacity ?? .6 }))
         boxGeometry.dispose()
         stock.position.set(stockOrigin.x + size.x / 2, stockOrigin.y + size.y / 2, stockOrigin.z + size.z / 2); stock.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(stock)
+      }
+      if (props.stock && (props.machine === undefined || props.machine.kind === "mill")) {
+        for (const { size, origin } of props.extraStocks ?? []) {
+          const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z)
+          const outline = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: props.toolpathDisplay?.stockOpacity ?? .6 }))
+          boxGeometry.dispose()
+          outline.position.set(origin.x + size.x / 2, origin.y + size.y / 2, origin.z + size.z / 2); outline.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(outline)
+        }
       }
       for (const raw of props.drawing?.entities ?? []) {
         if (!raw.visible || props.drawing?.layers.find(l => l.id === raw.layerId)?.visible === false) continue

@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, offsetsOf, placedProgram, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -179,10 +179,39 @@ describe("several workpieces in the viewport", () => {
 describe("a saved multi-part program keeps its fixture", () => {
   test("the fixture travels in the saved document's drawing and comes back only for two parts or more", async () => {
     const { workpiecesOfSnapshot } = await import("../src/features/cam/lib/saved-program.ts")
-    const parts = [{ id: "wp-1", name: "P1", workOffset: "G54" }, { id: "wp-2", name: "P2", workOffset: "G55", placement: { x: 80, y: 0, z: 0 } }]
+    const parts: cam.program.Workpiece[] = [{ id: "wp-1", name: "P1", workOffset: "G54" }, { id: "wp-2", name: "P2", workOffset: "G55", placement: { x: 80, y: 0, z: 0 } }]
     expect(workpiecesOfSnapshot({ drawing: { workpieces: parts } })).toEqual(parts)
     expect(workpiecesOfSnapshot({ drawing: { workpieces: [parts[0]] } })).toEqual([])
     expect(workpiecesOfSnapshot({ drawing: { workpieces: "nonsense" } })).toEqual([])
     expect(workpiecesOfSnapshot({ drawing: {} })).toEqual([])
+  })
+})
+
+describe("operations restricted to some workpieces", () => {
+  const fixture: cam.program.Workpiece[] = [{ id: "w1", name: "P1", workOffset: "G54" }, { id: "w2", name: "P2", workOffset: "G55" }, { id: "w3", name: "P3", workOffset: "G56" }]
+  test("switching a part off restricts the toolpath, switching it on again frees it, the last part stays", () => {
+    const off = toggleToolpathWorkpiece(fixture, undefined, "w2")
+    expect(off).toEqual(["w1", "w3"])
+    expect(toggleToolpathWorkpiece(fixture, off, "w2")).toBeUndefined()
+    expect(toggleToolpathWorkpiece(fixture, ["w1"], "w1")).toEqual(["w1"])
+  })
+
+  test("a removed part leaves the lists; one part left means unrestricted", () => {
+    expect(withoutWorkpiece(["w1", "w3"], "w3", 2)).toEqual(["w1"])
+    expect(withoutWorkpiece(["w3"], "w3", 2)).toBeUndefined()
+    expect(withoutWorkpiece(["w1", "w3"], "w3", 1)).toBeUndefined()
+    expect(withoutWorkpiece(undefined, "w3", 2)).toBeUndefined()
+  })
+
+  test("the restriction goes into the setup and back onto the panel; it is dropped for parts the fixture no longer has", () => {
+    const toolpaths = panel().toolpaths.map((tp, i) => (i === 0 ? { ...tp, workpieceIds: ["w1", "w3", "w9"] } : tp))
+    const setup = setupOfToolpaths(toolpaths, { ...DEFAULT_SETUP_CHOICES, workpieces: fixture })
+    expect(setup.operations[0]!.workpieceIds).toEqual(["w1", "w3"])
+    expect(setup.operations[1]!.workpieceIds).toBeUndefined()
+    expect(toolpathsOfSetup(setup, [], TOOLPATH_COLORS).toolpaths[0]!.workpieceIds).toEqual(["w1", "w3"])
+    // On a fixture of one part the list is not sent at all.
+    expect(setupOfToolpaths(toolpaths, DEFAULT_SETUP_CHOICES).operations[0]!.workpieceIds).toBeUndefined()
+    // The planner honours it: the restricted operation runs on two of three parts.
+    expect(cam.program.runsOf(setup).filter((run) => run.operation.id === setup.operations[0]!.id)).toHaveLength(2)
   })
 })

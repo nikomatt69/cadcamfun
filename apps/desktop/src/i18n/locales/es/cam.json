@@ -1706,5 +1706,6 @@
   "cam.setupDoc.open": "Abrir en el editor",
   "cam.setupDoc.offsets": "Orígenes de pieza: {offsets}",
   "cam.workpieces.placement": "Posición respecto a la primera pieza, mm (X, Y, Z): solo vista previa, nunca en el NC",
-  "cam.workpieces.orderChanges": "Cambios de herramienta: {toolFirst} herramienta primero, {partFirst} pieza primero"
+  "cam.workpieces.orderChanges": "Cambios de herramienta: {toolFirst} herramienta primero, {partFirst} pieza primero",
+  "cam.workpieces.runsOn": "Se ejecuta en"
 }
