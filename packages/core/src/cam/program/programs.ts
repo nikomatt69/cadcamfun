@@ -108,9 +108,11 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
         const made = toolpathOf(op)
         if (made === undefined) continue
         if (!used.includes(op)) used.push(op)
+        // A part on an indexed face: the table turns to its angles first, then the same moves run under that face's register.
+        const indexed = workpiece.index === undefined ? made : { ...made, moves: [{ _tag: "Orient" as const, ...workpiece.index }, ...made.moves] }
         toolpaths.push(multi
-          ? { ...made, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, ...(workpiece.workOffsetRef !== undefined ? { workOffsetRef: workpiece.workOffsetRef } : {}), operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
-          : made)
+          ? { ...indexed, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, ...(workpiece.workOffsetRef !== undefined ? { workOffsetRef: workpiece.workOffsetRef } : {}), operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
+          : indexed)
       }
       const fixture = workpiecesOf(setup)
       const program = makeProgram(planned.name, toolpaths, {

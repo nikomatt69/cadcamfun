@@ -238,6 +238,20 @@ describe("several workpieces on one fixture: one program, one work offset per pa
     expect(issues[0]!.message).toMatch(/T3, the magazine holds 2/)
   })
 
+  test("a tombstone: each face has its register and turns the table to its angle first", () => {
+    const faces: program.Setup["workpieces"] = [
+      { id: "f0", name: "Face 0", workOffset: "G54", index: { b: 0 } }, { id: "f1", name: "Face 90", workOffset: "G55", index: { b: 90 } }, { id: "f2", name: "Face 180", workOffset: "G56", index: { b: 180 } }
+    ]
+    const p = generateSetup(setup([op("a", t6)], { workpieces: faces }), geometryOf).programs[0]!
+    const lines = p.gcode.split("\n").map((l) => l.trim())
+    for (const [register, angle] of [["G55", "B90.000"], ["G56", "B180.000"]] as const) {
+      const at = lines.indexOf(register)
+      expect(at).toBeGreaterThan(0)
+      expect(lines.slice(at, at + 3).some((l) => l.includes(angle))).toBe(true)
+    }
+    expect(p.program.toolpaths.map((t) => t.moves[0]!._tag)).toEqual(["Orient", "Orient", "Orient"])
+  })
+
   test("a setup without workpieces is unchanged: no register block, no suffix on ids", () => {
     const p = generateSetup(setup(ops), geometryOf).programs[0]!
     expect(p.program.toolpaths.map((t) => t.id)).toEqual(["a", "b"])

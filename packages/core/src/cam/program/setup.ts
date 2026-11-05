@@ -38,6 +38,8 @@ export const WorkpieceSchema = Schema.Struct({
   /** An extended register (`G54.1 P3`, Haas `G154 P3`, Siemens `G505`) in place of `workOffset`: a fixture of more than six parts. */
   workOffsetRef: Schema.optionalKey(WorkOffsetRefSchema),
   placement: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+  /** The rotary index of this part (a tombstone face, an indexed vise), degrees: the table turns there, tool retracted, before its toolpaths. Each face keeps its own register. */
+  index: Schema.optionalKey(Schema.Struct({ a: Schema.optionalKey(Schema.Finite), b: Schema.optionalKey(Schema.Finite), c: Schema.optionalKey(Schema.Finite) })),
   /** This part's own blank when it is not the setup's (different blanks on one fixture); its corner is relative to the part's datum. */
   stock: Schema.optionalKey(StockSchema)
 })
