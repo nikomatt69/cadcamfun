@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -166,6 +166,34 @@ describe("several workpieces in the viewport", () => {
   test("a toolpath without its own register follows the program's", () => {
     const plain = cam.makeProgram("fix", [{ id: "x", name: "x", toolId: "t", spindleRpm: 1, coolant: "off", moves }], { workOffset: "G55" })
     expect(placedProgram(plain, two({ x: 10, y: 0, z: 0 })).toolpaths[0]!.moves[0]).toMatchObject({ to: { x: 11 } })
+  })
+
+  test("an operation can wait for several others: switching one on or off, none left is no dependency", () => {
+    expect(toggleDependency(undefined, "a")).toEqual(["a"])
+    expect(toggleDependency(["a"], "b")).toEqual(["a", "b"])
+    expect(toggleDependency(["a", "b"], "a")).toEqual(["b"])
+    expect(toggleDependency(["b"], "b")).toBeUndefined()
+  })
+
+  test("a part on an indexed face is drawn turned by its index from the first part's, blank included", () => {
+    const parts = (index: { a?: number; b?: number; c?: number }): ReadonlyArray<cam.program.Workpiece> => [
+      { id: "w1", name: "P1", workOffset: "G54" }, { id: "w2", name: "P2", workOffset: "G55", index }
+    ]
+    // C 90: x -> y, y -> -x, the arc keeps its plane and its centre turns with it; the first part stays.
+    const turned = placedProgram(program, parts({ c: 90 }))
+    expect(turned.toolpaths[0]!.moves).toEqual(moves)
+    expect(turned.toolpaths[1]!.moves[1]).toMatchObject({ to: { x: -2, y: 3, z: -1 } })
+    expect(turned.toolpaths[1]!.moves[2]).toMatchObject({ _tag: "Arc", to: { x: -4, y: 5 }, center: { x: -2, y: 4 } })
+    // A tilt takes the arc out of its plane: the viewport joins the end points; the program text is untouched.
+    const tilted = placedProgram(program, parts({ a: 90 }))
+    expect(tilted.toolpaths[1]!.moves[1]).toMatchObject({ to: { x: 3, y: 1, z: 2 } })
+    expect(tilted.toolpaths[1]!.moves[2]).toMatchObject({ _tag: "Linear", to: { x: 5, y: 1, z: 4 } })
+    expect(tilted.toolpaths[1]!.moves[4]).toEqual(moves[4])
+    // The index is measured from the first part: both on the same face is no turn at all.
+    expect(placedProgram(program, [{ id: "w1", name: "P1", workOffset: "G54", index: { c: 90 } }, { id: "w2", name: "P2", workOffset: "G55", index: { c: 90 } }])).toBe(program)
+    // The blank turns with its part: a quarter turn about Z swaps its sides.
+    const box = { origin: { x: 0, y: 0, z: -5 }, size: { x: 20, y: 10, z: 5 } }
+    expect(extraStocks(box, parts({ c: 90 }))).toEqual([{ origin: { x: -10, y: 0, z: -5 }, size: { x: 10, y: 20, z: 5 } }])
   })
 
   test("the other parts' stock boxes sit at their placements, and the registers a program uses are listed in order", () => {

@@ -9,7 +9,7 @@ import type { ToolpathSettings } from "../../lib/elementJob.ts"
 import { formatDuration } from "../../lib/multiToolpath.ts"
 import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
-import { registerKey, setupOfToolpaths, toggleToolpathWorkpiece } from "../../lib/setup.ts"
+import { registerKey, setupOfToolpaths, toggleDependency, toggleToolpathWorkpiece } from "../../lib/setup.ts"
 import { cam } from "@cadcamfun/core"
 import { t } from "../../../../i18n/index.ts"
 
@@ -212,12 +212,15 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                       </span>
                     </Show>
                     <Show when={earlier(toolpath.id).length > 0}>
-                      <select class="rounded border border-gray-600 bg-gray-900 px-1 py-0.5 text-[10px] text-white" name={`camToolpathAfter-${toolpath.id}`} data-testid="toolpath-depends-on"
-                        aria-label={t("cam.workpieces.dependsOn")} title={t("cam.workpieces.dependsOn")} value={toolpath.dependsOn?.[0] ?? ""}
-                        onChange={(event) => store.updateToolpath(toolpath.id, { dependsOn: event.currentTarget.value === "" ? undefined : [event.currentTarget.value] })}>
-                        <option value="">{t("cam.workpieces.dependsNone")}</option>
-                        <For each={earlier(toolpath.id)}>{(other) => <option value={other.id}>{other.elementName}</option>}</For>
-                      </select>
+                      <span class="flex flex-wrap items-center gap-1" role="group" aria-label={t("cam.workpieces.dependsOn")} title={t("cam.workpieces.dependsOn")} data-testid="toolpath-depends-on">
+                        <span class="text-[10px] text-gray-500">{t("cam.workpieces.dependsOn")}</span>
+                        <For each={earlier(toolpath.id)}>{(other) => {
+                          const on = () => toolpath.dependsOn?.includes(other.id) === true
+                          return <button type="button" aria-pressed={on()} data-depends-on={other.id} title={other.elementName}
+                            class={`max-w-24 truncate rounded px-1.5 py-0.5 text-[10px] transition-colors ${on() ? "bg-amber-700 text-white" : "bg-gray-700 text-gray-400"}`}
+                            onClick={() => store.updateToolpath(toolpath.id, { dependsOn: toggleDependency(toolpath.dependsOn, other.id) })}>{other.elementName}</button>
+                        }}</For>
+                      </span>
                     </Show>
                   </div>
                   <For each={issuesOf(toolpath.id)}>{(message) => <p class="mt-1 text-xs text-red-400" role="alert" data-testid="toolpath-issue">{message}</p>}</For>

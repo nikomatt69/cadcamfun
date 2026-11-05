@@ -200,19 +200,73 @@ export const shiftOf = (workpiece: Workpiece, first: Workpiece | undefined): Vec
   return { x: own.x - base.x, y: own.y - base.y, z: own.z - base.z }
 }
 
+/** Degrees a part's rotary index turns it by, about X (A), Y (B) and Z (C). */
+export interface Turn { readonly a: number; readonly b: number; readonly c: number }
+const isNoTurn = (t: Turn): boolean => t.a === 0 && t.b === 0 && t.c === 0
+const RAD = Math.PI / 180
+
+/** A point turned about the part's datum: A about X, then B about Y, then C about Z (rounded so a quarter turn stays exact). */
+export const turnPoint = (p: Vec3, t: Turn): Vec3 => {
+  const round = (n: number): number => Math.round(n * 1e9) / 1e9
+  let { x, y, z } = p
+  if (t.a !== 0) { const c = Math.cos(t.a * RAD), s = Math.sin(t.a * RAD); [y, z] = [y * c - z * s, y * s + z * c] }
+  if (t.b !== 0) { const c = Math.cos(t.b * RAD), s = Math.sin(t.b * RAD); [x, z] = [x * c + z * s, -x * s + z * c] }
+  if (t.c !== 0) { const c = Math.cos(t.c * RAD), s = Math.sin(t.c * RAD); [x, y] = [x * c - y * s, x * s + y * c] }
+  return { x: round(x), y: round(y), z: round(z) }
+}
+
 /**
- * The program as the viewport draws it: each toolpath moved to the place of the workpiece whose register it runs under. A program
- * with one workpiece (or none placed) is returned as it is.
+ * The index of a part from the first part's: the viewport's own stock box and frame are the first part's, so every other part is
+ * drawn turned by the difference (the table turns each face to its angles before its toolpaths).
+ */
+export const turnOf = (workpiece: Workpiece, first: Workpiece | undefined): Turn => ({
+  a: (workpiece.index?.a ?? 0) - (first?.index?.a ?? 0), b: (workpiece.index?.b ?? 0) - (first?.index?.b ?? 0), c: (workpiece.index?.c ?? 0) - (first?.index?.c ?? 0)
+})
+
+/**
+ * A move turned about the datum. A turn about Z alone keeps the XY plane, so arcs and splines stay what they are; a tilt takes them
+ * out of it, and the viewport draws their end points joined by straight lines (the NC keeps the arc).
+ */
+export const turnMove = (move: Move, t: Turn): Move => {
+  if (isNoTurn(t)) return move
+  const flat = t.a === 0 && t.b === 0
+  switch (move._tag) {
+    case "Rapid":
+      return move.machine === true ? move : { ...move, to: turnPoint(move.to, t) }
+    case "Linear":
+      return { ...move, to: turnPoint(move.to, t) }
+    case "Probe":
+      return { ...move, to: turnPoint(move.to, t), direction: turnPoint(move.direction, t) }
+    case "Arc": {
+      if (!flat) return { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+      const center = turnPoint({ ...move.center, z: 0 }, t)
+      return { ...move, to: turnPoint(move.to, t), center: { x: center.x, y: center.y } }
+    }
+    case "Spline": {
+      if (!flat) return { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+      return { ...move, to: turnPoint(move.to, t), controls: move.controls.map((c) => { const q = turnPoint({ ...c, z: 0 }, t); return { x: q.x, y: q.y } }) }
+    }
+    case "Cycle":
+      return flat ? { ...move, to: turnPoint(move.to, t) } : { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+    default:
+      return move
+  }
+}
+
+/**
+ * The program as the viewport draws it: each toolpath turned to its part's index and moved to the place of the workpiece whose
+ * register it runs under. A program with one workpiece (or none placed or indexed) is returned as it is.
  */
 export const placedProgram = (program: cam.Program, workpieces: ReadonlyArray<Workpiece>): cam.Program => {
   if (workpieces.length < 2) return program
-  const shifts = new Map(workpieces.map((wp) => [registerKey(wp), shiftOf(wp, workpieces[0])]))
-  if ([...shifts.values()].every(isZero)) return program
+  const places = new Map(workpieces.map((wp) => [registerKey(wp), { shift: shiftOf(wp, workpieces[0]), turn: turnOf(wp, workpieces[0]) }] as const))
+  if ([...places.values()].every((p) => isZero(p.shift) && isNoTurn(p.turn))) return program
   return {
     ...program,
     toolpaths: program.toolpaths.map((tp) => {
-      const shift = shifts.get(registerOf(tp, program))
-      return shift === undefined || isZero(shift) ? tp : { ...tp, moves: tp.moves.map((move) => translateMove(move, shift)) }
+      const place = places.get(registerOf(tp, program))
+      if (place === undefined || (isZero(place.shift) && isNoTurn(place.turn))) return tp
+      return { ...tp, moves: tp.moves.map((move) => translateMove(turnMove(move, place.turn), place.shift)) }
     })
   }
 }
@@ -228,10 +282,21 @@ const registerOf = (tp: cam.Toolpath, program: cam.Program): string =>
 export const extraStocks = (stock: StockBox | undefined, workpieces: ReadonlyArray<Workpiece>): ReadonlyArray<StockBox> => {
   if (stock === undefined || workpieces.length < 2) return []
   return workpieces.slice(1).map((wp) => {
-    const shift = shiftOf(wp, workpieces[0])
-    if (wp.stock === undefined) return { origin: add(stock.origin, shift), size: stock.size }
-    return { origin: add({ x: wp.stock.origin.x, y: wp.stock.origin.y, z: wp.stock.origin.z - wp.stock.z }, shift), size: { x: wp.stock.x, y: wp.stock.y, z: wp.stock.z } }
+    const shift = shiftOf(wp, workpieces[0]), turn = turnOf(wp, workpieces[0])
+    const own: StockBox = wp.stock === undefined ? stock
+      : { origin: { x: wp.stock.origin.x, y: wp.stock.origin.y, z: wp.stock.origin.z - wp.stock.z }, size: { x: wp.stock.x, y: wp.stock.y, z: wp.stock.z } }
+    return { origin: add(turnedBox(own, turn).origin, shift), size: turnedBox(own, turn).size }
   })
+}
+
+/** The box that holds a stock box after its part turned: exact for quarter turns, the enclosing box for any other angle. */
+const turnedBox = (box: StockBox, turn: Turn): StockBox => {
+  if (isNoTurn(turn)) return box
+  const { origin: o, size: s } = box
+  const corners = [0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((k) => turnPoint({ x: o.x + i * s.x, y: o.y + j * s.y, z: o.z + k * s.z }, turn))))
+  const min = { x: Math.min(...corners.map((c) => c.x)), y: Math.min(...corners.map((c) => c.y)), z: Math.min(...corners.map((c) => c.z)) }
+  const max = { x: Math.max(...corners.map((c) => c.x)), y: Math.max(...corners.map((c) => c.y)), z: Math.max(...corners.map((c) => c.z)) }
+  return { origin: min, size: { x: max.x - min.x, y: max.y - min.y, z: max.z - min.z } }
 }
 
 /** The work offsets a program runs under, in order of first use. */
@@ -252,6 +317,12 @@ export const toggleToolpathWorkpiece = (fixture: ReadonlyArray<Workpiece>, curre
   if (on.size === 0) return current
   const next = fixture.filter((wp) => on.has(wp.id)).map((wp) => wp.id)
   return next.length === fixture.length ? undefined : next
+}
+
+/** The operations a toolpath waits for after one of them is switched; none left is "no dependency" (the key is left out). */
+export const toggleDependency = (current: ReadonlyArray<string> | undefined, id: string): ReadonlyArray<string> | undefined => {
+  const next = (current ?? []).includes(id) ? (current ?? []).filter((other) => other !== id) : [...(current ?? []), id]
+  return next.length === 0 ? undefined : next
 }
 
 /** A toolpath's list after a workpiece left the fixture: what is left of it, or unrestricted when nothing is left or one part remains. */
