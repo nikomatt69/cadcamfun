@@ -53,7 +53,9 @@ export const CamVerifyNcRequest = Schema.Struct({
   dwell: Schema.optionalKey(Schema.Literals(["seconds", "milliseconds"])),
   okuma: Schema.optionalKey(Schema.Boolean),
   /** Where the tool stands before the first block, in the work frame (default: 50 mm above the stock's top corner). */
-  start: Schema.optionalKey(vec3)
+  start: Schema.optionalKey(vec3),
+  /** Replay only the moves under this work offset register (`G55`, `G54.1 P3`), the stock and the part being that register's frame: a program of several workpieces is replayed once per workpiece. */
+  register: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(24)))
 })
 export type CamVerifyNcRequest = typeof CamVerifyNcRequest.Type
 

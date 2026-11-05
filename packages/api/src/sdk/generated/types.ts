@@ -4331,6 +4331,7 @@ export type ToolpathGeneratorVerifyNcPayload = {
   readonly dwell?: "seconds" | "milliseconds"
   readonly okuma?: boolean
   readonly start?: { readonly x: number; readonly y: number; readonly z: number }
+  readonly register?: string
 }
 
 export type ToolpathGeneratorCollisionsPayload = {
@@ -4672,6 +4673,8 @@ export type CamSetupPlanPayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
         readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
@@ -4702,6 +4705,33 @@ export type CamSetupPlanPayload = {
     }>
     readonly magazineSize?: number
     readonly workpieceOrder?: "toolFirst" | "partFirst"
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly envelope?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly sisters?: ReadonlyArray<{
+      readonly toolId: string
+      readonly tool: {
+        readonly id: string
+        readonly name: string
+        readonly kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        readonly diameter: number
+        readonly flutes: number
+        readonly maxRpm: number
+        readonly stickout?: number
+        readonly angle?: number
+        readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
+      }
+    }>
   }
 }
 
@@ -4897,6 +4927,8 @@ export type CamSetupValidatePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
         readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
@@ -4927,6 +4959,33 @@ export type CamSetupValidatePayload = {
     }>
     readonly magazineSize?: number
     readonly workpieceOrder?: "toolFirst" | "partFirst"
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly envelope?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly sisters?: ReadonlyArray<{
+      readonly toolId: string
+      readonly tool: {
+        readonly id: string
+        readonly name: string
+        readonly kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        readonly diameter: number
+        readonly flutes: number
+        readonly maxRpm: number
+        readonly stickout?: number
+        readonly angle?: number
+        readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
+      }
+    }>
   }
 }
 
@@ -5122,6 +5181,8 @@ export type CamSetupGeneratePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
         readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
@@ -5152,6 +5213,33 @@ export type CamSetupGeneratePayload = {
     }>
     readonly magazineSize?: number
     readonly workpieceOrder?: "toolFirst" | "partFirst"
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly envelope?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly sisters?: ReadonlyArray<{
+      readonly toolId: string
+      readonly tool: {
+        readonly id: string
+        readonly name: string
+        readonly kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        readonly diameter: number
+        readonly flutes: number
+        readonly maxRpm: number
+        readonly stickout?: number
+        readonly angle?: number
+        readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
+      }
+    }>
   }
   readonly elements: { readonly [x: string]: { readonly [x: string]: JsonValue } }
   readonly stock?: {
@@ -5656,6 +5744,8 @@ export type CamSetupSavePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
         readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
@@ -5686,6 +5776,33 @@ export type CamSetupSavePayload = {
     }>
     readonly magazineSize?: number
     readonly workpieceOrder?: "toolFirst" | "partFirst"
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly envelope?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly sisters?: ReadonlyArray<{
+      readonly toolId: string
+      readonly tool: {
+        readonly id: string
+        readonly name: string
+        readonly kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        readonly diameter: number
+        readonly flutes: number
+        readonly maxRpm: number
+        readonly stickout?: number
+        readonly angle?: number
+        readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
+      }
+    }>
   }
 }
 
@@ -5882,6 +5999,8 @@ export type CamSetupUpdatePayload = {
         readonly stickout?: number
         readonly angle?: number
         readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
         readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
       }
       readonly pocket?: number
@@ -5912,6 +6031,33 @@ export type CamSetupUpdatePayload = {
     }>
     readonly magazineSize?: number
     readonly workpieceOrder?: "toolFirst" | "partFirst"
+    readonly fixtures?: ReadonlyArray<{
+      readonly id: string
+      readonly name: string
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }>
+    readonly envelope?: {
+      readonly min: { readonly x: number; readonly y: number; readonly z: number }
+      readonly max: { readonly x: number; readonly y: number; readonly z: number }
+    }
+    readonly sisters?: ReadonlyArray<{
+      readonly toolId: string
+      readonly tool: {
+        readonly id: string
+        readonly name: string
+        readonly kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        readonly diameter: number
+        readonly flutes: number
+        readonly maxRpm: number
+        readonly stickout?: number
+        readonly angle?: number
+        readonly tipRadius?: number
+        readonly holder?: { readonly diameter: number; readonly length: number }
+        readonly lifeMinutes?: number
+        readonly profile?: ReadonlyArray<{ readonly r: number; readonly z: number }>
+      }
+    }>
   }
   readonly baseUpdatedAt?: string
 }
@@ -12817,6 +12963,7 @@ export type ToolpathGeneratorVerifyNcInput = {
   readonly dwell?: ToolpathGeneratorVerifyNcPayload["dwell"]
   readonly okuma?: ToolpathGeneratorVerifyNcPayload["okuma"]
   readonly start?: ToolpathGeneratorVerifyNcPayload["start"]
+  readonly register?: ToolpathGeneratorVerifyNcPayload["register"]
 }
 
 export type ToolpathGeneratorVerifyNcOutput = {
@@ -13280,6 +13427,8 @@ export type CamSetupPlanOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
       profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
@@ -13468,6 +13617,8 @@ export type CamSetupGenerateOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
       profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
@@ -13885,6 +14036,8 @@ export type CamSetupListOutput = Array<{
         stickout?: number
         angle?: number
         tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
         profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
@@ -13909,6 +14062,30 @@ export type CamSetupListOutput = Array<{
     }>
     magazineSize?: number
     workpieceOrder?: "toolFirst" | "partFirst"
+    fixtures?: Array<{
+      id: string
+      name: string
+      min: { x: number; y: number; z: number }
+      max: { x: number; y: number; z: number }
+    }>
+    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    sisters?: Array<{
+      toolId: string
+      tool: {
+        id: string
+        name: string
+        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        diameter: number
+        flutes: number
+        maxRpm: number
+        stickout?: number
+        angle?: number
+        tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
+        profile?: Array<{ r: number; z: number }>
+      }
+    }>
   }
   createdAt: string
   updatedAt: string
@@ -14109,6 +14286,8 @@ export type CamSetupSaveOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
         profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
@@ -14133,6 +14312,30 @@ export type CamSetupSaveOutput = {
     }>
     magazineSize?: number
     workpieceOrder?: "toolFirst" | "partFirst"
+    fixtures?: Array<{
+      id: string
+      name: string
+      min: { x: number; y: number; z: number }
+      max: { x: number; y: number; z: number }
+    }>
+    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    sisters?: Array<{
+      toolId: string
+      tool: {
+        id: string
+        name: string
+        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        diameter: number
+        flutes: number
+        maxRpm: number
+        stickout?: number
+        angle?: number
+        tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
+        profile?: Array<{ r: number; z: number }>
+      }
+    }>
   }
   createdAt: string
   updatedAt: string
@@ -14332,6 +14535,8 @@ export type CamSetupGetOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
         profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
@@ -14356,6 +14561,30 @@ export type CamSetupGetOutput = {
     }>
     magazineSize?: number
     workpieceOrder?: "toolFirst" | "partFirst"
+    fixtures?: Array<{
+      id: string
+      name: string
+      min: { x: number; y: number; z: number }
+      max: { x: number; y: number; z: number }
+    }>
+    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    sisters?: Array<{
+      toolId: string
+      tool: {
+        id: string
+        name: string
+        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        diameter: number
+        flutes: number
+        maxRpm: number
+        stickout?: number
+        angle?: number
+        tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
+        profile?: Array<{ r: number; z: number }>
+      }
+    }>
   }
   createdAt: string
   updatedAt: string
@@ -14558,6 +14787,8 @@ export type CamSetupUpdateOutput = {
         stickout?: number
         angle?: number
         tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
         profile?: Array<{ r: number; z: number }>
       }
       pocket?: number
@@ -14582,6 +14813,30 @@ export type CamSetupUpdateOutput = {
     }>
     magazineSize?: number
     workpieceOrder?: "toolFirst" | "partFirst"
+    fixtures?: Array<{
+      id: string
+      name: string
+      min: { x: number; y: number; z: number }
+      max: { x: number; y: number; z: number }
+    }>
+    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    sisters?: Array<{
+      toolId: string
+      tool: {
+        id: string
+        name: string
+        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        diameter: number
+        flutes: number
+        maxRpm: number
+        stickout?: number
+        angle?: number
+        tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
+        profile?: Array<{ r: number; z: number }>
+      }
+    }>
   }
   createdAt: string
   updatedAt: string
@@ -14606,6 +14861,8 @@ export type CamSetupPlanSavedOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
       profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>
@@ -14791,6 +15048,8 @@ export type CamSetupGenerateSavedOutput = {
       stickout?: number
       angle?: number
       tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
       profile?: Array<{ r: number; z: number }>
     }
     operationIds: Array<string>

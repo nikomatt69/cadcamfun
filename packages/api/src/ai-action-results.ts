@@ -238,8 +238,14 @@ const setupList = Schema.Struct({
 /** The programs a saved setup made, each stored as a program of the project; its tool table and the cost of its tool changes. */
 const setupGenerated = Schema.Struct({
   ok: Schema.Literal(true), projectId: str, setupId: str,
-  programs: Schema.Array(Schema.Struct({ operationId: str, name: str, programNumber: int, toolNumbers: Schema.Array(int), operations: int, toolpaths: int, lines: int })),
+  programs: Schema.Array(Schema.Struct({
+    operationId: str, name: str, programNumber: int, toolNumbers: Schema.Array(int), operations: int, toolpaths: int, lines: int,
+    /** What the replay of the stored text found, per workpiece register; the release level it adds up to (`blocked` on a gouge, a rapid through material or a travel violation). */
+    release: Schema.optionalKey(str), evidence: Schema.optionalKey(record)
+  })),
   totals: Schema.Struct({ programs: int, toolLoads: int, toolChanges: int, cutLength: num, rapidLength: num, estimatedSeconds: num }),
+  /** Cutting minutes per tool against its life, with the sister tools that took over. */
+  toolLife: Schema.optionalKey(Schema.Array(record)),
   warnings: strings
 })
 const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })

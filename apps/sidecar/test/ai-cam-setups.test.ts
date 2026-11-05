@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
-import { cam } from "@cadcamfun/core"
+import { buildRecipe, cam } from "@cadcamfun/core"
 import { makeApp } from "./helpers.ts"
 
 /** RM-02: the assistant plans, saves and lists multi-operation setups through the same documents as the `camSetup` HTTP group. */
@@ -113,10 +113,52 @@ test("cam_edit setup_generate turns a saved fixture of three parts into one stor
   expect(document.program.toolpaths.map((t: { workOffset?: string }) => t.workOffset)).toEqual(["G54", "G55", "G56", "G54", "G55", "G56"])
   expect(document.setupId).toBe(saved.setupId)
 
+  // Every register is replayed against its own blank: three verdicts, stored with the program and read back by cam review. The elements are
+  // outlines, so there is no finished solid to compare with: the release is a preview and says so, never a pass.
+  const evidence = generated.programs[0].evidence
+  expect(evidence.registers.map((r: { register: string }) => r.register)).toEqual(["G54", "G55", "G56"])
+  expect(evidence.registers.every((r: { feedMoves: number }) => r.feedMoves > 0)).toBe(true)
+  expect(generated.programs[0].release).toBe("preview")
+  expect(evidence.notes.join(" ")).toMatch(/not a finished solid/)
+  expect(row.data.setupEvidence.programHash).toBe(evidence.programHash)
+  const reviewed = await call("cam", { action: "review", operationId: generated.programs[0].operationId })
+  expect(reviewed).toMatchObject({ status: "preview", release: "preview", setupId: saved.setupId })
+  expect(reviewed.registers).toHaveLength(3)
+
   // A setup that names an element the drawing does not have is refused with the element, nothing is stored.
   const broken = await call("cam_edit", { action: "setup_save", name: "Broken", setup: setup([elementOp("a", "gone", tool("t6", 6))]) })
   const refused = await call("cam_edit", { action: "setup_generate", setupId: broken.setupId })
   expect(refused.ok).toBe(false)
   expect(refused.error).toMatch(/gone/)
   expect((await call("cam_edit", { action: "setup_generate", setupId: "missing" })).ok).toBe(false)
+})
+
+test("setup_generate replays every register against the finished part: a pass needs the holder described, a blank that lacks part material blocks", async () => {
+  const id = (await app.call("/api/projects", { method: "POST", json: { name: "Plates" } })).body.id as string
+  const tools = buildTools(handlers, id)
+  const call = async (name: string, input: unknown) => JSON.parse(await tools.find((t) => t.id === name)!.execute(input, ctx))
+  const plate = buildRecipe("mounting_plate", { width: 60, depth: 40, thickness: 10, fastener: "M5", counterbore: true })
+  const added = await call("cad_edit", { action: "add", elements: [{ type: "parametric", name: "Plate", x: 0, y: 0, z: 0, history: plate.history }] })
+  expect(added.ok).toBe(true)
+  const blank = (width: number, height: number, x: number, y: number) => ({ width, height, depth: 12, radius: 0, x, y, topZ: 0, allowance: 0, material: "aluminum" })
+  const cutter = { id: "t6", name: "Endmill 6", kind: "endmill", diameter: 6, flutes: 2, maxRpm: 18000 }
+  const generate = async (t: Record<string, unknown>, stock: ReturnType<typeof blank>) => {
+    expect((await call("cam_edit", { action: "stock_set", stock })).ok).toBe(true)
+    const operation = { ...op("a", cutter), elementIds: [added.ids[0]], tool: t, params: { ...cam.generator.DEFAULT_SETTINGS, depth: 4, stepdown: 2, toolDiameter: 6, operationType: "profile" } }
+    const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55" }]
+    const saved = await call("cam_edit", { action: "setup_save", name: "Plates", setup: setup([operation], { workpieces: parts }) })
+    return call("cam_edit", { action: "setup_generate", setupId: saved.setupId })
+  }
+  // The part is centred on the blank (the stock centre is the origin): both registers replay clean; without a holder the release stays a preview.
+  const bare = await generate(cutter, blank(76, 56, 30, 20))
+  expect(bare.programs[0].evidence.registers.map((r: { register: string; verdict: string; gougeMm: number }) => [r.register, r.verdict, r.gougeMm])).toEqual([["G54", "clean", 0], ["G55", "clean", 0]])
+  expect(bare.programs[0].release).toBe("preview")
+  expect(bare.programs[0].evidence.notes.join(" ")).toMatch(/No holder is described for Endmill 6/)
+  const held = await generate({ ...cutter, holder: { diameter: 32, length: 40 } }, blank(76, 56, 30, 20))
+  expect(held.programs[0].release).toBe("verified-program")
+  // A blank that does not reach the part's far side lacks part material where the program cuts: a gouge, named with its NC line, blocks the release.
+  const short = await generate({ ...cutter, holder: { diameter: 32, length: 40 } }, blank(40, 56, 10, 20))
+  expect(short.programs[0].release).toBe("blocked")
+  expect(short.programs[0].evidence.registers[0].findings[0]).toMatchObject({ kind: "gouge" })
+  expect((await call("cam", { action: "review", operationId: short.programs[0].operationId })).status).toBe("blocked")
 })

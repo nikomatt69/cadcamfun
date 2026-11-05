@@ -3489,6 +3489,7 @@ type Endpoint29_8Input = {
   readonly dwell?: Endpoint29_8Request["payload"]["dwell"]
   readonly okuma?: Endpoint29_8Request["payload"]["okuma"]
   readonly start?: Endpoint29_8Request["payload"]["start"]
+  readonly register?: Endpoint29_8Request["payload"]["register"]
 }
 const Endpoint29_8 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_8Input) =>
   raw["verifyNc"]({
@@ -3504,6 +3505,7 @@ const Endpoint29_8 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       dwell: input["dwell"],
       okuma: input["okuma"],
       start: input["start"],
+      register: input["register"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

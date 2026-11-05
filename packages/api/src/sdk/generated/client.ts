@@ -4801,6 +4801,7 @@ export function make(options: ClientOptions) {
               dwell: input["dwell"],
               okuma: input["okuma"],
               start: input["start"],
+              register: input["register"],
             },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],

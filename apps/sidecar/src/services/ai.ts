@@ -178,6 +178,28 @@ const toolHandlers = Effect.gen(function*() {
   }
 
   /** The same run for a job that lists setups (`runSetups`): one artifact per setup and the job's coverage and release. */
+  /**
+   * The replay of a program a saved setup generated: the program text once per workpiece register against that workpiece's blank, each run a
+   * kernel job (a worker, a deadline, cancellation). A replay that cannot finish is not a pass: the program stays a preview and says why.
+   */
+  const replaySetupProgram = async (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined): Promise<cam.program.SetupEvidence> => {
+    const replay = cam.program.setupReplay(setup, program, geometryOf, configured)
+    const results: cam.kernel.VerifyNcResult[] = []
+    const part = replay.part.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
+    for (const register of replay.registers) {
+      try {
+        const outcome = await runOwnedKernelJob("cam-verify-nc", {
+          nc: program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
+          tools: replay.tools.map((t) => ({ number: t.number, cutter: t.cutter as never }))
+        })
+        if ("error" in outcome) results.push(failedReplay(outcome.error))
+        else results.push(outcome)
+      } catch (cause) {
+        results.push(failedReplay(cause instanceof Error ? cause.message : String(cause)))
+      }
+    }
+    return cam.program.setupEvidence(program.gcode, replay, results, program.tools)
+  }
   const manufactureSetupsRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-setups">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
     const report = camProgressReporter(liveEvents, projectId, runId)
@@ -647,7 +669,17 @@ const toolHandlers = Effect.gen(function*() {
           ...(job !== undefined ? { setupId: job.setupId, job: { release: job.release, setups: job.setups, coverage: job.coverage, stockCarried: job.stockCarried, ownRelease: artifact.release } } : {}),
           claims: artifact.claims, issues: artifact.issues, stock: artifact.stock, identity: artifact.identity, modelChange, note: "Evidence covers the original native-kernel NC and its modelled capabilities; no program was regenerated." }
       }
-      if (data["format"] === "cadcamfun-cam") return { ok: false, status: "unverified", operationId, identity: { nc: cam.kernel.sha256(stored.row.gcode ?? "") }, note: "Saved or edited G-code has no current native verification." }
+      if (data["format"] === "cadcamfun-cam") {
+        // A program a saved setup generated carries the replay of its text, one verdict per workpiece register.
+        const replayed = record(data["setupEvidence"])
+        const hash = cam.kernel.sha256(stored.row.gcode ?? "")
+        if (typeof replayed["release"] === "string") {
+          const stale = data["sourceRevision"] !== drawingRevision(loaded) || replayed["programHash"] !== hash
+          const status = stale ? "stale" : replayed["release"] === "verified-program" ? "pass" : String(replayed["release"])
+          return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision: drawingRevision(loaded), verifiedRevision: data["sourceRevision"], release: replayed["release"], setupId: data["setupId"], identity: { nc: hash }, registers: replayed["registers"], notes: replayed["notes"], note: replayed["basis"] }
+        }
+        return { ok: false, status: "unverified", operationId, identity: { nc: hash }, note: "Saved or edited G-code has no current native verification." }
+      }
       const found = await operation(projectId, operationId)
       if ("error" in found) return { ok: false, error: found.error }
       const evidence = record(data["verification"])
@@ -693,20 +725,24 @@ const toolHandlers = Effect.gen(function*() {
       if (stock === undefined) return { ok: false, error: "The programs are stored with a stock: set one with cam_edit stock_set or give the setup a stock block." }
       const generated = cam.program.generateSetup(setup, (op) => cam.program.geometryFor(op, byId, configured))
       if (generated.programs.length === 0) return { ok: false, error: "The setup generated no program.", issues: generated.issues, warnings: generated.warnings }
+      // Each stored text is replayed once per workpiece register against that workpiece's own blank, in the kernel worker: the release level and the findings are stored with it.
+      const evidences = new Map<cam.program.GeneratedProgram, cam.program.SetupEvidence>()
+      for (const program of generated.programs) evidences.set(program, await replaySetupProgram(setup, program, (op) => cam.program.geometryFor(op, byId, configured), configured))
       // Recheck the drawing after the computation, right before the write, as the manufacture path does.
       const current = await run(drawings.find(acting().id, loaded.id))
       if (!current || drawingRevision({ id: current.id, data: record(current.data), elements: elementsOf(record(current.data)) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed while the setup was generated. Generate again." }
-      const stored: Array<{ operationId: string; name: string; programNumber: number; toolNumbers: ReadonlyArray<number>; operations: number; toolpaths: number; lines: number }> = []
+      const stored: Array<{ operationId: string; name: string; programNumber: number; toolNumbers: ReadonlyArray<number>; operations: number; toolpaths: number; lines: number; release: string; evidence: cam.program.SetupEvidence }> = []
       for (const program of generated.programs) {
         const document = Schema.encodeSync(CamProgramDocument)(setupProgramDocument({ program, setup, stock }))
+        const evidence = evidences.get(program)!
         const row = await run(toolpaths.create(acting().id, {
           name: program.name, description: `Generated from the saved setup "${found.name}"`, projectId: loaded.projectId, drawingId: loaded.id,
-          type: "mill", operationType: "setup", gcode: program.gcode, data: { ...document, setupId: found.id, sourceRevision: revision }
+          type: "mill", operationType: "setup", gcode: program.gcode, data: { ...document, setupId: found.id, sourceRevision: revision, setupEvidence: evidence }
         }))
-        stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length })
+        stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length, release: evidence.release, evidence })
       }
       await audit(loaded.projectId, "ai.cam.setup_generated", { drawingId: loaded.id, setupId: found.id, programs: stored.map((p) => p.operationId), toolChanges: generated.totals.toolChanges })
-      return { ok: true, projectId: loaded.projectId, setupId: found.id, programs: stored, totals: generated.totals, warnings: generated.warnings }
+      return { ok: true, projectId: loaded.projectId, setupId: found.id, programs: stored, totals: generated.totals, ...(generated.toolLife.length > 0 ? { toolLife: generated.toolLife } : {}), warnings: generated.warnings }
     },
     stock: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
@@ -1770,6 +1806,12 @@ const cancelled = (error: unknown): { readonly status: "failed"; readonly issues
   if (!(error instanceof KernelJobError) || !error.explained) throw error
   return { status: "failed", issues: [{ tag: error.reason === "cancelled" ? "Cancelled" : "GenerationFailed", severity: "error", stage: "prepare", message: error.message }] }
 }
+
+/** A replay that did not run to the end: no verdict, no figures, the reason. */
+const failedReplay = (reason: string): cam.kernel.VerifyNcResult => ({
+  complete: false, reasons: [`the replay did not finish: ${reason}`], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 },
+  detached: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
+})
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
 
