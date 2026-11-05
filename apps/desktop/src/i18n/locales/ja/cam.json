@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "専用の素材（サイズ X, Y, Z mm）",
   "cam.setupDoc.magazine": "マガジンのポケット数（0＝指定なし）",
   "cam.workpieces.dependsOn": "実行順（この後）",
-  "cam.workpieces.dependsNone": "依存なし"
+  "cam.workpieces.dependsNone": "依存なし",
+  "cam.setupDoc.saveProgram": "プログラムとして保存",
+  "cam.kernel.job.title": "ジョブのセットアップ",
+  "cam.kernel.job.add": "セットアップを追加",
+  "cam.kernel.job.remove": "セットアップを削除",
+  "cam.kernel.job.carry": "残った素材を次のセットアップへ引き継ぐ",
+  "cam.kernel.job.open": "エディタで開く",
+  "cam.kernel.job.release": "ジョブのリリース（各セットアップの最低値）",
+  "cam.kernel.job.failed": "セットアップ {id}：{message}"
 }

@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "अपना कच्चा टुकड़ा (आकार X, Y, Z, मिमी)",
   "cam.setupDoc.magazine": "मैगज़ीन पॉकेट (0 = निर्दिष्ट नहीं)",
   "cam.workpieces.dependsOn": "इसके बाद चलता है",
-  "cam.workpieces.dependsNone": "कोई निर्भरता नहीं"
+  "cam.workpieces.dependsNone": "कोई निर्भरता नहीं",
+  "cam.setupDoc.saveProgram": "प्रोग्राम के रूप में सहेजें",
+  "cam.kernel.job.title": "जॉब के सेटअप",
+  "cam.kernel.job.add": "सेटअप जोड़ें",
+  "cam.kernel.job.remove": "सेटअप हटाएँ",
+  "cam.kernel.job.carry": "बचा हुआ स्टॉक एक सेटअप से अगले में ले जाएँ",
+  "cam.kernel.job.open": "एडिटर में खोलें",
+  "cam.kernel.job.release": "जॉब रिलीज़ (उसके सेटअप में सबसे निचला)",
+  "cam.kernel.job.failed": "सेटअप {id}: {message}"
 }

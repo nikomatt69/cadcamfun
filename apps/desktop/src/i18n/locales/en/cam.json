@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Own blank (size X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Magazine pockets (0 = not stated)",
   "cam.workpieces.dependsOn": "Runs after",
-  "cam.workpieces.dependsNone": "No dependency"
+  "cam.workpieces.dependsNone": "No dependency",
+  "cam.setupDoc.saveProgram": "Save as program",
+  "cam.kernel.job.title": "Job setups",
+  "cam.kernel.job.add": "Add setup",
+  "cam.kernel.job.remove": "Remove setup",
+  "cam.kernel.job.carry": "Carry the stock from one setup to the next",
+  "cam.kernel.job.open": "Open in editor",
+  "cam.kernel.job.release": "Job release (the lowest of its setups)",
+  "cam.kernel.job.failed": "Setup {id}: {message}"
 }

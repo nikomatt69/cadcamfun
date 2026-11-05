@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Bruto propio (tamaño X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Posiciones del almacén (0 = sin indicar)",
   "cam.workpieces.dependsOn": "Se ejecuta después de",
-  "cam.workpieces.dependsNone": "Sin dependencia"
+  "cam.workpieces.dependsNone": "Sin dependencia",
+  "cam.setupDoc.saveProgram": "Guardar como programa",
+  "cam.kernel.job.title": "Setups del trabajo",
+  "cam.kernel.job.add": "Añadir setup",
+  "cam.kernel.job.remove": "Quitar setup",
+  "cam.kernel.job.carry": "Llevar el material restante de un setup al siguiente",
+  "cam.kernel.job.open": "Abrir en el editor",
+  "cam.kernel.job.release": "Liberación del trabajo (la más baja de sus setups)",
+  "cam.kernel.job.failed": "Setup {id}: {message}"
 }

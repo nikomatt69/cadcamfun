@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "专用毛坯（尺寸 X、Y、Z，mm）",
   "cam.setupDoc.magazine": "刀库刀位数（0 = 未指定）",
   "cam.workpieces.dependsOn": "在其之后运行",
-  "cam.workpieces.dependsNone": "无依赖"
+  "cam.workpieces.dependsNone": "无依赖",
+  "cam.setupDoc.saveProgram": "另存为程序",
+  "cam.kernel.job.title": "作业的装夹",
+  "cam.kernel.job.add": "添加装夹",
+  "cam.kernel.job.remove": "删除装夹",
+  "cam.kernel.job.carry": "将剩余毛坯从一个装夹带到下一个",
+  "cam.kernel.job.open": "在编辑器中打开",
+  "cam.kernel.job.release": "作业放行等级（各装夹中最低的）",
+  "cam.kernel.job.failed": "装夹 {id}：{message}"
 }

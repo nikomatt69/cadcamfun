@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Eigenes Rohteil (Maße X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Magazinplätze (0 = nicht angegeben)",
   "cam.workpieces.dependsOn": "Läuft nach",
-  "cam.workpieces.dependsNone": "Keine Abhängigkeit"
+  "cam.workpieces.dependsNone": "Keine Abhängigkeit",
+  "cam.setupDoc.saveProgram": "Als Programm speichern",
+  "cam.kernel.job.title": "Setups des Auftrags",
+  "cam.kernel.job.add": "Setup hinzufügen",
+  "cam.kernel.job.remove": "Setup entfernen",
+  "cam.kernel.job.carry": "Rohteil von einem Setup ins nächste übernehmen",
+  "cam.kernel.job.open": "Im Editor öffnen",
+  "cam.kernel.job.release": "Freigabe des Auftrags (die niedrigste seiner Setups)",
+  "cam.kernel.job.failed": "Setup {id}: {message}"
 }

@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Своя заготовка (размеры X, Y, Z, мм)",
   "cam.setupDoc.magazine": "Места в магазине (0 = не задано)",
   "cam.workpieces.dependsOn": "Выполняется после",
-  "cam.workpieces.dependsNone": "Без зависимости"
+  "cam.workpieces.dependsNone": "Без зависимости",
+  "cam.setupDoc.saveProgram": "Сохранить как программу",
+  "cam.kernel.job.title": "Установы задания",
+  "cam.kernel.job.add": "Добавить установ",
+  "cam.kernel.job.remove": "Удалить установ",
+  "cam.kernel.job.carry": "Переносить остаток заготовки из установа в установ",
+  "cam.kernel.job.open": "Открыть в редакторе",
+  "cam.kernel.job.release": "Выпуск задания (самый низкий из его установов)",
+  "cam.kernel.job.failed": "Установ {id}: {message}"
 }

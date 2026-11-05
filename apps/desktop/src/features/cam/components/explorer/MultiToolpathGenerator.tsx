@@ -32,6 +32,7 @@ import ToolpathGenerator from "../ToolpathGenerator.tsx"
 import { assignmentOf, materialOf, toolOf } from "./assignments.ts"
 import ElementSelector from "./ElementSelector.tsx"
 import SetupPanel from "./SetupPanel.tsx"
+import SaveCamModal from "../SaveCamModal.tsx"
 import { t } from "../../../../i18n/index.ts"
 
 export interface MultiToolpathGeneratorProps {
@@ -51,6 +52,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
 
   const [configuringElementId, setConfiguringElementId] = createSignal<string | null>(null)
   const [showElementSelector, setShowElementSelector] = createSignal(true)
+  // The program being saved to the project: the editor holds it first, so the saved document carries its IR and its fixture.
+  const [saving, setSaving] = createSignal<string>()
   const [isGeneratingAll, setIsGeneratingAll] = createSignal(false)
   // The settings new toolpaths start from: the generator panel's current ones.
   const [defaultSettings, setDefaultSettings] = createSignal<ToolpathSettings>({ ...gen.settings })
@@ -166,6 +169,11 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     toast.success(t("cam.multi.sent"))
   }
 
+  const saveProgram = (program: CamSetupGenerated["programs"][number]): void => {
+    openProgram(program)
+    setSaving(program.gcode)
+  }
+
   // The combined program replaces the viewport's: G-code text for the editor, the parsed IR for the simulation.
   const sendToVisualizer = async (): Promise<void> => {
     const generated = [...store.toolpaths].sort((a, b) => a.order - b.order).filter((path) => path.gcode.trim())
@@ -254,7 +262,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
         </div>
       </div>
 
-      <SetupPanel onGenerate={() => void generatePrograms()} onOpenProgram={openProgram} />
+      <SetupPanel onGenerate={() => void generatePrograms()} onOpenProgram={openProgram} onSaveProgram={saveProgram} />
+      <Show when={saving()}>{(code) => <SaveCamModal code={code()} extension=".nc" projectOnly onClose={() => setSaving(undefined)} />}</Show>
 
       {/* Main content */}
       <div class="flex-1 flex overflow-hidden">

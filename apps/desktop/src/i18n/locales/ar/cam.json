@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "قطعة خام خاصة (الأبعاد X وY وZ، مم)",
   "cam.setupDoc.magazine": "مواضع المخزن (0 = غير محدد)",
   "cam.workpieces.dependsOn": "تعمل بعد",
-  "cam.workpieces.dependsNone": "بلا اعتماد"
+  "cam.workpieces.dependsNone": "بلا اعتماد",
+  "cam.setupDoc.saveProgram": "حفظ كبرنامج",
+  "cam.kernel.job.title": "إعدادات التثبيت للمهمة",
+  "cam.kernel.job.add": "إضافة إعداد تثبيت",
+  "cam.kernel.job.remove": "إزالة إعداد التثبيت",
+  "cam.kernel.job.carry": "نقل الخام المتبقي من إعداد إلى التالي",
+  "cam.kernel.job.open": "فتح في المحرر",
+  "cam.kernel.job.release": "إصدار المهمة (الأدنى بين إعداداتها)",
+  "cam.kernel.job.failed": "الإعداد {id}: {message}"
 }

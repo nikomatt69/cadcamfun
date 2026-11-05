@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Grezzo proprio (dimensioni X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Posti del magazzino utensili (0 = non indicato)",
   "cam.workpieces.dependsOn": "Dopo",
-  "cam.workpieces.dependsNone": "Nessuna dipendenza"
+  "cam.workpieces.dependsNone": "Nessuna dipendenza",
+  "cam.setupDoc.saveProgram": "Salva come programma",
+  "cam.kernel.job.title": "Setup del lavoro",
+  "cam.kernel.job.add": "Aggiungi setup",
+  "cam.kernel.job.remove": "Rimuovi setup",
+  "cam.kernel.job.carry": "Porta il grezzo residuo da un setup al successivo",
+  "cam.kernel.job.open": "Apri nell'editor",
+  "cam.kernel.job.release": "Rilascio del lavoro (il più basso dei suoi setup)",
+  "cam.kernel.job.failed": "Setup {id}: {message}"
 }

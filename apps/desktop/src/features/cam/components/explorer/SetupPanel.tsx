@@ -36,6 +36,8 @@ export interface SetupPanelProps {
   readonly onGenerate?: () => void
   /** Opens one generated program in the editor and the viewport. */
   readonly onOpenProgram?: (program: CamSetupGenerated["programs"][number]) => void
+  /** Opens one generated program in the editor and saves it as a project program (the page owns the save dialog). */
+  readonly onSaveProgram?: (program: CamSetupGenerated["programs"][number]) => void
 }
 
 export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
@@ -346,6 +348,9 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
                   <Show when={program.hints.length > 0}><span class="block text-gray-500" data-testid="cam-setup-program-hint">{program.hints.join(" ")}</span></Show>
                   <Show when={program.generated !== undefined && props.onOpenProgram}>
                     <button type="button" class={BUTTON} data-testid="cam-setup-open-program" onClick={() => props.onOpenProgram?.(program.generated!)} aria-label={t("cam.setupDoc.open")} title={t("cam.setupDoc.open")}><Play size={12} /></button>
+                  </Show>
+                  <Show when={program.generated !== undefined && props.onSaveProgram}>
+                    <button type="button" class={BUTTON} data-testid="cam-setup-save-program" onClick={() => props.onSaveProgram?.(program.generated!)} aria-label={t("cam.setupDoc.saveProgram")} title={t("cam.setupDoc.saveProgram")}><Save size={12} /></button>
                   </Show>
                 </li>
               )}</For>

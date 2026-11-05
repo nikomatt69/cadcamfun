@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Bloco próprio (dimensões X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Posições do magazine (0 = não indicado)",
   "cam.workpieces.dependsOn": "Executa depois de",
-  "cam.workpieces.dependsNone": "Sem dependência"
+  "cam.workpieces.dependsNone": "Sem dependência",
+  "cam.setupDoc.saveProgram": "Salvar como programa",
+  "cam.kernel.job.title": "Setups do trabalho",
+  "cam.kernel.job.add": "Adicionar setup",
+  "cam.kernel.job.remove": "Remover setup",
+  "cam.kernel.job.carry": "Levar o material restante de um setup ao seguinte",
+  "cam.kernel.job.open": "Abrir no editor",
+  "cam.kernel.job.release": "Liberação do trabalho (a mais baixa dos seus setups)",
+  "cam.kernel.job.failed": "Setup {id}: {message}"
 }

@@ -1716,5 +1716,13 @@
   "cam.workpieces.blank": "Brut propre (dimensions X, Y, Z, mm)",
   "cam.setupDoc.magazine": "Emplacements du magasin (0 = non indiqué)",
   "cam.workpieces.dependsOn": "S'exécute après",
-  "cam.workpieces.dependsNone": "Aucune dépendance"
+  "cam.workpieces.dependsNone": "Aucune dépendance",
+  "cam.setupDoc.saveProgram": "Enregistrer comme programme",
+  "cam.kernel.job.title": "Montages du travail",
+  "cam.kernel.job.add": "Ajouter un montage",
+  "cam.kernel.job.remove": "Retirer le montage",
+  "cam.kernel.job.carry": "Reporter la matière restante d'un montage au suivant",
+  "cam.kernel.job.open": "Ouvrir dans l'éditeur",
+  "cam.kernel.job.release": "Libération du travail (la plus basse de ses montages)",
+  "cam.kernel.job.failed": "Montage {id} : {message}"
 }
