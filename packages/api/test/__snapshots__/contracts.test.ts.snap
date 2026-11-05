@@ -26933,6 +26933,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "string",
                                   },
+                                  "reads": {
+                                    "type": "boolean",
+                                  },
                                   "target": {
                                     "anyOf": [
                                       {
@@ -28454,6 +28457,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "add",
                                       ],
                                       "type": "string",
+                                    },
+                                    "reads": {
+                                      "type": "boolean",
                                     },
                                     "target": {
                                       "anyOf": [
@@ -35107,6 +35113,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 ],
                                 "type": "string",
                               },
+                              "reads": {
+                                "type": "boolean",
+                              },
                               "target": {
                                 "anyOf": [
                                   {
@@ -40592,6 +40601,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                   "add",
                                                 ],
                                                 "type": "string",
+                                              },
+                                              "reads": {
+                                                "type": "boolean",
                                               },
                                               "target": {
                                                 "anyOf": [
@@ -89411,6 +89423,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                 ],
                                                 "type": "string",
                                               },
+                                              "reads": {
+                                                "type": "boolean",
+                                              },
                                               "target": {
                                                 "anyOf": [
                                                   {
@@ -104669,6 +104684,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           ],
                                           "type": "string",
                                         },
+                                        "reads": {
+                                          "type": "boolean",
+                                        },
                                         "target": {
                                           "anyOf": [
                                             {
@@ -110171,6 +110189,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   },
                                   "id": {
                                     "enum": [
+                                      "probing",
                                       "bed-fit",
                                       "heated-start",
                                       "layers-rise",
@@ -110415,6 +110434,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "tap",
                                       "ream",
                                       "print",
+                                      "probe",
                                     ],
                                     "type": "string",
                                   },
@@ -110625,6 +110645,68 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "parameters": {
                                     "type": "object",
                                   },
+                                  "probe": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "cycle": {
+                                        "enum": [
+                                          "z-surface",
+                                          "edge",
+                                          "corner",
+                                          "web",
+                                          "pocket",
+                                          "rectangle",
+                                          "bore",
+                                          "boss",
+                                          "edge-angle",
+                                          "plane",
+                                          "sphere",
+                                          "tool-length",
+                                          "tool-radius",
+                                          "broken-tool",
+                                          "stylus-calibrate",
+                                          "rotary-axis",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "device": {
+                                        "type": "string",
+                                      },
+                                      "native": {
+                                        "type": "string",
+                                      },
+                                      "nominal": {
+                                        "additionalProperties": {
+                                          "type": "number",
+                                        },
+                                        "type": "object",
+                                      },
+                                      "offsetTargets": {
+                                        "items": {
+                                          "type": "string",
+                                        },
+                                        "type": "array",
+                                      },
+                                      "touches": {
+                                        "type": "integer",
+                                      },
+                                      "variables": {
+                                        "additionalProperties": {
+                                          "type": "string",
+                                        },
+                                        "type": "object",
+                                      },
+                                    },
+                                    "required": [
+                                      "cycle",
+                                      "touches",
+                                      "device",
+                                      "nominal",
+                                      "variables",
+                                      "offsetTargets",
+                                    ],
+                                    "type": "object",
+                                  },
                                   "removedVolume": {
                                     "type": "number",
                                   },
@@ -110652,6 +110734,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "surface",
                                       "multiaxis",
                                       "print",
+                                      "probe",
                                     ],
                                     "type": "string",
                                   },
@@ -110954,6 +111037,30 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "size",
                                 "orientation",
                                 "settings",
+                              ],
+                              "type": "object",
+                            },
+                            "probing": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "operations": {
+                                  "items": {
+                                    "type": "string",
+                                  },
+                                  "type": "array",
+                                },
+                                "textReplay": {
+                                  "enum": [
+                                    "agrees",
+                                    "differs",
+                                    "not-replayed",
+                                  ],
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "operations",
+                                "textReplay",
                               ],
                               "type": "object",
                             },
@@ -112752,6 +112859,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                     "add",
                                                   ],
                                                   "type": "string",
+                                                },
+                                                "reads": {
+                                                  "type": "boolean",
                                                 },
                                                 "target": {
                                                   "anyOf": [
@@ -115093,6 +115203,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "add",
                                           ],
                                           "type": "string",
+                                        },
+                                        "reads": {
+                                          "type": "boolean",
                                         },
                                         "target": {
                                           "anyOf": [
@@ -122728,6 +122841,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         ],
                                         "type": "string",
                                       },
+                                      "reads": {
+                                        "type": "boolean",
+                                      },
                                       "target": {
                                         "anyOf": [
                                           {
@@ -126166,6 +126282,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                       "id": {
                                         "enum": [
+                                          "probing",
                                           "bed-fit",
                                           "heated-start",
                                           "layers-rise",
@@ -126410,6 +126527,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "tap",
                                           "ream",
                                           "print",
+                                          "probe",
                                         ],
                                         "type": "string",
                                       },
@@ -126620,6 +126738,68 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "parameters": {
                                         "type": "object",
                                       },
+                                      "probe": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "cycle": {
+                                            "enum": [
+                                              "z-surface",
+                                              "edge",
+                                              "corner",
+                                              "web",
+                                              "pocket",
+                                              "rectangle",
+                                              "bore",
+                                              "boss",
+                                              "edge-angle",
+                                              "plane",
+                                              "sphere",
+                                              "tool-length",
+                                              "tool-radius",
+                                              "broken-tool",
+                                              "stylus-calibrate",
+                                              "rotary-axis",
+                                            ],
+                                            "type": "string",
+                                          },
+                                          "device": {
+                                            "type": "string",
+                                          },
+                                          "native": {
+                                            "type": "string",
+                                          },
+                                          "nominal": {
+                                            "additionalProperties": {
+                                              "type": "number",
+                                            },
+                                            "type": "object",
+                                          },
+                                          "offsetTargets": {
+                                            "items": {
+                                              "type": "string",
+                                            },
+                                            "type": "array",
+                                          },
+                                          "touches": {
+                                            "type": "integer",
+                                          },
+                                          "variables": {
+                                            "additionalProperties": {
+                                              "type": "string",
+                                            },
+                                            "type": "object",
+                                          },
+                                        },
+                                        "required": [
+                                          "cycle",
+                                          "touches",
+                                          "device",
+                                          "nominal",
+                                          "variables",
+                                          "offsetTargets",
+                                        ],
+                                        "type": "object",
+                                      },
                                       "removedVolume": {
                                         "type": "number",
                                       },
@@ -126647,6 +126827,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "surface",
                                           "multiaxis",
                                           "print",
+                                          "probe",
                                         ],
                                         "type": "string",
                                       },
@@ -126949,6 +127130,30 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "size",
                                     "orientation",
                                     "settings",
+                                  ],
+                                  "type": "object",
+                                },
+                                "probing": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "operations": {
+                                      "items": {
+                                        "type": "string",
+                                      },
+                                      "type": "array",
+                                    },
+                                    "textReplay": {
+                                      "enum": [
+                                        "agrees",
+                                        "differs",
+                                        "not-replayed",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "operations",
+                                    "textReplay",
                                   ],
                                   "type": "object",
                                 },
@@ -128747,6 +128952,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                         "add",
                                                       ],
                                                       "type": "string",
+                                                    },
+                                                    "reads": {
+                                                      "type": "boolean",
                                                     },
                                                     "target": {
                                                       "anyOf": [

@@ -2902,6 +2902,7 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
             readonly mode: "set" | "add"
             readonly value: JsonValue
+            readonly reads?: boolean
           }
         | { readonly _tag: "Alarm"; readonly code: number; readonly text: string }
         | {
@@ -4107,6 +4108,7 @@ export type CamSetupLinkReportPayload = {
           readonly axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
           readonly mode: "set" | "add"
           readonly value: JsonValue
+          readonly reads?: boolean
         }
       | { readonly _tag: "Alarm"; readonly code: number; readonly text: string }
       | {
@@ -9740,6 +9742,7 @@ export type ToolpathsRegenerateOutput = {
               | "surface"
               | "multiaxis"
               | "print"
+              | "probe"
             toolId: string
             cut:
               | "face"
@@ -9757,6 +9760,7 @@ export type ToolpathsRegenerateOutput = {
               | "tap"
               | "ream"
               | "print"
+              | "probe"
             status: "ok" | "failed"
             cutting?: {
               cut:
@@ -9817,6 +9821,31 @@ export type ToolpathsRegenerateOutput = {
             cutLength: number
             timeSeconds: number
             removedVolume: number
+            probe?: {
+              cycle:
+                | "z-surface"
+                | "edge"
+                | "corner"
+                | "web"
+                | "pocket"
+                | "rectangle"
+                | "bore"
+                | "boss"
+                | "edge-angle"
+                | "plane"
+                | "sphere"
+                | "tool-length"
+                | "tool-radius"
+                | "broken-tool"
+                | "stylus-calibrate"
+                | "rotary-axis"
+              touches: number
+              device: string
+              nominal: { [x: string]: number }
+              variables: { [x: string]: string }
+              offsetTargets: Array<string>
+              native?: string
+            }
           }>
           program: {
             name: string
@@ -9945,6 +9974,7 @@ export type ToolpathsRegenerateOutput = {
                     axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
                     mode: "set" | "add"
                     value: JsonValue
+                    reads?: boolean
                   }
                 | { _tag: "Alarm"; code: number; text: string }
                 | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
@@ -9991,6 +10021,7 @@ export type ToolpathsRegenerateOutput = {
           nc: string
           claims: Array<{
             id:
+              | "probing"
               | "bed-fit"
               | "heated-start"
               | "layers-rise"
@@ -10056,6 +10087,7 @@ export type ToolpathsRegenerateOutput = {
           cycleTimeSeconds: number
           identity: { job: string; part: string; nc: string; algorithm: string }
           notes: Array<string>
+          probing?: { operations: Array<string>; textReplay: "agrees" | "differs" | "not-replayed" }
           print?: {
             dialect: "marlin" | "klipper" | "reprap"
             filament: { material: string; densityGcm3: number; diameter: number }
@@ -10560,6 +10592,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "surface"
             | "multiaxis"
             | "print"
+            | "probe"
           toolId: string
           cut:
             | "face"
@@ -10577,6 +10610,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "tap"
             | "ream"
             | "print"
+            | "probe"
           status: "ok" | "failed"
           cutting?: {
             cut:
@@ -10637,6 +10671,31 @@ export type ToolpathGeneratorManufactureOutput =
           cutLength: number
           timeSeconds: number
           removedVolume: number
+          probe?: {
+            cycle:
+              | "z-surface"
+              | "edge"
+              | "corner"
+              | "web"
+              | "pocket"
+              | "rectangle"
+              | "bore"
+              | "boss"
+              | "edge-angle"
+              | "plane"
+              | "sphere"
+              | "tool-length"
+              | "tool-radius"
+              | "broken-tool"
+              | "stylus-calibrate"
+              | "rotary-axis"
+            touches: number
+            device: string
+            nominal: { [x: string]: number }
+            variables: { [x: string]: string }
+            offsetTargets: Array<string>
+            native?: string
+          }
         }>
         program: {
           name: string
@@ -10762,6 +10821,7 @@ export type ToolpathGeneratorManufactureOutput =
                   axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
                   mode: "set" | "add"
                   value: JsonValue
+                  reads?: boolean
                 }
               | { _tag: "Alarm"; code: number; text: string }
               | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
@@ -10808,6 +10868,7 @@ export type ToolpathGeneratorManufactureOutput =
         nc: string
         claims: Array<{
           id:
+            | "probing"
             | "bed-fit"
             | "heated-start"
             | "layers-rise"
@@ -10873,6 +10934,7 @@ export type ToolpathGeneratorManufactureOutput =
         cycleTimeSeconds: number
         identity: { job: string; part: string; nc: string; algorithm: string }
         notes: Array<string>
+        probing?: { operations: Array<string>; textReplay: "agrees" | "differs" | "not-replayed" }
         print?: {
           dialect: "marlin" | "klipper" | "reprap"
           filament: { material: string; densityGcm3: number; diameter: number }
@@ -11240,6 +11302,7 @@ export type ToolpathGeneratorParseOutput = {
             axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
             mode: "set" | "add"
             value: JsonValue
+            reads?: boolean
           }
         | { _tag: "Alarm"; code: number; text: string }
         | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
@@ -11956,6 +12019,7 @@ export type CamSetupGenerateOutput = {
               axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
               mode: "set" | "add"
               value: JsonValue
+              reads?: boolean
             }
           | { _tag: "Alarm"; code: number; text: string }
           | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
@@ -12190,6 +12254,7 @@ export type CamSetupLinkReportOutput = {
           axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
           mode: "set" | "add"
           value: JsonValue
+          reads?: boolean
         }
       | { _tag: "Alarm"; code: number; text: string }
       | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
@@ -13189,6 +13254,7 @@ export type CamSetupGenerateSavedOutput = {
               axis: "X" | "Y" | "Z" | "A" | "B" | "C" | "R"
               mode: "set" | "add"
               value: JsonValue
+              reads?: boolean
             }
           | { _tag: "Alarm"; code: number; text: string }
           | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }

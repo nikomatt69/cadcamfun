@@ -105,3 +105,18 @@ test("reports run: a stored probe operation is simulated and its report kept", a
   expect(refused.status).toBe(400)
   expect(JSON.stringify(refused.body)).toContain("no cycle")
 })
+
+test("tool setter cycles plan on a machine: the setter is reached through the machine's work zero", async () => {
+  const id = (await app.call("/api/machine-configs", { method: "POST", json: { name: "Setter", type: "mill", config: { workVolume: { x: 800, y: 500, z: 500 }, maxSpindleSpeed: 10000, maxFeedRate: 10000 } } })).body.data.id
+  const setter = { kind: "contact", position: { x: -300, y: 200, z: -310 }, triggerZ: -350, discDiameter: 12, maxToolDiameter: 80, feeds: { fast: 800, touch: 50 }, brokenTolerance: 0.2 }
+  expect((await app.call(`/api/machine-configs/${id}/probe`, { method: "PUT", json: { probing: { stylusDiameter: 4 }, toolSetter: setter } })).status).toBe(200)
+  const plan = { operation: { kind: "tool-length", tool: 1, nominalLength: 100 }, settings: { machineConfig: id } }
+  // Without the work zero the setter cannot be placed, and the refusal says so.
+  const refused = await app.call("/api/cam/probing/plan", { method: "POST", json: plan })
+  expect(refused.status).toBe(400)
+  expect(JSON.stringify(refused.body)).toContain("work zero")
+  expect((await app.call(`/api/machine-configs/${id}/work-offsets`, { method: "PUT", json: { entries: { G54: { x: 100, y: 200, z: -300 } } } })).status).toBe(200)
+  const planned = await app.call("/api/cam/probing/plan", { method: "POST", json: plan })
+  expect(planned.body).toMatchObject({ cycle: "tool-length" })
+  expect(planned.status).toBe(200)
+})

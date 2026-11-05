@@ -132,19 +132,26 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),
   operations: Schema.Array(Schema.Struct({
-    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface", "multiaxis", "print"]),
-    toolId: id, cut: Schema.Union([cutting.fields.cut, Schema.Literal("print")]), status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
+    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface", "multiaxis", "print", "probe"]),
+    toolId: id, cut: Schema.Union([cutting.fields.cut, Schema.Literal("print"), Schema.Literal("probe")]), status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
     parameters: Schema.Record(Schema.String, Schema.Unknown), overridden: strings, warnings: strings, startZ: Schema.optionalKey(Schema.Finite),
-    cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite
+    cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite,
+    /** A probe operation: what it touches and where its results go (spec 73). */
+    probe: Schema.optionalKey(Schema.Struct({
+      cycle: Schema.Literals(cam.probing.PROBE_CYCLE_KINDS), touches: Schema.Int, device: Schema.String, nominal: Schema.Record(Schema.String, Schema.Finite),
+      variables: Schema.Record(Schema.String, Schema.String), offsetTargets: strings, native: Schema.optionalKey(Schema.String)
+    }))
   })),
   program: cam.ProgramSchema, tools: Schema.Array(CamKernelCutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage", "tolerance"]),
+    id: Schema.Literals(["probing", "bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage", "tolerance"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),
   stock: Schema.Struct({ initialVolume: Schema.Finite, finalVolume: Schema.Finite, partVolume: Schema.Finite, remainingVolume: Schema.Finite, maxRemaining: Schema.Finite, cellSize: Schema.Finite, fiveAxis: Schema.optionalKey(Schema.Struct({ voxelMm: Schema.Finite, removedLower: Schema.Finite, removedUpper: Schema.Finite, remainingLower: Schema.Finite, remainingUpper: Schema.Finite })) }),
   cycleTimeSeconds: Schema.Finite, identity: Schema.Struct({ job: id, part: id, nc: id, algorithm: id }), notes: strings,
+  /** Present when the job probes: the probe operations and whether the NC text replays to the same measurements (spec 73). */
+  probing: Schema.optionalKey(Schema.Struct({ operations: strings, textReplay: Schema.Literals(["agrees", "differs", "not-replayed"]) })),
   /** Present when the machine is a printer: what was printed and how it was measured. */
   print: Schema.optionalKey(Schema.Struct({
     dialect: Schema.Literals(["marlin", "klipper", "reprap"]),

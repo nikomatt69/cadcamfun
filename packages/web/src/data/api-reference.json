@@ -57422,7 +57422,8 @@
                                           "chamfer",
                                           "surface",
                                           "multiaxis",
-                                          "print"
+                                          "print",
+                                          "probe"
                                         ]
                                       },
                                       "toolId": {
@@ -57446,7 +57447,8 @@
                                           "thread-mill",
                                           "tap",
                                           "ream",
-                                          "print"
+                                          "print",
+                                          "probe"
                                         ]
                                       },
                                       "status": {
@@ -57670,6 +57672,68 @@
                                       },
                                       "removedVolume": {
                                         "type": "number"
+                                      },
+                                      "probe": {
+                                        "type": "object",
+                                        "properties": {
+                                          "cycle": {
+                                            "type": "string",
+                                            "enum": [
+                                              "z-surface",
+                                              "edge",
+                                              "corner",
+                                              "web",
+                                              "pocket",
+                                              "rectangle",
+                                              "bore",
+                                              "boss",
+                                              "edge-angle",
+                                              "plane",
+                                              "sphere",
+                                              "tool-length",
+                                              "tool-radius",
+                                              "broken-tool",
+                                              "stylus-calibrate",
+                                              "rotary-axis"
+                                            ]
+                                          },
+                                          "touches": {
+                                            "type": "integer"
+                                          },
+                                          "device": {
+                                            "type": "string"
+                                          },
+                                          "nominal": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "variables": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "offsetTargets": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "native": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "cycle",
+                                          "touches",
+                                          "device",
+                                          "nominal",
+                                          "variables",
+                                          "offsetTargets"
+                                        ],
+                                        "additionalProperties": false
                                       }
                                     },
                                     "required": [
@@ -59178,7 +59242,10 @@
                                                         "add"
                                                       ]
                                                     },
-                                                    "value": {}
+                                                    "value": {},
+                                                    "reads": {
+                                                      "type": "boolean"
+                                                    }
                                                   },
                                                   "required": [
                                                     "_tag",
@@ -59461,6 +59528,7 @@
                                       "id": {
                                         "type": "string",
                                         "enum": [
+                                          "probing",
                                           "bed-fit",
                                           "heated-start",
                                           "layers-rise",
@@ -59690,6 +59758,30 @@
                                   "items": {
                                     "type": "string"
                                   }
+                                },
+                                "probing": {
+                                  "type": "object",
+                                  "properties": {
+                                    "operations": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "textReplay": {
+                                      "type": "string",
+                                      "enum": [
+                                        "agrees",
+                                        "differs",
+                                        "not-replayed"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "operations",
+                                    "textReplay"
+                                  ],
+                                  "additionalProperties": false
                                 },
                                 "print": {
                                   "type": "object",
@@ -63900,7 +63992,8 @@
                                       "chamfer",
                                       "surface",
                                       "multiaxis",
-                                      "print"
+                                      "print",
+                                      "probe"
                                     ]
                                   },
                                   "toolId": {
@@ -63924,7 +64017,8 @@
                                       "thread-mill",
                                       "tap",
                                       "ream",
-                                      "print"
+                                      "print",
+                                      "probe"
                                     ]
                                   },
                                   "status": {
@@ -64148,6 +64242,68 @@
                                   },
                                   "removedVolume": {
                                     "type": "number"
+                                  },
+                                  "probe": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cycle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "z-surface",
+                                          "edge",
+                                          "corner",
+                                          "web",
+                                          "pocket",
+                                          "rectangle",
+                                          "bore",
+                                          "boss",
+                                          "edge-angle",
+                                          "plane",
+                                          "sphere",
+                                          "tool-length",
+                                          "tool-radius",
+                                          "broken-tool",
+                                          "stylus-calibrate",
+                                          "rotary-axis"
+                                        ]
+                                      },
+                                      "touches": {
+                                        "type": "integer"
+                                      },
+                                      "device": {
+                                        "type": "string"
+                                      },
+                                      "nominal": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "variables": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "offsetTargets": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "native": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "cycle",
+                                      "touches",
+                                      "device",
+                                      "nominal",
+                                      "variables",
+                                      "offsetTargets"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 },
                                 "required": [
@@ -65656,7 +65812,10 @@
                                                     "add"
                                                   ]
                                                 },
-                                                "value": {}
+                                                "value": {},
+                                                "reads": {
+                                                  "type": "boolean"
+                                                }
                                               },
                                               "required": [
                                                 "_tag",
@@ -65939,6 +66098,7 @@
                                   "id": {
                                     "type": "string",
                                     "enum": [
+                                      "probing",
                                       "bed-fit",
                                       "heated-start",
                                       "layers-rise",
@@ -66168,6 +66328,30 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "probing": {
+                              "type": "object",
+                              "properties": {
+                                "operations": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "textReplay": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agrees",
+                                    "differs",
+                                    "not-replayed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "operations",
+                                "textReplay"
+                              ],
+                              "additionalProperties": false
                             },
                             "print": {
                               "type": "object",
@@ -83876,7 +84060,10 @@
                                             "add"
                                           ]
                                         },
-                                        "value": {}
+                                        "value": {},
+                                        "reads": {
+                                          "type": "boolean"
+                                        }
                                       },
                                       "required": [
                                         "_tag",
@@ -87785,7 +87972,10 @@
                                             "add"
                                           ]
                                         },
-                                        "value": {}
+                                        "value": {},
+                                        "reads": {
+                                          "type": "boolean"
+                                        }
                                       },
                                       "required": [
                                         "_tag",
@@ -89893,7 +90083,10 @@
                                           "add"
                                         ]
                                       },
-                                      "value": {}
+                                      "value": {},
+                                      "reads": {
+                                        "type": "boolean"
+                                      }
                                     },
                                     "required": [
                                       "_tag",
@@ -99065,7 +99258,10 @@
                                                   "add"
                                                 ]
                                               },
-                                              "value": {}
+                                              "value": {},
+                                              "reads": {
+                                                "type": "boolean"
+                                              }
                                             },
                                             "required": [
                                               "_tag",
@@ -102929,7 +103125,10 @@
                                         "add"
                                       ]
                                     },
-                                    "value": {}
+                                    "value": {},
+                                    "reads": {
+                                      "type": "boolean"
+                                    }
                                   },
                                   "required": [
                                     "_tag",
@@ -104479,7 +104678,10 @@
                                       "add"
                                     ]
                                   },
-                                  "value": {}
+                                  "value": {},
+                                  "reads": {
+                                    "type": "boolean"
+                                  }
                                 },
                                 "required": [
                                   "_tag",
@@ -111976,7 +112178,10 @@
                                                   "add"
                                                 ]
                                               },
-                                              "value": {}
+                                              "value": {},
+                                              "reads": {
+                                                "type": "boolean"
+                                              }
                                             },
                                             "required": [
                                               "_tag",
@@ -114775,7 +114980,10 @@
                                   "add"
                                 ]
                               },
-                              "value": {}
+                              "value": {},
+                              "reads": {
+                                "type": "boolean"
+                              }
                             },
                             "required": [
                               "_tag",

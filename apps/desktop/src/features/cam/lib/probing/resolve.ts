@@ -107,9 +107,12 @@ export const contextOf = (settings: ProbeSettings, input: Pick<ResolveInput, "pr
     feeds: { ...stored.feeds, ...synthetic.feeds, positioning: synthetic.feeds.positioning, max: Math.max(stored.feeds.max, synthetic.feeds.max) },
     overtravel: synthetic.overtravel, backoff: synthetic.backoff, doubleTouch: settings.doubleTouch
   }
+  // A tool setter sits in machine coordinates: the machine's table says where the work zero is.
+  const origin = input.profile === undefined ? undefined : probing.workOffsetTableOf(input.profile).entries[probing.offsetKey(settings.workOffset)]
   return {
     probe, safeZ: settings.safeZ, clearance: settings.clearance, search: settings.search, prefix: options.prefix ?? "p",
-    ...(input.profile?.toolSetter !== undefined ? { setter: input.profile.toolSetter } : {})
+    ...(input.profile?.toolSetter !== undefined ? { setter: input.profile.toolSetter } : {}),
+    ...(origin !== undefined ? { workOrigin: { x: origin.x, y: origin.y, z: origin.z } } : {})
   }
 }
 

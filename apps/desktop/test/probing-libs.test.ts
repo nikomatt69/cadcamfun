@@ -3,6 +3,7 @@ import { expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { inspectionCsv, sortInspection, statusOf, summarizeInspection } from "../src/features/cam/lib/probing/inspection.ts"
 import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
+import { contextOf, resolveSettings } from "../src/features/cam/lib/probing/resolve.ts"
 import type { InspectionVerdict } from "../src/features/cam/lib/probing/contract.ts"
 
 const v = (name: string, deviation: number, over: Partial<InspectionVerdict> = {}): InspectionVerdict => ({
@@ -70,4 +71,11 @@ test("work offsets: measured updates (radians) land in the rows (degrees), the d
   expect(diff[0]!.delta).toBeCloseTo(0.3, 9)
   expect(diffRows(rows, withRowValue(rows, "G54", "x", -300.0001, "machine"))).toEqual([])
   expect(withRowValue(withRowValue(rows, "G54", "c", 1.5, "machine"), "G54", "c", undefined, "machine").find((r) => r.key === "G54")!.entry).toEqual({ x: -300, y: -200, z: -400 })
+})
+
+test("the planning context carries the machine's work zero, so a tool setter cycle plans in the editor", () => {
+  const p = profile({ post: "fanuc", probing: { stylusDiameter: 4 }, workOffsetTable: { entries: { G54: { x: 100, y: 200, z: -300 } } } })
+  const settings = resolveSettings({ profile: p, workOffset: "G54" })
+  expect(contextOf(settings, { profile: p }).workOrigin).toEqual({ x: 100, y: 200, z: -300 })
+  expect(contextOf(resolveSettings({ profile: p, workOffset: "G55" }), { profile: p }).workOrigin).toBeUndefined()
 })

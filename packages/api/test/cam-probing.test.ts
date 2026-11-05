@@ -6,6 +6,7 @@ import { LiveEvent } from "../src/groups/events.ts"
 import {
   CamProbingEmitRequest, CamProbingPlanRequest, CamProbingSimulateRequest, CamRotaryCalibrationRequest, ProbeReportRunBody
 } from "../src/cam-probing.ts"
+import { CamKernelArtifact } from "../src/cam-kernel.ts"
 
 const bore = { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5 }
 
@@ -53,4 +54,15 @@ test("probe.progress and probe.result decode as live events", () => {
   expect(Schema.decodeUnknownSync(LiveEvent)({ type: "probe.progress", at, projectId: "p", runId: "r", phase: "running", stage: "touch", index: 2, count: 12 }).type).toBe("probe.progress")
   expect(Schema.decodeUnknownSync(LiveEvent)({ type: "probe.result", at, projectId: "p", runId: "r", verdict: "fail", checks: 4, failed: 1, offsetsUpdated: false, kind: "part" }).type).toBe("probe.result")
   expect(() => Schema.decodeUnknownSync(LiveEvent)({ type: "probe.result", at, projectId: "p", runId: "r", verdict: "great", checks: 1, failed: 0, offsetsUpdated: true, kind: "part" })).toThrow()
+})
+
+test("a kernel artifact with a probe operation decodes: strategy, cut, its summary, the claim and the replay verdict", () => {
+  const operation = {
+    id: "bore", name: "Probe bore", strategy: "probe", toolId: "probe", cut: "probe", status: "ok", parameters: {}, overridden: [], warnings: [], cutLength: 10, timeSeconds: 5, removedVolume: 0,
+    probe: { cycle: "bore", touches: 4, device: "probe", nominal: { diameter: 20 }, variables: { diameter: "#610" }, offsetTargets: ["G54"] }
+  }
+  const fields = (CamKernelArtifact as unknown as { fields: Record<string, Schema.Top> }).fields
+  expect(Schema.decodeUnknownSync(fields["operations"] as never)([operation] as never)).toHaveLength(1)
+  expect(Schema.decodeUnknownSync(fields["claims"] as never)([{ id: "probing", status: "passed", detail: "replayed" }] as never)).toHaveLength(1)
+  expect(Schema.decodeUnknownSync(fields["probing"] as never)({ operations: ["bore"], textReplay: "agrees" } as never) as unknown).toEqual({ operations: ["bore"], textReplay: "agrees" })
 })

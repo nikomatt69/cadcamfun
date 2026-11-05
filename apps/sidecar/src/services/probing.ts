@@ -41,6 +41,8 @@ interface ResolvedSetup {
   readonly settings: cam.probing.ProbeSettings
   readonly device?: cam.probing.ProbeDevice
   readonly setter?: cam.probing.ToolSetter
+  /** Machine position of the active work zero, from the machine's table: where a machine-coordinate tool setter is from the part. */
+  readonly workOrigin?: cam.probing.OffsetEntry
   readonly frame?: cam.WorkFrame
   /** What the named machine's configuration says its rotary table is (the calibration's default `assumed`). */
   readonly assumed?: cam.probing.RotaryAssumption
@@ -50,6 +52,7 @@ const setupInput = (setup: ResolvedSetup) => ({
   settings: setup.settings,
   ...(setup.device !== undefined ? { device: setup.device } : {}),
   ...(setup.setter !== undefined ? { setter: setup.setter } : {}),
+  ...(setup.workOrigin !== undefined ? { workOrigin: { x: setup.workOrigin.x, y: setup.workOrigin.y, z: setup.workOrigin.z } } : {}),
   ...(setup.frame !== undefined ? { frame: setup.frame } : {})
 })
 
@@ -176,13 +179,18 @@ export class Probing extends Context.Service<Probing, {
         }
       }
       const settings = cam.probing.settingsFromMachine(profile, overrides)
+      let workOrigin: cam.probing.OffsetEntry | undefined
+      if (machineId !== undefined) {
+        const table = yield* store.get(userId, machineId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the work offsets")))
+        if (!("refused" in table)) workOrigin = table.entries[cam.probing.formatOffsetRef(settings.workOffset)]
+      }
       const device = profile === undefined ? undefined : cam.probing.probeDeviceOfProfile(profile)
       const frame = frameInput === undefined ? undefined : cam.probing.workFrameOfAngles({
         ...(frameInput.a !== undefined ? { a: frameInput.a * DEG } : {}),
         ...(frameInput.b !== undefined ? { b: frameInput.b * DEG } : {}),
         ...(frameInput.c !== undefined ? { c: frameInput.c * DEG } : {})
       })
-      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
+      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(workOrigin !== undefined ? { workOrigin } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
     })
     /** The kernel input of a plan or emit request: the cycle as given, or the feature an element resolves to. */
     const planInputOf = (setup: ResolvedSetup, payload: CamProbingPlanRequest | CamProbingEmitRequest): CamProbePlanInput => ({
