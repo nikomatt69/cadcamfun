@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "触碰点",
   "cam.probing.remote.result": "一次探测已完成：{verdict}，{checks} 项检测中 {failed} 项不合格。",
   "cam.probing.remote.open": "打开报告",
-  "cam.probing.remote.dismiss": "忽略"
+  "cam.probing.remote.dismiss": "忽略",
+  "cam.probing.program.misplace": "模拟工件偏移（mm，C 为度）",
+  "cam.probing.program.noPart": "图纸中没有可探测的实体。",
+  "cam.probing.calibration.rotary": "本次运行测得旋转轴的回转中心和轴线。",
+  "cam.probing.calibration.stylus": "本次运行测得测针的有效半径。",
+  "cam.probing.calibration.apply": "写入机床",
+  "cam.probing.calibration.storedOnly": "标定需要已保存的机床：请先在库中复制预设。",
+  "cam.probing.calibration.savedToast": "标定已写入机床"
 }

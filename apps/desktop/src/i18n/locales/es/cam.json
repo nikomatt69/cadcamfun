@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Toques",
   "cam.probing.remote.result": "Terminó un palpado: {verdict}, {failed} de {checks} comprobaciones fallidas.",
   "cam.probing.remote.open": "Abrir informe",
-  "cam.probing.remote.dismiss": "Descartar"
+  "cam.probing.remote.dismiss": "Descartar",
+  "cam.probing.program.misplace": "Desplazamiento simulado de la pieza (mm, C en grados)",
+  "cam.probing.program.noPart": "El dibujo no tiene ningún sólido que palpar.",
+  "cam.probing.calibration.rotary": "La ejecución midió el pivote y el eje rotativo.",
+  "cam.probing.calibration.stylus": "La ejecución midió el radio efectivo de la bola.",
+  "cam.probing.calibration.apply": "Escribir en la máquina",
+  "cam.probing.calibration.storedOnly": "Una calibración necesita una máquina guardada: duplica antes el preajuste en la biblioteca.",
+  "cam.probing.calibration.savedToast": "Calibración escrita en la máquina"
 }

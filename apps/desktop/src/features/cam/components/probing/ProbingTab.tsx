@@ -18,6 +18,7 @@ import type { PaletteEntry } from "../../lib/probing/cycle-palette.data.ts"
 import { planLocal, type ProbeOperation } from "../../lib/probing/operation.ts"
 import type { ProbeTarget } from "../../lib/probing/probe-targets.ts"
 import { summarizeInspection } from "../../lib/probing/inspection.ts"
+import type { RunCalibration } from "../../lib/probing/simulation.ts"
 import type { ProbingDefaults } from "../../../../shared/state/settings.ts"
 import type { OffsetScope } from "../../store/workOffsetStore.ts"
 import { InspectionList } from "./InspectionList.tsx"
@@ -55,6 +56,9 @@ export interface ProbingController {
   saveOffsets(): Promise<void>
   applyMeasured(id: string): void
   saveReport(id: string): Promise<void>
+  /** What the selected run calibrated, when it can be written to the machine. */
+  calibrationOf(id: string): RunCalibration | undefined
+  applyCalibration(id: string): Promise<void>
   /** Opens a stored report of the project for reading (`undefined`: back to the run of the selected cycle). */
   openReport(id: string | undefined): Promise<void>
 }
@@ -156,6 +160,12 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
           </select>
         </Show>
         <Show when={run()}>{(r) => <ProbeContactList contacts={r().outcome.contacts} expected={r().expected} highlighted={probing.highlight} onHighlight={(index) => probing.setHighlight(index)} />}</Show>
+        <Show when={selected() !== undefined && inspection.opened === undefined && run() !== undefined ? c.calibrationOf(selected()!.id) : undefined}>{(found) => (
+          <div class="probing-row-actions">
+            <p class="panel-hint" data-testid="probing-calibration">{found().kind === "rotary" ? t("cam.probing.calibration.rotary") : t("cam.probing.calibration.stylus")}</p>
+            <button type="button" class="panel-btn panel-btn--fit" data-testid="probing-apply-calibration" disabled={machine()?.stored !== true || probing.busy !== undefined} onClick={() => void c.applyCalibration(selected()!.id)}>{t("cam.probing.calibration.apply")}</button>
+          </div>
+        )}</Show>
         <InspectionList verdicts={run()?.verdicts ?? []} warnShare={inspection.warnShare} selected={inspection.selected}
           title={selected()?.probe.name ?? "inspection"} onSelect={(name) => inspection.select(name)}
           onSave={selected() !== undefined && run() !== undefined ? () => void c.saveReport(selected()!.id) : undefined} saved={run()?.reportId !== undefined} />
@@ -163,7 +173,7 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
 
       <PanelSection id="probing-program" icon={SECTION_ICON.program} title={t("cam.probing.section.program")} open={probing.open.program} onToggle={toggle("program")} testId="probing-section-program">
         <Show when={selected()} fallback={<p class="panel-empty">{t("cam.probing.program.select")}</p>}>{(cycle) => (
-          <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()}
+          <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()} misplacement={probing.misplacement} onMisplacement={(patch) => probing.setMisplacement(patch)}
             disabled={!planLocal(cycle().probe, { profile: c.profile(), defaults: c.defaults() }).ok} onDialect={(id) => probing.setDialect(id)} onGenerate={() => void c.generate(cycle().id)} onSimulate={() => void c.simulate(cycle().id)}
             onShow3d={(show) => { probing.setShowIn3d(show); if (show) cam.setActiveTab("toolpath") }} onInsert={(nc) => c.insert(nc)} />
         )}</Show>

@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Tocchi",
   "cam.probing.remote.result": "Una tastatura è terminata: {verdict}, {failed} controlli falliti su {checks}.",
   "cam.probing.remote.open": "Apri rapporto",
-  "cam.probing.remote.dismiss": "Chiudi"
+  "cam.probing.remote.dismiss": "Chiudi",
+  "cam.probing.program.misplace": "Spostamento simulato del pezzo (mm, C in gradi)",
+  "cam.probing.program.noPart": "Il disegno non ha solidi da tastare.",
+  "cam.probing.calibration.rotary": "L'esecuzione ha misurato il pivot e l'asse rotativo.",
+  "cam.probing.calibration.stylus": "L'esecuzione ha misurato il raggio efficace dello stilo.",
+  "cam.probing.calibration.apply": "Scrivi nella macchina",
+  "cam.probing.calibration.storedOnly": "Una calibrazione richiede una macchina salvata: duplica prima il preset nella libreria.",
+  "cam.probing.calibration.savedToast": "Calibrazione scritta nella macchina"
 }

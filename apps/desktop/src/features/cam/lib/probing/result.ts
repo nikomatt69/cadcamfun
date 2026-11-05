@@ -24,6 +24,8 @@ export interface ProbeRunResult {
   readonly reportId?: string
   /** The offset the run updated. */
   readonly workOffset?: string
+  /** What a rotary calibration measured, ready for the machine. */
+  readonly calibration?: { readonly kind: "rotary"; readonly rotary: import("./contract.ts").MachineRotaryCalibration }
   /** Fingerprint of the operation the run measured (`fingerprintOf`): a changed operation makes the result stale. */
   readonly fingerprint?: string
 }

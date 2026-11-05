@@ -47,6 +47,8 @@ export interface ProbeRunSummary {
   readonly kind: string
 }
 
+export interface Misplacement { readonly x: number; readonly y: number; readonly z: number; readonly c: number }
+
 export interface PickedPoint { readonly point: { readonly x: number; readonly y: number; readonly z: number }; readonly normal: { readonly x: number; readonly y: number; readonly z: number } }
 
 interface ProbingStore {
@@ -64,6 +66,8 @@ interface ProbingStore {
   /** The user is picking a feature on the model; the next surface hit fills the selected cycle. */
   readonly picking: boolean
   readonly lastPick: PickedPoint | undefined
+  /** Where the simulated part really sits against the drawn one (mm, C degrees): what the run should find; on a rotary run, the true pivot. */
+  readonly misplacement: Misplacement
   /** The probe run is drawn in the 3D view. */
   readonly showIn3d: boolean
   /** The measured result a list row highlights in the 3D view (a contact index). */
@@ -82,12 +86,13 @@ interface ProbingStore {
   setLastPick(pick: PickedPoint | undefined): void
   setShowIn3d(show: boolean): void
   setHighlight(index: number | undefined): void
+  setMisplacement(patch: Partial<Misplacement>): void
   reset(): void
 }
 
 const INITIAL = {
   selectedId: undefined, open: { cycles: true, offsets: false, inspection: true, program: true } as const, dialect: undefined,
-  programs: {}, results: {}, progress: undefined, remote: undefined, busy: undefined, error: undefined, picking: false, lastPick: undefined, showIn3d: true, highlight: undefined
+  programs: {}, results: {}, progress: undefined, remote: undefined, busy: undefined, error: undefined, picking: false, lastPick: undefined, showIn3d: true, highlight: undefined, misplacement: { x: 0, y: 0, z: 0, c: 0 }
 }
 
 export const useProbingStore = create<ProbingStore>((set) => ({
@@ -110,6 +115,7 @@ export const useProbingStore = create<ProbingStore>((set) => ({
   setLastPick: (lastPick) => set({ lastPick }),
   setShowIn3d: (showIn3d) => set({ showIn3d }),
   setHighlight: (highlight) => set({ highlight }),
+  setMisplacement: (patch) => set((state) => ({ misplacement: { ...state.misplacement, ...patch } })),
   reset: () => set({ ...INITIAL, open: { ...INITIAL.open } })
 }))
 

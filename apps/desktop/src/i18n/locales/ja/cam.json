@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "タッチ",
   "cam.probing.remote.result": "プロービングが完了しました：{verdict}、{checks} 件中 {failed} 件が不合格。",
   "cam.probing.remote.open": "レポートを開く",
-  "cam.probing.remote.dismiss": "閉じる"
+  "cam.probing.remote.dismiss": "閉じる",
+  "cam.probing.program.misplace": "シミュレーションする部品のずれ（mm、C は度）",
+  "cam.probing.program.noPart": "図面に接触できるソリッドがありません。",
+  "cam.probing.calibration.rotary": "実行により回転軸のピボットと軸方向を測定しました。",
+  "cam.probing.calibration.stylus": "実行によりスタイラスの有効半径を測定しました。",
+  "cam.probing.calibration.apply": "機械に書き込む",
+  "cam.probing.calibration.storedOnly": "校正には保存済みの機械が必要です。先にライブラリでプリセットを複製してください。",
+  "cam.probing.calibration.savedToast": "校正を機械に書き込みました"
 }

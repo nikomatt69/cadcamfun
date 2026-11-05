@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Touches",
   "cam.probing.remote.result": "A probing run finished: {verdict}, {failed} of {checks} checks failed.",
   "cam.probing.remote.open": "Open report",
-  "cam.probing.remote.dismiss": "Dismiss"
+  "cam.probing.remote.dismiss": "Dismiss",
+  "cam.probing.program.misplace": "Simulated part offset (mm, C in degrees)",
+  "cam.probing.program.noPart": "The drawing has no solid to touch.",
+  "cam.probing.calibration.rotary": "The run measured the rotary pivot and axis.",
+  "cam.probing.calibration.stylus": "The run measured the effective stylus radius.",
+  "cam.probing.calibration.apply": "Write to the machine",
+  "cam.probing.calibration.storedOnly": "A calibration needs a saved machine: duplicate the preset in the library first.",
+  "cam.probing.calibration.savedToast": "Calibration written to the machine"
 }

@@ -5,7 +5,7 @@
  * race fails with `WorkOffsetConflict` (HTTP 409), never by silently replacing what someone saved on the machine.
  */
 import { Effect, Schema } from "effect"
-import type { MachineProbeConfigBody, MachineProbeConfigDocument, ProbeReportDocument, ProbeReportSaveBody, ProbeReportSummary, WorkOffsetTableBody, WorkOffsetTableDocument } from "@cadcamfun/api"
+import type { CamProbingEmitRequest, CamProbingProgram, CamProbingSimulateRequest, CamProbingSimulation, CamRotaryCalibrationRequest, CamRotaryCalibrationResult, MachineProbeConfigBody, MachineProbeConfigDocument, ProbeReportDocument, ProbeReportSaveBody, ProbeReportSummary, WorkOffsetTableBody, WorkOffsetTableDocument } from "@cadcamfun/api"
 import type { Client } from "../../../shared/state/client.ts"
 import { isSaveConflict } from "../../cad/lib/stored-revision.ts"
 import { ToolpathGeneratorError } from "./generator.ts"
@@ -28,6 +28,12 @@ export type ProbingError = ToolpathGeneratorError
 export type { WorkOffsetTableDocument, MachineProbeConfigDocument, ProbeReportDocument, ProbeReportSummary }
 
 export interface ProbingService {
+  /** Absent in a fake that only drives the table and the reports. */
+  readonly program?: {
+    readonly emit: (payload: CamProbingEmitRequest) => Effect.Effect<CamProbingProgram, ProbingError>
+    readonly simulate: (payload: CamProbingSimulateRequest) => Effect.Effect<CamProbingSimulation, ProbingError>
+    readonly calibrateRotary: (payload: CamRotaryCalibrationRequest) => Effect.Effect<CamRotaryCalibrationResult, ProbingError>
+  }
   readonly workOffsets: {
     readonly get: (machineConfigId: string, setupId?: string) => Effect.Effect<WorkOffsetTableDocument, ProbingError>
     /** Writes the whole table; `baseUpdatedAt` is the revision the editor read. */
@@ -46,6 +52,11 @@ export interface ProbingService {
 }
 
 export const makeProbingStoreService = (client: Client): ProbingService => ({
+  program: {
+    emit: (payload) => client.camProbing.emit({ payload }).pipe(Effect.mapError(failure)),
+    simulate: (payload) => client.camProbing.simulate({ payload }).pipe(Effect.mapError(failure)),
+    calibrateRotary: (payload) => client.camProbing.calibrateRotary({ payload }).pipe(Effect.mapError(failure))
+  },
   workOffsets: {
     get: (id, setupId) => client.camProbing.workOffsetsGet({ params: { id }, query: setupId === undefined ? {} : { setupId } }).pipe(Effect.mapError(failure)),
     put: (id, payload, setupId) => client.camProbing.workOffsetsPut({ params: { id }, query: setupId === undefined ? {} : { setupId }, payload }).pipe(Effect.mapError(conflictOr(id)))

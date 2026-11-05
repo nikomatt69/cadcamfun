@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "اللمسات",
   "cam.probing.remote.result": "انتهى تشغيل سبر: {verdict}، فشل {failed} من {checks} فحوصات.",
   "cam.probing.remote.open": "فتح التقرير",
-  "cam.probing.remote.dismiss": "تجاهل"
+  "cam.probing.remote.dismiss": "تجاهل",
+  "cam.probing.program.misplace": "إزاحة القطعة المحاكاة (مم، و C بالدرجات)",
+  "cam.probing.program.noPart": "لا يحتوي الرسم على مجسم للتحسس.",
+  "cam.probing.calibration.rotary": "قاس التشغيل محور الدوران واتجاهه.",
+  "cam.probing.calibration.stylus": "قاس التشغيل نصف القطر الفعال للإبرة.",
+  "cam.probing.calibration.apply": "الكتابة إلى الآلة",
+  "cam.probing.calibration.storedOnly": "تتطلب المعايرة آلة محفوظة: انسخ الإعداد المسبق في المكتبة أولًا.",
+  "cam.probing.calibration.savedToast": "كُتبت المعايرة إلى الآلة"
 }

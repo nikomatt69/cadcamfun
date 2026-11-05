@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Касания",
   "cam.probing.remote.result": "Измерение завершено: {verdict}, брак по {failed} из {checks} проверок.",
   "cam.probing.remote.open": "Открыть отчёт",
-  "cam.probing.remote.dismiss": "Скрыть"
+  "cam.probing.remote.dismiss": "Скрыть",
+  "cam.probing.program.misplace": "Смоделированное смещение детали (мм, C в градусах)",
+  "cam.probing.program.noPart": "В чертеже нет тела для измерения.",
+  "cam.probing.calibration.rotary": "Прогон измерил центр и ось поворота.",
+  "cam.probing.calibration.stylus": "Прогон измерил эффективный радиус наконечника.",
+  "cam.probing.calibration.apply": "Записать в станок",
+  "cam.probing.calibration.storedOnly": "Для калибровки нужен сохранённый станок: сначала продублируйте шаблон в библиотеке.",
+  "cam.probing.calibration.savedToast": "Калибровка записана в станок"
 }

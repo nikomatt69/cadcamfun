@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "स्पर्श",
   "cam.probing.remote.result": "एक प्रोबिंग रन पूरा हुआ: {verdict}, {checks} में से {failed} जाँच फ़ेल।",
   "cam.probing.remote.open": "रिपोर्ट खोलें",
-  "cam.probing.remote.dismiss": "खारिज करें"
+  "cam.probing.remote.dismiss": "खारिज करें",
+  "cam.probing.program.misplace": "अनुकरित पार्ट ऑफ़सेट (mm, C डिग्री में)",
+  "cam.probing.program.noPart": "ड्रॉइंग में छूने के लिए कोई ठोस नहीं है।",
+  "cam.probing.calibration.rotary": "रन ने रोटरी पिवट और अक्ष को मापा।",
+  "cam.probing.calibration.stylus": "रन ने स्टाइलस की प्रभावी त्रिज्या मापी।",
+  "cam.probing.calibration.apply": "मशीन में लिखें",
+  "cam.probing.calibration.storedOnly": "कैलिब्रेशन के लिए सहेजी गई मशीन चाहिए: पहले लाइब्रेरी में प्रीसेट की प्रति बनाएँ।",
+  "cam.probing.calibration.savedToast": "कैलिब्रेशन मशीन में लिखा गया"
 }

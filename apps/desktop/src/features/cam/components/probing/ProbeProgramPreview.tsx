@@ -8,7 +8,8 @@ import { For, Show, createMemo, type JSX } from "solid-js"
 import { Box, ClipboardCopy, FileInput, Play, RefreshCw } from "lucide-solid"
 import { t } from "../../../../i18n/index.ts"
 import { Field, Note } from "../../../../shared/components/panel/ui.tsx"
-import type { ProbeProgram, ProbingBusy } from "../../store/probingStore.ts"
+import { NumberField } from "../../../cad/components/property-inputs/NumberField.tsx"
+import type { Misplacement, ProbeProgram, ProbingBusy } from "../../store/probingStore.ts"
 
 export interface DialectOption { readonly id: string; readonly label: string }
 
@@ -22,6 +23,9 @@ export interface ProbeProgramPreviewProps {
   readonly showIn3d: boolean
   /** Lines (1-based) of the touch blocks, from a simulated run: marked in the gutter. */
   readonly contactLines?: ReadonlySet<number>
+  /** Where the simulated part really sits: what Simulate finds. */
+  readonly misplacement: Misplacement
+  onMisplacement(patch: Partial<Misplacement>): void
   /** No cycle is selected or it is refused: nothing can be written. */
   readonly disabled: boolean
   onDialect(id: string): void
@@ -42,6 +46,14 @@ export function ProbeProgramPreview(props: ProbeProgramPreviewProps): JSX.Elemen
           <For each={props.dialects}>{(d) => <option value={d.id}>{d.label}</option>}</For>
         </select>
       </Field>
+      <fieldset class="probing-misplace" data-testid="probe-misplace">
+        <legend class="panel-hint">{t("cam.probing.program.misplace")}</legend>
+        <For each={["x", "y", "z", "c"] as const}>{(axis) => (
+          <label class="probing-misplace__axis"><span>{axis.toUpperCase()}</span>
+            <NumberField class="panel-input" testId={`probe-misplace-${axis}`} label={t("cam.probing.program.misplace")} deferred value={props.misplacement[axis]} onChange={(value) => props.onMisplacement({ [axis]: value })} />
+          </label>
+        )}</For>
+      </fieldset>
       <div class="probing-row-actions">
         <button type="button" class="panel-btn panel-btn--fit" data-testid="probe-generate" disabled={props.disabled || working()} onClick={props.onGenerate}>
           <RefreshCw size={14} />{props.busy === "emit" ? t("cam.probing.program.generating") : t("cam.probing.program.generate")}

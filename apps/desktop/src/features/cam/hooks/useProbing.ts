@@ -5,7 +5,7 @@
  * to the app, the CAD elements and the stores.
  */
 import { cam } from "@cadcamfun/core"
-import type { Effect } from "effect"
+import type { Effect, Schema } from "effect"
 import { useApp } from "../../../shared/state/context.ts"
 import type { ProbingDefaults } from "../../../shared/state/settings.ts"
 import { t } from "../../../i18n/index.ts"
@@ -13,6 +13,7 @@ import { toast } from "../../../shared/ui/toast.tsx"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { makeProbingStoreService, type ProbingService } from "../api/probing.ts"
+import { makeToolpathGenerator } from "../api/generator.ts"
 import { POST_TARGETS } from "../components/AdvancedPostProcessorPanel.tsx"
 import type { ProbingController } from "../components/probing/ProbingTab.tsx"
 import type { DialectOption } from "../components/probing/ProbeProgramPreview.tsx"
@@ -26,7 +27,11 @@ import { applyTarget, targetAt, targetsOf, workOriginOf, type ProbeTarget } from
 import { reportData, resultOfReport } from "../lib/probing/report-data.ts"
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
-import { useProbingStore } from "../store/probingStore.ts"
+import { cycleOfSpec } from "../lib/probing/cycle-fields.ts"
+import { entriesOfRows } from "../lib/probing/work-offsets.ts"
+import { fingerprintOf } from "../lib/probing/result.ts"
+import { requestOf, resultOfCalibration, resultOfSimulation, stylusCalibrationOf } from "../lib/probing/simulation.ts"
+import { freshProgram, useProbingStore } from "../store/probingStore.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { useSetupStore } from "../store/setupStore.ts"
 import { useWorkOffsetStore } from "../store/workOffsetStore.ts"
@@ -34,10 +39,87 @@ import { useJob } from "./useJob.ts"
 
 type Run = <A, E>(effect: Effect.Effect<A, E>) => Promise<A>
 
-/** The program-side calls: written by the sidecar (plan, emit, simulate), pending the `camProbing` program routes. */
+/** The program-side calls of one cycle, over the `camProbing` routes (`createProbingProgram`). */
 export interface ProbingProgramService {
   generate(id: string, operation: ProbeOperation, dialect: string): Promise<void>
   simulate(id: string, operation: ProbeOperation, dialect: string): Promise<void>
+}
+
+/** Parses a program for the 3D view; a program that cannot be parsed still shows as text. */
+type ParseProgram = (nc: string) => Promise<{ readonly program: cam.Program; readonly motion?: cam.viewer.MotionTrack | undefined } | undefined>
+
+const newRunId = (): string => globalThis.crypto.randomUUID()
+
+/** Write program and Simulate of the panel: the sidecar plans and writes, the results land in the probing store. */
+export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service" | "machine" | "defaults" | "elements" | "projectId"> & { readonly parse: ParseProgram }): ProbingProgramService => {
+  const probing = useProbingStore
+  const context = () => {
+    const machine = deps.machine()
+    const stored = machine !== null && cam.kernel.findMachine(machine.id) === undefined
+    return { profile: profileOfMachine(machine), defaults: deps.defaults(), ...(stored ? { machineConfig: machine.id } : {}) }
+  }
+  const calls = () => {
+    if (deps.service.program === undefined) throw new Error(t("cam.probing.program.unavailable"))
+    return deps.service.program
+  }
+  return {
+    generate: async (id, operation, dialect) => {
+      const service = calls()
+      const ctx = context()
+      const fingerprint = fingerprintOf(operation)
+      const decoded = cycleOfSpec(operation.cycle)
+      let written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string }
+      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
+        const c = decoded.cycle
+        const request = requestOf(operation, ctx)
+        if ("refused" in request) throw new Error(request.refused)
+        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, dialect: dialect as never }))
+        if (out.nc === undefined) throw new Error(out.refused ?? t("cam.probing.program.unavailable"))
+        written = { nc: out.nc, lines: out.nc.split("\n").length, notes: out.notes, warnings: [] }
+      } else {
+        const request = requestOf(operation, ctx)
+        if ("refused" in request) throw new Error(request.refused)
+        const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
+        written = { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc }
+      }
+      const parsed = await deps.parse(written.nc).catch(() => undefined)
+      probing.getState().setProgram({ operationId: id, dialect, fingerprint, ...written, ...(parsed !== undefined ? { parsed } : {}) })
+    },
+    simulate: async (id, operation) => {
+      const service = calls()
+      const ctx = context()
+      const project = deps.projectId()
+      const runId = newRunId()
+      const progress = project !== null ? { progress: { projectId: project, runId } } : {}
+      const m = probing.getState().misplacement
+      const decoded = cycleOfSpec(operation.cycle)
+      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
+        const c = decoded.cycle
+        const request = requestOf(operation, ctx)
+        if ("refused" in request) throw new Error(request.refused)
+        const truth = m.x !== 0 || m.y !== 0 || m.z !== 0 ? { truth: { pivot: m } } : {}
+        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, ...truth, ...progress }))
+        probing.getState().setResult(resultOfCalibration(out, { operationId: id, operation }))
+        return
+      }
+      const request = requestOf(operation, ctx)
+      if ("refused" in request) throw new Error(request.refused)
+      const planned = planLocal(operation, { profile: ctx.profile, defaults: ctx.defaults })
+      if (!planned.ok) throw new Error(planned.reason)
+      const elements = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
+      if (elements.length === 0) throw new Error(t("cam.probing.program.noPart"))
+      const table = useWorkOffsetStore.getState()
+      const workOffsets = table.machineConfigId !== undefined && table.rows.length > 0 ? entriesOfRows(table.rows, "machine") : undefined
+      const { operation: cycle, settings, frame, actions, checks } = request
+      const sim = await deps.run(service.simulate({
+        elements, settings, operations: [{ id, operation: cycle, ...(actions !== undefined ? { actions } : {}), ...(checks !== undefined ? { checks } : {}) }],
+        ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}),
+        misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...progress
+      }))
+      const program = freshProgram(probing.getState().programs, id, operation)
+      probing.getState().setResult(resultOfSimulation(sim, { operationId: id, operation, expected: planned.routine.contacts, runId, ...(program?.hash !== undefined ? { programHash: program.hash } : {}) }))
+    }
+  }
 }
 
 export interface ControllerDeps {
@@ -52,6 +134,8 @@ export interface ControllerDeps {
   readonly setups: () => ReadonlyArray<{ readonly id: string; readonly name: string }>
   readonly projectId: () => string | null
   readonly insert: (nc: string) => void
+  /** A calibration reached the machine: the selected machine's config follows, so the next cycle plans with it. */
+  readonly onMachineProbing?: ((config: { readonly probing: unknown; readonly rotaryCalibration: unknown }) => void) | undefined
 }
 
 const messageOf = (cause: unknown): string => (cause instanceof Error ? cause.message : typeof cause === "object" && cause !== null && "message" in cause ? String((cause as { message: unknown }).message) : String(cause))
@@ -162,6 +246,31 @@ export const createProbingController = (deps: ControllerDeps): ProbingController
       if (result !== undefined) useWorkOffsetStore.getState().applyUpdates(result.outcome.updates)
     },
 
+    calibrationOf: (id) => {
+      const result = probing.getState().results[id]
+      const operation = operationOf(id)
+      if (result === undefined || operation === undefined) return undefined
+      return result.calibration ?? stylusCalibrationOf(result, operation)
+    },
+    applyCalibration: async (id) => {
+      const machine = deps.machine()
+      const calibration = controller.calibrationOf(id)
+      if (calibration === undefined || machine === null) return
+      if (cam.kernel.findMachine(machine.id) !== undefined) { probing.getState().setError(t("cam.probing.calibration.storedOnly")); return }
+      probing.getState().setBusy("save")
+      probing.getState().setError(undefined)
+      try {
+        const current = await deps.run(deps.service.probeConfig.get(machine.id))
+        const body = calibration.kind === "rotary"
+          ? { rotaryCalibration: calibration.rotary, baseUpdatedAt: current.updatedAt }
+          : { probing: { ...current.probing, calibration: calibration.stylus }, baseUpdatedAt: current.updatedAt }
+        const saved = await deps.run(deps.service.probeConfig.put(machine.id, body))
+        deps.onMachineProbing?.(saved)
+        probing.getState().setBusy(undefined)
+        toast.success(t("cam.probing.calibration.savedToast"))
+      } catch (cause) { fail(cause) }
+    },
+
     saveReport: async (id) => {
       const project = deps.projectId()
       const result = probing.getState().results[id]
@@ -205,15 +314,26 @@ export const useProbing = (options: { readonly insert: (nc: string) => void; rea
   const job = useJob()
   const setups = useSetupStore()
   const document = useDocumentStore()
+  const service = makeProbingStoreService(app.client)
+  const run: Run = (effect) => app.runtime.run(effect)
+  const machine = () => cad.selectedMachine
+  const defaults = () => app.settings.settings().probing
+  const elements = () => job.elements()
+  const projectId = () => document.projectId
+  const generator = makeToolpathGenerator(app.client)
   return createProbingController({
-    run: (effect) => app.runtime.run(effect), service: makeProbingStoreService(app.client), program: options.program,
-    machine: () => cad.selectedMachine,
-    defaults: () => app.settings.settings().probing,
-    elements: () => job.elements(),
+    run, service, machine, defaults, elements, projectId,
+    program: options.program ?? createProbingProgram({ run, service, machine, defaults, elements, projectId, parse: (nc) => run(generator.parse(nc, "Probing")) }),
     stock: () => { const s = stockOf(job.sources()); return { x: s.x, y: s.y, width: s.width, height: s.height, topZ: s.topZ } },
     setups: () => setups.documents.map((d) => ({ id: d.id, name: d.name })),
-    projectId: () => document.projectId,
-    insert: options.insert
+    insert: options.insert,
+    onMachineProbing: (saved) => {
+      const m = cad.selectedMachine
+      if (m === null) return
+      const config = { ...(m.config as object) } as Record<string, unknown>
+      if (saved.probing !== null) config["probing"] = saved.probing
+      if (saved.rotaryCalibration !== null) config["rotary"] = { ...(config["rotary"] as object), calibration: saved.rotaryCalibration }
+      cad.setSelectedMachine({ ...m, config } as typeof m)
+    }
   })
 }
-

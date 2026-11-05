@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Toques",
   "cam.probing.remote.result": "Uma apalpação terminou: {verdict}, {failed} de {checks} verificações reprovadas.",
   "cam.probing.remote.open": "Abrir relatório",
-  "cam.probing.remote.dismiss": "Dispensar"
+  "cam.probing.remote.dismiss": "Dispensar",
+  "cam.probing.program.misplace": "Deslocamento simulado da peça (mm, C em graus)",
+  "cam.probing.program.noPart": "O desenho não tem nenhum sólido para apalpar.",
+  "cam.probing.calibration.rotary": "A execução mediu o pivô e o eixo rotativo.",
+  "cam.probing.calibration.stylus": "A execução mediu o raio efetivo da esfera.",
+  "cam.probing.calibration.apply": "Gravar na máquina",
+  "cam.probing.calibration.storedOnly": "Uma calibração precisa de uma máquina guardada: duplique primeiro a predefinição na biblioteca.",
+  "cam.probing.calibration.savedToast": "Calibração gravada na máquina"
 }

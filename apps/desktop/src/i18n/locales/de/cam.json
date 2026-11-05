@@ -1680,5 +1680,12 @@
   "cam.probing.contacts": "Antastungen",
   "cam.probing.remote.result": "Ein Antastlauf ist beendet: {verdict}, {failed} von {checks} Prüfungen nicht bestanden.",
   "cam.probing.remote.open": "Bericht öffnen",
-  "cam.probing.remote.dismiss": "Schließen"
+  "cam.probing.remote.dismiss": "Schließen",
+  "cam.probing.program.misplace": "Simulierter Werkstückversatz (mm, C in Grad)",
+  "cam.probing.program.noPart": "Die Zeichnung hat keinen Körper zum Antasten.",
+  "cam.probing.calibration.rotary": "Der Lauf hat Drehpunkt und Achse der Rundachse gemessen.",
+  "cam.probing.calibration.stylus": "Der Lauf hat den wirksamen Tastkugelradius gemessen.",
+  "cam.probing.calibration.apply": "In die Maschine schreiben",
+  "cam.probing.calibration.storedOnly": "Eine Kalibrierung braucht eine gespeicherte Maschine: Vorlage zuerst in der Bibliothek duplizieren.",
+  "cam.probing.calibration.savedToast": "Kalibrierung in die Maschine geschrieben"
 }
