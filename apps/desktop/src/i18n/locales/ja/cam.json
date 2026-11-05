@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "順序",
   "cam.workpieces.order.toolFirst": "工具優先：工具ごとに1回交換",
   "cam.workpieces.order.partFirst": "ワーク優先：1個仕上げてから次へ",
-  "cam.workpieces.hint": "ワークごとに1つの座標系（G54〜G59）。各工程はすべてのワークで実行されます。",
+  "cam.workpieces.hint": "ワークごとに1つの座標系：G54〜G59、その先は G54.1 P1 以降。各工程はすべてのワークで実行されます。",
   "cam.workpieces.defaultName": "ワーク {n}",
   "cam.setupDoc.generate": "プログラムを生成",
   "cam.setupDoc.open": "エディタで開く",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "選択をワークとして使用",
   "cam.explorer.useAsWorkpiecesTitle": "選択した部品ごとに1つのワーク（G54、G55…）。各部品の位置に配置します",
   "cam.explorer.nowWorkpieces": "治具上のワーク {count} 個: {offsets}",
-  "cam.explorer.workpiecesLimit": "G54〜G59に収まるのは最初の {count} 個のみです"
+  "cam.explorer.workpiecesLimit": "治具の48レジスタに収まるのは最初の {count} 個のみです",
+  "cam.workpieces.index": "このワークの回転割出し（度、A・B・C）：このワークの工程の前にテーブルが回転します",
+  "cam.workpieces.blank": "専用の素材（サイズ X, Y, Z mm）",
+  "cam.setupDoc.magazine": "マガジンのポケット数（0＝指定なし）",
+  "cam.workpieces.dependsOn": "実行順（この後）",
+  "cam.workpieces.dependsNone": "依存なし"
 }

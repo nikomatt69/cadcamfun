@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Ordine",
   "cam.workpieces.order.toolFirst": "Prima l'utensile: un cambio utensile per utensile",
   "cam.workpieces.order.partFirst": "Prima il pezzo: finisci un pezzo, poi il successivo",
-  "cam.workpieces.hint": "Un'origine pezzo per ogni pezzo, da G54 a G59. Ogni operazione gira su ciascun pezzo.",
+  "cam.workpieces.hint": "Un'origine pezzo per ogni pezzo: da G54 a G59, poi G54.1 P1 e oltre. Ogni operazione gira su ciascun pezzo.",
   "cam.workpieces.defaultName": "Pezzo {n}",
   "cam.setupDoc.generate": "Genera programmi",
   "cam.setupDoc.open": "Apri nell'editor",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Usa la selezione come pezzi",
   "cam.explorer.useAsWorkpiecesTitle": "Un pezzo per ogni parte selezionata, su G54, G55 ... posizionato dove si trova ciascuna parte",
   "cam.explorer.nowWorkpieces": "{count} pezzi sull'attrezzatura: {offsets}",
-  "cam.explorer.workpiecesLimit": "Solo le prime {count} parti entrano nei registri da G54 a G59"
+  "cam.explorer.workpiecesLimit": "Solo le prime {count} parti entrano nei 48 registri dell'attrezzatura",
+  "cam.workpieces.index": "Indexazione rotativa di questo pezzo, gradi (A, B, C): la tavola ruota qui prima dei suoi percorsi",
+  "cam.workpieces.blank": "Grezzo proprio (dimensioni X, Y, Z, mm)",
+  "cam.setupDoc.magazine": "Posti del magazzino utensili (0 = non indicato)",
+  "cam.workpieces.dependsOn": "Dopo",
+  "cam.workpieces.dependsNone": "Nessuna dipendenza"
 }

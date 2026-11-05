@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Порядок",
   "cam.workpieces.order.toolFirst": "Сначала инструмент: одна смена на инструмент",
   "cam.workpieces.order.partFirst": "Сначала деталь: закончить одну, затем следующую",
-  "cam.workpieces.hint": "Одно смещение нуля на деталь, от G54 до G59. Каждая операция выполняется на каждой заготовке.",
+  "cam.workpieces.hint": "Одно смещение нуля на деталь: G54–G59, затем G54.1 P1 и далее. Каждая операция выполняется на каждой заготовке.",
   "cam.workpieces.defaultName": "Деталь {n}",
   "cam.setupDoc.generate": "Создать программы",
   "cam.setupDoc.open": "Открыть в редакторе",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Использовать выделение как заготовки",
   "cam.explorer.useAsWorkpiecesTitle": "Одна заготовка на каждую выбранную деталь, на G54, G55 ... с положением по месту детали",
   "cam.explorer.nowWorkpieces": "Заготовок в оснастке: {count} ({offsets})",
-  "cam.explorer.workpiecesLimit": "В регистры G54–G59 помещаются только первые {count} деталей"
+  "cam.explorer.workpiecesLimit": "В 48 регистров оснастки помещаются только первые {count} деталей",
+  "cam.workpieces.index": "Поворотное индексирование детали, градусы (A, B, C): стол поворачивается здесь перед её траекториями",
+  "cam.workpieces.blank": "Своя заготовка (размеры X, Y, Z, мм)",
+  "cam.setupDoc.magazine": "Места в магазине (0 = не задано)",
+  "cam.workpieces.dependsOn": "Выполняется после",
+  "cam.workpieces.dependsNone": "Без зависимости"
 }

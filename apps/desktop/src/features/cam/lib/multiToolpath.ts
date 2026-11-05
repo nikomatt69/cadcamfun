@@ -43,6 +43,8 @@ export interface ElementToolpath {
   readonly probe?: ProbeOperation
   /** The workpieces of the fixture this toolpath runs on (their ids); absent = every one of them. */
   readonly workpieceIds?: ReadonlyArray<string>
+  /** Toolpaths (ids) that must run before this one. */
+  readonly dependsOn?: ReadonlyArray<string>
 }
 
 export const TOOLPATH_COLORS = [

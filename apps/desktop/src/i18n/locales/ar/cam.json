@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "الترتيب",
   "cam.workpieces.order.toolFirst": "الأداة أولًا: تبديل واحد لكل أداة",
   "cam.workpieces.order.partFirst": "القطعة أولًا: إنهاء قطعة ثم التالية",
-  "cam.workpieces.hint": "إزاحة صفر واحدة لكل قطعة، من G54 إلى G59. تُنفَّذ كل عملية على كل قطعة.",
+  "cam.workpieces.hint": "إزاحة صفر واحدة لكل قطعة: من G54 إلى G59 ثم G54.1 P1 وما بعده. تُنفَّذ كل عملية على كل قطعة.",
   "cam.workpieces.defaultName": "القطعة {n}",
   "cam.setupDoc.generate": "إنشاء البرامج",
   "cam.setupDoc.open": "فتح في المحرر",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "استخدام التحديد كقطع عمل",
   "cam.explorer.useAsWorkpiecesTitle": "قطعة عمل لكل جزء محدد، على G54 وG55 ... في موضع كل جزء",
   "cam.explorer.nowWorkpieces": "{count} قطع على التثبيت: {offsets}",
-  "cam.explorer.workpiecesLimit": "تتسع السجلات من G54 إلى G59 للأجزاء الأولى {count} فقط"
+  "cam.explorer.workpiecesLimit": "تتسع سجلات التثبيت الـ48 للأجزاء الأولى {count} فقط",
+  "cam.workpieces.index": "فهرسة الدوران لهذه القطعة، بالدرجات (A، B، C): تدور الطاولة هنا قبل مساراتها",
+  "cam.workpieces.blank": "قطعة خام خاصة (الأبعاد X وY وZ، مم)",
+  "cam.setupDoc.magazine": "مواضع المخزن (0 = غير محدد)",
+  "cam.workpieces.dependsOn": "تعمل بعد",
+  "cam.workpieces.dependsNone": "بلا اعتماد"
 }

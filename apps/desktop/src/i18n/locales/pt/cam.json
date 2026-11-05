@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Ordem",
   "cam.workpieces.order.toolFirst": "Ferramenta primeiro: uma troca por ferramenta",
   "cam.workpieces.order.partFirst": "Peça primeiro: terminar uma peça e depois a seguinte",
-  "cam.workpieces.hint": "Um zero peça por peça, de G54 a G59. Cada operação roda em todas as peças.",
+  "cam.workpieces.hint": "Um zero peça por peça: G54 a G59, depois G54.1 P1 em diante. Cada operação roda em todas as peças.",
   "cam.workpieces.defaultName": "Peça {n}",
   "cam.setupDoc.generate": "Gerar programas",
   "cam.setupDoc.open": "Abrir no editor",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Usar a seleção como peças",
   "cam.explorer.useAsWorkpiecesTitle": "Uma peça por parte selecionada, em G54, G55 ... posicionada onde cada parte está",
   "cam.explorer.nowWorkpieces": "{count} peças na fixação: {offsets}",
-  "cam.explorer.workpiecesLimit": "Só as primeiras {count} peças cabem nos registros G54 a G59"
+  "cam.explorer.workpiecesLimit": "Só as primeiras {count} peças cabem nos 48 registros da fixação",
+  "cam.workpieces.index": "Indexação rotativa desta peça, graus (A, B, C): a mesa gira aqui antes dos seus percursos",
+  "cam.workpieces.blank": "Bloco próprio (dimensões X, Y, Z, mm)",
+  "cam.setupDoc.magazine": "Posições do magazine (0 = não indicado)",
+  "cam.workpieces.dependsOn": "Executa depois de",
+  "cam.workpieces.dependsNone": "Sem dependência"
 }

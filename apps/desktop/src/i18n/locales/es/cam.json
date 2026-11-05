@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Orden",
   "cam.workpieces.order.toolFirst": "Primero la herramienta: un cambio por herramienta",
   "cam.workpieces.order.partFirst": "Primero la pieza: terminar una pieza y luego la siguiente",
-  "cam.workpieces.hint": "Un origen de pieza por cada pieza, de G54 a G59. Cada operación se ejecuta en todas las piezas.",
+  "cam.workpieces.hint": "Un origen de pieza por pieza: de G54 a G59, luego G54.1 P1 y más. Cada operación se ejecuta en todas las piezas.",
   "cam.workpieces.defaultName": "Pieza {n}",
   "cam.setupDoc.generate": "Generar programas",
   "cam.setupDoc.open": "Abrir en el editor",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Usar la selección como piezas",
   "cam.explorer.useAsWorkpiecesTitle": "Una pieza por cada parte seleccionada, en G54, G55 ... colocada donde está cada parte",
   "cam.explorer.nowWorkpieces": "{count} piezas en la sujeción: {offsets}",
-  "cam.explorer.workpiecesLimit": "Solo las primeras {count} piezas caben en los registros G54 a G59"
+  "cam.explorer.workpiecesLimit": "Solo las primeras {count} piezas caben en los 48 registros de la sujeción",
+  "cam.workpieces.index": "Indexado rotativo de esta pieza, grados (A, B, C): la mesa gira aquí antes de sus trayectorias",
+  "cam.workpieces.blank": "Bruto propio (tamaño X, Y, Z, mm)",
+  "cam.setupDoc.magazine": "Posiciones del almacén (0 = sin indicar)",
+  "cam.workpieces.dependsOn": "Se ejecuta después de",
+  "cam.workpieces.dependsNone": "Sin dependencia"
 }

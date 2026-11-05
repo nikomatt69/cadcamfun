@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "顺序",
   "cam.workpieces.order.toolFirst": "刀具优先：每把刀只换一次",
   "cam.workpieces.order.partFirst": "工件优先：先完成一个工件再加工下一个",
-  "cam.workpieces.hint": "每个工件一个工件坐标系，G54 至 G59。每道工序在每个工件上运行。",
+  "cam.workpieces.hint": "每个工件一个工件坐标系：G54 至 G59，之后是 G54.1 P1 及以上。每道工序在每个工件上运行。",
   "cam.workpieces.defaultName": "工件 {n}",
   "cam.setupDoc.generate": "生成程序",
   "cam.setupDoc.open": "在编辑器中打开",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "将所选用作工件",
   "cam.explorer.useAsWorkpiecesTitle": "每个所选零件一个工件（G54、G55…），按零件所在位置放置",
   "cam.explorer.nowWorkpieces": "夹具上有 {count} 个工件：{offsets}",
-  "cam.explorer.workpiecesLimit": "G54 至 G59 只容纳前 {count} 个零件"
+  "cam.explorer.workpiecesLimit": "夹具的 48 个寄存器只容纳前 {count} 个零件",
+  "cam.workpieces.index": "此工件的转台分度，度（A、B、C）：在其刀路之前转台转到此处",
+  "cam.workpieces.blank": "专用毛坯（尺寸 X、Y、Z，mm）",
+  "cam.setupDoc.magazine": "刀库刀位数（0 = 未指定）",
+  "cam.workpieces.dependsOn": "在其之后运行",
+  "cam.workpieces.dependsNone": "无依赖"
 }

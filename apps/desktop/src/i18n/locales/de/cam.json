@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Reihenfolge",
   "cam.workpieces.order.toolFirst": "Werkzeug zuerst: ein Werkzeugwechsel je Werkzeug",
   "cam.workpieces.order.partFirst": "Teil zuerst: ein Teil fertig, dann das nächste",
-  "cam.workpieces.hint": "Eine Nullpunktverschiebung je Teil, G54 bis G59. Jede Operation läuft auf jedem Werkstück.",
+  "cam.workpieces.hint": "Eine Nullpunktverschiebung je Teil: G54 bis G59, dann G54.1 P1 und weiter. Jede Operation läuft auf jedem Werkstück.",
   "cam.workpieces.defaultName": "Teil {n}",
   "cam.setupDoc.generate": "Programme erzeugen",
   "cam.setupDoc.open": "Im Editor öffnen",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Auswahl als Werkstücke verwenden",
   "cam.explorer.useAsWorkpiecesTitle": "Ein Werkstück je gewähltem Teil, auf G54, G55 ... dort platziert, wo das Teil liegt",
   "cam.explorer.nowWorkpieces": "{count} Werkstücke in der Aufspannung: {offsets}",
-  "cam.explorer.workpiecesLimit": "Nur die ersten {count} Teile passen in die Register G54 bis G59"
+  "cam.explorer.workpiecesLimit": "Nur die ersten {count} Teile passen in die 48 Register der Aufspannung",
+  "cam.workpieces.index": "Drehindexierung dieses Teils, Grad (A, B, C): der Tisch dreht hier vor seinen Bahnen",
+  "cam.workpieces.blank": "Eigenes Rohteil (Maße X, Y, Z, mm)",
+  "cam.setupDoc.magazine": "Magazinplätze (0 = nicht angegeben)",
+  "cam.workpieces.dependsOn": "Läuft nach",
+  "cam.workpieces.dependsNone": "Keine Abhängigkeit"
 }

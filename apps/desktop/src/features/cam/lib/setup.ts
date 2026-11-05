@@ -36,22 +36,45 @@ export interface SetupChoices {
   /** The parts of the fixture; empty = the setup's one workpiece under `workOffset`. */
   readonly workpieces: ReadonlyArray<cam.program.Workpiece>
   readonly workpieceOrder: cam.program.WorkpieceOrder
+  /** Pockets the tool magazine holds; 0 = not stated. */
+  readonly magazineSize: number
 }
 
 export const DEFAULT_SETUP_CHOICES: SetupChoices = {
-  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst"
+  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst", magazineSize: 0
 }
 
 const REGISTERS: ReadonlyArray<Setup["workOffset"]> = ["G54", "G55", "G56", "G57", "G58", "G59"]
+/** The most parts one fixture holds: six on G54-G59, the rest on G54.1 P1 to P42 (extended registers). */
+export const MAX_WORKPIECES = 48
 
-/** The next workpiece of the fixture: the first register no workpiece holds, or nothing once all six are taken. */
+/** A register a part can run under: G54-G59, then the extended `G54.1 Pn`. The base `workOffset` of an extended register is G54 (the schema asks for one); the ref decides. */
+export interface RegisterChoice { readonly key: string; readonly workOffset: Setup["workOffset"]; readonly ref?: Workpiece["workOffsetRef"] }
+export const REGISTER_CHOICES: ReadonlyArray<RegisterChoice> = [
+  ...REGISTERS.map((workOffset): RegisterChoice => ({ key: workOffset, workOffset })),
+  ...Array.from({ length: MAX_WORKPIECES - REGISTERS.length }, (_, i): RegisterChoice => ({ key: `G54.1 P${i + 1}`, workOffset: "G54", ref: { kind: "extended", p: i + 1 } }))
+]
+
+/** The register of a part or a toolpath as one key: its extended ref when it has one, else G54-G59. */
+export const registerKey = (x: { readonly workOffset: Setup["workOffset"]; readonly workOffsetRef?: Workpiece["workOffsetRef"] | undefined }): string =>
+  x.workOffsetRef !== undefined ? cam.probing.formatOffsetRef(x.workOffsetRef) : x.workOffset
+
+/** The part with its register changed to the choice `key`. */
+export const withRegister = (wp: Workpiece, key: string): Workpiece => {
+  const choice = REGISTER_CHOICES.find((c) => c.key === key)
+  if (choice === undefined) return wp
+  const { workOffsetRef: _old, ...rest } = wp
+  return { ...rest, workOffset: choice.workOffset, ...(choice.ref !== undefined ? { workOffsetRef: choice.ref } : {}) }
+}
+
+/** The next workpiece of the fixture: the first register no workpiece holds, or nothing once the fixture is full. */
 export const nextWorkpiece = (existing: ReadonlyArray<cam.program.Workpiece>, name: (n: number) => string): cam.program.Workpiece | undefined => {
-  const taken = new Set(existing.map((wp) => wp.workOffset))
-  const workOffset = REGISTERS.find((r) => !taken.has(r))
-  if (workOffset === undefined) return undefined
+  const taken = new Set(existing.map(registerKey))
+  const choice = REGISTER_CHOICES.find((c) => !taken.has(c.key))
+  if (choice === undefined || existing.length >= MAX_WORKPIECES) return undefined
   let n = existing.length + 1
   while (existing.some((wp) => wp.id === `wp-${n}`)) n++
-  return { id: `wp-${n}`, name: name(n), workOffset }
+  return withRegister({ id: `wp-${n}`, name: name(n), workOffset: "G54" }, choice.key)
 }
 
 /** The setup of the panel's toolpaths, in execution order. A toolpath that is hidden is not machined. */
@@ -61,6 +84,7 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
   machineType: "mill",
   // A fixture of one part runs under that part's register.
   workOffset: choices.workpieces.length === 1 ? choices.workpieces[0]!.workOffset : choices.workOffset,
+  ...(choices.magazineSize > 0 ? { magazineSize: choices.magazineSize } : {}),
   post: choices.post,
   grouping: choices.grouping,
   retractBeforeToolChange: choices.retractBeforeToolChange,
@@ -76,6 +100,7 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
     enabled: toolpath.visible,
     fromPreviousStock: false,
     // Only on a fixture of several parts, and only when the toolpath is limited to some of them.
+    ...(toolpath.dependsOn !== undefined && toolpath.dependsOn.length > 0 ? { dependsOn: toolpath.dependsOn } : {}),
     ...(choices.workpieces.length > 1 && toolpath.workpieceIds !== undefined ? { workpieceIds: toolpath.workpieceIds.filter((id) => choices.workpieces.some((wp) => wp.id === id)) } : {})
   }))
 })
@@ -98,7 +123,7 @@ export const programFileName = (program: { readonly name: string; readonly progr
 /** The choices a saved setup was written with, so loading it puts the panel back as it was saved. */
 export const choicesOfSetup = (setup: Setup): SetupChoices => ({
   name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset,
-  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst"
+  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst", magazineSize: setup.magazineSize ?? 0
 })
 
 export interface RestoredToolpaths {
@@ -128,7 +153,8 @@ export const toolpathsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElemen
       id: op.id, elementId, elementType: String(element?.["type"] ?? ""), elementName: op.name,
       toolpathSettings: op.params, gcode: "", color: colors[toolpaths.length % Math.max(1, colors.length)] ?? "#888888",
       visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0,
-      ...(op.workpieceIds !== undefined ? { workpieceIds: op.workpieceIds } : {})
+      ...(op.workpieceIds !== undefined ? { workpieceIds: op.workpieceIds } : {}),
+      ...(op.dependsOn !== undefined ? { dependsOn: op.dependsOn } : {})
     })
   }
   return { toolpaths, missingElementIds: missing, skippedOperationIds: skipped }
@@ -180,27 +206,38 @@ export const shiftOf = (workpiece: Workpiece, first: Workpiece | undefined): Vec
  */
 export const placedProgram = (program: cam.Program, workpieces: ReadonlyArray<Workpiece>): cam.Program => {
   if (workpieces.length < 2) return program
-  const shifts = new Map(workpieces.map((wp) => [wp.workOffset, shiftOf(wp, workpieces[0])]))
+  const shifts = new Map(workpieces.map((wp) => [registerKey(wp), shiftOf(wp, workpieces[0])]))
   if ([...shifts.values()].every(isZero)) return program
   return {
     ...program,
     toolpaths: program.toolpaths.map((tp) => {
-      const shift = shifts.get(tp.workOffset ?? program.workOffset)
+      const shift = shifts.get(registerOf(tp, program))
       return shift === undefined || isZero(shift) ? tp : { ...tp, moves: tp.moves.map((move) => translateMove(move, shift)) }
     })
   }
 }
 
-/** The stock box of every part but the first (that one is the viewport's own stock box), moved to its place. */
+/** The register a toolpath runs under: its own, else the program's. */
+const registerOf = (tp: cam.Toolpath, program: cam.Program): string =>
+  tp.workOffsetRef !== undefined || tp.workOffset !== undefined ? registerKey({ workOffset: tp.workOffset ?? program.workOffset, workOffsetRef: tp.workOffsetRef }) : registerKey(program)
+
+/**
+ * The stock box of every part but the first (that one is the viewport's own stock box), moved to its place. A part with a blank of its
+ * own gets that blank (its corner is relative to the part's datum, its top face at `origin.z`); the others get the viewport's stock.
+ */
 export const extraStocks = (stock: StockBox | undefined, workpieces: ReadonlyArray<Workpiece>): ReadonlyArray<StockBox> => {
   if (stock === undefined || workpieces.length < 2) return []
-  return workpieces.slice(1).map((wp) => ({ origin: add(stock.origin, shiftOf(wp, workpieces[0])), size: stock.size }))
+  return workpieces.slice(1).map((wp) => {
+    const shift = shiftOf(wp, workpieces[0])
+    if (wp.stock === undefined) return { origin: add(stock.origin, shift), size: stock.size }
+    return { origin: add({ x: wp.stock.origin.x, y: wp.stock.origin.y, z: wp.stock.origin.z - wp.stock.z }, shift), size: { x: wp.stock.x, y: wp.stock.y, z: wp.stock.z } }
+  })
 }
 
 /** The work offsets a program runs under, in order of first use. */
 export const offsetsOf = (program: cam.Program): ReadonlyArray<string> => {
   const seen: string[] = []
-  for (const tp of program.toolpaths) { const o = tp.workOffset ?? program.workOffset; if (!seen.includes(o)) seen.push(o) }
+  for (const tp of program.toolpaths) { const o = registerOf(tp, program); if (!seen.includes(o)) seen.push(o) }
   return seen
 }
 
@@ -230,12 +267,12 @@ export const withoutWorkpiece = (current: ReadonlyArray<string> | undefined, rem
  * are left out and counted by the caller from the lengths.
  */
 export const workpiecesFromElements = (elements: ReadonlyArray<Record<string, unknown>>, name: (n: number) => string): ReadonlyArray<Workpiece> => {
-  const boxes = elements.slice(0, REGISTERS.length).map((element) => cam.generator.elementBounds(element as never))
+  const boxes = elements.slice(0, MAX_WORKPIECES).map((element) => cam.generator.elementBounds(element as never))
   const origin = boxes[0]?.min
   return boxes.map((box, index): Workpiece => {
     const element = elements[index]!
     const label = typeof element["name"] === "string" && element["name"] !== "" ? element["name"] : name(index + 1)
-    const base = { id: `wp-${index + 1}`, name: label, workOffset: REGISTERS[index]! }
+    const base = withRegister({ id: `wp-${index + 1}`, name: label, workOffset: "G54" }, REGISTER_CHOICES[index]!.key)
     if (index === 0 || origin === undefined || !Object.values(box.min).every(Number.isFinite)) return base
     return { ...base, placement: { x: box.min.x - origin.x, y: box.min.y - origin.y, z: box.min.z - origin.z } }
   })

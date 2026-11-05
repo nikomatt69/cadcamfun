@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -100,11 +100,11 @@ describe("the setup store", () => {
 
 describe("several workpieces on the fixture", () => {
   const name = (n: number) => `Part ${n}`
-  test("the fixture grows on the first free register and stops at six", () => {
+  test("the fixture grows on the first free register: G54-G59 first, then the extended ones", () => {
     let parts: cam.program.Workpiece[] = [{ id: "wp-1", name: "Part 1", workOffset: "G54" }]
     for (let i = 0; i < 5; i++) parts = [...parts, nextWorkpiece(parts, name)!]
     expect(parts.map((p) => p.workOffset)).toEqual(["G54", "G55", "G56", "G57", "G58", "G59"])
-    expect(nextWorkpiece(parts, name)).toBeUndefined()
+    expect(registerKey(nextWorkpiece(parts, name)!)).toBe("G54.1 P1")
     // A register freed in the middle is the next one handed out.
     expect(nextWorkpiece(parts.filter((p) => p.workOffset !== "G56"), name)).toMatchObject({ workOffset: "G56" })
   })
@@ -226,7 +226,59 @@ describe("a selection of parts becomes the fixture", () => {
     expect(fixture[2]!.placement).toEqual({ x: -40, y: 0, z: 0 })
     expect(() => cam.program.decodeSetup({ ...setupOfToolpaths(panel().toolpaths), workpieces: JSON.parse(JSON.stringify(fixture)) })).not.toThrow()
   })
-  test("more parts than registers: the first six", () => {
-    expect(workpiecesFromElements(Array.from({ length: 9 }, (_, i) => part(`p${i}`, i * 30, 0)), (n) => `Part ${n}`)).toHaveLength(6)
+  test("more parts than G54-G59 go on the extended registers, up to 48", () => {
+    const nine = workpiecesFromElements(Array.from({ length: 9 }, (_, i) => part(`p${i}`, i * 30, 0)), (n) => `Part ${n}`)
+    expect(nine.map(registerKey).slice(5)).toEqual(["G59", "G54.1 P1", "G54.1 P2", "G54.1 P3"])
+    expect(workpiecesFromElements(Array.from({ length: 60 }, (_, i) => part(`p${i}`, i * 30, 0)), (n) => `Part ${n}`)).toHaveLength(48)
+  })
+})
+
+describe("extended registers, blanks of their own, dependencies and the magazine", () => {
+  test("the fixture grows past G59 onto G54.1 Pn, to 48 parts, each part on its own register", () => {
+    let parts: cam.program.Workpiece[] = []
+    for (let i = 0; i < MAX_WORKPIECES; i++) parts = [...parts, nextWorkpiece(parts, (n) => `Part ${n}`)!]
+    expect(parts).toHaveLength(48)
+    expect(new Set(parts.map(registerKey)).size).toBe(48)
+    expect(registerKey(parts[6]!)).toBe("G54.1 P1")
+    expect(parts[6]).toMatchObject({ workOffset: "G54", workOffsetRef: { kind: "extended", p: 1 } })
+    expect(nextWorkpiece(parts, (n) => `Part ${n}`)).toBeUndefined()
+    expect(REGISTER_CHOICES).toHaveLength(48)
+    expect(() => cam.program.decodeSetup({ ...setupOfToolpaths(panel().toolpaths), workpieces: JSON.parse(JSON.stringify(parts)) })).not.toThrow()
+  })
+
+  test("moving a part back to G56 drops the extended ref", () => {
+    const part = withRegister({ id: "w", name: "P", workOffset: "G54" }, "G54.1 P4")
+    expect(part.workOffsetRef).toEqual({ kind: "extended", p: 4 })
+    expect(withRegister(part, "G56")).toEqual({ id: "w", name: "P", workOffset: "G56" })
+  })
+
+  test("a part on an extended register is drawn at its placement and listed under its register", () => {
+    const parts = [withRegister({ id: "a", name: "A", workOffset: "G54" }, "G54"), { ...withRegister({ id: "b", name: "B", workOffset: "G54" }, "G54.1 P2"), placement: { x: 50, y: 0, z: 0 } }]
+    const move: cam.Move = { _tag: "Rapid", to: { x: 1, y: 1, z: 5 } }
+    const base = { name: "t", toolId: "t", spindleRpm: 1, coolant: "off" as const, moves: [move] }
+    const program = cam.makeProgram("fix", [{ id: "a", ...base, workOffset: "G54" }, { id: "b", ...base, workOffset: "G54", workOffsetRef: { kind: "extended", p: 2 } }])
+    expect(offsetsOf(program)).toEqual(["G54", "G54.1 P2"])
+    expect(placedProgram(program, parts).toolpaths.map((tp) => (tp.moves[0] as { to: { x: number } }).to.x)).toEqual([1, 51])
+  })
+
+  test("a part with its own blank has its own box, the corner relative to its datum and the top face at the origin", () => {
+    const main = { origin: { x: -10, y: -10, z: -5 }, size: { x: 20, y: 20, z: 5 } }
+    const own = { x: 30, y: 12, z: 8, origin: { x: -15, y: -6, z: 0 }, material: "aluminum" }
+    const boxes = extraStocks(main, [{ id: "a", name: "A", workOffset: "G54" }, { id: "b", name: "B", workOffset: "G55", placement: { x: 100, y: 0, z: 0 }, stock: own }, { id: "c", name: "C", workOffset: "G56", placement: { x: 200, y: 0, z: 0 } }])
+    expect(boxes[0]).toEqual({ origin: { x: 85, y: -6, z: -8 }, size: { x: 30, y: 12, z: 8 } })
+    expect(boxes[1]).toEqual({ origin: { x: 190, y: -10, z: -5 }, size: main.size })
+  })
+
+  test("dependencies and the magazine go into the setup, come back, and the setup's own issues name what is wrong", () => {
+    const toolpaths = panel().toolpaths.map((tp, i) => (i === 0 ? { ...tp, dependsOn: ["tp-b"] } : tp))
+    const setup = setupOfToolpaths(toolpaths, { ...DEFAULT_SETUP_CHOICES, magazineSize: 1 })
+    expect(setup.operations[0]).toMatchObject({ id: "tp-a", dependsOn: ["tp-b"] })
+    expect(setup.magazineSize).toBe(1)
+    expect(toolpathsOfSetup(setup, [], TOOLPATH_COLORS).toolpaths[0]!.dependsOn).toEqual(["tp-b"])
+    expect(choicesOfSetup(setup).magazineSize).toBe(1)
+    const messages = cam.program.validateSetup(setup).map((issue) => issue.message).join(" | ")
+    expect(messages).toMatch(/depends on tp-b, which runs after it/)
+    expect(messages).toMatch(/the magazine holds 1/)
+    expect(setupOfToolpaths(panel().toolpaths).magazineSize).toBeUndefined()
   })
 })

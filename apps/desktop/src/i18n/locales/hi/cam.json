@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "क्रम",
   "cam.workpieces.order.toolFirst": "पहले टूल: हर टूल का एक ही बदलाव",
   "cam.workpieces.order.partFirst": "पहले पुर्ज़ा: एक पूरा करके अगला",
-  "cam.workpieces.hint": "हर पुर्ज़े के लिए एक वर्क ऑफ़सेट, G54 से G59। हर ऑपरेशन हर वर्कपीस पर चलता है।",
+  "cam.workpieces.hint": "हर पुर्ज़े के लिए एक वर्क ऑफ़सेट: G54 से G59, फिर G54.1 P1 और आगे। हर ऑपरेशन हर वर्कपीस पर चलता है।",
   "cam.workpieces.defaultName": "पुर्ज़ा {n}",
   "cam.setupDoc.generate": "प्रोग्राम बनाएँ",
   "cam.setupDoc.open": "एडिटर में खोलें",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "चयन को वर्कपीस के रूप में उपयोग करें",
   "cam.explorer.useAsWorkpiecesTitle": "हर चुने हुए पुर्ज़े के लिए एक वर्कपीस, G54, G55 ... पर, पुर्ज़े की जगह के अनुसार",
   "cam.explorer.nowWorkpieces": "फ़िक्स्चर पर {count} वर्कपीस: {offsets}",
-  "cam.explorer.workpiecesLimit": "G54 से G59 रजिस्टरों में केवल पहले {count} पुर्ज़े आते हैं"
+  "cam.explorer.workpiecesLimit": "फ़िक्स्चर के 48 रजिस्टरों में केवल पहले {count} पुर्ज़े आते हैं",
+  "cam.workpieces.index": "इस पुर्ज़े का रोटरी इंडेक्स, डिग्री (A, B, C): इसके टूलपाथ से पहले टेबल यहाँ घूमती है",
+  "cam.workpieces.blank": "अपना कच्चा टुकड़ा (आकार X, Y, Z, मिमी)",
+  "cam.setupDoc.magazine": "मैगज़ीन पॉकेट (0 = निर्दिष्ट नहीं)",
+  "cam.workpieces.dependsOn": "इसके बाद चलता है",
+  "cam.workpieces.dependsNone": "कोई निर्भरता नहीं"
 }

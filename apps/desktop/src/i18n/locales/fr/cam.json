@@ -1700,7 +1700,7 @@
   "cam.workpieces.order": "Ordre",
   "cam.workpieces.order.toolFirst": "Outil d'abord : un changement d'outil par outil",
   "cam.workpieces.order.partFirst": "Pièce d'abord : terminer une pièce puis la suivante",
-  "cam.workpieces.hint": "Un décalage d'origine par pièce, de G54 à G59. Chaque opération s'exécute sur chaque pièce.",
+  "cam.workpieces.hint": "Un décalage d'origine par pièce : G54 à G59, puis G54.1 P1 et au-delà. Chaque opération s'exécute sur chaque pièce.",
   "cam.workpieces.defaultName": "Pièce {n}",
   "cam.setupDoc.generate": "Générer les programmes",
   "cam.setupDoc.open": "Ouvrir dans l'éditeur",
@@ -1711,5 +1711,10 @@
   "cam.explorer.useAsWorkpieces": "Utiliser la sélection comme pièces",
   "cam.explorer.useAsWorkpiecesTitle": "Une pièce par élément sélectionné, sur G54, G55 ... placée là où se trouve chaque élément",
   "cam.explorer.nowWorkpieces": "{count} pièces sur le montage : {offsets}",
-  "cam.explorer.workpiecesLimit": "Seules les {count} premières pièces tiennent dans les registres G54 à G59"
+  "cam.explorer.workpiecesLimit": "Seules les {count} premières pièces tiennent dans les 48 registres du montage",
+  "cam.workpieces.index": "Indexage rotatif de cette pièce, degrés (A, B, C) : la table tourne ici avant ses trajectoires",
+  "cam.workpieces.blank": "Brut propre (dimensions X, Y, Z, mm)",
+  "cam.setupDoc.magazine": "Emplacements du magasin (0 = non indiqué)",
+  "cam.workpieces.dependsOn": "S'exécute après",
+  "cam.workpieces.dependsNone": "Aucune dépendance"
 }

@@ -18,12 +18,12 @@ import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useDocumentStore } from "../../../cad/store/documentStore.ts"
 import { makeSetupService, refOfDocument } from "../../api/setup.ts"
-import { choicesOfSetup, nextWorkpiece, offsetsOf, setupOfToolpaths, toolpathsOfSetup, withoutWorkpiece, type SetupChoices } from "../../lib/setup.ts"
+import { choicesOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, nextWorkpiece, offsetsOf, registerKey, setupOfToolpaths, withRegister, toolpathsOfSetup, withoutWorkpiece, type SetupChoices } from "../../lib/setup.ts"
 import { TOOLPATH_COLORS, useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
+import { useCamStore } from "../../store/camStore.ts"
 
 const GROUPINGS: ReadonlyArray<SetupChoices["grouping"]> = ["single", "perTool", "perOperation"]
-const REGISTERS = ["G54", "G55", "G56", "G57", "G58", "G59"] as const
 const ORDERS: ReadonlyArray<SetupChoices["workpieceOrder"]> = ["toolFirst", "partFirst"]
 const FIELD = "w-full rounded-md border border-gray-600 bg-gray-900 px-2 py-1 text-sm text-white"
 const ROW = "grid grid-cols-[3rem_1fr_4rem_5rem] gap-2 py-0.5"
@@ -43,6 +43,7 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
   const service = makeSetupService(app.client)
   const setup = useSetupStore()
   const toolpaths = useMultiToolpathStore()
+  const camStore = useCamStore()
   const document = useDocumentStore()
   const [busy, setBusy] = createSignal(false)
   let disposed = false
@@ -54,8 +55,8 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
   const table = () => setup.result?.toolTable ?? setup.plan?.toolTable
   const toolChanges = () => setup.result?.totals.toolChanges ?? setup.plan?.toolChanges
   const toolLoads = () => setup.result?.totals.toolLoads ?? setup.plan?.toolLoads
-  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length, offsets: offsetsOf(p.program), generated: p }))
-    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length, offsets: [] as ReadonlyArray<string>, generated: undefined }))
+  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length, offsets: offsetsOf(p.program), generated: p, hints: p.warnings.filter((w) => / faster than /.test(w)) }))
+    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length, offsets: [] as ReadonlyArray<string>, generated: undefined, hints: [] as ReadonlyArray<string> }))
   /** The tool changes of the same operations in each order: the cost of finishing a part before the next is visible before it is chosen. */
   const orders = () => {
     if (setup.choices.workpieces.length < 2) return undefined
@@ -149,6 +150,13 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
   }
   const patchWorkpiece = (id: string, patch: Partial<SetupChoices["workpieces"][number]>): void =>
     useSetupStore.getState().setChoices({ workpieces: workpieces().map((wp) => (wp.id === id ? { ...wp, ...patch } : wp)) })
+  const replaceWorkpiece = (id: string, change: (wp: SetupChoices["workpieces"][number]) => SetupChoices["workpieces"][number]): void =>
+    useSetupStore.getState().setChoices({ workpieces: workpieces().map((wp) => (wp.id === id ? change(wp) : wp)) })
+  /** A part's own blank: centred on its datum, top face at the datum, seeded from the raw piece the page holds. */
+  const blankOf = (size: { readonly x: number; readonly y: number; readonly z: number }): NonNullable<SetupChoices["workpieces"][number]["stock"]> =>
+    ({ x: size.x, y: size.y, z: size.z, origin: { x: -size.x / 2, y: -size.y / 2, z: 0 }, material: camStore.material || "aluminum" })
+  /** What the setup says is wrong with the fixture, the tools and the order of the operations; the rows show their own. */
+  const issues = () => toolpaths.toolpaths.length === 0 ? [] : cam.program.validateSetup(current())
   const removeWorkpiece = (id: string): void => {
     const rest = workpieces().filter((wp) => wp.id !== id)
     // A toolpath limited to the part that left, or to a fixture of one part, runs unrestricted again.
@@ -192,7 +200,7 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
       <div class="space-y-1.5" data-testid="cam-setup-workpieces">
         <div class="flex items-center justify-between gap-2 text-xs text-gray-400">
           <span class="font-medium">{t("cam.workpieces.title")}</span>
-          <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-add" disabled={busy() || workpieces().length >= 6} onClick={addWorkpiece}>
+          <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-add" disabled={busy() || workpieces().length >= MAX_WORKPIECES} onClick={addWorkpiece}>
             <Plus size={12} />{t("cam.workpieces.add")}
           </button>
         </div>
@@ -202,9 +210,9 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
             <div class="grid grid-cols-[1fr_5rem_auto] items-center gap-2">
               <input class={FIELD} name={`camWorkpieceName-${wp.id}`} value={wp.name} aria-label={t("cam.workpieces.name")} disabled={busy()}
                 onInput={(event) => patchWorkpiece(wp.id, { name: event.currentTarget.value })} />
-              <select class={FIELD} name={`camWorkpieceOffset-${wp.id}`} value={wp.workOffset} aria-label={t("cam.workpieces.offset")} disabled={busy()}
-                onChange={(event) => patchWorkpiece(wp.id, { workOffset: event.currentTarget.value as typeof REGISTERS[number] })}>
-                <For each={REGISTERS}>{(register) => <option value={register} disabled={register !== wp.workOffset && workpieces().some((other) => other.workOffset === register)}>{register}</option>}</For>
+              <select class={FIELD} name={`camWorkpieceOffset-${wp.id}`} value={registerKey(wp)} aria-label={t("cam.workpieces.offset")} disabled={busy()}
+                onChange={(event) => replaceWorkpiece(wp.id, (current) => withRegister(current, event.currentTarget.value))}>
+                <For each={REGISTER_CHOICES}>{(register) => <option value={register.key} disabled={register.key !== registerKey(wp) && workpieces().some((other) => registerKey(other) === register.key)}>{register.key}</option>}</For>
               </select>
               <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-remove" disabled={busy()} onClick={() => removeWorkpiece(wp.id)} aria-label={t("cam.workpieces.remove")} title={t("cam.workpieces.remove")}><X size={12} /></button>
             </div>
@@ -219,6 +227,34 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
                 )}</For>
               </div>
             </Show>
+            <div class="grid grid-cols-3 items-center gap-2" role="group" aria-label={t("cam.workpieces.index")} title={t("cam.workpieces.index")}>
+              <For each={["a", "b", "c"] as const}>{(axis) => (
+                <label class="flex items-center gap-1 text-xs text-gray-400">
+                  <span class="uppercase">{axis}</span>
+                  <NumberField class={FIELD} name={`camWorkpiece${axis}-${wp.id}`} value={wp.index?.[axis] ?? 0} accept={() => true}
+                    onValue={(value) => patchWorkpiece(wp.id, { index: { ...wp.index, [axis]: value } })} />
+                </label>
+              )}</For>
+            </div>
+            <label class="flex items-center gap-1.5 text-xs text-gray-400">
+              <input type="checkbox" name={`camWorkpieceBlank-${wp.id}`} checked={wp.stock !== undefined} disabled={busy()}
+                onChange={(event) => replaceWorkpiece(wp.id, ({ stock: _blank, ...rest }) => (event.currentTarget.checked ? { ...rest, stock: blankOf(camStore.workpiece) } : rest))} />
+              <span>{t("cam.workpieces.blank")}</span>
+            </label>
+            <Show when={wp.stock}>{(blank) => (
+              <div class="grid grid-cols-3 items-center gap-2" role="group" aria-label={t("cam.workpieces.blank")}>
+                <For each={["x", "y", "z"] as const}>{(axis) => (
+                  <label class="flex items-center gap-1 text-xs text-gray-400">
+                    <span class="uppercase">{axis}</span>
+                    <NumberField class={FIELD} name={`camWorkpieceBlank${axis}-${wp.id}`} value={blank()[axis]}
+                      onValue={(value) => replaceWorkpiece(wp.id, (current) => ({ ...current, stock: blankOf({ x: blank().x, y: blank().y, z: blank().z, [axis]: value }) }))} />
+                  </label>
+                )}</For>
+              </div>
+            )}</Show>
+            <For each={issues().filter((issue) => issue.operationId === undefined && (issue.message.includes(wp.name)))}>{(issue) => (
+              <p class="text-xs text-red-400" role="alert" data-testid="cam-setup-workpiece-issue">{issue.message}</p>
+            )}</For>
             </div>
           )}</For>
           <label class="flex items-center gap-2 text-xs text-gray-400">
@@ -231,6 +267,15 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
           <Show when={orders()}>{(counts) => <p class="text-xs text-gray-500" data-testid="cam-setup-order-changes">{t("cam.workpieces.orderChanges", { toolFirst: counts().toolFirst, partFirst: counts().partFirst })}</p>}</Show>
         </Show>
       </div>
+
+      <label class="flex items-center gap-2 text-xs text-gray-400">
+        <span>{t("cam.setupDoc.magazine")}</span>
+        <NumberField class={`${FIELD} w-20`} name="camSetupMagazine" int value={setup.choices.magazineSize} accept={(value) => value >= 0}
+          onValue={(value) => useSetupStore.getState().setChoices({ magazineSize: value })} />
+      </label>
+      <For each={issues().filter((issue) => issue.operationId === undefined && !workpieces().some((wp) => issue.message.includes(wp.name)))}>{(issue) => (
+        <p class="text-xs text-red-400" role="alert" data-testid="cam-setup-issue">{issue.message}</p>
+      )}</For>
 
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" class={BUTTON} data-testid="cam-setup-plan" disabled={busy() || toolpaths.toolpaths.length === 0} onClick={plan}>
@@ -298,6 +343,7 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
                     {t("cam.setupDoc.program", { number: program.programNumber, name: program.name, tools: program.toolNumbers.map((n) => `T${n}`).join(" "), count: program.operations })}
                     <Show when={program.offsets.length > 1}>{" · "}{t("cam.setupDoc.offsets", { offsets: program.offsets.join(" ") })}</Show>
                   </span>
+                  <Show when={program.hints.length > 0}><span class="block text-gray-500" data-testid="cam-setup-program-hint">{program.hints.join(" ")}</span></Show>
                   <Show when={program.generated !== undefined && props.onOpenProgram}>
                     <button type="button" class={BUTTON} data-testid="cam-setup-open-program" onClick={() => props.onOpenProgram?.(program.generated!)} aria-label={t("cam.setupDoc.open")} title={t("cam.setupDoc.open")}><Play size={12} /></button>
                   </Show>
