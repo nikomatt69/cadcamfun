@@ -117,7 +117,10 @@ test("Write program, Simulate a misplaced part, the overlay shows the real run, 
   const parsed = played.parsed!
   const timeline = cam.viewer.buildTimeline(parsed.program, parsed.motion, 3000, cam.viewer.programStart("mill", parsed.program))
   expect(run.outcome.contacts.every((contact) => typeof contact.line === "number")).toBe(true)
-  const timed = overlayModelOf({ result: run, operation: updated, deviationScale: 100, timeline })
+  // The stylus stops at the wall: a touch played to the end of its search would run past the bore's radius (10 mm, ball 3 mm, part 0.3 off).
+  const reach = Math.max(...timeline.moves.filter((m) => m.state.probe === true).map((m) => Math.hypot(m.to.x - 30.3, m.to.y - 29.8)))
+  expect(reach).toBeLessThan(10 + 1e-3)
+  const timed = overlayModelOf({ result: run, operation: updated, deviationScale: 100, timeline, sourceLines: played.played!.lines })
   const times = timed.contacts.map((contact) => contact.time!)
   expect(times.every((time) => typeof time === "number")).toBe(true)
   for (let i = 1; i < times.length; i++) expect(times[i]!).toBeGreaterThan(times[i - 1]!)

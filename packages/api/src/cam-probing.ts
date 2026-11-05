@@ -374,6 +374,8 @@ export type CamProbeReportData = typeof CamProbeReportData.Type
 export const CamProbingSimulation = Schema.Struct({
   /** The program the report's `line` numbers refer to; absent without a dialect, or when the post refused (`warnings` says why). */
   program: Schema.optionalKey(Schema.Struct({ dialect: CamProbingDialect, nc: Schema.String, lines: Schema.Int, identity: Schema.Struct({ nc: Schema.String }) })),
+  /** The program as this run went: macros resolved, touches ending at their contacts; `lines[i]` is the line of `program.nc` of line i + 1. */
+  played: Schema.optionalKey(Schema.Struct({ text: Schema.String, lines: Schema.Array(Schema.Int) })),
   warnings: Schema.optionalKey(Schema.Array(Schema.String)),
   report: CamProbeReportData,
   offsetTable: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),

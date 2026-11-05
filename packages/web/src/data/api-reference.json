@@ -119324,6 +119324,25 @@
                       ],
                       "additionalProperties": false
                     },
+                    "played": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "lines": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "lines"
+                      ],
+                      "additionalProperties": false
+                    },
                     "warnings": {
                       "type": "array",
                       "items": {

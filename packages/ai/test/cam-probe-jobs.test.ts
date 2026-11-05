@@ -119,6 +119,28 @@ describe("cam-probe-simulate", () => {
     expect(shifted.report.operations[0]!.calibration).toEqual(zero.report.operations[0]!.calibration)
   })
 
+  test("the run as it went stops each touch at its contact, with every macro resolved, and names the lines of the written program", () => {
+    const out = runKernelJobInline("cam-probe-simulate", {
+      settings, elements, dialect: "fanuc", misplacement: { x: 0.4 },
+      operations: [{ cycle: bore, actions: [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }] }]
+    } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    const written = out.program!.nc, played = out.played!
+    expect(written).toMatch(/G91 G31/)
+    expect(played.text).not.toMatch(/\[#|G91 G31/)
+    expect(played.text.split("\n").length).toBeLessThanOrEqual(played.lines.length + 1)
+    const motion = cam.testing.interpretGcode(played.text, { track: true, probeMoves: true })
+    expect(motion.unsupported ?? []).toEqual([])
+    // The first touch ends on the wall of the shifted bore, not at the end of its search.
+    const contact = out.report.operations[0]!.contacts[0]!
+    const lastX = (text: string) => Number(/G31 X(-?[0-9.]+)/.exec(text)?.[1])
+    expect(lastX(played.text)).toBeDefined()
+    expect(played.text).toContain(contact.tip.x.toFixed(3))
+    const line = contact.line!
+    expect(written.split("\n")[line - 1]).toMatch(/G31/)
+    expect(played.lines).toContain(line)
+  })
+
   test("a tilt of the part is refused", () => {
     const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle: bore }], misplacement: { a: 0.01 } } satisfies CamProbeSimulateInput)
     expect("error" in out && out.error).toMatch(/not simulated/)

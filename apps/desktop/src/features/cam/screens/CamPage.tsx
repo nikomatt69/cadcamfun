@@ -146,7 +146,7 @@ export default function CamPage(): JSX.Element {
     const cycle = selectedProbe()
     if (cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
     const program = freshProgram(probingState.programs, cycle.id, cycle.probe)
-    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.nc }
+    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.played?.text ?? program.nc, ...(program.played !== undefined ? { sourceLines: program.played.lines } : {}) }
   })
   const shownProgram = () => probePreview()?.program ?? camStore.program
   const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
@@ -256,7 +256,7 @@ export default function CamPage(): JSX.Element {
   const probeOverlay = createMemo(() => {
     const run = probeRun(), cycle = selectedProbe()
     if (run === undefined || cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
-    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: probePreview() !== undefined ? shownTimeline() : undefined })
+    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: probePreview() !== undefined ? shownTimeline() : undefined, sourceLines: probePreview()?.sourceLines })
   })
   const probePart = createMemo(() => {
     if (camStore.rightTab !== "probing") return undefined

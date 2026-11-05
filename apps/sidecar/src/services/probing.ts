@@ -257,6 +257,7 @@ export class Probing extends Context.Service<Probing, {
           if ("error" in out) return yield* refusalError(out)
           return {
             ...(out.program !== undefined ? { program: out.program } : {}),
+            ...(out.played !== undefined ? { played: out.played } : {}),
             warnings: out.warnings,
             report: cam.probing.probeReportToWire(out.report) as CamProbeReportData,
             offsetTable: Object.fromEntries(Object.entries(out.offsetTable).map(([k, e]) => [k, cam.probing.offsetEntryToWire(e)])),

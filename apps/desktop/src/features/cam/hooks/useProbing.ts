@@ -63,8 +63,8 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
     return deps.service.program
   }
   /** A program for the panel: parsed for the 3D view, which plays exactly this text (the run's lines are lines of it). */
-  const keep = async (id: string, operation: ProbeOperation, dialect: string, written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string }) => {
-    const parsed = await deps.parse(written.nc).catch(() => undefined)
+  const keep = async (id: string, operation: ProbeOperation, dialect: string, written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string; played?: { text: string; lines: ReadonlyArray<number> } }) => {
+    const parsed = await deps.parse(written.played?.text ?? written.nc).catch(() => undefined)
     probing.getState().setProgram({ operationId: id, dialect, fingerprint: fingerprintOf(operation), ...written, ...(parsed !== undefined ? { parsed } : {}) })
   }
   return {
@@ -106,7 +106,7 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
         dialect: dialect as never, misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, partOrigin: origin, ...(stockElement !== undefined ? { stockElement } : {}), ...progress
       }))
       // The report's lines are lines of this text: the 3D view must play it, not a program written earlier.
-      if (sim.program !== undefined) await keep(id, operation, dialect, { nc: sim.program.nc, lines: sim.program.lines, notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc })
+      if (sim.program !== undefined) await keep(id, operation, dialect, { nc: sim.program.nc, lines: sim.program.lines, notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc, ...(sim.played !== undefined ? { played: sim.played } : {}) })
       probing.getState().setResult(resultOfSimulation(sim, {
         operationId: id, operation, expected: planned.ok ? planned.routine.contacts : [], runId, ...(sim.program !== undefined ? { programHash: sim.program.identity.nc } : {})
       }))

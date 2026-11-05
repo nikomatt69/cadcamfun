@@ -50,12 +50,18 @@ export const overlayModelOf = (input: {
   readonly deviationScale: number
   /** The timeline the program plays on: places the contacts in time. */
   readonly timeline?: { readonly moves: ReadonlyArray<{ readonly start: number; readonly duration: number; readonly state: { readonly line?: number | undefined } }> } | undefined
+  /** When the timeline plays a run's own text: the line of the written program of each of its lines (the contacts name those). */
+  readonly sourceLines?: ReadonlyArray<number> | undefined
   readonly triadLength?: number
 }): ProbeOverlayModel => {
-  const { result, operation } = input
+  const { result, operation, sourceLines } = input
+  const timeline = input.timeline === undefined || sourceLines === undefined ? input.timeline : {
+    ...input.timeline,
+    moves: input.timeline.moves.map((m) => ({ ...m, state: { line: m.state.line === undefined ? undefined : sourceLines[m.state.line - 1] } }))
+  }
   const change = offsetChange(result.outcome, refWire(operation.workOffset))
-  const times = input.timeline !== undefined ? contactTimesOnTimeline(result.outcome.contacts, input.timeline) : undefined
-  const offsetAt = input.timeline !== undefined ? offsetTimeOnTimeline(result.outcome.updates, input.timeline) : undefined
+  const times = timeline !== undefined ? contactTimesOnTimeline(result.outcome.contacts, timeline) : undefined
+  const offsetAt = timeline !== undefined ? offsetTimeOnTimeline(result.outcome.updates, timeline) : undefined
   const frame = operation.frame
   return probeOverlayModel({
     outcome: result.outcome, expected: result.expected, deviationScale: input.deviationScale,

@@ -221,6 +221,11 @@ export interface CamProbeSimulateInput extends ProbeSetup {
 export interface CamProbeSimulateOutput {
   /** The program `line` numbers refer to: lines of `program.nc`, 1-based. Absent without `dialect`, or when the post refused (a warning says why). */
   readonly program?: ProbeProgram
+  /**
+   * The program as this run went: every macro resolved, every touch ending at its contact rather than at the end of its search. It is what
+   * a 3D view plays (the text alone would draw the stylus through the part); `lines[i]` is the line of `program.nc` of line i + 1.
+   */
+  readonly played?: { readonly text: string; readonly lines: ReadonlyArray<number> }
   readonly report: cam.probing.ProbeReport
   readonly offsetTable: Readonly<Record<string, cam.probing.OffsetEntry>>
   readonly identity: { readonly elements: string; readonly operations: string }
@@ -233,13 +238,13 @@ export interface CamProbeSimulateOutput {
  * text is rounded to the post's decimals); the text gives the place. When the two do not pair up one to one, the lines are left out and
  * a warning says why: a line on the wrong block would show a contact at the wrong moment.
  */
-const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: ReadonlyArray<cam.Move>, runs: ReadonlyArray<cam.probing.ReportRun>, world: cam.probing.ProbeWorld3, machine: cam.probing.SimMachine, warnings: string[]): { readonly program?: ProbeProgram; readonly runs: ReadonlyArray<cam.probing.ReportRun> } | undefined => {
+const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: ReadonlyArray<cam.Move>, runs: ReadonlyArray<cam.probing.ReportRun>, world: cam.probing.ProbeWorld3, machine: cam.probing.SimMachine, warnings: string[]): { readonly program?: ProbeProgram; readonly played?: CamProbeSimulateOutput["played"]; readonly runs: ReadonlyArray<cam.probing.ReportRun> } | undefined => {
   const text = probeProgramText(moves, input, dialect, input.options, input.post)
   if ("error" in text) { warnings.push(`no NC lines on the contacts: ${text.error}`); return undefined }
   const program = programOf(dialect, text.nc)
   const codes = cam.dialectOf(dialect)?.probing
   if (codes === undefined) return { program, runs }
-  const nc = cam.testing.simulateNc(text.nc, { world, machine, codes, ...(input.post?.probing !== undefined ? { probing: input.post.probing } : {}) })
+  const nc = cam.testing.simulateNc(text.nc, { world, machine, codes, rewrite: true, ...(input.post?.probing !== undefined ? { probing: input.post.probing } : {}) })
   const contacts = runs.flatMap((r) => r.outcome.contacts)
   const updates = runs.flatMap((r) => r.outcome.updates)
   const sameContacts = nc.contacts.length === contacts.length
@@ -249,6 +254,7 @@ const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: R
   let c = 0, u = 0
   return {
     program,
+    played: { text: nc.expanded.text, lines: nc.expanded.lines },
     runs: runs.map((r) => ({
       ...r,
       outcome: {
@@ -320,6 +326,7 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   const placed = input.dialect === undefined ? undefined : linesOnText(input.dialect, input, allMoves, runs, world, { offsets: table, active, probe, start: { x: 0, y: 0, z: input.settings.safeZ }, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(kinematics !== undefined ? { kinematics } : {}) }, warnings)
   return {
     ...(placed !== undefined ? { program: placed.program } : {}),
+    ...(placed?.played !== undefined ? { played: placed.played } : {}),
     report: p.buildProbeReport(placed?.runs ?? runs), offsetTable: entries, warnings,
     identity: { elements: hash(input.elements), operations: hash(input.operations) }
   }
