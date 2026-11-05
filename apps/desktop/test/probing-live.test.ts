@@ -64,6 +64,25 @@ const added = (id: string) => {
   return { c, cycle: probeCycles(useMultiToolpathStore.getState()).at(-1)! }
 }
 
+test("the default corner cycle, rotation on: a program for Fanuc through G68, for Siemens in the offset, and the simulation brings it", async () => {
+  const { c, cycle } = added("corner")
+  c.update(cycle.id, { cycle: { kind: "corner", corner: { x: 100, y: 60 }, inside: false, xSense: -1, ySense: -1, depth: 5, touchesPerEdge: 2 }, workOffset: "G54", follow: ["X", "Y", "R"] })
+  useProbingStore.getState().setDialect?.("fanuc")
+  await c.generate(cycle.id)
+  expect(useProbingStore.getState().error).toBeUndefined()
+  expect(useProbingStore.getState().programs[cycle.id]!.nc).toMatch(/G68/)
+  await c.simulate(cycle.id)
+  expect(useProbingStore.getState().error).toBeUndefined()
+  const run = useProbingStore.getState().results[cycle.id]!
+  expect(useProbingStore.getState().programs[cycle.id]!.parsed).toBeDefined()
+  expect(run.outcome.contacts.every((contact) => contact.line !== undefined)).toBe(true)
+  // Every contact is paired with its own planned touch: a corner on the drawn part is within a hair of where it was planned.
+  expect(run.expected.length).toBe(run.outcome.contacts.length)
+  run.outcome.contacts.forEach((contact, i) => {
+    expect(Math.hypot(contact.tip.x - run.expected[i]!.expected.x, contact.tip.y - run.expected[i]!.expected.y)).toBeLessThan(1e-3)
+  })
+})
+
 test("Write program, Simulate a misplaced part, the overlay shows the real run, Save offsets reaches the machine", async () => {
   const { c, cycle } = added("bore")
   c.update(cycle.id, { cycle: { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }, workOffset: "G54" })

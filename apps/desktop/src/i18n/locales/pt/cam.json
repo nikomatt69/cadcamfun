@@ -1683,6 +1683,7 @@
   "cam.probing.remote.dismiss": "Dispensar",
   "cam.probing.program.misplace": "Deslocamento simulado da peça (mm, C em graus)",
   "cam.probing.program.noPart": "O desenho não tem nenhum sólido para apalpar.",
+  "cam.probing.program.noProgram": "Os contactos foram simulados, mas não foi possível escrever um programa para este comando.",
   "cam.probing.calibration.rotary": "A execução mediu o pivô e o eixo rotativo.",
   "cam.probing.calibration.stylus": "A execução mediu o raio efetivo da esfera.",
   "cam.probing.calibration.apply": "Gravar na máquina",

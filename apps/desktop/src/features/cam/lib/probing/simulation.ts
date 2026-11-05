@@ -9,6 +9,7 @@ import { parseOffsetRef, probing, type InspectionVerdict, type OffsetAxis, type 
 import { cycleOfSpec } from "./cycle-fields.ts"
 import { actionsOf, characteristicOf, type ProbeOperation } from "./operation.ts"
 import { resolveSettings, type ResolveInput } from "./resolve.ts"
+import { offsetFamilyOf } from "./work-offsets.ts"
 import { fingerprintOf, type ProbeRunResult, type RunCalibration } from "./result.ts"
 
 const DEG = Math.PI / 180
@@ -25,7 +26,7 @@ export interface OperationRequest {
 }
 
 /** The request of an operation, or why the core refuses it. `machineConfig` names a stored machine: the sidecar reads its probe and setter. */
-export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly machineConfig?: string | undefined }): OperationRequest | { readonly refused: string } => {
+export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly machineConfig?: string | undefined; readonly dialect?: string | undefined }): OperationRequest | { readonly refused: string } => {
   const decoded = cycleOfSpec(op.cycle)
   if (!decoded.ok) return { refused: decoded.issues[0] ?? "invalid cycle" }
   const s = resolveSettings({ ...input, overrides: op.overrides, workOffset: op.workOffset })
@@ -37,7 +38,7 @@ export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly m
     ...(input.machineConfig !== undefined ? { machineConfig: input.machineConfig } : {})
   }
   // The inspect action of the wire list is sent as `checks`: the sidecar compiles both the same way and records the characteristics.
-  const actions = Schema.decodeUnknownSync(Schema.Array(probing.ProbeActionSchema))(actionsOf(op).filter((a) => a["kind"] !== "inspect"))
+  const actions = Schema.decodeUnknownSync(Schema.Array(probing.ProbeActionSchema))(actionsOf(op, input.dialect !== undefined ? offsetFamilyOf({ post: input.dialect as never, controller: undefined as never }) : undefined).filter((a) => a["kind"] !== "inspect"))
   const macroStyle = input.profile?.probing?.macroStyle
   const rotary = input.profile?.rotary
   const pivot = rotary?.calibration?.pivotMeasured ?? rotary?.pivot
@@ -53,6 +54,17 @@ export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly m
 }
 
 const angular = (axis: string): boolean => axis === "A" || axis === "B" || axis === "C" || axis === "R"
+
+/**
+ * The planned touch of each contact. A double touch reports the fast and the slow contact of one planned touch, so there can be a whole
+ * number of contacts per planned touch; anything else is not matched rather than matched wrongly.
+ */
+export const expectedOfContacts = (contacts: number, expected: ReadonlyArray<ProbeContact>): ReadonlyArray<ProbeContact> => {
+  if (contacts === expected.length || expected.length === 0) return expected
+  const each = contacts / expected.length
+  if (!Number.isInteger(each)) return []
+  return expected.flatMap((e) => Array.from({ length: each }, () => e))
+}
 
 /** A simulated report read as a run of one operation; `expected` are the planned touches (the overlay's deviation arrows). */
 export const resultOfSimulation = (sim: CamProbingSimulation, input: {
@@ -83,7 +95,7 @@ export const resultOfSimulation = (sim: CamProbingSimulation, input: {
   const record = calibrationOfRecord(run?.calibration, measuredAt)
   return {
     operationId: input.operationId, source: "simulated", outcome: record.refused !== undefined && outcome.stopped === undefined ? { ...outcome, stopped: record.refused } : outcome,
-    expected: input.expected, verdicts, verdict: report.verdict, measuredAt,
+    expected: expectedOfContacts(run?.contacts.length ?? 0, input.expected), verdicts, verdict: report.verdict, measuredAt,
     workOffset: input.operation.workOffset, fingerprint: fingerprintOf(input.operation),
     ...(record.calibration !== undefined ? { calibration: record.calibration } : {}),
     ...(input.runId !== undefined ? { runId: input.runId } : {}), ...(input.programHash !== undefined ? { programHash: input.programHash } : {})

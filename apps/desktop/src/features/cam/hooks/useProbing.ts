@@ -70,7 +70,7 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
   return {
     generate: async (id, operation, dialect) => {
       const service = calls()
-      const request = requestOf(operation, context())
+      const request = requestOf(operation, { ...context(), dialect })
       if ("refused" in request) throw new Error(request.refused)
       const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
       await keep(id, operation, dialect, { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc, ...(out.native !== undefined ? { native: out.native } : {}) })
@@ -82,7 +82,7 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       const runId = newRunId()
       const progress = project !== null ? { progress: { projectId: project, runId } } : {}
       const m = probing.getState().misplacement
-      const request = requestOf(operation, ctx)
+      const request = requestOf(operation, { ...ctx, dialect })
       if ("refused" in request) throw new Error(request.refused)
       const { operation: cycle, settings, frame, actions, checks, assumed } = request
       // A job operation measures the table the control believes in; the offset fields simulate one that is really elsewhere.
@@ -110,6 +110,8 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       probing.getState().setResult(resultOfSimulation(sim, {
         operationId: id, operation, expected: planned.ok ? planned.routine.contacts : [], runId, ...(sim.program !== undefined ? { programHash: sim.program.identity.nc } : {})
       }))
+      // The contacts are real but no program came with them: the panel says why, or the 3D view would just stay empty.
+      if (sim.program === undefined) probing.getState().setError((sim.warnings ?? []).join("; ") || t("cam.probing.program.noProgram"))
     }
   }
 }

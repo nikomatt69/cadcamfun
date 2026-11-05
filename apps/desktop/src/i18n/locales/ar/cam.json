@@ -1683,6 +1683,7 @@
   "cam.probing.remote.dismiss": "تجاهل",
   "cam.probing.program.misplace": "إزاحة القطعة المحاكاة (مم، و C بالدرجات)",
   "cam.probing.program.noPart": "لا يحتوي الرسم على مجسم للتحسس.",
+  "cam.probing.program.noProgram": "تمت محاكاة نقاط التلامس، لكن تعذرت كتابة برنامج لوحدة التحكم هذه.",
   "cam.probing.calibration.rotary": "قاس التشغيل محور الدوران واتجاهه.",
   "cam.probing.calibration.stylus": "قاس التشغيل نصف القطر الفعال للإبرة.",
   "cam.probing.calibration.apply": "الكتابة إلى الآلة",

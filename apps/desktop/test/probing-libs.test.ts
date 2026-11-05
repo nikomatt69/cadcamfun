@@ -3,7 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { stockElementOf } from "../src/features/cam/lib/probing/part-solids.ts"
 import { cam } from "@cadcamfun/core"
 import { inspectionCsv, sortInspection, statusOf, summarizeInspection } from "../src/features/cam/lib/probing/inspection.ts"
-import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
+import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, rotationViaOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
+import { expectedOfContacts } from "../src/features/cam/lib/probing/simulation.ts"
+import { parseOffsetRef } from "../src/features/cam/lib/probing/contract.ts"
 import { contextOf, resolveSettings } from "../src/features/cam/lib/probing/resolve.ts"
 import type { InspectionVerdict } from "../src/features/cam/lib/probing/contract.ts"
 
@@ -90,5 +92,28 @@ describe("the stock as a part", () => {
   })
   test("a stock without depth is no part", () => {
     expect(stockElementOf({ ...stock, depth: 0 })).toBeUndefined()
+  })
+})
+
+describe("a rotation reaches the control it can", () => {
+  const ref = parseOffsetRef("G54")!
+  test("Fanuc keeps no rotation in the offset: G68; Siemens and LinuxCNC keep one", () => {
+    expect(rotationViaOf(ref, "fanuc")).toBe("g68")
+    expect(rotationViaOf(ref, "haas")).toBe("g68")
+    expect(rotationViaOf(ref, "siemens")).toBe("offset-r")
+    expect(rotationViaOf(parseOffsetRef("G55")!, "linuxcnc")).toBe("offset-r")
+  })
+})
+
+describe("contacts and planned touches", () => {
+  const planned = (name: string) => ({ name, expected: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } })
+  test("a double touch gives each planned touch to both of its contacts", () => {
+    const [a, b] = [planned("a"), planned("b")]
+    expect(expectedOfContacts(4, [a, b]).map((e) => e.name)).toEqual(["a", "a", "b", "b"])
+  })
+  test("one contact a touch stays as it is; counts that do not divide are not matched", () => {
+    const list = [planned("a"), planned("b")]
+    expect(expectedOfContacts(2, list)).toBe(list)
+    expect(expectedOfContacts(3, list)).toEqual([])
   })
 })

@@ -1683,6 +1683,7 @@
   "cam.probing.remote.dismiss": "忽略",
   "cam.probing.program.misplace": "模拟工件偏移（mm，C 为度）",
   "cam.probing.program.noPart": "图纸中没有可探测的实体。",
+  "cam.probing.program.noProgram": "已模拟接触，但无法为此控制系统生成程序。",
   "cam.probing.calibration.rotary": "本次运行测得旋转轴的回转中心和轴线。",
   "cam.probing.calibration.stylus": "本次运行测得测针的有效半径。",
   "cam.probing.calibration.apply": "写入机床",

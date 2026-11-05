@@ -1683,6 +1683,7 @@
   "cam.probing.remote.dismiss": "Скрыть",
   "cam.probing.program.misplace": "Смоделированное смещение детали (мм, C в градусах)",
   "cam.probing.program.noPart": "В чертеже нет тела для измерения.",
+  "cam.probing.program.noProgram": "Касания смоделированы, но программу для этой системы ЧПУ записать не удалось.",
   "cam.probing.calibration.rotary": "Прогон измерил центр и ось поворота.",
   "cam.probing.calibration.stylus": "Прогон измерил эффективный радиус наконечника.",
   "cam.probing.calibration.apply": "Записать в станок",

@@ -1683,6 +1683,7 @@
   "cam.probing.remote.dismiss": "閉じる",
   "cam.probing.program.misplace": "シミュレーションする部品のずれ（mm、C は度）",
   "cam.probing.program.noPart": "図面に接触できるソリッドがありません。",
+  "cam.probing.program.noProgram": "接触はシミュレートされましたが、この制御装置用のプログラムを作成できませんでした。",
   "cam.probing.calibration.rotary": "実行により回転軸のピボットと軸方向を測定しました。",
   "cam.probing.calibration.stylus": "実行によりスタイラスの有効半径を測定しました。",
   "cam.probing.calibration.apply": "機械に書き込む",

@@ -180,7 +180,12 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
           <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()} misplacement={probing.misplacement} onMisplacement={(patch) => probing.setMisplacement(patch)}
             nativeStyle={c.profile()?.probing?.macroStyle} native={cycle().probe.native === true} onNative={(native) => c.update(cycle().id, { native })}
             disabled={!planLocal(cycle().probe, { profile: c.profile(), defaults: c.defaults() }).ok} onDialect={(id) => probing.setDialect(id)} onGenerate={() => void c.generate(cycle().id)} onSimulate={() => void c.simulate(cycle().id)}
-            onShow3d={(show) => { probing.setShowIn3d(show); if (show) cam.setActiveTab("toolpath") }} onInsert={(nc) => c.insert(nc)} />
+            onShow3d={(show) => {
+              // The overlay stays armed after a simulation while the editor is in front: there the button brings the 3D view, not the switch off.
+              if (!show && cam.activeTab !== "toolpath") { cam.setActiveTab("toolpath"); return }
+              probing.setShowIn3d(show)
+              if (show) cam.setActiveTab("toolpath")
+            }} onInsert={(nc) => c.insert(nc)} />
         )}</Show>
       </PanelSection>
       <Show when={cam.gcode !== "" && selected() === undefined}><p class="panel-hint">{t("cam.probing.hint.legacy")}</p></Show>
