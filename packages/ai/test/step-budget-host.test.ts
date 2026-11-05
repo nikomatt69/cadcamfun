@@ -30,10 +30,10 @@ await Effect.runPromise(runtime.setProviderKey("fake", "sk-fake-test-key"))
 const model = { providerID: "fake", modelID: "fake-model" } as const
 afterAll(async () => { await Effect.runPromise(Scope.close(scope, { _tag: "Success", value: undefined } as never)); fake.stop() })
 
-const run = async (message: string, project: string): Promise<ReadonlyArray<AiEvent>> => {
+const run = async (message: string, project: string, extra: Partial<Parameters<typeof hostChatStream>[0]> = {}): Promise<ReadonlyArray<AiEvent>> => {
   const host = await Effect.runPromise(runtime.host(project))
   const sessionId = await Effect.runPromise(createHostSession(host, "step budget"))
-  return Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId, message, model, continues: 0 }))).then((c) => [...c])
+  return Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId, message, model, continues: 0, ...extra }))).then((c) => [...c])
 }
 
 /** What a real model does with nikcli's forced last step: it obeys and writes the summary instead of the next call. */
@@ -60,6 +60,35 @@ describe("the step budget belongs to the application", () => {
     expect(calls).toBe(total)
     expect(summaries).toBe(0)
     expect(events.some((event) => event.type === "turn" && event.phase === "continuing")).toBe(true)
+  })
+})
+
+describe("a /goal turn keeps the same budget", () => {
+  test("a long goal iteration renews its budget instead of being cut by the host's forced summary", async () => {
+    const total = PRIMARY_STEP_LIMIT + 10
+    let calls = 0
+    let summaries = 0
+    let completed = false
+    script = (request) => {
+      if (forcedSummary(request) && request.messages.at(-1)?.role === "assistant") {
+        summaries += 1
+        return { text: "Maximum steps reached. Remaining: the other checks." }
+      }
+      if (calls < total) {
+        calls += 1
+        return { toolCalls: [{ name: "cad", args: { action: "describe", index: calls } }] }
+      }
+      if (!completed) {
+        completed = true
+        return { toolCalls: [{ name: "update_goal", args: { status: "complete" } }] }
+      }
+      return { text: `All ${total} checks are done.` }
+    }
+    const events = await run("/goal Check every feature", "step-budget-goal", { goalArguments: "Check every feature" })
+    expect(calls).toBe(total)
+    expect(summaries).toBe(0)
+    expect(events.filter((e): e is Extract<AiEvent, { type: "goal" }> => e.type === "goal").at(-1)?.goal).toMatchObject({ status: "complete" })
+    expect(events.at(-1)).toMatchObject({ type: "done" })
   })
 })
 

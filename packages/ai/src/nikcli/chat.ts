@@ -400,7 +400,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       // explicit abort (`abortHostSession`) stops a turn; the client recovers the result with `readHostSessionState`.
 
       const state = newMapperState()
-      let stepCeiling = input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10
+      // One budget for every turn, `/goal` included. The host restarts its own step count at each goal iteration and this count
+      // never restarts within a run, so the pause always lands at or before the host's forced-summary step. An aborted step
+      // does not pause the goal: the resumed run finishes, and the host's goal continuation carries on from there.
+      let stepCeiling = PRIMARY_STEP_LIMIT
       let limitReached!: (result: HostPromptResult) => void
       let stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
       // True from the moment the step budget ran out until the turn is resumed: the aborted run's trailing events are not shown.
@@ -598,7 +601,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             const snapshot = await readMessages(1)
             beforePromptKnown = snapshot !== undefined
             beforePrompt = snapshot?.at(-1)?.info.id
-            stepCeiling = state.step + (input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10)
+            stepCeiling = state.step + PRIMARY_STEP_LIMIT
             usedGoalCommand = false
             if (goalPending !== undefined) {
               goalPending = undefined
