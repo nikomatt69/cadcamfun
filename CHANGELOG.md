@@ -3,6 +3,10 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.98 (November 2026)
+
+- No notable changes
+
 ## v0.1.97 (November 2026)
 
 ## Core
