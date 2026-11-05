@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.100 (November 2026)
+
+## Desktop
+
+- Implement AI probing handlers for enhanced probing operations; integrate new probe result frame and streamline event publishing; add comprehensive tests for probing functionalities
+
 ## v0.1.99 (November 2026)
 
 ## Core
