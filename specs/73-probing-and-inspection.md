@@ -39,6 +39,8 @@ Measured budgets on main (2026-11-04): tool catalogue 35 668 / 35 900; `cam_edit
 (nothing goes into `cam.txt`); descriptions 37 245 / 37 800; skill descriptions 3 213 / 3 300.
 
 ### 3.1 API (`packages/api`)
+**Status: done, one exception.** Group, schemas, events, deprecated routes, clients, snapshot, web reference and `CamKernelArtifact` (`probe` strategy and cut, operation summary, `probing` claim, `probing` block) are built and tested. The hand-written `CamProbeSettings/Operation/Step` stay: they describe the legacy `/api/cam/probe/*` body and the core has no schema of that shape to alias. Those two routes are marked deprecated and run the core's legacy adapter directly, not the `Probing` service.
+
 - `src/cam-probing.ts` (new): re-exports core Effect Schemas; transport wrappers `CamProbingSettingsInput` (partial settings +
   `machineConfig?`), `CamProbingFeatureRef {elements (Json records, 1..2000), elementId, ref?, hint?}`, `CamProbingPlanRequest`
   (exactly one of `operation` / `feature`; `settings`, `frame?`, `checks?` ≤50), `CamProbingPlan {operation, cycle, chosenBecause?,
@@ -78,6 +80,8 @@ Measured budgets on main (2026-11-04): tool catalogue 35 668 / 35 900; `cam_edit
   rejected), `contracts.test.ts` asserts (routes exist, 409/201 declared, deprecated flag), live-event decode.
 
 ### 3.2 Sidecar (`apps/sidecar`) and kernel jobs (`packages/ai`)
+**Status: done, with limits.** Repos, `Probing`, progress, handlers and tests are built. There is no `storeOperation` on the service: `ai-probing.ts` stores the operation. Offsets write through `WorkOffsetStore`; the rotary calibration is stored at `config.rotary.calibration`, as the core reads it, not `config.rotaryCalibration`. A `workOrigin` for tool setter cycles comes from the machine's table, so a machine without that offset is refused with the reason. A simulated contact carries no NC `line` (decision in §1 not met): `camProbeSimulate` runs the IR, not the NC text.
+
 - `packages/ai/src/cam-probe.ts`: `camProbePlan`, `camProbeSimulate(…, report)`, `camProbeCalibrate(…, report)`; kernel jobs
   `cam-probe-plan`, `cam-probe-simulate`, `cam-probe-calibrate` in `kernel-jobs.ts` (`KERNEL_JOBS`, `CACHEABLE`,
   `ProbeJobProgress {stage:"probe", step {index,count}, label?}`). Explicit-operation plan/emit run inline; feature resolution
@@ -100,6 +104,8 @@ Measured budgets on main (2026-11-04): tool catalogue 35 668 / 35 900; `cam_edit
   (round trip, setupId scope, 403/404/409, history row, resources.changed), `probe-reports.test.ts`.
 
 ### 3.3 AI (`packages/api` action contracts + `packages/ai`)
+**Status: done, budgets differ.** `cam_edit probe/probe_run/probe_apply`, `reviewOperation`, widened `library_edit` input, skill and inventory are built and tested. Measured after the change: catalogue limit 36 300 and `descriptions` 38 100 (spec said 36 200 and 38 000), because `library_edit` had to name the new machine fields. `probe` adds `update` and `tolerance` to the spec's fields. `native` is not exposed: the plan and emit routes have no native path, only kernel job operations do.
+
 - `packages/api/src/ai-cam-probe.ts`: `cam_edit.probe {operationId?, feature?, operation?, checks? ≤20, workOffset?, frame? deg
   −120..120, dialect?, machineConfig?, settings?, expectedRevision?}`, `cam_edit.probe_run {operationId, misplace?, machineConfig?,
   setupId?, calibrationError?, runId?}`, `cam_edit.probe_apply {machineConfig, reportId? | entries? ≤12, setupId?, mode add|set,
@@ -124,6 +130,8 @@ Measured budgets on main (2026-11-04): tool catalogue 35 668 / 35 900; `cam_edit
 ## 4. Desktop, visualizer, settings, i18n — planner 2
 
 All imports of core probing names go through `apps/desktop/src/features/cam/lib/probing/contract.ts`.
+
+**Status: partial.** Built and tested: pure libs, API client, stores, every component, CamPage and ribbon wiring, 3D overlay, library, settings, 11 locales. Write program, Simulate, Show in 3D and calibration write-back (stylus and rotary) run against the real routes (`test/probing-live.test.ts`, real sidecar and kernel). Added beyond the plan: simulated part offset fields in the program section. Not met: contacts are not revealed in time during playback, because a simulated contact has no NC line (§3.2), so the overlay shows them all at once; `ProbeProgramPreview` shows a numbered listing, not `GCodeViewer`; `native` and `macroStyle` are not offered in the UI. Not checked in the running app: this was verified by tests only, no screenshot.
 
 - Pure logic `features/cam/lib/probing/`: `cycle-palette.data.ts` (groups setup / five-axis / calibration / tool-setter /
   inspection; `availability(entry, profile)` with reason keys), `cycle-fields.ts` (stable `fieldsOf(kind)`, `defaultSpecOf`,
@@ -329,3 +337,4 @@ Tests: truePivot = assumed + (0.03, −0.02, 0.05) and 0.01° tilt recovered to 
 - 2026-11-04: spec written from three plans; `ProbeReport` table built (7d8318a5).
 - 2026-11-04 (desktop, B): Probing tab (palette, cycle editor with NumberField only, target picker with pick-on-model, work-offset table with 409 handling, inspection list, program preview), probe cycles as `probing` toolpaths, stores, offset/report client over `camProbing`, `probe.progress` / `probe.result` / stale-table handling, 3D overlay + surface pick + probe colours in the visualizer, 11 locales, `camProbing` in the web reference; NOT built (waiting for the api schemas of plan / emit / simulate / calibrate-rotary / reports run, the events and the sidecar services behind them): the program calls (Write program, Simulate, Show in 3D data), calibration write-back.
 - 2026-11-05 (core, A): §5.0-5.14 built, status per subsection above. This round: native cycles (`probing/native.ts`, `klartext-cycles.ts`, `nativeProbeLines`, `native: true` in the kernel with `unresolved` evidence), Okuma probing words, GRBL `G10 L20` touch-off (`OffsetUpdate.reads`, `grblTouchOff`), `lowerExprDepth` in the writer, every dialect in the goldens, plain retract off a contact (armed moves off a triggered probe fail on a control), `workOffsetRef` reaches the program, `skipFrame: "work"` under a tilted plane, Fanuc named variables go on at #500, Klartext refuses past Q0. ISO 13399 exchange takes every cutter kind and `formRadius` (a failing test on main).
+- 2026-11-05 (API, sidecar, AI, desktop, B): `cam_edit probe/probe_run/probe_apply` with `services/ai-probing.ts`, `cam review` verdict, widened `library_edit`, skill `probing-and-inspection`, budgets, inventory. Desktop program calls and calibration write-back on the real routes, proven in `test/probing-live.test.ts`. Gaps found in the audit and fixed: a probe artifact did not decode through `CamKernelArtifact`; tool setter cycles were refused everywhere because nothing passed `workOrigin`; `reports.run` ignored the stored settings and frame and left `programHash` / `sourceRevision` empty. Open: NC line on simulated contacts (`packages/ai/src/cam-probe.ts`), status per area at the head of §3.1-3.3 and §4.

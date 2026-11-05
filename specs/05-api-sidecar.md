@@ -1,5 +1,9 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Probing and inspection (2026-11-05)
+
+Spec 73 §3 adds the `camProbing` group (plan, emit, simulate, calibrate-rotary, work offsets, probe config, reports), `probe.progress` / `probe.result` frames and the `ProbeReportRepo`, `WorkOffsetStore` and `Probing` services. `CamKernelArtifact` gains the probe strategy, cut, claim and `probing` block. `/api/cam/probe/plan|emit` are deprecated. Clients, snapshot and API reference are regenerated.
+
 ## Assistant worker cancellation and export responsiveness (2026-11-02)
 
 Owner-requested performance scope is recorded in spec 23. WP4 export solid acquisition now awaits the
