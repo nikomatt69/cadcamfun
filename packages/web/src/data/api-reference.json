@@ -59342,6 +59342,44 @@
                                                     "optional"
                                                   ],
                                                   "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "Rotation"
+                                                      ]
+                                                    },
+                                                    "on": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "centre": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number"
+                                                        },
+                                                        "y": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "angle": {}
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "on",
+                                                    "centre",
+                                                    "angle"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
                                               ]
                                             }
@@ -65910,6 +65948,44 @@
                                               "required": [
                                                 "_tag",
                                                 "optional"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "Rotation"
+                                                  ]
+                                                },
+                                                "on": {
+                                                  "type": "boolean"
+                                                },
+                                                "centre": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "x": {
+                                                      "type": "number"
+                                                    },
+                                                    "y": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "x",
+                                                    "y"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                "angle": {}
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "on",
+                                                "centre",
+                                                "angle"
                                               ],
                                               "additionalProperties": false
                                             }
@@ -84160,6 +84236,44 @@
                                         "optional"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Rotation"
+                                          ]
+                                        },
+                                        "on": {
+                                          "type": "boolean"
+                                        },
+                                        "centre": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "angle": {}
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "on",
+                                        "centre",
+                                        "angle"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -88072,6 +88186,44 @@
                                         "optional"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": {
+                                          "type": "string",
+                                          "enum": [
+                                            "Rotation"
+                                          ]
+                                        },
+                                        "on": {
+                                          "type": "boolean"
+                                        },
+                                        "centre": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "angle": {}
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "on",
+                                        "centre",
+                                        "angle"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -90181,6 +90333,44 @@
                                     "required": [
                                       "_tag",
                                       "optional"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Rotation"
+                                        ]
+                                      },
+                                      "on": {
+                                        "type": "boolean"
+                                      },
+                                      "centre": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "angle": {}
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "on",
+                                      "centre",
+                                      "angle"
                                     ],
                                     "additionalProperties": false
                                   }
@@ -99358,6 +99548,44 @@
                                               "optional"
                                             ],
                                             "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Rotation"
+                                                ]
+                                              },
+                                              "on": {
+                                                "type": "boolean"
+                                              },
+                                              "centre": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "x": {
+                                                    "type": "number"
+                                                  },
+                                                  "y": {
+                                                    "type": "number"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "x",
+                                                  "y"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              "angle": {}
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "on",
+                                              "centre",
+                                              "angle"
+                                            ],
+                                            "additionalProperties": false
                                           }
                                         ]
                                       }
@@ -103225,6 +103453,44 @@
                                     "optional"
                                   ],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Rotation"
+                                      ]
+                                    },
+                                    "on": {
+                                      "type": "boolean"
+                                    },
+                                    "centre": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "angle": {}
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "on",
+                                    "centre",
+                                    "angle"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               ]
                             }
@@ -104776,6 +105042,44 @@
                                 "required": [
                                   "_tag",
                                   "optional"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Rotation"
+                                    ]
+                                  },
+                                  "on": {
+                                    "type": "boolean"
+                                  },
+                                  "centre": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "angle": {}
+                                },
+                                "required": [
+                                  "_tag",
+                                  "on",
+                                  "centre",
+                                  "angle"
                                 ],
                                 "additionalProperties": false
                               }
@@ -112278,6 +112582,44 @@
                                               "optional"
                                             ],
                                             "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Rotation"
+                                                ]
+                                              },
+                                              "on": {
+                                                "type": "boolean"
+                                              },
+                                              "centre": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "x": {
+                                                    "type": "number"
+                                                  },
+                                                  "y": {
+                                                    "type": "number"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "x",
+                                                  "y"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              "angle": {}
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "on",
+                                              "centre",
+                                              "angle"
+                                            ],
+                                            "additionalProperties": false
                                           }
                                         ]
                                       }
@@ -115080,6 +115422,44 @@
                               "optional"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": [
+                                  "Rotation"
+                                ]
+                              },
+                              "on": {
+                                "type": "boolean"
+                              },
+                              "centre": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "angle": {}
+                            },
+                            "required": [
+                              "_tag",
+                              "on",
+                              "centre",
+                              "angle"
+                            ],
+                            "additionalProperties": false
                           }
                         ]
                       }
@@ -115145,6 +115525,9 @@
                       "additionalProperties": {
                         "type": "number"
                       }
+                    },
+                    "native": {
+                      "type": "string"
                     },
                     "notes": {
                       "type": "array",
@@ -116123,6 +116506,55 @@
                     },
                     "additionalProperties": false
                   },
+                  "native": {
+                    "type": "boolean"
+                  },
+                  "macroStyle": {
+                    "type": "string",
+                    "enum": [
+                      "inline",
+                      "renishaw",
+                      "heidenhain-ts",
+                      "siemens-cycles"
+                    ]
+                  },
+                  "assumed": {
+                    "type": "object",
+                    "properties": {
+                      "layout": {
+                        "type": "string",
+                        "enum": [
+                          "table-AC",
+                          "table-BC"
+                        ]
+                      },
+                      "pivot": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "z"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "layout",
+                      "pivot"
+                    ],
+                    "additionalProperties": false
+                  },
                   "checks": {
                     "type": "array",
                     "items": {
@@ -116870,6 +117302,9 @@
                     },
                     "lines": {
                       "type": "integer"
+                    },
+                    "native": {
+                      "type": "string"
                     },
                     "steps": {
                       "type": "array",
@@ -117943,6 +118378,55 @@
                     },
                     "additionalProperties": false
                   },
+                  "native": {
+                    "type": "boolean"
+                  },
+                  "macroStyle": {
+                    "type": "string",
+                    "enum": [
+                      "inline",
+                      "renishaw",
+                      "heidenhain-ts",
+                      "siemens-cycles"
+                    ]
+                  },
+                  "assumed": {
+                    "type": "object",
+                    "properties": {
+                      "layout": {
+                        "type": "string",
+                        "enum": [
+                          "table-AC",
+                          "table-BC"
+                        ]
+                      },
+                      "pivot": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "z"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "layout",
+                      "pivot"
+                    ],
+                    "additionalProperties": false
+                  },
                   "checks": {
                     "type": "array",
                     "items": {
@@ -118659,6 +119143,58 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "program": {
+                      "type": "object",
+                      "properties": {
+                        "dialect": {
+                          "type": "string",
+                          "enum": [
+                            "generic",
+                            "fanuc",
+                            "grbl",
+                            "linuxcnc",
+                            "haas",
+                            "siemens",
+                            "heidenhain",
+                            "okuma",
+                            "mazak",
+                            "mitsubishi",
+                            "brother"
+                          ]
+                        },
+                        "nc": {
+                          "type": "string"
+                        },
+                        "lines": {
+                          "type": "integer"
+                        },
+                        "identity": {
+                          "type": "object",
+                          "properties": {
+                            "nc": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "nc"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "dialect",
+                        "nc",
+                        "lines",
+                        "identity"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "report": {
                       "type": "object",
                       "properties": {
@@ -118794,6 +119330,264 @@
                               },
                               "stopped": {
                                 "type": "string"
+                              },
+                              "calibration": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stylus"
+                                        ]
+                                      },
+                                      "stylus": {
+                                        "type": "object",
+                                        "properties": {
+                                          "ballDiameter": {
+                                            "type": "number"
+                                          },
+                                          "effectiveRadius": {
+                                            "type": "number"
+                                          },
+                                          "directional": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "angle": {
+                                                  "type": "number"
+                                                },
+                                                "radius": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "angle",
+                                                "radius"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "zTrigger": {
+                                            "type": "number"
+                                          },
+                                          "centreOffset": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "artefact": {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ring",
+                                                  "sphere",
+                                                  "height"
+                                                ]
+                                              },
+                                              "diameter": {
+                                                "type": "number"
+                                              },
+                                              "serial": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "calibratedAt": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "ballDiameter",
+                                          "effectiveRadius"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "stylus"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "rotary"
+                                        ]
+                                      },
+                                      "axis": {
+                                        "type": "string",
+                                        "enum": [
+                                          "A",
+                                          "B",
+                                          "C"
+                                        ]
+                                      },
+                                      "centres": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            },
+                                            "z": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                            "z"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "angles": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "rotary": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pivot": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              },
+                                              "z": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "axisDirection": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              },
+                                              "z": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "pivotError": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number"
+                                              },
+                                              "y": {
+                                                "type": "number"
+                                              },
+                                              "z": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "axisTilt": {
+                                            "type": "number"
+                                          },
+                                          "radius": {
+                                            "type": "number"
+                                          },
+                                          "rms": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "pivot",
+                                          "axisDirection",
+                                          "pivotError",
+                                          "axisTilt",
+                                          "radius",
+                                          "rms"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "axis",
+                                      "centres",
+                                      "angles",
+                                      "rotary"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "refused"
+                                        ]
+                                      },
+                                      "reason": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "reason"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -118886,6 +119680,9 @@
                               },
                               "after": {
                                 "type": "number"
+                              },
+                              "line": {
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -120727,6 +121524,81 @@
                         "type": "number"
                       }
                     },
+                    "additionalProperties": false
+                  },
+                  "dialect": {
+                    "type": "string",
+                    "enum": [
+                      "generic",
+                      "fanuc",
+                      "grbl",
+                      "linuxcnc",
+                      "haas",
+                      "siemens",
+                      "heidenhain",
+                      "okuma",
+                      "mazak",
+                      "mitsubishi",
+                      "brother"
+                    ]
+                  },
+                  "post": {
+                    "type": "object"
+                  },
+                  "options": {
+                    "type": "object",
+                    "properties": {
+                      "orientSpindle": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 360
+                      },
+                      "programNumber": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9999
+                      },
+                      "lineNumbers": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "assumed": {
+                    "type": "object",
+                    "properties": {
+                      "layout": {
+                        "type": "string",
+                        "enum": [
+                          "table-AC",
+                          "table-BC"
+                        ]
+                      },
+                      "pivot": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "z"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "layout",
+                      "pivot"
+                    ],
                     "additionalProperties": false
                   },
                   "progress": {

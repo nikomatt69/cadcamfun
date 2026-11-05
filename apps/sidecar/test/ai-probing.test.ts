@@ -108,7 +108,7 @@ test("a rotary calibration: the pivot error is recovered, written to the machine
   expect(stored).toMatchObject({ ok: true, cycle: "rotary-axis" })
   const report = await run("cam_edit", { action: "probe_run", operationId: stored.operationId, calibrationError: { pivot: { x: 0.03, y: -0.02, z: 100.05 } } })
   expect(report).toMatchObject({ kind: "rotary", verdict: "pass" })
-  expect(report.calibration.pivot.y).toBeCloseTo(-0.02, 2)
+  expect(report.calibration.rotary.pivot.y).toBeCloseTo(-0.02, 2)
   const setup = await run("cam_edit", { action: "probe_apply", machineConfig: machineId, reportId: report.reportId, setupId: "s1", mode: "set" })
   expect(JSON.stringify(setup)).toContain("not to a setup")
   expect(await run("cam_edit", { action: "probe_apply", machineConfig: machineId, reportId: report.reportId, mode: "set" })).toMatchObject({ ok: true, applied: ["rotary calibration"] })
@@ -126,4 +126,28 @@ test("a changed drawing makes the operation and its report stale", async () => {
   expect(await run("cam_edit", { action: "probe_run", operationId: stored.operationId })).toMatchObject({ ok: false, status: "stale" })
   expect(await run("cam_edit", { action: "probe_apply", machineConfig: machineId, reportId: report.reportId, mode: "add" })).toMatchObject({ ok: false, status: "stale" })
   expect(await run("cam", { action: "review", operationId: stored.operationId })).toMatchObject({ ok: false, status: "stale" })
+})
+
+test("calibration is an operation: a rotary run on the believed table and a stylus run are kept and written to the machine", async () => {
+  const rotary = await run("cam_edit", { action: "probe", operation: { kind: "rotary-axis", axis: "A", sphere: { centre: { x: 0, y: 0, z: 150 }, diameter: 25 }, angles: [-60, -30, 0, 30, 60] }, machineConfig: machineId, settings: { safeZ: 260 } })
+  const believed = await run("cam_edit", { action: "probe_run", operationId: rotary.operationId })
+  expect(believed).toMatchObject({ kind: "rotary", verdict: "pass", calibration: { kind: "rotary", axis: "A" } })
+  const stylus = await run("cam_edit", { action: "probe", operation: { kind: "stylus-calibrate", artefact: { kind: "ring", centre: { x: 200, y: 200 }, diameter: 25, depth: 5 } }, machineConfig: machineId })
+  const report = await run("cam_edit", { action: "probe_run", operationId: stylus.operationId })
+  expect(report).toMatchObject({ kind: "stylus", verdict: "pass", calibration: { kind: "stylus" } })
+  expect(await run("cam_edit", { action: "probe_apply", machineConfig: machineId, reportId: report.reportId, mode: "set" })).toMatchObject({ ok: true, applied: ["stylus calibration"] })
+  const config = (await app.call(`/api/machine-configs/${machineId}/probe`)).body
+  expect(config.probing.calibration.effectiveRadius).toBeCloseTo(2, 2)
+  expect(config.probing.calibration.directional).toHaveLength(4)
+})
+
+test("a native cycle is stored with its word and an unresolved claim; a machine that has none is refused with the reason", async () => {
+  const cycle = { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }
+  const refused = await run("cam_edit", { action: "probe", operation: cycle, native: true, machineConfig: machineId, dialect: "fanuc" })
+  expect(refused).toMatchObject({ ok: false })
+  expect(JSON.stringify(refused)).toContain("No native cycle")
+  const renishaw = (await run("library_edit", { action: "upsert_machine_config", name: "Renishaw", kind: "mill", post: "fanuc", probing: { stylusDiameter: 4, macroStyle: "renishaw" } })).id
+  const stored = await run("cam_edit", { action: "probe", operation: cycle, native: true, machineConfig: renishaw })
+  expect(stored).toMatchObject({ ok: true, claims: { probing: "unresolved" } })
+  expect(stored.native).toContain("G65")
 })

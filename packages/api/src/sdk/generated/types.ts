@@ -2911,6 +2911,12 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly values: ReadonlyArray<{ readonly name: string; readonly value: JsonValue }>
           }
         | { readonly _tag: "Stop"; readonly optional: boolean }
+        | {
+            readonly _tag: "Rotation"
+            readonly on: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly angle: JsonValue
+          }
       >
       readonly operation?: { readonly id: string; readonly name: string }
     }>
@@ -4117,6 +4123,12 @@ export type CamSetupLinkReportPayload = {
           readonly values: ReadonlyArray<{ readonly name: string; readonly value: JsonValue }>
         }
       | { readonly _tag: "Stop"; readonly optional: boolean }
+      | {
+          readonly _tag: "Rotation"
+          readonly on: boolean
+          readonly centre: { readonly x: number; readonly y: number }
+          readonly angle: JsonValue
+        }
     >
     readonly operation?: { readonly id: string; readonly name: string }
   }>
@@ -9979,6 +9991,7 @@ export type ToolpathsRegenerateOutput = {
                 | { _tag: "Alarm"; code: number; text: string }
                 | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
                 | { _tag: "Stop"; optional: boolean }
+                | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
               >
               operation?: { id: string; name: string }
             }>
@@ -10826,6 +10839,7 @@ export type ToolpathGeneratorManufactureOutput =
               | { _tag: "Alarm"; code: number; text: string }
               | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
               | { _tag: "Stop"; optional: boolean }
+              | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
             >
             operation?: { id: string; name: string }
           }>
@@ -11307,6 +11321,7 @@ export type ToolpathGeneratorParseOutput = {
         | { _tag: "Alarm"; code: number; text: string }
         | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
         | { _tag: "Stop"; optional: boolean }
+        | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
       >
       operation?: { id: string; name: string }
     }>
@@ -12024,6 +12039,7 @@ export type CamSetupGenerateOutput = {
           | { _tag: "Alarm"; code: number; text: string }
           | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
           | { _tag: "Stop"; optional: boolean }
+          | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
         >
         operation?: { id: string; name: string }
       }>
@@ -12259,6 +12275,7 @@ export type CamSetupLinkReportOutput = {
       | { _tag: "Alarm"; code: number; text: string }
       | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
       | { _tag: "Stop"; optional: boolean }
+      | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
     >
     operation?: { id: string; name: string }
   }>
@@ -13259,6 +13276,7 @@ export type CamSetupGenerateSavedOutput = {
           | { _tag: "Alarm"; code: number; text: string }
           | { _tag: "Report"; label: string; values: Array<{ name: string; value: JsonValue }> }
           | { _tag: "Stop"; optional: boolean }
+          | { _tag: "Rotation"; on: boolean; centre: { x: number; y: number }; angle: JsonValue }
         >
         operation?: { id: string; name: string }
       }>

@@ -3839,6 +3839,9 @@ type Endpoint32_0Input = {
   readonly feature?: Endpoint32_0Request["payload"]["feature"]
   readonly settings?: Endpoint32_0Request["payload"]["settings"]
   readonly frame?: Endpoint32_0Request["payload"]["frame"]
+  readonly native?: Endpoint32_0Request["payload"]["native"]
+  readonly macroStyle?: Endpoint32_0Request["payload"]["macroStyle"]
+  readonly assumed?: Endpoint32_0Request["payload"]["assumed"]
   readonly checks?: Endpoint32_0Request["payload"]["checks"]
   readonly actions?: Endpoint32_0Request["payload"]["actions"]
 }
@@ -3849,6 +3852,9 @@ const Endpoint32_0 = (raw: RawClient["camProbing"]) => (input?: Endpoint32_0Inpu
       feature: input?.["feature"],
       settings: input?.["settings"],
       frame: input?.["frame"],
+      native: input?.["native"],
+      macroStyle: input?.["macroStyle"],
+      assumed: input?.["assumed"],
       checks: input?.["checks"],
       actions: input?.["actions"],
     },
@@ -3862,6 +3868,9 @@ type Endpoint32_1Input = {
   readonly options?: Endpoint32_1Request["payload"]["options"]
   readonly settings?: Endpoint32_1Request["payload"]["settings"]
   readonly frame?: Endpoint32_1Request["payload"]["frame"]
+  readonly native?: Endpoint32_1Request["payload"]["native"]
+  readonly macroStyle?: Endpoint32_1Request["payload"]["macroStyle"]
+  readonly assumed?: Endpoint32_1Request["payload"]["assumed"]
   readonly checks?: Endpoint32_1Request["payload"]["checks"]
   readonly actions?: Endpoint32_1Request["payload"]["actions"]
 }
@@ -3874,6 +3883,9 @@ const Endpoint32_1 = (raw: RawClient["camProbing"]) => (input: Endpoint32_1Input
       options: input["options"],
       settings: input["settings"],
       frame: input["frame"],
+      native: input["native"],
+      macroStyle: input["macroStyle"],
+      assumed: input["assumed"],
       checks: input["checks"],
       actions: input["actions"],
     },
@@ -3887,6 +3899,10 @@ type Endpoint32_2Input = {
   readonly frame?: Endpoint32_2Request["payload"]["frame"]
   readonly workOffsets?: Endpoint32_2Request["payload"]["workOffsets"]
   readonly misplacement?: Endpoint32_2Request["payload"]["misplacement"]
+  readonly dialect?: Endpoint32_2Request["payload"]["dialect"]
+  readonly post?: Endpoint32_2Request["payload"]["post"]
+  readonly options?: Endpoint32_2Request["payload"]["options"]
+  readonly assumed?: Endpoint32_2Request["payload"]["assumed"]
   readonly progress?: Endpoint32_2Request["payload"]["progress"]
 }
 const Endpoint32_2 = (raw: RawClient["camProbing"]) => (input: Endpoint32_2Input) =>
@@ -3898,6 +3914,10 @@ const Endpoint32_2 = (raw: RawClient["camProbing"]) => (input: Endpoint32_2Input
       frame: input["frame"],
       workOffsets: input["workOffsets"],
       misplacement: input["misplacement"],
+      dialect: input["dialect"],
+      post: input["post"],
+      options: input["options"],
+      assumed: input["assumed"],
       progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))
