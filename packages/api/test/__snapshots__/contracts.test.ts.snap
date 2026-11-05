@@ -27206,6 +27206,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 ],
                                 "type": "object",
                               },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "_tag": {
+                                    "enum": [
+                                      "Rotation",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "angle": {},
+                                  "centre": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "on": {
+                                    "type": "boolean",
+                                  },
+                                },
+                                "required": [
+                                  "_tag",
+                                  "on",
+                                  "centre",
+                                  "angle",
+                                ],
+                                "type": "object",
+                              },
                             ],
                           },
                           "type": "array",
@@ -28728,6 +28766,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "required": [
                                     "_tag",
                                     "optional",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "_tag": {
+                                      "enum": [
+                                        "Rotation",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "angle": {},
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "on": {
+                                      "type": "boolean",
+                                    },
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "on",
+                                    "centre",
+                                    "angle",
                                   ],
                                   "type": "object",
                                 },
@@ -31235,6 +31311,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "type": "object",
                   },
+                  "macroStyle": {
+                    "enum": [
+                      "inline",
+                      "renishaw",
+                      "heidenhain-ts",
+                      "siemens-cycles",
+                    ],
+                    "type": "string",
+                  },
+                  "native": {
+                    "type": "boolean",
+                  },
                   "operation": {
                     "anyOf": [
                       {
@@ -32131,6 +32219,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "lines": {
                       "type": "integer",
+                    },
+                    "native": {
+                      "type": "string",
                     },
                     "nc": {
                       "type": "string",
@@ -35386,6 +35477,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             ],
                             "type": "object",
                           },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "_tag": {
+                                "enum": [
+                                  "Rotation",
+                                ],
+                                "type": "string",
+                              },
+                              "angle": {},
+                              "centre": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                ],
+                                "type": "object",
+                              },
+                              "on": {
+                                "type": "boolean",
+                              },
+                            },
+                            "required": [
+                              "_tag",
+                              "on",
+                              "centre",
+                              "angle",
+                            ],
+                            "type": "object",
+                          },
                         ],
                       },
                       "type": "array",
@@ -36392,6 +36521,22 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "dialect": {
+                    "enum": [
+                      "generic",
+                      "fanuc",
+                      "grbl",
+                      "linuxcnc",
+                      "haas",
+                      "siemens",
+                      "heidenhain",
+                      "okuma",
+                      "mazak",
+                      "mitsubishi",
+                      "brother",
+                    ],
+                    "type": "string",
+                  },
                   "elements": {
                     "items": {
                       "type": "object",
@@ -37908,6 +38053,25 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "minItems": 1,
                     "type": "array",
                   },
+                  "options": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "lineNumbers": {
+                        "type": "boolean",
+                      },
+                      "orientSpindle": {
+                        "maximum": 360,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "programNumber": {
+                        "maximum": 9999,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                    },
+                    "type": "object",
+                  },
                   "progress": {
                     "additionalProperties": false,
                     "properties": {
@@ -38101,6 +38265,53 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "object",
                       },
+                      "type": "object",
+                    },
+                    "program": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "dialect": {
+                          "enum": [
+                            "generic",
+                            "fanuc",
+                            "grbl",
+                            "linuxcnc",
+                            "haas",
+                            "siemens",
+                            "heidenhain",
+                            "okuma",
+                            "mazak",
+                            "mitsubishi",
+                            "brother",
+                          ],
+                          "type": "string",
+                        },
+                        "identity": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "nc": {
+                              "pattern": "^[0-9a-f]{64}$",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "nc",
+                          ],
+                          "type": "object",
+                        },
+                        "lines": {
+                          "type": "integer",
+                        },
+                        "nc": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "dialect",
+                        "nc",
+                        "lines",
+                        "identity",
+                      ],
                       "type": "object",
                     },
                     "report": {
@@ -38432,6 +38643,12 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "offsets",
                       ],
                       "type": "object",
+                    },
+                    "warnings": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
                     },
                   },
                   "required": [
@@ -40872,6 +41089,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "required": [
                                               "_tag",
                                               "optional",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "_tag": {
+                                                "enum": [
+                                                  "Rotation",
+                                                ],
+                                                "type": "string",
+                                              },
+                                              "angle": {},
+                                              "centre": {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "x": {
+                                                    "type": "number",
+                                                  },
+                                                  "y": {
+                                                    "type": "number",
+                                                  },
+                                                },
+                                                "required": [
+                                                  "x",
+                                                  "y",
+                                                ],
+                                                "type": "object",
+                                              },
+                                              "on": {
+                                                "type": "boolean",
+                                              },
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "on",
+                                              "centre",
+                                              "angle",
                                             ],
                                             "type": "object",
                                           },
@@ -89696,6 +89951,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             ],
                                             "type": "object",
                                           },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "_tag": {
+                                                "enum": [
+                                                  "Rotation",
+                                                ],
+                                                "type": "string",
+                                              },
+                                              "angle": {},
+                                              "centre": {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "x": {
+                                                    "type": "number",
+                                                  },
+                                                  "y": {
+                                                    "type": "number",
+                                                  },
+                                                },
+                                                "required": [
+                                                  "x",
+                                                  "y",
+                                                ],
+                                                "type": "object",
+                                              },
+                                              "on": {
+                                                "type": "boolean",
+                                              },
+                                            },
+                                            "required": [
+                                              "_tag",
+                                              "on",
+                                              "centre",
+                                              "angle",
+                                            ],
+                                            "type": "object",
+                                          },
                                         ],
                                       },
                                       "type": "array",
@@ -104957,6 +105250,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       ],
                                       "type": "object",
                                     },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Rotation",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "angle": {},
+                                        "centre": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "on": {
+                                          "type": "boolean",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "on",
+                                        "centre",
+                                        "angle",
+                                      ],
+                                      "type": "object",
+                                    },
                                   ],
                                 },
                                 "type": "array",
@@ -113133,6 +113464,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               ],
                                               "type": "object",
                                             },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Rotation",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "angle": {},
+                                                "centre": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "x": {
+                                                      "type": "number",
+                                                    },
+                                                    "y": {
+                                                      "type": "number",
+                                                    },
+                                                  },
+                                                  "required": [
+                                                    "x",
+                                                    "y",
+                                                  ],
+                                                  "type": "object",
+                                                },
+                                                "on": {
+                                                  "type": "boolean",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "on",
+                                                "centre",
+                                                "angle",
+                                              ],
+                                              "type": "object",
+                                            },
                                           ],
                                         },
                                         "type": "array",
@@ -115474,6 +115843,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "required": [
                                         "_tag",
                                         "optional",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Rotation",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "angle": {},
+                                        "centre": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "on": {
+                                          "type": "boolean",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "on",
+                                        "centre",
+                                        "angle",
                                       ],
                                       "type": "object",
                                     },
@@ -123114,6 +123521,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "object",
                                   },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Rotation",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "angle": {},
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "on": {
+                                        "type": "boolean",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "on",
+                                      "centre",
+                                      "angle",
+                                    ],
+                                    "type": "object",
+                                  },
                                 ],
                               },
                               "type": "array",
@@ -129223,6 +129668,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                   "required": [
                                                     "_tag",
                                                     "optional",
+                                                  ],
+                                                  "type": "object",
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "_tag": {
+                                                      "enum": [
+                                                        "Rotation",
+                                                      ],
+                                                      "type": "string",
+                                                    },
+                                                    "angle": {},
+                                                    "centre": {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "x": {
+                                                          "type": "number",
+                                                        },
+                                                        "y": {
+                                                          "type": "number",
+                                                        },
+                                                      },
+                                                      "required": [
+                                                        "x",
+                                                        "y",
+                                                      ],
+                                                      "type": "object",
+                                                    },
+                                                    "on": {
+                                                      "type": "boolean",
+                                                    },
+                                                  },
+                                                  "required": [
+                                                    "_tag",
+                                                    "on",
+                                                    "centre",
+                                                    "angle",
                                                   ],
                                                   "type": "object",
                                                 },

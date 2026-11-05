@@ -58,6 +58,11 @@ Tool cycles use `toolSetter` of the machine (top level, machine coordinates). Wi
 
 A change of the drawing makes the operation stale: store it again, do not reuse the old report.
 
+## Native cycles
+`native: true` on `cam_edit probe` writes the control's own cycle instead of the inline touches: Renishaw Inspection Plus `G65 P98xx` (Fanuc family), Heidenhain `TCH PROBE 4xx`, Siemens `CYCLE97x`. The package is the machine's `probing.macroStyle` (`renishaw`, `heidenhain-ts`, `siemens-cycles`; `inline` means none), so name the machine with `machineConfig`. Ask for native only when the shop runs that package and wants its cycles in the program; inline touches are the default and are fully replayed.
+- The vendor cycle writes the datum unconditionally: use `update: set` (or a pure measurement without `workOffset`), no `tolerance`, no `checks`, no `frame`. Bore, boss, rectangle, pocket, web, axis-parallel edge and top face have native forms; corners, tilted planes, rotary calibration (451 / CYCLE996) do not. A refusal names the reason: clear `native` rather than working around it.
+- `probe_run` replays the inline touches the cycle stands for, never the vendor cycle; `cam review` says so in its note. Say it when you report the run.
+
 ## What a report proves
 A simulated report is the modelled part on the modelled machine, replayed from the program text. It is not a measurement of the real part and not controller acceptance: the vendor syntax is read from the manuals, not run on a control. Say so whenever you report it. Native cycles (Heidenhain 4xx, Siemens CYCLE97x, Renishaw G65) are not replayed.
 

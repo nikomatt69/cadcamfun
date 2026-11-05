@@ -30,6 +30,7 @@ import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
 import { cycleOfSpec } from "../lib/probing/cycle-fields.ts"
 import { entriesOfRows } from "../lib/probing/work-offsets.ts"
 import { fingerprintOf } from "../lib/probing/result.ts"
+import { isProbingDialect, macroStyleOf } from "../lib/probing/native.ts"
 import { requestOf, resultOfCalibration, resultOfSimulation, stylusCalibrationOf } from "../lib/probing/simulation.ts"
 import { freshProgram, useProbingStore } from "../store/probingStore.ts"
 import { useCamStore } from "../store/camStore.ts"
@@ -68,7 +69,7 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       const ctx = context()
       const fingerprint = fingerprintOf(operation)
       const decoded = cycleOfSpec(operation.cycle)
-      let written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string }
+      let written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string }
       if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
         const c = decoded.cycle
         const request = requestOf(operation, ctx)
@@ -79,13 +80,16 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       } else {
         const request = requestOf(operation, ctx)
         if ("refused" in request) throw new Error(request.refused)
-        const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
-        written = { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc }
+        // A native cycle is written for the machine's package; the core refuses what the package cannot express (no silent fallback).
+        const style = macroStyleOf(ctx.profile)
+        const native = operation.native === true ? { native: true, ...(style !== undefined ? { macroStyle: style } : {}) } : {}
+        const out = await deps.run(service.emit({ ...request, dialect: dialect as never, ...native }))
+        written = { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc, ...(out.native !== undefined ? { native: out.native } : {}) }
       }
       const parsed = await deps.parse(written.nc).catch(() => undefined)
       probing.getState().setProgram({ operationId: id, dialect, fingerprint, ...written, ...(parsed !== undefined ? { parsed } : {}) })
     },
-    simulate: async (id, operation) => {
+    simulate: async (id, operation, dialect) => {
       const service = calls()
       const ctx = context()
       const project = deps.projectId()
@@ -111,13 +115,25 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       const table = useWorkOffsetStore.getState()
       const workOffsets = table.machineConfigId !== undefined && table.rows.length > 0 ? entriesOfRows(table.rows, "machine") : undefined
       const { operation: cycle, settings, frame, actions, checks } = request
+      // The run is posted for the control and that text replayed, so each contact carries the line of its touch block: the program
+      // view marks it and playback reveals it in time. A native cycle is the vendor's code and is never replayed: its inline touches
+      // are simulated without a program, and the native program the user wrote stays the one shown.
+      const posted = operation.native !== true && isProbingDialect(dialect) ? { dialect } : {}
       const sim = await deps.run(service.simulate({
         elements, settings, operations: [{ id, operation: cycle, ...(actions !== undefined ? { actions } : {}), ...(checks !== undefined ? { checks } : {}) }],
         ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}),
-        misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...progress
+        misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...posted, ...progress
       }))
+      if (sim.program !== undefined) {
+        const parsed = await deps.parse(sim.program.nc).catch(() => undefined)
+        probing.getState().setProgram({
+          operationId: id, dialect: sim.program.dialect, fingerprint: fingerprintOf(operation), nc: sim.program.nc, lines: sim.program.lines,
+          notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc, ...(parsed !== undefined ? { parsed } : {})
+        })
+      }
       const program = freshProgram(probing.getState().programs, id, operation)
-      probing.getState().setResult(resultOfSimulation(sim, { operationId: id, operation, expected: planned.routine.contacts, runId, ...(program?.hash !== undefined ? { programHash: program.hash } : {}) }))
+      const result = resultOfSimulation(sim, { operationId: id, operation, expected: planned.routine.contacts, runId, ...(program?.hash !== undefined ? { programHash: program.hash } : {}) })
+      probing.getState().setResult(result)
     }
   }
 }

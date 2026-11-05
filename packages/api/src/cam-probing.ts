@@ -254,11 +254,21 @@ export const CamProbingEmitOptions = Schema.Struct({
   lineNumbers: Schema.optionalKey(Schema.Boolean)
 })
 
+/** The control's own cycle package: Renishaw `G65 P98xx`, Heidenhain `TCH PROBE 4xx`, Siemens `CYCLE97x`. */
+export const CamProbingMacroStyle = Schema.Literals(cam.probing.MACRO_STYLES)
+
 export const CamProbingEmitRequest = Schema.Struct({
   operation: Schema.optionalKey(k.ProbeCycleSchema),
   feature: Schema.optionalKey(CamProbingFeatureRef),
   dialect: CamProbingDialect,
   options: Schema.optionalKey(CamProbingEmitOptions),
+  /**
+   * Write the control's own cycle instead of the inline touches. A cycle with no native form, an action other than one plain
+   * `set-offset`, a corner or a tilted plane is refused with the reason (never a silent fallback to inline touches).
+   */
+  native: Schema.optionalKey(Schema.Boolean),
+  /** The cycle package `native` writes for; default the machine's (`probing.macroStyle`), else refused. */
+  macroStyle: Schema.optionalKey(CamProbingMacroStyle),
   ...planCommon
 })
 export type CamProbingEmitRequest = typeof CamProbingEmitRequest.Type
@@ -270,6 +280,8 @@ export const CamProbingProgram = Schema.Struct({
   /** The number of lines of `nc`. */
   lines: Schema.Int,
   steps: Schema.Array(CamProbingStep),
+  /** What the post wrote for a native cycle (`TCH PROBE 412`, `G65 P9814`, `CYCLE977`); absent for inline touches. */
+  native: Schema.optionalKey(Schema.String),
   notes: Schema.Array(Schema.String),
   warnings: Schema.Array(Schema.String)
 })
@@ -297,6 +309,12 @@ export const CamProbingSimulateRequest = Schema.Struct({
   /** The offsets the control holds before the run (key -> row); default zero. */
   workOffsets: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),
   misplacement: Schema.optionalKey(CamProbingMisplacement),
+  /**
+   * The control the run is for. With it the operations are posted as one program and that text is replayed: every contact, alarm and
+   * offset change in the report carries the 1-based line of its block in `program.nc` (what playback reveals in time).
+   */
+  dialect: Schema.optionalKey(CamProbingDialect),
+  options: Schema.optionalKey(CamProbingEmitOptions),
   progress: Schema.optionalKey(CamProbingProgressTarget)
 })
 export type CamProbingSimulateRequest = typeof CamProbingSimulateRequest.Type
@@ -330,6 +348,15 @@ export type CamProbeReportData = typeof CamProbeReportData.Type
 
 /** A simulated run: the report, the offset table it leaves (key -> row) and the identity of what was simulated. */
 export const CamProbingSimulation = Schema.Struct({
+  /** The program the report's `line` numbers refer to; absent without `dialect`, or when the post refused (`warnings` says why). */
+  program: Schema.optionalKey(Schema.Struct({
+    dialect: CamProbingDialect,
+    nc: Schema.String,
+    lines: Schema.Int,
+    identity: Schema.Struct({ nc: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)) })
+  })),
+  /** Why lines are missing or the replay differs (the figures stay the IR run's). */
+  warnings: Schema.optionalKey(Schema.Array(Schema.String)),
   report: CamProbeReportData,
   offsetTable: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),
   identity: Schema.Struct({ elements: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)), operations: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)) })

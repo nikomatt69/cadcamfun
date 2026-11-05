@@ -46,6 +46,8 @@ interface ResolvedSetup {
   readonly frame?: cam.WorkFrame
   /** What the named machine's configuration says its rotary table is (the calibration's default `assumed`). */
   readonly assumed?: cam.probing.RotaryAssumption
+  /** The named machine's cycle package (`probing.macroStyle`): the default of a native request. */
+  readonly macroStyle?: cam.probing.MacroStyle
 }
 
 const setupInput = (setup: ResolvedSetup) => ({
@@ -64,6 +66,13 @@ const settingsWire = (s: cam.probing.ProbeSettings): CamProbingSettings => ({
   ...(s.toolNumber !== undefined ? { toolNumber: s.toolNumber } : {}),
   ...(s.effectiveRadius !== undefined ? { effectiveRadius: s.effectiveRadius } : {}),
   ...(s.orientSpindle !== undefined ? { orientSpindle: s.orientSpindle / DEG } : {})
+})
+
+/** The emit options of the wire, without absent keys (`exactOptionalPropertyTypes`). */
+const emitOptions = (o: { readonly orientSpindle?: number; readonly programNumber?: number; readonly lineNumbers?: boolean }): NonNullable<CamProbePlanInput["options"]> => ({
+  ...(o.orientSpindle !== undefined ? { orientSpindle: o.orientSpindle } : {}),
+  ...(o.programNumber !== undefined ? { programNumber: o.programNumber } : {}),
+  ...(o.lineNumbers !== undefined ? { lineNumbers: o.lineNumbers } : {})
 })
 
 /** A kernel refusal is the caller's to fix (400), or names an element that is not there (404). */
@@ -142,6 +151,7 @@ export class Probing extends Context.Service<Probing, {
       let profile: Parameters<typeof cam.probing.settingsFromMachine>[0] = undefined
       let setter: cam.probing.ToolSetter | undefined
       let assumed: cam.probing.RotaryAssumption | undefined
+      let macroStyle: cam.probing.MacroStyle | undefined
       if (machineId !== undefined) {
         const found = yield* machines.find(userId, machineId).pipe(Effect.catchTag("DatabaseError", dbFault("Failed to read the machine configuration")))
         if (!found) return yield* new NotFound({ message: "Machine configuration not found" })
@@ -150,6 +160,8 @@ export class Probing extends Context.Service<Probing, {
         if ("refused" in view) return yield* readRefusal(view)
         profile = { ...(view.probing !== null ? { probing: view.probing } : {}), ...(view.toolSetter !== null ? { toolSetter: view.toolSetter } : {}) }
         setter = view.toolSetter ?? undefined
+        const style = view.probing?.macroStyle
+        if (style !== undefined && cam.probing.MACRO_STYLES.includes(style)) macroStyle = style
         const rotary = recordOf(recordOf(found.row.config)["rotary"])
         const layout = rotary["layout"]
         const pivot = recordOf(rotary["pivot"] ?? recordOf(rotary["calibration"])["pivotMeasured"])
@@ -190,7 +202,7 @@ export class Probing extends Context.Service<Probing, {
         ...(frameInput.b !== undefined ? { b: frameInput.b * DEG } : {}),
         ...(frameInput.c !== undefined ? { c: frameInput.c * DEG } : {})
       })
-      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(workOrigin !== undefined ? { workOrigin } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
+      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(workOrigin !== undefined ? { workOrigin } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}), ...(macroStyle !== undefined ? { macroStyle } : {}) } satisfies ResolvedSetup
     })
     /** The kernel input of a plan or emit request: the cycle as given, or the feature an element resolves to. */
     const planInputOf = (setup: ResolvedSetup, payload: CamProbingPlanRequest | CamProbingEmitRequest): CamProbePlanInput => ({
@@ -217,16 +229,21 @@ export class Probing extends Context.Service<Probing, {
         }),
         emit: Effect.fn("Probing.plan.emit")(function*(userId, payload) {
           const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
+          const macroStyle = payload.macroStyle ?? setup.macroStyle
+          if (payload.native === true && (macroStyle === undefined || macroStyle === "inline")) {
+            return yield* new BadRequest({ message: "A native cycle needs the machine's cycle package: send macroStyle (renishaw, heidenhain-ts, siemens-cycles) or name a machine configuration whose probing has one. Clear native for the inline touches." })
+          }
           const input: CamProbePlanInput = {
             ...planInputOf(setup, payload), dialect: payload.dialect,
-            ...(payload.options !== undefined ? { options: { ...(payload.options.orientSpindle !== undefined ? { orientSpindle: payload.options.orientSpindle } : {}), ...(payload.options.programNumber !== undefined ? { programNumber: payload.options.programNumber } : {}), ...(payload.options.lineNumbers !== undefined ? { lineNumbers: payload.options.lineNumbers } : {}) } } : {})
+            ...(payload.options !== undefined ? { options: emitOptions(payload.options) } : {}),
+            ...(payload.native === true ? { native: true, ...(macroStyle !== undefined ? { macroStyle } : {}) } : {})
           }
           const out = payload.feature !== undefined
             ? yield* runKernelJobEffect("cam-probe-plan", input).pipe(Effect.catch(explainKernelFailure("Failed to write the probing program")))
             : camProbePlan(input)
           if ("error" in out) return yield* refusalError(out)
           if (out.program === undefined) return yield* new InternalError({ message: "Failed to write the probing program" })
-          return { dialect: payload.dialect, nc: out.program.nc, identity: out.program.identity, lines: out.program.lines, steps: out.steps, notes: out.notes, warnings: out.warnings }
+          return { dialect: payload.dialect, nc: out.program.nc, identity: out.program.identity, lines: out.program.lines, steps: out.steps, ...(out.native !== undefined ? { native: out.native } : {}), notes: out.notes, warnings: out.warnings }
         }),
         simulate: Effect.fn("Probing.plan.simulate")(function*(userId, payload, report) {
           const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
@@ -235,11 +252,16 @@ export class Probing extends Context.Service<Probing, {
             ...setupInput(setup), elements: payload.elements,
             operations: payload.operations.map((op) => ({ cycle: op.operation, ...(op.id !== undefined ? { id: op.id } : {}), ...(op.checks !== undefined ? { checks: op.checks } : {}), ...(op.actions !== undefined ? { actions: op.actions } : {}) })),
             ...(payload.workOffsets !== undefined ? { workOffsets: Object.fromEntries(Object.entries(payload.workOffsets).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)])) } : {}),
-            ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
+            ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {}),
+            ...(payload.dialect !== undefined ? { dialect: payload.dialect } : {}),
+            ...(payload.options !== undefined ? { options: emitOptions(payload.options) } : {}),
+            ...(setup.assumed !== undefined ? { assumed: setup.assumed } : {})
           }
           const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to simulate the probing")))
           if ("error" in out) return yield* refusalError(out)
           return {
+            ...(out.program !== undefined ? { program: { dialect: out.program.dialect as CamProbingProgram["dialect"], nc: out.program.nc, lines: out.program.lines, identity: out.program.identity } } : {}),
+            ...(out.warnings.length > 0 ? { warnings: out.warnings } : {}),
             report: cam.probing.probeReportToWire(out.report) as CamProbeReportData,
             offsetTable: Object.fromEntries(Object.entries(out.offsetTable).map(([k, e]) => [k, cam.probing.offsetEntryToWire(e)])),
             identity: out.identity
@@ -337,6 +359,7 @@ export class Probing extends Context.Service<Probing, {
             ...setupInput(setup), elements,
             operations: [{ id: body.operationId, cycle: stored.cycle, ...(stored.checks !== undefined ? { checks: stored.checks } : {}), ...(stored.actions !== undefined ? { actions: stored.actions } : {}) }],
             ...(workOffsets !== undefined ? { workOffsets } : {}),
+            ...(setup.assumed !== undefined ? { assumed: setup.assumed } : {}),
             ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
           }
           const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to run the probe operation")))

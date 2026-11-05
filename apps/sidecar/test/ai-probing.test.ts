@@ -127,3 +127,26 @@ test("a changed drawing makes the operation and its report stale", async () => {
   expect(await run("cam_edit", { action: "probe_apply", machineConfig: machineId, reportId: report.reportId, mode: "add" })).toMatchObject({ ok: false, status: "stale" })
   expect(await run("cam", { action: "review", operationId: stored.operationId })).toMatchObject({ ok: false, status: "stale" })
 })
+
+test("native: the machine's cycle package is written into the stored program; no package, checks or a rotary calibration are refused by name", async () => {
+  const bare = await run("cam_edit", { action: "probe", feature: { elementId: "part", hint: "bore" }, workOffset: "G54", machineConfig: machineId, native: true })
+  expect(bare.ok).toBe(false)
+  expect(JSON.stringify(bare)).toContain("macroStyle")
+  const renishaw = await run("library_edit", { action: "upsert_machine_config", name: "VMC renishaw", kind: "mill", post: "fanuc", probing: { stylusDiameter: 4, toolNumber: 99, macroStyle: "renishaw" }, workOffsetTable: { entries: { G54: { x: -300, y: -200, z: -400 } } } })
+  expect(renishaw).toMatchObject({ ok: true })
+  const stored = await run("cam_edit", { action: "probe", feature: { elementId: "part", hint: "bore" }, workOffset: "G54", machineConfig: renishaw.id, native: true })
+  expect(stored).toMatchObject({ ok: true, cycle: "bore" })
+  expect(stored.native).toMatch(/P98/)
+  const row = (await app.call(`/api/toolpaths/${stored.operationId}`)).body
+  expect(String(row.gcode ?? row.data?.gcode ?? "")).toContain("G65")
+  // A check is an action whose variables the vendor cycle does not leave.
+  const checked = await run("cam_edit", { action: "probe", feature: { elementId: "part", hint: "bore" }, machineConfig: renishaw.id, native: true, checks: [{ name: "d", kind: "size", result: "diameter", nominal: 20, lower: -0.02, upper: 0.02 }] })
+  expect(checked.ok).toBe(false)
+  const rotary = await run("cam_edit", { action: "probe", operation: { kind: "rotary-axis", axis: "A", sphere: { centre: { x: 0, y: 0, z: 150 }, diameter: 25 }, angles: [-60, 0, 60] }, machineConfig: renishaw.id, native: true })
+  expect(JSON.stringify(rotary)).toContain("clear native")
+  // The run replays the inline touches; the review says the vendor cycle itself was not replayed.
+  const report = await run("cam_edit", { action: "probe_run", operationId: stored.operationId, machineConfig: renishaw.id, misplace: { x: 0.2 } })
+  expect(report).toMatchObject({ verdict: "pass" })
+  const review = await run("cam", { action: "review", operationId: stored.operationId })
+  expect(JSON.stringify(review)).toContain("not the vendor cycle")
+})

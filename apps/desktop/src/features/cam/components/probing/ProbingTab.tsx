@@ -18,6 +18,7 @@ import type { PaletteEntry } from "../../lib/probing/cycle-palette.data.ts"
 import { planLocal, type ProbeOperation } from "../../lib/probing/operation.ts"
 import type { ProbeTarget } from "../../lib/probing/probe-targets.ts"
 import { summarizeInspection } from "../../lib/probing/inspection.ts"
+import { nativePatch, nativeStatusOf } from "../../lib/probing/native.ts"
 import type { RunCalibration } from "../../lib/probing/simulation.ts"
 import type { ProbingDefaults } from "../../../../shared/state/settings.ts"
 import type { OffsetScope } from "../../store/workOffsetStore.ts"
@@ -80,7 +81,14 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
   const stale = () => { const s = selected(); const p = program(); return s !== undefined && p !== undefined && freshProgram(probing.programs, s.id, s.probe) === undefined }
   const dialect = () => probing.dialect ?? c.profile()?.post ?? "fanuc"
   const toggle = (section: ProbingSection) => () => probing.toggleSection(section)
-  const contactLines = createMemo(() => new Set((run()?.outcome.contacts ?? []).flatMap((contact) => contact.line === undefined ? [] : [contact.line])))
+  // Whether native is possible is asked of the operation as turning it on would leave it (unconditional datum write).
+  const checkedNative = (op: ProbeOperation): ProbeOperation => (op.native === true ? op : { ...op, ...nativePatch(op, true) })
+  // The gutter marks touch lines only on the text they were counted in: the program the simulation posted (same hash).
+  const contactLines = createMemo(() => {
+    const r = run(), p = program()
+    if (r === undefined || p === undefined || r.programHash === undefined || r.programHash !== p.hash) return new Set<number>()
+    return new Set(r.outcome.contacts.flatMap((contact) => contact.line === undefined ? [] : [contact.line]))
+  })
   const summary = (): string | undefined => {
     const r = run()
     if (r === undefined) return undefined
@@ -175,6 +183,8 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
         <Show when={selected()} fallback={<p class="panel-empty">{t("cam.probing.program.select")}</p>}>{(cycle) => (
           <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()} misplacement={probing.misplacement} onMisplacement={(patch) => probing.setMisplacement(patch)}
             disabled={!planLocal(cycle().probe, { profile: c.profile(), defaults: c.defaults() }).ok} onDialect={(id) => probing.setDialect(id)} onGenerate={() => void c.generate(cycle().id)} onSimulate={() => void c.simulate(cycle().id)}
+            native={{ checked: cycle().probe.native === true, status: nativeStatusOf(checkedNative(cycle().probe), { profile: c.profile(), defaults: c.defaults() }) }}
+            onNative={(checked) => c.update(cycle().id, nativePatch(cycle().probe, checked))}
             onShow3d={(show) => { probing.setShowIn3d(show); if (show) cam.setActiveTab("toolpath") }} onInsert={(nc) => c.insert(nc)} />
         )}</Show>
       </PanelSection>

@@ -107,6 +107,8 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
     let actions: ReadonlyArray<cam.probing.ProbeAction> = []
     let nc: string
     let warnings: ReadonlyArray<string> = []
+    let native: string | undefined
+    if (input.native === true && operation?.kind === "rotary-axis") return { ok: false, error: "A rotary calibration has no native cycle here (451 / CYCLE996 are not written): clear native." }
     if (operation?.kind === "rotary-axis") {
       // A calibration is planned by the rotary routine: it needs what the machine believes about its table.
       const planned = await attempt(probing.plan.calibrateRotary(user, { axis: operation.axis, sphere: operation.sphere, angles: operation.angles.map((a) => a * 180 / Math.PI), settings, dialect }))
@@ -127,9 +129,10 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       const wanted = actionsOf(cycle, input)
       if (typeof wanted === "string") return { ok: false, error: wanted }
       actions = wanted
-      const written = await attempt(probing.plan.emit(user, { operation: cycle, settings, dialect, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}), ...(actions.length > 0 ? { actions } : {}) }))
+      const written = await attempt(probing.plan.emit(user, { operation: cycle, settings, dialect, ...(input.native === true ? { native: true } : {}), ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}), ...(actions.length > 0 ? { actions } : {}) }))
       if (!written.ok) return written
       nc = written.value.nc
+      native = written.value.native
       warnings = [...planned.value.warnings, ...written.value.warnings]
     }
     if (startsSpindle(nc)) return { ok: false, error: "The written probing program starts the spindle: it was not stored. A probe must never turn under power." }
@@ -139,7 +142,9 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       ...(input.checks !== undefined && input.checks.length > 0 ? { checks: Schema.encodeSync(Schema.Array(cam.kernel.CharacteristicSchema))(input.checks) } : {}),
       ...(actions.length > 0 ? { actions: Schema.encodeSync(Schema.Array(cam.kernel.ProbeActionSchema))(actions) } : {}),
       ...(Object.keys(settings).length > 0 ? { settings: Object.fromEntries(Object.entries(settings).filter(([key]) => key !== "machineConfig")) } : {}),
-      ...(input.frame !== undefined ? { frame: input.frame } : {})
+      ...(input.frame !== undefined ? { frame: input.frame } : {}),
+      // A native program is the vendor's cycle: the replay runs its inline touches, never the cycle (`cam review` says so).
+      ...(native !== undefined ? { native } : {})
     }
     const name = `Probe ${cycle.kind}`
     const row = previous !== undefined
@@ -150,7 +155,7 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       }))
     await audit(loaded.projectId, "ai.cam.probe_saved", { drawingId: loaded.id, operationId: row.id, cycle: cycle.kind, dialect, nc: programHash })
     return {
-      ok: true, operationId: row.id, cycle: cycle.kind, programHash, lines: nc.split("\n").length, dialect, revision, warnings,
+      ok: true, operationId: row.id, cycle: cycle.kind, programHash, lines: nc.split("\n").length, dialect, revision, warnings, ...(native !== undefined ? { native } : {}),
       ...(chosenBecause !== undefined ? { chosenBecause } : {}), drawingId: loaded.id, projectId: loaded.projectId
     }
   }
@@ -275,7 +280,7 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
     const latest = await run(probing.reports.latest(actorId(), loaded.projectId, row.id).pipe(Effect.catch(() => Effect.succeed(undefined))))
     if (latest === undefined) return { ok: false, status: "unverified", ...base, note: "No probe report yet: run cam_edit probe_run." }
     if (latest.sourceRevision !== revision || (latest.programHash !== null && latest.programHash !== programHash)) return { ok: false, status: "stale", ...base, reportId: latest.id, verdict: latest.verdict, note: "The latest report measured an older revision: run cam_edit probe_run again." }
-    return { ok: latest.verdict === "pass" || latest.verdict === "warn", status: latest.verdict === "pass" || latest.verdict === "warn" ? "pass" : "failed", ...base, reportId: latest.id, verdict: latest.verdict, measuredAt: latest.measuredAt, note: "A simulated report measures the modelled part and machine, not the shop floor." }
+    return { ok: latest.verdict === "pass" || latest.verdict === "warn", status: latest.verdict === "pass" || latest.verdict === "warn" ? "pass" : "failed", ...base, reportId: latest.id, verdict: latest.verdict, measuredAt: latest.measuredAt, ...(typeof data["native"] === "string" ? { native: data["native"] } : {}), note: typeof data["native"] === "string" ? `A simulated report measures the modelled part and machine, not the shop floor. The program calls the control's own cycle (${data["native"]}): the run replayed the inline touches it stands for, not the vendor cycle.` : "A simulated report measures the modelled part and machine, not the shop floor." }
   }
 
   return { probeOperation, probeRun, probeApply, reviewProbe }

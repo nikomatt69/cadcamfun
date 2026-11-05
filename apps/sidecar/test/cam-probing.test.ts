@@ -66,6 +66,47 @@ test("simulate: the top of the plate is touched where the program believes it is
   expect(out.identity.elements).toMatch(/^[0-9a-f]{64}$/)
 })
 
+test("emit native: the control's own cycle is written for the named package; no package is a 400 that says so", async () => {
+  const native = await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc", native: true, macroStyle: "renishaw" } })
+  expect(native.status).toBe(200)
+  const program = Schema.decodeUnknownSync(CamProbingProgram)(native.body)
+  expect(program.native).toMatch(/P98/)
+  expect(program.nc).toContain("G65")
+  expect(program.nc).not.toMatch(/(^|\s)M0?[34](\s|$)/m)
+  const heidenhain = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "heidenhain", native: true, macroStyle: "heidenhain-ts" } })).body)
+  expect(heidenhain.native).toMatch(/TCH PROBE 4\d\d/)
+  // Without a package there is nothing native to write: refused, never a silent fall back to inline touches.
+  const none = await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc", native: true } })
+  expect(none.status).toBe(400)
+  expect(JSON.stringify(none.body)).toContain("macroStyle")
+  // Inline stays the default and carries no native word.
+  const inline = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc" } })).body)
+  expect(inline.native).toBeUndefined()
+})
+
+test("simulate with a dialect: every contact carries the line of its touch block in the program it returns", async () => {
+  const out = Schema.decodeUnknownSync(CamProbingSimulation)((await app.call("/api/cam/probing/simulate", {
+    method: "POST", json: { elements: plate, operations: [{ id: "b1", operation: { kind: "z-surface", at: { x: 50, y: 30 }, expectedZ: 0 }, actions: [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { Z: "z" }, policy: { mode: "set" } }] }], dialect: "fanuc", misplacement: { z: 0.2 } }
+  })).body)
+  expect(out.program?.dialect).toBe("fanuc")
+  const lines = (out.program?.nc ?? "").split("\n")
+  const contacts = out.report.operations[0]?.contacts ?? []
+  expect(contacts.length).toBeGreaterThan(0)
+  for (const c of contacts) {
+    expect(c.line).toBeDefined()
+    // The block on that line is an armed probe move (G31 on Fanuc).
+    expect(lines[c.line! - 1]).toContain("G31")
+  }
+  expect(out.report.updates.length).toBeGreaterThan(0)
+  expect(out.report.updates[0]?.after).toBeCloseTo(0.2, 3)
+  // Without a dialect nothing is posted: no program, no lines.
+  const bare = Schema.decodeUnknownSync(CamProbingSimulation)((await app.call("/api/cam/probing/simulate", {
+    method: "POST", json: { elements: plate, operations: [{ operation: { kind: "z-surface", at: { x: 50, y: 30 }, expectedZ: 0 } }] }
+  })).body)
+  expect(bare.program).toBeUndefined()
+  expect(bare.report.operations[0]?.contacts.every((c) => c.line === undefined)).toBe(true)
+})
+
 test("calibrate-rotary: measured centres are fitted; no assumed table and no machine is a 400", async () => {
   const angles = [0, 90, 180, 270]
   const measured = angles.map((d) => { const a = d * Math.PI / 180; return { x: 50 + 30 * Math.cos(a), y: 40 + 30 * Math.sin(a), z: 10 } })

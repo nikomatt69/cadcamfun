@@ -61,3 +61,5 @@ export const workOffsetTableOf = cam.probing.workOffsetTableOf
 export const withWorkOffsetTable = cam.probing.withWorkOffsetTable
 export const profileOfConfig = cam.kernel.profileOfConfig
 export const configOfProfile = cam.kernel.configOfProfile
+export type MacroStyle = cam.probing.MacroStyle
+export const nativeCycle = cam.probing.nativeCycle

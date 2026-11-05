@@ -146,7 +146,7 @@ export default function CamPage(): JSX.Element {
     const cycle = selectedProbe()
     if (cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
     const program = freshProgram(probingState.programs, cycle.id, cycle.probe)
-    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.nc }
+    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.nc, ...(program.hash !== undefined ? { hash: program.hash } : {}) }
   })
   const shownProgram = () => probePreview()?.program ?? camStore.program
   const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
@@ -253,10 +253,13 @@ export default function CamPage(): JSX.Element {
   // A different program on the stage starts from its beginning.
   createEffect(on(() => probePreview()?.nc, () => { camStore.setPlaying(false); camStore.setPlaybackTime(0) }, { defer: true }))
   const probeRun = createMemo(() => inspectionState.opened ?? (selectedProbe() === undefined ? undefined : freshResult(probingState.results, selectedProbe()!.id, selectedProbe()!.probe)))
+  // Contacts are placed in time only on the program their lines were counted in (the simulated one); another text would misplace them.
+  const linesMatch = (run: { readonly programHash?: string | undefined }, preview: { readonly hash?: string | undefined } | undefined): boolean =>
+    preview !== undefined && run.programHash !== undefined && run.programHash === preview.hash
   const probeOverlay = createMemo(() => {
     const run = probeRun(), cycle = selectedProbe()
     if (run === undefined || cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
-    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: probePreview() !== undefined ? shownTimeline() : undefined })
+    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: linesMatch(run, probePreview()) ? shownTimeline() : undefined })
   })
   const probePart = createMemo(() => {
     if (camStore.rightTab !== "probing") return undefined

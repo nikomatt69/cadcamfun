@@ -7,7 +7,9 @@ import { afterAll, beforeAll, beforeEach, expect, setDefaultTimeout, test } from
 import { brep } from "@cadcamfun/core"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { DEFAULT_PROBING } from "../src/shared/state/settings.ts"
+import { cam } from "@cadcamfun/core"
 import { makeProbingStoreService } from "../src/features/cam/api/probing.ts"
+import { makeToolpathGenerator } from "../src/features/cam/api/generator.ts"
 import { PALETTE } from "../src/features/cam/lib/probing/cycle-palette.data.ts"
 import { probeCycles } from "../src/features/cam/lib/probing/cycles.ts"
 import { overlayModelOf } from "../src/features/cam/lib/probing/overlay-input.ts"
@@ -52,7 +54,8 @@ const controller = () => {
   const run = <A, E>(effect: import("effect").Effect.Effect<A, E>) => app.state.runtime.run(effect)
   const machine = () => ({ id: machineId, name: "VMC", type: "mill", config })
   const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, projectId: () => projectId }
-  const program = hook.createProbingProgram({ ...deps, parse: async () => undefined })
+  const generator = makeToolpathGenerator(app.client)
+  const program = hook.createProbingProgram({ ...deps, parse: (nc) => run(generator.parse(nc, "Probing")) })
   return hook.createProbingController({ ...deps, program, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), setups: () => [], insert: () => {}, onMachineProbing: () => {} })
 }
 const added = (id: string) => {
@@ -78,8 +81,20 @@ test("Write program, Simulate a misplaced part, the overlay shows the real run, 
   const run = useProbingStore.getState().results[cycle.id]!
   expect(run.verdict).toBe("pass")
   expect(run.outcome.contacts.length).toBeGreaterThanOrEqual(4)
-  expect(run.programHash).toBe(program.hash!)
   expect(run.outcome.updates.map((u) => u.axis).sort()).toEqual(["X", "Y"])
+  // Simulate posts the run for the control and keeps that program: every contact sits on an armed G31 block of the text shown.
+  const simulated = useProbingStore.getState().programs[cycle.id]!
+  expect(run.programHash).toBe(simulated.hash!)
+  const text = simulated.nc.split("\n")
+  for (const contact of run.outcome.contacts) expect(text[contact.line! - 1]).toContain("G31")
+  // Playback reveals the contacts in time on that program's timeline, in the order the program makes them.
+  expect(simulated.parsed).toBeDefined()
+  const timeline = cam.viewer.buildTimeline(simulated.parsed!.program, simulated.parsed!.motion, 5000, cam.viewer.programStart("mill", simulated.parsed!.program))
+  const timed = overlayModelOf({ result: run, operation: useMultiToolpathStore.getState().getToolpathById(cycle.id)!.probe!, deviationScale: 100, timeline })
+  const times = timed.contacts.map((k) => k.time)
+  expect(times.every((time) => time !== undefined && time > 0)).toBe(true)
+  expect(timed.switchAt).toBe(Math.max(...times.map(Number)))
+  expect([...times].sort((a, b) => a! - b!)).toEqual(times)
 
   const updated = useMultiToolpathStore.getState().getToolpathById(cycle.id)!.probe!
   const model = overlayModelOf({ result: run, operation: updated, deviationScale: 100 })
