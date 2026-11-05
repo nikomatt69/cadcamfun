@@ -139,6 +139,21 @@ export const legacyTool = (c: Cutter, fallbackMaxRpm = 24000): Tool => ({
   ...(c.kind === "ball" || c.kind === "lollipop" ? { tipRadius: c.diameter / 2 } : c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })
 
+/**
+ * The kernel cutter of a legacy tool (a setup's tool): the shape the replay sweeps. Unknown lengths take the same defaults the
+ * assistant's `verify_nc` takes (flutes 3 diameters, stick-out 4 diameters + 10); the holder is only there when the tool names one.
+ */
+export const cutterOfTool = (tool: Tool): Cutter => {
+  const kind: CutterKind = tool.kind === "ballnose" ? "ball" : tool.kind === "drill" ? "drill" : tool.kind === "vbit" ? "chamfer" : tool.kind === "facemill" ? "facemill" : tool.tipRadius !== undefined && tool.tipRadius < tool.diameter / 2 - 1e-9 ? "bull" : "flat"
+  return {
+    id: tool.id, name: tool.name, kind, diameter: tool.diameter, flutes: tool.flutes, material: "carbide", coating: "none",
+    fluteLength: 3 * tool.diameter, shankDiameter: tool.diameter, stickout: tool.stickout ?? Math.max(10, 4 * tool.diameter + 10), maxRpm: tool.maxRpm,
+    ...(kind === "bull" ? { cornerRadius: tool.tipRadius! } : {}),
+    ...(kind === "chamfer" ? { angle: tool.angle ?? 60 } : {}),
+    ...(tool.holder !== undefined ? { holder: tool.holder } : {})
+  }
+}
+
 const SWEPT: ReadonlySet<CutterKind> = new Set<CutterKind>(["tapered", "lollipop", "barrel", "lens"])
 
 /**

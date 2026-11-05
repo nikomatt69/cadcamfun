@@ -328,3 +328,33 @@ describe("tool life and sister tools", () => {
     expect(validateSetup(setup([op("a", t6), op("b", t3)], { magazineSize: 2, sisters: [{ toolId: "t6", tool: sister }] })).map((i) => i.message).join(" ")).toMatch(/need 3 pockets, the magazine holds 2/)
   })
 })
+
+describe("replay of a generated program: inputs and release", () => {
+  const stock = { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }
+  const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", stock: { ...stock, x: 70, origin: { x: -35, y: -25, z: 0 } } }]
+  const made = generateSetup(setup([op("a", t6), op("b", t3)], { workpieces: parts, stock }), geometryOf)
+  const replay = program.setupReplay(setup([op("a", t6), op("b", t3)], { workpieces: parts, stock }), made.programs[0]!, geometryOf)
+  const result = (verdict: "clean" | "faults" | "incomplete") => ({ verdict, complete: verdict !== "incomplete", reasons: [], findings: verdict === "faults" ? [{ kind: "gouge" as const, message: "cut", line: 12 }] : [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, cell: 0.1, errorBound: 0.1, threshold: 0.1, moves: 10, feedMoves: 5 })
+
+  test("one blank per register (the part's own, else the setup's), each tool under its pocket as a kernel cutter", () => {
+    expect(replay.registers.map((r) => [r.register, r.stock.min.x, r.stock.max.x])).toEqual([["G54", -30, 30], ["G55", -35, 35]])
+    expect(replay.tools.map((t) => [t.number, t.cutter.kind, t.cutter.diameter])).toEqual([[1, "flat", 6], [2, "flat", 3]])
+    expect(replay.part).toHaveLength(0)
+    expect(replay.notes.join(" ")).toMatch(/not a finished solid/)
+  })
+
+  test("a fault blocks, a clean replay of everything with holders described is verified, anything less is a preview", () => {
+    const gcode = made.programs[0]!.gcode
+    const bare = made.programs[0]!.tools
+    expect(program.setupEvidence(gcode, replay, [result("faults"), result("clean")], bare).release).toBe("blocked")
+    const solid = { ...replay, part: [{ positions: new Float32Array(9), indices: new Uint32Array(3) }] }
+    const held = bare.map((t) => ({ ...t, holder: { diameter: 30, length: 40 } }))
+    expect(program.setupEvidence(gcode, solid, [result("clean"), result("clean")], held).release).toBe("verified-program")
+    const noHolder = program.setupEvidence(gcode, solid, [result("clean"), result("clean")], bare)
+    expect(noHolder.release).toBe("preview")
+    expect(noHolder.notes.join(" ")).toMatch(/No holder is described/)
+    expect(program.setupEvidence(gcode, replay, [result("clean"), result("clean")], held).release).toBe("preview")
+    expect(program.setupEvidence(gcode, solid, [result("clean"), result("incomplete")], held).release).toBe("preview")
+    expect(program.setupEvidence(gcode, solid, [result("clean"), result("clean")], held).programHash).toHaveLength(64)
+  })
+})

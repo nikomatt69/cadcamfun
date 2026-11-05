@@ -4,6 +4,14 @@
  * G43 H<n> M3 S...`) between toolpaths; nothing here concatenates text.
  */
 import { analyseGcode } from "../generator/analysis.ts"
+import { targetMeshesFor } from "../generator/evidence.ts"
+import { stockInWork } from "../generator/dispatch.ts"
+import type { Stock } from "../generator/schema.ts"
+import type { Mesh } from "../../cad/solid.ts"
+import { sha256 } from "../kernel/identity.ts"
+import type { ReleaseLevel } from "../kernel/contracts.ts"
+import type { VerifyNcResult } from "../kernel/verify-nc.ts"
+import { cutterOfTool, type Cutter } from "../kernel/cutters.ts"
 import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GenerateOutcome, type GeometryInput, type GcodeStats } from "../generator/index.ts"
 import { arcExtrema, estimateTime, expandMoves, makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { consumeLife, emptyLifeBook, pickSister, type ToolLifeBook } from "../kernel/tool-library.ts"
@@ -13,7 +21,7 @@ import type { Tool } from "../tool.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import type { Operation } from "./op.ts"
 import { groupsOf, planPrograms, type SetupPlan } from "./plan.ts"
-import { runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue, type WorkpieceOrder } from "./setup.ts"
+import { enabledOperations, runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue, type Workpiece, type WorkpieceOrder } from "./setup.ts"
 import { assignPockets, type ToolTableEntry } from "./tooltable.ts"
 
 export interface GeneratedProgram {
@@ -77,6 +85,112 @@ export const geometryFor = (operation: Operation, elements: Readonly<Record<stri
   return { ...DEFAULT_GEOMETRY, geometryType: "selected", selectedElements: operation.elementIds.map((id) => elements[id]!), ...(stock !== undefined ? { stock } : {}) }
 }
 
+/** The generator settings of an operation: its own, with the tool's size, its pocket and the setup's register. A rest pass that continues the operation before it cut with that operation's tool. */
+const settingsFor = (setup: Setup, op: Operation, ordered: ReadonlyArray<Operation>, pockets: ReadonlyMap<string, number>) => {
+  const before = ordered[ordered.indexOf(op) - 1]
+  return {
+    ...op.params,
+    toolDiameter: op.tool.diameter, flutes: op.tool.flutes, toolNumber: pockets.get(op.id)!, workOffset: setup.workOffset,
+    ...(op.fromPreviousStock && op.params.useRestMachining && before !== undefined ? { restToolDiameter: before.tool.diameter } : {})
+  }
+}
+
+/** The register a workpiece's toolpaths run under, as the reference interpreter names it. */
+export const registerOf = (wp: Workpiece): string => (wp.workOffsetRef !== undefined ? formatOffsetRef(wp.workOffsetRef) : wp.workOffset)
+
+/** What the replay of one generated program needs: the tools by pocket, the finished part and, per register, the blank of that workpiece. All in the work frame the program is written in. */
+export interface SetupReplay {
+  readonly tools: ReadonlyArray<{ readonly number: number; readonly cutter: Cutter }>
+  /** The finished solids of the operations' elements, placed as the generator placed them; empty when the elements are outlines only. */
+  readonly part: ReadonlyArray<Mesh>
+  readonly registers: ReadonlyArray<{ readonly register: string; readonly workpieceId: string; readonly name: string; readonly stock: { readonly min: Vec3; readonly max: Vec3 } }>
+  readonly notes: ReadonlyArray<string>
+}
+
+/**
+ * The inputs to replay a program a setup generated against its parts: each tool as the kernel cutter it is, the part from the
+ * operations' own elements (`targetMeshesFor`, in the generator's coordinates), and the blank of every register that the program uses
+ * (the workpiece's own blank, else the drawing's stock as the generator placed it, else the setup's block).
+ */
+export const setupReplay = (setup: Setup, generated: GeneratedProgram, geometryOf: (operation: Operation) => GeometryInput, configured?: Stock): SetupReplay => {
+  const ordered = enabledOperations(setup)
+  const pockets = assignPockets(ordered)
+  const notes: string[] = []
+  const tools = generated.tools.map((t) => ({ number: generated.pockets[t.id]!, cutter: cutterOfTool(t) }))
+  const part: Mesh[] = []
+  const seen = new Set<string>()
+  for (const op of ordered.filter((o) => generated.operationIds.includes(o.id))) {
+    const key = [...op.elementIds].sort().join(",")
+    if (seen.has(key)) continue
+    seen.add(key)
+    try {
+      const meshes = targetMeshesFor(decodeGenerateRequest({ settings: settingsFor(setup, op, ordered, pockets), geometry: geometryOf(op), evidence: false }))
+      if (meshes !== undefined) part.push(...meshes)
+    } catch (cause) { notes.push(`${op.name}: the part could not be read (${cause instanceof Error ? cause.message : String(cause)})`) }
+  }
+  if (part.length === 0) notes.push("The operations' elements are outlines or features, not a finished solid: gouge and leftover cannot be judged, only rapids through material and unknown tools")
+  const first = ordered.find((o) => generated.operationIds.includes(o.id)) ?? ordered[0]!
+  const blockBox = (b: NonNullable<Setup["stock"]>) => ({ min: { x: b.origin.x, y: b.origin.y, z: b.origin.z - b.z }, max: { x: b.origin.x + b.x, y: b.origin.y + b.y, z: b.origin.z } })
+  const shared = configured !== undefined ? stockInWork(settingsFor(setup, first, ordered, pockets) as never, configured) : setup.stock !== undefined ? blockBox(setup.stock) : undefined
+  const used = new Set(generated.program.toolpaths.map((t) => (t.workOffsetRef !== undefined ? formatOffsetRef(t.workOffsetRef) : t.workOffset ?? generated.program.workOffset ?? setup.workOffset)))
+  const registers: SetupReplay["registers"][number][] = []
+  for (const wp of workpiecesOf(setup)) {
+    const register = registerOf(wp)
+    if (!used.has(register)) continue
+    const stock = wp.stock !== undefined ? blockBox(wp.stock) : shared
+    if (stock === undefined) { notes.push(`${wp.name} has no blank: the setup and the drawing give no stock to replay against`); continue }
+    registers.push({ register, workpieceId: wp.id, name: wp.name, stock })
+  }
+  return { tools, part, registers, notes }
+}
+
+/** The replay of a program a setup generated, one verdict per workpiece's register, and the release level they add up to. */
+export interface SetupEvidence {
+  readonly release: ReleaseLevel
+  /** Hash of the NC text that was replayed: evidence about other bytes is not evidence. */
+  readonly programHash: string
+  readonly registers: ReadonlyArray<{
+    readonly register: string
+    readonly workpieceId: string
+    readonly name: string
+    readonly verdict: VerifyNcResult["verdict"]
+    readonly complete: boolean
+    readonly reasons: ReadonlyArray<string>
+    readonly findings: ReadonlyArray<{ readonly kind: string; readonly message: string; readonly line?: number }>
+    readonly gougeMm: number
+    readonly leftMm: number
+    readonly feedMoves: number
+  }>
+  readonly notes: ReadonlyArray<string>
+  readonly basis: string
+}
+
+/**
+ * The release of a replayed setup program. Any gouge, rapid through material or travel violation blocks it. It is a verified program
+ * only when every register was replayed completely against a finished solid part and every tool has its holder described; anything
+ * less is a preview, with the reason named. Legacy programs carry no machine claims beyond this replay.
+ */
+export const setupEvidence = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>, tools: ReadonlyArray<Tool>): SetupEvidence => {
+  const notes = [...replay.notes]
+  const registers = replay.registers.map((r, i) => {
+    const v = results[i]!
+    return {
+      register: r.register, workpieceId: r.workpieceId, name: r.name, verdict: v.verdict, complete: v.complete, reasons: v.reasons.slice(0, 6),
+      findings: v.findings.slice(0, 8).map((f) => ({ kind: f.kind, message: f.message, ...(f.line !== undefined ? { line: f.line } : {}) })),
+      gougeMm: Math.round(v.gouge.depth * 1000) / 1000, leftMm: Math.round(v.left.depth * 1000) / 1000, feedMoves: v.feedMoves
+    }
+  })
+  const bare = tools.filter((t) => t.holder === undefined).map((t) => t.name)
+  if (bare.length > 0) notes.push(`No holder is described for ${bare.join(", ")}: shank and holder clearance is not claimed`)
+  const faults = registers.some((r) => r.verdict === "faults")
+  const clean = registers.length > 0 && registers.every((r) => r.verdict === "clean") && replay.part.length > 0 && bare.length === 0
+  if (registers.length === 0) notes.push("No register of the program could be replayed")
+  return {
+    release: faults ? "blocked" : clean ? "verified-program" : "preview", programHash: sha256(gcode), registers, notes,
+    basis: "The emitted text is replayed by the reference interpreter on a tri-dexel blank per workpiece register against the finished part and the tools as described. A pass is not controller acceptance or a machine qualification."
+  }
+}
+
 /**
  * Toolpaths that reach the workholding: every move (arcs by their box, cycles expanded) of every run, moved to the fixture's frame by
  * the workpiece's placement, against each clamp box grown by the tool's radius sideways and by its stick-out upwards from the tip.
@@ -136,15 +250,7 @@ export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) =
   if (workpieceIssues(setup).length > 0) return { programs: [], toolTable: plan.toolTable, toolLife: [], totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [...warnings, "The fixture is inconsistent: no program was generated"], issues }
   const ordered = setup.operations.filter((op) => op.enabled)
   const pockets = assignPockets(ordered)
-  /** The generator settings of an operation: its own, with the tool's size, its pocket and the setup's register. A rest pass that continues the operation before it cut with that operation's tool. */
-  const settingsOf = (op: Operation) => {
-    const before = ordered[ordered.indexOf(op) - 1]
-    return {
-      ...op.params,
-      toolDiameter: op.tool.diameter, flutes: op.tool.flutes, toolNumber: pockets.get(op.id)!, workOffset: setup.workOffset,
-      ...(op.fromPreviousStock && op.params.useRestMachining && before !== undefined ? { restToolDiameter: before.tool.diameter } : {})
-    }
-  }
+  const settingsOf = (op: Operation) => settingsFor(setup, op, ordered, pockets)
   const programs: GeneratedProgram[] = []
   // A sister tool has a pocket of its own, after the highest one the operations hold.
   const sisterPocket = new Map<string, number>()
