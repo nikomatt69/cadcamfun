@@ -157,6 +157,8 @@ describe("rest machining", () => {
 })
 
 describe("rest finishing (pencil)", () => {
+  /** Below this a point counts as cut at the crease: the row nearest the wall rides up its fillet, higher than a tool on the floor. */
+  const WALL_FOOT = -0.3
   const ball = (d: number): Tool => ({ id: "b", name: "ball", kind: "ballnose", diameter: d, flutes: 2, maxRpm: 20000 })
   // A floor at z = -6 with a wall rising to z = 0 along x >= 10: a concave crease where the wall meets the floor.
   const crease = () => buildPartModel([
@@ -172,7 +174,7 @@ describe("rest finishing (pencil)", () => {
   test("after a 6 mm ball, a 2 mm ball cuts only the strip beside the wall the big ball could not reach (and the stock's own edge)", () => {
     const rest = pencil("parallel", { angle: 90 })
     const everything = full("parallel")
-    const restPts = cutPoints(rest).filter((p) => p.z < -0.5)
+    const restPts = cutPoints(rest).filter((p) => p.z < WALL_FOOT)
     expect(restPts.length).toBeGreaterThan(5)
     // The crease is at x = 10. The 6 mm ball (radius 3) touches the floor out to x = 7 at best, so the 2 mm ball is wanted on the
     // floor between about x = 7 and the wall, and nowhere further out. The only other place the two balls differ is the stock's
@@ -190,9 +192,10 @@ describe("rest finishing (pencil)", () => {
 
   test("it follows the 2 mm ball's own drop-cutter path exactly where it does cut", () => {
     const part = crease()
-    const surface = new Surface(part.grid, part.dexels.top(-Infinity))
+    // The surface the generator drops the tool on: the ceiling of each column, not one ray through it.
+    const surface = new Surface(part.grid, part.conservative!.top(-Infinity))
     const cutter = cutterOf(ball(2))
-    const rest = cutPoints(pencil("parallel", { angle: 90 })).filter((p) => p.z < -0.5 && p.x < 24.9)
+    const rest = cutPoints(pencil("parallel", { angle: 90 })).filter((p) => p.z < WALL_FOOT && p.x < 24.9)
     expect(rest.length).toBeGreaterThan(5)
     for (const p of rest) expect(p.z).toBeCloseTo(Math.max(surface.tip(cutter, p.x, p.y), -6), 1)
   })
@@ -212,8 +215,8 @@ describe("rest finishing (pencil)", () => {
     expect(none.toolpath.moves.some((m) => m._tag === "Comment" && m.text.startsWith("nothing to cut"))).toBe(true)
     const smaller = pencil("parallel", { restFrom: { diameter: 1, kind: "ballnose" } })
     expect(smaller.warnings.join(" ")).toContain("smaller than this one")
-    const lenient = cutPoints(pencil("parallel", { angle: 90, restThreshold: 0.5 })).filter((p) => p.z < -0.5)
-    const strict = cutPoints(pencil("parallel", { angle: 90, restThreshold: 0.01 })).filter((p) => p.z < -0.5)
+    const lenient = cutPoints(pencil("parallel", { angle: 90, restThreshold: 0.5 })).filter((p) => p.z < WALL_FOOT)
+    const strict = cutPoints(pencil("parallel", { angle: 90, restThreshold: 0.01 })).filter((p) => p.z < WALL_FOOT)
     expect(lenient.length).toBeLessThan(strict.length)
   })
 
