@@ -76,6 +76,9 @@ export interface VerifyNcResult {
   readonly gouge: Deviation
   readonly left: Deviation
   readonly detached: number
+  /** Material the blank held before the replay, and what the replayed moves took out of it, mm³ (the mean of the three ray directions; true within `errorBound`). */
+  readonly stockVolume: number
+  readonly removedVolume: number
   readonly cell: number
   /** The declared error of every figure, mm. */
   readonly errorBound: number
@@ -95,6 +98,7 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   const { min, max } = request.stock
   const cell = triCellFor({ x: max.x - min.x, y: max.y - min.y, z: max.z - min.z }, request.cell ?? 0.1)
   const replay = new TriReplay({ min, max, cell, budget: request.budget ?? 2e9 })
+  const stockVolume = replay.stock.volumeMean()
   const cutters = new Map(request.tools.map((t) => [t.number, t.cutter] as const))
   const radiusOf = new Map(request.tools.map((t) => [t.number, t.cutter.diameter / 2] as const))
   const full = new Map<Cutter, ToolSolid>()
@@ -221,6 +225,7 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   const complete = reasons.length === 0
   return {
     complete, reasons, findings, gouge: verdict.gouge, left: verdict.left, detached: verdict.detached,
+    stockVolume, removedVolume: Math.max(0, stockVolume - replay.stock.volumeMean()),
     cell: verdict.cell, errorBound: verdict.errorBound, threshold, moves: run.segments.length, feedMoves,
     verdict: findings.some((f) => FAULT_KINDS.has(f.kind)) ? "faults" : complete ? "clean" : "incomplete"
   }

@@ -1810,7 +1810,7 @@ const cancelled = (error: unknown): { readonly status: "failed"; readonly issues
 /** A replay that did not run to the end: no verdict, no figures, the reason. */
 const failedReplay = (reason: string): cam.kernel.VerifyNcResult => ({
   complete: false, reasons: [`the replay did not finish: ${reason}`], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 },
-  detached: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
+  detached: 0, stockVolume: 0, removedVolume: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
 })
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))

@@ -334,7 +334,7 @@ describe("replay of a generated program: inputs and release", () => {
   const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", stock: { ...stock, x: 70, origin: { x: -35, y: -25, z: 0 } } }]
   const made = generateSetup(setup([op("a", t6), op("b", t3)], { workpieces: parts, stock }), geometryOf)
   const replay = program.setupReplay(setup([op("a", t6), op("b", t3)], { workpieces: parts, stock }), made.programs[0]!, geometryOf)
-  const result = (verdict: "clean" | "faults" | "incomplete") => ({ verdict, complete: verdict !== "incomplete", reasons: [], findings: verdict === "faults" ? [{ kind: "gouge" as const, message: "cut", line: 12 }] : [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, cell: 0.1, errorBound: 0.1, threshold: 0.1, moves: 10, feedMoves: 5 })
+  const result = (verdict: "clean" | "faults" | "incomplete") => ({ verdict, complete: verdict !== "incomplete", reasons: [], findings: verdict === "faults" ? [{ kind: "gouge" as const, message: "cut", line: 12 }] : [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, stockVolume: 1000, removedVolume: 100, cell: 0.1, errorBound: 0.1, threshold: 0.1, moves: 10, feedMoves: 5 })
 
   test("one blank per register (the part's own, else the setup's), each tool under its pocket as a kernel cutter", () => {
     expect(replay.registers.map((r) => [r.register, r.stock.min.x, r.stock.max.x])).toEqual([["G54", -30, 30], ["G55", -35, 35]])

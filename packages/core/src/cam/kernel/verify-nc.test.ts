@@ -100,6 +100,10 @@ describe("verifyNc: a program that machines several workpieces is replayed once 
     expect(second.verdict).toBe("faults")
     expect(second.gouge.depth).toBeGreaterThan(0.08)
     expect(second.findings.find((f) => f.kind === "gouge")?.line).toBeGreaterThan(first.moves)
+    // Each blank loses its own material: the same 20 x 20 ring is cut in both frames, so both took out about the same volume of their own blank.
+    expect(first.stockVolume).toBeCloseTo(26 * 26 * 10, -2)
+    expect(first.removedVolume).toBeGreaterThan(1000)
+    expect(Math.abs(first.removedVolume - second.removedVolume) / first.removedVolume).toBeLessThan(0.1)
     // Without a register the whole text is replayed against one blank: the two parts' cuts add up on it.
     expect(verifyNc(request(nc)).feedMoves).toBe(first.feedMoves + second.feedMoves)
   })

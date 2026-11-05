@@ -12979,6 +12979,8 @@ export type ToolpathGeneratorVerifyNcOutput = {
   gouge: { volume: number; depth: number; rays: number; at?: { x: number; y: number; z: number } }
   left: { volume: number; depth: number; rays: number; at?: { x: number; y: number; z: number } }
   detached: number
+  stockVolume?: number
+  removedVolume?: number
   cell: number
   errorBound: number
   threshold: number

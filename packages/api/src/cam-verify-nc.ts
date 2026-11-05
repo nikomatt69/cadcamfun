@@ -79,6 +79,9 @@ export const CamVerifyNcResult = Schema.Struct({
   gouge: deviation,
   left: deviation,
   detached: Schema.Finite,
+  /** The blank before the replay and what the replayed moves took out of it, mm³. */
+  stockVolume: Schema.optionalKey(Schema.Finite),
+  removedVolume: Schema.optionalKey(Schema.Finite),
   cell: Schema.Finite,
   /** The declared error of every figure, mm. */
   errorBound: Schema.Finite,

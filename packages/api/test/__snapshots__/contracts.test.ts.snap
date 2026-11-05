@@ -140477,6 +140477,12 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "type": "array",
                     },
+                    "removedVolume": {
+                      "type": "number",
+                    },
+                    "stockVolume": {
+                      "type": "number",
+                    },
                     "threshold": {
                       "type": "number",
                     },

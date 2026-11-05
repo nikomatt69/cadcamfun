@@ -163,6 +163,9 @@ export interface SetupEvidence {
     /** The lattice cell and the declared error of every figure above, mm. */
     readonly cellMm: number
     readonly errorBoundMm: number
+    /** What the program's moves under this register took out of this workpiece's own blank, and the blank, mm³. */
+    readonly removedMm3: number
+    readonly stockMm3: number
   }>
   readonly notes: ReadonlyArray<string>
   readonly basis: string
@@ -180,7 +183,7 @@ export const setupEvidence = (gcode: string, replay: SetupReplay, results: Reado
     return {
       register: r.register, workpieceId: r.workpieceId, name: r.name, verdict: v.verdict, complete: v.complete, reasons: v.reasons.slice(0, 6),
       findings: v.findings.slice(0, 8).map((f) => ({ kind: f.kind, message: f.message, ...(f.line !== undefined ? { line: f.line } : {}) })),
-      gougeMm: Math.round(v.gouge.depth * 1000) / 1000, leftMm: Math.round(v.left.depth * 1000) / 1000, feedMoves: v.feedMoves, cellMm: Math.round(v.cell * 1000) / 1000, errorBoundMm: Math.round(v.errorBound * 1000) / 1000
+      gougeMm: Math.round(v.gouge.depth * 1000) / 1000, leftMm: Math.round(v.left.depth * 1000) / 1000, feedMoves: v.feedMoves, removedMm3: Math.round(v.removedVolume), stockMm3: Math.round(v.stockVolume), cellMm: Math.round(v.cell * 1000) / 1000, errorBoundMm: Math.round(v.errorBound * 1000) / 1000
     }
   })
   const bare = tools.filter((t) => t.holder === undefined).map((t) => t.name)

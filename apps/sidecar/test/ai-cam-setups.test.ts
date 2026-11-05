@@ -152,6 +152,11 @@ test("setup_generate replays every register against the finished part: a pass ne
   // The part is centred on the blank (the stock centre is the origin): both registers replay clean; without a holder the release stays a preview.
   const bare = await generate(cutter, blank(76, 56, 30, 20))
   expect(bare.programs[0].evidence.registers.map((r: { register: string; verdict: string; gougeMm: number }) => [r.register, r.verdict, r.gougeMm])).toEqual([["G54", "clean", 0], ["G55", "clean", 0]])
+  // Each register removed material from its own blank: the same moves, the same volume, not the sum of both on one blank.
+  const [first, second] = bare.programs[0].evidence.registers as Array<{ removedMm3: number; stockMm3: number }>
+  expect(first!.removedMm3).toBeGreaterThan(1000)
+  expect(Math.abs(first!.removedMm3 - second!.removedMm3)).toBeLessThan(first!.removedMm3 * 0.02)
+  expect(first!.stockMm3).toBeCloseTo(76 * 56 * 12, -3)
   expect(bare.programs[0].release).toBe("preview")
   expect(bare.programs[0].evidence.notes.join(" ")).toMatch(/No holder is described for Endmill 6/)
   const held = await generate({ ...cutter, holder: { diameter: 32, length: 40 } }, blank(76, 56, 30, 20))
