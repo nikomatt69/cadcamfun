@@ -3,6 +3,27 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.99 (November 2026)
+
+## Core
+
+- A carried stock says when an earlier setup cut under an overhang: part-coverage is unresolved and names the setups
+- The replay of a program reports how much material each workpiece's own blank lost
+- Setup_generate replays each program per work offset against its blank and stores the release with it; cam review reads it back
+- VerifyNc replays one work offset register against its own blank, and a setup program gets its replay inputs and a release level
+- Fixture boxes and machine travel checked against the placed blanks, clamp reach reported per operation, tool life counted with sister tools taking over on their own pocket
+
+## Desktop
+
+- The drawing of a setup example is built again when another example of the same kind is picked
+- The kernel panel builds a job of several setups: one program per setup on its own work offset, the job's release, either program opens in the editor
+- A setup's program row saves it as a project program, and the kernel job labels in all locales
+- The preview turns each part by its rotary index, an operation can wait for several others
+
+## Documentation
+
+- Spec 74 final state of the multi-workpiece round
+
 ## v0.1.98 (November 2026)
 
 - No notable changes
