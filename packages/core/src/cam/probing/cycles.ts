@@ -118,9 +118,20 @@ class Builder {
     const into = (start.x - expected.x) * -dir.x + (start.y - expected.y) * -dir.y + (start.z - expected.z) * -dir.z
     if (!(into > 0)) throw new RangeError(`touch ${name}: the probe starts past the surface it is to find`)
     const storeOf = (prefix: string, axes: ReadonlyArray<Axis>): { x?: VarRef; y?: VarRef; z?: VarRef } => Object.fromEntries(axes.map((a) => [a, this.v(`${prefix}${a}`)]))
+    // A control that reports in the work offset's frame under a tilted plane (`skipFrame: "work"`): all three go through the plane's axes.
+    const frame = this.ctx.skipFrame === "work" ? this.ctx.frame : undefined
+    const touchMove = (prefix: string, axes: ReadonlyArray<Axis>, feed: number): void => {
+      if (frame === undefined) { this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed, kind: "touch", onMiss: "alarm", store: storeOf(prefix, axes) }); return }
+      this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed, kind: "touch", onMiss: "alarm", store: storeOf(`${prefix}w`, ["x", "y", "z"]) })
+      const w = (a: Axis): Expr => subE(this.e(`${prefix}w${a}`), frame.origin[a])
+      for (const a of axes) {
+        const u = a === "x" ? frame.xAxis : a === "y" ? frame.yAxis : frame.zAxis
+        this.moves.push({ _tag: "Assign", variable: this.v(`${prefix}${a}`), value: add(add(mul(w("x"), u.x), mul(w("y"), u.y)), mul(w("z"), u.z)) })
+      }
+    }
     if (p.doubleTouch) {
       const moving = (["x", "y", "z"] as const).filter((a) => Math.abs(dir[a]) > 1e-12)
-      this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed: p.feeds.fast, kind: "touch", onMiss: "alarm", store: storeOf(`${name}f`, moving) })
+      touchMove(`${name}f`, moving, p.feeds.fast)
       const back = { x: expected.x - dir.x * p.backoff, y: expected.y - dir.y * p.backoff, z: expected.z - dir.z * p.backoff }
       const set: Partial<Record<Axis, Expr>> = {}
       for (const a of moving) set[a] = subE(this.e(`${name}f${a}`), dir[a] * p.backoff)
@@ -129,9 +140,9 @@ class Builder {
       this.at = expected
       this.computed = {}
       this.leave(back, set)
-      this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed: p.feeds.touch, kind: "touch", onMiss: "alarm", store: storeOf(name, store) })
+      touchMove(name, store, p.feeds.touch)
     } else {
-      this.moves.push({ _tag: "Probe", to: expected, direction: dir, overtravel, feed: p.feeds.touch, kind: "touch", onMiss: "alarm", store: storeOf(name, store) })
+      touchMove(name, store, p.feeds.touch)
     }
     this.touches++
     this.contacts.push({ name, expected, direction: dir })

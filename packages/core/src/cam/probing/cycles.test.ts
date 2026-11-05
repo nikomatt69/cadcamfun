@@ -222,3 +222,30 @@ describe("the tool setter cycles", () => {
     expect("refused" in planProbeCycle({ kind: "tool-radius", tool: 1, nominalRadius: 5 }, sctx({ setter: { ...setter, discDiameter: undefined } }))).toBe(true)
   })
 })
+
+describe("a control that reports contacts in the work frame under a tilted plane", () => {
+  const t = Math.PI / 6
+  const frame = { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: Math.cos(t), z: Math.sin(t) }, zAxis: { x: 0, y: -Math.sin(t), z: Math.cos(t) } }
+  const cycle: ProbeCycle = { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5 }
+  // the bore in the plane's coordinates, carried into the work offset's by the plane: a wall through the frame
+  const inFrame = plateWorld({ min: { x: 0, y: 0, z: -20 }, max: { x: 100, y: 60, z: 0 }, bores: [{ centre: { x: 30.2, y: 29.9 }, radius: 10 }] })
+  const world: ProbeWorld3 = {
+    touch: (from, to, stylus) => {
+      const toF = (p: Vec3): Vec3 => { const d = p; return { x: d.x * frame.xAxis.x + d.y * frame.xAxis.y + d.z * frame.xAxis.z, y: d.x * frame.yAxis.x + d.y * frame.yAxis.y + d.z * frame.yAxis.z, z: d.x * frame.zAxis.x + d.y * frame.zAxis.y + d.z * frame.zAxis.z } }
+      const hit = inFrame.touch(toF(from), toF(to), { ...stylus, axis: { x: 0, y: 0, z: 1 } })
+      if (hit === undefined) return undefined
+      const L = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z)
+      const k = hit.travelled / L
+      return { tip: { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, z: from.z + (to.z - from.z) * k }, normal: hit.normal, travelled: hit.travelled }
+    }
+  }
+  test("the results are the plane's either way", () => {
+    for (const skipFrame of ["program", "work"] as const) {
+      const r = planProbeCycle(cycle, { ...ctx(), frame, skipFrame })
+      if ("refused" in r) throw new Error(r.refused)
+      const out = runProbeMoves(r.moves, world, machine(probe, { frame, skipFrame, start: { x: 0, y: 0, z: 30 } }), { results: r.results, units: r.units })
+      expect(out.stopped).toBeUndefined()
+      close(out.results, { x: 30.2, y: 29.9, diameter: 20 })
+    }
+  })
+})

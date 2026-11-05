@@ -518,11 +518,12 @@ export const encodeProgram = Schema.encodeEffect(ProgramSchema)
 export const makeProgram = (
   name: string,
   toolpaths: ReadonlyArray<Toolpath>,
-  options: { readonly units?: ProgramUnits; readonly workOffset?: WorkOffset; readonly metadata?: Readonly<Record<string, string>> } = {}
+  options: { readonly units?: ProgramUnits; readonly workOffset?: WorkOffset; readonly workOffsetRef?: Program["workOffsetRef"]; readonly metadata?: Readonly<Record<string, string>> } = {}
 ): Program => ({
   name,
   units: options.units ?? "mm",
   workOffset: options.workOffset ?? "G54",
+  ...(options.workOffsetRef !== undefined ? { workOffsetRef: options.workOffsetRef } : {}),
   toolpaths,
   ...(options.metadata !== undefined ? { metadata: options.metadata } : {})
 })

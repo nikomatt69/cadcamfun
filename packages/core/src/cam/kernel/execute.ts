@@ -1008,6 +1008,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   }
   const programOptions = {
     ...(job.workOffset !== undefined ? { workOffset: job.workOffset } : {}),
+    ...(job.workOffsetRef !== undefined ? { workOffsetRef: job.workOffsetRef } : {}),
     metadata: { ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? { setup: `Manual ${job.setupOrientation} setup - refixture and touch off; workholding unverified` } : {}), material: material.name, machine: machine.name, stock: `${width.toFixed(2)} x ${depthY.toFixed(2)} x ${(sMax.z - sMin.z).toFixed(2)} mm` }
   }
   let program: Program = makeProgram(job.name, toolpaths, programOptions)

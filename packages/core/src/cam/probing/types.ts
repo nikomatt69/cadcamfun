@@ -67,6 +67,8 @@ export interface ProbeContext {
   readonly prefix: string
   /** The tilted plane the cycle runs in (5-axis probing); absent: the work offset itself. */
   readonly frame?: WorkFrame
+  /** The frame the control reports a contact in under `frame` (default the program's, the plane's own). */
+  readonly skipFrame?: "program" | "work"
   readonly setter?: ToolSetter
   /** Machine position of the active work zero: the tool setter is placed in machine coordinates, the cycles run in the work offset's. */
   readonly workOrigin?: Vec3

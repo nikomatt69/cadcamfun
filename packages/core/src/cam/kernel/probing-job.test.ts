@@ -189,6 +189,22 @@ describe("probing inside a tilted plane (5-axis: the plane the control swivels t
   })
 })
 
+describe("a job in an offset other than G54..G59", () => {
+  for (const [label, machine, ref, word] of [
+    ["fanuc G54.1 P3", machineOf("vmc-standard"), { kind: "extended", p: 3 }, "G54.1 P3"],
+    ["siemens G505", machineOf("siemens-840d-vmc"), { kind: "frame", n: 5 }, "G505"],
+    ["linuxcnc G59.2", machineOf("vmc-standard", "linuxcnc"), { kind: "linuxcnc", p: 8 }, "G59.2"]
+  ] as const) {
+    test(`${label}: selected in the program, probed and released`, () => {
+      const op = probeOp("bore", { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }, [{ kind: "set-offset", ref, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }])
+      const art = ok(runJob(jobOf(machine, [op], { workOffsetRef: ref })))
+      expect(art.nc.split("\n").some((l) => l.includes(word))).toBe(true)
+      expect(art.claims.find((c) => c.id === "nc-replay")?.status).toBe("passed")
+      expect(art.claims.find((c) => c.id === "probing")?.status).toBe("passed")
+    })
+  }
+})
+
 describe("native probe cycles in a job", () => {
   const nativeOp = (id: string, cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction> = []): OperationSpec => ({ id, strategy: "probe", tool: device.id, cycle, actions, native: true })
   const bore = nativeOp("bore", { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }, [setOffset({ X: "x", Y: "y" })])

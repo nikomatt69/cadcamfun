@@ -703,8 +703,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 84.2 || g === 84.3) { motion = g === 84.2 ? 84 : 74; cycleStarted = true }
         else if (options.okuma === true && g === 15) {
           const h = get("H")
-          if (h === undefined || !Number.isInteger(h) || h < 1 || h > 6) { errors.push(`line ${physical}: G15 needs H1-H6 (work coordinate systems beyond 6 are not modelled)`); unsupported.push({ line: physical, word: "G15" }) }
-          else activeWork = 53 + h
+          if (h === undefined || !Number.isInteger(h) || h < 1 || h > 50) { errors.push(`line ${physical}: G15 needs H1-H50 (work coordinate systems beyond 50 are not modelled)`); unsupported.push({ line: physical, word: "G15" }) }
+          else activeWork = h <= 6 ? 53 + h : 1000 + h - 6
         } else if (options.okuma === true && (g === 56 || g === 57 || g === 58)) {
           // OSP tool length offsets: no geometric effect on the programmed path.
         } else if (g === 32 || g === 33) motion = 32
@@ -735,6 +735,10 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 52) setting = "g52"
         else if (g === 10) setting = "g10"
         else if (g >= 54 && g <= 59 && Number.isInteger(g)) activeWork = g
+        // Extended offsets (G54.1 P / G154 P, Siemens G505.., LinuxCNC G59.1..): selected, with no value the replay knows unless G10 set one.
+        else if (g === 54.1 || g === 154) activeWork = 1000 + (get("P") ?? 1)
+        else if (g >= 505 && g <= 599 && Number.isInteger(g)) activeWork = g
+        else if (g === 59.1 || g === 59.2 || g === 59.3) activeWork = Math.round(g * 10)
         else if (g === 68) frameWord = "g68"
         else if (g === 68.2) frameWord = "g68.2"
         else if (g === 69) frameWord = "g69"

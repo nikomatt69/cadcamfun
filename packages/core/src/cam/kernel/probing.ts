@@ -91,7 +91,7 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   const prefix = op.resultPrefix ?? `p${env.index + 1}_`
   const frame = jobFrameOf(env.job)
   const ctx = {
-    probe, safeZ: env.stockTop + 15, ...(frame !== undefined ? { frame } : {}), clearance: op.clearance ?? 3, search: op.search ?? 6, prefix,
+    probe, safeZ: env.stockTop + 15, ...(frame !== undefined ? { frame, ...(machine.probing !== undefined ? { skipFrame: machine.probing.skipFrame } : {}) } : {}), clearance: op.clearance ?? 3, search: op.search ?? 6, prefix,
     ...(machine.probing?.toolSetter !== undefined ? { setter: machine.probing.toolSetter } : {}),
     ...(setterOrigin !== undefined ? { workOrigin: setterOrigin } : {})
   }
