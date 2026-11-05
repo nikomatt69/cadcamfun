@@ -3,6 +3,10 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.96 (November 2026)
+
+- No notable changes
+
 ## v0.1.95 (November 2026)
 
 ## Sidecar
