@@ -291,7 +291,7 @@ Siemens MEAS/MEAW, Klartext TCH PROBE 0; byte-identical without the new options.
 `runProbeMoves`; interpreter suite unchanged.
 
 ### 5.12 Kernel operation (`kernel/contracts.ts`, `schema.ts`, `probing.ts`, `execute.ts`)
-**Status: done.** The closed loop, tilted plane and refusals are in `probing-job.test.ts`. Tool-setter cycles and calibrations are run through `cam.probing`, stylus and rotary calibration are refused as job operations.
+**Status: done.** The closed loop, tilted plane and refusals are in `probing-job.test.ts`. Stylus and rotary calibration are refused as job operations: they run through `cam.probing`.
 `ProbeOperationSpec {strategy: "probe", cycle, actions?, search?, clearance?, doubleTouch?, resultPrefix?, native?}` (`tool` =
 device id) in `OperationSpec`; `CuttingOperationSpec = Exclude<…>`; `OperationOutcome.cut |= "probe"`, `.probe?:
 ProbeOperationSummary {cycle, touches, device, nominal, variables, offsetTargets, native?}`; `CamArtifact.probing? {operations,

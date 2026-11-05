@@ -62,6 +62,20 @@ describe("native probe cycles", () => {
     })
   }
 
+  test("heidenhain tool cycles: 481 writes the length with a tool-offset, 482 the radius, a broken-tool check blocks", () => {
+    const row = (cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction>): string => {
+      const n = nativeCycle(cycle, actions, "heidenhain-ts", [{ _tag: "Rapid", to: { x: 0, y: 0, z: 30 } }], nctx)
+      if ("refused" in n) throw new Error(n.refused)
+      return write("heidenhain", n.moves, true)
+    }
+    const length: ProbeAction = { kind: "tool-offset", tool: 5, quantity: "length", result: "length", part: "geometry" }
+    expect(row({ kind: "tool-length", tool: 5 }, [length])).toMatch(/TCH PROBE 481 TOOL LENGTH[\s\S]*Q340=\+0/)
+    expect(row({ kind: "tool-radius", tool: 5 }, [])).toMatch(/TCH PROBE 482 TOOL RADIUS[\s\S]*Q340=\+1/)
+    expect(row({ kind: "broken-tool", tool: 5, nominalLength: 80 }, [])).toMatch(/TCH PROBE 481[\s\S]*Q340=\+2/)
+    const wear = nativeCycle({ kind: "tool-length", tool: 5 }, [{ ...length, part: "wear" } as ProbeAction], "heidenhain-ts", [], nctx)
+    expect("refused" in wear && wear.refused).toMatch(/wear/)
+  })
+
   test("a marked program runs exactly as the inline one", () => {
     for (const style of ["heidenhain-ts", "renishaw", "siemens-cycles"] as const) {
       const world = plateWorld({ min: { x: 0, y: 0, z: -20 }, max: { x: 100, y: 60, z: 0 }, bores: [{ centre: { x: 30, y: 30 }, radius: 10 }] }, { translate: { x: 100.3, y: 199.8, z: -300 } })
