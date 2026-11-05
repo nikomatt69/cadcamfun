@@ -239,7 +239,6 @@ const inMachine = (segments: ReadonlyArray<GSegment>, madeIn: ReadonlyArray<numb
   })
 
 export const interpretGcode = (text: string, options: InterpretOptions = {}): InterpretResult => {
-  if (options.probeMoves === true) text = text.replace(/\bMEAS=1\s+G1\b/g, "G38.2")
   const segments: GSegment[] = []
   /** The offset each segment was made in, for `frame: "machine"`. */
   const madeIn: number[] = []
@@ -256,6 +255,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       unsupported.push({ line: Number(/^line (\d+)/.exec(message)?.[1] ?? 0), word: "macro" })
     }
   }
+  // After the macros, which leave a block as it is unless a host ran it: Siemens' measuring move reads as any probing move.
+  if (options.probeMoves === true) text = text.replace(/\bMEAS=1\s+G1\b/g, "G38.2")
   if (/\bBEGIN PGM\b/i.test(text)) {
     text = legacyWorkingPlane(text)
     const decoded = decodeKlartext(text, (tool) => options.toolRadius?.(undefined, tool), options.probeMoves === true)
