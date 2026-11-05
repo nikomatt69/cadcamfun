@@ -190,8 +190,16 @@ export const runProbeMoves = (moves: ReadonlyArray<Move>, world: ProbeWorld3, ma
   let pose = { a: 0, b: 0, c: 0 }
   const frame = machine.frame
   const offset = (): OffsetEntry => getOffset(table, machine.active)
-  const progToMachine = (p: Vec3): Vec3 => workToMachine(offset(), frameToWork(frame, p))
-  const machineToProg = (m: Vec3): Vec3 => workToFrame(frame, machineToWork(offset(), m))
+  // A coordinate rotation (G68) turns the program's points about its centre, inside the frame.
+  let rotation: { readonly centre: { readonly x: number; readonly y: number }; readonly angle: number } | undefined
+  const turn = (p: Vec3, sign: 1 | -1): Vec3 => {
+    if (rotation === undefined) return p
+    const c = Math.cos(rotation.angle * sign), s = Math.sin(rotation.angle * sign)
+    const x = p.x - rotation.centre.x, y = p.y - rotation.centre.y
+    return { x: rotation.centre.x + c * x - s * y, y: rotation.centre.y + s * x + c * y, z: p.z }
+  }
+  const progToMachine = (p: Vec3): Vec3 => workToMachine(offset(), frameToWork(frame, turn(p, 1)))
+  const machineToProg = (m: Vec3): Vec3 => turn(workToFrame(frame, machineToWork(offset(), m)), -1)
   const firstTarget = moves.find((m) => m._tag === "Rapid" || m._tag === "Linear" || m._tag === "Probe") as { readonly to: Vec3 } | undefined
   const startProg = machine.start ?? firstTarget?.to ?? { x: 0, y: 0, z: 0 }
   let at = progToMachine(startProg) // tip, machine coordinates
@@ -343,6 +351,7 @@ export const runProbeMoves = (moves: ReadonlyArray<Move>, world: ProbeWorld3, ma
         }
         break
       }
+      case "Rotation": rotation = m.on ? { centre: m.centre, angle: val(m.angle) * DEG } : undefined; break
       case "Alarm": stop(m.code, m.text, i); break
       case "Report": reports.push({ label: m.label, values: Object.fromEntries(m.values.map((v) => [v.name, val(v.value)])) }); break
       case "Stop": if (!m.optional) stopped = `program stop at move ${i}`; break
@@ -366,6 +375,7 @@ export const runProbeMoves = (moves: ReadonlyArray<Move>, world: ProbeWorld3, ma
     inspections: options.characteristics === undefined ? [] : evaluateInspection(results, options.characteristics),
     alarms,
     reports,
+    ...(rotation !== undefined ? { rotation } : {}),
     ...(stopped !== undefined ? { stopped } : {}),
     path
   }

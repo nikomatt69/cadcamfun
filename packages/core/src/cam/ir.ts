@@ -208,6 +208,13 @@ export const ReportSchema = Schema.TaggedStruct("Report", {
   values: Schema.Array(Schema.Struct({ name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(24)), value: ExprSchema })).check(Schema.isMaxLength(32))
 })
 
+/**
+ * Coordinate rotation by the control (`G68 X Y R`, cancelled with `G69`): from here on the moves are turned by `angle` (degrees, computed)
+ * about `centre` (program coordinates), to the end of the program or `on: false`. What a measured rotation of the part hands to the cutting
+ * toolpaths that follow (spec 73 §5.7). A control without the word refuses the program.
+ */
+export const RotationSchema = Schema.TaggedStruct("Rotation", { on: Schema.Boolean, centre: Vec2Schema, angle: ExprSchema })
+
 /** Program stop: `M0`, or `M1` (`optional`, only when the operator's optional-stop switch is on). */
 export const StopSchema = Schema.TaggedStruct("Stop", { optional: Schema.Boolean })
 
@@ -238,7 +245,8 @@ export const MoveSchema = Schema.Union([
   OffsetUpdateSchema,
   AlarmSchema,
   ReportSchema,
-  StopSchema
+  StopSchema,
+  RotationSchema
 ])
 
 export type RapidMove = typeof RapidSchema.Type
@@ -323,13 +331,13 @@ export const arcExtrema = (move: ArcMove, from: Vec3): ReadonlyArray<Vec3> => {
 }
 
 /** A move that moves nothing: it is data for the post (a variable, a macro, a branch, a message) or for the operator. */
-export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "CycleBegin" | "CycleEnd" | "Message" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" }> =>
+export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "CycleBegin" | "CycleEnd" | "Message" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" | "Rotation" }> =>
   move._tag === "Assign" || move._tag === "CycleBegin" || move._tag === "CycleEnd" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message" ||
-  move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop"
+  move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop" || move._tag === "Rotation"
 
 /** A move of the probing set (spec 73): a post writes it only with `Dialect.probing`. */
-export const isProbingMove = (move: Move): move is Extract<Move, { readonly _tag: "Probe" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" }> =>
-  move._tag === "Probe" || move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop"
+export const isProbingMove = (move: Move): move is Extract<Move, { readonly _tag: "Probe" | "OffsetUpdate" | "Alarm" | "Report" | "Stop" | "Rotation" }> =>
+  move._tag === "Probe" || move._tag === "OffsetUpdate" || move._tag === "Alarm" || move._tag === "Report" || move._tag === "Stop" || move._tag === "Rotation"
 
 /** Length of a move from `from`; arcs use the true radius and sweep and include the helical rise. */
 export const moveLength = (move: Move, from: Vec3): number => {
@@ -367,6 +375,7 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "Alarm":
     case "Report":
     case "Stop":
+    case "Rotation":
       return 0
   }
 }

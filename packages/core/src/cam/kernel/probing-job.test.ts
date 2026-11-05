@@ -4,7 +4,10 @@ import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type KernelProbing, type Prob
 import type { ProbeAction, ProbeCycle } from "../probing/types.ts"
 import { findMachine } from "./machines.ts"
 import { prepareJob, runJob, type CamArtifact, type KernelMachine, type ManufacturingJob, type OperationSpec } from "./index.ts"
-import { probeRefusal, simulateProbing } from "./probing.ts"
+import { nominalProbeWorld, probeRefusal, simulateProbing } from "./probing.ts"
+import { interpretGcode } from "../testing/gcode-interpreter.ts"
+import { createNcProbeHost } from "../testing/probe-machine.ts"
+import { dialectOf } from "../post/index.ts"
 import type { ProbeOperationSpec } from "./contracts.ts"
 import { workplaneFrame } from "./workplane.ts"
 
@@ -299,5 +302,79 @@ describe("calibration as operations of a job", () => {
     const op: OperationSpec = { id: "rot", strategy: "probe", tool: device.id, cycle: { kind: "rotary-axis", axis: "C", sphere: { centre: ballAt, diameter: 25 }, angles: [0, 2, 4] } }
     const r = prepareJob(jobOf(machineOf("vmc-standard"), [op]))
     expect(r.status === "failed" && r.issues[0]!.message).toMatch(/needs a rotary table/)
+  })
+})
+
+describe("the closed loop on the machine: the cut replayed in machine coordinates against the part where it really sits", () => {
+  const wall = 100, depth = 60
+  // A block 100 x 60 x 20 with its corner at the work zero, clamped `shift` away and turned by `theta`; a profile around it.
+  const block = (): Brep => transformBrep(makeBox(wall, depth, 20), at(0, 0, -20))
+  const R = 5
+  const outline = [{ x: 0, y: 0 }, { x: wall, y: 0 }, { x: wall, y: depth }, { x: 0, y: depth }]
+  const cut: OperationSpec = { id: "wall", strategy: "profile", tool: "flat-10", loop: outline, side: "outside", top: 0, bottom: -5, finish: true, leadIn: "direct" }
+  const corner: ProbeCycle = { kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5, top: 0, inset: 15 }
+  const G54Ref = { kind: "g5x" as const, code: "G54" as const }
+  const jobWith = (actions: ReadonlyArray<ProbeAction>): ManufacturingJob => {
+    const body = block()
+    return {
+      schemaVersion: 1, id: "loop", name: "Loop", material: "6061", machine: machineOf("vmc-standard"), origin: "stock-corner",
+      part: { kind: "elements", elements: [{ id: "p", type: "brep", brep: body, x: 0, y: 0, z: 0 }] }, ...blank(body),
+      stock: { min: { x: -12, y: -12, z: -20 }, max: { x: wall + 12, y: depth + 12, z: 0 } }, stockModel: undefined as never,
+      operations: [probeOp("corner", corner, actions), cut]
+    } as ManufacturingJob
+  }
+  const shift = { x: 0.6, y: -0.4, z: 0 }, theta = 0.25 * Math.PI / 180
+  // The work zero is the stock's corner, 12 mm off the block's.
+  const O = 12
+  const placement = { translate: shift, rotate: theta }
+  // Tool centre, in the part's own coordinates: how far inside the rectangle's offset by the cutter radius does the cut go?
+  const deepest = (art: CamArtifact, g54: { x: number; y: number; z: number }): number => {
+    const cr = interpretGcode(art.nc.replace(/#3000=\d+\([^)]*\)/g, "(ALARM)"), { frame: "machine", probeMoves: true, workOffsets: { G54: g54 }, macroHost: hostFor(art) })
+    const line = art.nc.split("\n").findIndex((l) => /OP2/.test(l)) + 1
+    let worst = -Infinity
+    for (const s of cr.segments) {
+      if (s.kind !== "linear" && s.kind !== "arc") continue
+      if (s.line <= line || s.to.z > -1) continue
+      for (let k = 0; k <= 40; k++) {
+        const t = k / 40
+        const px = s.from.x + (s.to.x - s.from.x) * t - shift.x, py = s.from.y + (s.to.y - s.from.y) * t - shift.y
+        const c = Math.cos(-theta), n = Math.sin(-theta)
+        const x = c * px - n * py - O, y = n * px + c * py - O
+        // Signed distance outside the block; the cutter must stay R clear of it.
+        const dx = Math.max(-x, x - wall), dy = Math.max(-y, y - depth)
+        const d = dx > 0 && dy > 0 ? Math.hypot(dx, dy) : Math.max(dx, dy)
+        worst = Math.max(worst, R - d)
+      }
+    }
+    return worst
+  }
+  let hostFor: (art: CamArtifact) => ReturnType<typeof createNcProbeHost>["expand"]
+
+  test("a turned block: the corner measured, G68 turns the cut and it clears the part; without the rotation it gouges", () => {
+    const job = jobWith([{ kind: "set-offset", ref: G54Ref, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }, { kind: "rotation", result: "rotation", via: "g68", policy: { mode: "set" } }])
+    const prepared = prepareJob(job)
+    if (prepared.status !== "ok") throw new Error(prepared.issues.map((i) => i.message).join("; "))
+    const art = ok(runJob(job))
+    expect(art.nc).toMatch(/G68 X12\.000 Y12\.000 R#\d+/)
+    expect(art.nc).toMatch(/G69/)
+    const runs = simulateProbing(prepared.value, { placement })
+    if ("refused" in runs) throw new Error(runs.refused)
+    const out = runs[0]!.outcome
+    expect(out.rotation!.angle).toBeCloseTo(theta, 6)
+    const g54 = out.offsets["G54"]!
+    // The corner of the block is at (O, O) on the turned table: the offset takes where it went to.
+    expect(g54.x).toBeCloseTo(shift.x + O * (Math.cos(theta) - Math.sin(theta)) - O, 6)
+    hostFor = () => createNcProbeHost({ world: nominalProbeWorld(prepared.value, placement), machine: { offsets: { entries: {} }, active: G54Ref, probe: device, skipFrame: "program" }, codes: dialectOf("fanuc")!.probing!, rewrite: true }).expand
+    expect(deepest(art, g54)).toBeLessThan(0.05)
+    // The same cut with the measured offset but without the turn cuts into the far corner of the block.
+    const flat = ok(runJob(jobWith([{ kind: "set-offset", ref: G54Ref, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }])))
+    expect(deepest(flat, g54)).toBeGreaterThan(0.2)
+  })
+
+  test("a control without G68 refuses the rotation with what to use", () => {
+    const job = jobWith([{ kind: "rotation", result: "rotation", via: "g68", policy: { mode: "set" } }])
+    const art = runJob({ ...job, machine: machineOf("vmc-standard", "linuxcnc") })
+    const text = art.status === "ok" ? art.value.issues.map((i) => i.message).join(" ") : art.issues.map((i) => i.message).join(" ")
+    expect(text).toMatch(/offset-r/)
   })
 })

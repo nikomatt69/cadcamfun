@@ -296,7 +296,7 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
       touch(progToMachine(target), line, "g38.2", block.stop)
       if (stopped === undefined) block.write(before.result, machineToProg(here())[before.axis] / unit)
       const e = machineToProg(here())
-      return `L X${e.x < 0 ? "-" : "+"}${Math.abs(e.x / unit).toFixed(4)} Y${e.y < 0 ? "-" : "+"}${Math.abs(e.y / unit).toFixed(4)} Z${e.z < 0 ? "-" : "+"}${Math.abs(e.z / unit).toFixed(4)} R0 F${Math.round(words0Feed)}`
+      return `TCH PROBE 0.1 X${e.x < 0 ? "-" : "+"}${Math.abs(e.x / unit).toFixed(4)} Y${e.y < 0 ? "-" : "+"}${Math.abs(e.y / unit).toFixed(4)} Z${e.z < 0 ? "-" : "+"}${Math.abs(e.z / unit).toFixed(4)} F${Math.round(words0Feed)}`
     }
     if (/^(L\s|CC\s|C\s)/.test(t)) {
       const kl = /^L\s+(.*)$/.exec(t)
@@ -411,7 +411,7 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
     touch(target, line, motion, block.stop)
     const e = machineToProg(here())
     const f = words.get("F")
-    return `G90 G1 X${(e.x / unit).toFixed(4)} Y${(e.y / unit).toFixed(4)} Z${(e.z / unit).toFixed(4)}${f !== undefined ? ` F${f}` : ""}`
+    return `G90 G31 X${(e.x / unit).toFixed(4)} Y${(e.y / unit).toFixed(4)} Z${(e.z / unit).toFixed(4)}${f !== undefined ? ` F${f}` : ""}`
   }
   const handle = (block: Parameters<typeof handleInner>[0]): boolean | string => {
     const r = handleInner(block)

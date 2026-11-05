@@ -38,7 +38,7 @@ import { assertCycleSafe } from "../cycle-safety.ts"
 import { fitSplineMoves, flattenSpline } from "../spline.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
-import { alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
+import { alarmBlocks, machineRapidWord, nativeProbeLines, offsetLines, rotationLines, protectedLines, reportLines, stopBlock, touchLines, type ProbeIo } from "./probing-writer.ts"
 import { addressOf } from "../work-offset.ts"
 import { isKlartextProbeCycle, klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import { lowerExprDepth, type WordExpr } from "../macro.ts"
@@ -347,6 +347,28 @@ class Writer {
     for (const line of reportLines(move, this.probeIo("Report"))) this.macroLine(line)
   }
 
+  /** Coordinate rotation in force: it is cancelled before the end of the program. */
+  rotated = false
+
+  rotationMove(move: Extract<Move, { readonly _tag: "Rotation" }>): void {
+    this.endCycle()
+    if (this.plane !== undefined) throw new RangeError(`${this.dialect.id}: a coordinate rotation inside a tilted plane is refused: the two frames are not composed here`)
+    const io = this.probeIo("Rotation")
+    const word = this.macro.word("R", move.angle)
+    for (const line of word.pre) this.macroLine(line)
+    for (const line of rotationLines(move.on, this.num(move.centre.x), this.num(move.centre.y), word.text, io)) this.block(line)
+    this.rotated = move.on
+    // The control turns what follows: the axis words of the next move are all stated again.
+    this.forgetModalState()
+  }
+
+  closeRotation(): void {
+    if (!this.rotated) return
+    for (const line of rotationLines(false, "", "", "", this.probeIo("Rotation"))) this.block(line)
+    this.rotated = false
+    this.forgetModalState()
+  }
+
   stop(optional: boolean): void {
     this.endCycle()
     this.probeIo("Stop")
@@ -516,6 +538,7 @@ class Writer {
    * position, the motion mode and the rotary words is gone: the next move states everything again.
    */
   applyPlane(plane: TiltedPlane): void {
+    if (this.rotated) throw new RangeError(`${this.dialect.id}: a tilted plane under a coordinate rotation is refused: the two frames are not composed here`)
     const codes = this.dialect.tiltedPlane
     if (codes === undefined) throw new RangeError(`${this.dialect.id}: this control has no tilted-plane words`)
     this.endCycle()
@@ -946,6 +969,9 @@ class Writer {
       case "Report":
         this.report(move)
         break
+      case "Rotation":
+        this.rotationMove(move)
+        break
       case "Stop":
         this.stop(move.optional)
         break
@@ -1292,6 +1318,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   // Leave the control with tool length compensation, never with tool-centre-point control still on
   // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
   if (w.macro.open > 0) throw new RangeError(`The program leaves ${w.macro.open} If or While open: every If needs its EndIf and every While its EndWhile`)
+  w.closeRotation()
   w.endTcp()
   w.leaveInverse()
   w.cancelPlane()

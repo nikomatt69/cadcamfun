@@ -42,7 +42,7 @@ export const MAX_CALL_DEPTH = 8
 export type { P3 } from "./frames.ts"
 
 export type GSegment =
-  | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly subLine?: number; readonly rotary?: RotaryAngles; readonly tcp?: true }
+  | { readonly kind: "rapid" | "linear"; /** A probing move (`probeMoves`): a touch, not a cut. */ readonly probe?: true; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly subLine?: number; readonly rotary?: RotaryAngles; readonly tcp?: true }
   | {
       readonly kind: "arc"
       readonly from: P3
@@ -76,6 +76,10 @@ export interface InterpretOptions {
    * stylus touches is not known before the machine runs). Off by default: the verifier and the evidence never see them as cuts.
    */
   readonly probeMoves?: boolean
+  /** The work offsets the control holds, by `offsetKey` (`G54`, `G54.1 P3`, `G505`, `G59.1`): read with `frame: "machine"`. */
+  readonly workOffsets?: Readonly<Record<string, { readonly x: number; readonly y: number; readonly z: number; /** Radians about the tool axis. */ readonly rotation?: number }>>
+  /** `machine`: the segments end in machine coordinates, through `workOffsets` for the offset active on each. Default `program`. */
+  readonly frame?: "program" | "machine"
   /**
    * The machine under the macro runtime (`createNcProbeHost(..).expand`): a probe program reads the positions the probe touched at, so
    * its macros cannot run without a part to touch. With `rewrite` the probing blocks come back as moves that end at the contact.
@@ -220,8 +224,25 @@ const legacyWorkingPlane = (text: string): string =>
     return `PLANE SPATIAL SPA${signed(a)} SPB${signed(b)} SPC${signed(c)}`
   }).join("\n")
 
+/** The table key of the interpreter's active offset number. */
+const offsetKeyOf = (work: number): string => (work >= 1000 ? `G54.1 P${work - 1000}` : work >= 591 && work <= 593 ? `G59.${work - 590}` : `G${work}`)
+
+/** Segments carried from the program's coordinates to the machine's, each through the offset it was made in. */
+const inMachine = (segments: ReadonlyArray<GSegment>, madeIn: ReadonlyArray<number>, table: NonNullable<InterpretOptions["workOffsets"]>): GSegment[] =>
+  segments.map((s, i) => {
+    if (s.kind === "dwell") return s
+    const e = table[offsetKeyOf(madeIn[i] ?? 54)] ?? { x: 0, y: 0, z: 0 }
+    const c = Math.cos(e.rotation ?? 0), n = Math.sin(e.rotation ?? 0)
+    const at = (p: P3): P3 => ({ x: e.x + c * p.x - n * p.y, y: e.y + n * p.x + c * p.y, z: e.z + p.z })
+    if (s.kind === "arc") { const q = at({ x: s.center.x, y: s.center.y, z: 0 }); return { ...s, from: at(s.from), to: at(s.to), center: { x: q.x, y: q.y } } }
+    return { ...s, from: at(s.from), to: at(s.to) }
+  })
+
 export const interpretGcode = (text: string, options: InterpretOptions = {}): InterpretResult => {
+  if (options.probeMoves === true) text = text.replace(/\bMEAS=1\s+G1\b/g, "G38.2")
   const segments: GSegment[] = []
+  /** The offset each segment was made in, for `frame: "machine"`. */
+  const madeIn: number[] = []
   const errors: string[] = []
   const unsupported: Array<{ line: number; word: string }> = []
   // Variables, expressions, jumps, loops and macro calls run first, as the control would: the replay then sees the program it cuts.
@@ -237,7 +258,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
   if (/\bBEGIN PGM\b/i.test(text)) {
     text = legacyWorkingPlane(text)
-    const decoded = decodeKlartext(text, (tool) => options.toolRadius?.(undefined, tool))
+    const decoded = decodeKlartext(text, (tool) => options.toolRadius?.(undefined, tool), options.probeMoves === true)
     // A fixed cycle that moves in a path is several lines: findings still name the Klartext line (and the source line behind it).
     lineMap = decoded.lines.map((l) => lineMap?.[l - 1] ?? l)
     text = decoded.text
@@ -350,6 +371,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const angles = rotaryOf()
     if (dist(pos, to) < 1e-12 && !turned(angles)) return
     turned(angles)
+    madeIn[segments.length] = activeWork
     segments.push(angles === undefined ? { kind: "rapid", from: pos, to, feed, line, ...inSub(), ...tcpMark() } : { kind: "rapid", from: pos, to, feed, line, ...inSub(), rotary: angles, ...tcpMark() })
     sample(line, to)
     rapidLength += dist(pos, to)
@@ -360,6 +382,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const angles = rotaryOf()
     if (dist(pos, to) < 1e-12 && !turned(angles)) return
     turned(angles)
+    madeIn[segments.length] = activeWork
     segments.push(angles === undefined ? { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), ...tcpMark() } : { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), rotary: angles, ...tcpMark() })
     sample(line, to)
     cutLength += dist(pos, to)
@@ -467,6 +490,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
     if (Math.hypot(target.x - pos.x, target.y - pos.y) < 1e-9 || sweep < 1e-12) sweep = 2 * Math.PI
     const length = Math.hypot(radiusStart * sweep, target.z - pos.z)
+    madeIn[segments.length] = activeWork
     segments.push({ kind: "arc", from: pos, to: target, center, clockwise, radiusStart, radiusEnd, feed: rate, line, ...inSub(), ...tcpMark() })
     sample(line, target)
     cutLength += length
@@ -972,7 +996,12 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     } else if (motion === 0 && hasAxis) rapid(target, lineNo)
     else if (motion === 1 && hasAxis) linear(target, lineNo, inverse ? feed * dist(start, target) : feedNow(false))
     else if (motion === 32 && hasAxis) linear(target, lineNo, feedNow(true))
-    else if (motion === 38 && hasAxis) linear(target, lineNo, feedNow(false))
+    else if (motion === 38 && hasAxis) {
+      const before = segments.length
+      linear(target, lineNo, feedNow(false))
+      const seg = segments[before]
+      if (seg !== undefined && seg.kind === "linear") segments[before] = { ...seg, probe: true }
+    }
     else if ((motion === 2 || motion === 3) && hasAxis && (plane !== 17 || (frame !== undefined && !frame.planar))) {
       const i = get("I"), j = get("J"), k = get("K"), r = get("R")
       const words = { ...(i !== undefined ? { i } : {}), ...(j !== undefined ? { j } : {}), ...(k !== undefined ? { k } : {}), ...(r !== undefined ? { r } : {}) }
@@ -1163,7 +1192,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   flushComp()
   drain()
 
-  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, orients, unsupported, tipControlSegments: tcpSegments, ...(states !== undefined ? { states } : {}) }
+  return { segments: options.frame === "machine" ? inMachine(segments, madeIn, options.workOffsets ?? {}) : segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, orients, unsupported, tipControlSegments: tcpSegments, ...(states !== undefined ? { states } : {}) }
 }
 
 // -- frame maths ----------------------------------------------------------------------------------------------------------

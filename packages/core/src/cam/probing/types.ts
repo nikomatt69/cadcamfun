@@ -190,6 +190,8 @@ export interface ProbeSimOutcome {
   readonly inspections: ReadonlyArray<InspectionVerdict>
   readonly alarms: ReadonlyArray<{ readonly code: number; readonly text: string; readonly moveIndex: number; readonly line?: number }>
   readonly reports: ReadonlyArray<{ readonly label: string; readonly values: Readonly<Record<string, number>> }>
+  /** The coordinate rotation in force at the end (a G68 the program set), radians. */
+  readonly rotation?: { readonly centre: Vec2; readonly angle: number }
   /** The program stopped before its end (an alarm, a stop, a missed touch). */
   readonly stopped?: string
   /** The tip's path, work coordinates of the offset active at each point. */

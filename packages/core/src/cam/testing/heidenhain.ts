@@ -21,7 +21,7 @@ export interface DecodedKlartext {
 }
 
 /** `toolRadius` gives the radius of a tool number: the cycles that mill a path (208) need it to replay the tool centre's path. */
-export const decodeKlartext = (text: string, toolRadius?: (tool: number) => number | undefined): DecodedKlartext => {
+export const decodeKlartext = (text: string, toolRadius?: (tool: number) => number | undefined, probeMoves = false): DecodedKlartext => {
   const unsupported: Array<{ line: number; word: string }> = []
   let orienting = false, orientCalled = false
   let dwell = false, tolerance = false, datum = false, inch = false, name: string | undefined, ended = false
@@ -123,6 +123,10 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     const end = /^END PGM ([A-Z0-9_]+) (MM|INCH)$/.exec(line)
     if (end) return end[1] !== name || (end[2] === "INCH") !== inch ? bad() : ended ? "" : "M30"
     if (/^CYCL DEF 247 (?:PRESETTING|DATUM SETTING)$/.test(line)) { datum = true; return "" }
+    // Touch probe cycle 0 with `probeMoves`: the second row is the move to the search end, read like any probing move.
+    if (probeMoves && /^TCH PROBE 0\.0\b/.test(line)) return ""
+    const touch = probeMoves ? /^TCH PROBE 0\.1\s+(.*)$/.exec(line) : null
+    if (touch !== null) return `G90 G31 ${touch[1]!.replace(/([XYZ])\+/g, "$1")}`
     // Tilted plane: the datum shift (cycle 7, absolute to the preset) is read as the local shift G52, the plane word goes to the replay as
     // it is (`PLANE SPATIAL` / `PLANE RESET`; the interpreter turns the frame).
     if (/^PLANE (?:SPATIAL|RESET)\b/.test(line)) return line

@@ -91,8 +91,7 @@ export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<Pro
         break
       }
       case "rotation": {
-        if (a.via === "g68") throw new RangeError("rotation via G68 is not written by the IR: use the offset's rotation (offset-r) or the table (table-c)")
-        if (a.ref === undefined) throw new RangeError("a rotation correction needs the work offset it goes into")
+        if (a.via !== "g68" && a.ref === undefined) throw new RangeError("a rotation correction needs the work offset it goes into")
         if (routine.units[a.result] !== "deg") throw new RangeError(`rotation: '${a.result}' is not an angle`)
         const problem = policyProblem({ ...a.policy, ...(a.policy.tolerance === undefined && a.policy.angleTolerance !== undefined ? { tolerance: 0 } : {}) })
         if (problem !== undefined && !/tolerance/.test(problem)) throw new RangeError(`rotation: ${problem}`)
@@ -104,7 +103,11 @@ export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<Pro
         if (c.alarm !== undefined) out.push(...guarded(c.alarm, [{ _tag: "Alarm", code: OFFSET_ALARM, text: "ROTATION CORRECTION OUT OF RANGE" }]))
         // A part turned by +t is aligned by turning the table by -t; the offset's own rotation takes +t.
         const value: Expr = a.via === "table-c" ? binary("-", num(0), { var: v }) : { var: v }
-        out.push(...guarded(c.write, [{ _tag: "OffsetUpdate", target: { kind: "work", ref: a.ref }, axis: a.via === "table-c" ? "C" : "R", mode: "add", value }]))
+        // G68 turns the cutting that follows about the point of the part that was measured: with a set-offset before it that point reads
+        // its nominal position, so the turn about the nominal point is the part's own.
+        out.push(...guarded(c.write, [a.via === "g68"
+          ? { _tag: "Rotation", on: true, centre: { x: routine.nominal["x"] ?? 0, y: routine.nominal["y"] ?? 0 }, angle: { var: v } }
+          : { _tag: "OffsetUpdate", target: { kind: "work", ref: a.ref! }, axis: a.via === "table-c" ? "C" : "R", mode: "add", value }]))
         break
       }
       case "tool-offset":

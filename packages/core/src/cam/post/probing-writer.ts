@@ -359,6 +359,15 @@ export const nativeProbeLines = (move: { readonly family: string; readonly numbe
   return [...words, `CYCLE${move.number}`, `G0 Z${num(p["z"]!)}`]
 }
 
+/**
+ * Coordinate rotation words: the Fanuc family's `G68 X Y R` / `G69`. Siemens (`ROT`), Okuma, Klartext and LinuxCNC are refused: none of the
+ * replays reads their word, and the offset's own rotation (`offset-r`) or the table (`table-c`) does the same there.
+ */
+export const rotationLines = (on: boolean, x: string, y: string, r: string, io: ProbeIo): string[] => {
+  if (io.codes.syntax !== "fanuc") return refuse(io, "a coordinate rotation (G68): correct the rotation through the offset (offset-r) or the table (table-c)")
+  return [on ? `G68 X${x} Y${y} R${r}` : "G69"]
+}
+
 /** The word of a rapid in machine coordinates (G53 / SUPA), or the reason the control has none. */
 export const machineRapidWord = (io: ProbeIo): { readonly before: string; readonly after?: string } => {
   switch (io.codes.syntax) {
