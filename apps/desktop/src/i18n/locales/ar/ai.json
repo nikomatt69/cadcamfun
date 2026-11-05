@@ -599,6 +599,8 @@
   "ai.catalog.write": "كتابة",
   "ai.catalog.destructive": "مُدمِّر",
   "ai.catalog.tools": "{count} أداة",
+  "ai.toolTitle.cad": "قراءة الرسم",
+  "ai.toolTitle.cad_edit": "تعديل الرسم",
   "ai.catalog.actions": "{count} إجراء",
   "ai.catalog.empty": "الفهرس غير متاح بعد.",
   "ai.catalog.unavailable": "لم يستجب المضيف.",

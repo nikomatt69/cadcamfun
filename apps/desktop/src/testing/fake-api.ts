@@ -89,7 +89,7 @@ const generatorRoute = (kind: string, body: unknown): { readonly status: number;
 
 export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
   const now = options.now ?? (() => new Date().toISOString())
-  const common = () => ({ createdAt: now(), updatedAt: now(), ownerId: "user-local", organizationId: null, isPublic: false })
+  const common = () => ({ createdAt: now(), updatedAt: now(), ownerId: "user-local", organizationId: null, isPublic: false, version: 1 })
   const store: FakeStore = {
     projects: (options.seed?.projects ?? []).map((p) => ({ ...common(), description: null, ...p })),
     drawings: [],

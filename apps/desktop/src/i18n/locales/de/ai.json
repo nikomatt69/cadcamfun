@@ -599,6 +599,8 @@
   "ai.catalog.write": "Schreiben",
   "ai.catalog.destructive": "Destruktiv",
   "ai.catalog.tools": "{count} Werkzeuge",
+  "ai.toolTitle.cad": "Zeichnung lesen",
+  "ai.toolTitle.cad_edit": "Zeichnung bearbeiten",
   "ai.catalog.actions": "{count} Aktionen",
   "ai.catalog.empty": "Der Katalog ist noch nicht verfügbar.",
   "ai.catalog.unavailable": "Der Host hat nicht geantwortet.",
