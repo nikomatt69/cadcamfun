@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
+import { addJobSetup, jobRelease, patchJobSetup, removeJobSetup } from "../src/features/cam/lib/job.ts"
 import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
@@ -308,5 +309,27 @@ describe("extended registers, blanks of their own, dependencies and the magazine
     expect(messages).toMatch(/depends on tp-b, which runs after it/)
     expect(messages).toMatch(/the magazine holds 1/)
     expect(setupOfToolpaths(panel().toolpaths).magazineSize).toBeUndefined()
+  })
+})
+
+describe("the setups of a kernel job", () => {
+  test("the first add turns the panel's fixing into setup 1 and adds one on the next register; at six, no more", () => {
+    const two = addJobSetup(undefined, "-Z")!
+    expect(two).toEqual([{ id: "setup-1", orientation: "-Z", workOffset: "G54" }, { id: "setup-2", orientation: "+Z", workOffset: "G55" }])
+    let list = two
+    for (let i = 0; i < 4; i++) list = addJobSetup(list, undefined)!
+    expect(list.map((s) => s.workOffset)).toEqual(["G54", "G55", "G56", "G57", "G58", "G59"])
+    expect(addJobSetup(list, undefined)).toBeUndefined()
+  })
+
+  test("a register another setup holds is refused, one setup left is no job, the job's release is its lowest", () => {
+    const list = addJobSetup(undefined, "+Z")!
+    expect(patchJobSetup(list, "setup-2", { workOffset: "G54" })).toBe(list)
+    expect(patchJobSetup(list, "setup-2", { workOffset: "G57", orientation: "-X" })[1]).toEqual({ id: "setup-2", orientation: "-X", workOffset: "G57" })
+    expect(removeJobSetup(list, "setup-1")).toBeUndefined()
+    expect(removeJobSetup(addJobSetup(list, undefined)!, "setup-2")!.map((s) => s.id)).toEqual(["setup-1", "setup-3"])
+    expect(jobRelease(["verified-program", "preview"])).toBe("preview")
+    expect(jobRelease(["verified-program", "blocked", "preview"])).toBe("blocked")
+    expect(jobRelease([])).toBeUndefined()
   })
 })
