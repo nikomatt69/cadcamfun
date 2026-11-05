@@ -4,7 +4,7 @@
  * `ManufacturingJob`: this one groups the legacy generator's operations into programs with tool changes.
  */
 import { Schema } from "effect"
-import { StockSchema, type Tool } from "../tool.ts"
+import { StockSchema, ToolSchema, type Tool } from "../tool.ts"
 import { WorkOffsetSchema } from "../ir.ts"
 import { WorkOffsetRefSchema, formatOffsetRef } from "../work-offset.ts"
 import { OperationSchema, type Operation } from "./op.ts"
@@ -49,6 +49,24 @@ export type Workpiece = typeof WorkpieceSchema.Type
 export const WorkpieceOrderSchema = Schema.Literals(["toolFirst", "partFirst"])
 export type WorkpieceOrder = typeof WorkpieceOrderSchema.Type
 
+const Vec = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+
+/**
+ * A clamp, a vise jaw, a parallel or the plate under the parts, as a box in the frame of the first workpiece's datum (the frame of
+ * `placement`). Blanks may not overlap it, and a generated toolpath that reaches it is reported.
+ */
+export const FixtureBoxSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  name: Schema.String,
+  min: Vec,
+  max: Vec
+})
+export type FixtureBox = typeof FixtureBoxSchema.Type
+
+/** A tool and the tool that takes over from it once its life is spent (a sister tool: the same cutter, a fresh edge, its own pocket). */
+export const SisterToolSchema = Schema.Struct({ toolId: Schema.String.check(Schema.isMinLength(1)), tool: ToolSchema })
+export type SisterTool = typeof SisterToolSchema.Type
+
 export const SetupGroupingSchema = Schema.Literals(["single", "perTool", "perOperation"])
 export type SetupGrouping = typeof SetupGroupingSchema.Type
 
@@ -68,7 +86,13 @@ export const SetupSchema = Schema.Struct({
   /** Pockets the tool magazine holds; a tool table that needs more is an issue. */
   magazineSize: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   /** How operations and workpieces interleave; default `toolFirst`. */
-  workpieceOrder: Schema.optionalKey(WorkpieceOrderSchema)
+  workpieceOrder: Schema.optionalKey(WorkpieceOrderSchema),
+  /** Clamps, jaws and plates of the fixture, in the frame of the first workpiece's datum. */
+  fixtures: Schema.optionalKey(Schema.Array(FixtureBoxSchema).check(Schema.isMaxLength(64))),
+  /** The machine's travel, in the frame of the first workpiece's datum: the placed blanks must lie inside it. */
+  envelope: Schema.optionalKey(Schema.Struct({ min: Vec, max: Vec })),
+  /** Sister tools: when a tool's `lifeMinutes` would be spent by the next run, the runs after it use its sister, which has its own pocket. */
+  sisters: Schema.optionalKey(Schema.Array(SisterToolSchema).check(Schema.isMaxLength(64)))
 })
 export type Setup = typeof SetupSchema.Type
 
@@ -106,6 +130,19 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
       max: { x: wp.placement.x + block.origin.x + block.x, y: wp.placement.y + block.origin.y + block.y, z: wp.placement.z + block.origin.z }
     }]
   })
+  const fixtures = setup.fixtures ?? []
+  const touches = (a: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }, b: typeof a): boolean => {
+    const eps = 1e-6
+    return a.min.x < b.max.x - eps && b.min.x < a.max.x - eps && a.min.y < b.max.y - eps && b.min.y < a.max.y - eps && a.min.z < b.max.z - eps && b.min.z < a.max.z - eps
+  }
+  for (const box of boxes) {
+    for (const fx of fixtures) if (touches(box, fx)) issues.push({ message: `${box.name}'s blank overlaps ${fx.name}: the part would stand inside the workholding` })
+    const env = setup.envelope
+    if (env !== undefined && (box.min.x < env.min.x || box.min.y < env.min.y || box.min.z < env.min.z || box.max.x > env.max.x || box.max.y > env.max.y || box.max.z > env.max.z)) {
+      issues.push({ message: `${box.name}'s blank lies outside the machine travel` })
+    }
+  }
+  for (const fx of fixtures) if (!(fx.max.x > fx.min.x && fx.max.y > fx.min.y && fx.max.z > fx.min.z)) issues.push({ message: `${fx.name}: max must be larger than min on every axis` })
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i]!, b = boxes[j]!, eps = 1e-6
     if (a.min.x < b.max.x - eps && b.min.x < a.max.x - eps && a.min.y < b.max.y - eps && b.min.y < a.max.y - eps && a.min.z < b.max.z - eps && b.min.z < a.max.z - eps) {
@@ -137,6 +174,10 @@ export const validateSetup = (setup: Setup): ReadonlyArray<SetupIssue> => {
   }
   if (!setup.operations.some((op) => op.enabled)) issues.push({ message: "The setup has no enabled operation" })
   issues.push(...workpieceIssues(setup))
+  for (const sister of setup.sisters ?? []) {
+    if (!setup.operations.some((op) => op.tool.id === sister.toolId)) issues.push({ message: `Sister tool ${sister.tool.name} backs ${sister.toolId}, which no operation uses` })
+    if (setup.operations.some((op) => op.tool.id === sister.tool.id)) issues.push({ message: `Sister tool ${sister.tool.name} is already a tool of an operation: a sister has an id of its own` })
+  }
   const enabledIds = new Set(setup.operations.filter((o) => o.enabled).map((o) => o.id))
   const earlier = new Set<string>()
   for (const op of setup.operations) {
@@ -150,6 +191,9 @@ export const validateSetup = (setup: Setup): ReadonlyArray<SetupIssue> => {
   if (setup.magazineSize !== undefined) {
     const enabled = setup.operations.filter((o) => o.enabled)
     const pockets = assignPockets(enabled)
+    const held = new Set([...pockets.values()])
+    const spare = (setup.sisters ?? []).filter((s) => enabled.some((o) => o.tool.id === s.toolId)).length
+    if (spare > 0 && held.size <= setup.magazineSize && held.size + spare > setup.magazineSize) issues.push({ message: `The tools and their sister tools need ${held.size + spare} pockets, the magazine holds ${setup.magazineSize}` })
     for (const op of enabled) {
       const pocket = pockets.get(op.id)!
       if (pocket > setup.magazineSize) issues.push({ operationId: op.id, message: `${op.name} needs pocket T${pocket}, the magazine holds ${setup.magazineSize}` })

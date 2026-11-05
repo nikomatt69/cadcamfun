@@ -259,3 +259,72 @@ describe("several workpieces on one fixture: one program, one work offset per pa
     expect(p.gcode.split("\n").filter((l) => /^G55\b/.test(l.trim()))).toHaveLength(0)
   })
 })
+
+describe("workholding: clamps and the machine's travel", () => {
+  const stock = { x: 50, y: 50, z: 10, origin: { x: -25, y: -25, z: 0 }, material: "aluminum" }
+  const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54", placement: { x: 0, y: 0, z: 0 } }, { id: "w2", name: "Part 2", workOffset: "G55", placement: { x: 80, y: 0, z: 0 } }]
+  const ops = [op("a", t6)]
+  const clamp = (x0: number, x1: number) => ({ id: "c1", name: "Clamp 1", min: { x: x0, y: -30, z: -12 }, max: { x: x1, y: 30, z: 4 } })
+
+  test("a blank standing in a clamp, or past the machine's travel, is an issue and nothing is generated", () => {
+    const inside = setup(ops, { stock, workpieces: parts, fixtures: [clamp(20, 40)] })
+    expect(validateSetup(inside).map((i) => i.message).join(" ")).toMatch(/Part 1's blank overlaps Clamp 1/)
+    expect(generateSetup(inside, geometryOf).programs).toHaveLength(0)
+    const clear = setup(ops, { stock, workpieces: parts, fixtures: [clamp(30, 50)] })
+    expect(validateSetup(clear).filter((i) => /overlaps Clamp/.test(i.message))).toHaveLength(0)
+    const tight = setup(ops, { stock, workpieces: parts, envelope: { min: { x: -30, y: -30, z: -12 }, max: { x: 100, y: 30, z: 10 } } })
+    expect(validateSetup(tight).map((i) => i.message).join(" ")).toMatch(/Part 2's blank lies outside the machine travel/)
+    const wide = setup(ops, { stock, workpieces: parts, envelope: { min: { x: -30, y: -30, z: -12 }, max: { x: 120, y: 30, z: 10 } } })
+    expect(validateSetup(wide).filter((i) => /travel/.test(i.message))).toHaveLength(0)
+    expect(validateSetup(setup(ops, { stock, workpieces: parts, fixtures: [{ id: "bad", name: "Bad", min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 5, z: 5 } }] })).some((i) => /Bad: max must be larger/.test(i.message))).toBe(true)
+  })
+
+  test("a toolpath that reaches a clamp is named once for the operation, the part and the clamp; a clamp out of reach is not", () => {
+    // The outside profile of the 40 x 30 plate runs 3 mm beyond it (the cutter's radius): a clamp 1 mm off the blank is in its way.
+    const snug = { ...stock, x: 44, origin: { x: -22, y: -25, z: 0 } }
+    const outside = [op("a", t6, {}, { operationType: "profile" })]
+    const near = generateSetup(setup(outside, { stock: snug, workpieces: parts, fixtures: [clamp(23, 40)] }), geometryOf)
+    expect(near.programs).toHaveLength(1)
+    expect(near.warnings.filter((w) => /reaches/.test(w))).toEqual(["Op a on Part 1: the tool reaches Clamp 1 (Endmill Ø6 Ø6, 34 mm out of the holder)"])
+    const away = generateSetup(setup(outside, { stock: snug, workpieces: parts, fixtures: [clamp(30, 50)] }), geometryOf)
+    expect(away.warnings.filter((w) => /reaches/.test(w))).toEqual([])
+    // The pocket stays inside the plate: the same clamp is not touched.
+    expect(generateSetup(setup(ops, { stock: snug, workpieces: parts, fixtures: [clamp(23, 40)] }), geometryOf).warnings.filter((w) => /reaches/.test(w))).toEqual([])
+  })
+})
+
+describe("tool life and sister tools", () => {
+  const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55" }, { id: "w3", name: "Part 3", workOffset: "G56" }]
+  const sister = { ...t6, id: "t6b", name: "Endmill Ø6 sister" }
+  const perRun = generateSetup(setup([op("a", t6)], { workpieces: [parts![0]!] }), geometryOf).programs[0]!.stats.estimatedSeconds / 60
+
+  test("the minutes every tool cuts over the setup are counted against its life", () => {
+    const life = perRun * 5
+    const made = generateSetup(setup([op("a", { ...t6, lifeMinutes: life })], { workpieces: parts }), geometryOf)
+    expect(made.toolLife).toHaveLength(1)
+    expect(made.toolLife[0]).toMatchObject({ toolId: "t6", pocket: 1, lifeMinutes: life })
+    expect(made.toolLife[0]!.minutes).toBeGreaterThan(perRun * 2)
+    expect(made.warnings.join(" ")).not.toMatch(/no life left/)
+  })
+
+  test("a spent tool without a sister is named; with a sister the runs after it take its pocket and the post calls it", () => {
+    const short = { ...t6, lifeMinutes: perRun * 1.5 }
+    const alone = generateSetup(setup([op("a", short)], { workpieces: parts }), geometryOf)
+    expect(alone.warnings.join(" ")).toMatch(/Endmill .6 has no life left for Op a/)
+    const backed = generateSetup(setup([op("a", short)], { workpieces: parts, sisters: [{ toolId: "t6", tool: { ...sister, lifeMinutes: perRun * 10 } }] }), geometryOf)
+    const p = backed.programs[0]!
+    expect(p.program.toolpaths.map((t) => t.toolId)).toEqual(["t6", "t6b", "t6b"])
+    expect(p.pockets).toEqual({ t6: 1, t6b: 2 })
+    expect(p.toolNumbers).toEqual([1, 2])
+    expect(p.gcode.match(/T\d+\s*M6/g)).toEqual(["T1 M6", "T2 M6"])
+    expect(backed.toolTable.map((e) => [e.pocket, e.tool.id])).toEqual([[1, "t6"], [2, "t6b"]])
+    expect(backed.toolLife.map((l) => [l.toolId, l.sisterOf ?? null])).toEqual([["t6", null], ["t6b", "t6"]])
+    expect(p.warnings.join(" ")).toMatch(/takes over from Op a/)
+  })
+
+  test("a sister that no operation backs, or that shares a tool's id, is an issue; the magazine counts sisters", () => {
+    expect(validateSetup(setup([op("a", t6)], { sisters: [{ toolId: "nope", tool: sister }] })).map((i) => i.message).join(" ")).toMatch(/backs nope/)
+    expect(validateSetup(setup([op("a", t6), op("b", t3)], { sisters: [{ toolId: "t6", tool: t3 }] })).map((i) => i.message).join(" ")).toMatch(/already a tool of an operation/)
+    expect(validateSetup(setup([op("a", t6), op("b", t3)], { magazineSize: 2, sisters: [{ toolId: "t6", tool: sister }] })).map((i) => i.message).join(" ")).toMatch(/need 3 pockets, the magazine holds 2/)
+  })
+})
