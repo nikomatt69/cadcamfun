@@ -9,6 +9,7 @@ import { CADCAM_AGENT, PRIMARY_STEP_LIMIT } from "./config.ts"
 import { currentHostAgent } from "./primaries.ts"
 import { primaryOfHost, reminderFor } from "../prompts/reminders.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
+import { compactHostSession } from "./context.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
 
@@ -351,17 +352,29 @@ export const replyHostPermission = (
     catch: (cause) => new AiProviderError({ message: cause instanceof Error ? cause.message : String(cause) })
   })
 
-const failureOf = (result: HostPromptResult): { message: string; aborted: boolean } | undefined => {
+interface TurnFailure {
+  readonly message: string
+  readonly aborted: boolean
+  /** The provider refused the request as longer than the model's context window. */
+  readonly overflow: boolean
+}
+
+const failureOf = (result: HostPromptResult): TurnFailure | undefined => {
   if (result.info === undefined) {
-    return { message: result.data?.message ?? result.name ?? "The host rejected the prompt.", aborted: false }
+    const message = result.data?.message ?? result.name ?? "The host rejected the prompt."
+    return { message, aborted: false, overflow: isContextOverflowError(message) }
   }
   const error = result.info.error
   if (error === undefined) return undefined
+  const message = error.data?.message ?? error.name ?? "The model request failed."
   return {
-    message: error.data?.message ?? error.name ?? "The model request failed.",
-    aborted: error.name === "MessageAbortedError" || isInterruption(error.data?.message ?? error.name ?? "")
+    message,
+    aborted: error.name === "MessageAbortedError" || isInterruption(error.data?.message ?? error.name ?? ""),
+    overflow: error.name === "MessageContextOverflowError" || error.name === "ContextOverflowError" || isContextOverflowError(message)
   }
 }
+
+const failureOfMessage = (message: string): TurnFailure => ({ message, aborted: false, overflow: isContextOverflowError(message) })
 
 /**
  * One chat turn through the embedded host. Events are subscribed to BEFORE the
@@ -497,6 +510,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let failedToolsAtNudge: ReadonlySet<string> = new Set()
         let stalls = 0
         let askedForReport = false
+        let compactedForOverflow = false
         let stepResumes = 0
         let successesAtStepLimit = 0
         const answers: string[] = []
@@ -650,7 +664,26 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           let continuationState: EventMapperState | undefined = state
           if (subscriber.signal.aborted) continuationState = await readContinuationState(host, sessionId).catch(() => undefined)
           const sessionError = continuationState?.sessionError
-          const failure = failureOf(result) ?? (sessionError !== undefined ? { message: sessionError, aborted: false } : undefined)
+          const failure = failureOf(result) ?? (sessionError !== undefined ? failureOfMessage(sessionError) : undefined)
+          // The pinned host stores a provider's context-overflow refusal as the turn's error and stops: its own compaction only
+          // runs on its token estimate. Summarise once and carry on, as Claude Code and opencode do; a second overflow in the
+          // same turn means the summary did not help, and it is reported.
+          if (failure?.overflow && !failure.aborted && !compactedForOverflow && !controller.signal.aborted) {
+            compactedForOverflow = true
+            offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
+            const compactionsBefore = state.compactions
+            const compacted = await runHere(compactHostSession(host, sessionId, input.model).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false))))
+            // Let the summary's bus events (`session.compacted`) reach the subscriber before the next run starts.
+            const settle = Date.now() + IDLE_GRACE_MS
+            while (compacted && !subscriber.signal.aborted && state.compactions === compactionsBefore && Date.now() < settle) await pause(10)
+            if (compacted && !controller.signal.aborted) {
+              state.retry = undefined
+              state.sessionError = undefined
+              state.idle = false
+              parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
+              continue
+            }
+          }
           if (failure && !failure.aborted && attempt < resumes && isTransientFailure(failure.message)) {
             // The host gave up on this call; the conversation is intact, so ask it to carry on after a pause.
             attempt += 1

@@ -62,3 +62,31 @@ describe("the step budget belongs to the application", () => {
     expect(events.some((event) => event.type === "turn" && event.phase === "continuing")).toBe(true)
   })
 })
+
+describe("a full context window is cured by a summary, not by an error", () => {
+  test("the provider rejects the request as too long: the session is compacted once and the turn carries on", async () => {
+    let overflowed = false
+    script = () => {
+      if (!overflowed) {
+        overflowed = true
+        return { status: 400, body: JSON.stringify({ error: { message: "This model's maximum context length is 100000 tokens. However, your messages resulted in 180000 tokens.", code: "context_length_exceeded" } }) }
+      }
+      return { text: "The bracket is finished and checked." }
+    }
+    const events = await run("finish the bracket", "step-budget-overflow")
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "The bracket is finished and checked." })
+    expect(events.some((event) => event.type === "compacted")).toBe(true)
+    expect(events.some((event) => event.type === "turn" && event.phase === "recovering")).toBe(true)
+  })
+
+  test("a second overflow in the same turn is reported, never compacted again in a loop", async () => {
+    let requests = 0
+    script = () => {
+      requests += 1
+      return { status: 400, body: JSON.stringify({ error: { message: "prompt is too long: 250000 tokens > 200000 maximum", code: "context_length_exceeded" } }) }
+    }
+    const events = await run("finish the bracket", "step-budget-overflow-twice")
+    expect(events.at(-1)).toMatchObject({ type: "error", code: "provider" })
+    expect(requests).toBeLessThan(6)
+  })
+})
