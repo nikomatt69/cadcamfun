@@ -242,3 +242,63 @@ describe("native probe cycles in a job", () => {
     expect(runs[0]!.outcome.results["x"]! - 30).toBeCloseTo(0.2, 2)
   })
 })
+
+describe("calibration as operations of a job", () => {
+  const ballAt = { x: -60, y: 30, z: 5 }
+  test("a stylus on a ring beside the part: planned, posted, replayed; the report carries the stylus, nothing goes to the machine", () => {
+    const op: OperationSpec = { id: "ring", strategy: "probe", tool: device.id, cycle: { kind: "stylus-calibrate", artefact: { kind: "ring", centre: { x: -60, y: 30 }, diameter: 50, depth: 6, top: 0 }, directions: 8 } }
+    const job = jobOf(machineOf("vmc-standard"), [op])
+    const art = ok(runJob(job))
+    const claim = art.claims.find((c) => c.id === "probing")!
+    expect(claim.status, claim.detail).toBe("passed")
+    expect(art.probing?.textReplay).toBe("agrees")
+    const prepared = prepareJob(job)
+    if (prepared.status !== "ok") throw new Error(prepared.issues[0]!.message)
+    const runs = simulateProbing(prepared.value)
+    if ("refused" in runs) throw new Error(runs.refused)
+    const cal = runs[0]!.calibration!
+    expect(cal.kind).toBe("stylus")
+    if (cal.kind === "stylus") {
+      expect(cal.stylus.directional!.length).toBe(8)
+      expect(Math.abs(cal.stylus.effectiveRadius - 2)).toBeLessThan(1e-6)
+    }
+    expect(art.nc).not.toMatch(/#3004|\$MA_|G10 L50/)
+  })
+
+  test("a sphere artefact and a height block", () => {
+    for (const artefact of [{ kind: "sphere" as const, centre: ballAt, diameter: 25 }, { kind: "height" as const, at: { x: -60, y: 30 }, z: 5 }]) {
+      const art = ok(runJob(jobOf(machineOf("vmc-standard"), [{ id: "cal", strategy: "probe", tool: device.id, cycle: { kind: "stylus-calibrate", artefact } }])))
+      const claim = art.claims.find((c) => c.id === "probing")!
+      expect(claim.status, claim.detail).toBe("passed")
+    }
+  })
+
+  test("a rotary axis: the ball measured at each angle, the pivot error found, the program leaves the table at zero", () => {
+    const five = findMachine("trunnion-5ax")!
+    const machine: KernelMachine = { ...five, probing: probing({}) }
+    const pivot = machine.fiveAxis!.pivot
+    // The ball stands on the table beside the part and turns with it.
+    const sphere = { centre: ballAt, diameter: 25 }
+    const op: OperationSpec = { id: "rot", strategy: "probe", tool: device.id, cycle: { kind: "rotary-axis", axis: "C", sphere, angles: [0, 90, 180, 270].map((d) => (d * Math.PI) / 180) } }
+    const job = jobOf(machine, [op], { })
+    const art = ok(runJob(job))
+    const claim = art.claims.find((c) => c.id === "probing")!
+    expect(claim.status, claim.detail).toBe("passed")
+    expect(art.nc).toMatch(/C90\.000/)
+    const prepared = prepareJob(job)
+    if (prepared.status !== "ok") throw new Error(prepared.issues[0]!.message)
+    const truePivot = { x: pivot.x + 0.03, y: pivot.y - 0.02, z: pivot.z }
+    const runs = simulateProbing(prepared.value, { truePivot })
+    if ("refused" in runs) throw new Error(runs.refused)
+    const cal = runs[0]!.calibration!
+    if (cal.kind !== "rotary") throw new Error(JSON.stringify(cal))
+    expect(cal.rotary.pivotError.x).toBeCloseTo(0.03, 6)
+    expect(cal.rotary.pivotError.y).toBeCloseTo(-0.02, 6)
+  })
+
+  test("a machine without a table refuses a rotary calibration with the reason", () => {
+    const op: OperationSpec = { id: "rot", strategy: "probe", tool: device.id, cycle: { kind: "rotary-axis", axis: "C", sphere: { centre: ballAt, diameter: 25 }, angles: [0, 2, 4] } }
+    const r = prepareJob(jobOf(machineOf("vmc-standard"), [op]))
+    expect(r.status === "failed" && r.issues[0]!.message).toMatch(/needs a rotary table/)
+  })
+})

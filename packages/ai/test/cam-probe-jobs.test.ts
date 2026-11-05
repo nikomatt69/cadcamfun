@@ -114,3 +114,89 @@ describe("cam-probe-calibrate", () => {
     expect("error" in bad).toBe(true)
   })
 })
+
+describe("the NC line of every contact and offset change (spec 73 §1)", () => {
+  const G54 = { kind: "g5x" as const, code: "G54" as const }
+  const operations = [
+    { id: "bore", cycle: bore, actions: [{ kind: "set-offset" as const, ref: G54, axes: { X: "x", Y: "y" }, policy: { mode: "set" as const } }] },
+    { id: "top", cycle: { kind: "z-surface" as const, at: { x: 10, y: 10 }, expectedZ: 0 }, actions: [{ kind: "set-offset" as const, ref: G54, axes: { Z: "z" }, policy: { mode: "set" as const } }] }
+  ]
+  const simulate = (dialect: cam.PostId) => {
+    const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations, dialect, misplacement: { x: 0.3, y: -0.2, z: 0.1 } } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    return out
+  }
+  for (const [dialect, touch, write] of [["fanuc", /^G91 G31 /, /^#522[123]=/], ["linuxcnc", /^G38\.2 /, /^G10 L2 P1 /], ["siemens", /^G91 MEAS=1 /, /^\$P_UIFR\[1,[XYZ],TR\]=/]] as const) {
+    test(`${dialect}: each line is the touch block or the offset write of the program it comes with`, () => {
+      const out = simulate(dialect)
+      expect(out.warnings.filter((w) => /NC lines/.test(w))).toEqual([])
+      const text = out.program!.nc.split("\n")
+      expect(out.program!.dialect).toBe(dialect)
+      const contacts = out.report.operations.flatMap((o) => o.contacts)
+      expect(contacts.length).toBeGreaterThan(6)
+      const lines = contacts.map((c) => c.line!)
+      for (const l of lines) expect(text[l - 1]!).toMatch(touch)
+      // In program order, one block per touch.
+      expect(new Set(lines).size).toBe(lines.length)
+      expect([...lines].sort((a, b) => a - b)).toEqual(lines)
+      expect(out.report.updates.length).toBe(3)
+      for (const u of out.report.updates) expect(text[u.line! - 1]!).toMatch(write)
+      expect(out.report.updates.map((u) => u.axis)).toEqual(["X", "Y", "Z"])
+      // The figures stay the IR's, unrounded by the text.
+      expect(out.report.operations[0]!.results["x"]!).toBeCloseTo(30.3, 2)
+    })
+  }
+
+  test("block numbers in the text: the line is still the line of the text; without a dialect there are none", () => {
+    const numbered = runKernelJobInline("cam-probe-simulate", { settings, elements, operations, dialect: "fanuc", options: { lineNumbers: true } } satisfies CamProbeSimulateInput)
+    if ("error" in numbered) throw new Error(numbered.error)
+    const text = numbered.program!.nc.split("\n")
+    for (const c of numbered.report.operations[0]!.contacts) expect(text[c.line! - 1]!).toMatch(/^N\d+ G91 G31 /)
+    const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    expect(out.program).toBeUndefined()
+    expect(out.report.operations[0]!.contacts[0]!.line).toBeUndefined()
+  })
+
+  test("a control that cannot write the program: the run stands, a warning says why there are no lines", () => {
+    const out = simulate("heidenhain")
+    expect(out.program).toBeUndefined()
+    expect(out.warnings.some((w) => /no NC lines/.test(w))).toBe(true)
+    expect(out.report.operations[0]!.results["x"]!).toBeCloseTo(30.3, 2)
+  })
+})
+
+describe("calibration and native through the kernel jobs", () => {
+  test("a stylus on a ring in a simulation: the report carries the stylus record", () => {
+    const op = { id: "ring", cycle: { kind: "stylus-calibrate" as const, artefact: { kind: "ring" as const, centre: { x: -60, y: 30 }, diameter: 50, depth: 6, top: 0 }, directions: 4 as const } }
+    const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [op], dialect: "fanuc" } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    const cal = out.report.operations[0]!.calibration
+    expect(cal?.kind).toBe("stylus")
+    if (cal?.kind === "stylus") expect(cal.stylus.effectiveRadius).toBeCloseTo(2, 6)
+  })
+
+  test("a rotary axis needs the table; with it, plan and simulate run and the report carries the axis", () => {
+    const cycle = { kind: "rotary-axis" as const, axis: "C" as const, sphere: { centre: { x: -60, y: 30, z: 5 }, diameter: 25 }, angles: [0, 90, 180, 270].map((d) => d * DEG) }
+    const none = runKernelJobInline("cam-probe-plan", { settings, cycle } satisfies CamProbePlanInput)
+    expect("error" in none && none.error).toMatch(/rotary table/)
+    const assumed = { layout: "table-AC" as const, pivot: { x: 0, y: 0, z: 0 } }
+    const plan = runKernelJobInline("cam-probe-plan", { settings, cycle, assumed, dialect: "fanuc" } satisfies CamProbePlanInput)
+    if ("error" in plan) throw new Error(plan.error)
+    expect(plan.program!.nc).toContain("C90.000")
+    const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle }], assumed } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    const cal = out.report.operations[0]!.calibration
+    expect(cal?.kind).toBe("rotary")
+    if (cal?.kind === "rotary") expect(Math.hypot(cal.rotary.pivotError.x, cal.rotary.pivotError.y)).toBeLessThan(1e-6)
+  })
+
+  test("native: the plan writes the cycle, a machine without a package is refused with what to do", () => {
+    const out = runKernelJobInline("cam-probe-plan", { settings, cycle: bore, dialect: "fanuc", native: true, macroStyle: "renishaw" } satisfies CamProbePlanInput)
+    if ("error" in out) throw new Error(out.error)
+    expect(out.native).toBe("G65 P9814")
+    expect(out.program!.nc).toContain("G65 P9814 D20.000")
+    const refused = runKernelJobInline("cam-probe-plan", { settings, cycle: bore, native: true } satisfies CamProbePlanInput)
+    expect("error" in refused && refused.error).toMatch(/Clear native/)
+  })
+})

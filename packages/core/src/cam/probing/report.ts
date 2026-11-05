@@ -42,7 +42,7 @@ export interface ReportOperation {
   readonly calibration?: ProbeCalibration
 }
 
-export interface ReportUpdate { readonly operationId: string; readonly offset: string; readonly axis: string; readonly before: number; readonly after: number }
+export interface ReportUpdate { readonly operationId: string; readonly offset: string; readonly axis: string; readonly before: number; readonly after: number; /** 1-based NC line of the write. */ readonly line?: number }
 
 export interface ProbeReport {
   readonly verdict: ReportVerdict
@@ -111,7 +111,7 @@ export const buildProbeReport = (runs: ReadonlyArray<ReportRun>, options: { read
       if (status === "fail") worse("fail")
       else if (status === "warn") worse("warn")
     }
-    for (const u of o.updates) updates.push({ operationId: run.operationId, offset: offsetKey(u.ref), axis: u.axis, before: u.before, after: u.after })
+    for (const u of o.updates) updates.push({ operationId: run.operationId, offset: offsetKey(u.ref), axis: u.axis, before: u.before, after: u.after, ...(u.line !== undefined ? { line: u.line } : {}) })
     for (const t of o.tools) tools.push({ operationId: run.operationId, ...t })
     offsets = { ...offsets, ...o.offsets }
     for (const a of o.alarms) {

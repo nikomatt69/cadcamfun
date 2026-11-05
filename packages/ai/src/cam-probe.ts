@@ -70,6 +70,11 @@ export interface CamProbePlanInput extends ProbeSetup {
   readonly options?: { readonly orientSpindle?: number; readonly programNumber?: number; readonly lineNumbers?: boolean }
   /** Options of the post (the swivel data of a Siemens tilted plane, the machine's probing words). */
   readonly post?: Partial<cam.PostOptions>
+  /** Write the control's own cycle; `macroStyle` is the machine's (`KernelProbing.macroStyle`). A cycle that has none is refused with the reason. */
+  readonly native?: boolean
+  readonly macroStyle?: cam.probing.MacroStyle
+  /** The machine's rotary table: a `rotary-axis` cycle needs it. */
+  readonly assumed?: cam.probing.RotaryAssumption
 }
 
 export interface CamProbePlanOutput {
@@ -82,8 +87,20 @@ export interface CamProbePlanOutput {
   readonly nominal: Readonly<Record<string, number>>
   readonly notes: ReadonlyArray<string>
   readonly warnings: ReadonlyArray<string>
-  readonly program?: { readonly dialect: cam.PostId; readonly nc: string; readonly lines: number; readonly identity: { readonly nc: string } }
+  readonly program?: ProbeProgram
+  /** What the post writes for a native cycle (`TCH PROBE 412`, `G65 P9814`, `CYCLE977`). */
+  readonly native?: string
 }
+
+export interface ProbeProgram { readonly dialect: cam.PostId; readonly nc: string; readonly lines: number; readonly identity: { readonly nc: string } }
+
+const programOf = (dialect: cam.PostId, nc: string): ProbeProgram => ({ dialect, nc, lines: nc.split("\n").length - (nc.endsWith("\n") ? 1 : 0), identity: { nc: hash(nc) } })
+
+/** The routine of a cycle: a rotary calibration needs the machine's table, every other cycle the context. */
+const routineOf = (cycle: cam.probing.ProbeCycle, ctx: cam.probing.ProbeContext, assumed: cam.probing.RotaryAssumption | undefined): cam.probing.ProbeRoutineResult =>
+  cycle.kind !== "rotary-axis" ? p.planProbeCycle(cycle, ctx)
+    : assumed === undefined ? { refused: "A rotary-axis calibration needs the machine's rotary table (its layout and pivot)." }
+    : p.rotaryRoutine(cycle, ctx, assumed)
 
 /** The cycle of a request: given, or read from a feature of an element. */
 const resolveCycle = (input: CamProbePlanInput): { readonly cycle: cam.probing.ProbeCycle; readonly because?: string } | CamProbeRefusal => {
@@ -135,24 +152,33 @@ export const camProbePlan = (input: CamProbePlanInput, report?: Report): CamProb
   const resolved = resolveCycle(input)
   if ("error" in resolved) return resolved
   const ctx = contextOf(input)
-  const planned = p.planProbeCycle(resolved.cycle, ctx)
+  const planned = routineOf(resolved.cycle, ctx, input.assumed)
   if ("refused" in planned) return { error: planned.refused, status: 400 }
   let moves: cam.Move[]
-  try { moves = p.compileActions(planned, withChecks(input.actions, input.checks), ctx) } catch (error) { return { error: error instanceof Error ? error.message : String(error), status: 400 } }
+  const actions = withChecks(input.actions, input.checks)
+  try { moves = p.compileActions(planned, actions, ctx) } catch (error) { return { error: error instanceof Error ? error.message : String(error), status: 400 } }
   const warnings: string[] = []
   if (input.checks !== undefined) for (const c of input.checks) {
     if (planned.results[c.result] === undefined) return { error: `Check '${c.name}' reads '${c.result}', which the ${resolved.cycle.kind} cycle does not measure (it measures ${Object.keys(planned.results).join(", ")}).`, status: 400 }
   }
+  let native: string | undefined
+  if (input.native === true) {
+    const marked = p.nativeCycle(resolved.cycle, actions, input.macroStyle ?? "inline", moves, { probe: ctx.probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: input.frame !== undefined })
+    if ("refused" in marked) return { error: `No native cycle: ${marked.refused}. Clear native for the inline touches.`, status: 400 }
+    moves = [...marked.moves]
+    native = marked.word
+  }
   const out: CamProbePlanOutput = {
+    ...(native !== undefined ? { native } : {}),
     cycle: resolved.cycle, ...(resolved.because !== undefined ? { chosenBecause: resolved.because } : {}), settings: input.settings,
     steps: p.previewMoves(moves), moves, checks: input.checks ?? [],
     nominal: Object.fromEntries(Object.entries(planned.nominal).map(([k, v]) => [k, planned.units[k] === "deg" ? v : v])), notes: planned.notes, warnings
   }
   report?.({ stage: "probe", step: { index: 1, count: 2 }, phase: "plan", label: "write the program" })
   if (input.dialect === undefined) return out
-  const text = probeProgramText(moves, input, input.dialect, input.options, input.post)
+  const text = probeProgramText(moves, input, input.dialect, input.options, { ...input.post, ...(native !== undefined ? { nativeCycles: true } : {}) })
   if ("error" in text) return text
-  return { ...out, program: { dialect: input.dialect, nc: text.nc, lines: text.nc.split("\n").length - (text.nc.endsWith("\n") ? 1 : 0), identity: { nc: hash(text.nc) } } }
+  return { ...out, program: programOf(input.dialect, text.nc) }
 }
 
 // ---------------------------------------------------------------- simulate
@@ -173,13 +199,58 @@ export interface CamProbeSimulateInput extends ProbeSetup {
   readonly misplacement?: { readonly x?: number; readonly y?: number; readonly z?: number; readonly a?: number; readonly b?: number; readonly c?: number }
   /** The probe as it is: trigger radius by direction is the device's calibration; `noise` a seeded measurement noise, mm. */
   readonly noise?: number
+  /**
+   * The control the simulation is for. With it the operations are posted as one program and that text is replayed, so every contact and
+   * offset change in the report carries the line of its block in `program.nc` (spec 73 §1); without it there are no lines.
+   */
+  readonly dialect?: cam.PostId
+  readonly post?: Partial<cam.PostOptions>
+  /** As in a plan: block numbers in the text do not change the lines, which count the lines of the text. */
+  readonly options?: CamProbePlanInput["options"]
+  /** The machine's rotary table: a `rotary-axis` operation needs it. */
+  readonly assumed?: cam.probing.RotaryAssumption
 }
 
 export interface CamProbeSimulateOutput {
+  /** The program `line` numbers refer to: lines of `program.nc`, 1-based. Absent without `dialect`, or when the post refused (a warning says why). */
+  readonly program?: ProbeProgram
   readonly report: cam.probing.ProbeReport
   readonly offsetTable: Readonly<Record<string, cam.probing.OffsetEntry>>
   readonly identity: { readonly elements: string; readonly operations: string }
   readonly warnings: ReadonlyArray<string>
+}
+
+/**
+ * The program of a simulation and the runs with their NC lines: the moves posted as one program for `dialect`, that text replayed on the
+ * same part, and each contact and offset change of the IR run given the line of the block that made it. The IR stays the figures (the
+ * text is rounded to the post's decimals); the text gives the place. When the two do not pair up one to one, the lines are left out and
+ * a warning says why: a line on the wrong block would show a contact at the wrong moment.
+ */
+const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: ReadonlyArray<cam.Move>, runs: ReadonlyArray<cam.probing.ReportRun>, world: cam.probing.ProbeWorld3, machine: cam.probing.SimMachine, warnings: string[]): { readonly program?: ProbeProgram; readonly runs: ReadonlyArray<cam.probing.ReportRun> } | undefined => {
+  const text = probeProgramText(moves, input, dialect, input.options, input.post)
+  if ("error" in text) { warnings.push(`no NC lines on the contacts: ${text.error}`); return undefined }
+  const program = programOf(dialect, text.nc)
+  const codes = cam.dialectOf(dialect)?.probing
+  if (codes === undefined) return { program, runs }
+  const nc = cam.testing.simulateNc(text.nc, { world, machine, codes, ...(input.post?.probing !== undefined ? { probing: input.post.probing } : {}) })
+  const contacts = runs.flatMap((r) => r.outcome.contacts)
+  const updates = runs.flatMap((r) => r.outcome.updates)
+  const sameContacts = nc.contacts.length === contacts.length
+  const sameUpdates = nc.updates.length === updates.length && nc.updates.every((u, i) => u.axis === updates[i]!.axis)
+  if (!sameContacts) warnings.push(`no NC lines on the contacts: the text makes ${nc.contacts.length} contacts, the moves ${contacts.length}`)
+  if (!sameUpdates) warnings.push(`no NC lines on the offset changes: the text makes ${nc.updates.length}, the moves ${updates.length}`)
+  let c = 0, u = 0
+  return {
+    program,
+    runs: runs.map((r) => ({
+      ...r,
+      outcome: {
+        ...r.outcome,
+        contacts: r.outcome.contacts.map((k) => { const line = sameContacts ? nc.contacts[c++]?.line : undefined; return line === undefined ? k : { ...k, line } }),
+        updates: r.outcome.updates.map((k) => { const line = sameUpdates ? nc.updates[u++]?.line : undefined; return line === undefined ? k : { ...k, line } })
+      }
+    }))
+  }
 }
 
 export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report): CamProbeSimulateOutput | CamProbeRefusal => {
@@ -197,18 +268,21 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   const base = p.getOffset(table, active)
   // The part sits where the control believes (the offset) plus how far it is really displaced.
   const placement = { translate: { x: base.x + (m?.x ?? 0), y: base.y + (m?.y ?? 0), z: base.z + (m?.z ?? 0) }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
-  const world = p.meshWorld(built.meshes, placement)
+  const artefacts = input.operations.flatMap((op) => { const w = p.artefactWorld(op.cycle); return w === undefined ? [] : [w] })
+  const world = artefacts.length === 0 ? p.meshWorld(built.meshes, placement) : p.unionWorld([p.meshWorld(built.meshes, placement), ...artefacts])
   const ctx = contextOf(input)
   const probe = ctx.probe
   let seed = 11
   const rnd = (): number => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 - 0.5 }
   const runs: cam.probing.ReportRun[] = []
+  const allMoves: cam.Move[] = []
+  const kinematics = input.assumed === undefined ? undefined : { layout: input.assumed.layout, pivot: input.assumed.pivot }
   let entries = { ...table.entries }
   const count = input.operations.length
   for (const [index, op] of input.operations.entries()) {
     const id = op.id ?? `op${index + 1}`
     report?.({ stage: "probe", step: { index, count }, phase: "plan", operationId: id, label: `${op.cycle.kind}` })
-    const planned = p.planProbeCycle(op.cycle, { ...ctx, prefix: `p${index + 1}_` })
+    const planned = routineOf(op.cycle, { ...ctx, prefix: `p${index + 1}_` }, input.assumed)
     if ("refused" in planned) return { error: `${id}: ${planned.refused}`, status: 400 }
     let moves: cam.Move[]
     try { moves = p.compileActions(planned, withChecks(op.actions, op.checks), { prefix: `p${index + 1}_`, ...(input.frame !== undefined ? { frame: input.frame } : {}) }) } catch (error) { return { error: `${id}: ${error instanceof Error ? error.message : String(error)}`, status: 400 } }
@@ -216,17 +290,23 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
     const machine: cam.probing.SimMachine = {
       offsets: { entries }, active, probe, start: { x: base.x === 0 ? 0 : 0, y: 0, z: input.settings.safeZ },
       ...(input.frame !== undefined ? { frame: input.frame } : {}),
+      ...(kinematics !== undefined ? { kinematics } : {}),
       ...(input.noise !== undefined && input.noise > 0 ? { truth: { noise: () => input.noise! * 2 * rnd() } } : {})
     }
+    allMoves.push(...moves)
     const chars = [...(op.checks ?? []), ...(op.actions ?? []).flatMap((a) => (a.kind === "inspect" ? a.characteristics : []))]
-    const outcome = p.runProbeMoves(moves, world, machine, { results: planned.results, units: planned.units, ...(chars.length > 0 ? { characteristics: chars } : {}) })
+    const raw = p.runProbeMoves(moves, world, machine, { results: planned.results, units: planned.units, ...(chars.length > 0 ? { characteristics: chars } : {}) })
+    const outcome = { ...raw, results: p.withHostFit(planned, raw.results, probe) }
     report?.({ stage: "probe", step: { index, count }, phase: "check", operationId: id })
     entries = { ...outcome.offsets }
-    runs.push({ operationId: id, cycle: op.cycle.kind, outcome, nominal: planned.nominal, units: planned.units, ...(chars.length > 0 ? { characteristics: chars } : {}) })
+    const calibration = p.calibrationOf(op.cycle, outcome.results, probe, input.assumed)
+    runs.push({ operationId: id, cycle: op.cycle.kind, outcome, nominal: planned.nominal, units: planned.units, ...(chars.length > 0 ? { characteristics: chars } : {}), ...(calibration !== undefined ? { calibration } : {}) })
   }
   report?.({ stage: "probe", step: { index: count, count }, phase: "offsets" })
+  const placed = input.dialect === undefined ? undefined : linesOnText(input.dialect, input, allMoves, runs, world, { offsets: table, active, probe, start: { x: 0, y: 0, z: input.settings.safeZ }, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(kinematics !== undefined ? { kinematics } : {}) }, warnings)
   return {
-    report: p.buildProbeReport(runs), offsetTable: entries, warnings,
+    ...(placed !== undefined ? { program: placed.program } : {}),
+    report: p.buildProbeReport(placed?.runs ?? runs), offsetTable: entries, warnings,
     identity: { elements: hash(input.elements), operations: hash(input.operations) }
   }
 }

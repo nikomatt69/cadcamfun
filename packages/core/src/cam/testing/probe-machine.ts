@@ -369,7 +369,7 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
           // L20: the position the tip is at now reads `v`: the offset is the machine position minus it.
           const next = (m[axis.toLowerCase() as "x" | "y" | "z"] - v * unit) / unit
           if (name !== undefined) block.write(name, next)
-          else { const before = (staticEntry(ref)[ENTRY_KEY[axis]] as number) ?? 0; updates.push({ ref, axis, before, after: next * unit }) }
+          else { const before = (staticEntry(ref)[ENTRY_KEY[axis]] as number) ?? 0; updates.push({ ref, axis, before, after: next * unit, line }) }
         }
         return true
       }
@@ -444,7 +444,7 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
         const key = ENTRY_KEY[o.axis]
         const before = (staticEntry(o.ref)[key] as number | undefined) ?? 0
         const prior = [...updates].reverse().find((u) => offsetKey(u.ref) === offsetKey(o.ref) && u.axis === o.axis)
-        updates.push({ ref: o.ref, axis: o.axis, before: prior !== undefined ? prior.after : before, after: ANGULAR(o.axis) ? value * DEG : value * unit })
+        updates.push({ ref: o.ref, axis: o.axis, before: prior !== undefined ? prior.after : before, after: ANGULAR(o.axis) ? value * DEG : value * unit, line })
         return
       }
       const tool = toolOf(name) ?? siemensTool(name)
@@ -455,7 +455,6 @@ export const createNcProbeHost = (options: NcSimOptions): NcProbeHost => {
         toolUpdates.push({ ...tool, before, after: value * unit })
         tools[tool.tool] = { ...cur, [field]: value * unit }
       }
-      void line
     },
     onAlarm: (a) => { alarms.push({ code: a.code, text: a.text, moveIndex: blockCount, line: a.line }); stopped = `alarm ${a.code}: ${a.text}` }
   }

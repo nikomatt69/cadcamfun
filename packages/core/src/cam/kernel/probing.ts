@@ -15,9 +15,11 @@ import { compileActions } from "../probing/actions.ts"
 import { nativeCycle } from "../probing/native.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
 import { translateCycle } from "../probing/transform.ts"
-import { runProbeMoves, type ProbeTruth, type SimMachine } from "../probing/simulate.ts"
+import { artefactWorld, calibrationOf, withHostFit, type ProbeCalibration } from "../probing/calibration.ts"
+import { rotaryRoutine } from "../probing/rotary-cal.ts"
+import { runProbeMoves, tablePose, type ProbeTruth, type SimMachine } from "../probing/simulate.ts"
 import { createNcProbeHost, simulateNc, type NcProbeHost } from "../testing/probe-machine.ts"
-import { meshWorld, type Placement, type ProbeWorld3 } from "../probing/world.ts"
+import { meshWorld, unionWorld, type Placement, type ProbeWorld3 } from "../probing/world.ts"
 import type { ProbeCycle, ProbeOperationSummary, ProbeRoutine, ProbeSimOutcome } from "../probing/types.ts"
 import type { ProbeDevice } from "../probing/device.ts"
 import { resolveProbe } from "../probing/device.ts"
@@ -75,7 +77,12 @@ export const probeRefusal = (op: ProbeOperationSpec, machine: KernelMachine, dia
     if (family === undefined) return `Operation ${op.id} asks for the control's own cycle and the machine's probing has no cycle package (macroStyle)`
     if (dialect.probing.syntax !== family) return `Operation ${op.id} asks for ${machine.probing.macroStyle} cycles, which the ${machine.post} post does not write`
   }
-  if (op.cycle.kind === "stylus-calibrate" || op.cycle.kind === "rotary-axis") return `The ${op.cycle.kind} cycle is run through cam.probing, not as an operation of a cutting job`
+  if (op.cycle.kind === "rotary-axis") {
+    const five = machine.fiveAxis
+    if (five === undefined) return `A rotary-axis calibration needs a rotary table: machine ${machine.id} has none`
+    if (tilted) return "A rotary-axis calibration turns the table itself: it does not run in a tilted plane"
+    if (op.cycle.axis !== "C" && op.cycle.axis !== (five.layout === "table-AC" ? "A" : "B")) return `Machine ${machine.id} (${five.layout}) has no ${op.cycle.axis} axis`
+  }
   return undefined
 }
 
@@ -91,12 +98,15 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   const prefix = op.resultPrefix ?? `p${env.index + 1}_`
   const frame = jobFrameOf(env.job)
   const ctx = {
-    probe, safeZ: env.stockTop + 15, ...(frame !== undefined ? { frame, ...(machine.probing !== undefined ? { skipFrame: machine.probing.skipFrame } : {}) } : {}), clearance: op.clearance ?? 3, search: op.search ?? 6, prefix,
+    probe, safeZ: Math.max(env.stockTop + 15, artefactTop(op, machine, env.origin) + 15), ...(frame !== undefined ? { frame, ...(machine.probing !== undefined ? { skipFrame: machine.probing.skipFrame } : {}) } : {}), clearance: op.clearance ?? 3, search: op.search ?? 6, prefix,
     ...(machine.probing?.toolSetter !== undefined ? { setter: machine.probing.toolSetter } : {}),
     ...(setterOrigin !== undefined ? { workOrigin: setterOrigin } : {})
   }
   const cycle = translateCycle(op.cycle, -env.origin.x, -env.origin.y, -env.origin.z)
-  const routine = planProbeCycle(cycle, ctx)
+  const five = machine.fiveAxis
+  const routine = cycle.kind === "rotary-axis"
+    ? (five === undefined ? { refused: "a rotary-axis calibration needs a rotary table" } : rotaryRoutine(cycle, ctx, { layout: five.layout, pivot: five.pivot }))
+    : planProbeCycle(cycle, ctx)
   if ("refused" in routine) return { refused: routine.refused }
   let moves: Move[]
   try { moves = compileActions(routine, op.actions ?? [], ctx) } catch (error) { return { refused: error instanceof Error ? error.message : String(error) } }
@@ -120,6 +130,23 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   }
   return { toolpath, routine, moves: toolpath.moves, summary, device }
 }
+
+/** The highest a calibration artefact stands (work Z, at every angle the table takes): the probe travels above it. */
+const artefactTop = (op: ProbeOperationSpec, machine: KernelMachine, origin: Vec3): number => {
+  const c = op.cycle
+  if (c.kind === "stylus-calibrate" && c.artefact.kind === "sphere") return c.artefact.centre.z - origin.z + c.artefact.diameter / 2
+  if (c.kind !== "rotary-axis") return -Infinity
+  const five = machine.fiveAxis
+  if (five === undefined) return -Infinity
+  const k = { layout: five.layout, pivot: five.pivot }
+  return Math.max(...c.angles.map((t) => tablePose(k, { a: c.axis === "A" ? t : 0, b: c.axis === "B" ? t : 0, c: c.axis === "C" ? t : 0 }, false).toMachine(c.sphere.centre).z)) + c.sphere.diameter / 2
+}
+
+/** The artefacts of a job's calibration operations in the work offset's axes: they stand on the table beside the part, a misplaced part leaves them where they are. */
+const artefactsOf = (ops: ReadonlyArray<ProbeOperationSpec>, origin: Vec3): ReadonlyArray<ProbeWorld3> =>
+  ops.flatMap((op) => { const w = artefactWorld(translateCycle(op.cycle, -origin.x, -origin.y, -origin.z)); return w === undefined ? [] : [w] })
+
+const withArtefacts = (world: ProbeWorld3, artefacts: ReadonlyArray<ProbeWorld3>): ProbeWorld3 => (artefacts.length === 0 ? world : unionWorld([world, ...artefacts]))
 
 const transformMesh = (m: { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }, f: (p: Vec3) => Vec3): { readonly positions: Float64Array; readonly indices: Uint32Array } => {
   const out = new Float64Array(m.positions.length)
@@ -160,6 +187,8 @@ export interface SimulateProbingOptions {
   readonly probeTruth?: ProbeTruth
   /** Where the table really turns, machine coordinates (a pivot the control has wrong). */
   readonly truePivot?: Vec3
+  /** The true direction of a rotary axis, when it leans. */
+  readonly trueAxes?: Partial<Record<"A" | "B" | "C", Vec3>>
   /** The offsets the control holds (machine coordinates of each zero); default all zero. */
   readonly offsets?: Readonly<Record<string, { readonly x: number; readonly y: number; readonly z: number; readonly rotation?: number }>>
 }
@@ -169,6 +198,8 @@ export interface ProbeOperationRun {
   readonly cycle: ProbeCycle["kind"]
   readonly routine: ProbeRoutine
   readonly outcome: ProbeSimOutcome
+  /** What a calibration cycle found: reported, machine parameters are never written. */
+  readonly calibration?: ProbeCalibration
   /** The IR the run executed. */
   readonly moves: ReadonlyArray<Move>
 }
@@ -188,7 +219,7 @@ export const simulateProbing = (
   const probeOps = prepared.operations.filter((o): o is ProbeOperationSpec => o.strategy === "probe")
   if (probeOps.length === 0) return []
   const dialect = dialectOf(machine.post)
-  const world = nominalProbeWorld(prepared, options.placement)
+  const world = withArtefacts(nominalProbeWorld(prepared, options.placement), artefactsOf(probeOps, prepared.origin))
   const frame = jobFrame(job)
   const active = offsetRefOfJob(job)
   let entries = { ...(options.offsets ?? {}) }
@@ -206,11 +237,13 @@ export const simulateProbing = (
       ...(machine.probing !== undefined ? { skipFrame: machine.probing.skipFrame } : {}),
       ...(machine.probing?.toolSetter !== undefined ? { setter: machine.probing.toolSetter } : {}),
       ...(options.probeTruth !== undefined ? { truth: options.probeTruth } : {}),
-      ...(five !== undefined && options.truePivot !== undefined ? { kinematics: { layout: five.layout, pivot: five.pivot, truePivot: options.truePivot } } : {})
+      ...(five !== undefined ? { kinematics: { layout: five.layout, pivot: five.pivot, ...(options.truePivot !== undefined ? { truePivot: options.truePivot } : {}), ...(options.trueAxes !== undefined ? { trueAxes: options.trueAxes } : {}) } } : {})
     }
-    const outcome = runProbeMoves(planned.moves, world, sim, { results: planned.routine.results, units: planned.routine.units })
+    const raw = runProbeMoves(planned.moves, world, sim, { results: planned.routine.results, units: planned.routine.units })
+    const outcome = { ...raw, results: withHostFit(planned.routine, raw.results, planned.device) }
     entries = { ...outcome.offsets }
-    runs.push({ operationId: op.id, cycle: op.cycle.kind, routine: planned.routine, outcome, moves: planned.moves })
+    const calibration = calibrationOf(planned.routine.cycle, outcome.results, planned.device, five === undefined ? undefined : { layout: five.layout, pivot: five.pivot })
+    runs.push({ operationId: op.id, cycle: op.cycle.kind, routine: planned.routine, outcome, moves: planned.moves, ...(calibration !== undefined ? { calibration } : {}) })
   }
   return runs
 }
@@ -246,9 +279,10 @@ export const probingEvidence = (args: {
   const { prepared, planned } = args
   const codes = args.dialect?.probing
   if (codes === undefined) return { claim: { id: "probing", status: "unresolved", detail: "The post has no probing words: the probe operations are not replayed" }, textReplay: "not-replayed" }
-  const world = nominalProbeWorld(prepared)
+  const world = withArtefacts(nominalProbeWorld(prepared), artefactsOf(planned.map((p) => p.op), prepared.origin))
   const frame = jobFrame(prepared.job)
   const active = offsetRefOfJob(prepared.job)
+  const five = prepared.machine.fiveAxis
   const problems: string[] = []
   const mismatches: string[] = []
   let replayed = 0
@@ -260,6 +294,7 @@ export const probingEvidence = (args: {
     const sim: SimMachine = {
       offsets: { entries: {} }, active, probe: device,
       ...(frame !== undefined ? { frame } : {}),
+      ...(five !== undefined ? { kinematics: { layout: five.layout, pivot: five.pivot } } : {}),
       ...(prepared.machine.probing !== undefined ? { skipFrame: prepared.machine.probing.skipFrame } : {})
     }
     const ir = runProbeMoves(p.moves, world, sim, { results: p.routine.results, units: p.routine.units })
@@ -294,10 +329,12 @@ export const probeReplayHost = (prepared: { readonly job: ManufacturingJob; read
   const codes = dialect?.probing
   if (codes === undefined) return undefined
   const frame = jobFrame(prepared.job)
+  const five = prepared.machine.fiveAxis
   const sim: SimMachine = {
     offsets: { entries: {} }, active: offsetRefOfJob(prepared.job), probe: device,
     ...(frame !== undefined ? { frame } : {}),
+    ...(five !== undefined ? { kinematics: { layout: five.layout, pivot: five.pivot } } : {}),
     ...(prepared.machine.probing !== undefined ? { skipFrame: prepared.machine.probing.skipFrame } : {})
   }
-  return createNcProbeHost({ world: nominalProbeWorld(prepared), machine: sim, codes, rewrite: true, ...(probing !== undefined ? { probing } : {}) })
+  return createNcProbeHost({ world: withArtefacts(nominalProbeWorld(prepared), artefactsOf(probeOperationsOf(prepared.job.operations ?? []), prepared.origin)), machine: sim, codes, rewrite: true, ...(probing !== undefined ? { probing } : {}) })
 }

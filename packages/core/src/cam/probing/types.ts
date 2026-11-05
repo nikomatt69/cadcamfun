@@ -165,6 +165,8 @@ export interface ProbeSimUpdate {
   /** mm, radians for A / B / C / R. */
   readonly before: number
   readonly after: number
+  /** 1-based NC line of the write, when the run replayed NC text. */
+  readonly line?: number
 }
 
 export interface ProbeSimToolUpdate {
