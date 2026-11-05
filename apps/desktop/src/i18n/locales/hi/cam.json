@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "रन ने स्टाइलस की प्रभावी त्रिज्या मापी।",
   "cam.probing.calibration.apply": "मशीन में लिखें",
   "cam.probing.calibration.storedOnly": "कैलिब्रेशन के लिए सहेजी गई मशीन चाहिए: पहले लाइब्रेरी में प्रीसेट की प्रति बनाएँ।",
-  "cam.probing.calibration.savedToast": "कैलिब्रेशन मशीन में लिखा गया"
+  "cam.probing.calibration.savedToast": "कैलिब्रेशन मशीन में लिखा गया",
+  "cam.probing.program.native": "कंट्रोल का अपना चक्र उपयोग करें",
+  "cam.probing.program.nativeClaim": "{word}: कंट्रोल अपना चक्र चलाता है। सिमुलेशन इस कॉल को नहीं, इनलाइन स्पर्शों को दोहराता है, इसलिए प्रोबिंग दावा अनिर्णीत रहता है।"
 }

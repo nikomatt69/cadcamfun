@@ -4,10 +4,12 @@
  * jobs are the real ones.
  */
 import { afterAll, beforeAll, beforeEach, expect, setDefaultTimeout, test } from "bun:test"
-import { brep } from "@cadcamfun/core"
+import { brep, cam } from "@cadcamfun/core"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { DEFAULT_PROBING } from "../src/shared/state/settings.ts"
 import { makeProbingStoreService } from "../src/features/cam/api/probing.ts"
+import { makeToolpathGenerator } from "../src/features/cam/api/generator.ts"
+import { createProbeOverlay } from "../src/viewport/view3d/probe-overlay.ts"
 import { PALETTE } from "../src/features/cam/lib/probing/cycle-palette.data.ts"
 import { probeCycles } from "../src/features/cam/lib/probing/cycles.ts"
 import { overlayModelOf } from "../src/features/cam/lib/probing/overlay-input.ts"
@@ -52,7 +54,8 @@ const controller = () => {
   const run = <A, E>(effect: import("effect").Effect.Effect<A, E>) => app.state.runtime.run(effect)
   const machine = () => ({ id: machineId, name: "VMC", type: "mill", config })
   const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, projectId: () => projectId }
-  const program = hook.createProbingProgram({ ...deps, parse: async () => undefined })
+  const generator = makeToolpathGenerator(app.client)
+  const program = hook.createProbingProgram({ ...deps, parse: (nc) => run(generator.parse(nc, "Probing")) })
   return hook.createProbingController({ ...deps, program, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), setups: () => [], insert: () => {}, onMachineProbing: () => {} })
 }
 const added = (id: string) => {
@@ -78,7 +81,7 @@ test("Write program, Simulate a misplaced part, the overlay shows the real run, 
   const run = useProbingStore.getState().results[cycle.id]!
   expect(run.verdict).toBe("pass")
   expect(run.outcome.contacts.length).toBeGreaterThanOrEqual(4)
-  expect(run.programHash).toBe(program.hash!)
+  expect(run.programHash).toBe(useProbingStore.getState().programs[cycle.id]!.hash!)
   expect(run.outcome.updates.map((u) => u.axis).sort()).toEqual(["X", "Y"])
 
   const updated = useMultiToolpathStore.getState().getToolpathById(cycle.id)!.probe!
@@ -88,6 +91,28 @@ test("Write program, Simulate a misplaced part, the overlay shows the real run, 
   expect(Math.max(...model.deviations.map((d) => d.magnitude))).toBeGreaterThan(0.1)
   expect(model.wcsShift.x).toBeCloseTo(0.3, 3)
   expect(model.wcsShift.y).toBeCloseTo(-0.2, 3)
+
+  // Show in 3D: the program of the run is what plays, and its lines place the contacts and the offset change in time.
+  const played = useProbingStore.getState().programs[cycle.id]!
+  expect(played.parsed).toBeDefined()
+  const parsed = played.parsed!
+  const timeline = cam.viewer.buildTimeline(parsed.program, parsed.motion, 3000, cam.viewer.programStart("mill", parsed.program))
+  expect(run.outcome.contacts.every((contact) => typeof contact.line === "number")).toBe(true)
+  const timed = overlayModelOf({ result: run, operation: updated, deviationScale: 100, timeline })
+  const times = timed.contacts.map((contact) => contact.time!)
+  expect(times.every((time) => typeof time === "number")).toBe(true)
+  for (let i = 1; i < times.length; i++) expect(times[i]!).toBeGreaterThan(times[i - 1]!)
+  expect(timed.switchAt).toBeGreaterThanOrEqual(times.at(-1)!)
+  const overlay = createProbeOverlay(timed)
+  overlay.update(times[0]! - 0.001)
+  expect(overlay.root.getObjectByName("probe:contact:0")!.visible).toBe(false)
+  overlay.update(times[0]!)
+  expect(overlay.root.getObjectByName("probe:contact:0")!.visible).toBe(true)
+  expect(overlay.root.getObjectByName(`probe:contact:${times.length - 1}`)!.visible).toBe(false)
+  expect(overlay.root.getObjectByName("probe:wcs:after")!.visible).toBe(false)
+  overlay.update(timed.switchAt! )
+  expect(overlay.root.getObjectByName("probe:wcs:after")!.visible).toBe(true)
+  overlay.dispose()
 
   c.applyMeasured(cycle.id)
   await c.saveOffsets()
@@ -127,4 +152,28 @@ test("a rotary calibration: Write program, Simulate a table off its pivot, write
   expect(useProbingStore.getState().error).toBeUndefined()
   const stored = (await app.sidecar.call(`/api/machine-configs/${machineId}/probe`)).body
   expect(stored.rotaryCalibration.pivotMeasured.y).toBeCloseTo(-0.02, 2)
+})
+
+test("a rotary calibration as a job operation: Simulate on the believed table keeps its record and lines", async () => {
+  const { c, cycle } = added("rotary-axis")
+  c.update(cycle.id, { cycle: { kind: "rotary-axis", axis: "A", sphere: { centre: { x: 0, y: 0, z: 150 }, diameter: 25 }, angles: [-60, -30, 0, 30, 60] }, overrides: { safeZ: 260 } })
+  await c.simulate(cycle.id)
+  expect(useProbingStore.getState().error).toBeUndefined()
+  const run = useProbingStore.getState().results[cycle.id]!
+  expect(run.verdict).toBe("pass")
+  expect(run.calibration?.kind).toBe("rotary")
+  expect(run.outcome.contacts[0]?.line).toBeGreaterThan(0)
+  expect(useProbingStore.getState().programs[cycle.id]?.parsed).toBeDefined()
+})
+
+test("a native cycle needs a machine that has one; the written program says what it does not prove", async () => {
+  config = { ...config, probing: { ...(config.probing as object), macroStyle: "renishaw" } }
+  const { c, cycle } = added("bore")
+  c.update(cycle.id, { cycle: { kind: "bore", centre: { x: 30, y: 30 }, diameter: 20, depth: 5, top: 0 }, native: true, deadband: 0, limit: 0 })
+  await c.generate(cycle.id)
+  expect(useProbingStore.getState().error).toBeUndefined()
+  const program = useProbingStore.getState().programs[cycle.id]!
+  expect(program.native).toContain("G65")
+  expect(program.nc).toContain("G65")
+  config = { ...config, probing: { ...(config.probing as object), macroStyle: "inline" } }
 })

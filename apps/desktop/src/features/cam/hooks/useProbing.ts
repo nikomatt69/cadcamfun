@@ -27,11 +27,10 @@ import { applyTarget, targetAt, targetsOf, workOriginOf, type ProbeTarget } from
 import { reportData, resultOfReport } from "../lib/probing/report-data.ts"
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
-import { cycleOfSpec } from "../lib/probing/cycle-fields.ts"
 import { entriesOfRows } from "../lib/probing/work-offsets.ts"
 import { fingerprintOf } from "../lib/probing/result.ts"
-import { requestOf, resultOfCalibration, resultOfSimulation, stylusCalibrationOf } from "../lib/probing/simulation.ts"
-import { freshProgram, useProbingStore } from "../store/probingStore.ts"
+import { requestOf, resultOfCalibration, resultOfSimulation } from "../lib/probing/simulation.ts"
+import { useProbingStore } from "../store/probingStore.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { useSetupStore } from "../store/setupStore.ts"
 import { useWorkOffsetStore } from "../store/workOffsetStore.ts"
@@ -62,62 +61,50 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
     if (deps.service.program === undefined) throw new Error(t("cam.probing.program.unavailable"))
     return deps.service.program
   }
+  /** A program for the panel: parsed for the 3D view, which plays exactly this text (the run's lines are lines of it). */
+  const keep = async (id: string, operation: ProbeOperation, dialect: string, written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string }) => {
+    const parsed = await deps.parse(written.nc).catch(() => undefined)
+    probing.getState().setProgram({ operationId: id, dialect, fingerprint: fingerprintOf(operation), ...written, ...(parsed !== undefined ? { parsed } : {}) })
+  }
   return {
     generate: async (id, operation, dialect) => {
       const service = calls()
-      const ctx = context()
-      const fingerprint = fingerprintOf(operation)
-      const decoded = cycleOfSpec(operation.cycle)
-      let written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string }
-      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
-        const c = decoded.cycle
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, dialect: dialect as never }))
-        if (out.nc === undefined) throw new Error(out.refused ?? t("cam.probing.program.unavailable"))
-        written = { nc: out.nc, lines: out.nc.split("\n").length, notes: out.notes, warnings: [] }
-      } else {
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
-        written = { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc }
-      }
-      const parsed = await deps.parse(written.nc).catch(() => undefined)
-      probing.getState().setProgram({ operationId: id, dialect, fingerprint, ...written, ...(parsed !== undefined ? { parsed } : {}) })
+      const request = requestOf(operation, context())
+      if ("refused" in request) throw new Error(request.refused)
+      const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
+      await keep(id, operation, dialect, { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc, ...(out.native !== undefined ? { native: out.native } : {}) })
     },
-    simulate: async (id, operation) => {
+    simulate: async (id, operation, dialect) => {
       const service = calls()
       const ctx = context()
       const project = deps.projectId()
       const runId = newRunId()
       const progress = project !== null ? { progress: { projectId: project, runId } } : {}
       const m = probing.getState().misplacement
-      const decoded = cycleOfSpec(operation.cycle)
-      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
-        const c = decoded.cycle
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        const truth = m.x !== 0 || m.y !== 0 || m.z !== 0 ? { truth: { pivot: m } } : {}
-        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, ...truth, ...progress }))
+      const request = requestOf(operation, ctx)
+      if ("refused" in request) throw new Error(request.refused)
+      const { operation: cycle, settings, frame, actions, checks, assumed } = request
+      // A job operation measures the table the control believes in; the offset fields simulate one that is really elsewhere.
+      if (cycle.kind === "rotary-axis" && (m.x !== 0 || m.y !== 0 || m.z !== 0)) {
+        const out = await deps.run(service.calibrateRotary({ axis: cycle.axis, sphere: cycle.sphere, angles: cycle.angles.map((a) => a * 180 / Math.PI), settings, truth: { pivot: m }, ...(assumed !== undefined ? { assumed } : {}), ...progress }))
         probing.getState().setResult(resultOfCalibration(out, { operationId: id, operation }))
         return
       }
-      const request = requestOf(operation, ctx)
-      if ("refused" in request) throw new Error(request.refused)
       const planned = planLocal(operation, { profile: ctx.profile, defaults: ctx.defaults })
-      if (!planned.ok) throw new Error(planned.reason)
       const elements = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
       if (elements.length === 0) throw new Error(t("cam.probing.program.noPart"))
       const table = useWorkOffsetStore.getState()
       const workOffsets = table.machineConfigId !== undefined && table.rows.length > 0 ? entriesOfRows(table.rows, "machine") : undefined
-      const { operation: cycle, settings, frame, actions, checks } = request
       const sim = await deps.run(service.simulate({
         elements, settings, operations: [{ id, operation: cycle, ...(actions !== undefined ? { actions } : {}), ...(checks !== undefined ? { checks } : {}) }],
-        ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}),
-        misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...progress
+        ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}), ...(assumed !== undefined ? { assumed } : {}),
+        dialect: dialect as never, misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...progress
       }))
-      const program = freshProgram(probing.getState().programs, id, operation)
-      probing.getState().setResult(resultOfSimulation(sim, { operationId: id, operation, expected: planned.routine.contacts, runId, ...(program?.hash !== undefined ? { programHash: program.hash } : {}) }))
+      // The report's lines are lines of this text: the 3D view must play it, not a program written earlier.
+      if (sim.program !== undefined) await keep(id, operation, dialect, { nc: sim.program.nc, lines: sim.program.lines, notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc })
+      probing.getState().setResult(resultOfSimulation(sim, {
+        operationId: id, operation, expected: planned.ok ? planned.routine.contacts : [], runId, ...(sim.program !== undefined ? { programHash: sim.program.identity.nc } : {})
+      }))
     }
   }
 }
@@ -248,9 +235,7 @@ export const createProbingController = (deps: ControllerDeps): ProbingController
 
     calibrationOf: (id) => {
       const result = probing.getState().results[id]
-      const operation = operationOf(id)
-      if (result === undefined || operation === undefined) return undefined
-      return result.calibration ?? stylusCalibrationOf(result, operation)
+      return result === undefined || result.verdict === "fail" || result.verdict === "missed" || result.verdict === "incomplete" ? undefined : result.calibration
     },
     applyCalibration: async (id) => {
       const machine = deps.machine()

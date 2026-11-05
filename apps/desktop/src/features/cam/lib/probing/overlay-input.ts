@@ -6,7 +6,7 @@
 import { cam } from "@cadcamfun/core"
 import type { Vec3 } from "@cadcamfun/core"
 import { probeOverlayModel, type ProbeOverlayModel } from "../../../../viewport/view3d/probe-overlay.ts"
-import { contactTimesOnTimeline } from "./contact-times.ts"
+import { contactTimesOnTimeline, offsetTimeOnTimeline } from "./contact-times.ts"
 import { getPath, type CycleSpec } from "./cycle-fields.ts"
 import { refWire, type ProbeOperation, type TiltedFrame } from "./operation.ts"
 import { offsetChange, type ProbeRunResult } from "./result.ts"
@@ -34,6 +34,7 @@ const spheresOf = (op: ProbeOperation, result: ProbeRunResult): ProbeOverlayMode
   const diameter = Number(getPath(op.cycle, "sphere.diameter") ?? 0)
   if (!(diameter > 0)) return []
   const measured: Array<{ centre: Vec3; diameter: number }> = []
+  if (result.calibration?.kind === "rotary" && result.calibration.centres !== undefined) return result.calibration.centres.map((centre) => ({ centre, diameter }))
   for (let i = 0; ; i++) {
     const x = result.outcome.results[`cal_${i}_x`], y = result.outcome.results[`cal_${i}_y`], z = result.outcome.results[`cal_${i}_z`]
     if (x === undefined || y === undefined || z === undefined) break
@@ -54,10 +55,12 @@ export const overlayModelOf = (input: {
   const { result, operation } = input
   const change = offsetChange(result.outcome, refWire(operation.workOffset))
   const times = input.timeline !== undefined ? contactTimesOnTimeline(result.outcome.contacts, input.timeline) : undefined
+  const offsetAt = input.timeline !== undefined ? offsetTimeOnTimeline(result.outcome.updates, input.timeline) : undefined
   const frame = operation.frame
   return probeOverlayModel({
     outcome: result.outcome, expected: result.expected, deviationScale: input.deviationScale,
     ...(times !== undefined ? { times } : {}),
+    ...(offsetAt !== undefined ? { offsetAt } : {}),
     ...(change !== undefined ? { before: change.before, after: change.after } : {}),
     ...(frame !== undefined ? { frames: [{ origin: anchorOf(operation.cycle), ...(({ x, y }) => ({ x, y }))(frameAxesOfAbc(frame)) }] } : {}),
     spheres: spheresOf(operation, result),

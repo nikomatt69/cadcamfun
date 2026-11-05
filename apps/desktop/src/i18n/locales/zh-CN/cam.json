@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "本次运行测得测针的有效半径。",
   "cam.probing.calibration.apply": "写入机床",
   "cam.probing.calibration.storedOnly": "标定需要已保存的机床：请先在库中复制预设。",
-  "cam.probing.calibration.savedToast": "标定已写入机床"
+  "cam.probing.calibration.savedToast": "标定已写入机床",
+  "cam.probing.program.native": "使用控制器自带循环",
+  "cam.probing.program.nativeClaim": "{word}：控制器运行其自带循环。仿真回放的是展开的接触，而非此调用，因此探测结论仍未确认。"
 }

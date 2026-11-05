@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "A execução mediu o raio efetivo da esfera.",
   "cam.probing.calibration.apply": "Gravar na máquina",
   "cam.probing.calibration.storedOnly": "Uma calibração precisa de uma máquina guardada: duplique primeiro a predefinição na biblioteca.",
-  "cam.probing.calibration.savedToast": "Calibração gravada na máquina"
+  "cam.probing.calibration.savedToast": "Calibração gravada na máquina",
+  "cam.probing.program.native": "Usar o ciclo próprio do comando",
+  "cam.probing.program.nativeClaim": "{word}: o comando executa o seu próprio ciclo. A simulação reproduz os toques em linha, não esta chamada, por isso a verificação de apalpação fica por resolver."
 }

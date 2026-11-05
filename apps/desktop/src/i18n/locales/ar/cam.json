@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "قاس التشغيل نصف القطر الفعال للإبرة.",
   "cam.probing.calibration.apply": "الكتابة إلى الآلة",
   "cam.probing.calibration.storedOnly": "تتطلب المعايرة آلة محفوظة: انسخ الإعداد المسبق في المكتبة أولًا.",
-  "cam.probing.calibration.savedToast": "كُتبت المعايرة إلى الآلة"
+  "cam.probing.calibration.savedToast": "كُتبت المعايرة إلى الآلة",
+  "cam.probing.program.native": "استخدام الدورة الخاصة بوحدة التحكم",
+  "cam.probing.program.nativeClaim": "{word}: تشغّل وحدة التحكم دورتها الخاصة. تعيد المحاكاة تشغيل اللمسات المضمنة لا هذا الاستدعاء، لذا يبقى ادعاء التحسس غير محسوم."
 }

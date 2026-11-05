@@ -20,6 +20,8 @@ export interface ProbeOverlayInput {
   readonly after?: OffsetEntry
   /** Playback time of each contact, seconds (from `contact-times`); absent: every contact is shown. */
   readonly times?: ReadonlyArray<number | undefined>
+  /** Playback time of the block that writes the offset; absent: the triad moves at the last contact. */
+  readonly offsetAt?: number
   readonly deviationScale: number
   /** Tilted probing frames (5-axis probing): origin and X / Y axes in work coordinates. */
   readonly frames?: ReadonlyArray<{ readonly origin: Vec3; readonly x: Vec3; readonly y: Vec3 }>
@@ -68,7 +70,7 @@ export const probeOverlayModel = (input: ProbeOverlayInput): ProbeOverlayModel =
   const times = contacts.map((c) => c.time).filter((t): t is number => t !== undefined)
   return {
     contacts, deviations, wcsShift, wcsRotation: (after.rotation ?? 0) - r,
-    ...(times.length > 0 ? { switchAt: Math.max(...times) } : {}),
+    ...(input.offsetAt !== undefined ? { switchAt: input.offsetAt } : times.length > 0 ? { switchAt: Math.max(...times) } : {}),
     frames: input.frames ?? [], spheres: input.spheres ?? []
   }
 }

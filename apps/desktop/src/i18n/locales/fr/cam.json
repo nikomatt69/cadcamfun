@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "L'exécution a mesuré le rayon effectif de la bille.",
   "cam.probing.calibration.apply": "Écrire dans la machine",
   "cam.probing.calibration.storedOnly": "Un étalonnage exige une machine enregistrée : dupliquez d'abord le préréglage dans la bibliothèque.",
-  "cam.probing.calibration.savedToast": "Étalonnage écrit dans la machine"
+  "cam.probing.calibration.savedToast": "Étalonnage écrit dans la machine",
+  "cam.probing.program.native": "Utiliser le cycle propre à la commande",
+  "cam.probing.program.nativeClaim": "{word} : la commande exécute son propre cycle. La simulation rejoue les touches en ligne, pas cet appel : le contrôle de palpage reste non résolu."
 }

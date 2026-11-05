@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "L'esecuzione ha misurato il raggio efficace dello stilo.",
   "cam.probing.calibration.apply": "Scrivi nella macchina",
   "cam.probing.calibration.storedOnly": "Una calibrazione richiede una macchina salvata: duplica prima il preset nella libreria.",
-  "cam.probing.calibration.savedToast": "Calibrazione scritta nella macchina"
+  "cam.probing.calibration.savedToast": "Calibrazione scritta nella macchina",
+  "cam.probing.program.native": "Usa il ciclo proprio del controllo",
+  "cam.probing.program.nativeClaim": "{word}: il controllo esegue il proprio ciclo. La simulazione riproduce i contatti in linea, non questa chiamata, quindi la verifica di tastatura resta non risolta."
 }

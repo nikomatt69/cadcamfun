@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "実行によりスタイラスの有効半径を測定しました。",
   "cam.probing.calibration.apply": "機械に書き込む",
   "cam.probing.calibration.storedOnly": "校正には保存済みの機械が必要です。先にライブラリでプリセットを複製してください。",
-  "cam.probing.calibration.savedToast": "校正を機械に書き込みました"
+  "cam.probing.calibration.savedToast": "校正を機械に書き込みました",
+  "cam.probing.program.native": "制御装置の専用サイクルを使う",
+  "cam.probing.program.nativeClaim": "{word}: 制御装置が専用サイクルを実行します。シミュレーションはこの呼び出しではなく展開した接触を再生するため、プロービングの判定は未確定のままです。"
 }

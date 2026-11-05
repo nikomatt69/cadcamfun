@@ -18,7 +18,7 @@ import type { PaletteEntry } from "../../lib/probing/cycle-palette.data.ts"
 import { planLocal, type ProbeOperation } from "../../lib/probing/operation.ts"
 import type { ProbeTarget } from "../../lib/probing/probe-targets.ts"
 import { summarizeInspection } from "../../lib/probing/inspection.ts"
-import type { RunCalibration } from "../../lib/probing/simulation.ts"
+import type { RunCalibration } from "../../lib/probing/result.ts"
 import type { ProbingDefaults } from "../../../../shared/state/settings.ts"
 import type { OffsetScope } from "../../store/workOffsetStore.ts"
 import { InspectionList } from "./InspectionList.tsx"
@@ -174,6 +174,7 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
       <PanelSection id="probing-program" icon={SECTION_ICON.program} title={t("cam.probing.section.program")} open={probing.open.program} onToggle={toggle("program")} testId="probing-section-program">
         <Show when={selected()} fallback={<p class="panel-empty">{t("cam.probing.program.select")}</p>}>{(cycle) => (
           <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()} misplacement={probing.misplacement} onMisplacement={(patch) => probing.setMisplacement(patch)}
+            nativeStyle={c.profile()?.probing?.macroStyle} native={cycle().probe.native === true} onNative={(native) => c.update(cycle().id, { native })}
             disabled={!planLocal(cycle().probe, { profile: c.profile(), defaults: c.defaults() }).ok} onDialect={(id) => probing.setDialect(id)} onGenerate={() => void c.generate(cycle().id)} onSimulate={() => void c.simulate(cycle().id)}
             onShow3d={(show) => { probing.setShowIn3d(show); if (show) cam.setActiveTab("toolpath") }} onInsert={(nc) => c.insert(nc)} />
         )}</Show>

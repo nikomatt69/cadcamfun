@@ -83,3 +83,5 @@ li[data-status="fail"] .probing-gauge__mark { background: var(--panel-bad); }
 .probing-misplace { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; border: 0; margin: 0; padding: 0; min-width: 0; }
 .probing-misplace legend { grid-column: 1 / -1; padding: 0; margin-bottom: 4px; }
 .probing-misplace__axis { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 11px; }
+
+.probing-native { display: flex; align-items: center; gap: 6px; font-size: 12px; }

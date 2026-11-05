@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "The run measured the effective stylus radius.",
   "cam.probing.calibration.apply": "Write to the machine",
   "cam.probing.calibration.storedOnly": "A calibration needs a saved machine: duplicate the preset in the library first.",
-  "cam.probing.calibration.savedToast": "Calibration written to the machine"
+  "cam.probing.calibration.savedToast": "Calibration written to the machine",
+  "cam.probing.program.native": "Use the control's own cycle",
+  "cam.probing.program.nativeClaim": "{word}: the control runs its own cycle. The simulation replays the inline touches, not this call, so the probing claim stays unresolved."
 }

@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "La ejecución midió el radio efectivo de la bola.",
   "cam.probing.calibration.apply": "Escribir en la máquina",
   "cam.probing.calibration.storedOnly": "Una calibración necesita una máquina guardada: duplica antes el preajuste en la biblioteca.",
-  "cam.probing.calibration.savedToast": "Calibración escrita en la máquina"
+  "cam.probing.calibration.savedToast": "Calibración escrita en la máquina",
+  "cam.probing.program.native": "Usar el ciclo propio del control",
+  "cam.probing.program.nativeClaim": "{word}: el control ejecuta su propio ciclo. La simulación reproduce los contactos en línea, no esta llamada, así que la verificación de palpado queda sin resolver."
 }

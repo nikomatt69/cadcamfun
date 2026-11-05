@@ -8,6 +8,11 @@ import { statusOf, WARN_SHARE } from "./inspection.ts"
 export type RunVerdict = "pass" | "warn" | "fail" | "missed" | "incomplete"
 export type RunSource = "simulated" | "machine" | "imported"
 
+/** What a calibration run found, ready for the machine (wire units: degrees). */
+export type RunCalibration =
+  | { readonly kind: "rotary"; readonly rotary: import("./contract.ts").MachineRotaryCalibration; readonly centres?: ReadonlyArray<import("@cadcamfun/core").Vec3> }
+  | { readonly kind: "stylus"; readonly stylus: NonNullable<import("./contract.ts").MachineProbing["calibration"]> }
+
 export interface ProbeRunResult {
   /** The probe cycle (toolpath id) it measured. */
   readonly operationId: string
@@ -25,7 +30,7 @@ export interface ProbeRunResult {
   /** The offset the run updated. */
   readonly workOffset?: string
   /** What a rotary calibration measured, ready for the machine. */
-  readonly calibration?: { readonly kind: "rotary"; readonly rotary: import("./contract.ts").MachineRotaryCalibration }
+  readonly calibration?: RunCalibration
   /** Fingerprint of the operation the run measured (`fingerprintOf`): a changed operation makes the result stale. */
   readonly fingerprint?: string
 }

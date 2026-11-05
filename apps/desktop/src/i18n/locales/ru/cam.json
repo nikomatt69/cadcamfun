@@ -1687,5 +1687,7 @@
   "cam.probing.calibration.stylus": "Прогон измерил эффективный радиус наконечника.",
   "cam.probing.calibration.apply": "Записать в станок",
   "cam.probing.calibration.storedOnly": "Для калибровки нужен сохранённый станок: сначала продублируйте шаблон в библиотеке.",
-  "cam.probing.calibration.savedToast": "Калибровка записана в станок"
+  "cam.probing.calibration.savedToast": "Калибровка записана в станок",
+  "cam.probing.program.native": "Использовать цикл системы ЧПУ",
+  "cam.probing.program.nativeClaim": "{word}: ЧПУ выполняет собственный цикл. Симуляция воспроизводит отдельные касания, а не этот вызов, поэтому проверка измерения остаётся неразрешённой."
 }
