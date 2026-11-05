@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "将剩余毛坯从一个装夹带到下一个",
   "cam.kernel.job.open": "在编辑器中打开",
   "cam.kernel.job.release": "作业放行等级（各装夹中最低的）",
-  "cam.kernel.job.failed": "装夹 {id}：{message}"
+  "cam.kernel.job.failed": "装夹 {id}：{message}",
+  "cam.batch.title": "导入 CAM 程序",
+  "cam.batch.explanation": "选择文件或文件夹，然后打开程序。程序在本次会话中保持独立。",
+  "cam.batch.available": "{count} 个可用程序",
+  "cam.batch.skipped": "{count} 个文件未导入",
+  "cam.batch.confirmReplace": "将替换当前程序。请先保存更改。是否继续？",
+  "cam.batch.export": "导出",
+  "cam.batch.projects": "项目",
+  "cam.batch.unsupported": "不支持的文件格式",
+  "cam.batch.invalidFile": "文件为空或不是有效的 CAM 程序。",
+  "cam.batch.reading": "正在读取文件…",
+  "cam.gen.mach.latheIntro": "配置快速生成器的车床设置。铣床装夹规划器和已验证铣削内核不适用于车床。",
+  "cam.gen.mach.printerIntro": "选择用于验证切片的打印机，同时更新快速生成器的热床、喷嘴和固件设置。",
+  "cam.gen.lathe.compUnsupported": "快速生成器不支持刀具半径补偿。请禁用后生成程序。"
 }

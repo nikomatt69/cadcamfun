@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Llevar el material restante de un setup al siguiente",
   "cam.kernel.job.open": "Abrir en el editor",
   "cam.kernel.job.release": "Liberación del trabajo (la más baja de sus setups)",
-  "cam.kernel.job.failed": "Setup {id}: {message}"
+  "cam.kernel.job.failed": "Setup {id}: {message}",
+  "cam.batch.title": "Importar programas CAM",
+  "cam.batch.explanation": "Elige archivos o una carpeta y abre un programa. Los programas permanecen separados durante esta sesión.",
+  "cam.batch.available": "{count} programas disponibles",
+  "cam.batch.skipped": "{count} archivos no importados",
+  "cam.batch.confirmReplace": "Se reemplazará el programa actual. Guarda primero los cambios. ¿Continuar?",
+  "cam.batch.export": "Exportar",
+  "cam.batch.projects": "Proyectos",
+  "cam.batch.unsupported": "Formato no compatible",
+  "cam.batch.invalidFile": "El archivo está vacío o no es un programa CAM válido.",
+  "cam.batch.reading": "Leyendo archivos…",
+  "cam.gen.mach.latheIntro": "Configura el torno para el generador rápido. El planificador y el núcleo de fresado verificado no se aplican al torno.",
+  "cam.gen.mach.printerIntro": "Elige una impresora para el laminado verificado. También se actualizan la cama, la boquilla y el firmware del generador rápido.",
+  "cam.gen.lathe.compUnsupported": "El generador rápido no admite la compensación del radio de herramienta. Desactívala para generar el programa."
 }

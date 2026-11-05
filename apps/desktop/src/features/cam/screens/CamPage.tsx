@@ -8,7 +8,7 @@
  * generated, imported and hand-edited code all share one pipeline.
  */
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
-import { useSearchParams } from "@solidjs/router"
+import { useNavigate, useSearchParams } from "@solidjs/router"
 import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
 import { Box, Crosshair, ShieldCheck, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -25,6 +25,7 @@ import { makeToolpathGenerator } from "../api/generator.ts"
 import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
 import CamToolbar from "../components/CamToolbar.tsx"
+import CamImportDialog from "../components/CamImportDialog.tsx"
 import CamSidebar, { type SidebarTab } from "../components/CamSidebar.tsx"
 import ToolpathGenerator from "../components/ToolpathGenerator.tsx"
 import VerifyPanel from "../components/VerifyPanel.tsx"
@@ -153,6 +154,7 @@ export default function CamPage(): JSX.Element {
   const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
   const shownGcode = () => probePreview()?.nc ?? camStore.gcode
   const [search, setSearch] = useSearchParams()
+  const navigate = useNavigate()
 
   const [gcode, setGcodeSignal] = createSignal<string>(camStore.gcode)
   const [processedGcode, setProcessedGcode] = createSignal("")
@@ -161,8 +163,8 @@ export default function CamPage(): JSX.Element {
   const [showLibrary, setShowLibrary] = createSignal(false)
   const [showCosts, setShowCosts] = createSignal(false)
   const [showHistory, setShowHistory] = createSignal(false)
+  const [showImport, setShowImport] = createSignal(false)
   const [saveRequest, setSaveRequest] = createSignal<{ readonly code: string; readonly extension: string; readonly projectOnly: boolean }>()
-  let ribbonFilePicker: HTMLInputElement | undefined
   let parseVersion = 0
   let manualParse: AbortController | undefined
   let automaticParse: AbortController | undefined
@@ -205,7 +207,7 @@ export default function CamPage(): JSX.Element {
         else saveGCode()
       },
       "file.export": () => { saveGCode() },
-      "file.import": () => { ribbonFilePicker?.click() },
+      "file.import": () => { setShowImport(true) },
       "edit.undo": { run: () => { useCamHistoryStore.getState().undo() }, inText: inEditor },
       "edit.redo": { run: () => { useCamHistoryStore.getState().redo() }, inText: inEditor },
       "cam.tab.editor": () => { camStore.setActiveTab("editor") },
@@ -355,6 +357,15 @@ export default function CamPage(): JSX.Element {
     setSaveRequest({ code, extension, projectOnly })
   }
 
+  const saveWorkspace = async (): Promise<void> => {
+    const owner = captureEditorOwner()
+    if (owner.drawingId || camStore.savedProgram) {
+      const result = await projectSession(app).saveInteractive()
+      if (result === undefined || !owner.current()) return
+    }
+    if (!camStore.savedProgram && gcode().trim()) saveGCode(true)
+  }
+
   const toggleSimulation = (): void => {
     const next = !camStore.playing
     if (next && camStore.program.toolpaths.length === 0) {
@@ -430,8 +441,10 @@ export default function CamPage(): JSX.Element {
           isSimulating={camStore.playing}
           aiEnhanced={app.panelOpen()}
           showChat={app.panelOpen()}
-          onSave={saveGCode}
-          onImport={importGCode}
+          onSave={() => void saveWorkspace()}
+          onImport={() => setShowImport(true)}
+          onExport={() => saveGCode()}
+          onProjects={() => navigate("/projects")}
           onToggleSimulation={toggleSimulation}
           onOpenLibrary={() => setShowLibrary(true)}
           onOpenCosts={() => setShowCosts(true)}
@@ -442,7 +455,7 @@ export default function CamPage(): JSX.Element {
 
         <CamRibbon
           onSave={saveGCode}
-          onImport={() => ribbonFilePicker?.click()}
+          onImport={() => setShowImport(true)}
           onOpenLibrary={() => setShowLibrary(true)}
           onOpenCosts={() => setShowCosts(true)}
           onSelectActiveTab={(next) => camStore.setActiveTab(next)}
@@ -455,18 +468,7 @@ export default function CamPage(): JSX.Element {
           postProcessor={selectedPostProcessor()}
         />
 
-        <input
-          ref={ribbonFilePicker}
-          type="file"
-          class="hidden"
-          accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
-          aria-label={t("cam.import")}
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0]
-            if (file) importGCode(file)
-            event.currentTarget.value = ""
-          }}
-        />
+        <CamImportDialog open={showImport()} hasProgram={gcode().length > 0} onClose={() => setShowImport(false)} onOpen={importGCode} />
 
         <div
           class="cam-workspace__body flex flex-1 overflow-hidden w-full"

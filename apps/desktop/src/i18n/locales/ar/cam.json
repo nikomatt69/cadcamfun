@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "نقل الخام المتبقي من إعداد إلى التالي",
   "cam.kernel.job.open": "فتح في المحرر",
   "cam.kernel.job.release": "إصدار المهمة (الأدنى بين إعداداتها)",
-  "cam.kernel.job.failed": "الإعداد {id}: {message}"
+  "cam.kernel.job.failed": "الإعداد {id}: {message}",
+  "cam.batch.title": "استيراد برامج CAM",
+  "cam.batch.explanation": "اختر ملفات أو مجلدًا ثم افتح برنامجًا. تبقى البرامج منفصلة أثناء هذه الجلسة.",
+  "cam.batch.available": "{count} برامج متاحة",
+  "cam.batch.skipped": "لم يتم استيراد {count} ملفًا",
+  "cam.batch.confirmReplace": "سيتم استبدال البرنامج الحالي. احفظ التغييرات أولًا. هل تريد المتابعة؟",
+  "cam.batch.export": "تصدير",
+  "cam.batch.projects": "المشاريع",
+  "cam.batch.unsupported": "تنسيق ملف غير مدعوم",
+  "cam.batch.invalidFile": "الملف فارغ أو ليس برنامج CAM صالحًا.",
+  "cam.batch.reading": "جارٍ قراءة الملفات…",
+  "cam.gen.mach.latheIntro": "اضبط المخرطة للمولّد السريع. لا ينطبق مخطط إعدادات التفريز والنواة المتحقق منها على المخرطة.",
+  "cam.gen.mach.printerIntro": "اختر طابعة للتقطيع المتحقق منه. يتم أيضًا تحديث إعدادات السرير والفوهة والبرنامج الثابت للمولّد السريع.",
+  "cam.gen.lathe.compUnsupported": "لا يدعم المولّد السريع تعويض نصف قطر الأداة. أوقفه لإنشاء البرنامج."
 }

@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Porta il grezzo residuo da un setup al successivo",
   "cam.kernel.job.open": "Apri nell'editor",
   "cam.kernel.job.release": "Rilascio del lavoro (il più basso dei suoi setup)",
-  "cam.kernel.job.failed": "Setup {id}: {message}"
+  "cam.kernel.job.failed": "Setup {id}: {message}",
+  "cam.batch.title": "Importa programmi CAM",
+  "cam.batch.explanation": "Scegli file o una cartella, poi apri un programma. I programmi restano separati e disponibili mentre lo spazio di lavoro è aperto.",
+  "cam.batch.available": "{count} programmi disponibili",
+  "cam.batch.skipped": "{count} file non importati",
+  "cam.batch.confirmReplace": "Aprendo questo programma il contenuto corrente dell’editor verrà sostituito. Salva prima le modifiche. Continuare?",
+  "cam.batch.export": "Esporta",
+  "cam.batch.projects": "Progetti",
+  "cam.batch.unsupported": "Formato non supportato",
+  "cam.batch.invalidFile": "Il file è vuoto o non è un programma CAM valido.",
+  "cam.batch.reading": "Lettura dei file…",
+  "cam.gen.mach.latheIntro": "Configura il tornio per il generatore rapido. Il pianificatore e il kernel verificato della fresatrice non si applicano al tornio.",
+  "cam.gen.mach.printerIntro": "Scegli una stampante per lo slicing verificato. La scelta aggiorna anche piano, ugello e firmware del generatore rapido.",
+  "cam.gen.lathe.compUnsupported": "La compensazione del raggio utensile non è supportata dal generatore rapido. Disattivala per generare un programma."
 }

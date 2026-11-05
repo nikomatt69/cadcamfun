@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "اختر ملف CAD",
   "cad.importExport.upload": "ارفع ملفًا",
   "cad.importExport.orDrag": "أو اسحبه وأفلته",
-  "cad.importExport.formats": "ملفات JSON أو STL أو OBJ أو PLY أو STEP أو IGES أو CAD/CAM FUN",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "تنبيه",
   "cad.importExport.importWarning": "سيؤدي استيراد ملف إلى استبدال رسمك الحالي. تأكد من حفظ عملك قبل الاستيراد.",
   "cad.importExport.fileName": "اسم الملف",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "اختر ملفات CAD أو مجلدًا",
+  "cad.importExport.chooseFiles": "اختر الملفات",
+  "cad.importExport.chooseFolder": "اختر مجلدًا",
+  "cad.importExport.importing": "جارٍ استيراد {current} من {total}…",
+  "cad.importExport.importAdditive": "تُضاف الملفات إلى الرسم الحالي، وتُفحص المجلدات الفرعية أيضًا.",
+  "cad.importExport.importSummary": "تم استيراد {files} ملفًا ({elements} عنصرًا)؛ تعذر استيراد {failed} ملفًا.",
+  "cad.importExport.importSuccess": "تم استيراد {count} عنصرًا",
+  "cad.importExport.importFailed": "تعذر الاستيراد",
+  "cad.importExport.importWarnings": "تحذيرات",
+  "cad.importExport.importNoLayer": "لا توجد طبقة نشطة. لم تتم إضافة شيء.",
+  "cad.importExport.importDone": "تم"
 }

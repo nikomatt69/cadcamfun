@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Levar o material restante de um setup ao seguinte",
   "cam.kernel.job.open": "Abrir no editor",
   "cam.kernel.job.release": "Liberação do trabalho (a mais baixa dos seus setups)",
-  "cam.kernel.job.failed": "Setup {id}: {message}"
+  "cam.kernel.job.failed": "Setup {id}: {message}",
+  "cam.batch.title": "Importar programas CAM",
+  "cam.batch.explanation": "Escolha arquivos ou uma pasta e abra um programa. Eles permanecem separados durante esta sessão.",
+  "cam.batch.available": "{count} programas disponíveis",
+  "cam.batch.skipped": "{count} arquivos não importados",
+  "cam.batch.confirmReplace": "O programa atual será substituído. Salve as alterações primeiro. Continuar?",
+  "cam.batch.export": "Exportar",
+  "cam.batch.projects": "Projetos",
+  "cam.batch.unsupported": "Formato não suportado",
+  "cam.batch.invalidFile": "O arquivo está vazio ou não é um programa CAM válido.",
+  "cam.batch.reading": "Lendo arquivos…",
+  "cam.gen.mach.latheIntro": "Configure o torno para o gerador rápido. O planejador e o núcleo de fresagem verificada não se aplicam ao torno.",
+  "cam.gen.mach.printerIntro": "Escolha uma impressora para fatiamento verificado. Mesa, bico e firmware do gerador rápido também são atualizados.",
+  "cam.gen.lathe.compUnsupported": "O gerador rápido não suporta compensação do raio da ferramenta. Desative-a para gerar o programa."
 }

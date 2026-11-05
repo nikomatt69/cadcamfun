@@ -156,7 +156,8 @@ export const ToolpathSettingsSchema = Schema.Struct({
   stockLength: withDefault(Positive, 100),
   spindleDirection: withDefault(Schema.Literals(["cw", "ccw"]), "cw"),
   turningOperation: withDefault(Schema.Literals(["external", "internal", "face"]), "external"),
-  applyToolCompensation: withDefault(Schema.Boolean, true),
+  /** Quick lathe generation does not yet implement nose compensation; an explicit true is refused. */
+  applyToolCompensation: withDefault(Schema.Boolean, false),
   // workholding and machine layout (spec 31 §4.1): how the part is held, as the preview draws it and the checks use it
   /** Mill: a machine vise, strap clamps, a fixture plate (stock straight on the table) or nothing drawn. */
   workholding: withDefault(Schema.Literals(["vise", "clamps", "plate", "none"]), "vise"),

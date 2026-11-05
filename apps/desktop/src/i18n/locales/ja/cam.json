@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "残った素材を次のセットアップへ引き継ぐ",
   "cam.kernel.job.open": "エディタで開く",
   "cam.kernel.job.release": "ジョブのリリース（各セットアップの最低値）",
-  "cam.kernel.job.failed": "セットアップ {id}：{message}"
+  "cam.kernel.job.failed": "セットアップ {id}：{message}",
+  "cam.batch.title": "CAMプログラムをインポート",
+  "cam.batch.explanation": "ファイルまたはフォルダーを選び、プログラムを開きます。プログラムはセッション中、個別に保持されます。",
+  "cam.batch.available": "{count}件のプログラム",
+  "cam.batch.skipped": "{count}ファイルをインポートできません",
+  "cam.batch.confirmReplace": "現在のプログラムを置き換えます。変更を先に保存してください。続行しますか？",
+  "cam.batch.export": "エクスポート",
+  "cam.batch.projects": "プロジェクト",
+  "cam.batch.unsupported": "未対応の形式",
+  "cam.batch.invalidFile": "ファイルが空か、有効なCAMプログラムではありません。",
+  "cam.batch.reading": "ファイルを読み込み中…",
+  "cam.gen.mach.latheIntro": "クイック生成用の旋盤を設定します。フライス盤の段取りプランナーと検証済み加工カーネルは旋盤には適用されません。",
+  "cam.gen.mach.printerIntro": "検証済みスライス用のプリンターを選択します。クイック生成のベッド、ノズル、ファームウェア設定も更新されます。",
+  "cam.gen.lathe.compUnsupported": "クイック生成は工具半径補正に対応していません。プログラム生成前に無効にしてください。"
 }

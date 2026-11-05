@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Reporter la matière restante d'un montage au suivant",
   "cam.kernel.job.open": "Ouvrir dans l'éditeur",
   "cam.kernel.job.release": "Libération du travail (la plus basse de ses montages)",
-  "cam.kernel.job.failed": "Montage {id} : {message}"
+  "cam.kernel.job.failed": "Montage {id} : {message}",
+  "cam.batch.title": "Importer des programmes CAM",
+  "cam.batch.explanation": "Choisissez des fichiers ou un dossier, puis ouvrez un programme. Ils restent séparés pendant cette session.",
+  "cam.batch.available": "{count} programmes disponibles",
+  "cam.batch.skipped": "{count} fichiers non importés",
+  "cam.batch.confirmReplace": "Le programme actuel sera remplacé. Enregistrez les modifications. Continuer ?",
+  "cam.batch.export": "Exporter",
+  "cam.batch.projects": "Projets",
+  "cam.batch.unsupported": "Format non pris en charge",
+  "cam.batch.invalidFile": "Le fichier est vide ou ne contient pas de programme CAM valide.",
+  "cam.batch.reading": "Lecture des fichiers…",
+  "cam.gen.mach.latheIntro": "Configurez le tour pour le générateur rapide. Le planificateur et le noyau de fraisage vérifié ne s’appliquent pas au tour.",
+  "cam.gen.mach.printerIntro": "Choisissez une imprimante pour le tranchage vérifié. Le plateau, la buse et le firmware du générateur rapide sont aussi mis à jour.",
+  "cam.gen.lathe.compUnsupported": "Le générateur rapide ne prend pas en charge la compensation du rayon d’outil. Désactivez-la pour générer le programme."
 }

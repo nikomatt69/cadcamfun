@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Rohteil von einem Setup ins nächste übernehmen",
   "cam.kernel.job.open": "Im Editor öffnen",
   "cam.kernel.job.release": "Freigabe des Auftrags (die niedrigste seiner Setups)",
-  "cam.kernel.job.failed": "Setup {id}: {message}"
+  "cam.kernel.job.failed": "Setup {id}: {message}",
+  "cam.batch.title": "CAM-Programme importieren",
+  "cam.batch.explanation": "Dateien oder einen Ordner wählen und ein Programm öffnen. Programme bleiben getrennt und während dieser Sitzung verfügbar.",
+  "cam.batch.available": "{count} Programme verfügbar",
+  "cam.batch.skipped": "{count} Dateien nicht importiert",
+  "cam.batch.confirmReplace": "Das aktuelle Programm wird ersetzt. Änderungen zuerst speichern. Fortfahren?",
+  "cam.batch.export": "Exportieren",
+  "cam.batch.projects": "Projekte",
+  "cam.batch.unsupported": "Nicht unterstütztes Dateiformat",
+  "cam.batch.invalidFile": "Die Datei ist leer oder kein gültiges CAM-Programm.",
+  "cam.batch.reading": "Dateien werden gelesen…",
+  "cam.gen.mach.latheIntro": "Drehmaschine für den Schnellgenerator einrichten. Fräsplaner und verifizierter Fräskernel gelten nicht für Drehmaschinen.",
+  "cam.gen.mach.printerIntro": "Drucker für verifiziertes Slicing wählen. Die Auswahl aktualisiert auch Bett, Düse und Firmware des Schnellgenerators.",
+  "cam.gen.lathe.compUnsupported": "Die Werkzeugradiuskompensation wird vom Schnellgenerator nicht unterstützt. Zum Generieren deaktivieren."
 }

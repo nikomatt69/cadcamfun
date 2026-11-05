@@ -23,7 +23,9 @@ export interface CamToolbarProps {
   readonly aiEnhanced: boolean
   readonly showChat: boolean
   readonly onSave: () => void
-  readonly onImport: (file: File) => void
+  readonly onImport: () => void
+  readonly onExport: () => void
+  readonly onProjects: () => void
   readonly onToggleSimulation: () => void
   readonly onOpenLibrary: () => void
   readonly onOpenCosts: () => void
@@ -75,22 +77,13 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
 
         <div class="flex items-center gap-1">
           <button onClick={() => props.onSave()} class={`${OUTLINE} cursor-pointer`} title={t("cam.saveGcode")} aria-label={t("cam.saveGcode")} disabled={!props.canSave}>
-            <Save size={16} class="mr-1" />
+            <Save size={16} class="mr-1" />{t("common.save")}
           </button>
-          <label class="btn btn-sm btn-outline flex items-center cursor-pointer" title={t("cam.import")} aria-label={t("cam.import")}>
-            <Upload size={16} class="mr-1" />
-            <input
-              type="file"
-              class="hidden"
-              accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
-              aria-label={t("cam.import")}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0]
-                if (file) props.onImport(file)
-                event.currentTarget.value = ""
-              }}
-            />
-          </label>
+          <button type="button" class="btn btn-sm btn-outline flex items-center cursor-pointer" title={t("cam.import")} aria-label={t("cam.import")} onClick={props.onImport}>
+            <Upload size={16} class="mr-1" />{t("keys.import")}
+          </button>
+          <button type="button" class={OUTLINE} title={t("cam.batch.export")} aria-label={t("cam.batch.export")} onClick={props.onExport} disabled={!props.canSave}>{t("cam.batch.export")}</button>
+          <button type="button" class={OUTLINE} title={t("cam.batch.projects")} aria-label={t("cam.batch.projects")} onClick={props.onProjects}>{t("cam.batch.projects")}</button>
           <button type="button" title={t("cad.undo")} aria-label={t("cad.undo")} class={OUTLINE} disabled={history.index <= 0} onClick={() => history.undo()}><RotateCcw size={16} /></button>
           <button type="button" title={t("cad.redo")} aria-label={t("cad.redo")} class={OUTLINE} disabled={history.index >= history.entries.length - 1} onClick={() => history.redo()}><RotateCw size={16} /></button>
           <button type="button" title={t("cam.history.title")} aria-label={t("cam.history.title")} class={OUTLINE} onClick={() => props.onOpenHistory?.()}><History size={16} /></button>

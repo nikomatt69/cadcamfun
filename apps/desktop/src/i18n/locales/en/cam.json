@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "Carry the stock from one setup to the next",
   "cam.kernel.job.open": "Open in editor",
   "cam.kernel.job.release": "Job release (the lowest of its setups)",
-  "cam.kernel.job.failed": "Setup {id}: {message}"
+  "cam.kernel.job.failed": "Setup {id}: {message}",
+  "cam.batch.title": "Import CAM programs",
+  "cam.batch.explanation": "Choose files or a folder, then open a program. Programs stay separate and are available while this workspace is open.",
+  "cam.batch.available": "{count} programs available",
+  "cam.batch.skipped": "{count} files not imported",
+  "cam.batch.confirmReplace": "Opening this program replaces the current editor contents. Save any changes first. Continue?",
+  "cam.batch.export": "Export",
+  "cam.batch.projects": "Projects",
+  "cam.batch.unsupported": "Unsupported file format",
+  "cam.batch.invalidFile": "The file is empty or is not a valid CAM program.",
+  "cam.batch.reading": "Reading files…",
+  "cam.gen.mach.latheIntro": "Configure the turning setup for the quick generator. The mill setup planner and verified milling kernel do not apply to lathes.",
+  "cam.gen.mach.printerIntro": "Choose a printer for verified slicing. Selecting one also updates the quick generator’s bed, nozzle and firmware settings.",
+  "cam.gen.lathe.compUnsupported": "Tool radius compensation is not supported by the quick generator. Disable it to generate a program."
 }

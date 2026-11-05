@@ -54,6 +54,9 @@ interface KernelApi {
   readonly settings: () => ReturnType<typeof useGeneratorStore.getState>["kernelSettings"]
   readonly savedMachines: () => ReadonlyArray<CamMachineConfig>
   readonly machineValue: () => string
+  readonly printerValue: () => string
+  readonly savedPrinters: () => ReadonlyArray<CamMachineConfig>
+  readonly selectPrinter: (value: string) => void
   readonly linkPost: (postId: string | null) => Promise<void>
   readonly request: () => ReturnType<typeof kernelRequestOf> | undefined
   readonly artifact: () => CamKernelArtifact | undefined
@@ -93,7 +96,7 @@ export interface JobRun { readonly id: string; readonly orientation: string; rea
 
 const KernelContext = createContext<KernelApi>()
 
-const useKernel = (): KernelApi => {
+export const useKernel = (): KernelApi => {
   const api = useContext(KernelContext)
   if (api === undefined) throw new Error("Kernel controls render inside KernelSession")
   return api
@@ -125,6 +128,21 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   const [runs, setRuns] = createSignal<{ readonly requestId: string; readonly input: CamKernelRequest; readonly runs: ReadonlyArray<JobRun> }>()
   /** The machine configurations of the library: the machines the person configured, usable by the kernel. */
   const [savedMachines, setSavedMachines] = createSignal<ReadonlyArray<CamMachineConfig>>([])
+  const [savedPrinters, setSavedPrinters] = createSignal<ReadonlyArray<CamMachineConfig>>([])
+  const [printerValue, setPrinterValue] = createSignal(cam.kernel.PRINTERS[0]!.id)
+  const selectPrinter = (value: string): void => {
+    const config = savedPrinters().find((row) => `config:${row.id}` === value)
+    const machine = config !== undefined ? cam.kernel.kernelMachineOfConfig(config) : cam.kernel.findPrinter(value)
+    const printer = machine?.printer
+    if (printer === undefined) return
+    setPrinterValue(value)
+    gen.patchSettings({
+      bedWidth: printer.bed.width, bedDepth: printer.bed.depth, buildHeight: printer.buildHeight,
+      bedOrigin: printer.bed.origin, printerKinematics: printer.kinematics,
+      nozzleDiameter: printer.nozzle.diameter, extrusionWidth: printer.nozzle.diameter, filamentDiameter: printer.filamentDiameter
+    })
+    gen.setPrinter({ flavor: printer.flavor })
+  }
   /** The machine the panel plans against: a saved configuration, else the preset id. */
   const machineValue = (): string => {
     const config = settings().machineConfig
@@ -204,8 +222,12 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   // The library's machines: what the person configured is what the kernel plans against.
   onMount(() => {
     void app.runtime.run(app.client.machineConfigs.list({ query: {} }))
-      .then((value) => setSavedMachines(kernelMachineConfigsOf(machinesFromResponse(value)).filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind !== "printer")))
-      .catch(() => setSavedMachines([]))
+      .then((value) => {
+        const configs = kernelMachineConfigsOf(machinesFromResponse(value))
+        setSavedMachines(configs.filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind !== "printer"))
+        setSavedPrinters(configs.filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind === "printer"))
+      })
+      .catch(() => { setSavedMachines([]); setSavedPrinters([]) })
   })
   onCleanup(() => { disposed = true; controller?.abort(); if (controller) gen.setGenerating(false) })
 
@@ -361,7 +383,7 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
 
   return (
     <KernelContext.Provider value={{
-      settings, savedMachines, machineValue, linkPost, request, artifact, stale, ncCheck, verifyEditorNc, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
+      settings, savedMachines, machineValue, printerValue, savedPrinters, selectPrinter, linkPost, request, artifact, stale, ncCheck, verifyEditorNc, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
       patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result, jobRuns, activeSetup, openSetup
     }}>
       {props.children}

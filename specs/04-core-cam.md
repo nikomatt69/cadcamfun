@@ -1,5 +1,17 @@
 # WP2 — CAM and G-code core (`packages/core/src/cam`)
 
+## Quick lathe generator option integrity (2026-11-05)
+
+Status: in progress. Owner requests real machine-specific generator options. WP2 owns
+the quick lathe generator, its settings/defaults, error adapter and tests. The selected
+thread pitch must control its G32 lead; boring and internal turning must use a declared
+pilot bore rather than inventing one. The quick generator does not implement nose-radius
+compensation: default it off for new settings and explicitly refuse a request that enables
+it. Preserve explicitly saved values; do not silently write uncompensated NC when enabled.
+The separate turning planner's capability and qualification remain unchanged.
+
+Change log: 2026-11-05 — scope established for lathe option integrity and explicit refusals.
+
 ## Operation-aware preview tooling (2026-10-26)
 
 Status: in progress. Owner extension: WP2 owns a pure `programTools` resolver for

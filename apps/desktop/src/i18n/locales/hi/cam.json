@@ -1725,5 +1725,18 @@
   "cam.kernel.job.carry": "बचा हुआ स्टॉक एक सेटअप से अगले में ले जाएँ",
   "cam.kernel.job.open": "एडिटर में खोलें",
   "cam.kernel.job.release": "जॉब रिलीज़ (उसके सेटअप में सबसे निचला)",
-  "cam.kernel.job.failed": "सेटअप {id}: {message}"
+  "cam.kernel.job.failed": "सेटअप {id}: {message}",
+  "cam.batch.title": "CAM प्रोग्राम आयात करें",
+  "cam.batch.explanation": "फ़ाइलें या फ़ोल्डर चुनें और एक प्रोग्राम खोलें। इस सत्र में प्रोग्राम अलग रहेंगे।",
+  "cam.batch.available": "{count} प्रोग्राम उपलब्ध",
+  "cam.batch.skipped": "{count} फ़ाइलें आयात नहीं हुईं",
+  "cam.batch.confirmReplace": "वर्तमान प्रोग्राम बदल जाएगा। पहले बदलाव सहेजें। जारी रखें?",
+  "cam.batch.export": "निर्यात",
+  "cam.batch.projects": "प्रोजेक्ट",
+  "cam.batch.unsupported": "असमर्थित फ़ाइल प्रारूप",
+  "cam.batch.invalidFile": "फ़ाइल खाली है या मान्य CAM प्रोग्राम नहीं है।",
+  "cam.batch.reading": "फ़ाइलें पढ़ी जा रही हैं…",
+  "cam.gen.mach.latheIntro": "त्वरित जनरेटर के लिए लेथ सेटअप करें। मिल सेटअप प्लानर और सत्यापित मिलिंग कर्नेल लेथ पर लागू नहीं होते।",
+  "cam.gen.mach.printerIntro": "सत्यापित स्लाइसिंग के लिए प्रिंटर चुनें। त्वरित जनरेटर की बेड, नोज़ल और फ़र्मवेयर सेटिंग भी अपडेट होंगी।",
+  "cam.gen.lathe.compUnsupported": "त्वरित जनरेटर टूल रेडियस कम्पेन्सेशन का समर्थन नहीं करता। प्रोग्राम बनाने के लिए इसे बंद करें।"
 }
