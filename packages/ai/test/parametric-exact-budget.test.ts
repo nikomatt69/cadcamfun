@@ -30,6 +30,13 @@ const slowMachine = (factor: number) => {
   clocks.push(spy)
 }
 
+/** A clock that moves `ms` at every read, whatever the real speed: the kernel's work takes the same reads on any machine, so a clock budget runs out at the same point. */
+const steppingClock = (ms: number) => {
+  let now = 0
+  const spy = spyOn(performance, "now").mockImplementation(() => (now += ms))
+  clocks.push(spy)
+}
+
 const verdict = (history: History, budget?: Parameters<typeof exactReport>[2]) => {
   const result = rebuild(history)
   return JSON.stringify(exactReport(history, result, budget).bodies)
@@ -52,7 +59,7 @@ describe("the exact view of a report is a budget of work, not of time", () => {
 
   test("the old clock budget is what made it flip: 1.5 s on that slow machine, the same part comes back pending", () => {
     const history = part()
-    slowMachine(20)
+    steppingClock(50)
     const [body] = JSON.parse(verdict(history, 1_500))
     expect(body.exact).toBe(false)
     expect(body.reason).toContain("time budget")
