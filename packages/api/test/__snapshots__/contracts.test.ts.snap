@@ -22992,6 +22992,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               ],
                                               "type": "object",
                                             },
+                                            "reads": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "A": {
+                                                  "type": "number",
+                                                },
+                                                "B": {
+                                                  "type": "number",
+                                                },
+                                                "C": {
+                                                  "type": "number",
+                                                },
+                                                "R": {
+                                                  "type": "number",
+                                                },
+                                                "X": {
+                                                  "type": "number",
+                                                },
+                                                "Y": {
+                                                  "type": "number",
+                                                },
+                                                "Z": {
+                                                  "type": "number",
+                                                },
+                                              },
+                                              "type": "object",
+                                            },
                                             "ref": {
                                               "anyOf": [
                                                 {
@@ -30642,6 +30669,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "object",
                             },
+                            "reads": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "A": {
+                                  "type": "number",
+                                },
+                                "B": {
+                                  "type": "number",
+                                },
+                                "C": {
+                                  "type": "number",
+                                },
+                                "R": {
+                                  "type": "number",
+                                },
+                                "X": {
+                                  "type": "number",
+                                },
+                                "Y": {
+                                  "type": "number",
+                                },
+                                "Z": {
+                                  "type": "number",
+                                },
+                              },
+                              "type": "object",
+                            },
                             "ref": {
                               "anyOf": [
                                 {
@@ -32515,6 +32569,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "required": [
                                 "mode",
                               ],
+                              "type": "object",
+                            },
+                            "reads": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "A": {
+                                  "type": "number",
+                                },
+                                "B": {
+                                  "type": "number",
+                                },
+                                "C": {
+                                  "type": "number",
+                                },
+                                "R": {
+                                  "type": "number",
+                                },
+                                "X": {
+                                  "type": "number",
+                                },
+                                "Y": {
+                                  "type": "number",
+                                },
+                                "Z": {
+                                  "type": "number",
+                                },
+                              },
                               "type": "object",
                             },
                             "ref": {
@@ -36811,6 +36892,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "required": [
                                       "mode",
                                     ],
+                                    "type": "object",
+                                  },
+                                  "reads": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "A": {
+                                        "type": "number",
+                                      },
+                                      "B": {
+                                        "type": "number",
+                                      },
+                                      "C": {
+                                        "type": "number",
+                                      },
+                                      "R": {
+                                        "type": "number",
+                                      },
+                                      "X": {
+                                        "type": "number",
+                                      },
+                                      "Y": {
+                                        "type": "number",
+                                      },
+                                      "Z": {
+                                        "type": "number",
+                                      },
+                                    },
                                     "type": "object",
                                   },
                                   "ref": {
@@ -108911,6 +109019,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         ],
                                         "type": "object",
                                       },
+                                      "reads": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "A": {
+                                            "type": "number",
+                                          },
+                                          "B": {
+                                            "type": "number",
+                                          },
+                                          "C": {
+                                            "type": "number",
+                                          },
+                                          "R": {
+                                            "type": "number",
+                                          },
+                                          "X": {
+                                            "type": "number",
+                                          },
+                                          "Y": {
+                                            "type": "number",
+                                          },
+                                          "Z": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "type": "object",
+                                      },
                                       "ref": {
                                         "anyOf": [
                                           {
@@ -119329,6 +119464,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "required": [
                                           "mode",
                                         ],
+                                        "type": "object",
+                                      },
+                                      "reads": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "A": {
+                                            "type": "number",
+                                          },
+                                          "B": {
+                                            "type": "number",
+                                          },
+                                          "C": {
+                                            "type": "number",
+                                          },
+                                          "R": {
+                                            "type": "number",
+                                          },
+                                          "X": {
+                                            "type": "number",
+                                          },
+                                          "Y": {
+                                            "type": "number",
+                                          },
+                                          "Z": {
+                                            "type": "number",
+                                          },
+                                        },
                                         "type": "object",
                                       },
                                       "ref": {

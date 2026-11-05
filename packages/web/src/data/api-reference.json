@@ -71286,6 +71286,33 @@
                                         },
                                         "additionalProperties": false
                                       },
+                                      "reads": {
+                                        "type": "object",
+                                        "properties": {
+                                          "X": {
+                                            "type": "number"
+                                          },
+                                          "Y": {
+                                            "type": "number"
+                                          },
+                                          "Z": {
+                                            "type": "number"
+                                          },
+                                          "A": {
+                                            "type": "number"
+                                          },
+                                          "B": {
+                                            "type": "number"
+                                          },
+                                          "C": {
+                                            "type": "number"
+                                          },
+                                          "R": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
                                       "policy": {
                                         "type": "object",
                                         "properties": {
@@ -76178,6 +76205,33 @@
                                             "minLength": 1,
                                             "maxLength": 32,
                                             "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "reads": {
+                                        "type": "object",
+                                        "properties": {
+                                          "X": {
+                                            "type": "number"
+                                          },
+                                          "Y": {
+                                            "type": "number"
+                                          },
+                                          "Z": {
+                                            "type": "number"
+                                          },
+                                          "A": {
+                                            "type": "number"
+                                          },
+                                          "B": {
+                                            "type": "number"
+                                          },
+                                          "C": {
+                                            "type": "number"
+                                          },
+                                          "R": {
+                                            "type": "number"
                                           }
                                         },
                                         "additionalProperties": false
@@ -81353,6 +81407,33 @@
                                                   "minLength": 1,
                                                   "maxLength": 32,
                                                   "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                                                }
+                                              },
+                                              "additionalProperties": false
+                                            },
+                                            "reads": {
+                                              "type": "object",
+                                              "properties": {
+                                                "X": {
+                                                  "type": "number"
+                                                },
+                                                "Y": {
+                                                  "type": "number"
+                                                },
+                                                "Z": {
+                                                  "type": "number"
+                                                },
+                                                "A": {
+                                                  "type": "number"
+                                                },
+                                                "B": {
+                                                  "type": "number"
+                                                },
+                                                "C": {
+                                                  "type": "number"
+                                                },
+                                                "R": {
+                                                  "type": "number"
                                                 }
                                               },
                                               "additionalProperties": false
@@ -116788,6 +116869,33 @@
                               },
                               "additionalProperties": false
                             },
+                            "reads": {
+                              "type": "object",
+                              "properties": {
+                                "X": {
+                                  "type": "number"
+                                },
+                                "Y": {
+                                  "type": "number"
+                                },
+                                "Z": {
+                                  "type": "number"
+                                },
+                                "A": {
+                                  "type": "number"
+                                },
+                                "B": {
+                                  "type": "number"
+                                },
+                                "C": {
+                                  "type": "number"
+                                },
+                                "R": {
+                                  "type": "number"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
                             "policy": {
                               "type": "object",
                               "properties": {
@@ -118656,6 +118764,33 @@
                                   "minLength": 1,
                                   "maxLength": 32,
                                   "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "reads": {
+                              "type": "object",
+                              "properties": {
+                                "X": {
+                                  "type": "number"
+                                },
+                                "Y": {
+                                  "type": "number"
+                                },
+                                "Z": {
+                                  "type": "number"
+                                },
+                                "A": {
+                                  "type": "number"
+                                },
+                                "B": {
+                                  "type": "number"
+                                },
+                                "C": {
+                                  "type": "number"
+                                },
+                                "R": {
+                                  "type": "number"
                                 }
                               },
                               "additionalProperties": false
@@ -120908,6 +121043,33 @@
                                         "minLength": 1,
                                         "maxLength": 32,
                                         "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "reads": {
+                                    "type": "object",
+                                    "properties": {
+                                      "X": {
+                                        "type": "number"
+                                      },
+                                      "Y": {
+                                        "type": "number"
+                                      },
+                                      "Z": {
+                                        "type": "number"
+                                      },
+                                      "A": {
+                                        "type": "number"
+                                      },
+                                      "B": {
+                                        "type": "number"
+                                      },
+                                      "C": {
+                                        "type": "number"
+                                      },
+                                      "R": {
+                                        "type": "number"
                                       }
                                     },
                                     "additionalProperties": false

@@ -125,7 +125,8 @@ export interface Characteristic {
 
 export type ProbeAction =
   /** Move the work offset so the measured results read their nominal: `axes` maps an offset axis to the result it follows. */
-  | { readonly kind: "set-offset"; readonly ref: WorkOffsetRef; readonly axes: Partial<Record<OffsetAxis, string>>; readonly policy: UpdatePolicy }
+  /** `reads`: what each axis's result reads after the update; absent, its nominal (the part is where the program believes). */
+  | { readonly kind: "set-offset"; readonly ref: WorkOffsetRef; readonly axes: Partial<Record<OffsetAxis, string>>; readonly policy: UpdatePolicy; readonly reads?: Partial<Record<OffsetAxis, number>> }
   /** Correct a measured rotation: with the control's rotation (`g68`), the offset's rotation (`offset-r`) or a rotary table (`table-c`). */
   | { readonly kind: "rotation"; readonly result: string; readonly via: "g68" | "offset-r" | "table-c"; readonly ref?: WorkOffsetRef; readonly policy: UpdatePolicy }
   /** Write a measured tool length / radius into the tool table. */

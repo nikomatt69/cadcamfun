@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { CamSetupRepo } from "../repos/cam-setup-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
+import { Probing } from "../services/probing.ts"
 
 const p = cam.program
 
@@ -27,12 +28,18 @@ const probing = <A>(label: string, settings: Parameters<typeof p.validateProbeSe
   )
 }
 
+/** The deprecated routes name no machine, so the service cannot answer 403 or 404; their contract has only 400 and 500. */
+const machineErrorsAreFaults = (message: string) => ({
+  Forbidden: () => Effect.fail(new InternalError({ message })), NotFound: () => Effect.fail(new InternalError({ message }))
+})
+
 /**
  * Multi-operation setups (spec 14 §4, RM-02): the HTTP face of `cam.program`. Planning and validation are pure and cheap; generation
  * resolves each operation's elements from the request, then runs the same generator and post as a single operation, once per program.
  */
 export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(function*(handlers) {
   const setups = yield* CamSetupRepo
+  const service = yield* Probing
   const projects = yield* ProjectRepo
   const fail = (message: string) => (e: unknown) =>
     Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -54,10 +61,17 @@ export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(
       if (missing.length > 0) return yield* new BadRequest({ message: `The request carries no element for ${missing.join(", ")}` })
       return yield* guarded("Failed to generate the setup", () => p.generateSetup(payload.setup, (op) => p.geometryFor(op, payload.elements, payload.stock)))
     }))
-    .handle("probePlan", ({ payload }) => probing("Failed to plan the probing", payload.settings, () => p.planProbe(payload.operation, payload.settings)))
-    .handle("probeEmit", ({ payload }) => probing("Failed to write the probing program", payload.settings, () => {
-      const plan = p.planProbe(payload.operation, payload.settings)
-      return { gcode: p.emitProbeSteps(plan.steps, payload.settings, payload.dialect), steps: plan.steps, notes: plan.notes }
+    .handle("probePlan", Effect.fn("http.camSetup.probePlan")(function*({ payload }) {
+      const legacy = yield* probing("Failed to plan the probing", payload.settings, () => ({ plan: p.planProbe(payload.operation, payload.settings), kernel: p.kernelProbe(payload.operation, payload.settings) }))
+      const user = yield* CurrentUser
+      yield* service.plan.plan(user.id, { operation: legacy.kernel.cycle, actions: legacy.kernel.actions, settings: payload.settings }).pipe(Effect.catchTags(machineErrorsAreFaults("Failed to plan the probing")))
+      return legacy.plan
+    }))
+    .handle("probeEmit", Effect.fn("http.camSetup.probeEmit")(function*({ payload }) {
+      const legacy = yield* probing("Failed to write the probing program", payload.settings, () => ({ plan: p.planProbe(payload.operation, payload.settings), kernel: p.kernelProbe(payload.operation, payload.settings) }))
+      const user = yield* CurrentUser
+      const written = yield* service.plan.emit(user.id, { operation: legacy.kernel.cycle, actions: legacy.kernel.actions, settings: payload.settings, dialect: payload.dialect }).pipe(Effect.catchTags(machineErrorsAreFaults("Failed to write the probing program")))
+      return { gcode: written.nc, steps: legacy.plan.steps, notes: [...legacy.plan.notes, ...written.notes] }
     }))
     .handle("linkReport", Effect.fn("http.camSetup.linkReport")(function*({ payload }) {
       return yield* guarded("Failed to measure the links", () => p.linkReport(payload.toolpaths, { lowSafeZ: payload.lowSafeZ, ...(payload.rapidRate !== undefined ? { rapidRate: payload.rapidRate } : {}) }))

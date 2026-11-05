@@ -1812,6 +1812,15 @@ export type ToolpathGeneratorManufacturePayload = {
                 readonly C?: string
                 readonly R?: string
               }
+              readonly reads?: {
+                readonly X?: number
+                readonly Y?: number
+                readonly Z?: number
+                readonly A?: number
+                readonly B?: number
+                readonly C?: number
+                readonly R?: number
+              }
               readonly policy: {
                 readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"
                 readonly tolerance?: number
@@ -2492,6 +2501,15 @@ export type ToolpathGeneratorPlanPayload = {
                 readonly B?: string
                 readonly C?: string
                 readonly R?: string
+              }
+              readonly reads?: {
+                readonly X?: number
+                readonly Y?: number
+                readonly Z?: number
+                readonly A?: number
+                readonly B?: number
+                readonly C?: number
+                readonly R?: number
               }
               readonly policy: {
                 readonly mode: "set" | "report" | "update-within-tolerance" | "alarm-outside-tolerance"

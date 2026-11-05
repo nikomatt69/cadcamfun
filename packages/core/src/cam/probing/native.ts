@@ -69,6 +69,7 @@ const datumOf = (cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction>): { read
   const sets = actions.filter((a): a is Extract<ProbeAction, { readonly kind: "set-offset" }> => a.kind === "set-offset")
   if (sets.length > 1) return refuse("a native cycle writes one datum")
   const set = sets[0]
+  if (set?.reads !== undefined) return refuse("a native cycle sets the datum to the nominal: it cannot make a result read another value")
   if (set === undefined) return {}
   if (set.policy.mode !== "set" || set.policy.deadband !== undefined || set.policy.limit !== undefined) return refuse("a native cycle writes the datum unconditionally: an update policy with a tolerance, a deadband or a limit needs the inline touches")
   const axes = datumAxes(cycle)
