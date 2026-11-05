@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "ワーク座標系: {offsets}",
   "cam.workpieces.placement": "最初のワークからの位置 mm（X, Y, Z）：プレビューのみ、NCには出力されません",
   "cam.workpieces.orderChanges": "工具交換: 工具優先 {toolFirst} 回、ワーク優先 {partFirst} 回",
-  "cam.workpieces.runsOn": "実行するワーク"
+  "cam.workpieces.runsOn": "実行するワーク",
+  "cam.explorer.useAsWorkpieces": "選択をワークとして使用",
+  "cam.explorer.useAsWorkpiecesTitle": "選択した部品ごとに1つのワーク（G54、G55…）。各部品の位置に配置します",
+  "cam.explorer.nowWorkpieces": "治具上のワーク {count} 個: {offsets}",
+  "cam.explorer.workpiecesLimit": "G54〜G59に収まるのは最初の {count} 個のみです"
 }

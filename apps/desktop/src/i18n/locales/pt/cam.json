@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "Zeros peça: {offsets}",
   "cam.workpieces.placement": "Posição em relação à primeira peça, mm (X, Y, Z): só pré-visualização, nunca no NC",
   "cam.workpieces.orderChanges": "Trocas de ferramenta: {toolFirst} ferramenta primeiro, {partFirst} peça primeiro",
-  "cam.workpieces.runsOn": "Executa em"
+  "cam.workpieces.runsOn": "Executa em",
+  "cam.explorer.useAsWorkpieces": "Usar a seleção como peças",
+  "cam.explorer.useAsWorkpiecesTitle": "Uma peça por parte selecionada, em G54, G55 ... posicionada onde cada parte está",
+  "cam.explorer.nowWorkpieces": "{count} peças na fixação: {offsets}",
+  "cam.explorer.workpiecesLimit": "Só as primeiras {count} peças cabem nos registros G54 a G59"
 }

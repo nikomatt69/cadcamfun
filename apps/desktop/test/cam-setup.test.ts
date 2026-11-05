@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -213,5 +213,20 @@ describe("operations restricted to some workpieces", () => {
     expect(setupOfToolpaths(toolpaths, DEFAULT_SETUP_CHOICES).operations[0]!.workpieceIds).toBeUndefined()
     // The planner honours it: the restricted operation runs on two of three parts.
     expect(cam.program.runsOf(setup).filter((run) => run.operation.id === setup.operations[0]!.id)).toHaveLength(2)
+  })
+})
+
+describe("a selection of parts becomes the fixture", () => {
+  const part = (id: string, x: number, y: number, name?: string) => ({ id, type: "cube", x, y, z: 0, width: 20, height: 10, depth: 5, ...(name ? { name } : {}) })
+  test("one workpiece per part on G54, G55 ..., placed by the distance of its box from the first's", () => {
+    const fixture = workpiecesFromElements([part("a", 0, 0, "Blank A"), part("b", 60, 5), part("c", -40, 0)], (n) => `Part ${n}`)
+    expect(fixture.map((wp) => [wp.name, wp.workOffset])).toEqual([["Blank A", "G54"], ["Part 2", "G55"], ["Part 3", "G56"]])
+    expect(fixture[0]!.placement).toBeUndefined()
+    expect(fixture[1]!.placement).toEqual({ x: 60, y: 5, z: 0 })
+    expect(fixture[2]!.placement).toEqual({ x: -40, y: 0, z: 0 })
+    expect(() => cam.program.decodeSetup({ ...setupOfToolpaths(panel().toolpaths), workpieces: JSON.parse(JSON.stringify(fixture)) })).not.toThrow()
+  })
+  test("more parts than registers: the first six", () => {
+    expect(workpiecesFromElements(Array.from({ length: 9 }, (_, i) => part(`p${i}`, i * 30, 0)), (n) => `Part ${n}`)).toHaveLength(6)
   })
 })

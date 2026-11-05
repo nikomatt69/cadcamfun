@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "Work offsets: {offsets}",
   "cam.workpieces.placement": "Placement from the first part, mm (X, Y, Z): preview only, never in the NC",
   "cam.workpieces.orderChanges": "Tool changes: {toolFirst} tool first, {partFirst} part first",
-  "cam.workpieces.runsOn": "Runs on"
+  "cam.workpieces.runsOn": "Runs on",
+  "cam.explorer.useAsWorkpieces": "Use selection as workpieces",
+  "cam.explorer.useAsWorkpiecesTitle": "One workpiece per selected part, on G54, G55 ... placed by where each part lies",
+  "cam.explorer.nowWorkpieces": "{count} workpieces on the fixture: {offsets}",
+  "cam.explorer.workpiecesLimit": "Only the first {count} parts fit the registers G54 to G59"
 }

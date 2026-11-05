@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "工件坐标系：{offsets}",
   "cam.workpieces.placement": "相对第一个工件的位置，mm（X、Y、Z）：仅用于预览，不会写入 NC",
   "cam.workpieces.orderChanges": "换刀次数：刀具优先 {toolFirst} 次，工件优先 {partFirst} 次",
-  "cam.workpieces.runsOn": "运行于"
+  "cam.workpieces.runsOn": "运行于",
+  "cam.explorer.useAsWorkpieces": "将所选用作工件",
+  "cam.explorer.useAsWorkpiecesTitle": "每个所选零件一个工件（G54、G55…），按零件所在位置放置",
+  "cam.explorer.nowWorkpieces": "夹具上有 {count} 个工件：{offsets}",
+  "cam.explorer.workpiecesLimit": "G54 至 G59 只容纳前 {count} 个零件"
 }

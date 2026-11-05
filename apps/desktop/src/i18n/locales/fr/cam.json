@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "Décalages d'origine : {offsets}",
   "cam.workpieces.placement": "Position par rapport à la première pièce, mm (X, Y, Z) : aperçu seulement, jamais dans le NC",
   "cam.workpieces.orderChanges": "Changements d'outil : {toolFirst} outil d'abord, {partFirst} pièce d'abord",
-  "cam.workpieces.runsOn": "S'exécute sur"
+  "cam.workpieces.runsOn": "S'exécute sur",
+  "cam.explorer.useAsWorkpieces": "Utiliser la sélection comme pièces",
+  "cam.explorer.useAsWorkpiecesTitle": "Une pièce par élément sélectionné, sur G54, G55 ... placée là où se trouve chaque élément",
+  "cam.explorer.nowWorkpieces": "{count} pièces sur le montage : {offsets}",
+  "cam.explorer.workpiecesLimit": "Seules les {count} premières pièces tiennent dans les registres G54 à G59"
 }

@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "إزاحات الصفر: {offsets}",
   "cam.workpieces.placement": "الموضع بالنسبة للقطعة الأولى، مم (X، Y، Z): للمعاينة فقط، لا يُكتب في NC",
   "cam.workpieces.orderChanges": "تبديلات الأداة: {toolFirst} الأداة أولًا، {partFirst} القطعة أولًا",
-  "cam.workpieces.runsOn": "تعمل على"
+  "cam.workpieces.runsOn": "تعمل على",
+  "cam.explorer.useAsWorkpieces": "استخدام التحديد كقطع عمل",
+  "cam.explorer.useAsWorkpiecesTitle": "قطعة عمل لكل جزء محدد، على G54 وG55 ... في موضع كل جزء",
+  "cam.explorer.nowWorkpieces": "{count} قطع على التثبيت: {offsets}",
+  "cam.explorer.workpiecesLimit": "تتسع السجلات من G54 إلى G59 للأجزاء الأولى {count} فقط"
 }

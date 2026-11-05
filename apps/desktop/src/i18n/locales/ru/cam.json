@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "Смещения нуля: {offsets}",
   "cam.workpieces.placement": "Положение относительно первой детали, мм (X, Y, Z): только предпросмотр, не попадает в УП",
   "cam.workpieces.orderChanges": "Смены инструмента: {toolFirst} сначала инструмент, {partFirst} сначала деталь",
-  "cam.workpieces.runsOn": "Выполняется на"
+  "cam.workpieces.runsOn": "Выполняется на",
+  "cam.explorer.useAsWorkpieces": "Использовать выделение как заготовки",
+  "cam.explorer.useAsWorkpiecesTitle": "Одна заготовка на каждую выбранную деталь, на G54, G55 ... с положением по месту детали",
+  "cam.explorer.nowWorkpieces": "Заготовок в оснастке: {count} ({offsets})",
+  "cam.explorer.workpiecesLimit": "В регистры G54–G59 помещаются только первые {count} деталей"
 }

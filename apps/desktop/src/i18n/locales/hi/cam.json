@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "वर्क ऑफ़सेट: {offsets}",
   "cam.workpieces.placement": "पहले पुर्ज़े से स्थिति, मिमी (X, Y, Z): केवल प्रीव्यू, NC में कभी नहीं",
   "cam.workpieces.orderChanges": "टूल बदलाव: पहले टूल {toolFirst}, पहले पुर्ज़ा {partFirst}",
-  "cam.workpieces.runsOn": "इन पर चलता है"
+  "cam.workpieces.runsOn": "इन पर चलता है",
+  "cam.explorer.useAsWorkpieces": "चयन को वर्कपीस के रूप में उपयोग करें",
+  "cam.explorer.useAsWorkpiecesTitle": "हर चुने हुए पुर्ज़े के लिए एक वर्कपीस, G54, G55 ... पर, पुर्ज़े की जगह के अनुसार",
+  "cam.explorer.nowWorkpieces": "फ़िक्स्चर पर {count} वर्कपीस: {offsets}",
+  "cam.explorer.workpiecesLimit": "G54 से G59 रजिस्टरों में केवल पहले {count} पुर्ज़े आते हैं"
 }

@@ -1707,5 +1707,9 @@
   "cam.setupDoc.offsets": "Origini pezzo: {offsets}",
   "cam.workpieces.placement": "Posizione rispetto al primo pezzo, mm (X, Y, Z): solo anteprima, mai nell'NC",
   "cam.workpieces.orderChanges": "Cambi utensile: {toolFirst} prima l'utensile, {partFirst} prima il pezzo",
-  "cam.workpieces.runsOn": "Eseguita su"
+  "cam.workpieces.runsOn": "Eseguita su",
+  "cam.explorer.useAsWorkpieces": "Usa la selezione come pezzi",
+  "cam.explorer.useAsWorkpiecesTitle": "Un pezzo per ogni parte selezionata, su G54, G55 ... posizionato dove si trova ciascuna parte",
+  "cam.explorer.nowWorkpieces": "{count} pezzi sull'attrezzatura: {offsets}",
+  "cam.explorer.workpiecesLimit": "Solo le prime {count} parti entrano nei registri da G54 a G59"
 }

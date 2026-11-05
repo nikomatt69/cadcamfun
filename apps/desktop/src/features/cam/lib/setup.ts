@@ -223,3 +223,20 @@ export const withoutWorkpiece = (current: ReadonlyArray<string> | undefined, rem
   const next = current.filter((id) => id !== removed)
   return next.length === 0 ? undefined : next
 }
+
+/**
+ * The fixture of a selection of parts (imported or drawn): one workpiece per part, on the next free registers G54 to G59, the first
+ * part where the datum is and each of the others placed by how far its box lies from the first's. Parts beyond the six registers
+ * are left out and counted by the caller from the lengths.
+ */
+export const workpiecesFromElements = (elements: ReadonlyArray<Record<string, unknown>>, name: (n: number) => string): ReadonlyArray<Workpiece> => {
+  const boxes = elements.slice(0, REGISTERS.length).map((element) => cam.generator.elementBounds(element as never))
+  const origin = boxes[0]?.min
+  return boxes.map((box, index): Workpiece => {
+    const element = elements[index]!
+    const label = typeof element["name"] === "string" && element["name"] !== "" ? element["name"] : name(index + 1)
+    const base = { id: `wp-${index + 1}`, name: label, workOffset: REGISTERS[index]! }
+    if (index === 0 || origin === undefined || !Object.values(box.min).every(Number.isFinite)) return base
+    return { ...base, placement: { x: box.min.x - origin.x, y: box.min.y - origin.y, z: box.min.z - origin.z } }
+  })
+}
