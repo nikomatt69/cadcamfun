@@ -3,6 +3,57 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.97 (November 2026)
+
+## Core
+
+- The legacy probing steps are read off the kernel's cycle: there is one planner (spec 73 §5.1)
+- Constant-scallop spacing is measured on the part, not on the conservative ceiling; tests read what the generator does
+- The normal-turn sampling of display meshes stays out of the Boolean
+- The 3D overlay appears on a finished simulation; a feature keeps its height; a low safe height is refused; a stopped run says why (spec 73 §4, §5.6)
+- The deprecated routes run through the Probing service and the real posts; the legacy text writer is gone (spec 73 §1, §5.1)
+- The control computes the rotary pivot on symmetric patterns; Siemens report with WRITE (spec 73 §5.8, §5.14)
+- The MEAS word is read after the macro host (spec 73 §5.11)
+- Rotation via G68 with the closed loop in machine coordinates; interpreter probe segments, work offsets and machine frame, MEAS and TCH PROBE 0 without the host (spec 73 §5.7, §5.11)
+- Stylus calibration is a job operation now (spec 73 §5.12)
+- Stylus and rotary calibration as job operations with their records in the report; simulated contacts and offset changes carry the line of their NC block; native and rotary through the plan job (spec 73 §1, §5.6, §5.12, §5.14)
+- Nine-touch sphere with the host fit, stylus calibration on a sphere, calibration records in the report; native refusals say the operation fails (spec 73 §5.6, §5.9)
+- Heidenhain tool cycles 481 and 482 (spec 73 §5.9)
+- WorkOffsetRef reaches the program and the replay, a contact reported in the work frame goes through the tilted plane (spec 73 §5.11, §5.12)
+- Okuma probing words, GRBL touch-off with G10 L20, formula depth in the writer, plain retract off a contact, every dialect in the probing goldens (spec 73 §5.2, §5.8, §5.11)
+- Native probe cycles: replay reads the inline expansion, Klartext without its preset writes (spec 73 §5.9)
+
+## Desktop
+
+- The 3D view plays the run as it went: touches stop at their contacts, macros resolved (spec 73 §4, §5.11)
+- The two drawing tool titles go through t() in 11 languages; the fake API rows carry version
+- Canvas doubles are restored and the toolpath store starts empty, so a full run stops failing tests that pass alone
+- The default corner writes a program on every control, Show in 3D opens the view, contacts match their planned touch (spec 73 §4)
+- A simulation finds the part where a cycle in work coordinates expects it; stock block before anything is modelled (spec 73 §4)
+- The 3D view plays the simulated program, contacts and the triad move in time; native cycles, GCodeViewer, calibration from job records (spec 73 §4)
+- Probe artifacts decode, tool setter cycles reach the machine's work zero; clients, snapshot, API reference (spec 73 §3.1, §3.2)
+- Write program, Simulate and calibration write-back over the real camProbing routes, part offset fields (spec 73 §4)
+
+## Sidecar
+
+- A stylus calibration finds its artefact through a non-zero work offset; the sidecar shortcut is gone (spec 73 §3.2)
+- NC lines on simulated runs, native and rotary table on plan, emit and simulate, calibration from job records; clients, snapshot, reference, inventory (spec 73 §3)
+- Cam_edit probe, probe_run, probe_apply end to end, skill probing-and-inspection, budgets, inventory (spec 73 §3.3)
+
+## AI
+
+- The clock budget test no longer depends on the machine's speed
+
+## Documentation
+
+- Spec 73 final state: all suites green, what changed in the red tests
+- Spec 73 closing round: real-app run on a modelled part, open items closed, red tests traced
+- Spec 73 real-app check, fixes and known limits
+- Spec 73 status and change log, last round
+- Spec 73 status after the second core round (spec 73 §5)
+- Spec 73 status of §3 and §4, change log, notes in specs 05 and 08
+- Spec 73 §5 status per subsection, change log, spec 72 P4-7 (spec 73)
+
 ## v0.1.96 (November 2026)
 
 - No notable changes
