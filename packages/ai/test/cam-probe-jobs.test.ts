@@ -109,6 +109,16 @@ describe("cam-probe-simulate", () => {
     expect(solid.warnings.join(" ")).not.toContain("stock block")
   })
 
+  test("a stylus calibration finds its ring through a work offset that is not zero", () => {
+    const cycle = { kind: "stylus-calibrate", artefact: { kind: "ring", centre: { x: 10, y: 20 }, diameter: 30, depth: 5, top: 0 } } as cam.probing.ProbeCycle
+    const zero = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle }] })
+    const shifted = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle }], workOffsets: { G54: { x: 120, y: -40, z: -200 } } })
+    if ("error" in zero) throw new Error(zero.error)
+    if ("error" in shifted) throw new Error(shifted.error)
+    expect(shifted.report.verdict).not.toBe("missed")
+    expect(shifted.report.operations[0]!.calibration).toEqual(zero.report.operations[0]!.calibration)
+  })
+
   test("a tilt of the part is refused", () => {
     const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle: bore }], misplacement: { a: 0.01 } } satisfies CamProbeSimulateInput)
     expect("error" in out && out.error).toMatch(/not simulated/)

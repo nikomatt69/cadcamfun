@@ -278,7 +278,11 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   // The part sits where the control believes (the offset) plus how far it is really displaced.
   const o = input.partOrigin ?? { x: 0, y: 0, z: 0 }
   const placement = { translate: { x: base.x + (m?.x ?? 0) - o.x, y: base.y + (m?.y ?? 0) - o.y, z: base.z + (m?.z ?? 0) - o.z }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
-  const artefacts = input.operations.flatMap((op) => { const w = p.artefactWorld(op.cycle); return w === undefined ? [] : [w] })
+  // A stylus artefact stands where its cycle says in work coordinates, so the machine sees it through the offset; a rotary sphere is given in machine coordinates.
+  const artefacts = input.operations.flatMap((op) => {
+    const w = p.artefactWorld(op.cycle.kind === "stylus-calibrate" ? p.translateCycle(op.cycle, base.x, base.y, base.z) : op.cycle)
+    return w === undefined ? [] : [w]
+  })
   const world = artefacts.length === 0 ? p.meshWorld(built.meshes, placement) : p.unionWorld([p.meshWorld(built.meshes, placement), ...artefacts])
   const ctx = contextOf(input)
   const probe = ctx.probe

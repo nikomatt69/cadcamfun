@@ -240,8 +240,7 @@ export class Probing extends Context.Service<Probing, {
           const input: CamProbeSimulateInput = {
             ...setupInput(setup), elements: payload.elements,
             operations: payload.operations.map((op) => ({ cycle: op.operation, ...(op.id !== undefined ? { id: op.id } : {}), ...(op.checks !== undefined ? { checks: op.checks } : {}), ...(op.actions !== undefined ? { actions: op.actions } : {}) })),
-            // A calibration artefact stands in the cycle's own coordinates, not on the part: the run is not shifted by the work offset.
-            ...(payload.workOffsets !== undefined && !payload.operations.every((op) => op.operation.kind === "rotary-axis" || op.operation.kind === "stylus-calibrate") ? { workOffsets: Object.fromEntries(Object.entries(payload.workOffsets).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)])) } : {}),
+            ...(payload.workOffsets !== undefined ? { workOffsets: Object.fromEntries(Object.entries(payload.workOffsets).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)])) } : {}),
             ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
           }
           const assumed = payload.assumed ?? setup.assumed
