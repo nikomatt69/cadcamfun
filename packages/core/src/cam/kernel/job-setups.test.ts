@@ -6,7 +6,7 @@ import { runJob } from "./execute.ts"
 import { findMachine } from "./machines.ts"
 import { JobSetupSchema } from "./schema.ts"
 import { jobOfSnapshot } from "./snapshot.ts"
-import { expandSetupPatterns, runSetups, setupsOf } from "./setups.ts"
+import { carryLimitsOf, expandSetupPatterns, runSetups, setupsOf } from "./setups.ts"
 
 setDefaultTimeout(100_000)
 
@@ -111,5 +111,14 @@ describe("N identical parts as a pattern of one setup", () => {
     if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
     expect(ran.value.setups.map((r) => r.workOffset)).toEqual(["G54", "G55", "G56"])
     expect(ran.value.stockCarried).toBe(true)
+  })
+
+  test("a carried stock is flagged after a setup that cuts under an overhang, and only then", () => {
+    expect(carryLimitsOf([{ id: "top", kinds: ["flat", "ball"] }, { id: "back", kinds: ["flat"] }])).toEqual([])
+    const limits = carryLimitsOf([{ id: "side", kinds: ["flat", "tslot", "tslot"] }, { id: "back", kinds: ["flat"] }])
+    expect(limits).toHaveLength(1)
+    expect(limits[0]).toMatch(/setup side cuts under overhangs \(tslot\).*back and the setups after it/)
+    // The last setup hands nothing on, so an undercut there is not a carry problem.
+    expect(carryLimitsOf([{ id: "top", kinds: ["flat"] }, { id: "last", kinds: ["dovetail"] }])).toEqual([])
   })
 })

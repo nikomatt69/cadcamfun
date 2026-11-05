@@ -137,6 +137,23 @@ const failed = (message: string, tag: CamIssue["tag"] = "InvalidInput"): CamResu
 const rank: Readonly<Record<ReleaseLevel, number>> = { blocked: 0, preview: 1, "verified-program": 2 }
 
 /** Runs every setup and states what the whole job guarantees. See the module note. */
+/** Cutters that reach under an overhang and leave a void. */
+const UNDERCUT_KINDS: ReadonlySet<string> = new Set(["tslot", "dovetail", "lollipop", "boringbar"])
+
+/**
+ * The limit of a carried stock (spec 69 C4): each setup hands the next one a height field, which holds one solid run per column. A setup
+ * whose cutters reach under an overhang (T-slot, dovetail, lollipop, back-boring bar) leaves a void the field cannot hold, so the setups
+ * after it start from a stock that is not exact there. One sentence per such setup that is followed by another.
+ */
+export const carryLimitsOf = (runs: ReadonlyArray<{ readonly id: string; readonly kinds: ReadonlyArray<string> }>): ReadonlyArray<string> => {
+  const out: string[] = []
+  for (let k = 0; k < runs.length - 1; k++) {
+    const kinds = [...new Set(runs[k]!.kinds.filter((kind) => UNDERCUT_KINDS.has(kind)))]
+    if (kinds.length > 0) out.push(`setup ${runs[k]!.id} cuts under overhangs (${kinds.join(", ")}) and the stock it hands on is a height field, which cannot hold that void: ${runs[k + 1]!.id} and the setups after it see the region as the field has it, so their removal and leftover there are not exact (run the undercut last, or without carryStock)`)
+  }
+  return out
+}
+
 export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamResult<SetupsArtifact> => {
   const { setups, synthesised } = setupsOf(job)
   if (setups.length === 0) return failed("A multi-setup job needs at least one setup")
@@ -196,10 +213,11 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
   for (const r of runs) for (const c of r.artifact.claims) if (c.id !== "part-coverage") claims.push({ ...c, setup: r.id })
   // A setup's own part-coverage that reports skipped five-axis samples is a finding about reach, not about the other fixings: keep it.
   for (const r of runs) for (const c of r.artifact.claims) if (c.id === "part-coverage" && /required multiaxis contact samples/.test(c.detail)) claims.push({ ...c, setup: r.id })
+  const carryLimits = carried ? carryLimitsOf(runs.map((r) => ({ id: r.id, kinds: r.artifact.tools.map((t) => t.kind) }))) : []
   claims.push({
-    id: "part-coverage", status: complete ? "passed" : "unresolved",
+    id: "part-coverage", status: complete && carryLimits.length === 0 ? "passed" : "unresolved",
     detail: complete
-      ? `Every part of the surface faces the spindle, or stands vertical, in at least one of ${runs.length} setups (${runs.map((r) => `${r.id}: ${pct(coverage.bySetup[r.id]!)}`).join(", ")}); occlusion and undercuts are decided by each setup's own replay, not by this facing test`
+      ? `Every part of the surface faces the spindle, or stands vertical, in at least one of ${runs.length} setups (${runs.map((r) => `${r.id}: ${pct(coverage.bySetup[r.id]!)}`).join(", ")}); occlusion and undercuts are decided by each setup's own replay, not by this facing test${carryLimits.length > 0 ? `. Carried stock: ${carryLimits.join("; ")}` : ""}`
       : `${coverage.uncovered.toFixed(1)} mm² (${pct(coverage.uncovered)}) of the part surface faces away from the spindle in every setup (${runs.map((r) => r.orientation).join(", ")}): add a setup that sees it, or a rotary process`
   })
   const own = runs.reduce<ReleaseLevel>((low, r) => (rank[r.artifact.release] < rank[low] ? r.artifact.release : low), "verified-program")
