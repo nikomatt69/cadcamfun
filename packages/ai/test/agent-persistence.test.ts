@@ -197,16 +197,18 @@ describe("the loop's limits are nikcli's", () => {
   test("resumes follow nikcli's retry curve: 2 s, doubling, never past 30 s", () => {
     expect([1, 2, 3, 4, 5, 6, 10].map((attempt) => resumeDelay(attempt))).toEqual([2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000])
   })
-  test("a provider's own wait hint wins over the curve, within five minutes", () => {
+  test("a provider's own wait hint is a floor under the curve, within fifteen minutes", () => {
     expect(retryHintMs("Rate limited. Retry-After: 20")).toBe(20_000)
     expect(retryHintMs("Rate limit reached. Please try again in 7.5s.")).toBe(7_500)
     expect(retryHintMs("Quota resets in 2 minutes")).toBe(120_000)
     expect(retryHintMs("Overloaded, retry after 350ms")).toBe(350)
     expect(retryHintMs("try again in 3 hours")).toBeUndefined()
-    expect(retryHintMs("retry after 3600 seconds")).toBe(300_000)
+    expect(retryHintMs("retry after 3600 seconds")).toBe(900_000)
     expect(retryHintMs("The server is overloaded.")).toBeUndefined()
     expect(resumeDelay(1, "429 Too Many Requests: try again in 12s")).toBe(12_000)
     expect(resumeDelay(3, "503 Service Unavailable")).toBe(8_000)
+    // A hint shorter than the curve does not shorten it.
+    expect(resumeDelay(3, "Overloaded, retry after 350ms")).toBe(8_000)
   })
   test("ordinary chat has a bounded continuation budget", () => {
     expect(DEFAULT_AUTO_CONTINUES).toBe(8)

@@ -9,7 +9,7 @@ import { CADCAM_AGENT, PRIMARY_STEP_LIMIT } from "./config.ts"
 import { currentHostAgent } from "./primaries.ts"
 import { primaryOfHost, reminderFor } from "../prompts/reminders.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
-import { compactHostSession } from "./context.ts"
+import { compactHostSession, readHostContextPolicy } from "./context.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
 
@@ -128,8 +128,8 @@ const RESUME_PROMPT = "The connection to the model failed and has been restored.
 /** nikcli's retry curve (`session/retry.ts`): 2 s, doubling, never longer than 30 s. */
 const RESUME_BACKOFF_MS = 2_000
 const RESUME_BACKOFF_MAX_MS = 30_000
-/** A provider's own wait hint wins over the curve (opencode's `retry-after` rule), within a bound a user would still wait out. */
-const RETRY_HINT_MAX_MS = 5 * 60_000
+/** A provider's own wait hint is a floor under the curve, bounded so a buggy hint cannot stall a turn (opencode `model-retry.ts`). */
+const RETRY_HINT_MAX_MS = 15 * 60_000
 /** A known unit after the number, or none at all: "3 hours" is not read as three seconds. */
 const RETRY_HINT = /(?:retry[- ]after|try again in|retry in|retrying in|resets? in)[:\s]*(\d+(?:\.\d+)?)(?:\s*(ms|milliseconds?|s|secs?|seconds?|m|mins?|minutes?)\b|(?!\s*[a-z]))/i
 
@@ -145,7 +145,7 @@ export const retryHintMs = (message: string): number | undefined => {
 }
 
 export const resumeDelay = (attempt: number, message?: string): number =>
-  (message === undefined ? undefined : retryHintMs(message)) ?? Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS)
+  Math.max(Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS), (message === undefined ? undefined : retryHintMs(message)) ?? 0)
 
 /** Automatic continuation is bounded independently of native goal iterations. */
 export const DEFAULT_AUTO_CONTINUES = 8
@@ -669,9 +669,11 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           const sessionError = continuationState?.sessionError
           const failure = failureOf(result) ?? (sessionError !== undefined ? failureOfMessage(sessionError) : undefined)
           // The pinned host stores a provider's context-overflow refusal as the turn's error and stops: its own compaction only
-          // runs on its token estimate. Summarise once and carry on, as Claude Code and opencode do; a second overflow in the
-          // same turn means the summary did not help, and it is reported.
-          if (failure?.overflow && !failure.aborted && !compactedForOverflow && !controller.signal.aborted) {
+          // runs on its token estimate. Summarise once and carry on, as Claude Code and upstream opencode do; a second overflow
+          // in the same turn means the summary did not help, and it is reported. As upstream, only the user compacts when
+          // automatic compaction is off, overflow included.
+          if (failure?.overflow && !failure.aborted && !compactedForOverflow && !controller.signal.aborted
+            && await runHere(readHostContextPolicy(host).pipe(Effect.map((policy) => policy.auto), Effect.catch(() => Effect.succeed(true))))) {
             compactedForOverflow = true
             offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
             const compactionsBefore = state.compactions
