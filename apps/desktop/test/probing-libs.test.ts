@@ -1,5 +1,6 @@
 /** Pure probing libs of the desktop (spec 73 §4): inspection status / order / CSV and the work-offset table. */
-import { expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
+import { stockElementOf } from "../src/features/cam/lib/probing/part-solids.ts"
 import { cam } from "@cadcamfun/core"
 import { inspectionCsv, sortInspection, statusOf, summarizeInspection } from "../src/features/cam/lib/probing/inspection.ts"
 import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
@@ -78,4 +79,16 @@ test("the planning context carries the machine's work zero, so a tool setter cyc
   const settings = resolveSettings({ profile: p, workOffset: "G54" })
   expect(contextOf(settings, { profile: p }).workOrigin).toEqual({ x: 100, y: 200, z: -300 })
   expect(contextOf(resolveSettings({ profile: p, workOffset: "G55" }), { profile: p }).workOrigin).toBeUndefined()
+})
+
+describe("the stock as a part", () => {
+  const stock = { x: 10, y: 20, width: 100, height: 200, depth: 20, topZ: 5 }
+  test("its top is the stock top", () => {
+    const block = stockElementOf(stock)!
+    expect(block).toMatchObject({ type: "cube", x: 10, y: 20, z: -5, width: 100, height: 200, depth: 20 })
+    expect(cam.generator.elementBounds(block as never).max.z).toBeCloseTo(5, 9)
+  })
+  test("a stock without depth is no part", () => {
+    expect(stockElementOf({ ...stock, depth: 0 })).toBeUndefined()
+  })
 })

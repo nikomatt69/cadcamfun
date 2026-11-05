@@ -80,6 +80,9 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
   const stale = () => { const s = selected(); const p = program(); return s !== undefined && p !== undefined && freshProgram(probing.programs, s.id, s.probe) === undefined }
   const dialect = () => probing.dialect ?? c.profile()?.post ?? "fanuc"
   const toggle = (section: ProbingSection) => () => probing.toggleSection(section)
+  // The palette is taller than the panel: a new cycle would open out of sight and the click would seem to do nothing.
+  let editorEl: HTMLDivElement | undefined
+  const revealEditor = () => queueMicrotask(() => editorEl?.scrollIntoView?.({ block: "start", behavior: "smooth" }))
   const contactLines = createMemo(() => new Set((run()?.outcome.contacts ?? []).flatMap((contact) => contact.line === undefined ? [] : [contact.line])))
   const summary = (): string | undefined => {
     const r = run()
@@ -127,10 +130,11 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
 
       <PanelSection id="probing-cycles" icon={SECTION_ICON.cycles} title={t("cam.probing.section.cycles")} open={probing.open.cycles} onToggle={toggle("cycles")} testId="probing-section-cycles"
         summary={t("cam.probing.cycles.count", { count: cycles().length })}>
-        <ProbeCyclePalette profile={c.profile()} onAdd={(entry) => c.add(entry)} />
+        <ProbeCyclePalette profile={c.profile()} onAdd={(entry) => { c.add(entry); revealEditor() }} />
         <ProbeCycleList cycles={cycles()} selectedId={probing.selectedId} resultOf={resultOf}
           onSelect={(id) => probing.select(id)} onToggleVisible={(id) => c.toggleVisible(id)} onMove={(id, dir) => c.move(id, dir)}
           onDuplicate={(id) => c.duplicate(id)} onRemove={(id) => c.remove(id)} />
+        <div ref={editorEl} data-testid="probe-editor-anchor" />
         <Show when={selected()}>{(cycle) => (
           <ProbeCycleEditor id={cycle().id} operation={cycle().probe} profile={c.profile()} defaults={c.defaults()} targets={c.targets()} picking={probing.picking}
             onChange={(patch) => c.update(cycle().id, patch)} onPick={c.pick} onTarget={(target) => c.applyTarget(cycle().id, target)} />

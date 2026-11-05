@@ -310,6 +310,10 @@ export const CamProbingSimulateRequest = Schema.Struct({
   /** The offsets the control holds before the run (key -> row); default zero. */
   workOffsets: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),
   misplacement: Schema.optionalKey(CamProbingMisplacement),
+  /** The point of the drawing that is work zero, for cycles planned in work coordinates; absent: the drawing's own coordinates. */
+  partOrigin: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+  /** The stock as an element: what the probe touches when the drawing has no closed solid yet. */
+  stockElement: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
   /** The control: the operations are posted as one program, and contacts and offset changes carry the line of their block in `program.nc`. */
   dialect: Schema.optionalKey(CamProbingDialect),
   /** Options of the post (a Siemens tilted plane's swivel data, the machine's probing words). */

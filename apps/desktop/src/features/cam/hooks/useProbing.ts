@@ -23,6 +23,7 @@ import { isProbeToolpath } from "../lib/probing/cycles.ts"
 import { loadOffsets, saveOffsets } from "../lib/probing/offset-sync.ts"
 import { defaultChecks, defaultOperation, followOf, movesOffset, planLocal, type ProbeOperation } from "../lib/probing/operation.ts"
 import { profileOfMachine } from "../lib/probing/machine.ts"
+import { stockElementOf } from "../lib/probing/part-solids.ts"
 import { applyTarget, targetAt, targetsOf, workOriginOf, type ProbeTarget } from "../lib/probing/probe-targets.ts"
 import { reportData, resultOfReport } from "../lib/probing/report-data.ts"
 import { useInspectionStore } from "../store/inspectionStore.ts"
@@ -50,7 +51,7 @@ type ParseProgram = (nc: string) => Promise<{ readonly program: cam.Program; rea
 const newRunId = (): string => globalThis.crypto.randomUUID()
 
 /** Write program and Simulate of the panel: the sidecar plans and writes, the results land in the probing store. */
-export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service" | "machine" | "defaults" | "elements" | "projectId"> & { readonly parse: ParseProgram }): ProbingProgramService => {
+export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service" | "machine" | "defaults" | "elements" | "stock" | "projectId"> & { readonly parse: ParseProgram }): ProbingProgramService => {
   const probing = useProbingStore
   const context = () => {
     const machine = deps.machine()
@@ -91,14 +92,18 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
         return
       }
       const planned = planLocal(operation, { profile: ctx.profile, defaults: ctx.defaults })
-      const elements = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
+      const stock = deps.stock()
+      const origin = workOriginOf(stock)
+      const stockElement = stockElementOf(stock)
+      const drawn = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
+      const elements = drawn.length > 0 ? drawn : stockElement !== undefined ? [stockElement] : []
       if (elements.length === 0) throw new Error(t("cam.probing.program.noPart"))
       const table = useWorkOffsetStore.getState()
       const workOffsets = table.machineConfigId !== undefined && table.rows.length > 0 ? entriesOfRows(table.rows, "machine") : undefined
       const sim = await deps.run(service.simulate({
         elements, settings, operations: [{ id, operation: cycle, ...(actions !== undefined ? { actions } : {}), ...(checks !== undefined ? { checks } : {}) }],
         ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}), ...(assumed !== undefined ? { assumed } : {}),
-        dialect: dialect as never, misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...progress
+        dialect: dialect as never, misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, partOrigin: origin, ...(stockElement !== undefined ? { stockElement } : {}), ...progress
       }))
       // The report's lines are lines of this text: the 3D view must play it, not a program written earlier.
       if (sim.program !== undefined) await keep(id, operation, dialect, { nc: sim.program.nc, lines: sim.program.lines, notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc })
@@ -117,7 +122,7 @@ export interface ControllerDeps {
   readonly machine: () => { readonly id: string; readonly name: string; readonly type?: string | undefined; readonly config: object } | null
   readonly defaults: () => ProbingDefaults
   readonly elements: () => ReadonlyArray<CadElement>
-  readonly stock: () => { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly topZ: number }
+  readonly stock: () => { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth?: number; readonly topZ: number }
   readonly setups: () => ReadonlyArray<{ readonly id: string; readonly name: string }>
   readonly projectId: () => string | null
   readonly insert: (nc: string) => void
@@ -304,12 +309,13 @@ export const useProbing = (options: { readonly insert: (nc: string) => void; rea
   const machine = () => cad.selectedMachine
   const defaults = () => app.settings.settings().probing
   const elements = () => job.elements()
+  const stock = () => { const s = stockOf(job.sources()); return { x: s.x, y: s.y, width: s.width, height: s.height, depth: s.depth, topZ: s.topZ } }
   const projectId = () => document.projectId
   const generator = makeToolpathGenerator(app.client)
   return createProbingController({
     run, service, machine, defaults, elements, projectId,
-    program: options.program ?? createProbingProgram({ run, service, machine, defaults, elements, projectId, parse: (nc) => run(generator.parse(nc, "Probing")) }),
-    stock: () => { const s = stockOf(job.sources()); return { x: s.x, y: s.y, width: s.width, height: s.height, topZ: s.topZ } },
+    program: options.program ?? createProbingProgram({ run, service, machine, defaults, elements, stock, projectId, parse: (nc) => run(generator.parse(nc, "Probing")) }),
+    stock,
     setups: () => setups.documents.map((d) => ({ id: d.id, name: d.name })),
     insert: options.insert,
     onMachineProbing: (saved) => {

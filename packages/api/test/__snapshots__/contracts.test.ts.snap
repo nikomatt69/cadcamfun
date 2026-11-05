@@ -38198,6 +38198,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "type": "object",
                   },
+                  "partOrigin": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                      },
+                      "y": {
+                        "type": "number",
+                      },
+                      "z": {
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z",
+                    ],
+                    "type": "object",
+                  },
                   "post": {
                     "type": "object",
                   },
@@ -38288,6 +38308,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "string",
                       },
                     },
+                    "type": "object",
+                  },
+                  "stockElement": {
                     "type": "object",
                   },
                   "workOffsets": {

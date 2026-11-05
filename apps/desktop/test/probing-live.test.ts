@@ -53,10 +53,10 @@ const controller = () => {
   const service = makeProbingStoreService(app.client)
   const run = <A, E>(effect: import("effect").Effect.Effect<A, E>) => app.state.runtime.run(effect)
   const machine = () => ({ id: machineId, name: "VMC", type: "mill", config })
-  const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, projectId: () => projectId }
+  const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), projectId: () => projectId }
   const generator = makeToolpathGenerator(app.client)
   const program = hook.createProbingProgram({ ...deps, parse: (nc) => run(generator.parse(nc, "Probing")) })
-  return hook.createProbingController({ ...deps, program, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), setups: () => [], insert: () => {}, onMachineProbing: () => {} })
+  return hook.createProbingController({ ...deps, program, setups: () => [], insert: () => {}, onMachineProbing: () => {} })
 }
 const added = (id: string) => {
   const c = controller()

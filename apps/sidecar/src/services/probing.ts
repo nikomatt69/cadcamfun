@@ -250,6 +250,8 @@ export class Probing extends Context.Service<Probing, {
             ...(payload.dialect !== undefined ? { dialect: payload.dialect } : {}),
             ...(payload.post !== undefined ? { post: payload.post as NonNullable<CamProbeSimulateInput["post"]> } : {}),
             ...(payload.options !== undefined ? { options: payload.options } : {}),
+            ...(payload.partOrigin !== undefined ? { partOrigin: payload.partOrigin } : {}),
+            ...(payload.stockElement !== undefined ? { stockElement: payload.stockElement } : {}),
             ...(assumed !== undefined ? { assumed } : {})
           }
           const out = yield* runKernelJobEffect("cam-probe-simulate", placed, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to simulate the probing")))

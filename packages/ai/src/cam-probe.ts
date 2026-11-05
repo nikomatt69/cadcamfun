@@ -209,6 +209,13 @@ export interface CamProbeSimulateInput extends ProbeSetup {
   readonly options?: CamProbePlanInput["options"]
   /** The machine's rotary table: a `rotary-axis` operation needs it. */
   readonly assumed?: cam.probing.RotaryAssumption
+  /**
+   * The point of the drawing that is work zero, for cycles planned in work coordinates (the desktop: stock centre, top face); without it
+   * the drawing's own coordinates are the work coordinates.
+   */
+  readonly partOrigin?: { readonly x: number; readonly y: number; readonly z: number }
+  /** The stock as an element: what the probe touches when the drawing has no closed solid yet. */
+  readonly stockElement?: Readonly<Record<string, unknown>>
 }
 
 export interface CamProbeSimulateOutput {
@@ -259,15 +266,18 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   const m = input.misplacement
   if (m !== undefined && ((m.a ?? 0) !== 0 || (m.b ?? 0) !== 0)) return { error: "The part may be shifted and turned about the vertical (x, y, z, c); a tilt of the part (a, b) is not simulated.", status: 400 }
   const warnings: string[] = []
-  const built = cam.model.partMeshes(input.elements as never)
+  const drawn = cam.model.partMeshes(input.elements as never)
+  const built = drawn ?? (input.stockElement !== undefined ? cam.model.partMeshes([input.stockElement] as never) : undefined)
   if (built === undefined) return { error: "The drawing has no closed solid to touch (send solids, not curves or surfaces).", status: 400 }
+  if (drawn === undefined) warnings.push("the drawing has no closed solid: the probe touches the stock block")
   if (built.skipped.length > 0) warnings.push(`not part of the world the probe touches: ${built.skipped.join(", ")}`)
   warnings.push(...built.warnings)
   const active = input.settings.workOffset
   const table: cam.probing.WorkOffsetTable = { entries: input.workOffsets ?? {} }
   const base = p.getOffset(table, active)
   // The part sits where the control believes (the offset) plus how far it is really displaced.
-  const placement = { translate: { x: base.x + (m?.x ?? 0), y: base.y + (m?.y ?? 0), z: base.z + (m?.z ?? 0) }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
+  const o = input.partOrigin ?? { x: 0, y: 0, z: 0 }
+  const placement = { translate: { x: base.x + (m?.x ?? 0) - o.x, y: base.y + (m?.y ?? 0) - o.y, z: base.z + (m?.z ?? 0) - o.z }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
   const artefacts = input.operations.flatMap((op) => { const w = p.artefactWorld(op.cycle); return w === undefined ? [] : [w] })
   const world = artefacts.length === 0 ? p.meshWorld(built.meshes, placement) : p.unionWorld([p.meshWorld(built.meshes, placement), ...artefacts])
   const ctx = contextOf(input)

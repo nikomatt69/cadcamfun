@@ -3899,6 +3899,8 @@ type Endpoint32_2Input = {
   readonly frame?: Endpoint32_2Request["payload"]["frame"]
   readonly workOffsets?: Endpoint32_2Request["payload"]["workOffsets"]
   readonly misplacement?: Endpoint32_2Request["payload"]["misplacement"]
+  readonly partOrigin?: Endpoint32_2Request["payload"]["partOrigin"]
+  readonly stockElement?: Endpoint32_2Request["payload"]["stockElement"]
   readonly dialect?: Endpoint32_2Request["payload"]["dialect"]
   readonly post?: Endpoint32_2Request["payload"]["post"]
   readonly options?: Endpoint32_2Request["payload"]["options"]
@@ -3914,6 +3916,8 @@ const Endpoint32_2 = (raw: RawClient["camProbing"]) => (input: Endpoint32_2Input
       frame: input["frame"],
       workOffsets: input["workOffsets"],
       misplacement: input["misplacement"],
+      partOrigin: input["partOrigin"],
+      stockElement: input["stockElement"],
       dialect: input["dialect"],
       post: input["post"],
       options: input["options"],
