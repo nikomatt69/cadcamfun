@@ -344,3 +344,19 @@ Tests: truePivot = assumed + (0.03, −0.02, 0.05) and 0.01° tilt recovered to 
 - 2026-11-05 (lead, closing round): second real-app run, on a modelled part away from the CAD origin (plate + boss, stock at X200 Y100 Z50), boss found at (15.300, 4.798) for a shift of (0.3, -0.2), verdict pass. Closed: the 3D overlay was never built when the view opened after a simulation (View3D's effect ran before the mount); targets dropped the feature's `top`, so every cycle probed as if at Z0; a safe height at or below the feature is refused; a stopped run says why; the viewer plays the run as it went (`played`: touches end at contacts, macros resolved, no more "Partial preview"); stylus calibration through a non-zero offset (`translateCycle`, sidecar shortcut removed); the deprecated `/api/cam/probe/*` run through the `Probing` service and the real posts (`kernelProbe`, `set-offset.reads`); the legacy text writer is gone.
 - Red tests that are not probing, cause found: `c39185ec` (conservative ceiling for the drop-cutter, deliberate, up to about 0.1 mm above the surface on steep flanks at cell 0.1) turned surface / surface-finishing / rest / rest-stock red (6 tests, bisected: 0 fail on its parent). Variable fillet volume (2 tests) went red between 12465919 and c5e70e2b. Superseded by the entry below.
 - 2026-11-05 (lead, last round): every suite green on the final commit (8 614 tests, 0 fail, `packages/core` run whole in parts). `planProbe` now reads its steps off `planProbeCycle`, so there is one planner; its tests pass unchanged. Fillets: `sampleNormalTurn` (c5e70e2b) moved the Boolean's seeds and left a spurious sliver, so the Boolean turns it off (`edgeNormalTurn: false`), tolerances untouched. Scallop passes were 23% too close because distances were measured on the conservative ceiling: they are measured on the part. Test changes: rest-stock checks each cutting move against the slot in X and Y; pencil tests use the surface the generator drops on; the finishing upper bound is slope x cell + 0.03 instead of a flat 0.08, which accepts about 0.1 mm above the surface on 45 degree flanks at cell 0.1, the price of c39185ec. `params.contact: "mesh"` avoids it. The AI clock budget test uses a stepping clock.
+
+## Vendor syntax checked against the manuals (2026-11-05)
+
+Nothing here was run on a control. "Confirmed" means the manual says so.
+
+| Control | Word | Source | Result |
+| --- | --- | --- | --- |
+| Renishaw | G65 P9810 / 9811 / 9812 / 9814, D, Z only for a boss or web, S1..S6 | Inspection Plus programming manual (2008, Haas) | confirmed |
+| Renishaw | extended offset | same | was `S = 100 + p`, not in the manual: now `S154.pp` on Haas, refused elsewhere |
+| Siemens | `_MVAR` 1/2/3/4 + 100 for a work offset, CYCLE978 `_MVAR` 0/100, `_KNUM` 1..99, `_SETVAL`, `_ID`, `_MA` | Measuring cycles 06.00 and 02/2012 | confirmed; a measurement alone now has hundreds 0 |
+| Siemens | `_MD` on CYCLE978 | same | was missing: now 1 down or negative, 0 positive |
+| Heidenhain | cycles 408, 410, 412, 417, 419: parameter rows | iTNC 530 cycle programming, 60642x-04 | confirmed |
+| Heidenhain | Q303 / Q305 | same, "Saving the calculated datum" | was `Q303 = -1`, `Q305 = 0` for a measurement, which moves the active datum: refused now, Q303 is 1 |
+| Okuma | `VSKPX`, `VPPAX` | no Okuma document found | NOT confirmed |
+| Okuma | `VZOFX[n]`, `VDOUT[992]`, `VUACM[1]` | forum and third-party pages only | seen in use, not confirmed by Okuma |
+| Renishaw | `G54.1 P` word on Fanuc | no source | refused |

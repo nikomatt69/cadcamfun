@@ -367,7 +367,7 @@ const writeWork = (m: OffsetUpdateMove, a: OffsetAddress, io: ProbeIo): string[]
 export const nativeProbeLines = (move: { readonly family: string; readonly number: number; readonly params: Readonly<Record<string, number>> }, num: (mm: number) => string): string[] => {
   const p = move.params
   if (move.family === "renishaw") {
-    const words = Object.keys(p).filter((k) => /^[A-Z]$/.test(k)).sort().map((k) => `${k}${k === "S" ? p[k]!.toFixed(0) + "." : num(p[k]!)}`)
+    const words = Object.keys(p).filter((k) => /^[A-Z]$/.test(k)).sort().map((k) => `${k}${k === "S" ? (Number.isInteger(p[k]!) ? `${p[k]!}.` : p[k]!.toFixed(2)) : num(p[k]!)}`)
     return [`G65 P${move.number} ${words.join(" ")}`, `G65 P9810 Z${num(p["z"]!)} F${Math.round(p["f"]!)}`]
   }
   const words = Object.keys(p).filter((k) => k.startsWith("_")).sort().map((k) => `${k}=${Number(p[k]!.toFixed(6))}`)

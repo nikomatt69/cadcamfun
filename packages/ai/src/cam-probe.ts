@@ -163,7 +163,7 @@ export const camProbePlan = (input: CamProbePlanInput, report?: Report): CamProb
   }
   let native: string | undefined
   if (input.native === true) {
-    const marked = p.nativeCycle(resolved.cycle, actions, input.macroStyle ?? "inline", moves, { probe: ctx.probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: input.frame !== undefined })
+    const marked = p.nativeCycle(resolved.cycle, actions, input.macroStyle ?? "inline", moves, { probe: ctx.probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: input.frame !== undefined, ...(input.dialect !== undefined ? { post: input.dialect } : {}) })
     if ("refused" in marked) return { error: `No native cycle: ${marked.refused}. Clear native for the inline touches.`, status: 400 }
     moves = [...marked.moves]
     native = marked.word
