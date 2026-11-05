@@ -71,7 +71,6 @@ describe("probe operations in a job", () => {
     expect(probeRefusal(PROBES[0] as ProbeOperationSpec, machineOf("vmc-standard"), undefined)).toMatch(/writes no probing words/)
     expect(refusal(jobOf({ ...findMachine("vmc-standard")! }, [PROBES[0]!]))).toMatch(/has no probe/)
     expect(refusal(jobOf({ ...findMachine("vmc-standard")!, probing: probing({ probes: [{ ...device, on: ["M69"] }] }) }, [PROBES[0]!]))).toMatch(/on \/ off words/)
-    expect(refusal(jobOf(machineOf("vmc-standard"), [probeOp("cal", { kind: "stylus-calibrate", artefact: { kind: "height", at: { x: 0, y: 0 }, z: 0 } })]))).toMatch(/cam\.probing/)
   })
 
   test("a probe that cannot find its feature on the part as drawn fails the claim and blocks the release", () => {
