@@ -36,6 +36,7 @@ class Builder {
   readonly nominal: Record<string, number> = {}
   readonly units: Record<string, "mm" | "deg"> = {}
   readonly notes: string[] = []
+  hostFit: ProbeRoutine["hostFit"]
   /** The writer's position (program coordinates). */
   at: Vec3 | undefined
   /** The control's value of an axis where it is computed (a re-centred probe). */
@@ -166,7 +167,7 @@ class Builder {
   finish(cycle: ProbeCycle): ProbeRoutine {
     this.up()
     if (this.touches === 0) throw new RangeError("a cycle without a touch")
-    return { cycle, moves: this.moves, contacts: this.contacts, results: this.results, nominal: this.nominal, units: this.units, notes: this.notes }
+    return { cycle, moves: this.moves, contacts: this.contacts, results: this.results, nominal: this.nominal, units: this.units, notes: this.notes, ...(this.hostFit !== undefined ? { hostFit: this.hostFit } : {}) }
   }
 }
 
@@ -467,7 +468,6 @@ export const planProbeCycle = (cycle: ProbeCycle, ctx: ProbeContext): ProbeRouti
         return b.finish(cycle)
       }
       case "sphere": {
-        if ((cycle.touches ?? 5) !== 5) return refuse("a nine-touch sphere is not built here: use five touches")
         const R = cycle.diameter / 2
         const c = cycle.centre
         if (ctx.safeZ <= c.z + R + ctx.clearance) return refuse("the safe height must be above the top of the sphere")
@@ -496,6 +496,30 @@ export const planProbeCycle = (cycle: ProbeCycle, ctx: ProbeContext): ProbeRouti
         b.result("y", bb, c.y)
         b.result("z", subE(tz, Rm), c.z)
         b.result("diameter", mul(2, Rm), cycle.diameter)
+        if (cycle.touches === 9) {
+          // The control's result stays the closed form of the first five; four touches 45 degrees up the ball go out for the host's fit.
+          const q = Math.SQRT1_2
+          const centres: Array<{ x: Expr; y: Expr; z: Expr }> = [{ ...xp, z: zt + r }, { ...xm, z: zt + r }, { ...yp, z: zt + r }, { ...ym, z: zt + r }, { x: a, y: bb, z: add(top.z, r) }]
+          for (const [i, az] of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].entries()) {
+            const out = { x: Math.cos(az) * q, y: Math.sin(az) * q, z: q }
+            const dir = { x: -out.x, y: -out.y, z: -out.z }
+            const rho = R + effectiveRadius(ctx.probe, dir)
+            const point = (l: number): Vec3 => ({ x: c.x + out.x * l, y: c.y + out.y * l, z: c.z + out.z * l - r })
+            const from = point(rho + ctx.clearance)
+            b.up()
+            b.go({ x: from.x, y: from.y, z: ctx.safeZ })
+            b.go(from)
+            const t = b.touch(`t${6 + i}`, dir, point(rho), ["x", "y", "z"])
+            centres.push({ x: t.x, y: t.y, z: add(t.z, r) })
+          }
+          centres.forEach((p, i) => {
+            b.result(`bx${i}`, p.x, NaN); b.result(`by${i}`, p.y, NaN); b.result(`bz${i}`, p.z, NaN)
+          })
+          b.moves.push({ _tag: "Report", label: "SPHERE", values: centres.flatMap((_, i) => [`bx${i}`, `by${i}`, `bz${i}`].map((n) => ({ name: n, value: b.e(n) }))) })
+          for (const k of Object.keys(b.nominal)) if (Number.isNaN(b.nominal[k])) { delete b.nominal[k]; delete b.units[k] }
+          b.notes.push("nine touches: the control holds the closed form of the first five; the host's least-squares fit of all nine replaces it in the report (withHostFit)")
+          b.hostFit = "sphere"
+        }
         return b.finish(cycle)
       }
       case "stylus-calibrate": {
@@ -506,7 +530,46 @@ export const planProbeCycle = (cycle: ProbeCycle, ctx: ProbeContext): ProbeRouti
           b.result("zTrigger", subE(art.z, t.z), 0)
           return b.finish(cycle)
         }
-        if (art.kind === "sphere") return refuse("calibrating on a sphere is not built here: use a ring gauge or a height artefact")
+        if (art.kind === "sphere") {
+          // Find the ball (X and Y chords, the top with the known radius), then touch its equator in each direction through the centre found.
+          const R = art.diameter / 2
+          const c = art.centre
+          if (ctx.safeZ <= c.z + R + ctx.clearance) return refuse("the safe height must be above the top of the sphere")
+          const zt = c.z - r
+          const so = R + standOff(b)
+          const eq = (dir: Vec2, name: string): { x: Expr; y: Expr } => {
+            approach(b, { x: c.x - dir.x * so, y: c.y - dir.y * so }, zt)
+            const re = effectiveRadius(ctx.probe, dir)
+            return b.touch(name, { x: dir.x, y: dir.y, z: 0 }, { x: c.x - dir.x * (R + re), y: c.y - dir.y * (R + re), z: zt }, ["x", "y"])
+          }
+          const xp = eq({ x: 1, y: 0 }, "ca"), xm = eq({ x: -1, y: 0 }, "cb"), yp = eq({ x: 0, y: 1 }, "cc"), ym = eq({ x: 0, y: -1 }, "cd")
+          const a = b.let(half(add(xp.x, xm.x)), "sa"), bb = b.let(half(add(yp.y, ym.y)), "sb")
+          b.up()
+          b.go({ x: c.x, y: c.y, z: ctx.safeZ }, { x: a, y: bb })
+          b.go({ x: c.x, y: c.y, z: c.z + R + ctx.clearance })
+          const cz = b.let(subE(add(b.touch("ce", { x: 0, y: 0, z: -1 }, { x: c.x, y: c.y, z: c.z + R }, ["z"]).z, b.zTrigger()), R), "sz")
+          const equator = b.let(subE(cz, r), "se")
+          b.result("x", a, c.x)
+          b.result("y", bb, c.y)
+          b.result("z", cz, c.z)
+          const n = cycle.directions ?? 4
+          const radii: Expr[] = []
+          for (let k = 0; k < n; k++) {
+            const t = (2 * Math.PI * k) / n
+            const u = { x: Math.cos(t), y: Math.sin(t) }
+            const re = effectiveRadius(ctx.probe, u)
+            const start = { x: c.x - u.x * so, y: c.y - u.y * so }
+            b.up()
+            b.go({ ...start, z: ctx.safeZ }, { x: subE(a, u.x * so), y: subE(bb, u.y * so) })
+            b.go({ ...start, z: zt }, { z: equator })
+            const p = b.touch(`d${k}`, { x: u.x, y: u.y, z: 0 }, { x: c.x - u.x * (R + re), y: c.y - u.y * (R + re), z: zt }, ["x", "y"])
+            b.result(`r${k}`, subE(call("sqrt", add(sq(subE(p.x, a)), sq(subE(p.y, bb)))), R), r)
+            radii.push(b.e(`r${k}`))
+          }
+          b.result("radius", div(radii.reduce((s, v) => add(s, v)), n), r)
+          b.notes.push(`effective radius in ${n} directions: the distance of the ball centre from the sphere's centre less the sphere's radius, at its equator`)
+          return b.finish(cycle)
+        }
         const R = art.diameter / 2
         if (R - r <= ctx.clearance / 2) return refuse(`a stylus of ${2 * r} mm does not fit a ring of ${art.diameter} mm`)
         const zt = tipZ(ctx, art.top, art.depth)

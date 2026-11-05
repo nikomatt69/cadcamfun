@@ -64,6 +64,8 @@ export const rotaryRoutine = (cycle: Extract<ProbeCycle, { readonly kind: "rotar
     }
     contacts.push(...r.contacts.map((c) => ({ ...c, name: `c${i}_${c.name}` })))
   }
+  // The table goes back: what follows in the program is written for it at zero.
+  moves.push({ _tag: "Orient", ...(cycle.axis === "A" ? { a: 0 } : cycle.axis === "B" ? { b: 0 } : { c: 0 }) })
   moves.push({ _tag: "Report", label: "ROTARY", values })
   return { cycle, moves, contacts, results, nominal, units, notes }
 }

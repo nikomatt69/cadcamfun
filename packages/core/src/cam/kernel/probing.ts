@@ -104,7 +104,7 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   let native: string | undefined
   if (op.native === true) {
     const marked = nativeCycle(cycle, op.actions ?? [], machine.probing?.macroStyle ?? "inline", moves, { probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: frame !== undefined })
-    if ("refused" in marked) return { refused: `native cycle: ${marked.refused}` }
+    if ("refused" in marked) return { refused: `native cycle refused (clear native on the operation for the inline touches): ${marked.refused}` }
     moves = [...marked.moves]
     native = marked.word
   }

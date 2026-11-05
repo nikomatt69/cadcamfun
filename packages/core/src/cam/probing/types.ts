@@ -99,6 +99,8 @@ export interface ProbeRoutine {
   readonly nominal: Readonly<Record<string, number>>
   readonly units: Readonly<Record<string, "mm" | "deg">>
   readonly notes: ReadonlyArray<string>
+  /** The results the control computes are refined by the host from the reported touches (`withHostFit`): a nine-touch sphere. */
+  readonly hostFit?: "sphere"
 }
 
 export type ProbeRoutineResult = ProbeRoutine | { readonly refused: string }

@@ -9,6 +9,7 @@ import { offsetKey } from "../work-offset.ts"
 import type { OffsetEntry } from "../work-offset.ts"
 import { INSPECTION_ALARM, OFFSET_ALARM, WEAR_ALARM } from "./actions.ts"
 import { PROBE_COLLISION_ALARM, PROBE_MISS_ALARM, evaluateInspection } from "./simulate.ts"
+import { calibrationToWire, type ProbeCalibration } from "./calibration.ts"
 import type { Characteristic, InspectionVerdict, ProbeCycleKind, ProbeSimOutcome } from "./types.ts"
 
 const DEG = Math.PI / 180
@@ -37,6 +38,8 @@ export interface ReportOperation {
   readonly units: Readonly<Record<string, "mm" | "deg">>
   readonly alarms: ReadonlyArray<{ readonly code: number; readonly text: string; readonly line?: number }>
   readonly stopped?: string
+  /** What a calibration cycle found. Reported, never written to the machine's parameters. */
+  readonly calibration?: ProbeCalibration
 }
 
 export interface ReportUpdate { readonly operationId: string; readonly offset: string; readonly axis: string; readonly before: number; readonly after: number }
@@ -62,6 +65,7 @@ export interface ReportRun {
   readonly nominal: Readonly<Record<string, number>>
   readonly units: Readonly<Record<string, "mm" | "deg">>
   readonly characteristics?: ReadonlyArray<Characteristic>
+  readonly calibration?: ProbeCalibration
 }
 
 /** A check inside this fraction of the way to its limit but not past it is a warning (the part is drifting, still good). */
@@ -97,7 +101,8 @@ export const buildProbeReport = (runs: ReadonlyArray<ReportRun>, options: { read
     operations.push({
       operationId: run.operationId, cycle: run.cycle, contacts: o.contacts.map((c) => ({ ...(c.name !== undefined ? { name: c.name } : {}), tip: c.tip, ...(c.line !== undefined ? { line: c.line } : {}) })),
       results: o.results, nominal: run.nominal, units: run.units, alarms: o.alarms.map((a) => ({ code: a.code, text: a.text, ...(a.line !== undefined ? { line: a.line } : {}) })),
-      ...(o.stopped !== undefined ? { stopped: o.stopped } : {})
+      ...(o.stopped !== undefined ? { stopped: o.stopped } : {}),
+      ...(run.calibration !== undefined ? { calibration: run.calibration } : {})
     })
     const verdicts = run.characteristics === undefined ? o.inspections : evaluateInspection(o.results, run.characteristics)
     for (const v of verdicts) {
@@ -136,7 +141,8 @@ export const probeReportToWire = (r: ProbeReport): unknown => ({
     ...op,
     results: Object.fromEntries(Object.entries(op.results).map(([k, v]) => [k, roundTo(op.units[k] === "deg" ? v / DEG : v)])),
     nominal: Object.fromEntries(Object.entries(op.nominal).map(([k, v]) => [k, roundTo(v)])),
-    contacts: op.contacts.map((c) => ({ ...c, tip: { x: roundTo(c.tip.x), y: roundTo(c.tip.y), z: roundTo(c.tip.z) } }))
+    contacts: op.contacts.map((c) => ({ ...c, tip: { x: roundTo(c.tip.x), y: roundTo(c.tip.y), z: roundTo(c.tip.z) } })),
+    ...(op.calibration !== undefined ? { calibration: calibrationToWire(op.calibration) } : {})
   })),
   checks: r.checks.map((c) => (c.kind === "angle" ? { ...c, measured: roundTo(c.measured / DEG), nominal: roundTo(c.nominal / DEG), deviation: roundTo(c.deviation / DEG), lower: roundTo(c.lower / DEG), upper: roundTo(c.upper / DEG) } : { ...c, measured: roundTo(c.measured), nominal: roundTo(c.nominal), deviation: roundTo(c.deviation), lower: roundTo(c.lower), upper: roundTo(c.upper) })),
   updates: r.updates.map((u) => ({ ...u, before: roundTo(angular(u.axis) ? u.before / DEG : u.before), after: roundTo(angular(u.axis) ? u.after / DEG : u.after) })),

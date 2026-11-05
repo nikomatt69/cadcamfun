@@ -249,3 +249,39 @@ describe("a control that reports contacts in the work frame under a tilted plane
     }
   })
 })
+
+describe("spheres", () => {
+  const S = { x: 20, y: -30, z: 5 }
+  test("a nine-touch sphere: the control's five, the host's nine, exact on an exact ball and better than five under noise", async () => {
+    const { withHostFit } = await import("./calibration.ts")
+    const c: ProbeCycle = { kind: "sphere", centre: S, diameter: 25, touches: 9 }
+    const r = plan(c)
+    expect(r.contacts.length).toBe(9)
+    expect(r.hostFit).toBe("sphere")
+    const world = sphereWorld({ x: 20.3, y: -30.2, z: 5.1 }, 12.5)
+    const out = runProbeMoves(r.moves, world, machine(), { results: r.results, units: r.units })
+    expect(out.stopped).toBeUndefined()
+    close(out.results, { x: 20.3, y: -30.2, z: 5.1, diameter: 25 })
+    const fit = withHostFit(r, out.results, probe)
+    close(fit, { x: 20.3, y: -30.2, z: 5.1, diameter: 25, sphericity: 0 }, 1e-7)
+    let s = 3
+    const rnd = (): number => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648 - 0.5 }
+    let five = 0, nine = 0
+    for (let i = 0; i < 40; i++) {
+      const noisy = runProbeMoves(r.moves, world, machine(probe, { truth: { noise: () => 0.004 * rnd() } }), { results: r.results, units: r.units })
+      const f = withHostFit(r, noisy.results, probe)
+      five += (noisy.results["z"]! - 5.1) ** 2
+      nine += (f["z"]! - 5.1) ** 2
+    }
+    expect(nine).toBeLessThan(five)
+  })
+
+  test("stylus calibration on a sphere reads the radius by direction", () => {
+    const r = plan({ kind: "stylus-calibrate", artefact: { kind: "sphere", centre: S, diameter: 25 }, directions: 8 })
+    const truth = { radius: (d: Vec3) => 1.98 + 0.01 * Math.abs(d.y) }
+    const out = runProbeMoves(r.moves, sphereWorld({ x: 20.4, y: -29.7, z: 5.2 }, 12.5), machine(probe, { truth }), { results: r.results, units: r.units })
+    expect(out.stopped).toBeUndefined()
+    close(out.results, { x: 20.4, y: -29.7, z: 5.2 })
+    for (let k = 0; k < 8; k++) expect(out.results[`r${k}`]!).toBeCloseTo(1.98 + 0.01 * Math.abs(Math.sin((k * Math.PI) / 4)), 7)
+  })
+})
