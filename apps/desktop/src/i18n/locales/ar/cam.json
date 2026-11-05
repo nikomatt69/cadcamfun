@@ -155,6 +155,7 @@
   "cam.axes": "المحاور",
   "cam.rewind": "إرجاع",
   "cam.visualizer.settings": "إعدادات العرض المرئي",
+  "cam.visualizer.showPathLines": "إظهار خطوط مسار الأداة",
   "cam.visualizer.showStats": "إظهار الإحصاءات",
   "cam.visualizer.moves": "الحركات",
   "cam.visualizer.points": "النقاط",

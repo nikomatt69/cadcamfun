@@ -1,5 +1,15 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Toolpath line visibility (2026-11-05)
+
+Status: implemented. The visualizer settings can hide and restore cutting, rapid,
+direction and collision path lines, including printer travel. Tool, stock, playback,
+point and arc overlays, and printed deposits retain their independent controls.
+Reset view restores path lines. Existing per-operation visibility is preserved.
+
+Change log: 2026-11-05 — added the localized display control and connected it to
+the shared viewport and machine scene.
+
 ## Stageshow craft pass (2026-11-02)
 
 Status: in progress. The owner requests Stageshow principles across the desktop UI.

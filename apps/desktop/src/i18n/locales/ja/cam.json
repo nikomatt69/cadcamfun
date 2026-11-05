@@ -155,6 +155,7 @@
   "cam.axes": "軸",
   "cam.rewind": "巻き戻し",
   "cam.visualizer.settings": "表示設定",
+  "cam.visualizer.showPathLines": "工具経路の線を表示",
   "cam.visualizer.showStats": "統計を表示",
   "cam.visualizer.moves": "移動",
   "cam.visualizer.points": "点",

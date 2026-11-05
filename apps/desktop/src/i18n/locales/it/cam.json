@@ -155,6 +155,7 @@
   "cam.axes": "Assi",
   "cam.rewind": "Riavvolgi",
   "cam.visualizer.settings": "Impostazioni di visualizzazione",
+  "cam.visualizer.showPathLines": "Mostra linee del percorso utensile",
   "cam.visualizer.showStats": "Mostra le statistiche",
   "cam.visualizer.moves": "Movimenti",
   "cam.visualizer.points": "Punti",

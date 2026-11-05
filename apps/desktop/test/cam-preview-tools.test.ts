@@ -82,6 +82,13 @@ test("operation navigation, active model and keyboard scrubbing share the simula
   const model = () => root.querySelector('[data-testid="visualizer-tool-model"]')!.textContent
   const click = (id: string) => root.querySelector<HTMLButtonElement>(`[data-testid="${id}"]`)!.click()
   try {
+    root.querySelector<HTMLButtonElement>('[aria-label="Visualization settings"]')!.click()
+    const pathToggle = [...root.querySelectorAll("label")].find((label) => label.textContent?.includes("Show toolpath lines"))?.querySelector("input")
+    expect(pathToggle?.checked).toBe(true)
+    pathToggle!.click()
+    expect(pathToggle?.checked).toBe(false)
+    root.querySelector<HTMLButtonElement>('[aria-label="Reset view"]')!.click()
+    expect(pathToggle?.checked).toBe(true)
     expect(model()).toContain("drill Ø8.5")
     click("timeline-next-op")
     expect(model()).toContain("tap Ø10")

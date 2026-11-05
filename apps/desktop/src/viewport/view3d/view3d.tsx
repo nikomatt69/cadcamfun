@@ -111,6 +111,8 @@ export interface View3DProps {
   /** What the machine scene found (set-up findings, printer layers) after each rebuild. */
   readonly onMachineInfo?: (info: MachineInfo) => void
   readonly toolpathDisplay?: {
+    /** Draw the toolpath lines and direction markers (default true). */
+    readonly showPathLines?: boolean
     readonly showPoints: boolean
     readonly showPointLabels: boolean
     readonly pointFilter: "all" | ToolpathPointKind
@@ -551,7 +553,7 @@ export function View3D(props: View3DProps) {
         const cutter = props.tools?.get(props.program.toolpaths[0]?.toolId ?? "") ?? props.defaultTool
         const extent = props.stock ? Math.max(props.stock.size.x, props.stock.size.y, props.stock.size.z) : 100
         machineScene = createMachineScene({
-          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: { ...DEFAULT_MACHINE_DISPLAY, ...props.machineDisplay, showTool: props.toolpathDisplay?.showTool ?? props.machineDisplay?.showTool ?? true, showHolder: props.toolpathDisplay?.showHolder ?? props.machineDisplay?.showHolder ?? true },
+          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: { ...DEFAULT_MACHINE_DISPLAY, ...props.machineDisplay, showPathLines: props.toolpathDisplay?.showPathLines ?? true, showTool: props.toolpathDisplay?.showTool ?? props.machineDisplay?.showTool ?? true, showHolder: props.toolpathDisplay?.showHolder ?? props.machineDisplay?.showHolder ?? true },
           ...(start !== undefined ? { start } : {}),
           ...(props.machineOptions !== undefined ? { machineOptions: props.machineOptions } : {}),
           gaugeOf,
@@ -658,15 +660,15 @@ export function View3D(props: View3DProps) {
         content.add(line)
         return line
       }
-      const rapidLine = lineObject(buffers.rapid.positions, true)
-      const cutLine = lineObject(buffers.cut.positions, false, buffers.cut.colors)
+      const rapidLine = display?.showPathLines === false ? undefined : lineObject(buffers.rapid.positions, true)
+      const cutLine = display?.showPathLines === false ? undefined : lineObject(buffers.cut.positions, false, buffers.cut.colors)
       // The cuts under the stock's top face are the point of the program: a faint copy drawn through the material keeps them readable.
       const ghost = cutLine !== undefined && machine?.kind !== "3dprinter"
         ? createLines(buffers.cut.positions, { ...(buffers.cut.colors !== undefined ? { colors: buffers.cut.colors } : { color: 0x38bdf8 }), width: 1.2, opacity: 0.3, depthTest: false }, { quality: currentLookTier() })
         : undefined
       if (ghost !== undefined) { ghost.name = "toolpath:cuts-ghost"; ghost.renderOrder = 9; content.add(ghost) }
       // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
-      const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
+      const arrows = display?.showPathLines === false || display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
       if (arrows !== undefined) content.add(arrows.object)
       pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}), ...(ghost !== undefined ? { ghost } : {}) }
       props.onPathLegend?.(buffers.legend)

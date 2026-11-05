@@ -155,6 +155,7 @@
   "cam.axes": "Eixos",
   "cam.rewind": "Retroceder",
   "cam.visualizer.settings": "Configurações de visualização",
+  "cam.visualizer.showPathLines": "Mostrar linhas do percurso da ferramenta",
   "cam.visualizer.showStats": "Mostrar estatísticas",
   "cam.visualizer.moves": "Movimentos",
   "cam.visualizer.points": "Pontos",

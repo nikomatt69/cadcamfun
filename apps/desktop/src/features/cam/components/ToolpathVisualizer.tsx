@@ -111,6 +111,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     try { globalThis.localStorage?.setItem(STATS_KEY, value ? "1" : "0") } catch { /* private window */ }
   }
   const [showDirection, setShowDirection] = createSignal(true)
+  const [showPathLines, setShowPathLines] = createSignal(true)
   const [showPoints, setShowPoints] = createSignal(false)
   const [showPointLabels, setShowPointLabels] = createSignal(false)
   const [pointFilter, setPointFilter] = createSignal<"all" | ToolpathPointKind>("all")
@@ -304,6 +305,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     setMode("shaded-edges")
     setGridVisible(true)
     setAxesVisible(true)
+    setShowPathLines(true)
     setShowPoints(false)
     setShowPointLabels(false)
     setPointFilter("all")
@@ -367,7 +369,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             {...(props.probe !== undefined && (showPart() || props.probe.picking) && props.probe.part !== undefined ? { solids: props.probe.part } : {})}
             {...(props.probe?.model !== undefined ? { probeOverlay: { model: props.probe.model, layers: probeLayers(), highlight: props.probe.highlight, triadLength: 20 } } : {})}
             {...(props.probe !== undefined ? { surfacePick: { active: props.probe.picking, onHit: (hit: SurfaceHit) => props.probe?.onPick?.(hit) }, onProbeContact: setProbeContact } : {})}
-            toolpathDisplay={{ probeColors: props.probe?.model !== undefined, showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
+            toolpathDisplay={{ probeColors: props.probe?.model !== undefined, showPathLines: showPathLines(), showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
             onStockInfo={setStockInfo}
             {...(effectiveMachine() !== undefined ? { machine: effectiveMachine()!, machineDisplay: machineDisplay(), machineOptions: machineOptions(), onMachineInfo: setMachineInfo } : {})}
@@ -617,6 +619,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             </div>
             <div class="space-y-3">
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}
+              {toggle(t("cam.visualizer.showPathLines"), showPathLines, setShowPathLines)}
               {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.toolpathPoints")}</h4>

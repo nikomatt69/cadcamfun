@@ -155,6 +155,7 @@
   "cam.axes": "坐标轴",
   "cam.rewind": "倒回",
   "cam.visualizer.settings": "可视化设置",
+  "cam.visualizer.showPathLines": "显示刀具路径线",
   "cam.visualizer.showStats": "显示统计",
   "cam.visualizer.moves": "移动",
   "cam.visualizer.points": "点",

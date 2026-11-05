@@ -155,6 +155,7 @@
   "cam.axes": "Achsen",
   "cam.rewind": "Zurückspulen",
   "cam.visualizer.settings": "Darstellungseinstellungen",
+  "cam.visualizer.showPathLines": "Werkzeugbahnlinien anzeigen",
   "cam.visualizer.showStats": "Statistik anzeigen",
   "cam.visualizer.moves": "Bewegungen",
   "cam.visualizer.points": "Punkte",

@@ -155,6 +155,7 @@
   "cam.axes": "अक्ष",
   "cam.rewind": "रिवाइंड",
   "cam.visualizer.settings": "विज़ुअलाइज़ेशन सेटिंग्स",
+  "cam.visualizer.showPathLines": "टूलपाथ रेखाएं दिखाएं",
   "cam.visualizer.showStats": "सांख्यिकी दिखाएँ",
   "cam.visualizer.moves": "मूव्स",
   "cam.visualizer.points": "बिंदु",

@@ -155,6 +155,7 @@
   "cam.axes": "Оси",
   "cam.rewind": "Перемотка",
   "cam.visualizer.settings": "Параметры визуализации",
+  "cam.visualizer.showPathLines": "Показывать линии траектории инструмента",
   "cam.visualizer.showStats": "Показать статистику",
   "cam.visualizer.moves": "Перемещения",
   "cam.visualizer.points": "Точки",

@@ -155,6 +155,7 @@
   "cam.axes": "Ejes",
   "cam.rewind": "Rebobinar",
   "cam.visualizer.settings": "Ajustes de visualización",
+  "cam.visualizer.showPathLines": "Mostrar líneas de trayectoria de herramienta",
   "cam.visualizer.showStats": "Mostrar estadísticas",
   "cam.visualizer.moves": "Movimientos",
   "cam.visualizer.points": "Puntos",
