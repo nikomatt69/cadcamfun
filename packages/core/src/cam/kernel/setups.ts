@@ -16,6 +16,7 @@ import { applyPoint } from "../../cad/brep/math.ts"
 import type { WorkOffset } from "../ir.ts"
 import type { SetupOrientation } from "../setup.ts"
 import { jobTransform } from "./workplane.ts"
+import { patternSetups } from "./operation-model.ts"
 import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
@@ -44,6 +45,25 @@ export const setupsOf = (job: ManufacturingJob): { readonly setups: ReadonlyArra
       ...(job.operations !== undefined ? { operations: job.operations } : {})
     }]
   }
+}
+
+/** A setup as a caller writes it: with an optional `pattern` that stands for N identical parts laid out at a step. */
+export type PatternedSetup = JobSetup & { readonly pattern?: { readonly count: number; readonly dx: number; readonly dy: number; readonly dz?: number } }
+
+/**
+ * The setups with every `pattern` expanded (`patternSetups`: ids `<id>.<n>`, operations moved by the step, a datum each from the next free
+ * work offset). The part must really hold the N parts at that step: the pattern moves the setup, never the part. A stored job keeps the
+ * expanded list, so the program re-runs without knowing a pattern was ever written.
+ */
+export const expandSetupPatterns = (setups: ReadonlyArray<PatternedSetup>): CamResult<ReadonlyArray<JobSetup>> => {
+  const out: JobSetup[] = []
+  for (const { pattern, ...setup } of setups) {
+    if (pattern === undefined) { out.push(setup); continue }
+    const copies = patternSetups(setup, pattern)
+    if (copies.status === "failed") return copies
+    out.push(...copies.value)
+  }
+  return { status: "ok", value: out }
 }
 
 export interface SetupRun {

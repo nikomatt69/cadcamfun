@@ -77,7 +77,17 @@ export const CamManufactureInput = Schema.Struct({
   postDefinition: Schema.optionalKey(Schema.Json),
   postDefinitionId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
   /** How a printer job is sliced (walls, infill, supports, adhesion, speeds, temperatures); read only when the machine is a printer. */
-  print: Schema.optionalKey(cam.kernel.PrintRequirementSchema)
+  print: Schema.optionalKey(cam.kernel.PrintRequirementSchema),
+  /**
+   * Several fixings of the part (1-6), each its own program: orientation, own work offset (default G54, G55...), stock, fixtures, operations.
+   * `pattern {count, dx, dy, dz?}` stands for N identical parts laid out at that step (the part must hold them); it expands to numbered copies.
+   */
+  setups: Schema.optionalKey(Schema.Array(Schema.Struct({
+    ...cam.kernel.JobSetupSchema.fields,
+    pattern: Schema.optionalKey(Schema.Struct({ count: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 6 })), dx: Schema.Finite, dy: Schema.Finite, dz: Schema.optionalKey(Schema.Finite) }))
+  })).check(Schema.isMinLength(1), Schema.isMaxLength(6))),
+  /** Each setup starts from the stock the one before left. */
+  carryStock: Schema.optionalKey(Schema.Boolean)
 })
 /**
  * Turning in the kernel (spec 29 A1): a turned profile in the lathe's own coordinates — X is a diameter,
@@ -120,7 +130,8 @@ export const CamManufactureOperationInput = Schema.Struct({
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr, tabs: CamManufactureInput.fields.tabs, breadth: CamManufactureInput.fields.breadth,
-  subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, tcp: CamManufactureInput.fields.tcp, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
+  subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, tcp: CamManufactureInput.fields.tcp, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print,
+  setups: CamManufactureInput.fields.setups, carryStock: CamManufactureInput.fields.carryStock
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

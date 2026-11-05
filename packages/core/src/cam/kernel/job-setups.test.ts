@@ -6,7 +6,7 @@ import { runJob } from "./execute.ts"
 import { findMachine } from "./machines.ts"
 import { JobSetupSchema } from "./schema.ts"
 import { jobOfSnapshot } from "./snapshot.ts"
-import { runSetups, setupsOf } from "./setups.ts"
+import { expandSetupPatterns, runSetups, setupsOf } from "./setups.ts"
 
 setDefaultTimeout(100_000)
 
@@ -73,5 +73,43 @@ describe("a job that lists setups", () => {
     const ok = Schema.decodeUnknownSync(JobSetupSchema)({ id: "a", orientation: "+X", workOffset: "G55", fixtures: [{ id: "f", min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 1 } }] })
     expect(ok.orientation).toBe("+X")
     expect(() => Schema.decodeUnknownSync(JobSetupSchema)({ id: "a", orientation: "diagonal" })).toThrow()
+  })
+})
+
+describe("N identical parts as a pattern of one setup", () => {
+  const op = (id: string, x: number) => ({ id, strategy: "drill", tool: "drill-5", points: [{ x, y: 12 }], top: 8, bottom: 0 }) as never
+
+  test("a pattern expands to numbered copies moved by the step, each on the next free register; the original keeps its own", () => {
+    const r = expandSetupPatterns([{ id: "p", workOffset: "G55", operations: [op("pk", 10)], pattern: { count: 3, dx: 60, dy: 0 } }])
+    if (r.status !== "ok") throw new Error("must expand")
+    expect(r.value.map((s) => s.id)).toEqual(["p", "p.1", "p.2"])
+    expect(r.value[0]!.workOffset).toBe("G55")
+    expect(r.value[1]!.workOffset).toBeUndefined()
+    expect(JSON.stringify(r.value[2]!.operations)).toContain("\"x\":130")
+    expect("pattern" in r.value[0]!).toBe(false)
+  })
+
+  test("more than six copies, or none, is refused: the control has six registers", () => {
+    expect(expandSetupPatterns([{ id: "p", pattern: { count: 7, dx: 1, dy: 0 } }]).status).toBe("failed")
+    expect(expandSetupPatterns([{ id: "p", pattern: { count: 0, dx: 1, dy: 0 } }]).status).toBe("failed")
+  })
+
+  test("a setup without a pattern is left as it is", () => {
+    const r = expandSetupPatterns([{ id: "a" }, { id: "b", orientation: "-Z" }])
+    expect(r).toEqual({ status: "ok", value: [{ id: "a" }, { id: "b", orientation: "-Z" }] })
+  })
+
+  test("the three copies run as three programs on G54, G55, G56, and the job carries the stock when asked", () => {
+    const part = [0, 1, 2].map((n) => ({ ...plate, id: `plate-${n}`, x: 60 * n }))
+    const snap = jobOfSnapshot({
+      schemaVersion: 1, id: "vise", name: "Vise", material: "6061", elements: part, machine: "vmc-standard", resolution: 0.5, carryStock: true,
+      setups: (() => { const e = expandSetupPatterns([{ id: "p", pattern: { count: 3, dx: 60, dy: 0 } }]); if (e.status !== "ok") throw new Error("expand"); return e.value })()
+    })
+    if (snap.status !== "ok") throw new Error("snapshot")
+    expect(snap.value.carryStock).toBe(true)
+    const ran = runSetups(snap.value)
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    expect(ran.value.setups.map((r) => r.workOffset)).toEqual(["G54", "G55", "G56"])
+    expect(ran.value.stockCarried).toBe(true)
   })
 })
