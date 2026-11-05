@@ -160,6 +160,8 @@ describe("the store", () => {
   test("actions drive the reducers and persist toolpaths + global settings (not the selection) under the legacy key", async () => {
     const { useMultiToolpathStore, STORAGE_KEY } = await import("../src/features/cam/store/multiToolpathStore.ts")
     const store = useMultiToolpathStore
+    // The store is shared with every file that ran before this one in the process.
+    store.getState().clearAllToolpaths()
     const first = store.getState().addToolpath("el-1", "circle", "Hole", settings)
     const second = store.getState().addToolpath("el-2", "rectangle", "Plate", settings)
     store.getState().selectToolpath(second)
