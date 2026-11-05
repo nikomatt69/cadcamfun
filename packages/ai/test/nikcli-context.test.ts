@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
+import { HOST_STEP_LIMIT, PRIMARY_STEP_LIMIT, buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
 import { compactHostSession, readHostContextPolicy } from "../src/nikcli/context.ts"
 import { mapHostEvent, newMapperState } from "../src/nikcli/event-mapper.ts"
 import type { ProjectHost } from "../src/nikcli/runtime.ts"
@@ -10,7 +10,9 @@ describe("host context management", () => {
     const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: [], systemPrompt: "CAD" }) as {
       agent: Record<string, { steps?: number }>; provider: Record<string, { options: Record<string, unknown> }>
     }
-    for (const id of ["cadcam-build", "cadcam-plan", "cadcam-build-auto", "cadcam-plan-ask"]) expect(config.agent[id]?.steps).toBe(25)
+    // The host's own bound sits one step past the application's budget, so its forced summary step is never reached.
+    expect(HOST_STEP_LIMIT).toBe(PRIMARY_STEP_LIMIT + 1)
+    for (const id of ["cadcam-build", "cadcam-plan", "cadcam-build-auto", "cadcam-plan-ask"]) expect(config.agent[id]?.steps).toBe(HOST_STEP_LIMIT)
     for (const provider of Object.values(config.provider)) {
       expect(provider.options).toEqual({ headerTimeout: 120_000, chunkTimeout: 120_000 })
     }
