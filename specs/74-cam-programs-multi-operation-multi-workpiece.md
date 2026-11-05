@@ -37,28 +37,44 @@ still separates the product from hyperMILL / Fusion 360 on this axis. Every stat
 Tests: `packages/core/test/cam/program.test.ts` (6 workpiece cases), `apps/sidecar/test/ai-cam-setups.test.ts` (plan, save,
 read back, generate and store, refusals), `apps/desktop/test/cam-setup.test.ts`.
 
-## 3. What is still missing against hyperMILL / Fusion 360 (ordered by value)
+## 3. State at the end of the round (2026-11-05)
 
-1. **Verified multi-setup programs.** The kernel can run `setups[]` with carried stock and claims, but nothing stores or shows it:
-   `CamKernelRequest` has no `setups`, `cam_edit.manufacture` stores one setup, the desktop `KernelSetups` panel only advises an
-   orientation. The programs of §2 come from the legacy generator and carry **no replay evidence** (no gouge / collision /
-   remaining-stock claims, no release level). Fusion and hyperMILL release a whole job; here only a single kernel setup is released.
-   Next: `setups` in `CamKernelRequest` + `jobOfRequest`, a stored artifact per setup (`setupsOf`), the page's kernel panel listing
-   setups with their work offsets and per-setup release, and `patternSetups` as "N parts" for the kernel path (this is the verified
-   twin of the workpieces above).
-2. **Operations are thin in the legacy setup.** One element per operation, no dependencies, no templates; the kernel's operation
-   model (`dependsOn`, copy / mirror / pattern) and the tool-library `planMagazine` / sister tools / tool life are not used by the
-   setup's tool table (pockets are first-use numbers only).
-3. **Identical parts only.** All workpieces share the operation's geometry; `placement` is for display and is not checked for
-   collision between parts, clamps or the machine envelope. No per-part stock, no per-part element set, no probing of each datum
-   (workpiece offset update from a probe run exists in the probing path, not tied to `workpieces`).
-4. **Registers.** Six (G54–G59). No G54.1 Pn / G505… extended registers for larger fixtures, though `workOffsetRef` exists in the IR.
-5. **Round trip.** The converter refuses programs with several offsets; re-parsing stored NC (the sidecar parse) loses the per-part
-   register in the IR. The IR kept in the stored document is the source for display.
-6. **Time.** `partFirst` vs `toolFirst` is compared by tool-change count only; no cycle-time figure (the kernel has `cycle-time`,
-   it is not applied to legacy programs).
-7. **Simulation.** No stock-removal simulation over several parts of one program; the viewer machine scene draws at one datum.
-8. **Indexed / tombstone fixtures.** A workpiece per face of a tombstone with a rotary index per face is not modelled (the kernel's
-   setup orientation covers one part per setup).
+Everything below was read in the code or run; the test names are in the commit messages.
 
-Nothing above is claimed as done; items 1–3 are the next steps in that order.
+Built on top of §2:
+
+- **Fixture.** Extended registers (G54.1 Pn, up to 48 parts), a blank and a rotary index per part (tombstone), `dependsOn`, `magazineSize`,
+  placed blanks that overlap refused, both part orders timed (6 s per change, indicative).
+- **Workholding.** `Setup.fixtures` (clamp boxes) and `Setup.envelope` (travel), both in the first part's datum frame: a blank in a clamp
+  or past the travel is a `workpieceIssues` entry and nothing is generated. A generated toolpath that reaches a clamp (tool radius sideways,
+  stick-out upwards from the tip, arcs by their box) is named once per operation, part and clamp. The clamp boxes are as exact as the
+  operator made them: there is no holder/shank collision against the machine itself.
+- **Tool life and sister tools.** `Tool.lifeMinutes`, `Setup.sisters [{toolId, tool}]`. The cutting minutes of every run (programmed
+  feeds, no acceleration) are counted over the whole setup with the kernel's life book (`consumeLife`, `pickSister`); when the next run
+  would pass the life, the runs after it use the sister, on a pocket of its own, and the post calls it. Without a sister the program warns.
+  `GeneratedSetup.toolLife` reports minutes against life. The magazine check counts the sisters. Life is explicit (an operator's number);
+  the Taylor model of `process.ts` is not applied to legacy tools.
+- **Replay evidence.** `cam_edit.setup_generate` replays every stored program once per work offset register (`verifyNc({register})`)
+  against that part's own blank (its own `stock`, else the drawing's stock as the generator placed it, else the setup's block), the finished
+  solid parts of the operations' elements (`setupReplay`), and the tools as kernel cutters (`cutterOfTool`, `Tool.holder`). The result
+  per program is `release` (`blocked` on a gouge, a rapid through material or a travel violation; `verified-program` only when every register
+  replayed completely against a solid part and every tool has its holder; otherwise `preview`) with the findings (NC line), gouge, leftover and
+  the volume each blank lost. It is stored in the row (`data.setupEvidence`, with the hash of the replayed text) and `cam review` reads it
+  back, `stale` when the drawing or the text changed. A replay that cannot finish is a preview with the reason, never a pass.
+- **Multi-part removal.** Each register is cut from its own blank in its own frame (`VerifyNcResult.stockVolume/removedVolume`), so the
+  figures are per part and not the sum of all parts on one blank.
+- **Carried stock (kernel).** Still a height field per setup. A setup that cuts under an overhang (T-slot, dovetail, lollipop, back-boring
+  bar) hands on a void the field cannot hold: `part-coverage` is now `unresolved` and names the setups (`carryLimitsOf`), so the job is a
+  preview, not a pass. Lateral setups are covered by this only in so far as they use such cutters; a true fix needs a tri-dexel residual
+  between setups (the replay already is one; the hand-over is not).
+
+Still not done:
+
+1. The HTTP generate route (`POST /api/cam-setups/.../generate`-style downloads) does not replay; only the assistant's `setup_generate`
+   stores programs with evidence.
+2. Operation templates and copy/mirror/pattern of operations in the legacy setup (the kernel has them).
+3. A combined machine-frame stock-removal view of all parts at once for the viewer (the interpreter has `frame: "machine"` and
+   `workOffsets`; the replay itself is per part).
+4. Probing each part's datum tied to `workpieces`.
+5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids (boxes only), holder collision against
+   the machine; no controller qualification (a pass is the reference interpreter's, not a machine's).
