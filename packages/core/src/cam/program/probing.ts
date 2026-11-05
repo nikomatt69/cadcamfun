@@ -9,6 +9,10 @@
  * The spindle is off while a probe works.
  */
 import type { Vec2 } from "../../cad/vec.ts"
+import type { Move } from "../ir.ts"
+import { varKey, type Expr } from "../macro.ts"
+import { planProbeCycle } from "../probing/cycles.ts"
+import { DEFAULT_PROBE_SETTINGS, deviceOfSettings } from "../probing/device.ts"
 import type { ProbeAction, ProbeCycle as ProbeCycleSpec } from "../probing/types.ts"
 
 export type ProbeCycle = "z-surface" | "edge" | "corner" | "bore" | "boss"
@@ -59,76 +63,74 @@ export const validateProbeSettings = (s: ProbeSettings): ReadonlyArray<string> =
   return out
 }
 
-/** Steps of one probing operation. Throws a RangeError with the reason for an operation the probe cannot do. */
+/** The kernel's moves of an operation as neutral steps: a touch keeps the order of its register, a move to a measured midpoint names its two registers. */
+const stepsOfMoves = (moves: ReadonlyArray<Move>, start: { x: number; y: number; z: number }): { readonly steps: ProbeStep[]; readonly touches: number } => {
+  const steps: ProbeStep[] = []
+  const stores = new Map<string, number>()
+  const mids = new Map<string, readonly [number, number]>()
+  const here = { ...start }
+  const go = (to: { readonly x: number; readonly y: number; readonly z: number }, expr: Readonly<Partial<Record<"x" | "y" | "z", Expr>>> | undefined, guard: boolean): void => {
+    for (const axis of ["x", "y"] as const) {
+      const e = expr?.[axis]
+      const mid = e !== undefined && typeof e === "object" && "var" in e ? mids.get(varKey(e.var)) : undefined
+      if (mid !== undefined) steps.push({ kind: "rapid-mid", axis: axis === "x" ? "X" : "Y", store: mid[0], store2: mid[1] })
+    }
+    const words = { ...(expr?.x === undefined && to.x !== here.x ? { x: to.x } : {}), ...(expr?.y === undefined && to.y !== here.y ? { y: to.y } : {}), ...(to.z !== here.z ? { z: to.z } : {}) }
+    if (Object.keys(words).length > 0) steps.push({ kind: "rapid", ...words, ...(guard ? { guard: true } : {}) })
+    Object.assign(here, to)
+  }
+  let touches = 0
+  for (const m of moves) {
+    if (m._tag === "Assign") {
+      const v = m.value
+      if (typeof v === "object" && "op" in v && v.op === "*" && v.b === 0.5 && typeof v.a === "object" && "op" in v.a && v.a.op === "+" && typeof v.a.a === "object" && "var" in v.a.a && typeof v.a.b === "object" && "var" in v.a.b) {
+        const a = stores.get(varKey(v.a.a.var)), b = stores.get(varKey(v.a.b.var))
+        if (a !== undefined && b !== undefined) mids.set(varKey(m.variable), [a, b])
+      }
+    } else if (m._tag === "Linear") go(m.to, m.expr, false)
+    else if (m._tag === "Probe" && m.kind === "protected") go(m.to, m.expr, m.to.z < here.z && m.to.z < start.z)
+    else if (m._tag === "Probe") {
+      const axis = (["X", "Y", "Z"] as const).find((name) => Math.abs(m.direction[name.toLowerCase() as "x" | "y" | "z"]) > 0.5)
+      if (axis === undefined) throw new RangeError("probing: a legacy step touches along X, Y or Z")
+      const key = axis.toLowerCase() as "x" | "y" | "z", sense = m.direction[key]
+      steps.push({ kind: "touch", axis, distance: m.to[key] - here[key] + sense * m.overtravel, store: touches })
+      const stored = m.store?.[key]
+      if (stored !== undefined) stores.set(varKey(stored), touches)
+      touches++
+    }
+  }
+  return { steps, touches }
+}
+
+/** Steps of one probing operation, read off the kernel's cycle: there is one planner. Throws a RangeError with the reason for an operation the probe cannot do. */
 export const planProbe = (op: ProbeOperation, s: ProbeSettings): ProbePlan => {
   const problems = validateProbeSettings(s)
   if (problems.length > 0) throw new RangeError(`probing: ${problems.join("; ")}`)
   const r = s.stylusDiameter / 2
-  const steps: ProbeStep[] = []
   const notes: string[] = ["the spindle stays off: a probe is a sensor, not a cutter"]
-  const search = s.search
+  const probe = { ...deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: s.stylusDiameter, feed: s.feed }), doubleTouch: false }
+  const routine = planProbeCycle(kernelProbe(op, s).cycle, { probe, safeZ: s.safeZ, clearance: Math.min(s.search, 5), search: s.search, prefix: "p" })
+  if ("refused" in routine) throw new RangeError(`probing: ${routine.refused}`)
+  const { steps } = stepsOfMoves(routine.moves, { x: 0, y: 0, z: s.safeZ })
   switch (op.cycle) {
-    case "z-surface": {
-      steps.push({ kind: "rapid", z: s.safeZ }, { kind: "rapid", x: op.at.x, y: op.at.y })
-      steps.push({ kind: "rapid", z: op.expectedZ + Math.min(search, 5), guard: true }, { kind: "touch", axis: "Z", distance: -(Math.min(search, 5) + search), store: 0 })
-      steps.push({ kind: "set-offset", axis: "Z", store: 0, radius: 0, sign: 1, value: op.zero ?? 0 }, { kind: "rapid", z: s.safeZ })
-      return { steps, notes }
-    }
-    case "edge": {
-      const along = op.axis
-      const startAt = op.expectedEdge - op.direction * (r + Math.min(search, 5))
-      steps.push({ kind: "rapid", z: s.safeZ }, along === "X" ? { kind: "rapid", x: startAt, y: op.at.y } : { kind: "rapid", x: op.at.x, y: startAt })
-      steps.push({ kind: "rapid", z: -op.depth, guard: true }, { kind: "touch", axis: along, distance: op.direction * (Math.min(search, 5) + search), store: 0 })
-      steps.push({ kind: "set-offset", axis: along, store: 0, radius: r, sign: op.direction, value: op.zero ?? 0 }, { kind: "rapid", z: s.safeZ })
-      return { steps, notes }
-    }
-    case "corner": {
-      const a = planProbe({ cycle: "edge", axis: "X", direction: op.sx, at: { x: op.corner.x, y: op.corner.y + op.sy * (r + 7) }, depth: op.depth, expectedEdge: op.corner.x, ...(op.zero !== undefined ? { zero: op.zero.x } : {}) }, s)
-      const b = planProbe({ cycle: "edge", axis: "Y", direction: op.sy, at: { x: op.corner.x + op.sx * (r + 7), y: op.corner.y }, depth: op.depth, expectedEdge: op.corner.y, ...(op.zero !== undefined ? { zero: op.zero.y } : {}) }, s)
-      return { steps: [...a.steps, ...b.steps], notes: [...notes, "X edge first, then Y edge; each edge is touched on its face, 7 mm plus the stylus radius in from the corner"] }
-    }
+    case "z-surface":
+      return { steps: [...steps, { kind: "set-offset", axis: "Z", store: 0, radius: 0, sign: 1, value: op.zero ?? 0 }], notes }
+    case "edge":
+      return { steps: [...steps, { kind: "set-offset", axis: op.axis, store: 0, radius: r, sign: op.direction, value: op.zero ?? 0 }], notes }
+    case "corner":
+      return {
+        steps: [...steps, { kind: "set-offset", axis: "X", store: 0, radius: r, sign: op.sx, value: op.zero?.x ?? 0 }, { kind: "set-offset", axis: "Y", store: 1, radius: r, sign: op.sy, value: op.zero?.y ?? 0 }],
+        notes: [...notes, "X edge first, then Y edge; each edge is touched on its face, 7 mm plus the stylus radius in from the corner"]
+      }
     case "bore": case "boss": {
       const inside = op.cycle === "bore"
-      const nominalR = op.diameter / 2
-      if (inside && nominalR - r <= 0.5) throw new RangeError(`probing: a stylus of ${s.stylusDiameter} mm does not fit a bore of ${op.diameter} mm`)
-      // Bore: from the centre outward to each wall. Boss: from outside inward, starting 5 mm clear of the wall.
-      const reach = inside ? nominalR - r + search : search + 5
-      const z = -op.depth
-      steps.push({ kind: "rapid", z: s.safeZ }, { kind: "rapid", x: op.centre.x, y: op.centre.y })
-      if (inside) steps.push({ kind: "rapid", z, guard: true })
       // X pair, re-centre X, Y pair, re-centre Y, X pair again: the sizes are then measured through the true centre, not along a chord.
-      const pair = (axis: "X" | "Y", a: number): void => {
-        for (const [k, dir] of [[a, -1], [a + 1, 1]] as const) {
-          if (inside) {
-            steps.push({ kind: "touch", axis, distance: dir * reach, store: k })
-            // back to where this pair started
-            const back = axis === "X" ? (a === 0 ? op.centre.x : undefined) : op.centre.y
-            if (back !== undefined) steps.push(axis === "X" ? { kind: "rapid", x: back } : { kind: "rapid", y: back })
-            else steps.push({ kind: "rapid-mid", axis, store: 0, store2: 1 })
-          } else {
-            const offset = nominalR + r + 5
-            steps.push({ kind: "rapid", z: s.safeZ })
-            steps.push(axis === "X" ? { kind: "rapid", x: op.centre.x - dir * offset } : { kind: "rapid", y: op.centre.y - dir * offset })
-            steps.push({ kind: "rapid", z, guard: true })
-            steps.push({ kind: "touch", axis, distance: dir * reach, store: k })
-          }
-        }
+      return {
+        steps: [...steps,
+          { kind: "set-offset", axis: "X", store: 4, store2: 5, radius: 0, sign: 1, value: op.centre.x }, { kind: "set-offset", axis: "Y", store: 2, store2: 3, radius: 0, sign: 1, value: op.centre.y },
+          { kind: "report-size", axis: "X", store: 4, store2: 5, stylus: s.stylusDiameter, inside, label: `${op.cycle} diameter X` }, { kind: "report-size", axis: "Y", store: 2, store2: 3, stylus: s.stylusDiameter, inside, label: `${op.cycle} diameter Y` }],
+        notes: [...notes, "the centre is the midpoint of two opposite touches, so the stylus radius cancels", `the diameter is the touch distance ${inside ? "plus" : "minus"} the stylus diameter`]
       }
-      const toMid = (axis: "X" | "Y", a: number): void => {
-        // a boss is left at safe height first: the middle of a boss is inside it
-        if (!inside) steps.push({ kind: "rapid", z: s.safeZ })
-        steps.push({ kind: "rapid-mid", axis, store: a, store2: a + 1 })
-      }
-      pair("X", 0)
-      toMid("X", 0)
-      pair("Y", 2)
-      toMid("Y", 2)
-      pair("X", 4)
-      // centre = midpoint of opposite touches of the last pairs; the stylus radius cancels
-      steps.push({ kind: "set-offset", axis: "X", store: 4, store2: 5, radius: 0, sign: 1, value: op.centre.x }, { kind: "set-offset", axis: "Y", store: 2, store2: 3, radius: 0, sign: 1, value: op.centre.y })
-      steps.push({ kind: "report-size", axis: "X", store: 4, store2: 5, stylus: s.stylusDiameter, inside, label: `${op.cycle} diameter X` }, { kind: "report-size", axis: "Y", store: 2, store2: 3, stylus: s.stylusDiameter, inside, label: `${op.cycle} diameter Y` })
-      steps.push({ kind: "rapid", z: s.safeZ })
-      return { steps, notes: [...notes, `the centre is the midpoint of two opposite touches, so the stylus radius cancels`, `the diameter is the touch distance ${inside ? "plus" : "minus"} the stylus diameter`] }
     }
   }
 }
