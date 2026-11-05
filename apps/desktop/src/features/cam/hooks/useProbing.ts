@@ -112,6 +112,9 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       }))
       // The contacts are real but no program came with them: the panel says why, or the 3D view would just stay empty.
       if (sim.program === undefined) probing.getState().setError((sim.warnings ?? []).join("; ") || t("cam.probing.program.noProgram"))
+      // A run the control stopped measured nothing: its alarm is the reason, and the panel must say it.
+      const alarms = sim.report.operations.flatMap((o) => [...o.alarms.map((a) => a.text), ...(o.stopped !== undefined ? [o.stopped] : [])])
+      if (alarms.length > 0) probing.getState().setError(t("cam.probing.program.stopped", { reason: [...new Set(alarms)].join("; ") }))
     }
   }
 }

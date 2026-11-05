@@ -1684,6 +1684,7 @@
   "cam.probing.program.misplace": "Décalage simulé de la pièce (mm, C en degrés)",
   "cam.probing.program.noPart": "Le dessin n'a aucun solide à palper.",
   "cam.probing.program.noProgram": "Les contacts ont été simulés, mais aucun programme n'a pu être écrit pour cette commande.",
+  "cam.probing.program.stopped": "La simulation s'est arrêtée : {reason}",
   "cam.probing.calibration.rotary": "L'exécution a mesuré le pivot et l'axe rotatif.",
   "cam.probing.calibration.stylus": "L'exécution a mesuré le rayon effectif de la bille.",
   "cam.probing.calibration.apply": "Écrire dans la machine",

@@ -703,6 +703,8 @@ export function View3D(props: View3DProps) {
       orthographic.top = radius * 1.4; orthographic.bottom = -radius * 1.4; orthographic.updateProjectionMatrix()
     }
     rebuild(); resize()
+    // The effects ran before this mount: a view opened on a finished simulation has its overlay already, and it will not change again.
+    rebuildProbe()
     const observer = new ResizeObserver(resize)
     observer.observe(host)
     const raycaster = new THREE.Raycaster()

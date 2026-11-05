@@ -285,3 +285,11 @@ describe("spheres", () => {
     for (let k = 0; k < 8; k++) expect(out.results[`r${k}`]!).toBeCloseTo(1.98 + 0.01 * Math.abs(Math.sin((k * Math.PI) / 4)), 7)
   })
 })
+
+test("a safe height at or below the feature is refused: the traverses would go through it", () => {
+  const boss = planProbeCycle({ kind: "boss", centre: { x: 0, y: 0 }, diameter: 20, depth: 5, top: 40 }, ctx())
+  expect("refused" in boss && boss.refused).toMatch(/safe height Z30 is not above the feature at Z40/)
+  const surface = planProbeCycle({ kind: "z-surface", at: { x: 0, y: 0 }, expectedZ: 30 }, ctx())
+  expect("refused" in surface).toBe(true)
+  expect("refused" in planProbeCycle({ kind: "boss", centre: { x: 0, y: 0 }, diameter: 20, depth: 5, top: 10 }, ctx())).toBe(false)
+})

@@ -1684,6 +1684,7 @@
   "cam.probing.program.misplace": "Spostamento simulato del pezzo (mm, C in gradi)",
   "cam.probing.program.noPart": "Il disegno non ha solidi da tastare.",
   "cam.probing.program.noProgram": "I contatti sono stati simulati, ma non è stato possibile scrivere un programma per questo controllo.",
+  "cam.probing.program.stopped": "La simulazione si è fermata: {reason}",
   "cam.probing.calibration.rotary": "L'esecuzione ha misurato il pivot e l'asse rotativo.",
   "cam.probing.calibration.stylus": "L'esecuzione ha misurato il raggio efficace dello stilo.",
   "cam.probing.calibration.apply": "Scrivi nella macchina",

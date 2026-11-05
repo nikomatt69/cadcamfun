@@ -5,6 +5,7 @@ import { cam } from "@cadcamfun/core"
 import { inspectionCsv, sortInspection, statusOf, summarizeInspection } from "../src/features/cam/lib/probing/inspection.ts"
 import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, rotationViaOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
 import { expectedOfContacts } from "../src/features/cam/lib/probing/simulation.ts"
+import { targetsOf } from "../src/features/cam/lib/probing/probe-targets.ts"
 import { parseOffsetRef } from "../src/features/cam/lib/probing/contract.ts"
 import { contextOf, resolveSettings } from "../src/features/cam/lib/probing/resolve.ts"
 import type { InspectionVerdict } from "../src/features/cam/lib/probing/contract.ts"
@@ -116,4 +117,13 @@ describe("contacts and planned touches", () => {
     expect(expectedOfContacts(2, list)).toBe(list)
     expect(expectedOfContacts(3, list)).toEqual([])
   })
+})
+
+test("a feature that is not at Z0 keeps its height: a round or a corner target carries its top in work coordinates", () => {
+  const origin = { x: 200, y: 100, z: 50 }
+  const elements = [{ id: "pin", type: "cylinder", x: 215, y: 105, z: 55, radius: 12, height: 10 }, { id: "plate", type: "cube", x: 200, y: 100, z: 40, width: 120, height: 80, depth: 20 }] as never
+  const targets = targetsOf(elements, { origin })
+  const boss = targets.find((t) => t.id === "pin:boss")!
+  expect(boss.patch).toMatchObject({ centre: { x: 15, y: 5 }, diameter: 24, top: 10 })
+  expect(targets.find((t) => t.id === "plate:corner:left front")!.patch).toMatchObject({ top: 0 })
 })

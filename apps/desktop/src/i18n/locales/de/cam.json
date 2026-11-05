@@ -1684,6 +1684,7 @@
   "cam.probing.program.misplace": "Simulierter Werkstückversatz (mm, C in Grad)",
   "cam.probing.program.noPart": "Die Zeichnung hat keinen Körper zum Antasten.",
   "cam.probing.program.noProgram": "Die Antastungen wurden simuliert, aber für diese Steuerung konnte kein Programm geschrieben werden.",
+  "cam.probing.program.stopped": "Der simulierte Lauf wurde angehalten: {reason}",
   "cam.probing.calibration.rotary": "Der Lauf hat Drehpunkt und Achse der Rundachse gemessen.",
   "cam.probing.calibration.stylus": "Der Lauf hat den wirksamen Tastkugelradius gemessen.",
   "cam.probing.calibration.apply": "In die Maschine schreiben",

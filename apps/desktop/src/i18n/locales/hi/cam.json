@@ -1684,6 +1684,7 @@
   "cam.probing.program.misplace": "अनुकरित पार्ट ऑफ़सेट (mm, C डिग्री में)",
   "cam.probing.program.noPart": "ड्रॉइंग में छूने के लिए कोई ठोस नहीं है।",
   "cam.probing.program.noProgram": "संपर्क सिम्युलेट किए गए, लेकिन इस कंट्रोल के लिए प्रोग्राम नहीं लिखा जा सका।",
+  "cam.probing.program.stopped": "सिम्युलेशन रुक गया: {reason}",
   "cam.probing.calibration.rotary": "रन ने रोटरी पिवट और अक्ष को मापा।",
   "cam.probing.calibration.stylus": "रन ने स्टाइलस की प्रभावी त्रिज्या मापी।",
   "cam.probing.calibration.apply": "मशीन में लिखें",
