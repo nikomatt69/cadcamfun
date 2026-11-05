@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Outil d'abord : un changement d'outil par outil",
   "cam.workpieces.order.partFirst": "Pièce d'abord : terminer une pièce puis la suivante",
   "cam.workpieces.hint": "Un décalage d'origine par pièce, de G54 à G59. Chaque opération s'exécute sur chaque pièce.",
-  "cam.workpieces.defaultName": "Pièce {n}"
+  "cam.workpieces.defaultName": "Pièce {n}",
+  "cam.setupDoc.generate": "Générer les programmes",
+  "cam.setupDoc.open": "Ouvrir dans l'éditeur",
+  "cam.setupDoc.offsets": "Décalages d'origine : {offsets}",
+  "cam.workpieces.placement": "Position par rapport à la première pièce, mm (X, Y, Z) : aperçu seulement, jamais dans le NC",
+  "cam.workpieces.orderChanges": "Changements d'outil : {toolFirst} outil d'abord, {partFirst} pièce d'abord"
 }

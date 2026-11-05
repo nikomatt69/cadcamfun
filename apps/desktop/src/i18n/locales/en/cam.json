@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Tool first: one tool change per tool",
   "cam.workpieces.order.partFirst": "Part first: finish one part, then the next",
   "cam.workpieces.hint": "One work offset per part, G54 to G59. Every operation runs on each workpiece.",
-  "cam.workpieces.defaultName": "Part {n}"
+  "cam.workpieces.defaultName": "Part {n}",
+  "cam.setupDoc.generate": "Generate programs",
+  "cam.setupDoc.open": "Open in editor",
+  "cam.setupDoc.offsets": "Work offsets: {offsets}",
+  "cam.workpieces.placement": "Placement from the first part, mm (X, Y, Z): preview only, never in the NC",
+  "cam.workpieces.orderChanges": "Tool changes: {toolFirst} tool first, {partFirst} part first"
 }

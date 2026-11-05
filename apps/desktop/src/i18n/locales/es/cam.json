@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Primero la herramienta: un cambio por herramienta",
   "cam.workpieces.order.partFirst": "Primero la pieza: terminar una pieza y luego la siguiente",
   "cam.workpieces.hint": "Un origen de pieza por cada pieza, de G54 a G59. Cada operación se ejecuta en todas las piezas.",
-  "cam.workpieces.defaultName": "Pieza {n}"
+  "cam.workpieces.defaultName": "Pieza {n}",
+  "cam.setupDoc.generate": "Generar programas",
+  "cam.setupDoc.open": "Abrir en el editor",
+  "cam.setupDoc.offsets": "Orígenes de pieza: {offsets}",
+  "cam.workpieces.placement": "Posición respecto a la primera pieza, mm (X, Y, Z): solo vista previa, nunca en el NC",
+  "cam.workpieces.orderChanges": "Cambios de herramienta: {toolFirst} herramienta primero, {partFirst} pieza primero"
 }

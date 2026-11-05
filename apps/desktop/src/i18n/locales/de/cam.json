@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Werkzeug zuerst: ein Werkzeugwechsel je Werkzeug",
   "cam.workpieces.order.partFirst": "Teil zuerst: ein Teil fertig, dann das nächste",
   "cam.workpieces.hint": "Eine Nullpunktverschiebung je Teil, G54 bis G59. Jede Operation läuft auf jedem Werkstück.",
-  "cam.workpieces.defaultName": "Teil {n}"
+  "cam.workpieces.defaultName": "Teil {n}",
+  "cam.setupDoc.generate": "Programme erzeugen",
+  "cam.setupDoc.open": "Im Editor öffnen",
+  "cam.setupDoc.offsets": "Nullpunktverschiebungen: {offsets}",
+  "cam.workpieces.placement": "Lage gegenüber dem ersten Teil, mm (X, Y, Z): nur Vorschau, nie im NC",
+  "cam.workpieces.orderChanges": "Werkzeugwechsel: {toolFirst} Werkzeug zuerst, {partFirst} Teil zuerst"
 }

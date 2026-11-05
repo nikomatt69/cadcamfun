@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Ferramenta primeiro: uma troca por ferramenta",
   "cam.workpieces.order.partFirst": "Peça primeiro: terminar uma peça e depois a seguinte",
   "cam.workpieces.hint": "Um zero peça por peça, de G54 a G59. Cada operação roda em todas as peças.",
-  "cam.workpieces.defaultName": "Peça {n}"
+  "cam.workpieces.defaultName": "Peça {n}",
+  "cam.setupDoc.generate": "Gerar programas",
+  "cam.setupDoc.open": "Abrir no editor",
+  "cam.setupDoc.offsets": "Zeros peça: {offsets}",
+  "cam.workpieces.placement": "Posição em relação à primeira peça, mm (X, Y, Z): só pré-visualização, nunca no NC",
+  "cam.workpieces.orderChanges": "Trocas de ferramenta: {toolFirst} ferramenta primeiro, {partFirst} peça primeiro"
 }

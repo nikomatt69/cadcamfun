@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "Prima l'utensile: un cambio utensile per utensile",
   "cam.workpieces.order.partFirst": "Prima il pezzo: finisci un pezzo, poi il successivo",
   "cam.workpieces.hint": "Un'origine pezzo per ogni pezzo, da G54 a G59. Ogni operazione gira su ciascun pezzo.",
-  "cam.workpieces.defaultName": "Pezzo {n}"
+  "cam.workpieces.defaultName": "Pezzo {n}",
+  "cam.setupDoc.generate": "Genera programmi",
+  "cam.setupDoc.open": "Apri nell'editor",
+  "cam.setupDoc.offsets": "Origini pezzo: {offsets}",
+  "cam.workpieces.placement": "Posizione rispetto al primo pezzo, mm (X, Y, Z): solo anteprima, mai nell'NC",
+  "cam.workpieces.orderChanges": "Cambi utensile: {toolFirst} prima l'utensile, {partFirst} prima il pezzo"
 }

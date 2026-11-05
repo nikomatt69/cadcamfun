@@ -17,7 +17,9 @@ import { useApp } from "../../../../shared/state/context.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { makeSetupService } from "../../api/setup.ts"
 import { stockOf } from "../../lib/job.ts"
-import { elementsOfSetup, programFileName, setupOfToolpaths } from "../../lib/setup.ts"
+import { elementsOfSetup, placedProgram, programFileName, setupOfToolpaths } from "../../lib/setup.ts"
+import type { CamSetupGenerated } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
 import { useSetupStore } from "../../store/setupStore.ts"
 import { effectiveSettings, generateForElement } from "../../lib/elementGenerate.ts"
 import { assignmentProblem, type ToolpathSettings } from "../../lib/elementJob.ts"
@@ -128,20 +130,40 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
 
   // The multi-operation setup (spec 14): the toolpaths become one program with tool changes (or one file per tool / operation, by the
   // setup store's grouping), written by the post of the sidecar's `camSetup` group, not by joining the toolpaths' texts.
-  const downloadCombinedGCode = (): void => {
+  const generatePrograms = async (): Promise<CamSetupGenerated | undefined> => {
     const setup = setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices)
     const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock: stockOf(job.sources()) }
-    void app.runtime.run(makeSetupService(app.client).generate(request))
-      .then(async (result) => {
-        useSetupStore.getState().setResult(result)
-        for (const issue of result.issues) toast(issue.message)
-        for (const warning of result.warnings) toast(warning)
-        if (result.programs.length === 0) { toast.error(t("cam.multi.failed")); return }
-        let saved = false
-        for (const program of result.programs) saved = (await saveFile({ name: programFileName(program), data: program.gcode, mime: "text/plain" })) || saved
-        if (saved) toast.success(t("cam.multi.downloaded"))
-      })
-      .catch(() => toast.error(t("shell.export.failed", { name: "G-code", reason: t("common.error") })))
+    try {
+      const result = await app.runtime.run(makeSetupService(app.client).generate(request))
+      useSetupStore.getState().setResult(result)
+      for (const issue of result.issues) toast(issue.message)
+      for (const warning of result.warnings) toast(warning)
+      if (result.programs.length === 0) toast.error(t("cam.multi.failed"))
+      return result
+    } catch {
+      toast.error(t("shell.export.failed", { name: "G-code", reason: t("common.error") }))
+      return undefined
+    }
+  }
+
+  const downloadCombinedGCode = (): void => {
+    void generatePrograms().then(async (result) => {
+      if (result === undefined || result.programs.length === 0) return
+      let saved = false
+      for (const program of result.programs) saved = (await saveFile({ name: programFileName(program), data: program.gcode, mime: "text/plain" })) || saved
+      if (saved) toast.success(t("cam.multi.downloaded"))
+    })
+  }
+
+  // A generated program opens in the editor with its IR (the register of every toolpath), and the viewport draws each part where it lies.
+  const openProgram = (program: CamSetupGenerated["programs"][number]): void => {
+    const workpieces = cam.program.workpiecesOf(setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices))
+    camStore.clearOperationResults()
+    camStore.setKernelArtifact(undefined); camStore.setKernelRequest(undefined)
+    camStore.setGeneratedProgram({ gcode: program.gcode, program: program.program, workpieces })
+    camStore.setProgram(placedProgram(program.program, workpieces))
+    props.onGCodeGenerated(program.gcode)
+    toast.success(t("cam.multi.sent"))
   }
 
   // The combined program replaces the viewport's: G-code text for the editor, the parsed IR for the simulation.
@@ -232,7 +254,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
         </div>
       </div>
 
-      <SetupPanel />
+      <SetupPanel onGenerate={() => void generatePrograms()} onOpenProgram={openProgram} />
 
       {/* Main content */}
       <div class="flex-1 flex overflow-hidden">

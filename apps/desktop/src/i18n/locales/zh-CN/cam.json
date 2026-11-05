@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "刀具优先：每把刀只换一次",
   "cam.workpieces.order.partFirst": "工件优先：先完成一个工件再加工下一个",
   "cam.workpieces.hint": "每个工件一个工件坐标系，G54 至 G59。每道工序在每个工件上运行。",
-  "cam.workpieces.defaultName": "工件 {n}"
+  "cam.workpieces.defaultName": "工件 {n}",
+  "cam.setupDoc.generate": "生成程序",
+  "cam.setupDoc.open": "在编辑器中打开",
+  "cam.setupDoc.offsets": "工件坐标系：{offsets}",
+  "cam.workpieces.placement": "相对第一个工件的位置，mm（X、Y、Z）：仅用于预览，不会写入 NC",
+  "cam.workpieces.orderChanges": "换刀次数：刀具优先 {toolFirst} 次，工件优先 {partFirst} 次"
 }

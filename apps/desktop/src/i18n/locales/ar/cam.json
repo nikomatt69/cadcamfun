@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "الأداة أولًا: تبديل واحد لكل أداة",
   "cam.workpieces.order.partFirst": "القطعة أولًا: إنهاء قطعة ثم التالية",
   "cam.workpieces.hint": "إزاحة صفر واحدة لكل قطعة، من G54 إلى G59. تُنفَّذ كل عملية على كل قطعة.",
-  "cam.workpieces.defaultName": "القطعة {n}"
+  "cam.workpieces.defaultName": "القطعة {n}",
+  "cam.setupDoc.generate": "إنشاء البرامج",
+  "cam.setupDoc.open": "فتح في المحرر",
+  "cam.setupDoc.offsets": "إزاحات الصفر: {offsets}",
+  "cam.workpieces.placement": "الموضع بالنسبة للقطعة الأولى، مم (X، Y، Z): للمعاينة فقط، لا يُكتب في NC",
+  "cam.workpieces.orderChanges": "تبديلات الأداة: {toolFirst} الأداة أولًا، {partFirst} القطعة أولًا"
 }

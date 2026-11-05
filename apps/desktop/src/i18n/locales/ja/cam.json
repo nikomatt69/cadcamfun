@@ -1701,5 +1701,10 @@
   "cam.workpieces.order.toolFirst": "工具優先：工具ごとに1回交換",
   "cam.workpieces.order.partFirst": "ワーク優先：1個仕上げてから次へ",
   "cam.workpieces.hint": "ワークごとに1つの座標系（G54〜G59）。各工程はすべてのワークで実行されます。",
-  "cam.workpieces.defaultName": "ワーク {n}"
+  "cam.workpieces.defaultName": "ワーク {n}",
+  "cam.setupDoc.generate": "プログラムを生成",
+  "cam.setupDoc.open": "エディタで開く",
+  "cam.setupDoc.offsets": "ワーク座標系: {offsets}",
+  "cam.workpieces.placement": "最初のワークからの位置 mm（X, Y, Z）：プレビューのみ、NCには出力されません",
+  "cam.workpieces.orderChanges": "工具交換: 工具優先 {toolFirst} 回、ワーク優先 {partFirst} 回"
 }

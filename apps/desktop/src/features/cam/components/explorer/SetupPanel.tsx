@@ -6,16 +6,19 @@
  * panel says so and the user chooses: load the stored one, or keep this one (written over the revision they have now seen).
  */
 import { For, Show, createEffect, createSignal, on, onCleanup, type JSX } from "solid-js"
-import { FolderOpen, ListOrdered, Plus, Save, Trash2, X } from "lucide-solid"
+import { FolderOpen, ListOrdered, Play, Plus, Save, Trash2, X, Zap } from "lucide-solid"
 import type { CamSetupDocument } from "@cadcamfun/api"
 import { Effect } from "effect"
+import { cam } from "@cadcamfun/core"
+import type { CamSetupGenerated } from "@cadcamfun/api"
+import { NumberField } from "../../../../shared/components/panel/ui.tsx"
 import { t } from "../../../../i18n/index.ts"
 import { useApp } from "../../../../shared/state/context.ts"
 import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useDocumentStore } from "../../../cad/store/documentStore.ts"
 import { makeSetupService, refOfDocument } from "../../api/setup.ts"
-import { choicesOfSetup, nextWorkpiece, setupOfToolpaths, toolpathsOfSetup, type SetupChoices } from "../../lib/setup.ts"
+import { choicesOfSetup, nextWorkpiece, offsetsOf, setupOfToolpaths, toolpathsOfSetup, type SetupChoices } from "../../lib/setup.ts"
 import { TOOLPATH_COLORS, useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
 
@@ -28,7 +31,14 @@ const BUTTON ="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-45 d
 
 const messageOf = (cause: unknown): string => cause instanceof Error ? cause.message : typeof cause === "object" && cause !== null && "message" in cause ? String(cause.message) : String(cause)
 
-export default function SetupPanel(): JSX.Element {
+export interface SetupPanelProps {
+  /** Generates the setup's programs (the page owns the elements and the stock they need); the result lands in the setup store. */
+  readonly onGenerate?: () => void
+  /** Opens one generated program in the editor and the viewport. */
+  readonly onOpenProgram?: (program: CamSetupGenerated["programs"][number]) => void
+}
+
+export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
   const app = useApp()
   const service = makeSetupService(app.client)
   const setup = useSetupStore()
@@ -44,8 +54,14 @@ export default function SetupPanel(): JSX.Element {
   const table = () => setup.result?.toolTable ?? setup.plan?.toolTable
   const toolChanges = () => setup.result?.totals.toolChanges ?? setup.plan?.toolChanges
   const toolLoads = () => setup.result?.totals.toolLoads ?? setup.plan?.toolLoads
-  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length }))
-    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length }))
+  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length, offsets: offsetsOf(p.program), generated: p }))
+    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length, offsets: [] as ReadonlyArray<string>, generated: undefined }))
+  /** The tool changes of the same operations in each order: the cost of finishing a part before the next is visible before it is chosen. */
+  const orders = () => {
+    if (setup.choices.workpieces.length < 2) return undefined
+    const base = current()
+    return { toolFirst: cam.program.planPrograms({ ...base, workpieceOrder: "toolFirst" }).toolChanges, partFirst: cam.program.planPrograms({ ...base, workpieceOrder: "partFirst" }).toolChanges }
+  }
 
   const run = async <A,>(work: Effect.Effect<A, unknown>): Promise<A | undefined> => {
     setBusy(true)
@@ -177,7 +193,8 @@ export default function SetupPanel(): JSX.Element {
         </div>
         <Show when={workpieces().length > 1} fallback={<p class="text-xs text-gray-500">{t("cam.workpieces.hint")}</p>}>
           <For each={workpieces()}>{(wp) => (
-            <div class="grid grid-cols-[1fr_5rem_auto] items-center gap-2" data-testid="cam-setup-workpiece" data-id={wp.id}>
+            <div class="space-y-1" data-testid="cam-setup-workpiece" data-id={wp.id}>
+            <div class="grid grid-cols-[1fr_5rem_auto] items-center gap-2">
               <input class={FIELD} name={`camWorkpieceName-${wp.id}`} value={wp.name} aria-label={t("cam.workpieces.name")} disabled={busy()}
                 onInput={(event) => patchWorkpiece(wp.id, { name: event.currentTarget.value })} />
               <select class={FIELD} name={`camWorkpieceOffset-${wp.id}`} value={wp.workOffset} aria-label={t("cam.workpieces.offset")} disabled={busy()}
@@ -185,6 +202,18 @@ export default function SetupPanel(): JSX.Element {
                 <For each={REGISTERS}>{(register) => <option value={register} disabled={register !== wp.workOffset && workpieces().some((other) => other.workOffset === register)}>{register}</option>}</For>
               </select>
               <button type="button" class={BUTTON} data-testid="cam-setup-workpiece-remove" disabled={busy()} onClick={() => removeWorkpiece(wp.id)} aria-label={t("cam.workpieces.remove")} title={t("cam.workpieces.remove")}><X size={12} /></button>
+            </div>
+            <Show when={wp.id !== workpieces()[0]?.id}>
+              <div class="grid grid-cols-3 items-center gap-2" role="group" aria-label={t("cam.workpieces.placement")} title={t("cam.workpieces.placement")}>
+                <For each={["x", "y", "z"] as const}>{(axis) => (
+                  <label class="flex items-center gap-1 text-xs text-gray-400">
+                    <span class="uppercase">{axis}</span>
+                    <NumberField class={FIELD} name={`camWorkpiece${axis}-${wp.id}`} value={wp.placement?.[axis] ?? 0} accept={() => true}
+                      onValue={(value) => patchWorkpiece(wp.id, { placement: { x: 0, y: 0, z: 0, ...wp.placement, [axis]: value } })} />
+                  </label>
+                )}</For>
+              </div>
+            </Show>
             </div>
           )}</For>
           <label class="flex items-center gap-2 text-xs text-gray-400">
@@ -194,6 +223,7 @@ export default function SetupPanel(): JSX.Element {
               <For each={ORDERS}>{(order) => <option value={order}>{t(`cam.workpieces.order.${order}`)}</option>}</For>
             </select>
           </label>
+          <Show when={orders()}>{(counts) => <p class="text-xs text-gray-500" data-testid="cam-setup-order-changes">{t("cam.workpieces.orderChanges", { toolFirst: counts().toolFirst, partFirst: counts().partFirst })}</p>}</Show>
         </Show>
       </div>
 
@@ -201,6 +231,11 @@ export default function SetupPanel(): JSX.Element {
         <button type="button" class={BUTTON} data-testid="cam-setup-plan" disabled={busy() || toolpaths.toolpaths.length === 0} onClick={plan}>
           <ListOrdered size={14} />{t("cam.setupDoc.plan")}
         </button>
+        <Show when={props.onGenerate}>{(generate) => (
+          <button type="button" class={BUTTON} data-testid="cam-setup-generate" disabled={busy() || toolpaths.toolpaths.length === 0} onClick={() => generate()()}>
+            <Zap size={14} />{t("cam.setupDoc.generate")}
+          </button>
+        )}</Show>
         <button type="button" class={BUTTON} data-testid="cam-setup-save" disabled={busy() || projectId() === null || toolpaths.toolpaths.length === 0} onClick={() => void save(false)}>
           <Save size={14} />{setup.saved === undefined ? t("cam.setupDoc.save") : t("cam.setupDoc.update")}
         </button>
@@ -253,7 +288,15 @@ export default function SetupPanel(): JSX.Element {
             </div>
             <ul class="space-y-0.5 text-xs text-gray-400">
               <For each={programs() ?? []}>{(program) => (
-                <li data-testid="cam-setup-program">{t("cam.setupDoc.program", { number: program.programNumber, name: program.name, tools: program.toolNumbers.map((n) => `T${n}`).join(" "), count: program.operations })}</li>
+                <li class="flex items-center justify-between gap-2" data-testid="cam-setup-program">
+                  <span>
+                    {t("cam.setupDoc.program", { number: program.programNumber, name: program.name, tools: program.toolNumbers.map((n) => `T${n}`).join(" "), count: program.operations })}
+                    <Show when={program.offsets.length > 1}>{" · "}{t("cam.setupDoc.offsets", { offsets: program.offsets.join(" ") })}</Show>
+                  </span>
+                  <Show when={program.generated !== undefined && props.onOpenProgram}>
+                    <button type="button" class={BUTTON} data-testid="cam-setup-open-program" onClick={() => props.onOpenProgram?.(program.generated!)} aria-label={t("cam.setupDoc.open")} title={t("cam.setupDoc.open")}><Play size={12} /></button>
+                  </Show>
+                </li>
               )}</For>
             </ul>
           </div>

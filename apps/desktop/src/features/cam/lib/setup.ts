@@ -8,6 +8,7 @@ import type { ElementToolpath } from "./multiToolpath.ts"
 import type { CadElement } from "./job.ts"
 
 type Setup = cam.program.Setup
+type Workpiece = cam.program.Workpiece
 type Operation = cam.program.Operation
 type ToolKind = cam.Tool["kind"]
 
@@ -128,4 +129,74 @@ export const toolpathsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElemen
     })
   }
   return { toolpaths, missingElementIds: missing, skippedOperationIds: skipped }
+}
+
+// ---------------------------------------------------------------- several workpieces, as the viewport shows them
+
+/*
+ * Display only: the NC of a multi-part program carries the same moves under another work offset register for each part, and
+ * the viewport has no registers. `Workpiece.placement` (where a part's datum lies from the first part's) moves the IR's moves
+ * for drawing and never reaches the program text.
+ */
+type Move = cam.Move
+type Vec3 = { readonly x: number; readonly y: number; readonly z: number }
+export interface StockBox { readonly origin: Vec3; readonly size: Vec3 }
+
+const ZERO: Vec3 = { x: 0, y: 0, z: 0 }
+const add = (p: Vec3, d: Vec3): Vec3 => ({ x: p.x + d.x, y: p.y + d.y, z: p.z + d.z })
+const isZero = (d: Vec3): boolean => d.x === 0 && d.y === 0 && d.z === 0
+
+/** The move moved by `d`. Moves in machine coordinates (G53) and moves with no position stay as they are. */
+export const translateMove = (move: Move, d: Vec3): Move => {
+  switch (move._tag) {
+    case "Rapid":
+      return move.machine === true ? move : { ...move, to: add(move.to, d) }
+    case "Linear":
+    case "Probe":
+      return { ...move, to: add(move.to, d) }
+    case "Arc":
+      return { ...move, to: add(move.to, d), center: { x: move.center.x + d.x, y: move.center.y + d.y } }
+    case "Spline":
+      return { ...move, to: add(move.to, d), controls: move.controls.map((c) => ({ x: c.x + d.x, y: c.y + d.y })) }
+    case "Cycle":
+      return { ...move, to: add(move.to, d), retractHeight: move.retractHeight + d.z }
+    default:
+      return move
+  }
+}
+
+/** Where a part's datum lies from the first part's: the placements are both measured from the fixture, so the difference. */
+export const shiftOf = (workpiece: Workpiece, first: Workpiece | undefined): Vec3 => {
+  const own = workpiece.placement ?? ZERO, base = first?.placement ?? ZERO
+  return { x: own.x - base.x, y: own.y - base.y, z: own.z - base.z }
+}
+
+/**
+ * The program as the viewport draws it: each toolpath moved to the place of the workpiece whose register it runs under. A program
+ * with one workpiece (or none placed) is returned as it is.
+ */
+export const placedProgram = (program: cam.Program, workpieces: ReadonlyArray<Workpiece>): cam.Program => {
+  if (workpieces.length < 2) return program
+  const shifts = new Map(workpieces.map((wp) => [wp.workOffset, shiftOf(wp, workpieces[0])]))
+  if ([...shifts.values()].every(isZero)) return program
+  return {
+    ...program,
+    toolpaths: program.toolpaths.map((tp) => {
+      const shift = shifts.get(tp.workOffset ?? program.workOffset)
+      return shift === undefined || isZero(shift) ? tp : { ...tp, moves: tp.moves.map((move) => translateMove(move, shift)) }
+    })
+  }
+}
+
+/** The stock box of every part but the first (that one is the viewport's own stock box), moved to its place. */
+export const extraStocks = (stock: StockBox | undefined, workpieces: ReadonlyArray<Workpiece>): ReadonlyArray<StockBox> => {
+  if (stock === undefined || workpieces.length < 2) return []
+  return workpieces.slice(1).map((wp) => ({ origin: add(stock.origin, shiftOf(wp, workpieces[0])), size: stock.size }))
+}
+
+/** The work offsets a program runs under, in order of first use. */
+export const offsetsOf = (program: cam.Program): ReadonlyArray<string> => {
+  const seen: string[] = []
+  for (const tp of program.toolpaths) { const o = tp.workOffset ?? program.workOffset; if (!seen.includes(o)) seen.push(o) }
+  return seen
 }

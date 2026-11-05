@@ -58,6 +58,12 @@ interface CAMState {
   setSavedProgram(program: CAMState["savedProgram"]): void
   kernelArtifact: cam.kernel.CamArtifact | undefined
   setKernelArtifact(artifact: cam.kernel.CamArtifact | undefined): void
+  /**
+   * A program a multi-operation setup generated (spec 14): the post's text, its IR with the work offset of every toolpath, and the
+   * fixture it was made for. The IR is kept because parsing the text again cannot say which part a toolpath machines.
+   */
+  generatedProgram: GeneratedProgramView | undefined
+  setGeneratedProgram(program: GeneratedProgramView | undefined): void
   // Persistent state
   workpiece: Workpiece
   material: string
@@ -142,6 +148,13 @@ interface CAMState {
   reset(): void
 }
 
+/** A setup's program as the editor holds it. */
+export interface GeneratedProgramView {
+  readonly gcode: string
+  readonly program: cam.Program
+  readonly workpieces: ReadonlyArray<cam.program.Workpiece>
+}
+
 /** One stored operation's generated program, as the page shows it. */
 export type OperationResult = CamProgramOperation
 
@@ -213,6 +226,8 @@ export const useCamStore = create<CAMState>((set, get) => ({
   setMachineOverride: (machineOverride) => set({ machineOverride }),
   kernelArtifact: undefined,
   setKernelArtifact: (kernelArtifact) => set({ kernelArtifact }),
+  generatedProgram: undefined,
+  setGeneratedProgram: (generatedProgram) => set({ generatedProgram }),
   setGcode: (gcode) => set({ gcode }),
   upsertOperationResult: (result) => set((state) => {
     const at = state.operationResults.findIndex((r) => r.id === result.id)
@@ -290,6 +305,7 @@ export const useCamStore = create<CAMState>((set, get) => ({
     kernelRequest: undefined,
     savedProgram: undefined,
     kernelArtifact: undefined,
+    generatedProgram: undefined,
     workpiece: initialWorkpiece,
     material: "",
     controller: "gcode",

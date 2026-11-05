@@ -54,6 +54,7 @@ import { freshProgram, freshResult, useProbingStore } from "../store/probingStor
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
 import { probeCycles } from "../lib/probing/cycles.ts"
+import { placedProgram } from "../lib/setup.ts"
 import { overlayModelOf } from "../lib/probing/overlay-input.ts"
 import { partSolidsOf } from "../lib/probing/part-solids.ts"
 import { workOriginOf } from "../lib/probing/probe-targets.ts"
@@ -234,6 +235,8 @@ export default function CamPage(): JSX.Element {
     if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
     // The kernel returned this exact program with named operations/tool changes; reparsing would discard that structure.
     if (camStore.kernelArtifact?.nc === text) return
+    // A setup's program keeps the register of every toolpath (which part it machines): the viewport draws each part where it lies.
+    if (camStore.generatedProgram?.gcode === text) { camStore.setProgram(placedProgram(camStore.generatedProgram.program, camStore.generatedProgram.workpieces)); return }
     const controller = new AbortController()
     automaticParse = controller
     const owner = captureEditorOwner()

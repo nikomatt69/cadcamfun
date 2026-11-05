@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, nextWorkpiece, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, extraStocks, nextWorkpiece, offsetsOf, placedProgram, programFileName, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -127,5 +127,62 @@ describe("several workpieces on the fixture", () => {
     const saved = setupOfToolpaths(panel().toolpaths, { ...DEFAULT_SETUP_CHOICES, workpieces: parts, workpieceOrder: "partFirst" })
     expect(choicesOfSetup(saved)).toMatchObject({ workpieces: parts, workpieceOrder: "partFirst" })
     expect(choicesOfSetup(setupOfToolpaths(panel().toolpaths))).toMatchObject({ workpieces: [], workpieceOrder: "toolFirst" })
+  })
+})
+
+describe("several workpieces in the viewport", () => {
+  const two = (placement: { x: number; y: number; z: number } | undefined): ReadonlyArray<cam.program.Workpiece> => [
+    { id: "w1", name: "P1", workOffset: "G54" }, { id: "w2", name: "P2", workOffset: "G55", ...(placement ? { placement } : {}) }
+  ]
+  const moves: cam.Move[] = [
+    { _tag: "Rapid", to: { x: 1, y: 2, z: 10 } },
+    { _tag: "Linear", to: { x: 3, y: 2, z: -1 }, feed: 100 },
+    { _tag: "Arc", to: { x: 5, y: 4, z: -1 }, center: { x: 4, y: 2 }, clockwise: false, feed: 100 },
+    { _tag: "Cycle", cycle: "drill", to: { x: 7, y: 7, z: -5 }, feed: 80, peckDepth: 0, dwellSeconds: 0, retractHeight: 2 },
+    { _tag: "Rapid", to: { x: 0, y: 0, z: 0 }, machine: true }
+  ]
+  const program: cam.Program = cam.makeProgram("fix", [
+    { id: "a@w1", name: "a", toolId: "t", spindleRpm: 1000, coolant: "off", moves, workOffset: "G54" },
+    { id: "a@w2", name: "a", toolId: "t", spindleRpm: 1000, coolant: "off", moves, workOffset: "G55" }
+  ])
+
+  test("the part on the second register is drawn at its placement, the first stays; the NC is untouched", () => {
+    const placed = placedProgram(program, two({ x: 100, y: -20, z: 0 }))
+    expect(placed.toolpaths[0]!.moves).toEqual(moves)
+    const shifted = placed.toolpaths[1]!.moves
+    expect(shifted[0]).toMatchObject({ to: { x: 101, y: -18, z: 10 } })
+    expect(shifted[2]).toMatchObject({ to: { x: 105, y: -16, z: -1 }, center: { x: 104, y: -18 } })
+    expect(shifted[3]).toMatchObject({ to: { x: 107, y: -13, z: -5 }, retractHeight: 2 })
+    // A move in machine coordinates does not follow the datum.
+    expect(shifted[4]).toEqual(moves[4])
+    expect(program.toolpaths[1]!.moves).toBe(moves)
+  })
+
+  test("no placement, one part or no register: the program is returned as it is", () => {
+    expect(placedProgram(program, two(undefined))).toBe(program)
+    expect(placedProgram(program, [two(undefined)[0]!])).toBe(program)
+  })
+
+  test("a toolpath without its own register follows the program's", () => {
+    const plain = cam.makeProgram("fix", [{ id: "x", name: "x", toolId: "t", spindleRpm: 1, coolant: "off", moves }], { workOffset: "G55" })
+    expect(placedProgram(plain, two({ x: 10, y: 0, z: 0 })).toolpaths[0]!.moves[0]).toMatchObject({ to: { x: 11 } })
+  })
+
+  test("the other parts' stock boxes sit at their placements, and the registers a program uses are listed in order", () => {
+    const box = { origin: { x: -10, y: -10, z: -5 }, size: { x: 20, y: 20, z: 5 } }
+    expect(extraStocks(box, two({ x: 50, y: 0, z: 0 }))).toEqual([{ origin: { x: 40, y: -10, z: -5 }, size: box.size }])
+    expect(extraStocks(undefined, two({ x: 50, y: 0, z: 0 }))).toEqual([])
+    expect(offsetsOf(program)).toEqual(["G54", "G55"])
+  })
+})
+
+describe("a saved multi-part program keeps its fixture", () => {
+  test("the fixture travels in the saved document's drawing and comes back only for two parts or more", async () => {
+    const { workpiecesOfSnapshot } = await import("../src/features/cam/lib/saved-program.ts")
+    const parts = [{ id: "wp-1", name: "P1", workOffset: "G54" }, { id: "wp-2", name: "P2", workOffset: "G55", placement: { x: 80, y: 0, z: 0 } }]
+    expect(workpiecesOfSnapshot({ drawing: { workpieces: parts } })).toEqual(parts)
+    expect(workpiecesOfSnapshot({ drawing: { workpieces: [parts[0]] } })).toEqual([])
+    expect(workpiecesOfSnapshot({ drawing: { workpieces: "nonsense" } })).toEqual([])
+    expect(workpiecesOfSnapshot({ drawing: {} })).toEqual([])
   })
 })
