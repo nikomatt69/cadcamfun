@@ -9,9 +9,17 @@
  * The spindle is off while a probe works.
  */
 import type { Vec2 } from "../../cad/vec.ts"
-import type { Move } from "../ir.ts"
+import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
+import { analyseGcode } from "../generator/analysis.ts"
+import { getPost, dialectOf } from "../post/index.ts"
+import { formatOffsetRef, type OffsetAxis } from "../work-offset.ts"
+import type { GeneratedProgram } from "./programs.ts"
+import type { Setup } from "./setup.ts"
+import { enabledOperations, workpiecesOf } from "./setup.ts"
+import { assignPockets } from "./tooltable.ts"
 import { varKey, type Expr } from "../macro.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
+import { compileActions } from "../probing/actions.ts"
 import { DEFAULT_PROBE_SETTINGS, deviceOfSettings } from "../probing/device.ts"
 import type { ProbeAction, ProbeCycle as ProbeCycleSpec } from "../probing/types.ts"
 
@@ -218,3 +226,114 @@ export const kernelProbe = (op: ProbeOperation, s: ProbeSettings): { readonly cy
       return { cycle: { kind: "boss", centre: op.centre, diameter: op.diameter, depth: op.depth, top: op.top }, actions: set({ X: "x", Y: "y" }) }
   }
 }
+
+/* ------------------------------------------------------------------------------------------------- the datum probe of every part */
+
+/** One part's probe: the register it writes, the touches it takes and the axes of the offset it corrects. */
+export interface PartProbeEntry {
+  readonly workpieceId: string
+  readonly name: string
+  readonly register: string
+  readonly touches: number
+  /** The axes whose offset the cycles correct, in order of the cycles. */
+  readonly axes: ReadonlyArray<OffsetAxis>
+}
+
+export interface PartProbePlan {
+  /** Why no probe program can be made, or undefined. */
+  readonly refused?: string
+  readonly toolNumber: number
+  readonly parts: ReadonlyArray<PartProbeEntry>
+  readonly notes: ReadonlyArray<string>
+}
+
+const PART_PROBE_ID = "part-probe"
+const PART_PROBE_LIMIT = 5
+
+/**
+ * The probe program of a setup's workpieces: for every workpiece (in the fixture's order) the configured cycles run in that part's frame
+ * and the deviation of each measured datum is added to that part's own register. The post must write probing words; the register is
+ * the one the part's toolpaths run under, so the cut that follows starts from the measured datum. Pure: the replay of the touches is
+ * the kernel's (`simulateProbing`), not this function's.
+ */
+export const partProbeProgram = (setup: Setup, programNumber: number): { readonly plan: PartProbePlan; readonly generated?: GeneratedProgram } => {
+  const config = setup.partProbe
+  const operations = enabledOperations(setup)
+  const toolNumber = config?.toolNumber ?? Math.max(0, ...assignPockets(operations).values()) + (setup.sisters ?? []).length + 1
+  const refuse = (refused: string): { readonly plan: PartProbePlan } => ({ plan: { refused, toolNumber, parts: [], notes: [] } })
+  if (config === undefined) return refuse("The setup has no partProbe: give it the cycles to run on every workpiece")
+  if (setup.machineType !== "mill") return refuse(`A part probe is a milling accessory: a ${setup.machineType} setup has none`)
+  const dialect = dialectOf(setup.post.postId)
+  if (dialect?.probing === undefined) return refuse(`Post ${setup.post.postId} writes no probing words: use a post that does (fanuc, haas, mazak, mitsubishi, brother, generic, okuma, linuxcnc, siemens, heidenhain)`)
+  const post = getPost(setup.post.postId)
+  if (post === undefined) return refuse(`Post ${setup.post.postId} is not implemented`)
+  const used = new Set(assignPockets(operations).values())
+  if (config.toolNumber !== undefined && used.has(config.toolNumber)) return refuse(`The probe's T${config.toolNumber} is a pocket of the operations' tools: give the probe a pocket of its own`)
+  const top = setup.stock === undefined ? undefined : setup.stock.origin.z
+  const stylus = config.stylusDiameter ?? DEFAULT_PROBE_SETTINGS.stylusDiameter
+  const device = deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: stylus, ...(config.feed !== undefined ? { feed: config.feed } : {}), toolNumber }, PART_PROBE_ID)
+  const safeZ = config.safeZ ?? (top === undefined ? DEFAULT_PROBE_SETTINGS.safeZ : top + 15)
+  const clearance = config.clearance ?? DEFAULT_PROBE_SETTINGS.clearance
+  const search = config.search ?? DEFAULT_PROBE_SETTINGS.search
+  const fixture = workpiecesOf(setup)
+  const toolpaths: Toolpath[] = []
+  const parts: PartProbeEntry[] = []
+  const notes: string[] = [`T${toolNumber} measures ${fixture.length} workpiece${fixture.length === 1 ? "" : "s"}; each deviation goes into that part's register, so the toolpaths that follow start from the measured datum`]
+  for (let w = 0; w < fixture.length; w++) {
+    const wp = fixture[w]!
+    const ref = wp.workOffsetRef ?? ({ kind: "g5x", code: wp.workOffset } as const)
+    const register = wp.workOffsetRef !== undefined ? formatOffsetRef(wp.workOffsetRef) : wp.workOffset
+    const moves: Move[] = wp.index === undefined ? [] : [{ _tag: "Orient", ...wp.index }]
+    let touches = 0
+    const axes: OffsetAxis[] = []
+    for (let c = 0; c < config.cycles.length; c++) {
+      const ctx = { probe: device, safeZ, clearance, search, prefix: `w${w + 1}c${c + 1}_` }
+      const routine = planProbeCycle(config.cycles[c]! as ProbeCycleSpec, ctx)
+      if ("refused" in routine) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): ${routine.refused}`)
+      const cycleAxes = (["X", "Y", "Z"] as const).filter((axis) => routine.results[axis.toLowerCase()] !== undefined)
+      if (cycleAxes.length === 0) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}) measures no X, Y or Z position: it cannot set a work offset`)
+      const action: ProbeAction = { kind: "set-offset", ref, axes: Object.fromEntries(cycleAxes.map((axis) => [axis, axis.toLowerCase()])), policy: { mode: "set", limit: config.limit ?? PART_PROBE_LIMIT } }
+      let compiled: Move[]
+      try { compiled = compileActions(routine, [action], ctx) } catch (error) { return refuse(`${wp.name}, cycle ${c + 1}: ${error instanceof Error ? error.message : String(error)}`) }
+      const first = compiled.find((m) => m._tag === "Probe")
+      if (first !== undefined && first._tag === "Probe") moves.push({ _tag: "Rapid", to: { x: first.to.x, y: first.to.y, z: safeZ } })
+      moves.push(...compiled)
+      touches += routine.contacts.length
+      axes.push(...cycleAxes)
+    }
+    parts.push({ workpieceId: wp.id, name: wp.name, register, touches, axes })
+    toolpaths.push({
+      id: `probe@${wp.id}`, name: `Probe - ${wp.name}`, toolId: device.id, spindleRpm: 0, coolant: "off", moves,
+      workOffset: wp.workOffset, ...(wp.workOffsetRef !== undefined ? { workOffsetRef: wp.workOffsetRef } : {}),
+      operation: { id: `probe@${wp.id}`, name: `Probe - ${wp.name}` }
+    })
+  }
+  const plan: PartProbePlan = { toolNumber, parts, notes }
+  const name = `${setup.name} - probe parts`
+  const program: Program = makeProgram(name, toolpaths, {
+    workOffset: toolpaths[0]?.workOffset ?? setup.workOffset,
+    ...(toolpaths[0]?.workOffsetRef !== undefined ? { workOffsetRef: toolpaths[0].workOffsetRef } : {}),
+    metadata: { programNumber: String(programNumber), probe: "parts" }
+  })
+  let gcode: string
+  try {
+    gcode = post.emit(program, {
+      decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
+      toolNumbers: { [device.id]: toolNumber }, retractBeforeToolChange: setup.retractBeforeToolChange,
+      ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
+      ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
+    })
+  } catch (error) { return refuse(`The ${setup.post.postId} post cannot write the probe program: ${error instanceof Error ? error.message : String(error)}`) }
+  const stats = analyseGcode(gcode, name).stats
+  return {
+    plan,
+    generated: {
+      name, programNumber, gcode, program, stats,
+      warnings: [`Run this program first: it reads ${parts.map((p) => p.register).join(", ")} from the parts as clamped. It has no cutting tool and replays no material removal`],
+      operationIds: toolpaths.map((t) => t.id), toolNumbers: [toolNumber], pockets: { [device.id]: toolNumber }, tools: []
+    }
+  }
+}
+
+/** The plan of the part probe without text: refused, or the register, touches and axes of each part. */
+export const planPartProbe = (setup: Setup): PartProbePlan => partProbeProgram(setup, setup.post.programNumberBase).plan

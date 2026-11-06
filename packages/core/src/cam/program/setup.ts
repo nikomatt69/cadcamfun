@@ -7,7 +7,8 @@ import { Schema } from "effect"
 import { StockSchema, ToolSchema, type Tool } from "../tool.ts"
 import { WorkOffsetSchema } from "../ir.ts"
 import { WorkOffsetRefSchema, formatOffsetRef } from "../work-offset.ts"
-import { OperationSchema, type Operation } from "./op.ts"
+import { ToolpathSettingsSchema } from "../generator/schema.ts"
+import { OperationSchema, OperationTemplateSchema, TemplateUseSchema, type Operation, type OperationTemplate, type TemplateUse } from "./op.ts"
 import { assignPockets } from "./tooltable.ts"
 
 export const PostConfigSchema = Schema.Struct({
@@ -67,6 +68,42 @@ export type FixtureBox = typeof FixtureBoxSchema.Type
 export const SisterToolSchema = Schema.Struct({ toolId: Schema.String.check(Schema.isMinLength(1)), tool: ToolSchema })
 export type SisterTool = typeof SisterToolSchema.Type
 
+const Vec2 = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
+const Unit2 = Schema.Struct({ x: Schema.Finite.check(Schema.isBetween({ minimum: -1, maximum: 1 })), y: Schema.Finite.check(Schema.isBetween({ minimum: -1, maximum: 1 })) })
+const Depth = { depth: Schema.Finite.check(Schema.isGreaterThan(0)), top: Schema.optionalKey(Schema.Finite) } as const
+const Sense = Schema.Literals([1, -1])
+
+/**
+ * What the probe measures on every workpiece to find its datum, in the part's own frame (each part's zero is where its cycle expects it;
+ * the register of each part receives the deviation). The same kinds as the probing cycles without an angle: a Z surface, an edge, an outside
+ * or inside corner, a bore, a boss.
+ */
+export const PartProbeCycleSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("z-surface"), at: Vec2, expectedZ: Schema.Finite }),
+  Schema.Struct({ kind: Schema.Literal("edge"), at: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }), normal: Unit2 }),
+  Schema.Struct({ kind: Schema.Literal("corner"), corner: Vec2, inside: Schema.Boolean, xSense: Sense, ySense: Sense, ...Depth, inset: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))), touchesPerEdge: Schema.optionalKey(Schema.Literals([1, 2])) }),
+  Schema.Struct({ kind: Schema.Literals(["bore", "boss"]), centre: Vec2, diameter: Schema.Finite.check(Schema.isGreaterThan(0)), ...Depth })
+])
+export type PartProbeCycle = typeof PartProbeCycleSchema.Type
+
+/** The probe run on each workpiece before it is cut (`probePart` on generate): one program of the probe tool that reads every part's datum into that part's register. */
+export const PartProbeSchema = Schema.Struct({
+  cycles: Schema.Array(PartProbeCycleSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  /** The probe's tool number in the magazine; absent = the pocket after the last one the operations use. */
+  toolNumber: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 9999 }))),
+  stylusDiameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  /** Touch feed, mm/min. */
+  feed: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  /** How far past the expected surface the probe looks before it alarms, mm. */
+  search: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  clearance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  /** Travel height above the datum; absent = 15 above the stock's top (25 without a stock). */
+  safeZ: Schema.optionalKey(Schema.Finite),
+  /** A correction larger than this is a wrong datum or a clamped part, never written: the control alarms. Default 5 mm. */
+  limit: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0)))
+})
+export type PartProbe = typeof PartProbeSchema.Type
+
 export const SetupGroupingSchema = Schema.Literals(["single", "perTool", "perOperation"])
 export type SetupGrouping = typeof SetupGroupingSchema.Type
 
@@ -92,7 +129,12 @@ export const SetupSchema = Schema.Struct({
   /** The machine's travel, in the frame of the first workpiece's datum: the placed blanks must lie inside it. */
   envelope: Schema.optionalKey(Schema.Struct({ min: Vec, max: Vec })),
   /** Sister tools: when a tool's `lifeMinutes` would be spent by the next run, the runs after it use its sister, which has its own pocket. */
-  sisters: Schema.optionalKey(Schema.Array(SisterToolSchema).check(Schema.isMaxLength(64)))
+  sisters: Schema.optionalKey(Schema.Array(SisterToolSchema).check(Schema.isMaxLength(64))),
+  /** Operation templates (a rough, semi-finish and finish cycle) the setup applies through `uses`; expanded into `operations` before planning and generating. */
+  templates: Schema.optionalKey(Schema.Array(OperationTemplateSchema).check(Schema.isMaxLength(64))),
+  uses: Schema.optionalKey(Schema.Array(TemplateUseSchema).check(Schema.isMaxLength(256))),
+  /** The datum probe of every workpiece, generated as its own program on request. */
+  partProbe: Schema.optionalKey(PartProbeSchema)
 })
 export type Setup = typeof SetupSchema.Type
 
@@ -152,9 +194,83 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
   return issues
 }
 
-/** Problems with a setup. Reported, not thrown: the UI shows them next to the offending row. */
-export const validateSetup = (setup: Setup): ReadonlyArray<SetupIssue> => {
+/**
+ * The setup with its template uses turned into operations (templates and uses removed): each use gives the elements, the template the tools,
+ * settings and strategy. Pure and idempotent; a use that cannot be expanded is skipped and named in `issues`. The expanded operations go
+ * before `position` (an index in the original operations) or after all of them, in the order of the uses.
+ */
+export const expandSetup = (setup: Setup): { readonly setup: Setup; readonly issues: ReadonlyArray<SetupIssue> } => {
+  if ((setup.uses ?? []).length === 0 && setup.templates === undefined) return { setup, issues: [] }
+  const { templates, uses, ...rest } = setup
   const issues: SetupIssue[] = []
+  const byId = new Map<string, OperationTemplate>()
+  for (const template of templates ?? []) {
+    if (byId.has(template.id)) issues.push({ message: `Template id ${template.id} is used twice` })
+    else byId.set(template.id, template)
+    const stepIds = new Set<string>()
+    for (const step of template.steps) {
+      if (stepIds.has(step.id)) issues.push({ message: `Template ${template.name} has the step id ${step.id} twice` })
+      stepIds.add(step.id)
+    }
+    for (const step of template.steps) for (const dep of step.dependsOn ?? []) if (!stepIds.has(dep)) issues.push({ message: `Template ${template.name}: step ${step.name} depends on ${dep}, which the template does not have` })
+  }
+  const taken = new Set(rest.operations.map((op) => op.id))
+  const useIds = new Set<string>()
+  const buckets = new Map<number, Operation[]>()
+  const place = (position: number | undefined, ops: ReadonlyArray<Operation>): void => {
+    const at = position === undefined ? rest.operations.length : Math.min(position, rest.operations.length)
+    buckets.set(at, [...(buckets.get(at) ?? []), ...ops])
+  }
+  for (const use of uses ?? []) {
+    const label = use.name ?? use.id
+    if (useIds.has(use.id)) { issues.push({ message: `Template use id ${use.id} is used twice` }); continue }
+    useIds.add(use.id)
+    const template = byId.get(use.templateId)
+    if (template === undefined) { issues.push({ message: `${label} uses the template ${use.templateId}, which the setup does not have` }); continue }
+    if (use.elementIds.length === 0) { issues.push({ message: `${label} has no elements to machine` }); continue }
+    if (use.position !== undefined && use.position > rest.operations.length) issues.push({ message: `${label} goes before operation ${use.position}, the setup has ${rest.operations.length}: it goes last` })
+    const known = new Set(Object.keys(template.steps[0]!.params))
+    const badKeys = Object.keys(use.overrides ?? {}).filter((key) => !known.has(key))
+    if (badKeys.length > 0) { issues.push({ message: `${label} overrides ${badKeys.join(", ")}, which are not settings of the toolpath` }); continue }
+    const instances = use.perElement === true ? use.elementIds.map((id) => [id]) : [use.elementIds]
+    const many = instances.length > 1
+    const order = use.order ?? "perStep"
+    const made: Operation[][] = []
+    let invalid = false
+    instances.forEach((elementIds, i) => {
+      const idOf = (stepId: string): string => (many ? `${use.id}[${i + 1}]:${stepId}` : `${use.id}:${stepId}`)
+      const ops = template.steps.map((step): Operation => {
+        const params = use.overrides === undefined ? step.params : { ...step.params, ...use.overrides }
+        if (use.overrides !== undefined && !invalid) {
+          try { Schema.decodeUnknownSync(ToolpathSettingsSchema)(params) } catch (error) { invalid = true; issues.push({ message: `${label}: the overrides are not valid settings (${error instanceof Error ? error.message.split("\n")[0] : String(error)})` }) }
+        }
+        return {
+          id: idOf(step.id), name: `${use.name ?? template.name}${many ? ` #${i + 1}` : ""} - ${step.name}`, elementIds, params, tool: step.tool,
+          ...(step.pocket !== undefined ? { pocket: step.pocket } : {}), enabled: use.enabled ?? true, fromPreviousStock: step.fromPreviousStock ?? false,
+          ...(use.workpieceIds !== undefined ? { workpieceIds: use.workpieceIds } : {}),
+          ...(step.dependsOn !== undefined && step.dependsOn.length > 0 ? { dependsOn: step.dependsOn.map(idOf) } : {})
+        }
+      })
+      made.push(ops)
+    })
+    if (invalid) continue
+    if (many && order === "perStep") for (const step of template.steps) if (step.fromPreviousStock === true) issues.push({ message: `${label}: ${step.name} continues the previous operation, which is another feature when the steps run step by step: use order perFeature` })
+    const ops = order === "perFeature" || !many ? made.flat() : template.steps.flatMap((_, s) => made.map((instance) => instance[s]!))
+    const clash = ops.filter((op) => taken.has(op.id))
+    if (clash.length > 0) { issues.push({ message: `${label} would make the operation ids ${clash.map((op) => op.id).join(", ")}, which the setup already has` }); continue }
+    for (const op of ops) taken.add(op.id)
+    place(use.position, ops)
+  }
+  const operations: Operation[] = []
+  rest.operations.forEach((op, i) => { operations.push(...(buckets.get(i) ?? []), op) })
+  operations.push(...(buckets.get(rest.operations.length) ?? []))
+  return { setup: { ...rest, operations }, issues }
+}
+
+/** Problems with a setup. Reported, not thrown: the UI shows them next to the offending row. A setup with template uses is validated as expanded. */
+export const validateSetup = (given: Setup): ReadonlyArray<SetupIssue> => {
+  const { setup, issues: templateIssues } = expandSetup(given)
+  const issues: SetupIssue[] = [...templateIssues]
   const ids = new Set<string>()
   for (const op of setup.operations) {
     if (ids.has(op.id)) issues.push({ operationId: op.id, message: `Operation id ${op.id} is used twice` })
@@ -174,6 +290,7 @@ export const validateSetup = (setup: Setup): ReadonlyArray<SetupIssue> => {
   }
   if (!setup.operations.some((op) => op.enabled)) issues.push({ message: "The setup has no enabled operation" })
   issues.push(...workpieceIssues(setup))
+  if (setup.partProbe !== undefined && setup.machineType !== "mill") issues.push({ message: `A part probe is a milling accessory: a ${setup.machineType} setup has none` })
   for (const sister of setup.sisters ?? []) {
     if (!setup.operations.some((op) => op.tool.id === sister.toolId)) issues.push({ message: `Sister tool ${sister.tool.name} backs ${sister.toolId}, which no operation uses` })
     if (setup.operations.some((op) => op.tool.id === sister.tool.id)) issues.push({ message: `Sister tool ${sister.tool.name} is already a tool of an operation: a sister has an id of its own` })

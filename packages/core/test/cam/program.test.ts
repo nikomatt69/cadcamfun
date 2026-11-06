@@ -381,3 +381,129 @@ describe("replay of a generated program: inputs and release", () => {
     expect(program.setupEvidence(gcode, { ...solid, registers: [solid.registers[0]!] }, [result("clean")], held).fixture).toBeUndefined()
   })
 })
+
+describe("operation templates: a cycle of operations applied to features", () => {
+  const rough = { id: "rough", name: "Rough", tool: t6, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 2, toolDiameter: 6, operationType: "pocket" as const } }
+  const finish = { id: "finish", name: "Finish", tool: t3, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 4, toolDiameter: 3, operationType: "contour" as const }, dependsOn: ["rough"] }
+  const cycle: program.OperationTemplate = { id: "pocket-cycle", name: "Pocket", steps: [rough, finish] }
+  const use = (over: Partial<program.TemplateUse> = {}): program.TemplateUse => ({ id: "u", templateId: "pocket-cycle", elementIds: ["a", "b", "c"], perElement: true, ...over })
+  const withUses = (uses: ReadonlyArray<program.TemplateUse>, operations: ReadonlyArray<program.Operation> = [], over: Partial<program.Setup> = {}): program.Setup =>
+    setup(operations, { templates: [cycle], uses, ...over })
+
+  test("one instance per element, step by step: every roughing before any finishing, so each tool is loaded once", () => {
+    const { setup: expanded, issues } = program.expandSetup(withUses([use()]))
+    expect(issues).toEqual([])
+    expect(expanded.templates).toBeUndefined()
+    expect(expanded.uses).toBeUndefined()
+    expect(expanded.operations.map((o) => o.id)).toEqual(["u[1]:rough", "u[2]:rough", "u[3]:rough", "u[1]:finish", "u[2]:finish", "u[3]:finish"])
+    expect(expanded.operations.map((o) => o.elementIds)).toEqual([["a"], ["b"], ["c"], ["a"], ["b"], ["c"]])
+    expect(expanded.operations[3]).toMatchObject({ name: "Pocket #1 - Finish", dependsOn: ["u[1]:rough"], enabled: true, fromPreviousStock: false })
+    expect(planPrograms(expanded).toolChanges).toBe(1)
+    expect(validateSetup(withUses([use()]))).toEqual([])
+  })
+
+  test("feature by feature: an instance is finished before the next starts, and the changes show", () => {
+    const expanded = program.expandSetup(withUses([use({ order: "perFeature" })])).setup
+    expect(expanded.operations.map((o) => o.id)).toEqual(["u[1]:rough", "u[1]:finish", "u[2]:rough", "u[2]:finish", "u[3]:rough", "u[3]:finish"])
+    expect(planPrograms(expanded).toolChanges).toBe(5)
+  })
+
+  test("one instance over all the elements, a position among the setup's own operations, overrides, workpieces and a disabled use", () => {
+    const own = [op("a", t6), op("b", t3)]
+    const { setup: expanded, issues } = program.expandSetup(withUses([use({ perElement: false, position: 1, overrides: { depth: 7 }, workpieceIds: ["w1"], name: "Pockets" })], own))
+    expect(issues).toEqual([])
+    expect(expanded.operations.map((o) => o.id)).toEqual(["a", "u:rough", "u:finish", "b"])
+    expect(expanded.operations[1]).toMatchObject({ name: "Pockets - Rough", elementIds: ["a", "b", "c"], workpieceIds: ["w1"] })
+    expect(expanded.operations[1]!.params.depth).toBe(7)
+    expect(expanded.operations[2]!.params.depth).toBe(7)
+    const off = program.expandSetup(withUses([use({ enabled: false })])).setup
+    expect(off.operations.every((o) => !o.enabled)).toBe(true)
+  })
+
+  test("expansion is idempotent and leaves a setup without uses untouched", () => {
+    const once = program.expandSetup(withUses([use()])).setup
+    expect(program.expandSetup(once).setup).toBe(once)
+    const plain = setup([op("a", t6)])
+    expect(program.expandSetup(plain).setup).toBe(plain)
+  })
+
+  test("what cannot be expanded is an issue and the use is skipped", () => {
+    const messages = (s: program.Setup): string => validateSetup(s).map((i) => i.message).join(" | ")
+    expect(messages(withUses([use({ templateId: "nope" })], [op("a", t6)]))).toMatch(/template nope, which the setup does not have/)
+    expect(messages(withUses([use({ elementIds: [] })], [op("a", t6)]))).toMatch(/no elements to machine/)
+    expect(messages(withUses([use({ overrides: { notASetting: 1 } })], [op("a", t6)]))).toMatch(/notASetting, which are not settings/)
+    expect(messages(withUses([use({ overrides: { depth: "deep" } })], [op("a", t6)]))).toMatch(/not valid settings/)
+    expect(messages(withUses([use(), use()], [op("a", t6)]))).toMatch(/use id u is used twice/)
+    expect(messages(withUses([use({ id: "x", elementIds: ["a"], perElement: false })], [op("x:rough", t6)]))).toMatch(/already has/)
+    expect(messages(setup([op("a", t6)], { templates: [{ ...cycle, steps: [rough, { ...finish, dependsOn: ["gone"] }] }], uses: [] }))).toMatch(/depends on gone/)
+    const rest = { ...cycle, steps: [rough, { ...finish, fromPreviousStock: true }] }
+    expect(messages(withUses([use()], [], { templates: [rest] }))).toMatch(/use order perFeature/)
+    // A step that dropped out of the setup does not leave a lone dependency: the setup keeps the operations of the valid uses.
+    const mixed = program.expandSetup(withUses([use({ id: "bad", templateId: "nope" }), use({ id: "good", elementIds: ["a"] })], [])).setup
+    expect(mixed.operations.map((o) => o.id)).toEqual(["good:rough", "good:finish"])
+  })
+
+  test("a setup of templates generates one program with the tool changes of its order, and the pieces are the same on every part", () => {
+    const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" as const }, { id: "w2", name: "Part 2", workOffset: "G55" as const }]
+    const expanded = program.expandSetup(withUses([use({ elementIds: ["a", "b"] })], [], { workpieces: parts })).setup
+    const generated = generateSetup(expanded, geometryOf)
+    expect(generated.issues).toEqual([])
+    expect(generated.programs).toHaveLength(1)
+    const text = generated.programs[0]!.gcode
+    expect(text.match(/T\d+\s*M6/g)).toHaveLength(2)
+    expect(text.match(/^G55\b/gm)).toHaveLength(4)
+    expect(generated.programs[0]!.operationIds).toEqual(["u[1]:rough", "u[2]:rough", "u[1]:finish", "u[2]:finish"])
+  })
+})
+
+describe("the probe of every part before it is cut", () => {
+  const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" as const }, { id: "w2", name: "Part 2", workOffset: "G55" as const }, { id: "w3", name: "Part 3", workOffset: "G56" as const, index: { b: 90 } }]
+  const partProbe: program.PartProbe = { cycles: [{ kind: "z-surface", at: { x: 5, y: 5 }, expectedZ: 0 }, { kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }] }
+  const probed = (over: Partial<program.Setup> = {}): program.Setup => setup([op("a", t6), op("b", t3)], { workpieces: parts, stock: { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }, partProbe, ...over })
+
+  test("every part is measured in its own register: the program reads each datum into the register its toolpaths run under", () => {
+    const { plan, generated } = program.partProbeProgram(probed(), 2000)
+    expect(plan.refused).toBeUndefined()
+    expect(plan.toolNumber).toBe(3)
+    expect(plan.parts.map((p) => [p.register, p.axes.join("")])).toEqual([["G54", "ZXY"], ["G55", "ZXY"], ["G56", "ZXY"]])
+    expect(generated).toBeDefined()
+    const text = generated!.gcode
+    expect(generated).toMatchObject({ programNumber: 2000, toolNumbers: [3], pockets: { "part-probe": 3 } })
+    expect(text.match(/T3\s*M6/g)).toHaveLength(1)
+    const lines = text.split("\n").map((l) => l.trim())
+    // Fanuc writes the work offsets of G54 as #5221-#5223 and of G55 as #5241-#5243: each part corrects its own register, never another's.
+    expect(lines.filter((l) => /^#5223=#5223\+/.test(l))).toHaveLength(1)
+    expect(lines.filter((l) => /^#5243=#5243\+/.test(l))).toHaveLength(1)
+    expect(lines.filter((l) => /^#5263=#5263\+/.test(l))).toHaveLength(1)
+    expect(lines.filter((l) => /^G55\b/.test(l))).toHaveLength(1)
+    expect(lines.filter((l) => /^G56\b/.test(l))).toHaveLength(1)
+    // The part on an indexed face is measured on that face; the spindle never turns; a correction beyond the limit alarms instead of writing.
+    expect(generated!.program.toolpaths[2]!.moves[0]).toMatchObject({ _tag: "Orient", b: 90 })
+    expect(generated!.program.toolpaths.every((t) => t.spindleRpm === 0)).toBe(true)
+    expect(text).toMatch(/OFFSET CORRECTION OUT OF RANGE/)
+    expect(text).toMatch(/G31 /)
+    expect(generated!.warnings.join(" ")).toMatch(/Run this program first/)
+  })
+
+  test("the probe takes a pocket of its own, the limit and the stylus are the setup's, an extended register is measured as such", () => {
+    expect(program.planPartProbe(probed({ partProbe: { ...partProbe, toolNumber: 1 } })).refused).toMatch(/T1 is a pocket of the operations/)
+    expect(program.planPartProbe(probed({ partProbe: { ...partProbe, toolNumber: 9, limit: 1 } })).toolNumber).toBe(9)
+    const text = program.partProbeProgram(probed({ partProbe: { ...partProbe, limit: 1 } }), 1).generated!.gcode
+    expect(text).toMatch(/IF \[#\d+ LE 1\] GOTO/)
+    const extended = probed({ workpieces: [{ id: "w1", name: "P1", workOffset: "G54", workOffsetRef: { kind: "extended", p: 7 } }] })
+    const plan = program.planPartProbe(extended)
+    expect(plan.refused).toBeUndefined()
+    expect(plan.parts[0]!.register).toBe("G54.1 P7")
+  })
+
+  test("a setup without a probe, a lathe and a post without probing words are refused with the reason", () => {
+    expect(program.planPartProbe(setup([op("a", t6)])).refused).toMatch(/no partProbe/)
+    expect(program.planPartProbe(probed({ machineType: "lathe" })).refused).toMatch(/milling accessory/)
+    expect(validateSetup(probed({ machineType: "lathe" })).map((i) => i.message).join(" ")).toMatch(/part probe is a milling accessory/)
+    // Every post of the catalogue either writes the probe program or says why it cannot: none throws, none writes nothing.
+    for (const postId of ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak", "mitsubishi", "brother"] as const) {
+      const made = program.partProbeProgram(probed({ post: { ...DEFAULT_POST_CONFIG, postId } }), 1)
+      expect(made.plan.refused !== undefined || (made.generated !== undefined && made.generated.gcode.length > 100), postId).toBe(true)
+    }
+  })
+})
