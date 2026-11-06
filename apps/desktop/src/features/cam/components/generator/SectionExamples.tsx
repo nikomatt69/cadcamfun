@@ -4,7 +4,7 @@
  * the origin / geometry / operation diagrams. Values come from the live settings; anything not available cheaply is
  * left out rather than invented.
  */
-import { For, Match, Show, Switch, createUniqueId, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createMemo, createUniqueId, type JSX } from "solid-js"
 import type { cam } from "@cadcamfun/core"
 import { PreviewStage } from "./PreviewStage.tsx"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
@@ -1001,7 +1001,11 @@ const label = (props: { readonly title?: string | undefined; readonly detail?: s
 
 /** The drawing alone: the scene of `kind` inside the shared 320 x 128 viewBox, or the real tool assembly for a cutter. */
 export function SectionScene(props: SceneProps & { readonly title?: string | undefined; readonly height?: number | undefined }): JSX.Element {
+  // The scenes read their props once when they are built, so a second example of the same kind (another orientation, another
+  // holding) would keep the first one's drawing: the drawing is built again whenever any prop of the example changes.
+  const key = createMemo(() => { try { return JSON.stringify({ ...props }) } catch { return String(Math.random()) } })
   return (
+    <Show when={key()} keyed>{(_scene) => (
     <Show when={props.kind === "tool" && props.cutter !== undefined} fallback={
       <svg viewBox="0 0 320 128" role="img" aria-label={label(props)} data-example={props.kind}>
         <g class="panel-preview__scene">
@@ -1029,6 +1033,7 @@ export function SectionScene(props: SceneProps & { readonly title?: string | und
         <div class="setup-tool__floor" aria-hidden="true" />
       </div>
     </Show>
+    )}</Show>
   )
 }
 

@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "CAD फ़ाइल चुनें",
   "cad.importExport.upload": "फ़ाइल अपलोड करें",
   "cad.importExport.orDrag": "या खींचकर छोड़ें",
-  "cad.importExport.formats": "JSON, STL, OBJ, PLY, STEP, IGES या CAD/CAM FUN फ़ाइलें",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "ध्यान दें",
   "cad.importExport.importWarning": "फ़ाइल आयात करने पर आपकी वर्तमान ड्राइंग बदल जाएगी। आयात से पहले अपना काम सहेज लें।",
   "cad.importExport.fileName": "फ़ाइल का नाम",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "CAD फ़ाइलें या फ़ोल्डर चुनें",
+  "cad.importExport.chooseFiles": "फ़ाइलें चुनें",
+  "cad.importExport.chooseFolder": "फ़ोल्डर चुनें",
+  "cad.importExport.importing": "{total} में से {current} आयात हो रहा है…",
+  "cad.importExport.importAdditive": "फ़ाइलें वर्तमान ड्रॉइंग में जुड़ती हैं। उपफ़ोल्डर भी खोजे जाते हैं।",
+  "cad.importExport.importSummary": "{files} फ़ाइलें ({elements} तत्व) आयात हुईं; {failed} फ़ाइलें आयात नहीं हुईं।",
+  "cad.importExport.importSuccess": "{count} तत्व आयात हुए",
+  "cad.importExport.importFailed": "आयात नहीं हुआ",
+  "cad.importExport.importWarnings": "चेतावनियाँ",
+  "cad.importExport.importNoLayer": "कोई सक्रिय लेयर नहीं है। कुछ भी नहीं जोड़ा गया।",
+  "cad.importExport.importDone": "पूर्ण"
 }

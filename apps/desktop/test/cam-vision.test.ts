@@ -11,6 +11,7 @@ import { captureVisibleViewport } from "../src/features/ai/lib/viewport-capture.
 import { programSheetLayout, drawProgramSheet, programSheetPaths, SHEET_MAX_LINES, type SheetContext } from "../src/features/cam/lib/program-sheet.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
+let restoreCanvas = (): void => undefined
 /** Every text the sheet drew; the recording double keeps it. */
 const drawn: string[] = []
 /** Every point the sheet stroked; the recording double keeps it. */
@@ -24,6 +25,8 @@ beforeAll(async () => {
     getContext: (type: string) => unknown
     toDataURL: (type?: string) => string
   }
+  const original = Object.getOwnPropertyDescriptors(proto)
+  restoreCanvas = () => { Object.defineProperties(proto, original) }
   proto.getContext = function (type: string): unknown {
     if (type !== "2d") return null
     return {
@@ -40,7 +43,8 @@ beforeAll(async () => {
   }
   proto.toDataURL = () => "data:image/png;base64,iVBORw0KGgo="
 })
-afterAll(async () => { await app.dispose() })
+// Later files in the same process draw on the real prototype: the double goes when this file is done.
+afterAll(async () => { restoreCanvas(); await app.dispose() })
 
 const byText = (tag: string, text: string): HTMLElement | undefined =>
   [...document.querySelectorAll<HTMLElement>(tag)].find((el) => el.textContent?.trim() === text)

@@ -51,6 +51,8 @@ export interface KernelSnapshot {
   readonly operations?: ReadonlyArray<OperationSpec>
   /** Several fixings of the part (spec 69 C1); run with `runSetups`. The snapshot's own orientation, stock, offset and operations are the defaults of a setup that names none. */
   readonly setups?: ReadonlyArray<JobSetup>
+  /** Each setup starts from the stock the one before left (`runSetups`, spec 69 C4). */
+  readonly carryStock?: boolean
   readonly tools?: ReadonlyArray<Cutter>
 }
 
@@ -83,7 +85,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       part: { kind: "elements", elements: s.elements }, ...(machine !== undefined ? { machine } : {}), ...(stock !== undefined ? { stock } : {}),
       ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
-      ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.setups !== undefined ? { setups: s.setups } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
+      ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.setups !== undefined ? { setups: s.setups } : {}), ...(s.carryStock === true ? { carryStock: true } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
       ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true || s.postDefinition !== undefined
         ? { post: {
           ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.tcp === true ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}), ...(s.nativeCycles === true ? { nativeCycles: true } : {}), ...(s.tcp === true ? { tcp: true } : {}) } } : {}),

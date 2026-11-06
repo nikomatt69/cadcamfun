@@ -133,7 +133,7 @@ export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionE
     const retract = m.to.z > m.from.z && Math.hypot(m.to.x - m.from.x, m.to.y - m.from.y) < 1e-6
     if (m.kind === "rapid" && !retract) {
       const low = deepest(0)
-      if (low !== undefined && low < top - 1e-6) add(`rapid:${i}`, { code: "RAPID_INTO_STOCK", severity: "error", ...at, depth: top - low, message: `rapid ${Math.round((top - low) * 100) / 100} mm into the stock at line ${line ?? "?"}` })
+      if (low !== undefined && low < top - 1e-6) add(`rapid:${i}`, { code: "RAPID_INTO_STOCK", severity: "error", ...at, depth: top - low, message: `rapid ${Math.round((top - low) * 100) / 100} mm into the stock${line === undefined ? "" : ` at line ${line}`}` })
     }
     // Shank / holder deeper than the cutting length / stickout, over the stock.
     if (reach !== undefined && m.kind === "feed") {
@@ -189,8 +189,8 @@ const liveStockChecks = (input: CollisionInput, add: (key: string, event: Omit<C
     // A contact anywhere along the move wins over a near miss earlier on it.
     const points = Array.from({ length: samples + 1 }, (_, k) => pointOn(m, k / samples))
     if (m.kind === "rapid" && !retract && cutter !== undefined) {
-      if (points.some((p) => field.touches(cutter, p.x, p.y, p.z))) add(`rapid:${i}`, { code: "RAPID_INTO_STOCK", severity: "error", ...at, message: `rapid into the stock left at line ${line ?? "?"}` })
-      else if (clearance > 0 && points.some((p) => field.reaches(p.x, p.y, cutter.radius + clearance, p.z - clearance))) add(`near-rapid:${i}`, { code: "NEAR_MISS", severity: "warning", ...at, message: `rapid within ${clearance} mm of the stock left at line ${line ?? "?"}` })
+      if (points.some((p) => field.touches(cutter, p.x, p.y, p.z))) add(`rapid:${i}`, { code: "RAPID_INTO_STOCK", severity: "error", ...at, message: `rapid into the stock left${line === undefined ? "" : ` at line ${line}`}` })
+      else if (clearance > 0 && points.some((p) => field.reaches(p.x, p.y, cutter.radius + clearance, p.z - clearance))) add(`near-rapid:${i}`, { code: "NEAR_MISS", severity: "warning", ...at, message: `rapid within ${clearance} mm of the stock left${line === undefined ? "" : ` at line ${line}`}` })
     }
     if (m.kind === "feed" && reach !== undefined && !m.state.probe) {
       if (points.some((p) => field.reaches(p.x, p.y, reach.holder, p.z + reach.stickout))) add("holder", { code: "HOLDER_IN_STOCK", severity: "error", ...at, message: `the holder meets the stock left (stickout ${reach.stickout} mm)` })

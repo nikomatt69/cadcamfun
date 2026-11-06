@@ -46,6 +46,8 @@ interface ResolvedSetup {
   readonly frame?: cam.WorkFrame
   /** What the named machine's configuration says its rotary table is (the calibration's default `assumed`). */
   readonly assumed?: cam.probing.RotaryAssumption
+  /** How the machine calls its own cycles. */
+  readonly macroStyle?: cam.probing.MacroStyle
 }
 
 const setupInput = (setup: ResolvedSetup) => ({
@@ -190,7 +192,8 @@ export class Probing extends Context.Service<Probing, {
         ...(frameInput.b !== undefined ? { b: frameInput.b * DEG } : {}),
         ...(frameInput.c !== undefined ? { c: frameInput.c * DEG } : {})
       })
-      return { settings, ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(workOrigin !== undefined ? { workOrigin } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
+      const macroStyle = (profile as { probing?: cam.kernel.MachineProbing } | undefined)?.probing?.macroStyle
+      return { settings, ...(macroStyle !== undefined ? { macroStyle } : {}), ...(device !== undefined ? { device } : {}), ...(setter !== undefined ? { setter } : {}), ...(workOrigin !== undefined ? { workOrigin } : {}), ...(frame !== undefined ? { frame } : {}), ...(assumed !== undefined ? { assumed } : {}) } satisfies ResolvedSetup
     })
     /** The kernel input of a plan or emit request: the cycle as given, or the feature an element resolves to. */
     const planInputOf = (setup: ResolvedSetup, payload: CamProbingPlanRequest | CamProbingEmitRequest): CamProbePlanInput => ({
@@ -198,7 +201,10 @@ export class Probing extends Context.Service<Probing, {
       ...(payload.operation !== undefined ? { cycle: payload.operation } : {}),
       ...(payload.feature !== undefined ? { feature: { elements: payload.feature.elements, elementId: payload.feature.elementId, ...(payload.feature.ref !== undefined ? { ref: payload.feature.ref } : {}), ...(payload.feature.hint !== undefined ? { hint: payload.feature.hint } : {}) } } : {}),
       ...(payload.checks !== undefined ? { checks: payload.checks } : {}),
-      ...(payload.actions !== undefined ? { actions: payload.actions } : {})
+      ...(payload.actions !== undefined ? { actions: payload.actions } : {}),
+      ...(payload.native === true ? { native: true } : {}),
+      ...(payload.macroStyle ?? setup.macroStyle) !== undefined ? { macroStyle: (payload.macroStyle ?? setup.macroStyle)! } : {},
+      ...(payload.assumed ?? setup.assumed) !== undefined ? { assumed: (payload.assumed ?? setup.assumed)! } : {}
     })
     return Probing.of({
       plan: {
@@ -212,7 +218,7 @@ export class Probing extends Context.Service<Probing, {
           if ("error" in out) return yield* refusalError(out)
           return {
             operation: out.cycle, cycle: out.cycle.kind, ...(out.chosenBecause !== undefined ? { chosenBecause: out.chosenBecause } : {}),
-            settings: settingsWire(out.settings), steps: out.steps, moves: out.moves, checks: out.checks, nominal: out.nominal, notes: out.notes, warnings: out.warnings
+            settings: settingsWire(out.settings), steps: out.steps, moves: out.moves, checks: out.checks, nominal: out.nominal, ...(out.native !== undefined ? { native: out.native } : {}), notes: out.notes, warnings: out.warnings
           }
         }),
         emit: Effect.fn("Probing.plan.emit")(function*(userId, payload) {
@@ -226,7 +232,7 @@ export class Probing extends Context.Service<Probing, {
             : camProbePlan(input)
           if ("error" in out) return yield* refusalError(out)
           if (out.program === undefined) return yield* new InternalError({ message: "Failed to write the probing program" })
-          return { dialect: payload.dialect, nc: out.program.nc, identity: out.program.identity, lines: out.program.lines, steps: out.steps, notes: out.notes, warnings: out.warnings }
+          return { dialect: payload.dialect, nc: out.program.nc, identity: out.program.identity, lines: out.program.lines, ...(out.native !== undefined ? { native: out.native } : {}), steps: out.steps, notes: out.notes, warnings: out.warnings }
         }),
         simulate: Effect.fn("Probing.plan.simulate")(function*(userId, payload, report) {
           const setup = yield* resolveSetup(userId, payload.settings, payload.frame)
@@ -237,9 +243,22 @@ export class Probing extends Context.Service<Probing, {
             ...(payload.workOffsets !== undefined ? { workOffsets: Object.fromEntries(Object.entries(payload.workOffsets).map(([k, e]) => [k, cam.probing.offsetEntryFromWire(e)])) } : {}),
             ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
           }
-          const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to simulate the probing")))
+          const assumed = payload.assumed ?? setup.assumed
+          const placed: CamProbeSimulateInput = {
+            ...input,
+            ...(payload.dialect !== undefined ? { dialect: payload.dialect } : {}),
+            ...(payload.post !== undefined ? { post: payload.post as NonNullable<CamProbeSimulateInput["post"]> } : {}),
+            ...(payload.options !== undefined ? { options: payload.options } : {}),
+            ...(payload.partOrigin !== undefined ? { partOrigin: payload.partOrigin } : {}),
+            ...(payload.stockElement !== undefined ? { stockElement: payload.stockElement } : {}),
+            ...(assumed !== undefined ? { assumed } : {})
+          }
+          const out = yield* runKernelJobEffect("cam-probe-simulate", placed, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to simulate the probing")))
           if ("error" in out) return yield* refusalError(out)
           return {
+            ...(out.program !== undefined ? { program: out.program } : {}),
+            ...(out.played !== undefined ? { played: out.played } : {}),
+            warnings: out.warnings,
             report: cam.probing.probeReportToWire(out.report) as CamProbeReportData,
             offsetTable: Object.fromEntries(Object.entries(out.offsetTable).map(([k, e]) => [k, cam.probing.offsetEntryToWire(e)])),
             identity: out.identity
@@ -336,14 +355,18 @@ export class Probing extends Context.Service<Probing, {
           const input: CamProbeSimulateInput = {
             ...setupInput(setup), elements,
             operations: [{ id: body.operationId, cycle: stored.cycle, ...(stored.checks !== undefined ? { checks: stored.checks } : {}), ...(stored.actions !== undefined ? { actions: stored.actions } : {}) }],
-            ...(workOffsets !== undefined ? { workOffsets } : {}),
+            // A calibration artefact stands in the cycle's own coordinates, not on the part: the run is not shifted by the work offset.
+            ...(workOffsets !== undefined && stored.cycle.kind !== "rotary-axis" && stored.cycle.kind !== "stylus-calibrate" ? { workOffsets } : {}),
+            ...(setup.assumed !== undefined ? { assumed: setup.assumed } : {}),
+            // Contacts and offset changes get the line of their block in the program the operation stored.
+            ...(cam.kernel.POST_IDS.find((id) => id === recordOf(row.data)["dialect"]) !== undefined ? { dialect: recordOf(row.data)["dialect"] as cam.PostId } : {}),
             ...(m !== undefined ? { misplacement: { ...(m.x !== undefined ? { x: m.x } : {}), ...(m.y !== undefined ? { y: m.y } : {}), ...(m.z !== undefined ? { z: m.z } : {}), ...(m.a !== undefined ? { a: m.a * DEG } : {}), ...(m.b !== undefined ? { b: m.b * DEG } : {}), ...(m.c !== undefined ? { c: m.c * DEG } : {}) } } : {})
           }
           const out = yield* runKernelJobEffect("cam-probe-simulate", input, report !== undefined ? { onProgress: report } : {}).pipe(Effect.catch(explainKernelFailure("Failed to run the probe operation")))
           if ("error" in out) return yield* refusalError(out)
           const wire = cam.probing.probeReportToWire(out.report) as CamProbeReportData
           const saved = yield* reports.create(projectId, userId, {
-            name: row.name, kind: stored.cycle.kind === "rotary-axis" ? "rotary" : "part", source: "simulated", verdict: wire.verdict, data: wire,
+            name: row.name, kind: stored.cycle.kind === "rotary-axis" ? "rotary" : stored.cycle.kind === "stylus-calibrate" ? "stylus" : stored.cycle.kind.startsWith("tool-") || stored.cycle.kind === "broken-tool" ? "tool-setter" : "part", source: "simulated", verdict: wire.verdict, data: wire,
             toolpathId: body.operationId, drawingId: row.drawingId, machineConfigId: machineId ?? null, setupId: body.setupId ?? null, runId: body.runId ?? null,
             workOffset: cam.probing.formatOffsetRef(setup.settings.workOffset),
             // What makes the report stale: the program and the drawing revision it measured.

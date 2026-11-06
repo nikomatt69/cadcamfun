@@ -38,7 +38,7 @@ test("the probing program is written for each control and keeps the spindle off"
   expect(fanuc).toContain("G31")
   expect(linux).toContain("G38.2")
   expect(siemens).toContain("MEAS=1")
-  for (const nc of [fanuc, linux, siemens]) { expect(nc).toContain("M5"); expect(nc).not.toMatch(/M0?3\b/) }
+  for (const nc of [fanuc, linux, siemens]) expect(nc).not.toMatch(/\bM0?[34]\b/)
   expect((await post("/api/cam/probe/emit", { operation: bore, settings, dialect: "mazatrol" })).status).toBe(400)
 })
 

@@ -3,22 +3,22 @@
  * program comes back with claims about that exact G-code (plate, heating, layers, walls, first and last layer, stray beads,
  * filament) and a release level, like a milled program does. The quick generator above stays; this is the one to take to the printer.
  */
-import { For, Show, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { Cpu } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import type { CamKernelArtifact, CamKernelResult, CamMachineConfig } from "@cadcamfun/api"
+import type { CamKernelArtifact, CamKernelResult } from "@cadcamfun/api"
 import { useApp } from "../../../../shared/state/context.ts"
 import { captureEditorOwner } from "../../../ai/lib/editor-sync.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { kernelRequestOf } from "../../lib/job.ts"
-import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
 import { formatDuration } from "./PrintResultSection.tsx"
 import { Badge, Field, INPUT, Note, Section, Stat } from "./ui.tsx"
 import { t } from "../../../../i18n/index.ts"
+import { useKernel } from "./KernelSection.tsx"
 
 const CLAIM_LABEL: Readonly<Record<string, string>> = {
   "operations-complete": "Layers complete", "machine-limits": "Within the printer's limits", "bed-fit": "On the plate", "heated-start": "Heated before extruding",
@@ -36,17 +36,15 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
   const store = useCamStore()
   const api = makeToolpathGenerator(app.client)
   const [result, setResult] = createSignal<CamKernelResult>()
+  const [resultRequestId, setResultRequestId] = createSignal<string>()
   const [error, setError] = createSignal<string>()
-  const [saved, setSaved] = createSignal<ReadonlyArray<CamMachineConfig>>([])
-  const [printer, setPrinter] = createSignal<string>(cam.kernel.PRINTERS[0]!.id)
+  const kernel = useKernel()
+  const saved = kernel.savedPrinters
+  const printer = kernel.printerValue
+  const setPrinter = kernel.selectPrinter
   let controller: AbortController | undefined
   let disposed = false
 
-  onMount(() => {
-    void app.runtime.run(app.client.machineConfigs.list({ query: {} }))
-      .then((value) => setSaved(kernelMachineConfigsOf(machinesFromResponse(value)).filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind === "printer")))
-      .catch(() => setSaved([]))
-  })
   onCleanup(() => { disposed = true; controller?.abort() })
 
   const request = createMemo(() => {
@@ -63,6 +61,12 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
     const value = result()
     return value?.status === "ok" ? value.value : undefined
   })
+  const stale = () => artifact() !== undefined && (request()?.id !== resultRequestId() || store.gcode !== artifact()?.nc)
+  createEffect(() => {
+    request()?.id
+    gen.settings.machineType
+    controller?.abort()
+  })
 
   const generate = async (): Promise<void> => {
     const input = request()
@@ -75,8 +79,9 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
     gen.setGenerating(true)
     try {
       const value = await app.runtime.run(api.manufacture(input), { signal: signal.signal })
-      if (disposed || signal.signal.aborted || !owner.current() || store.gcode !== previous) return
+      if (disposed || signal.signal.aborted || !owner.current() || gen.settings.machineType !== "3dprinter" || store.gcode !== previous || request()?.id !== input.id) return
       setResult(value)
+      setResultRequestId(input.id)
       if (value.status !== "ok" || value.value.release === "blocked") return
       store.clearOperationResults()
       useVerifyStore.getState().reset()
@@ -136,6 +141,7 @@ export default function KernelPrintSection(props: { readonly onGCodeGenerated: (
           {(value) => (
             <div class="panel-group" data-testid="kernel-print-evidence">
               <div class="panel-label"><span>{t("cam.gen.kp.release")}</span><Badge tone={RELEASE_TONE[value().release]}>{RELEASE_LABEL[value().release]}</Badge></div>
+              <Show when={stale()}><p role="status" class="text-[color:var(--panel-warn)]" data-testid="kernel-print-stale">{t("cam.kernel.stale")}</p></Show>
               <Show when={value().print}>
                 {(report) => (
                   <div class="panel-stats">

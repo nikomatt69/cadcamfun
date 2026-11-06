@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "Выберите файл CAD",
   "cad.importExport.upload": "Загрузите файл",
   "cad.importExport.orDrag": "или перетащите сюда",
-  "cad.importExport.formats": "Файлы JSON, STL, OBJ, PLY, STEP, IGES или CAD/CAM FUN",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "Внимание",
   "cad.importExport.importWarning": "Импорт файла заменит текущий чертёж. Перед импортом сохраните свою работу.",
   "cad.importExport.fileName": "Имя файла",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "Выберите файлы CAD или папку",
+  "cad.importExport.chooseFiles": "Выбрать файлы",
+  "cad.importExport.chooseFolder": "Выбрать папку",
+  "cad.importExport.importing": "Импорт {current} из {total}…",
+  "cad.importExport.importAdditive": "Файлы добавляются к текущему чертежу. Вложенные папки включены.",
+  "cad.importExport.importSummary": "Импортировано файлов: {files}, элементов: {elements}; не импортировано файлов: {failed}.",
+  "cad.importExport.importSuccess": "Импортировано элементов: {count}",
+  "cad.importExport.importFailed": "Не удалось импортировать",
+  "cad.importExport.importWarnings": "Предупреждения",
+  "cad.importExport.importNoLayer": "Нет активного слоя. Ничего не добавлено.",
+  "cad.importExport.importDone": "Готово"
 }

@@ -191,3 +191,23 @@ describe("setup examples", () => {
     expectTranslated(SETUP_EXAMPLES.flatMap((example) => [example.title, example.description]))
   })
 })
+
+describe("the drawing of a setup example", () => {
+  test("is built again when another example of the same kind is picked", async () => {
+    await import("./helpers/dom-global.ts")
+    const { installDom } = await import("./helpers/dom.ts")
+    installDom("http://localhost/cam")
+    const { render } = await import("solid-js/web")
+    const { createSignal } = await import("solid-js")
+    const { SectionScene } = await import("../src/features/cam/components/generator/SectionExamples.tsx")
+    const [orientation, setOrientation] = createSignal<"+Z" | "-Z">("+Z")
+    const root = document.createElement("div")
+    document.body.append(root)
+    const dispose = render(() => SectionScene({ kind: "kernel-setup", get orientation() { return orientation() } }), root)
+    try {
+      expect(root.querySelector(".panel-preview__caption-note")?.textContent).toBe("+Z")
+      setOrientation("-Z")
+      expect(root.querySelector(".panel-preview__caption-note")?.textContent).toBe("-Z")
+    } finally { dispose() }
+  })
+})

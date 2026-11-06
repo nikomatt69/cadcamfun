@@ -68,7 +68,7 @@ export const compileActions = (routine: ProbeRoutine, actions: ReadonlyArray<Pro
             const nominal = routine.nominal[result]
             if (nominal === undefined) throw new RangeError(`the cycle has no result '${result}'`)
             if ((routine.units[result] === "deg") !== deg) throw new RangeError(`set-offset: ${axis} cannot follow the ${routine.units[result] === "deg" ? "angle" : "length"} '${result}'`)
-            out.push({ _tag: "Assign", variable: v, value: sub(read(result), nominal) })
+            out.push({ _tag: "Assign", variable: v, value: sub(read(result), a.reads?.[axis] ?? nominal) })
             return { axis, value: { var: v } as Expr }
           })
           const m = name(`o${ai}${tag}m`)

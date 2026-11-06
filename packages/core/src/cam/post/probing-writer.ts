@@ -367,7 +367,7 @@ const writeWork = (m: OffsetUpdateMove, a: OffsetAddress, io: ProbeIo): string[]
 export const nativeProbeLines = (move: { readonly family: string; readonly number: number; readonly params: Readonly<Record<string, number>> }, num: (mm: number) => string): string[] => {
   const p = move.params
   if (move.family === "renishaw") {
-    const words = Object.keys(p).filter((k) => /^[A-Z]$/.test(k)).sort().map((k) => `${k}${k === "S" ? p[k]!.toFixed(0) + "." : num(p[k]!)}`)
+    const words = Object.keys(p).filter((k) => /^[A-Z]$/.test(k)).sort().map((k) => `${k}${k === "S" ? (Number.isInteger(p[k]!) ? `${p[k]!}.` : p[k]!.toFixed(2)) : num(p[k]!)}`)
     return [`G65 P${move.number} ${words.join(" ")}`, `G65 P9810 Z${num(p["z"]!)} F${Math.round(p["f"]!)}`]
   }
   const words = Object.keys(p).filter((k) => k.startsWith("_")).sort().map((k) => `${k}=${Number(p[k]!.toFixed(6))}`)
@@ -375,11 +375,11 @@ export const nativeProbeLines = (move: { readonly family: string; readonly numbe
 }
 
 /**
- * Coordinate rotation words: the Fanuc family's `G68 X Y R` / `G69`. Siemens (`ROT`), Okuma, Klartext and LinuxCNC are refused: none of the
- * replays reads their word, and the offset's own rotation (`offset-r`) or the table (`table-c`) does the same there.
+ * Coordinate rotation words: the Fanuc family's and LinuxCNC's `G68 X Y R` / `G69` (the same words on both). Siemens (`ROT`), Okuma and Klartext
+ * are refused: none of the replays reads their word, and the offset's own rotation (`offset-r`) or the table (`table-c`) does the same there.
  */
 export const rotationLines = (on: boolean, x: string, y: string, r: string, io: ProbeIo): string[] => {
-  if (io.codes.syntax !== "fanuc") return refuse(io, "a coordinate rotation (G68): correct the rotation through the offset (offset-r) or the table (table-c)")
+  if (io.codes.syntax !== "fanuc" && io.codes.syntax !== "linuxcnc") return refuse(io, "a coordinate rotation (G68): correct the rotation through the offset (offset-r) or the table (table-c)")
   return [on ? `G68 X${x} Y${y} R${r}` : "G69"]
 }
 

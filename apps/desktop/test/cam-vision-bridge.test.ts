@@ -7,6 +7,7 @@ import { bootLiveApp } from "./helpers/live-app.ts"
 import { useDocumentStore } from "../src/features/cad/store/documentStore.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
+let restoreCanvas = (): void => undefined
 
 beforeAll(async () => {
   app = await bootLiveApp()
@@ -15,6 +16,8 @@ beforeAll(async () => {
     getContext: (type: string) => unknown
     toDataURL: (type?: string) => string
   }
+  const original = Object.getOwnPropertyDescriptors(proto)
+  restoreCanvas = () => { Object.defineProperties(proto, original) }
   proto.getContext = function (type: string): unknown {
     if (type !== "2d") return null
     return {
@@ -31,7 +34,8 @@ beforeAll(async () => {
   }
   proto.toDataURL = () => "data:image/png;base64,iVBORw0KGgo="
 })
-afterAll(async () => { await app.dispose() })
+// Later files in the same process draw on the real prototype: the double goes when this file is done.
+afterAll(async () => { restoreCanvas(); await app.dispose() })
 
 const settle = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms))
 

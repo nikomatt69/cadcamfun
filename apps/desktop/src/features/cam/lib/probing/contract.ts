@@ -20,6 +20,7 @@ export type ProbeCycleKind = cam.probing.ProbeCycleKind
 export type ProbeAction = cam.probing.ProbeAction
 export type Characteristic = cam.probing.Characteristic
 export type InspectionVerdict = cam.probing.InspectionVerdict
+export type MacroStyle = cam.probing.MacroStyle
 export type ProbeSettings = cam.probing.ProbeSettings
 export type ProbeDevice = cam.probing.ProbeDevice
 export type ToolSetter = cam.probing.ToolSetter

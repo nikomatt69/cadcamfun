@@ -68,6 +68,10 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     run: (input, { handlers, projectId }) => handlers.setupSave?.(projectId, input) ?? { ok: false, error: "Saved setups are unavailable in this host." }
   }),
   defineWireAction({
+    id: "cam_edit.setup_generate", kind: "write", parameters: CAM_ACTION_INPUTS["cam_edit.setup_generate"],
+    run: (input, { handlers, projectId }) => handlers.setupGenerate?.(projectId, input) ?? { ok: false, error: "Generating saved setups is unavailable in this host." }
+  }),
+  defineWireAction({
     id: "cam_edit.stock_set", kind: "write", replaces: "cam_stock",
     parameters: CAM_ACTION_INPUTS["cam_edit.stock_set"],
     run: ({ stock }, { handlers, projectId }) =>

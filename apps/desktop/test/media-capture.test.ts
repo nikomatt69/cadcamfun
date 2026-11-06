@@ -3,7 +3,7 @@
  * video sizes, the container the webview can encode) and the two captures against a recording
  * double of the canvas, the stream and the recorder.
  */
-import { afterEach, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { installDom } from "./helpers/dom.ts"
 
 installDom("http://localhost/cad")
@@ -24,8 +24,14 @@ const liveCanvas = (width: number, height: number): HTMLCanvasElement => {
   return canvas
 }
 
+let restoreCanvas = (): void => undefined
+// Later files in the same process draw on the real prototype: the double goes when this file is done.
+afterAll(() => { restoreCanvas() })
+
 beforeAll(() => {
   const proto = Object.getPrototypeOf(document.createElement("canvas")) as Record<string, unknown>
+  const original = Object.getOwnPropertyDescriptors(proto)
+  restoreCanvas = () => { Object.defineProperties(proto, original) }
   proto.getContext = () => ({ fillStyle: "", fillRect: () => undefined, drawImage: (...args: unknown[]) => { drawCalls.push(args) } })
   proto.toBlob = function (callback: (blob: Blob | null) => void, type: string) { callback(new Blob(["png"], { type })) }
   proto.captureStream = () => ({ getTracks: () => [{ stop: () => undefined }] })

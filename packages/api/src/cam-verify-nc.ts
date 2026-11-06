@@ -22,6 +22,7 @@ export const NcTool = Schema.Struct({
     ...CamKernelCutter.fields,
     neckDiameter: Schema.optionalKey(positive),
     headHeight: Schema.optionalKey(positive),
+    insertWidth: Schema.optionalKey(positive),
     holder: Schema.optionalKey(Schema.Struct({
       diameter: positive, length: positive,
       steps: Schema.optionalKey(Schema.Array(Schema.Struct({ diameter: positive, length: positive })).check(Schema.isMaxLength(16)))
@@ -53,7 +54,9 @@ export const CamVerifyNcRequest = Schema.Struct({
   dwell: Schema.optionalKey(Schema.Literals(["seconds", "milliseconds"])),
   okuma: Schema.optionalKey(Schema.Boolean),
   /** Where the tool stands before the first block, in the work frame (default: 50 mm above the stock's top corner). */
-  start: Schema.optionalKey(vec3)
+  start: Schema.optionalKey(vec3),
+  /** Replay only the moves under this work offset register (`G55`, `G54.1 P3`), the stock and the part being that register's frame: a program of several workpieces is replayed once per workpiece. */
+  register: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(24)))
 })
 export type CamVerifyNcRequest = typeof CamVerifyNcRequest.Type
 
@@ -77,6 +80,9 @@ export const CamVerifyNcResult = Schema.Struct({
   gouge: deviation,
   left: deviation,
   detached: Schema.Finite,
+  /** The blank before the replay and what the replayed moves took out of it, mm³. */
+  stockVolume: Schema.optionalKey(Schema.Finite),
+  removedVolume: Schema.optionalKey(Schema.Finite),
   cell: Schema.Finite,
   /** The declared error of every figure, mm. */
   errorBound: Schema.Finite,

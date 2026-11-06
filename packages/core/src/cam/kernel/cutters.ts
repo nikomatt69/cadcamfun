@@ -87,6 +87,8 @@ export interface Cutter {
   readonly formRadius?: number
   /** Boring bar insert height, T-slot disc thickness, dovetail flank height: the axial extent of the cutting head from the tip, mm. */
   readonly headHeight?: number
+  /** Boring bar: the tangential width of one insert, mm (absent = a single point). `flutes` is the number of inserts, spaced evenly about the spindle axis, the first towards +X when the bar is oriented. */
+  readonly insertWidth?: number
   /** Length of the cutting edges from the tip, mm. */
   readonly fluteLength: number
   readonly shankDiameter: number
@@ -138,6 +140,21 @@ export const legacyTool = (c: Cutter, fallbackMaxRpm = 24000): Tool => ({
   ...(SWEPT.has(c.kind) ? { profile: sweptProfile(c) } : {}),
   ...(c.kind === "ball" || c.kind === "lollipop" ? { tipRadius: c.diameter / 2 } : c.kind === "bull" && c.cornerRadius !== undefined ? { tipRadius: c.cornerRadius } : {})
 })
+
+/**
+ * The kernel cutter of a legacy tool (a setup's tool): the shape the replay sweeps. Unknown lengths take the same defaults the
+ * assistant's `verify_nc` takes (flutes 3 diameters, stick-out 4 diameters + 10); the holder is only there when the tool names one.
+ */
+export const cutterOfTool = (tool: Tool): Cutter => {
+  const kind: CutterKind = tool.kind === "ballnose" ? "ball" : tool.kind === "drill" ? "drill" : tool.kind === "vbit" ? "chamfer" : tool.kind === "facemill" ? "facemill" : tool.tipRadius !== undefined && tool.tipRadius < tool.diameter / 2 - 1e-9 ? "bull" : "flat"
+  return {
+    id: tool.id, name: tool.name, kind, diameter: tool.diameter, flutes: tool.flutes, material: "carbide", coating: "none",
+    fluteLength: 3 * tool.diameter, shankDiameter: tool.diameter, stickout: tool.stickout ?? Math.max(10, 4 * tool.diameter + 10), maxRpm: tool.maxRpm,
+    ...(kind === "bull" ? { cornerRadius: tool.tipRadius! } : {}),
+    ...(kind === "chamfer" ? { angle: tool.angle ?? 60 } : {}),
+    ...(tool.holder !== undefined ? { holder: tool.holder } : {})
+  }
+}
 
 const SWEPT: ReadonlySet<CutterKind> = new Set<CutterKind>(["tapered", "lollipop", "barrel", "lens"])
 
@@ -202,6 +219,7 @@ export const cutterIssues = (c: Cutter): ReadonlyArray<string> => {
     if (c.headHeight === undefined || !(c.headHeight > 0) || c.headHeight > c.fluteLength + 1e-9) out.push(`${c.id}: a ${c.kind} needs a head height inside its cutting length`)
     else if (c.kind === "dovetail" && c.angle !== undefined && c.neckDiameter !== undefined && c.diameter / 2 - c.headHeight * Math.tan((c.angle * Math.PI) / 360) < c.neckDiameter / 2 - 1e-9) out.push(`${c.id}: the dovetail flanks run into the neck before the head height`)
   }
+  if (c.insertWidth !== undefined && (c.kind !== "boringbar" || !(c.insertWidth > 0) || c.insertWidth >= c.diameter)) out.push(`${c.id}: an insert width belongs to a boring bar and must be between 0 and its diameter`)
   if (c.kind === "tapered") {
     const rt = (c.tipDiameter ?? 0) / 2
     if (c.tipDiameter === undefined || !(c.tipDiameter > 0) || c.tipDiameter >= c.diameter) out.push(`${c.id}: a tapered cutter needs 0 < tip diameter < D`)

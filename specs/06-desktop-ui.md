@@ -1,5 +1,36 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## CAD file and folder import (2026-11-05)
+
+Status: in progress. The drawing import accepts multiple files or a recursively
+selected folder, adds readable geometry in one undo step, and reports each failed
+or unsupported file without hiding successful imports. Existing geometry remains.
+Support STEP, IGES, STL, OBJ, PLY and drawing JSON readers, 3MF through the core
+exchange reader, GLB as meshes, and DXF/SVG as 2D outlines with approximation
+warnings. Do not claim that native SolidWorks parts,
+assemblies or their placements were imported. Keep file paths and warnings visible.
+
+Change log: 2026-11-05 — owner requested multi-file and folder import, including
+nested CAD files and a truthful report for unsupported formats.
+
+CAM extension: accept batches of NC programs and folders in the CAM workspace.
+Keep each program separate and let the operator choose one to open; independent
+NC files must never be concatenated or presented as one verified program.
+Unsupported files and incomplete reads are reported. Import does not overwrite
+the current program without an explicit selection. The list lives in the current
+workspace session. Import, save, export and project navigation are adjacent in
+both workspaces and reuse their existing save, export and project interfaces.
+
+## Toolpath line visibility (2026-11-05)
+
+Status: implemented. The visualizer settings can hide and restore cutting, rapid,
+direction and collision path lines, including printer travel. Tool, stock, playback,
+point and arc overlays, and printed deposits retain their independent controls.
+Reset view restores path lines. Existing per-operation visibility is preserved.
+
+Change log: 2026-11-05 — added the localized display control and connected it to
+the shared viewport and machine scene.
+
 ## Stageshow craft pass (2026-11-02)
 
 Status: in progress. The owner requests Stageshow principles across the desktop UI.
@@ -65,6 +96,10 @@ the final full build was interrupted after prolonged dependency transformation
 without further progress, so final production bundle verification remains pending.
 
 ## Print deposition evidence (2026-10-24)
+
+2026-11-05 continuation: a printer kernel run is bound to its complete input snapshot and
+editor owner. Abort it when that snapshot changes, and do not publish a late result. Mark
+displayed evidence stale when the snapshot or editor NC no longer matches the run.
 
 The printing continuation owns only the existing print result/kernel/evidence panels and CAM
 locale for showing independent deposition measures and support/connectivity checks. Display

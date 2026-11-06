@@ -120,3 +120,34 @@ test("tool setter cycles plan on a machine: the setter is reached through the ma
   expect(planned.body).toMatchObject({ cycle: "tool-length" })
   expect(planned.status).toBe(200)
 })
+
+test("simulate with a dialect answers the program, and contacts and offset changes carry its lines", async () => {
+  const set = { kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }
+  const response = await app.call("/api/cam/probing/simulate", { method: "POST", json: {
+    elements: plate, operations: [{ id: "top", operation: { kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 }, actions: [{ ...set, axes: { Z: "z" } }] }],
+    settings: { stylusDiameter: 4 }, dialect: "fanuc", misplacement: { z: 0.2 }
+  } })
+  expect(response.status).toBe(200)
+  const sim = Schema.decodeUnknownSync(CamProbingSimulation)(response.body)
+  expect(sim.program?.nc).toMatch(/G31/)
+  expect(sim.program?.identity.nc).toMatch(/^[0-9a-f]{64}$/)
+  const contact = sim.report.operations[0]!.contacts[0]!
+  expect(contact.line).toBeGreaterThan(0)
+  expect(sim.program!.nc.split("\n")[contact.line! - 1]).toMatch(/G31/)
+  expect(sim.report.updates[0]!.line).toBeGreaterThan(contact.line!)
+  // Without a dialect there is no text to number.
+  const plain = await app.call("/api/cam/probing/simulate", { method: "POST", json: { elements: plate, operations: [{ operation: { kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 } }], settings: { stylusDiameter: 4 } } })
+  expect(plain.body.program).toBeUndefined()
+})
+
+test("plan and emit: native writes the control's word for a macro style that has one, and refuses otherwise with the reason", async () => {
+  const body = { operation: bore, native: true, macroStyle: "renishaw", dialect: "fanuc", settings: { stylusDiameter: 4 } }
+  const emitted = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: body })).body)
+  expect(emitted.native).toContain("G65")
+  expect(emitted.nc).toContain("G65")
+  const planned = await app.call("/api/cam/probing/plan", { method: "POST", json: { operation: bore, native: true, macroStyle: "renishaw", settings: { stylusDiameter: 4 } } })
+  expect(planned.body.native).toContain("G65")
+  const refused = await app.call("/api/cam/probing/emit", { method: "POST", json: { ...body, macroStyle: "inline" } })
+  expect(refused.status).toBe(400)
+  expect(JSON.stringify(refused.body)).toContain("No native cycle")
+})

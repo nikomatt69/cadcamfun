@@ -35,6 +35,8 @@ export const CamProbeInput = Schema.Struct({
   frame: Schema.optionalKey(Schema.Struct({ a: Schema.optionalKey(degrees), b: Schema.optionalKey(degrees), c: Schema.optionalKey(degrees) })),
   /** The control the program is written for (default: the machine's post, else fanuc). */
   dialect: Schema.optionalKey(CamProbingDialect),
+  /** Write the control's own cycle (the machine's macro style); its `probing` claim stays unresolved. */
+  native: Schema.optionalKey(Schema.Boolean),
   machineConfig: Schema.optionalKey(id),
   settings: Schema.optionalKey(CamProbingSettingsInput),
   expectedRevision: Schema.optionalKey(Schema.String)

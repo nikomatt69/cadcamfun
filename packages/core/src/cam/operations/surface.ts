@@ -652,7 +652,10 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     gridNote(rect, step)
     const grid = nodeGrid(rect, step)
     const w = grid.nx + 1, h = grid.ny + 1
-    const z = sampleNodes((x, y) => { const t = surface.tip(cutter, x, y); return t === -Infinity ? t : Math.max(t, bottomZ) }, rect, step)
+    // Distances are read on the part itself. The ceiling the tool rides on is a staircase on a slope, longer than the surface it covers, and
+    // measured on it the passes come out closer than the spacing asked for. The ceiling still sets each pass's height.
+    const metric = params.contact === "mesh" ? surface : new Surface(part.grid, part.dexels.top(-Infinity))
+    const z = sampleNodes((x, y) => { const t = metric.tip(cutter, x, y); return t === -Infinity ? t : Math.max(t, bottomZ) }, rect, step)
     const tanWall = Math.tan((SCALLOP_WALL_ANGLE * Math.PI) / 180)
     const has = (i: number, j: number): boolean => i >= 0 && j >= 0 && i < w && j < h && z[j * w + i]! !== -Infinity
     const inside = new Uint8Array(w * h)

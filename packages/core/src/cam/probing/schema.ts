@@ -70,7 +70,7 @@ export const CharacteristicSchema = CharacteristicWire
   .pipe(Schema.decodeTo(Schema.toType(CharacteristicWire), SchemaTransformation.transform({ decode: (c: CharacteristicWire) => angular(c, DEG), encode: (c: CharacteristicWire) => angular(c, 1 / DEG) })))
 
 export const ProbeActionSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("set-offset"), ref: WorkOffsetRefSchema, axes: Schema.Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, Schema.optionalKey(resultName)])) as { readonly [K in OffsetAxis]: Schema.optionalKey<typeof resultName> }), policy: UpdatePolicySchema }),
+  Schema.Struct({ kind: Schema.Literal("set-offset"), ref: WorkOffsetRefSchema, axes: Schema.Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, Schema.optionalKey(resultName)])) as { readonly [K in OffsetAxis]: Schema.optionalKey<typeof resultName> }), reads: Schema.optionalKey(Schema.Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, Schema.optionalKey(Schema.Finite)])) as { readonly [K in OffsetAxis]: Schema.optionalKey<typeof Schema.Finite> })), policy: UpdatePolicySchema }),
   Schema.Struct({ kind: Schema.Literal("rotation"), result: resultName, via: Schema.Literals(["g68", "offset-r", "table-c"]), ref: Schema.optionalKey(WorkOffsetRefSchema), policy: UpdatePolicySchema }),
   Schema.Struct({ kind: Schema.Literal("tool-offset"), tool: toolNumber, quantity: Schema.Literals(["length", "radius"]), result: resultName, part: Schema.Literals(["geometry", "wear"]) }),
   Schema.Struct({

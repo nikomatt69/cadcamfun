@@ -16,14 +16,20 @@ export type CamSetupRequest = typeof CamSetupRequest.Type
 export const CamSetupGenerateRequest = Schema.Struct({
   setup: p.SetupSchema,
   elements: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Json)),
-  stock: Schema.optionalKey(cam.generator.StockSchema)
+  stock: Schema.optionalKey(cam.generator.StockSchema),
+  /** Replay every program once per work offset against its part's own blank and return the verdicts and the release level with it (slower: kernel jobs). */
+  evidence: Schema.optionalKey(Schema.Boolean),
+  /** Also return the setup's part probe (`partProbe` on every workpiece register) as the first program, to run before the cuts. */
+  probePart: Schema.optionalKey(Schema.Boolean)
 })
 export type CamSetupGenerateRequest = typeof CamSetupGenerateRequest.Type
 
 /** Generate from a saved setup: the stored setup is the program, so the request carries only the geometry its operations name. */
 export const CamSetupGenerateSavedRequest = Schema.Struct({
   elements: CamSetupGenerateRequest.fields.elements,
-  stock: Schema.optionalKey(cam.generator.StockSchema)
+  stock: Schema.optionalKey(cam.generator.StockSchema),
+  evidence: Schema.optionalKey(Schema.Boolean),
+  probePart: Schema.optionalKey(Schema.Boolean)
 })
 export type CamSetupGenerateSavedRequest = typeof CamSetupGenerateSavedRequest.Type
 
@@ -45,7 +51,11 @@ export type CamSetupValidation = typeof CamSetupValidation.Type
 
 export const CamSetupProgram = Schema.Struct({
   name: Schema.String, programNumber: int, gcode: Schema.String, program: cam.ProgramSchema, stats: cam.generator.GcodeStatsSchema,
-  warnings: Schema.Array(Schema.String), operationIds: Schema.Array(Schema.String), toolNumbers: Schema.Array(int)
+  warnings: Schema.Array(Schema.String), operationIds: Schema.Array(Schema.String), toolNumbers: Schema.Array(int),
+  /** With `evidence: true`: the replay of this program per work offset (`cam.program.SetupEvidence`: release, registers, fixture, notes), as plain data. */
+  evidence: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  /** `probe`: the datum probe of the workpieces (`probePart`), to be run before the cuts. */
+  kind: Schema.optionalKey(Schema.Literal("probe"))
 })
 
 export const CamSetupGenerated = Schema.Struct({
