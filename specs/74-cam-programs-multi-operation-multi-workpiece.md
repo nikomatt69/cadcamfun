@@ -68,13 +68,23 @@ Built on top of §2:
   preview, not a pass. Lateral setups are covered by this only in so far as they use such cutters; a true fix needs a tri-dexel residual
   between setups (the replay already is one; the hand-over is not).
 
+- **HTTP generate replays on request.** `POST /api/cam/setups/generate` and `POST /api/projects/:id/cam-setups/:setupId/generate` take
+  `evidence: true`: every returned program carries `evidence` (the same `SetupEvidence` as the assistant's, built from the same
+  `setupReplayPlan`, one kernel job per work offset). The routes store nothing, so the caller stores the program with that evidence
+  (`data.setupEvidence`); without the flag nothing is replayed (the replay costs a kernel job per register).
+- **Parts seen together in one frame.** From two registers on, `SetupEvidence.fixture` places every blank at its `placement` in the first
+  part's datum frame, carries the program's moves into that frame (`interpretGcode` with `frame: "machine"` and the placements as the
+  offset table) and lists, per part, the blank there, the volume removed, the volume left (from that part's own replay) and where its
+  feed moves reached. `crossings` are cuts of one register inside another part's blank (a wrong register or placement): they block the
+  release. It needs a placement on every part after the first (else a note says so). It is a box test on the tool axis: the tool radius is
+  not added, arcs count by their ends, and the remaining volume is the per-part figure of the replay, not one tri-dexel of the whole fixture.
+
 Still not done:
 
-1. The HTTP generate route (`POST /api/cam-setups/.../generate`-style downloads) does not replay; only the assistant's `setup_generate`
-   stores programs with evidence.
-2. Operation templates and copy/mirror/pattern of operations in the legacy setup (the kernel has them).
-3. A combined machine-frame stock-removal view of all parts at once for the viewer (the interpreter has `frame: "machine"` and
-   `workOffsets`; the replay itself is per part).
+1. Operation templates and copy/mirror/pattern of operations in the legacy setup (the kernel has them).
+2. One tri-dexel of the whole fixture (clamps as solids, the figures of all parts from one run); today the parts are replayed one by one
+   and then compared by boxes in one frame.
+3. The viewer does not draw the combined fixture view (the data is in the evidence).
 4. Probing each part's datum tied to `workpieces`.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids (boxes only), holder collision against
    the machine; no controller qualification (a pass is the reference interpreter's, not a machine's).
