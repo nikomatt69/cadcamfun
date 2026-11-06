@@ -10,7 +10,7 @@ import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { restoreKernelSettings, useGeneratorStore } from "../store/generatorStore.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
-import { placedProgram } from "./setup.ts"
+import { evidenceOfProgram, placedProgram } from "./setup.ts"
 import { t } from "../../../i18n/index.ts"
 import { isSaveConflict } from "../../cad/lib/stored-revision.ts"
 
@@ -64,10 +64,14 @@ export const workpiecesOfSnapshot = (snapshot: Pick<SavedCamProgram, "drawing"> 
 
 export const savedProgramData = (previous: unknown, snapshot: SavedCamProgram): Record<string, unknown> => {
   const data = { ...record(previous) }
-  for (const key of ["kernelArtifact", "kernelRequest", "turningPlan", "turningRequest", "identity", "verification", "response", "sourceRevision", "operations"]) delete data[key]
+  // The replay of a setup program is about those bytes: it is kept only for the very text it was made for (the editor's, or the earlier row's).
+  const earlier = evidenceOfProgram(data["setupEvidence"], snapshot.gcode)
+  const held = useCamStore.getState().generatedProgram
+  const evidence = held?.gcode === snapshot.gcode && held.evidence !== undefined ? held.evidence : earlier
+  for (const key of ["kernelArtifact", "kernelRequest", "turningPlan", "turningRequest", "identity", "verification", "response", "sourceRevision", "operations", "setupEvidence"]) delete data[key]
   const old = record(previous), oldArtifact = record(old["kernelArtifact"])
   if (snapshot.kernelArtifact && oldArtifact["nc"] === snapshot.gcode && typeof old["sourceRevision"] === "string") data["sourceRevision"] = old["sourceRevision"]
-  return { ...data, ...Schema.encodeSync(SavedCamProgram)(snapshot) }
+  return { ...data, ...Schema.encodeSync(SavedCamProgram)(snapshot), ...(evidence !== undefined ? { setupEvidence: evidence } : {}) }
 }
 
 export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "id" | "name" | "gcode" | "data" | "projectId" | "drawingId"> & Partial<Pick<ToolpathRow, "description" | "isPublic">>, current: () => boolean): Promise<void> => {
@@ -86,7 +90,9 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
   const store = useCamStore.getState(), generator = useGeneratorStore.getState()
   store.clearOperationResults()
   const fixture = snapshot?.gcode === code ? workpiecesOfSnapshot(snapshot) : []
-  store.setGeneratedProgram(fixture.length > 1 && snapshot !== undefined ? { gcode: code, program: snapshot.program, workpieces: fixture } : undefined)
+  // The replay stored with a setup program comes back with it, when it is about this very text.
+  const evidence = snapshot?.gcode === code ? evidenceOfProgram(data["setupEvidence"], code) : undefined
+  store.setGeneratedProgram(snapshot !== undefined && (fixture.length > 1 || evidence !== undefined) ? { gcode: code, program: snapshot.program, workpieces: fixture, ...(evidence !== undefined ? { evidence } : {}) } : undefined)
   if (snapshot?.gcode === code && snapshot.operations?.length && combineOperationResults(snapshot.operations).gcode === code) {
     for (const operation of snapshot.operations) store.upsertOperationResult(operation)
   }

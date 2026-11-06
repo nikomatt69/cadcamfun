@@ -394,3 +394,44 @@ export const workpiecesFromElements = (elements: ReadonlyArray<Record<string, un
     return { ...base, placement: { x: box.min.x - origin.x, y: box.min.y - origin.y, z: box.min.z - origin.z } }
   })
 }
+
+// ---------------------------------------------------------------- the replay of a generated program
+
+export type SetupEvidence = cam.program.SetupEvidence
+const RELEASES: ReadonlyArray<string> = ["blocked", "preview", "verified-program"]
+
+/**
+ * The replay evidence of a program, as plain data from the generate route or a stored document, when it is about these very bytes:
+ * evidence of other NC text (an edited program) is not evidence, and anything that does not look like one is left out.
+ */
+export const evidenceOfProgram = (raw: unknown, gcode: string): SetupEvidence | undefined => {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const value = raw as Record<string, unknown>
+  if (typeof value["release"] !== "string" || !RELEASES.includes(value["release"]) || value["programHash"] !== cam.kernel.sha256(gcode)) return undefined
+  if (!Array.isArray(value["registers"]) || !Array.isArray(value["notes"])) return undefined
+  return value as unknown as SetupEvidence
+}
+
+/** One box of the parts seen together: a part's blank, how far its own register's cuts reached, and whether a cut crossed into it or out of it. */
+export interface FixtureBox {
+  readonly name: string
+  readonly origin: Vec3
+  readonly size: Vec3
+  /** "crossed": a cut of another part's register entered this blank, or this part's register cut into another blank. */
+  readonly state: "part" | "crossed"
+  readonly reach?: { readonly origin: Vec3; readonly size: Vec3 }
+}
+
+const boxOf = (b: { readonly min: Vec3; readonly max: Vec3 }): { readonly origin: Vec3; readonly size: Vec3 } =>
+  ({ origin: b.min, size: { x: b.max.x - b.min.x, y: b.max.y - b.min.y, z: b.max.z - b.min.z } })
+
+/** The parts of a program with several registers in one frame, for the viewport; nothing when the evidence has no such view. */
+export const fixtureBoxes = (evidence: SetupEvidence | undefined): ReadonlyArray<FixtureBox> => {
+  const fixture = evidence?.fixture
+  if (fixture === undefined || fixture.parts.length < 2) return []
+  const crossed = new Set(fixture.crossings.flatMap((c) => [c.register, c.other]))
+  return fixture.parts.map((part): FixtureBox => ({
+    name: part.name, ...boxOf(part.blank), state: crossed.has(part.register) ? "crossed" : "part",
+    ...(part.reach !== undefined ? { reach: boxOf(part.reach) } : {})
+  }))
+}

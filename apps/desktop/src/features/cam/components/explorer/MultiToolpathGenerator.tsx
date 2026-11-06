@@ -17,7 +17,7 @@ import { useApp } from "../../../../shared/state/context.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { makeSetupService } from "../../api/setup.ts"
 import { stockOf } from "../../lib/job.ts"
-import { elementsOfSetup, placedProgram, programFileName, setupOfToolpaths } from "../../lib/setup.ts"
+import { elementsOfSetup, evidenceOfProgram, placedProgram, programFileName, setupOfToolpaths } from "../../lib/setup.ts"
 import type { CamSetupGenerated } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { useSetupStore } from "../../store/setupStore.ts"
@@ -135,7 +135,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
   // setup store's grouping), written by the post of the sidecar's `camSetup` group, not by joining the toolpaths' texts.
   const generatePrograms = async (): Promise<CamSetupGenerated | undefined> => {
     const setup = setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices)
-    const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock: stockOf(job.sources()) }
+    // `evidence`: each program is replayed per work offset against its own blank (a kernel job per register), so the saved program carries its release.
+    const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock: stockOf(job.sources()), evidence: true }
     try {
       const result = await app.runtime.run(makeSetupService(app.client).generate(request))
       useSetupStore.getState().setResult(result)
@@ -163,7 +164,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     const workpieces = cam.program.workpiecesOf(setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices))
     camStore.clearOperationResults()
     camStore.setKernelArtifact(undefined); camStore.setKernelRequest(undefined)
-    camStore.setGeneratedProgram({ gcode: program.gcode, program: program.program, workpieces })
+    const evidence = evidenceOfProgram(program.evidence, program.gcode)
+    camStore.setGeneratedProgram({ gcode: program.gcode, program: program.program, workpieces, ...(evidence !== undefined ? { evidence } : {}) })
     camStore.setProgram(placedProgram(program.program, workpieces))
     props.onGCodeGenerated(program.gcode)
     toast.success(t("cam.multi.sent"))

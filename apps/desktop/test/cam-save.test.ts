@@ -263,3 +263,34 @@ test("CAD and CAM share export/project dialog layout and show their contents", a
     for (const name of ["projectName", "description", "organization", "public"]) expect(camProject.querySelector(`[name='${name}']`)).not.toBeNull()
   } finally { view.dispose() }
 })
+
+test("the replay of a setup program is saved with it, comes back with it, and is dropped for other text", async () => {
+  const gcode = "G21\nG54\nG0 X1 Y1 Z5\nG1 Z-1 F300\nG55\nG0 X1 Y1 Z5\nG1 Z-1 F300"
+  const program = cam.generator.analyseGcode(gcode).program
+  const workpieces: cam.program.Workpiece[] = [{ id: "w1", name: "P1", workOffset: "G54" }, { id: "w2", name: "P2", workOffset: "G55", placement: { x: 80, y: 0, z: 0 } }]
+  const box = (x: number) => ({ min: { x, y: 0, z: -5 }, max: { x: x + 20, y: 20, z: 0 } })
+  const evidence = {
+    release: "verified-program" as const, programHash: cam.kernel.sha256(gcode), notes: [], basis: "test",
+    registers: workpieces.map((w) => ({ register: w.workOffset, workpieceId: w.id, name: w.name, verdict: "clean" as const, complete: true, reasons: [], findings: [], gougeMm: 0, leftMm: 0, feedMoves: 1, cellMm: 0.1, errorBoundMm: 0.1, removedMm3: 10, stockMm3: 100 })),
+    fixture: { frame: "P1", parts: [{ register: "G54", workpieceId: "w1", name: "P1", datum: { x: 0, y: 0, z: 0 }, blank: box(0), removedMm3: 10, remainingMm3: 90 }, { register: "G55", workpieceId: "w2", name: "P2", datum: { x: 80, y: 0, z: 0 }, blank: box(80), removedMm3: 10, remainingMm3: 90 }], crossings: [] }
+  }
+  useElementsStore.setState({ elements: [plate], selectedElement: null })
+  const store = useCamStore.getState()
+  store.setGcode(gcode); store.setProgram(program)
+  store.setGeneratedProgram({ gcode, program, workpieces, evidence })
+  const snapshot = await snapshotCamProgram(app.state, gcode)
+  const data = savedProgramData(undefined, snapshot)
+  expect((data["setupEvidence"] as { release: string }).release).toBe("verified-program")
+  const project = await app.state.runtime.run(app.client.projects.create({ payload: { name: "Replay evidence" } }))
+  const row = await app.state.runtime.run(app.client.toolpaths.create({ payload: { name: "Two parts", projectId: project.id, operationType: "setup", gcode, data } }))
+  store.reset()
+  await restoreCamProgram(app.state, row, () => true)
+  const back = useCamStore.getState().generatedProgram
+  expect(back?.evidence?.release).toBe("verified-program")
+  expect(back?.evidence?.fixture?.parts).toHaveLength(2)
+  expect(back?.workpieces.map((w) => w.id)).toEqual(["w1", "w2"])
+  // Edited text: the earlier row's evidence is about other bytes and is not written again.
+  store.setGeneratedProgram(undefined)
+  const edited = await snapshotCamProgram(app.state, `${gcode}\nG0 Z10`)
+  expect(savedProgramData(row.data, edited)["setupEvidence"]).toBeUndefined()
+})

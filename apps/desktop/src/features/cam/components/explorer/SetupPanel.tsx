@@ -18,10 +18,13 @@ import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useDocumentStore } from "../../../cad/store/documentStore.ts"
 import { makeSetupService, refOfDocument } from "../../api/setup.ts"
-import { choicesOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, nextWorkpiece, offsetsOf, registerKey, setupOfToolpaths, withRegister, toolpathsOfSetup, withoutWorkpiece, type SetupChoices } from "../../lib/setup.ts"
+import { choicesOfSetup, evidenceOfProgram, MAX_WORKPIECES, REGISTER_CHOICES, nextWorkpiece, offsetsOf, registerKey, setupOfToolpaths, withRegister, toolpathsOfSetup, withoutWorkpiece, type SetupChoices } from "../../lib/setup.ts"
 import { TOOLPATH_COLORS, useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import { useSetupStore } from "../../store/setupStore.ts"
 import { useCamStore } from "../../store/camStore.ts"
+
+const RELEASE_LABEL = { blocked: "cam.setupDoc.release.blocked", preview: "cam.setupDoc.release.preview", "verified-program": "cam.setupDoc.release.verified-program" } as const
+const VERDICT_LABEL = { clean: "cam.setupDoc.verdict.clean", faults: "cam.setupDoc.verdict.faults", incomplete: "cam.setupDoc.verdict.incomplete" } as const
 
 const GROUPINGS: ReadonlyArray<SetupChoices["grouping"]> = ["single", "perTool", "perOperation"]
 const ORDERS: ReadonlyArray<SetupChoices["workpieceOrder"]> = ["toolFirst", "partFirst"]
@@ -57,8 +60,8 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
   const table = () => setup.result?.toolTable ?? setup.plan?.toolTable
   const toolChanges = () => setup.result?.totals.toolChanges ?? setup.plan?.toolChanges
   const toolLoads = () => setup.result?.totals.toolLoads ?? setup.plan?.toolLoads
-  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length, offsets: offsetsOf(p.program), generated: p, hints: p.warnings.filter((w) => / faster than /.test(w)) }))
-    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length, offsets: [] as ReadonlyArray<string>, generated: undefined, hints: [] as ReadonlyArray<string> }))
+  const programs = () => setup.result?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operationIds.length, offsets: offsetsOf(p.program), generated: p, hints: p.warnings.filter((w) => / faster than /.test(w)), evidence: evidenceOfProgram(p.evidence, p.gcode) }))
+    ?? setup.plan?.programs.map((p) => ({ name: p.name, programNumber: p.programNumber, toolNumbers: p.toolNumbers, operations: p.operations.length, offsets: [] as ReadonlyArray<string>, generated: undefined, hints: [] as ReadonlyArray<string>, evidence: undefined }))
   /** The tool changes of the same operations in each order: the cost of finishing a part before the next is visible before it is chosen. */
   const orders = () => {
     if (setup.choices.workpieces.length < 2) return undefined
@@ -346,6 +349,11 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
                     <Show when={program.offsets.length > 1}>{" · "}{t("cam.setupDoc.offsets", { offsets: program.offsets.join(" ") })}</Show>
                   </span>
                   <Show when={program.hints.length > 0}><span class="block text-gray-500" data-testid="cam-setup-program-hint">{program.hints.join(" ")}</span></Show>
+                  <Show when={program.evidence}>{(evidence) => (
+                    <span class="block text-gray-500" data-testid="cam-setup-program-evidence" data-release={evidence().release} title={evidence().notes.join(" ")}>
+                      {t("cam.setupDoc.evidence", { release: t(RELEASE_LABEL[evidence().release]), registers: evidence().registers.map((r) => `${r.register} ${t(VERDICT_LABEL[r.verdict])}`).join(" · ") })}
+                    </span>
+                  )}</Show>
                   <Show when={program.generated !== undefined && props.onOpenProgram}>
                     <button type="button" class={BUTTON} data-testid="cam-setup-open-program" onClick={() => props.onOpenProgram?.(program.generated!)} aria-label={t("cam.setupDoc.open")} title={t("cam.setupDoc.open")}><Play size={12} /></button>
                   </Show>

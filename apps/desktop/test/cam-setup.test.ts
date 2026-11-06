@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
 import { addJobSetup, jobRelease, patchJobSetup, removeJobSetup } from "../src/features/cam/lib/job.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, arcPoints, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, arcPoints, evidenceOfProgram, fixtureBoxes, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -351,5 +351,33 @@ describe("the setups of a kernel job", () => {
     expect(jobRelease(["verified-program", "preview"])).toBe("preview")
     expect(jobRelease(["verified-program", "blocked", "preview"])).toBe("blocked")
     expect(jobRelease([])).toBeUndefined()
+  })
+})
+
+describe("the replay evidence of a generated program", () => {
+  const gcode = "G21\nG54\nG0 X1"
+  const part = (register: string, x: number) => ({ register, workpieceId: register, name: register, datum: { x, y: 0, z: 0 }, blank: { min: { x, y: 0, z: -5 }, max: { x: x + 20, y: 20, z: 0 } }, removedMm3: 1, remainingMm3: 9, ...(x > 0 ? { reach: { min: { x, y: 2, z: -1 }, max: { x: x + 10, y: 8, z: 5 } } } : {}) })
+  const evidence = (crossings: ReadonlyArray<{ register: string; other: string }> = []) => ({
+    release: "preview", programHash: cam.kernel.sha256(gcode), registers: [], notes: [], basis: "",
+    fixture: { frame: "P1", parts: [part("G54", 0), part("G55", 80), part("G56", 160)], crossings: crossings.map((c) => ({ ...c, line: 3, message: "cut" })) }
+  })
+
+  test("it is taken only for the very text it was made for, and only when it looks like evidence", () => {
+    expect(evidenceOfProgram(evidence(), gcode)?.release).toBe("preview")
+    expect(evidenceOfProgram(evidence(), `${gcode}\nG0 Z9`)).toBeUndefined()
+    expect(evidenceOfProgram({ ...evidence(), release: "great" }, gcode)).toBeUndefined()
+    expect(evidenceOfProgram({ ...evidence(), registers: "no" }, gcode)).toBeUndefined()
+    expect(evidenceOfProgram(undefined, gcode)).toBeUndefined()
+    expect(evidenceOfProgram([], gcode)).toBeUndefined()
+  })
+
+  test("the parts seen together become boxes, the parts a cut crossed are marked, a single part has no combined view", () => {
+    const boxes = fixtureBoxes(evidenceOfProgram(evidence([{ register: "G55", other: "G54" }]), gcode))
+    expect(boxes.map((b) => [b.name, b.state])).toEqual([["G54", "crossed"], ["G55", "crossed"], ["G56", "part"]])
+    expect(boxes[1]).toMatchObject({ origin: { x: 80, y: 0, z: -5 }, size: { x: 20, y: 20, z: 5 }, reach: { origin: { x: 80, y: 2, z: -1 }, size: { x: 10, y: 6, z: 6 } } })
+    expect(boxes[0]!.reach).toBeUndefined()
+    expect(fixtureBoxes(undefined)).toEqual([])
+    const single = { ...evidence(), fixture: { ...evidence().fixture, parts: [part("G54", 0)] } }
+    expect(fixtureBoxes(evidenceOfProgram(single, gcode))).toEqual([])
   })
 })

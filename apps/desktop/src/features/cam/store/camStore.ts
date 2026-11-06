@@ -153,6 +153,8 @@ export interface GeneratedProgramView {
   readonly gcode: string
   readonly program: cam.Program
   readonly workpieces: ReadonlyArray<cam.program.Workpiece>
+  /** The replay of these very bytes per work offset (release, verdicts, the parts in one frame), when it was asked for. */
+  readonly evidence?: cam.program.SetupEvidence
 }
 
 /** One stored operation's generated program, as the page shows it. */
