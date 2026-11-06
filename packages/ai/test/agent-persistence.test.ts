@@ -107,11 +107,11 @@ describe("the turn does not end on words", () => {
     let stage = 0
     script = (request) => {
       const last = textOf(request)
-      if (last.includes("unfinished items")) { stage = 2; return { toolCalls: [{ name: "todowrite", args: { todos: [{ content: "Model", status: "completed", priority: "high" }, { content: "Verify", status: "completed", priority: "high" }] } }] } }
+      if (last.includes("unfinished items")) { stage = 2; return { toolCalls: [{ name: "todowrite", args: { todos: [{ id: "model", content: "Model", status: "completed", priority: "high" }, { id: "verify", content: "Verify", status: "completed", priority: "high" }] } }] } }
       if (stage === 2 && lastIsTool(request)) return { text: "Both steps are done." }
       if (lastIsTool(request) && stage === 1) return { text: "Modelled the part." }
       stage = 1
-      return { toolCalls: [{ name: "todowrite", args: { todos: [{ content: "Model", status: "completed", priority: "high" }, { content: "Verify", status: "pending", priority: "high" }] } }] }
+      return { toolCalls: [{ name: "todowrite", args: { todos: [{ id: "model", content: "Model", status: "completed", priority: "high" }, { id: "verify", content: "Verify", status: "pending", priority: "high" }] } }] }
     }
     const events = await run("model and verify", "persist-3")
     const done = events.at(-1) as Extract<AiEvent, { type: "done" }>
