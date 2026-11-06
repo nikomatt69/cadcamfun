@@ -692,7 +692,7 @@ describe("the probe program replayed against a blank that is not where the setup
     expect(program.partProbeProgram(probed({ ...twice, rotation: "offset-r" }), 7).generated!.gcode).toMatch(/G68 X/)
     // LinuxCNC has G68 too, with the Fanuc words; and G10 L2 R for the register.
     const lcncG68 = program.partProbeProgram(probed({ ...twice, rotation: "g68" }, lcnc), 7)
-    expect(lcncG68.refused).toBeUndefined()
+    expect(lcncG68.plan.refused).toBeUndefined()
     expect(lcncG68.generated!.gcode).toMatch(/G68 X/)
     expect(lcncG68.generated!.gcode).toMatch(/G69/)
     expect(replayOf({ ...twice, rotation: "g68" }, lcnc)).toMatchObject({ status: "within", g68: 0.5 })
