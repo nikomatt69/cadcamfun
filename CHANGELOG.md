@@ -3,6 +3,24 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.102 (November 2026)
+
+## Core
+
+- A collision message of a program without source lines no longer says 'line ?'
+- Enhance SetupPanel to display evidence messages and improve fixture simulation efficiency with caching
+- Setup and ToolpathSettings are named components in the OpenAPI document (the contracts snapshot loses a sixth of its size and a setup field is one copy, not nine); skill and spec 74 say what the inline probe, the tilted plane and the part frames do
+- Another part's blank is an exact obstacle like a clamp (swept tool against the box, tool radius counted), in each part's own frame: a part turned or tilted by its index meets the clamps and blanks where the table carries them and is not carved into the lattice body
+- Add cloud tab and corresponding panel to settings screen; update localization files to include cloud support
+
+## Web
+
+- Regenerate the API reference with Setup and ToolpathSettings as named components
+
+## Build and release
+
+- Drop secret_delete from the pending-caller list (#75)
+
 ## v0.1.101 (November 2026)
 
 ## Core
