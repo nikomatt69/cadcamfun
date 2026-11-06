@@ -70,9 +70,19 @@ Built on top of §2:
   setup, whatever its orientation. `carriedColumns` reads the columns from that solid; the stock volume, the leftover figures and the
   coverage then start from the right material. `part-coverage` states the evidence (cell, declared error, what is left or cut below the
   part after the last setup) and is `passed` when every setup's replay was complete, `failed` when the chain cuts below the part,
-  `unresolved` with the old `carryLimitsOf` sentence when a replay stopped (budget) or a carried solid was too large to sample. Not
-  done: the claims of the setup that cuts the undercut itself stay with the height field (back-boring moves are blind to it, so its
-  `no-gouge`/`material-removed` stay `unresolved` and the job is a preview); a flat-table job's verdicts are not taken from the tri-dexel.
+  `unresolved` with the old `carryLimitsOf` sentence when a replay stopped (budget) or a carried solid was too large to sample. The setup that cuts the
+  undercut itself is judged on its own tri-dexel (the replay exists whenever the program has a back-boring operation, carried or not): its
+  `no-rapid-in-stock`, `holder-clearance`, `no-gouge` and `material-removed` are decided there, with the error declared. While the bar passes the
+  pilot it is oriented and shifted by -Q (`backBoreShift`), and that pass is judged as the envelope the planner's own pilot rule assumes (the insert
+  is one tooth towards +X: reach R - Q, body Q + body radius, about the hole axis), not as an insert all round; the shifts between the bar on the
+  axis and the bar shifted judge the body only (the insert moves away from the wall it cut). Declared removal the mesh does not carry (drill
+  points, chamfers, threads) is named in the claim: a replay that found no cut below the part beyond its error passes whatever is declared, one
+  that found a cut cannot be told from the declared removal and stays `unresolved`. With the tri-dexel incomplete (budget) the claims stay
+  `unresolved`. A job is `verified-program` when every claim of every setup passes and the facing coverage of all the setups is complete: a setup's
+  own "faces that look away" part-coverage no longer holds the job at preview (the job's coverage replaces it), but an unfixed manual refixture
+  (`setup-workholding`) still does, so the flipped setup needs fixture bodies that hold the stock. The next setup's start volume differs from
+  the previous one's end volume by the sampling error (about 0.8 % in the back-bore job), asserted in the tests against the declared error times
+  the stock's surface. Still the height field: the verdicts of a flat-table job without an undercut, and the lateral rest-stock figures.
 
 - **HTTP generate replays on request.** `POST /api/cam/setups/generate` and `POST /api/projects/:id/cam-setups/:setupId/generate` take
   `evidence: true`: every returned program carries `evidence` (the same `SetupEvidence` as the assistant's, built from the same
@@ -82,8 +92,13 @@ Built on top of §2:
   part's datum frame, carries the program's moves into that frame (`interpretGcode` with `frame: "machine"` and the placements as the
   offset table) and lists, per part, the blank there, the volume removed, the volume left (from that part's own replay) and where its
   feed moves reached. `crossings` are cuts of one register inside another part's blank (a wrong register or placement): they block the
-  release. It needs a placement on every part after the first (else a note says so). It is a box test on the tool axis: the tool radius is
-  not added, arcs count by their ends, and the remaining volume is the per-part figure of the replay, not one tri-dexel of the whole fixture.
+  release. It needs a placement on every part after the first (else a note says so). The contacts are judged on a tri-dexel of what a register's
+  own moves must not touch (the other parts' blanks and the setup's `fixtures` clamps, as one solid in that frame), with the tool as it is: the
+  flutes and shank, and the holder when it is described, so the tool radius counts (a part whose blank the tool edge reaches while the axis is still
+  outside it is a crossing). Rapids count too. Only moves whose tool comes near an obstacle are replayed, the holder separately (wide but high). A
+  contact shallower than `errorBoundMm` is below the lattice's noise and is not reported; a replay that could not finish (`complete: false`,
+  `reasons`) claims nothing and keeps the release at `preview`. A single part with clamps gets the view as well (`clamps`, crossings named by the
+  clamp). The remaining volume is still the per-part figure of each part's own replay.
 
 - **Operation templates.** `Setup.templates` (a named cycle of steps: tool, settings, `dependsOn`, `fromPreviousStock`) and `Setup.uses` (a
   template applied to elements: `perElement` one instance per element, `order` `perStep` or `perFeature`, `workpieceIds`, `position`
@@ -107,8 +122,8 @@ Built on top of §2:
 Still not done:
 
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
-2. One tri-dexel of the whole fixture (clamps as solids, the figures of all parts from one run); today the parts are replayed one by one
-   and then compared by boxes in one frame.
+2. The remaining stock of ALL parts as one tri-dexel of the whole fixture: the figures per part still come from each part's own replay, and the
+   contacts between parts and clamps are on a tri-dexel per register, not one solid carved by every register in program order.
 3. The viewer does not draw the combined fixture view (the data is in the evidence).
 4. The part probe inline in each part's toolpaths, simulated with `simulateProbing` against a misplaced blank, probing more than one
    cycle kind with angles (web, pocket, rotation correction) and a tilted-plane or rotary index probe.

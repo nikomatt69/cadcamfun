@@ -382,6 +382,57 @@ describe("replay of a generated program: inputs and release", () => {
   })
 })
 
+describe("the fixture on one tri-dexel: the tool's radius counts, and the clamps are obstacles too", () => {
+  const stock = { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }
+  const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", stock: { ...stock, x: 70, origin: { x: -35, y: -25, z: 0 } } }]
+  const fixture = setup([op("a", t6), op("b", t3)], { workpieces: parts, stock })
+  const made = generateSetup(fixture, geometryOf)
+  const replay = program.setupReplay(fixture, made.programs[0]!, geometryOf)
+  const gcode = made.programs[0]!.gcode
+  const held = made.programs[0]!.tools.map((t) => ({ ...t, holder: { diameter: 30, length: 40 } }))
+  const solid = { ...replay, part: [{ positions: new Float32Array(9), indices: new Uint32Array(3) }] }
+  const clean = { verdict: "clean" as const, complete: true, reasons: [], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, cell: 0.5, errorBound: 0.5, poses: 1, feedMoves: 10, removedVolume: 100, stockVolume: 1000 } as never
+  const at = (x: number) => ({ ...solid, registers: solid.registers.map((r) => (r.register === "G55" ? { ...r, datum: { x, y: 0, z: 0 } } : r)) })
+
+  test("a part whose blank the other part's tool edge reaches, with the axis still outside it, is a crossing; a part beyond the radius is not", () => {
+    // Part 1's moves reach x 17 on the tool axis (a Ø6 cutter: its edge at x 20). Part 2's blank starts at 18 with the datum at 53.
+    const near = program.setupEvidence(gcode, at(53), [clean, clean], held)
+    expect(near.fixture!.complete).toBe(true)
+    expect(near.fixture!.method).toBe("tri-dexel")
+    expect(near.fixture!.crossings.map((c) => [c.register, c.other])).toEqual([["G54", "G55"]])
+    expect(near.fixture!.crossings[0]!.message).toMatch(/counted with its radius/)
+    expect(near.release).toBe("blocked")
+    // The blank starts at 25: the edge (x 20) stays 5 mm clear of it.
+    const clear = program.setupEvidence(gcode, at(60), [clean, clean], held)
+    expect(clear.fixture!.crossings).toEqual([])
+    expect(clear.fixture!.complete).toBe(true)
+    expect(clear.release).toBe("verified-program")
+  })
+
+  test("a clamp the tool's edge or holder reaches is a crossing named by the clamp, one beyond the radius is not, and a single part with clamps gets the view", () => {
+    const one = { ...solid, registers: [solid.registers[0]!] }
+    const clamp = (min: number) => ({ id: "c1", name: "Clamp 1", min: { x: min, y: -20, z: -10 }, max: { x: min + 20, y: 20, z: 5 } })
+    // The axis reaches 17, the Ø6 edge 20: a clamp from 19 is touched by 1 mm; one from 26 is not.
+    const hit = program.setupEvidence(gcode, { ...one, fixtures: [clamp(18)] }, [clean], held)
+    expect(hit.fixture?.clamps?.map((c) => c.id)).toEqual(["c1"])
+    expect(hit.fixture!.crossings.map((c) => [c.register, c.other])).toEqual([["G54", "c1"]])
+    expect(hit.fixture!.crossings[0]!.message).toMatch(/reaches the clamp Clamp 1 at NC line/)
+    expect(hit.release).toBe("blocked")
+    const miss = program.setupEvidence(gcode, { ...one, fixtures: [clamp(26)] }, [clean], held)
+    expect(miss.fixture!.crossings).toEqual([])
+    expect(miss.fixture!.complete).toBe(true)
+    // The holder is judged when it is described: a bridge high above the stock is reached by the Ø30 holder (it starts 34 mm above the tip), not by the flutes.
+    const bridge = { id: "c2", name: "Bridge", min: { x: 20, y: -20, z: 30 }, max: { x: 45, y: 20, z: 60 } }
+    const above = program.setupEvidence(gcode, { ...one, fixtures: [bridge] }, [clean], held)
+    expect(above.fixture!.crossings.map((c) => c.other)).toEqual(["c2"])
+    expect(above.fixture!.crossings[0]!.message).toMatch(/and holder/)
+    // A tool with no holder described is not judged where only its holder could reach: nothing is claimed beyond the flutes and shank.
+    const noHolder = program.setupEvidence(gcode, { ...one, fixtures: [bridge] }, [clean], made.programs[0]!.tools)
+    expect(noHolder.fixture!.crossings).toEqual([])
+    expect(noHolder.notes.join(" ")).toMatch(/No holder is described/)
+  })
+})
+
 describe("operation templates: a cycle of operations applied to features", () => {
   const rough = { id: "rough", name: "Rough", tool: t6, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 2, toolDiameter: 6, operationType: "pocket" as const } }
   const finish = { id: "finish", name: "Finish", tool: t3, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 4, toolDiameter: 3, operationType: "contour" as const }, dependsOn: ["rough"] }
