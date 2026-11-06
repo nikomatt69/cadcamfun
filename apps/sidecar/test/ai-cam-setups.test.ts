@@ -294,7 +294,7 @@ test("probePart stores the datum probe of every workpiece as the first program, 
   // Placed inline, the probe is inside the program that cuts the parts: one program, no separate probe program, and the replay runs the cuts only.
   const inlineSaved = await call("cam_edit", { action: "setup_save", name: "Probed inline", setup: { ...base, partProbe: { ...partProbe, placement: "inline" } } })
   const inlineGenerated = await call("cam_edit", { action: "setup_generate", setupId: inlineSaved.setupId, probePart: true })
-  expect(inlineGenerated.ok, inlineGenerated.error).toBe(true)
+  expect(inlineGenerated.ok, String(inlineGenerated.error ?? "")).toBe(true)
   expect(inlineGenerated.programs).toHaveLength(1)
   expect(inlineGenerated.programs[0].kind).toBeUndefined()
   expect(inlineGenerated.programs[0].toolNumbers).toContain(2)
