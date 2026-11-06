@@ -432,6 +432,7 @@ type Endpoint6_7Input = {
   readonly requestId?: Endpoint6_7Request["payload"]["requestId"]
   readonly answers?: Endpoint6_7Request["payload"]["answers"]
   readonly decision?: Endpoint6_7Request["payload"]["decision"]
+  readonly message?: Endpoint6_7Request["payload"]["message"]
   readonly model?: Endpoint6_7Request["payload"]["model"]
 }
 const Endpoint6_7 = (raw: RawClient["ai"]) => (input: Endpoint6_7Input) =>
@@ -446,6 +447,7 @@ const Endpoint6_7 = (raw: RawClient["ai"]) => (input: Endpoint6_7Input) =>
       requestId: input["requestId"],
       answers: input["answers"],
       decision: input["decision"],
+      message: input["message"],
       model: input["model"],
     },
   }).pipe(Effect.mapError(mapClientError))
@@ -847,6 +849,7 @@ type Endpoint6_46Input = {
   readonly projectId?: Endpoint6_46Request["payload"]["projectId"]
   readonly requestId: Endpoint6_46Request["payload"]["requestId"]
   readonly decision: Endpoint6_46Request["payload"]["decision"]
+  readonly message?: Endpoint6_46Request["payload"]["message"]
 }
 const Endpoint6_46 = (raw: RawClient["ai"]) => (input: Endpoint6_46Input) =>
   raw["permissionReply"]({
@@ -855,6 +858,7 @@ const Endpoint6_46 = (raw: RawClient["ai"]) => (input: Endpoint6_46Input) =>
       projectId: input["projectId"],
       requestId: input["requestId"],
       decision: input["decision"],
+      message: input["message"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

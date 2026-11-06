@@ -281,3 +281,39 @@ test("a gateway credential does not advertise unrelated providers as connected",
     expect((yield* ai.availableModels).length).toBeGreaterThan(0)
   }).pipe(Effect.provide(layer(() => streamModel(["x"])))))
 })
+
+test("a rejection carries the person's trimmed feedback to the host; feedback with an approval or an empty one is refused", async () => {
+  const replies: unknown[] = []
+  const projectHost = { projectId: "p", directory: "/p", client: {
+    session: {
+      get: async () => ({ id: "s", directory: "/p" }),
+      messages: async () => [{ info: { id: "u", role: "user", model: { providerID: "openai", modelID: "test-model" } }, parts: [{ type: "text", text: "Hi" }] }],
+      goal: async () => null
+    },
+    provider: {
+      list: async () => ({ all: [{ id: "openai", name: "OpenAI", models: { "test-model": { name: "Test", limit: { context: 100, output: 10 }, capabilities: { toolcall: true } } } }] }),
+      auth: async () => ({})
+    },
+    config: { get: async () => ({}) }, brain: { status: async () => ({}) },
+    question: { list: async () => [] },
+    permission: { list: async () => [{ id: "r1", sessionID: "s", permission: "cad_edit", patterns: [] }], reply: async (input: unknown) => { replies.push(input); return true } }
+  } }
+  const runtime = { catalogueReady: Promise.resolve("present"), host: () => Effect.succeed(projectHost) } as unknown as NikCliRuntime
+  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }), Layer.succeed(AiHost, { runtime, scheduler: new BackgroundTaskManager({}) }))
+  const live = AiService.layer.pipe(Layer.provideMerge(DirectModel.layerWith(() => streamModel(["x"])).pipe(Layer.provideMerge(base))))
+  const reply = (decision: "once" | "always" | "reject", message?: string) => Effect.runPromiseExit(Effect.gen(function* () {
+    return yield* (yield* AiService).controlSession({ sessionId: "s", projectId: "p", action: "reply_permission", requestId: "r1", decision, ...(message !== undefined ? { message } : {}) })
+  }).pipe(Effect.provide(live)))
+
+  expect((await reply("reject", "  Use a 30 mm cube instead.  "))._tag).toBe("Success")
+  expect((await reply("reject"))._tag).toBe("Success")
+  expect(replies).toEqual([
+    { requestID: "r1", reply: "reject", message: "Use a 30 mm cube instead." },
+    { requestID: "r1", reply: "reject" }
+  ])
+  for (const [decision, message] of [["once", "Use a 30 mm cube"], ["always", "fine"], ["reject", "   "]] as const) {
+    const exit = await reply(decision, message)
+    expect(exit._tag, `${decision} ${JSON.stringify(message)}`).toBe("Failure")
+  }
+  expect(replies).toHaveLength(2)
+})

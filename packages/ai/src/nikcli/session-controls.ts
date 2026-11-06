@@ -13,6 +13,8 @@ export interface SessionControlInput {
   readonly requestId?: string
   readonly answers?: ReadonlyArray<ReadonlyArray<string>>
   readonly decision?: "once" | "always" | "reject"
+  /** `reply_permission` with `reject` only: the person's correction, which the model reads and carries on with. */
+  readonly message?: string
   readonly model?: { readonly provider?: string; readonly model?: string }
   /** Explicit owner-authored engineering criteria; the sidecar validates and stores them separately from model text. */
   readonly criteria?: unknown
