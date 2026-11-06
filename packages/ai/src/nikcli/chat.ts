@@ -70,6 +70,14 @@ export const announcesWork = (text: string): boolean => {
 
 /** The host's own refusal texts (`permission/next.ts`): a rejected call, a rule that forbids it, a cancelled run. */
 const DENIAL = /permission (?:denied|rejected)|user (?:denied|rejected)|rejected permission|specified a rule which prevents you|execution cancel(?:led|ed)/i
+/** nikcli's `PermissionCorrectedError`: the person rejected the call and said what to do instead. */
+const CORRECTION = /rejected permission to use this specific tool call with the following feedback:\s*([\s\S]*)$/i
+
+/** The person's correction when a call was rejected with feedback, or undefined. */
+export const correctionOf = (error: string): string | undefined => CORRECTION.exec(error)?.[1]?.trim() || undefined
+
+/** A final refusal: never retried. A rejection with feedback is not one: the person asked for something else. */
+const isRefusal = (error: string): boolean => DENIAL.test(error) && correctionOf(error) === undefined
 
 /**
  * Why the turn should go on after the agent stopped, or undefined when it is done: its own plan still has open items, its last
@@ -82,15 +90,20 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
   // Native refusal/unknown finishes and a request for missing input are not unfinished agent work.
   if (finish !== undefined && !["stop", "length", "tool-calls", "tool_calls"].includes(finish)) return undefined
   if (/\?\s*$/.test(text.trim())) return undefined
-  if (state.lastToolError && DENIAL.test(state.lastToolError)) return undefined
+  if (state.lastToolError && isRefusal(state.lastToolError)) return undefined
   // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
   if (finish === "length") {
     return "Your last message was cut off by the output limit; if you were writing a tool call, it did not run. Resume directly from where you stopped: no apology, no recap. Split the remaining work into smaller calls (at most 10 elements per cad_edit action add call, one operation at a time) and keep going until the request is complete and checked."
   }
+  // The person's correction comes before the plan: it says how the next step must change.
+  const correction = state.lastToolError === undefined ? undefined : correctionOf(state.lastToolError)
+  if (correction !== undefined) {
+    return `The user rejected your last tool call and said what to do instead: "${correction.slice(0, 1_200)}"\nDo what they asked now with the tools: change the call as they said, do not repeat the rejected one. Keep going until the request is complete and checked.`
+  }
   const open = state.todos.filter((t) => t.status === "pending" || t.status === "in_progress")
   if (open.length > 0) {
     // A call the permission mode refused earlier in the turn stays refused: its items are reported, never retried.
-    const denied = [...(state.toolErrors?.entries() ?? [])].filter(([, error]) => DENIAL.test(error)).map(([tool]) => tool)
+    const denied = [...(state.toolErrors?.entries() ?? [])].filter(([, error]) => isRefusal(error)).map(([tool]) => tool)
     const denial = denied.length > 0 ? ` The ${denied.join(", ")} call(s) were refused by the permission mode earlier: do not retry them or reach the same effect another way; leave the items that need them open and list them for the user in your report.` : ""
     return `Your plan still has unfinished items:\n${open.map((t) => `- ${t.content}`).join("\n")}\nContinue with the next one now with the tools. Do not stop to report progress: finish every item, check the result, mark the items completed, and only then report.${denial}`
   }

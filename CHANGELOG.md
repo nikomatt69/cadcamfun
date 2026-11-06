@@ -3,6 +3,35 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.105 (November 2026)
+
+## Desktop
+
+- Reject a permission with feedback, nikcli style
+
+## Documentation
+
+- Record the reminders and /goal audit against nikcli
+
+## v0.1.104 (November 2026)
+
+## Sidecar
+
+- Operator stop hooks with Claude Code's Stop contract
+
+## AI
+
+- A todowrite the host rejects is a failed call, not the agent's plan
+- The announcement detector reads lead-ins and ignores offers to the user
+- Align turn recovery with upstream opencode
+- /goal turns share the per-run step budget; document loop parity
+- A context-overflow refusal compacts the session once and resumes the turn
+- The agent loop owns its step budget and never ends on the host's forced summary
+
+## Web
+
+- Map Claude Code's /goal Stop hook in the loop comparison; regenerate the API reference
+
 ## v0.1.103 (November 2026)
 
 ## Desktop

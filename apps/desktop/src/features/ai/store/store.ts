@@ -87,7 +87,8 @@ export interface AiStore {
   readonly openSession: (id: string) => void
   readonly renameSession: (id: string, title: string) => void
   readonly deleteSession: (id: string) => void
-  readonly replyPermission: (requestId: string, decision: "once" | "always" | "reject") => Promise<void>
+  /** `message` goes with `reject` only: what the person wants instead, which the agent reads and carries on with. */
+  readonly replyPermission: (requestId: string, decision: "once" | "always" | "reject", message?: string) => Promise<void>
   readonly agents: Accessor<ReadonlyArray<AiAgent>>
   readonly permissionMode: Accessor<"auto" | "ask" | "approve">
   readonly setPermissionMode: (mode: "auto" | "ask" | "approve") => void
@@ -587,12 +588,12 @@ export const createAiStore = (): AiStore => {
     void sessions.refreshServerHistory(id)
   }
 
-  const replyPermission: AiStore["replyPermission"] = async (requestId, decision) => {
+  const replyPermission: AiStore["replyPermission"] = async (requestId, decision, message) => {
     const permission = permissions().find((item) => item.requestId === requestId)
     const generation = conversationGeneration
     if (!permission) return
     await app.runtime.run(app.client.ai.permissionReply({
-      payload: { sessionId: permission.sessionId, requestId, decision, ...(projectId() ? { projectId: projectId()! } : {}) }
+      payload: { sessionId: permission.sessionId, requestId, decision, ...(decision === "reject" && message?.trim() ? { message: message.trim() } : {}), ...(projectId() ? { projectId: projectId()! } : {}) }
     }))
     if (!disposed && generation === conversationGeneration) setPermissions((current) => current.filter((item) => item.requestId !== requestId))
   }

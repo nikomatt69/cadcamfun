@@ -95,7 +95,9 @@ export const StreamChatBody = Schema.Struct({
   context: opt(Schema.String), includeContext: opt(Schema.Boolean), model: opt(AiModelSelector)
 })
 export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String), projectId: opt(Schema.String) })
-export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String), requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]) })
+/** What a person says when they reject a call: the model reads it and carries on with the correction (nikcli `PermissionCorrectedError`). Only with `reject`. */
+export const PermissionFeedback = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_000))
+export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String), requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]), message: opt(PermissionFeedback) })
 
 export const CompletionBody = Schema.Struct({
   prompt: opt(Schema.String), systemPrompt: opt(Schema.String), model: opt(Schema.String), temperature: opt(Schema.Number)
@@ -237,7 +239,9 @@ export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, proj
   criteria: opt(Schema.Unknown),
   /** `compact` only: what the summary should concentrate on (Claude Code's `/compact <focus>`). */
   instructions: opt(Schema.String.check(Schema.isMaxLength(500))),
-  taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
+  taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])),
+  /** `reply_permission` with `reject` only: the correction the model reads (see `PermissionReplyBody`). */
+  message: opt(PermissionFeedback), model: opt(AiModelSelector) })
 /** nikcli's session goal (`/goal`): what the agent works toward on its own, and how far it is. */
 export const SessionGoal = Schema.Struct({
   objective: Schema.String,
