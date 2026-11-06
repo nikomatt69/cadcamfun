@@ -62,6 +62,10 @@ describe("announcements and open work are recognised", () => {
     for (const yes of ["I'll build the base first.", "Ok. Now I will add the wheels.", "Procedo con le ruote.", "Let me check the result.", "Adesso creo il corpo."]) expect(announcesWork(yes), yes).toBe(true)
     for (const no of ["The plate is 40 mm wide with two 6 mm holes.", "Here is the plan:", "Supported operations:", "Done: hole-1 radius 3 -> 4.", "Which material should I use?", "", "Let me know if you want it thicker?"]) expect(announcesWork(no), no).toBe(false)
   })
+  test("a lead-in before the announcement still counts; an offer to the user does not", () => {
+    for (const yes of ["Now let me add the holes:", "Perfect, let me verify the toolpath.", "The base is done. Next, I'll machine the pocket.", "Great. Now I'm going to fillet the edges:", "Ok, now let me check the clearance.", "Bene, ora procedo con i fori."]) expect(announcesWork(yes), yes).toBe(true)
+    for (const no of ["Let me know if you want it thicker.", "The bracket is finished. Let me know if anything should change!", "I'll wait for your confirmation before machining.", "Fammi sapere se va bene.", "Now the part is finished and checked."]) expect(announcesWork(no), no).toBe(false)
+  })
   test("an open plan item or an unfixed failure asks to go on; a finished answer does not", () => {
     const base = { todos: [], lastToolError: undefined }
     expect(continuationFor({ ...base, todos: [{ content: "Drill the holes", status: "pending" }, { content: "Model", status: "completed" }] }, "Done.")).toContain("Drill the holes")
@@ -103,11 +107,11 @@ describe("the turn does not end on words", () => {
     let stage = 0
     script = (request) => {
       const last = textOf(request)
-      if (last.includes("unfinished items")) { stage = 2; return { toolCalls: [{ name: "todowrite", args: { todos: [{ content: "Model", status: "completed", priority: "high" }, { content: "Verify", status: "completed", priority: "high" }] } }] } }
+      if (last.includes("unfinished items")) { stage = 2; return { toolCalls: [{ name: "todowrite", args: { todos: [{ id: "model", content: "Model", status: "completed", priority: "high" }, { id: "verify", content: "Verify", status: "completed", priority: "high" }] } }] } }
       if (stage === 2 && lastIsTool(request)) return { text: "Both steps are done." }
       if (lastIsTool(request) && stage === 1) return { text: "Modelled the part." }
       stage = 1
-      return { toolCalls: [{ name: "todowrite", args: { todos: [{ content: "Model", status: "completed", priority: "high" }, { content: "Verify", status: "pending", priority: "high" }] } }] }
+      return { toolCalls: [{ name: "todowrite", args: { todos: [{ id: "model", content: "Model", status: "completed", priority: "high" }, { id: "verify", content: "Verify", status: "pending", priority: "high" }] } }] }
     }
     const events = await run("model and verify", "persist-3")
     const done = events.at(-1) as Extract<AiEvent, { type: "done" }>
