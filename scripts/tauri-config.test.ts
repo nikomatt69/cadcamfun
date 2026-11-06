@@ -139,7 +139,6 @@ interface Tree {
 /** Commands the shell implements that no webview code invokes yet. A new command without a caller is a violation; so is a stale entry here. */
 const PENDING_CALLER: Readonly<Record<string, string>> = {
   pick_file: "native open dialog: the import dialogs still use the browser file input",
-  secret_delete: "GitHub token sign-out is not wired to the keyring yet",
   set_recent_projects: "the tray's recent-projects submenu waits for the webview push (shared/state/recents.ts)",
 }
 
