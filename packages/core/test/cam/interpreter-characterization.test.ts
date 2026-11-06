@@ -55,6 +55,18 @@ describe("spec 32 P2 changed only the warnings of the milling fixtures", () => {
   })
 })
 
+describe("spec 31: an I/J block that returns to its own XY is one full turn", () => {
+  test("arcsIJ: two semicircles and a helical turn of radius 10", () => {
+    const r = interpretGcode(MILL_PROGRAMS.arcsIJ!)
+    expect(r.errors).toEqual([])
+    const arcs = r.segments.filter((s) => s.kind === "arc")
+    expect(arcs).toHaveLength(3)
+    expect(arcs[2]).toMatchObject({ from: { x: 10, y: 0, z: -1 }, to: { x: 10, y: 0, z: -2 }, center: { x: 0, y: 0 }, clockwise: false, radiusStart: 10, radiusEnd: 10 })
+    // Plunge of 3 mm, two semicircles, and one helical revolution.
+    expect(r.cutLength).toBeCloseTo(3 + 20 * Math.PI + Math.hypot(20 * Math.PI, 1), 9)
+  })
+})
+
 describe("spec 32 P5: a block that only turns the rotary axes is a move", () => {
   test("rotary: the one added segment is the G0 A30 C90 turn, at the same place", () => {
     const r = interpretGcode(MILL_PROGRAMS.rotary!)
