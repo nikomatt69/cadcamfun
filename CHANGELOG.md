@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.103 (November 2026)
+
+## Desktop
+
+- NC lines on simulated contacts over HTTP, native cycles in routes, panel, library and assistant (spec 73)
+
 ## v0.1.102 (November 2026)
 
 ## Core
