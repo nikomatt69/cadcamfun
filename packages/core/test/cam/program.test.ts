@@ -399,6 +399,8 @@ describe("operation templates: a cycle of operations applied to features", () =>
     expect(expanded.operations.map((o) => o.elementIds)).toEqual([["a"], ["b"], ["c"], ["a"], ["b"], ["c"]])
     expect(expanded.operations[3]).toMatchObject({ name: "Pocket #1 - Finish", dependsOn: ["u[1]:rough"], enabled: true, fromPreviousStock: false })
     expect(planPrograms(expanded).toolChanges).toBe(1)
+    // The planner takes the setup as the user saved it, uses and all (the desktop plans a saved setup directly).
+    expect(planPrograms(withUses([use()])).toolChanges).toBe(1)
     expect(validateSetup(withUses([use()]))).toEqual([])
   })
 

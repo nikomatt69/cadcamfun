@@ -3,7 +3,7 @@
  * UI can offer every grouping from the same planner and show the cost of each (tool loads, tool changes) before anything is generated.
  */
 import type { Operation } from "./op.ts"
-import { enabledOperations, runsOf, workpiecesOf, type Setup } from "./setup.ts"
+import { enabledOperations, expandSetup, runsOf, workpiecesOf, type Setup } from "./setup.ts"
 import { assignPockets, buildToolTable, type ToolTableEntry } from "./tooltable.ts"
 
 export interface PlannedProgram {
@@ -53,7 +53,9 @@ export const groupsOf = (setup: Setup): ReadonlyArray<{ readonly name: string; r
   }
 }
 
-export const planPrograms = (setup: Setup): SetupPlan => {
+export const planPrograms = (given: Setup): SetupPlan => {
+  // Template uses become operations first; an already expanded setup comes back unchanged.
+  const setup = expandSetup(given).setup
   const ops = enabledOperations(setup)
   const pockets = assignPockets(ops)
   const table = buildToolTable(ops)

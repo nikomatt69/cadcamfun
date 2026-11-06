@@ -22,7 +22,7 @@ import type { Tool } from "../tool.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import type { Operation } from "./op.ts"
 import { groupsOf, planPrograms, type SetupPlan } from "./plan.ts"
-import { enabledOperations, runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue, type Workpiece, type WorkpieceOrder } from "./setup.ts"
+import { enabledOperations, expandSetup, runsOf, validateSetup, workpieceIssues, workpiecesOf, type Setup, type SetupIssue, type Workpiece, type WorkpieceOrder } from "./setup.ts"
 import { assignPockets, type ToolTableEntry } from "./tooltable.ts"
 
 export interface GeneratedProgram {
@@ -339,9 +339,12 @@ const fixtureReach = (setup: Setup, operations: ReadonlyArray<Operation>, toolpa
   return out
 }
 
-export const generateSetup = (setup: Setup, geometryOf: (operation: Operation) => GeometryInput): GeneratedSetup => {
+export const generateSetup = (given: Setup, geometryOf: (operation: Operation) => GeometryInput): GeneratedSetup => {
+  // Template uses become operations first; an already expanded setup comes back unchanged.
+  const setup = expandSetup(given).setup
   const plan: SetupPlan = planPrograms(setup)
-  const issues = validateSetup(setup)
+  // The template issues come from the setup as given: the expanded one no longer has templates to complain about.
+  const issues = validateSetup(given)
   const warnings: string[] = [...plan.warnings]
   const blocked = new Set(issues.flatMap((i) => (i.operationId !== undefined ? [i.operationId] : [])))
   const post = getPost(setup.post.postId)
