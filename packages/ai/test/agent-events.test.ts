@@ -154,3 +154,39 @@ test("partial read results do not invent mutation evidence", () => {
   const events = map(state, part({ type: "tool", callID: "partial-read", tool: "cad", state: { status: "completed", input: {}, output: JSON.stringify({ elements: [{ id: "existing" }], skipped: ["hidden"] }) } }))
   expect(events.find((event) => event.type === "tool_diagnostic")).not.toHaveProperty("mutationApplied")
 })
+
+describe("a plan the host rejected is not the plan", () => {
+  const todoPart = (callID: string, status: string, todos: unknown, extra: object = {}) => ({
+    type: "message.part.updated",
+    properties: { part: { type: "tool", callID, tool: "todowrite", sessionID: "s", messageID: "m", state: { status, input: { todos }, ...extra } } }
+  })
+  test("a todowrite that fails validation restores the last accepted plan", () => {
+    const state = newMapperState()
+    const accepted = [{ content: "Base plate", status: "completed" }, { content: "Holes", status: "in_progress" }]
+    map(state, todoPart("t1", "running", accepted))
+    map(state, todoPart("t1", "completed", accepted, { output: "[]" }))
+    // The model marks everything finished with a status the host does not accept; the call fails.
+    const rejected = [{ content: "Base plate", status: "done" }, { content: "Holes", status: "done" }]
+    map(state, todoPart("t2", "running", rejected))
+    const events = map(state, todoPart("t2", "error", rejected, { error: "Invalid enum value. Expected 'pending' | 'in_progress' | 'completed' | 'cancelled'" }))
+    expect(state.todos).toEqual([{ content: "Base plate", status: "completed" }, { content: "Holes", status: "in_progress" }])
+    expect(events).toEqual([{ type: "todo", sessionId: "s", todos: [{ content: "Base plate", status: "completed" }, { content: "Holes", status: "in_progress" }] }])
+    // The refusal is a failed call the loop reports back; the next accepted plan clears it.
+    expect(state.lastToolError).toContain("Invalid enum value")
+    map(state, todoPart("t3", "completed", accepted.map((t) => ({ ...t, status: "completed" })), { output: "[]" }))
+    expect(state.lastToolError).toBeUndefined()
+  })
+  test("a plan first seen as completed is the accepted one", () => {
+    const state = newMapperState()
+    map(state, todoPart("t1", "completed", [{ content: "Holes", status: "pending" }], { output: "[]" }))
+    map(state, todoPart("t2", "running", [{ content: "Holes", status: "done" }]))
+    map(state, todoPart("t2", "error", [{ content: "Holes", status: "done" }], { error: "Invalid enum value" }))
+    expect(state.todos).toEqual([{ content: "Holes", status: "pending" }])
+  })
+  test("without an accepted plan, a rejected one leaves no plan", () => {
+    const state = newMapperState()
+    map(state, todoPart("t1", "running", [{ content: "Holes", status: "done" }]))
+    map(state, todoPart("t1", "error", [{ content: "Holes", status: "done" }], { error: "Invalid enum value" }))
+    expect(state.todos).toEqual([])
+  })
+})

@@ -1,6 +1,7 @@
 import { hostAgentWithPermissions, type PermissionMode } from "./nikcli/permission-modes.ts"
 import { Context, Effect, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
 import { AiConfig } from "./ai-config.ts"
+import { runStopHooks } from "./nikcli/stop-hooks.ts"
 import { AiCredentials } from "./credentials.ts"
 import { subscriptionText } from "./nikcli/subscription-call.ts"
 import { isOpenCodeProvider } from "./nikcli/opencode.ts"
@@ -168,6 +169,7 @@ export class AiService extends Context.Service<AiService, {
     Effect.gen(function* () {
       const credentials = yield* AiCredentials
       const config = yield* AiConfig
+      const stopHook = config.stopHooks !== undefined && config.stopHooks.length > 0 ? runStopHooks(config.stopHooks) : undefined
       const direct = yield* DirectModel
       const cache = yield* AiCache
       const host = yield* Effect.serviceOption(AiHost)
@@ -440,7 +442,8 @@ export class AiService extends Context.Service<AiService, {
                 ...(plan?.part !== undefined ? { observation: plan.part } : {}),
                 ...(goalArguments !== undefined ? { goalArguments } : {}),
                 agent: hostAgentWithPermissions(agent, input.permissionMode), ...(variant ? { variant } : {}),
-                model: { providerID: resolved.provider, modelID: resolved.modelId }
+                model: { providerID: resolved.provider, modelID: resolved.modelId },
+                ...(stopHook !== undefined ? { stopHook } : {})
               }).pipe(
                 Stream.mapError((e): AiError => e),
                 (stream) => contextChars > 0

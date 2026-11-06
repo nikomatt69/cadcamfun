@@ -39,8 +39,10 @@ export interface EventMapperState {
   retry: { attempt: number; message: string } | undefined
   /** Message of a `session.error` for this session. */
   sessionError: string | undefined
-  /** The agent's plan as of its last `todowrite`. */
+  /** The agent's plan as of its last `todowrite` (shown while the call runs, before the host validated it). */
   todos: ReadonlyArray<{ readonly content: string; readonly status: string }>
+  /** The plan of the last `todowrite` the host accepted: what a rejected call falls back to. */
+  acceptedTodos: ReadonlyArray<{ readonly id?: string; readonly content: string; readonly status: "pending" | "in_progress" | "completed" | "cancelled"; readonly priority?: string }>
   /** Tool calls started in this turn, by the agent and by its specialists. */
   toolCalls: number
   /** Completed tool evidence, keyed by call identity so a bounded history read cannot manufacture progress from a count. */
@@ -81,6 +83,7 @@ export const newMapperState = (): EventMapperState => ({
   retry: undefined,
   sessionError: undefined,
   todos: [],
+  acceptedTodos: [],
   toolCalls: 0,
   successfulCalls: new Map(),
   callSignatures: new Map(),
@@ -370,12 +373,27 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
         }
         const todos = tool === "todowrite" && (status === "running" || status === "completed") ? todosOf(rec(toolState?.["input"])?.["todos"]) : undefined
         const plan = todos === undefined ? undefined : JSON.stringify(todos)
+        if (status === "completed" && todos !== undefined) {
+          state.acceptedTodos = todos
+          if (state.toolErrors.delete(tool)) state.lastToolError = [...state.toolErrors.values()].at(-1)
+        }
         if (todos !== undefined && plan !== undefined && plan !== state.plans.get(callId)) {
           state.plans.set(callId, plan)
           state.todos = todos
           const out: AiEvent[] = [{ type: "todo", sessionId, todos }]
           if (status === "completed" && !state.finishedCalls.has(callId)) { state.finishedCalls.add(callId); state.startedCalls.add(callId) }
           return out
+        }
+        if (tool === "todowrite" && status === "error" && !state.finishedCalls.has(callId)) {
+          // The host refused the plan (an unknown status, a bad shape): the loop must not act on items it never accepted.
+          state.finishedCalls.add(callId)
+          state.plans.delete(callId)
+          // A refused plan call is a failed call: the loop tells the model what the host rejected so it can fix the call.
+          state.toolErrors.set(tool, toolOutput(toolState, status) || "The todowrite call failed.")
+          state.lastToolError = [...state.toolErrors.values()].at(-1)
+          const restored = state.todos !== state.acceptedTodos
+          state.todos = state.acceptedTodos
+          return restored ? [{ type: "todo", sessionId, todos: state.acceptedTodos }] : []
         }
         if (tool === "todowrite" || tool === "todoread") return []
         if (status === "running" && !state.startedCalls.has(callId)) {
