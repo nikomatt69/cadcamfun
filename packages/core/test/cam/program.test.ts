@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { DEFAULT_GEOMETRY, DEFAULT_SETTINGS, type GeometryInput } from "../../src/cam/generator/index.ts"
-import { program } from "../../src/cam/index.ts"
+import { program, indexPlane, indexMatrix, boxInPartFrame } from "../../src/cam/index.ts"
+import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
 import { analyseGcode } from "../../src/cam/generator/analysis.ts"
 
 const { assignPockets, buildToolTable, generateSetup, planPrograms, reorderByTool, validateSetup, DEFAULT_POST_CONFIG } = program
@@ -679,7 +680,29 @@ describe("the probe program replayed against a blank that is not where the setup
     expect(replayOf(twice, lcnc).displacement!.rotation).toBe(0)
     // A table's C axis is not replayed; a post that cannot write the register's rotation refuses the probe with the post's reason.
     expect(replayOf({ ...twice, rotation: "table-c" }, lcnc)).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/C axis/) })
-    expect(program.planPartProbe(probed({ ...twice, rotation: "offset-r" })).refused).toMatch(/fanuc post cannot write a write to the R of G54/)
+  })
+
+  test("a rotation the post cannot write the way the setup asked is written the way it can: Fanuc's register has no rotation (G68 instead), LinuxCNC writes both, Siemens has no G68 (the frame's rotation instead)", () => {
+    const twice = { cycles: [zSurface, corner(2)] }
+    // Fanuc: offset-r would write the R of G54, which the control does not have: the same measurement goes into G68 about the measured corner, and the plan says so.
+    const fanuc = program.planPartProbe(probed({ ...twice, rotation: "offset-r" }))
+    expect(fanuc.refused).toBeUndefined()
+    expect(fanuc.notes.join(" ")).toMatch(/no rotation in a work offset: the measured rotation is written as G68/)
+    expect(fanuc.parts[0]!.replay).toMatchObject({ status: "within", g68: 0.5 })
+    expect(program.partProbeProgram(probed({ ...twice, rotation: "offset-r" }), 7).generated!.gcode).toMatch(/G68 X/)
+    // LinuxCNC has G68 too, with the Fanuc words; and G10 L2 R for the register.
+    const lcncG68 = program.partProbeProgram(probed({ ...twice, rotation: "g68" }, lcnc), 7)
+    expect(lcncG68.refused).toBeUndefined()
+    expect(lcncG68.generated!.gcode).toMatch(/G68 X/)
+    expect(lcncG68.generated!.gcode).toMatch(/G69/)
+    expect(replayOf({ ...twice, rotation: "g68" }, lcnc)).toMatchObject({ status: "within", g68: 0.5 })
+    expect(program.partProbeProgram(probed({ ...twice, rotation: "offset-r" }, lcnc), 7).generated!.gcode).toMatch(/G10 L2 P1 .*R/)
+    // Siemens: a G68 is written as the frame's rotation, and the note says it turns about the frame's zero.
+    const siemens = program.planPartProbe(probed({ ...twice, rotation: "g68" }, { post: { ...DEFAULT_POST_CONFIG, postId: "siemens" as const } }))
+    expect(siemens.refused).toBeUndefined()
+    expect(siemens.notes.join(" ")).toMatch(/writes no G68: the measured rotation is written into the register/)
+    // Where no equivalent exists the post refuses with its own reason.
+    expect(program.planPartProbe(probed({ ...twice, rotation: "g68" }, { post: { ...DEFAULT_POST_CONFIG, postId: "okuma" as const } })).refused).toMatch(/okuma post cannot write a coordinate rotation/)
   })
 
   test("the angle of a face alone (edge-angle) is a rotation of the register; it needs a rotation to write to", () => {
@@ -739,5 +762,86 @@ describe("the probe program replayed against a blank that is not where the setup
     expect(made.generated!.warnings.join(" ")).toMatch(/Replay of Workpiece 1's probe on a displaced blank: outside - .*no cycle measures Y/)
     const fine = program.partProbeProgram(probed({ cycles: [zSurface, corner()] }), 7)
     expect(fine.generated!.warnings.join(" ")).not.toMatch(/Replay of/)
+  })
+})
+
+describe("a part indexed as a tilted work plane", () => {
+  const planeSetup = (postId: program.PostConfig["postId"], over: Partial<program.Setup> = {}, post: Partial<program.PostConfig> = {}): program.Setup => setup([op("a", t6)], {
+    post: { ...DEFAULT_POST_CONFIG, postId, ...post },
+    workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", index: { a: 90 }, indexAs: "plane" }], ...over
+  })
+
+  test("the plane is the table's orientation: its axes are the rows of the table rotation", () => {
+    const { frame, layout } = indexPlane({ a: 90 })
+    expect(layout).toBe("table-AC")
+    expect(frame.zAxis.y).toBeCloseTo(1, 12)
+    expect(frame.yAxis.z).toBeCloseTo(-1, 12)
+    expect(indexPlane({ b: 90 }).layout).toBe("table-BC")
+    expect(indexPlane({ b: 90 }).frame.zAxis.x).toBeCloseTo(-1, 12)
+  })
+
+  test("Fanuc writes G68.2 + G53.1 and G69 around the part, with no table turn, and the control's frame lands the tool where the table turn would", () => {
+    const made = generateSetup(planeSetup("fanuc"), geometryOf)
+    expect(made.issues).toEqual([])
+    const p = made.programs[0]!
+    expect(p.program.toolpaths.flatMap((t) => t.moves).some((m) => m._tag === "Orient")).toBe(false)
+    const lines = p.gcode.split("\n").map((l) => l.trim())
+    expect(lines.filter((l) => /^G68\.2\b/.test(l))).toHaveLength(1)
+    expect(lines.filter((l) => l === "G53.1")).toHaveLength(1)
+    expect(lines.filter((l) => l === "G69").length).toBeGreaterThanOrEqual(1)
+    // Replay: the second part's moves, in the part's frame, are the first part's moves seen through the plane (the frame's rows).
+    const run = interpretGcode(p.gcode, { track: true })
+    const first = run.segments.filter((_, i) => (run.states![i]!.workOffset ?? "G54") === "G54")
+    const second = run.segments.filter((_, i) => run.states![i]!.workOffset === "G55")
+    const m = indexMatrix({ a: 90 })
+    expect(second.length).toBeGreaterThanOrEqual(first.length)
+    first.forEach((seg, i) => {
+      const q = (seg as { to: { x: number; y: number; z: number } }).to
+      const expected = { x: m[0] * q.x + m[3] * q.y + m[6] * q.z, y: m[1] * q.x + m[4] * q.y + m[7] * q.z, z: m[2] * q.x + m[5] * q.y + m[8] * q.z }
+      const got = (second[i] as { to: { x: number; y: number; z: number } }).to
+      for (const axis of ["x", "y", "z"] as const) expect(got[axis], `${i} ${axis}`).toBeCloseTo(expected[axis], 9)
+    })
+  })
+
+  test("Siemens writes CYCLE800 with the machine's swivel record and refuses without it; Heidenhain writes PLANE SPATIAL", () => {
+    const refused = generateSetup(planeSetup("siemens"), geometryOf)
+    expect(refused.programs).toEqual([])
+    expect(refused.issues.map((i) => i.message).join(" ")).toMatch(/CYCLE800.*swivel\.dataRecord/)
+    const siemens = generateSetup(planeSetup("siemens", {}, { swivel: { dataRecord: "TC1" } }), geometryOf).programs[0]!
+    expect(siemens.gcode).toMatch(/CYCLE800\(1,"TC1"/)
+    const klartext = generateSetup(planeSetup("heidenhain"), geometryOf).programs[0]!
+    expect(klartext.gcode).toMatch(/PLANE SPATIAL SPA-90/)
+    expect(klartext.gcode).toMatch(/PLANE RESET/)
+  })
+
+  test("a post without tilted-plane words refuses the setup with the reason, and a plane of A and B together is an issue", () => {
+    for (const postId of ["generic", "grbl", "linuxcnc"] as const) {
+      const made = generateSetup(planeSetup(postId), geometryOf)
+      expect(made.programs, postId).toEqual([])
+      expect(made.issues[0]!.message, postId).toMatch(/no tilted-plane words/)
+    }
+    const both = validateSetup(planeSetup("fanuc", { workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", index: { a: 30, b: 20 }, indexAs: "plane" }] }))
+    expect(both.map((i) => i.message).join(" ")).toMatch(/one axis \(A or B\) and C/)
+    // The same part as a table turn is fine on a post that cannot do planes.
+    const table = generateSetup(planeSetup("generic", { workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", index: { a: 90 } }] }), geometryOf)
+    expect(table.issues).toEqual([])
+  })
+
+  test("a clamp of the fixture seen from a part indexed 90 degrees about A or Z is the box the table turn carries it to", () => {
+    const clamp = { min: { x: 10, y: 0, z: -5 }, max: { x: 20, y: 30, z: 0 } }
+    const datum = { x: 100, y: 0, z: 0 }
+    expect(boxInPartFrame(clamp, datum, undefined)).toBe(clamp)
+    // About Z (c 90): x - datum.x = -90..-80 turns to y = -90..-80 (about the datum), y 0..30 turns to x = -30..0 (plus the datum).
+    const c90 = boxInPartFrame(clamp, datum, { c: 90 })
+    expect(c90.min.x).toBeCloseTo(70, 9); expect(c90.max.x).toBeCloseTo(100, 9)
+    expect(c90.min.y).toBeCloseTo(-90, 9); expect(c90.max.y).toBeCloseTo(-80, 9)
+    expect(c90.min.z).toBeCloseTo(-5, 9); expect(c90.max.z).toBeCloseTo(0, 9)
+    // About A (tilt 90 about X): y becomes z, z becomes -y.
+    const a90 = boxInPartFrame(clamp, datum, { a: 90 })
+    expect(a90.min.y).toBeCloseTo(0, 9); expect(a90.max.y).toBeCloseTo(5, 9)
+    expect(a90.min.z).toBeCloseTo(0, 9); expect(a90.max.z).toBeCloseTo(30, 9)
+    // At 45 degrees the box returned is the bounding box of the turned one: it covers it.
+    const c45 = boxInPartFrame(clamp, datum, { c: 45 })
+    expect(c45.max.x - c45.min.x).toBeGreaterThan(30 * Math.SQRT1_2)
   })
 })

@@ -21,7 +21,14 @@ export const PostConfigSchema = Schema.Struct({
   lineNumbers: Schema.optionalKey(Schema.Struct({ start: Schema.Int, step: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)) })),
   stamp: Schema.optionalKey(Schema.String),
   /** The first program is numbered `programNumberBase`, the next one more (Fanuc `O1000`). */
-  programNumberBase: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+  programNumberBase: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  /** Siemens `CYCLE800` swivel data of the machine (the builder's record name and retraction): a part indexed as a tilted plane on a Siemens post needs it. */
+  swivel: Schema.optionalKey(Schema.Struct({
+    dataRecord: Schema.String.check(Schema.isMinLength(1)),
+    retraction: Schema.optionalKey(Schema.Literals([0, 1, 2, 4])),
+    retractDistance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+    status: Schema.optionalKey(Schema.Int)
+  }))
 })
 export type PostConfig = typeof PostConfigSchema.Type
 
@@ -41,6 +48,13 @@ export const WorkpieceSchema = Schema.Struct({
   placement: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
   /** The rotary index of this part (a tombstone face, an indexed vise), degrees: the table turns there, tool retracted, before its toolpaths. Each face keeps its own register. */
   index: Schema.optionalKey(Schema.Struct({ a: Schema.optionalKey(Schema.Finite), b: Schema.optionalKey(Schema.Finite), c: Schema.optionalKey(Schema.Finite) })),
+  /**
+   * How the index is written: `table` (default) turns the rotary table to the angles (`Orient`) and the toolpaths stay in the part's frame;
+   * `plane` keeps the table where it is and writes the same orientation as the control's own tilted work plane (Fanuc/Haas/Okuma-style `G68.2` + `G53.1`,
+   * Siemens `CYCLE800`, Heidenhain `PLANE SPATIAL`): the part's toolpaths are in the plane's coordinates and the control does the swivel. A post whose
+   * control has no such word refuses the setup with the reason.
+   */
+  indexAs: Schema.optionalKey(Schema.Literals(["table", "plane"])),
   /** This part's own blank when it is not the setup's (different blanks on one fixture); its corner is relative to the part's datum. */
   stock: Schema.optionalKey(StockSchema)
 })
@@ -112,6 +126,12 @@ export const PartProbeSchema = Schema.Struct({
   clearance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** Travel height above the datum; absent = 15 above the stock's top (25 without a stock). */
   safeZ: Schema.optionalKey(Schema.Finite),
+  /**
+   * Where the probe of each part runs: `first-program` (default) is one separate program of the probe tool that runs before any cut;
+   * `inline` puts each part's cycles at the start of that part's own toolpaths, in the program that first cuts it (the probe takes a pocket of
+   * its own: tool change to the probe and back).
+   */
+  placement: Schema.optionalKey(Schema.Literals(["first-program", "inline"])),
   /** A correction larger than this is a wrong datum or a clamped part, never written: the control alarms. Default 5 mm. */
   limit: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /**
@@ -183,6 +203,10 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
     const holder = wpOffsets.get(key)
     if (holder !== undefined) issues.push({ message: `${wp.name} and ${holder} share ${key}: two workpieces need two work offsets` })
     else wpOffsets.set(key, wp.name)
+  }
+  for (const wp of workpieces) {
+    if (wp.indexAs === "plane" && wp.index === undefined) issues.push({ message: `${wp.name} is indexed as a tilted plane but has no index angles` })
+    if (wp.indexAs === "plane" && (wp.index?.a ?? 0) !== 0 && (wp.index?.b ?? 0) !== 0) issues.push({ message: `${wp.name}: a tilted plane takes the tilt of one axis (A or B) and C, not A and B together` })
   }
   for (const op of setup.operations) {
     for (const id of op.workpieceIds ?? []) if (!wpIds.has(id)) issues.push({ operationId: op.id, message: `${op.name} names workpiece ${id}, which the setup does not have` })

@@ -21,7 +21,9 @@ import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type Generat
 import { arcExtrema, estimateTime, expandMoves, makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { consumeLife, emptyLifeBook, pickSister, type ToolLifeBook } from "../kernel/tool-library.ts"
 import { formatOffsetRef } from "../work-offset.ts"
-import { getPost } from "../post/index.ts"
+import { dialectOf, getPost } from "../post/index.ts"
+import type { TiltedPlane } from "../post/types.ts"
+import { boxInPartFrame, indexPlane } from "../indexing.ts"
 import type { Tool } from "../tool.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import type { Operation } from "./op.ts"
@@ -535,6 +537,20 @@ const fixtureReach = (setup: Setup, operations: ReadonlyArray<Operation>, toolpa
   return out
 }
 
+/**
+ * Why the setup's tilted-plane parts cannot be written, or undefined: a part indexed `plane` needs a post whose control has the swivel words
+ * (`G68.2` + `G53.1`, `CYCLE800`, `PLANE SPATIAL`), and a Siemens post needs the machine's swivel data record. Refused, never written as another frame.
+ */
+export const planeRefusal = (setup: Setup): string | undefined => {
+  const parts = workpiecesOf(setup).filter((wp) => wp.index !== undefined && wp.indexAs === "plane")
+  if (parts.length === 0) return undefined
+  const dialect = dialectOf(setup.post.postId)
+  // The Klartext writer adds its own PLANE SPATIAL words to the dialect it writes with (the ISO dialect of a Heidenhain definition has none).
+  if (dialect?.tiltedPlane === undefined && setup.post.postId !== "heidenhain") return `${parts.map((p) => p.name).join(", ")} ${parts.length > 1 ? "are" : "is"} indexed as a tilted plane, and the ${setup.post.postId} post has no tilted-plane words (G68.2, CYCLE800, PLANE SPATIAL): use a post that has them (fanuc, haas, okuma, siemens, heidenhain) or index the part as a table turn`
+  if (dialect?.id === "siemens" && setup.post.swivel === undefined) return "A tilted plane on a Siemens post is CYCLE800: set the post's swivel.dataRecord (the machine's swivel data record)"
+  return undefined
+}
+
 export const generateSetup = (given: Setup, geometryOf: (operation: Operation) => GeometryInput): GeneratedSetup => {
   // Template uses become operations first; an already expanded setup comes back unchanged.
   const setup = expandSetup(given).setup
@@ -547,6 +563,8 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
   if (post === undefined) return { programs: [], toolTable: plan.toolTable, toolLife: [], totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [`The post ${setup.post.postId} is not implemented`], issues }
   // Two workpieces on one register, or an operation on a workpiece that is not there, would cut the wrong part: nothing is generated.
   if (workpieceIssues(setup).length > 0) return { programs: [], toolTable: plan.toolTable, toolLife: [], totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [...warnings, "The fixture is inconsistent: no program was generated"], issues }
+  const refusal = planeRefusal(setup)
+  if (refusal !== undefined) return { programs: [], toolTable: plan.toolTable, toolLife: [], totals: { programs: 0, toolLoads: 0, toolChanges: 0, cutLength: 0, rapidLength: 0, estimatedSeconds: 0 }, warnings: [...warnings, refusal], issues: [...issues, { message: refusal }] }
   const ordered = setup.operations.filter((op) => op.enabled)
   const pockets = assignPockets(ordered)
   const settingsOf = (op: Operation) => settingsFor(setup, op, ordered, pockets)
@@ -592,6 +610,8 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
       const spent = new Set<string>()
       const callsLocal = new Map<string, { readonly tool: Tool; readonly pocket: number; readonly sisterOf?: string }>()
       const buildWarnings: string[] = []
+      // Parts indexed as a tilted plane: the toolpath stays in the plane's coordinates and the post writes the control's own word.
+      const planes: Record<string, TiltedPlane> = {}
       for (const { operation: op, workpiece, multi } of runsOf({ ...setup, workpieceOrder: order }, group.operations)) {
         const made = toolpathOf(op)
         if (made === undefined) continue
@@ -618,7 +638,9 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
         callsLocal.set(tool.id, { tool, pocket, ...(tool.id !== op.tool.id ? { sisterOf: op.tool.id } : {}) })
         const asTool: Toolpath = tool.id === op.tool.id ? made : { ...made, toolId: tool.id, spindleRpm: Math.min(op.params.rpm, tool.maxRpm) }
         // A part on an indexed face: the table turns to its angles first, then the same moves run under that face's register.
-        const indexed = workpiece.index === undefined ? asTool : { ...asTool, moves: [{ _tag: "Orient" as const, ...workpiece.index }, ...asTool.moves] }
+        const asPlane = workpiece.index !== undefined && workpiece.indexAs === "plane"
+        const indexed = workpiece.index === undefined || asPlane ? asTool : { ...asTool, moves: [{ _tag: "Orient" as const, ...workpiece.index }, ...asTool.moves] }
+        if (asPlane) planes[multi ? `${op.id}@${workpiece.id}` : op.id] = indexPlane(workpiece.index!)
         toolpaths.push(multi
           ? { ...indexed, id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}`, workOffset: workpiece.workOffset, ...(workpiece.workOffsetRef !== undefined ? { workOffsetRef: workpiece.workOffsetRef } : {}), operation: { id: `${op.id}@${workpiece.id}`, name: `${op.name} - ${workpiece.name}` } }
           : indexed)
@@ -638,7 +660,8 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
         decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
         toolNumbers, retractBeforeToolChange: setup.retractBeforeToolChange,
         ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
-        ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
+        ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}),
+        ...(Object.keys(planes).length > 0 ? { workPlanes: planes, ...(setup.post.swivel !== undefined ? { swivel: setup.post.swivel } : {}) } : {})
       })
       const stats = analyseGcode(gcode, planned.name).stats
       return { toolpaths, used, program, gcode, stats, book, calls: callsLocal, toolNumbers, notes: buildWarnings, seconds: stats.estimatedSeconds + toolChangesOf(toolpaths) * TOOL_CHANGE_SECONDS }
