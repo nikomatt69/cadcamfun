@@ -12,7 +12,7 @@ import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, PROBE_FORMAT, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, setupProgramDocument, stockOfSetup, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { Database, schema } from "@cadcamfun/db"
 import { eq } from "drizzle-orm"
-import { drawingRevision, jobOfRequest } from "./cam-program.ts"
+import { drawingRevision, failedReplay, jobOfRequest, setupReplayPlan } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
 import { z } from "zod"
@@ -183,22 +183,18 @@ const toolHandlers = Effect.gen(function*() {
    * kernel job (a worker, a deadline, cancellation). A replay that cannot finish is not a pass: the program stays a preview and says why.
    */
   const replaySetupProgram = async (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined): Promise<cam.program.SetupEvidence> => {
-    const replay = cam.program.setupReplay(setup, program, geometryOf, configured)
+    const plan = setupReplayPlan(setup, program, geometryOf, configured)
     const results: cam.kernel.VerifyNcResult[] = []
-    const part = replay.part.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
-    for (const register of replay.registers) {
+    for (const job of plan.jobs) {
       try {
-        const outcome = await runOwnedKernelJob("cam-verify-nc", {
-          nc: program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
-          tools: replay.tools.map((t) => ({ number: t.number, cutter: t.cutter as never }))
-        })
+        const outcome = await runOwnedKernelJob("cam-verify-nc", job)
         if ("error" in outcome) results.push(failedReplay(outcome.error))
         else results.push(outcome)
       } catch (cause) {
         results.push(failedReplay(cause instanceof Error ? cause.message : String(cause)))
       }
     }
-    return cam.program.setupEvidence(program.gcode, replay, results, program.tools)
+    return plan.finish(results)
   }
   const manufactureSetupsRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-setups">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
@@ -1806,12 +1802,6 @@ const cancelled = (error: unknown): { readonly status: "failed"; readonly issues
   if (!(error instanceof KernelJobError) || !error.explained) throw error
   return { status: "failed", issues: [{ tag: error.reason === "cancelled" ? "Cancelled" : "GenerationFailed", severity: "error", stage: "prepare", message: error.message }] }
 }
-
-/** A replay that did not run to the end: no verdict, no figures, the reason. */
-const failedReplay = (reason: string): cam.kernel.VerifyNcResult => ({
-  complete: false, reasons: [`the replay did not finish: ${reason}`], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 },
-  detached: 0, stockVolume: 0, removedVolume: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
-})
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
 

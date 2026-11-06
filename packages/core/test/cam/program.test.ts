@@ -357,4 +357,27 @@ describe("replay of a generated program: inputs and release", () => {
     expect(program.setupEvidence(gcode, solid, [result("clean"), result("incomplete")], held).release).toBe("preview")
     expect(program.setupEvidence(gcode, solid, [result("clean"), result("clean")], held).programHash).toHaveLength(64)
   })
+
+  test("the parts of a program with several registers are seen in one frame: each blank where its placement puts it, a cut into another part's blank blocks", () => {
+    const gcode = made.programs[0]!.gcode
+    const held = made.programs[0]!.tools.map((t) => ({ ...t, holder: { diameter: 30, length: 40 } }))
+    const solid = { ...replay, part: [{ positions: new Float32Array(9), indices: new Uint32Array(3) }] }
+    expect(program.setupEvidence(gcode, solid, [result("clean"), result("clean")], held).notes.join(" ")).toMatch(/Part 2 has no placement/)
+    const apart = { ...solid, registers: solid.registers.map((r) => (r.register === "G55" ? { ...r, datum: { x: 120, y: 0, z: 0 } } : r)) }
+    const good = program.setupEvidence(gcode, apart, [result("clean"), result("clean")], held)
+    expect(good.fixture?.parts.map((q) => [q.register, q.blank.min.x, q.blank.max.x, q.removedMm3, q.remainingMm3])).toEqual([["G54", -30, 30, 100, 900], ["G55", 85, 155, 100, 900]])
+    // The moves of G55 are carried to its placement: they reach into x 85..155 and nowhere near the first part.
+    expect(good.fixture!.parts[1]!.reach!.min.x).toBeGreaterThan(80)
+    expect(good.fixture!.parts[0]!.reach!.max.x).toBeLessThan(40)
+    expect(good.fixture!.crossings).toEqual([])
+    expect(good.release).toBe("verified-program")
+    // The same program with the second part placed on top of the first: the first part's cuts run inside the second blank.
+    const onTop = { ...solid, registers: solid.registers.map((r) => (r.register === "G55" ? { ...r, datum: { x: 10, y: 0, z: 0 } } : r)) }
+    const bad = program.setupEvidence(gcode, onTop, [result("clean"), result("clean")], held)
+    expect(bad.fixture!.crossings.length).toBeGreaterThan(0)
+    expect(bad.fixture!.crossings[0]!.message).toMatch(/cuts into the blank of Part/)
+    expect(bad.release).toBe("blocked")
+    // One register: nothing to compare, no fixture section.
+    expect(program.setupEvidence(gcode, { ...solid, registers: [solid.registers[0]!] }, [result("clean")], held).fixture).toBeUndefined()
+  })
 })

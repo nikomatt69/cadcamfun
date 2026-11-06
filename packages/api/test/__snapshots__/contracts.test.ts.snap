@@ -39529,6 +39529,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "type": "object",
                   },
+                  "evidence": {
+                    "type": "boolean",
+                  },
                   "setup": {
                     "additionalProperties": false,
                     "properties": {
@@ -40926,6 +40929,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "items": {
                         "additionalProperties": false,
                         "properties": {
+                          "evidence": {
+                            "type": "object",
+                          },
                           "gcode": {
                             "type": "string",
                           },
@@ -93910,6 +93916,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "type": "object",
                   },
+                  "evidence": {
+                    "type": "boolean",
+                  },
                   "stock": {
                     "additionalProperties": false,
                     "properties": {
@@ -93995,6 +94004,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "items": {
                         "additionalProperties": false,
                         "properties": {
+                          "evidence": {
+                            "type": "object",
+                          },
                           "gcode": {
                             "type": "string",
                           },

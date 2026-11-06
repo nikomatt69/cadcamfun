@@ -8,6 +8,7 @@ import { targetMeshesFor } from "../generator/evidence.ts"
 import { stockInWork } from "../generator/dispatch.ts"
 import type { Stock } from "../generator/schema.ts"
 import type { Mesh } from "../../cad/solid.ts"
+import { interpretGcode } from "../testing/gcode-interpreter.ts"
 import { sha256 } from "../kernel/identity.ts"
 import type { ReleaseLevel } from "../kernel/contracts.ts"
 import type { VerifyNcResult } from "../kernel/verify-nc.ts"
@@ -103,7 +104,11 @@ export interface SetupReplay {
   readonly tools: ReadonlyArray<{ readonly number: number; readonly cutter: Cutter }>
   /** The finished solids of the operations' elements, placed as the generator placed them; empty when the elements are outlines only. */
   readonly part: ReadonlyArray<Mesh>
-  readonly registers: ReadonlyArray<{ readonly register: string; readonly workpieceId: string; readonly name: string; readonly stock: { readonly min: Vec3; readonly max: Vec3 } }>
+  readonly registers: ReadonlyArray<{
+    readonly register: string; readonly workpieceId: string; readonly name: string; readonly stock: { readonly min: Vec3; readonly max: Vec3 }
+    /** Where this part's datum stands in the frame of the first part's datum (its `placement`); absent when the part has none. */
+    readonly datum?: Vec3
+  }>
   readonly notes: ReadonlyArray<string>
 }
 
@@ -139,7 +144,7 @@ export const setupReplay = (setup: Setup, generated: GeneratedProgram, geometryO
     if (!used.has(register)) continue
     const stock = wp.stock !== undefined ? blockBox(wp.stock) : shared
     if (stock === undefined) { notes.push(`${wp.name} has no blank: the setup and the drawing give no stock to replay against`); continue }
-    registers.push({ register, workpieceId: wp.id, name: wp.name, stock })
+    registers.push({ register, workpieceId: wp.id, name: wp.name, stock, ...(wp.placement !== undefined ? { datum: wp.placement } : {}) })
   }
   return { tools, part, registers, notes }
 }
@@ -167,8 +172,88 @@ export interface SetupEvidence {
     readonly removedMm3: number
     readonly stockMm3: number
   }>
+  /** All the parts of a program with several registers in ONE frame (the first part's datum): present from two registers on. */
+  readonly fixture?: FixtureSimulation
   readonly notes: ReadonlyArray<string>
   readonly basis: string
+}
+
+/**
+ * The parts of a multi-register program seen together. Every part's blank stands where its placement puts it, the program's moves are
+ * carried into that one frame through each register's datum (the interpreter's `frame: "machine"` with the placements as the offset
+ * table), and the remaining stock of every part is read from its own replay. `crossings` are the cuts of one part's register that
+ * enter another part's blank: a wrong register or a wrong placement, which no single-part replay can see.
+ */
+export interface FixtureSimulation {
+  readonly frame: string
+  readonly parts: ReadonlyArray<{
+    readonly register: string
+    readonly workpieceId: string
+    readonly name: string
+    readonly datum: Vec3
+    /** The part's blank in the fixture frame. */
+    readonly blank: { readonly min: Vec3; readonly max: Vec3 }
+    readonly removedMm3: number
+    readonly remainingMm3: number
+    /** Where the program's moves of this register reached in the fixture frame (feed moves only), absent when it has none. */
+    readonly reach?: { readonly min: Vec3; readonly max: Vec3 }
+  }>
+  readonly crossings: ReadonlyArray<{ readonly register: string; readonly other: string; readonly line: number; readonly message: string }>
+}
+
+const registerKeyOf = (table: Readonly<Record<string, unknown>>, key: string): string => (key in table ? key : "G54")
+
+/** The parts of a program in one frame: see `FixtureSimulation`. */
+export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>): FixtureSimulation => {
+  const zero = { x: 0, y: 0, z: 0 }
+  const datumOf = (r: SetupReplay["registers"][number]): Vec3 => r.datum ?? zero
+  const table: Record<string, { x: number; y: number; z: number }> = { G54: { ...zero } }
+  for (const r of replay.registers) table[r.register] = { ...datumOf(r) }
+  const shifted = (b: { readonly min: Vec3; readonly max: Vec3 }, d: Vec3) => ({ min: { x: b.min.x + d.x, y: b.min.y + d.y, z: b.min.z + d.z }, max: { x: b.max.x + d.x, y: b.max.y + d.y, z: b.max.z + d.z } })
+  const blanks = replay.registers.map((r) => shifted(r.stock, datumOf(r)))
+  const run = interpretGcode(gcode, { frame: "machine", workOffsets: table, track: true })
+  const radius = new Map(replay.tools.map((t) => [t.number, t.cutter.diameter / 2]))
+  const reach = new Map<string, { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }>()
+  const crossings: Array<{ register: string; other: string; line: number; message: string }> = []
+  const said = new Set<string>()
+  run.segments.forEach((seg, i) => {
+    if (seg.kind === "dwell" || seg.kind === "rapid") return
+    const state = run.states?.[i]
+    const register = registerKeyOf(table, state?.workOffset ?? "G54")
+    const own = replay.registers.findIndex((r) => r.register === register)
+    if (own < 0) return
+    const r = radius.get(state?.tool ?? -1) ?? 0
+    for (const p of [seg.from, seg.to]) {
+      const at = reach.get(register) ?? { min: { ...p }, max: { ...p } }
+      at.min.x = Math.min(at.min.x, p.x); at.min.y = Math.min(at.min.y, p.y); at.min.z = Math.min(at.min.z, p.z)
+      at.max.x = Math.max(at.max.x, p.x); at.max.y = Math.max(at.max.y, p.y); at.max.z = Math.max(at.max.z, p.z)
+      reach.set(register, at)
+      blanks.forEach((b, j) => {
+        if (j === own) return
+        // The tool's axis inside the other blank's outline (grown by nothing: a tool beside it is fine), below its top face.
+        const eps = 1e-3
+        const inside = p.x > b.min.x + eps && p.x < b.max.x - eps && p.y > b.min.y + eps && p.y < b.max.y - eps && p.z > b.min.z + eps && p.z < b.max.z - eps
+        if (!inside) return
+        const key = `${register}>${replay.registers[j]!.register}`
+        if (said.has(key)) return
+        said.add(key)
+        crossings.push({ register, other: replay.registers[j]!.register, line: seg.line, message: `${replay.registers[own]!.name} (${register}) cuts into the blank of ${replay.registers[j]!.name} (${replay.registers[j]!.register}) at NC line ${seg.line}: a wrong register or a wrong placement (tool radius ${Math.round(r * 100) / 100} mm not counted)` })
+      })
+    }
+  })
+  return {
+    frame: `the datum of ${replay.registers[0]?.name ?? "the first part"} (${replay.registers[0]?.register ?? "G54"})`,
+    parts: replay.registers.map((r, i) => {
+      const v = results[i]
+      const seen = reach.get(r.register)
+      return {
+        register: r.register, workpieceId: r.workpieceId, name: r.name, datum: datumOf(r), blank: blanks[i]!,
+        removedMm3: Math.round(v?.removedVolume ?? 0), remainingMm3: Math.round((v?.stockVolume ?? 0) - (v?.removedVolume ?? 0)),
+        ...(seen !== undefined ? { reach: seen } : {})
+      }
+    }),
+    crossings
+  }
 }
 
 /**
@@ -188,11 +273,20 @@ export const setupEvidence = (gcode: string, replay: SetupReplay, results: Reado
   })
   const bare = tools.filter((t) => t.holder === undefined).map((t) => t.name)
   if (bare.length > 0) notes.push(`No holder is described for ${bare.join(", ")}: shank and holder clearance is not claimed`)
-  const faults = registers.some((r) => r.verdict === "faults")
+  // Several parts: one more look, all of them in one frame. A cut of one part's register inside another part's blank blocks the release.
+  let fixture: FixtureSimulation | undefined
+  const unplaced = replay.registers.slice(1).filter((r) => r.datum === undefined).map((r) => r.name)
+  if (replay.registers.length > 1 && unplaced.length > 0) notes.push(`${unplaced.join(", ")} ha${unplaced.length > 1 ? "ve" : "s"} no placement: the parts are not seen together in one frame`)
+  else if (replay.registers.length > 1) {
+    try { fixture = fixtureSimulation(gcode, replay, results) } catch (cause) { notes.push(`The parts could not be seen together: ${cause instanceof Error ? cause.message : String(cause)}`) }
+  }
+  const crossed = fixture !== undefined && fixture.crossings.length > 0
+  for (const c of fixture?.crossings ?? []) notes.push(c.message)
+  const faults = crossed || registers.some((r) => r.verdict === "faults")
   const clean = registers.length > 0 && registers.every((r) => r.verdict === "clean") && replay.part.length > 0 && bare.length === 0
   if (registers.length === 0) notes.push("No register of the program could be replayed")
   return {
-    release: faults ? "blocked" : clean ? "verified-program" : "preview", programHash: sha256(gcode), registers, notes,
+    release: faults ? "blocked" : clean ? "verified-program" : "preview", programHash: sha256(gcode), registers, ...(fixture !== undefined ? { fixture } : {}), notes,
     basis: "The emitted text is replayed by the reference interpreter on a tri-dexel blank per workpiece register against the finished part and the tools as described. A pass is not controller acceptance or a machine qualification."
   }
 }

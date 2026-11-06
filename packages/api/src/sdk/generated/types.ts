@@ -5254,6 +5254,7 @@ export type CamSetupGeneratePayload = {
     readonly material?: string
     readonly elementId?: string
   }
+  readonly evidence?: boolean
 }
 
 export type CamSetupProbePlanPayload = {
@@ -6076,6 +6077,7 @@ export type CamSetupGenerateSavedPayload = {
     readonly material?: string
     readonly elementId?: string
   }
+  readonly evidence?: boolean
 }
 
 export type CamProbingCalibrateRotaryPayload = {
@@ -13448,6 +13450,7 @@ export type CamSetupGenerateInput = {
   readonly setup: CamSetupGeneratePayload["setup"]
   readonly elements: CamSetupGeneratePayload["elements"]
   readonly stock?: CamSetupGeneratePayload["stock"]
+  readonly evidence?: CamSetupGeneratePayload["evidence"]
 }
 
 export type CamSetupGenerateOutput = {
@@ -13606,6 +13609,7 @@ export type CamSetupGenerateOutput = {
     warnings: Array<string>
     operationIds: Array<string>
     toolNumbers: Array<number>
+    evidence?: { [x: string]: JsonValue }
   }>
   toolTable: Array<{
     pocket: number
@@ -14879,6 +14883,7 @@ export type CamSetupGenerateSavedInput = {
   readonly setupId: { readonly id: string; readonly setupId: string }["setupId"]
   readonly elements: CamSetupGenerateSavedPayload["elements"]
   readonly stock?: CamSetupGenerateSavedPayload["stock"]
+  readonly evidence?: CamSetupGenerateSavedPayload["evidence"]
 }
 
 export type CamSetupGenerateSavedOutput = {
@@ -15037,6 +15042,7 @@ export type CamSetupGenerateSavedOutput = {
     warnings: Array<string>
     operationIds: Array<string>
     toolNumbers: Array<number>
+    evidence?: { [x: string]: JsonValue }
   }>
   toolTable: Array<{
     pocket: number

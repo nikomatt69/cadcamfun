@@ -3717,11 +3717,12 @@ type Endpoint31_2Input = {
   readonly setup: Endpoint31_2Request["payload"]["setup"]
   readonly elements: Endpoint31_2Request["payload"]["elements"]
   readonly stock?: Endpoint31_2Request["payload"]["stock"]
+  readonly evidence?: Endpoint31_2Request["payload"]["evidence"]
 }
 const Endpoint31_2 = (raw: RawClient["camSetup"]) => (input: Endpoint31_2Input) =>
-  raw["generate"]({ payload: { setup: input["setup"], elements: input["elements"], stock: input["stock"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["generate"]({
+    payload: { setup: input["setup"], elements: input["elements"], stock: input["stock"], evidence: input["evidence"] },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint31_3Request = Parameters<RawClient["camSetup"]["probePlan"]>[0]
 type Endpoint31_3Input = {
@@ -3815,11 +3816,12 @@ type Endpoint31_12Input = {
   readonly setupId: Endpoint31_12Request["params"]["setupId"]
   readonly elements: Endpoint31_12Request["payload"]["elements"]
   readonly stock?: Endpoint31_12Request["payload"]["stock"]
+  readonly evidence?: Endpoint31_12Request["payload"]["evidence"]
 }
 const Endpoint31_12 = (raw: RawClient["camSetup"]) => (input: Endpoint31_12Input) =>
   raw["generateSaved"]({
     params: { id: input["id"], setupId: input["setupId"] },
-    payload: { elements: input["elements"], stock: input["stock"] },
+    payload: { elements: input["elements"], stock: input["stock"], evidence: input["evidence"] },
   }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint31_13Request = Parameters<RawClient["camSetup"]["remove"]>[0]

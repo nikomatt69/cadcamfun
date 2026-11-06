@@ -4997,7 +4997,12 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/cam/setups/generate`,
-            body: { setup: input["setup"], elements: input["elements"], stock: input["stock"] },
+            body: {
+              setup: input["setup"],
+              elements: input["elements"],
+              stock: input["stock"],
+              evidence: input["evidence"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,
@@ -5114,7 +5119,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/projects/${encodeURIComponent(input.id)}/cam-setups/${encodeURIComponent(input.setupId)}/generate`,
-            body: { elements: input["elements"], stock: input["stock"] },
+            body: { elements: input["elements"], stock: input["stock"], evidence: input["evidence"] },
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
             empty: false,

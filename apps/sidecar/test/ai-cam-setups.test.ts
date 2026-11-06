@@ -167,3 +167,31 @@ test("setup_generate replays every register against the finished part: a pass ne
   expect(short.programs[0].evidence.registers[0].findings[0]).toMatchObject({ kind: "gouge" })
   expect((await call("cam", { action: "review", operationId: short.programs[0].operationId })).status).toBe("blocked")
 })
+
+test("the HTTP generate routes of a setup replay each program per work offset when asked, with the same evidence as the assistant's", async () => {
+  const id = (await app.call("/api/projects", { method: "POST", json: { name: "Http replay" } })).body.id as string
+  const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", placement: { x: 120, y: 0, z: 0 } }]
+  const plate = { id: "plate", type: "rectangle", x: 0, y: 0, width: 40, height: 30, depth: 5, name: "Plate" }
+  const fixture = setup([{ ...op("a", tool("t6", 6)), elementIds: ["plate"] }], { workpieces: parts, stock: { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" } })
+  const saved = (await app.call(`/api/projects/${id}/cam-setups`, { method: "POST", json: { name: "Two parts", setup: fixture } })).body
+  const url = `/api/projects/${id}/cam-setups/${saved.id}/generate`
+
+  const plain = await app.call(url, { method: "POST", json: { elements: { plate } } })
+  expect(plain.status).toBe(200)
+  expect(plain.body.programs[0].evidence).toBeUndefined()
+
+  const replayed = await app.call(url, { method: "POST", json: { elements: { plate }, evidence: true } })
+  expect(replayed.status).toBe(200)
+  const evidence = replayed.body.programs[0].evidence
+  // Both registers were replayed, each against its own blank; the parts are also seen together in one frame.
+  expect(evidence.registers.map((r: { register: string }) => r.register)).toEqual(["G54", "G55"])
+  expect(evidence.programHash).toBe(cam.kernel.sha256(replayed.body.programs[0].gcode))
+  expect(evidence.fixture.parts.map((q: { register: string; blank: { min: { x: number } } }) => [q.register, q.blank.min.x])).toEqual([["G54", -30], ["G55", 90]])
+  expect(evidence.fixture.crossings).toEqual([])
+  // A drawing with outlines only is never a verified program: the release says preview and why.
+  expect(evidence.release).toBe("preview")
+  expect(evidence.notes.join(" ")).toMatch(/not a finished solid/)
+  // The stateless route takes the same flag.
+  const stateless = await app.call("/api/cam/setups/generate", { method: "POST", json: { setup: fixture, elements: { plate }, evidence: true } })
+  expect(stateless.body.programs[0].evidence.registers).toHaveLength(2)
+})

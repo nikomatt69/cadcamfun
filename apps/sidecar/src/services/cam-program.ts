@@ -145,3 +145,33 @@ export const prepareCamProgramData = Effect.fn("cam.prepareProgramData")(functio
   }
   return output
 })
+
+/** A replay that did not run to the end: no verdict, no figures, the reason. */
+export const failedReplay = (reason: string): cam.kernel.VerifyNcResult => ({
+  complete: false, reasons: [`the replay did not finish: ${reason}`], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 },
+  detached: 0, stockVolume: 0, removedVolume: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
+})
+
+/**
+ * The replay of a program a saved setup generated, as the jobs it needs (the program text once per workpiece register against that
+ * workpiece's blank) and how their results become the evidence. The assistant runs the jobs as owned kernel jobs, the HTTP routes as
+ * effects: one plan for both, so the release a program gets does not depend on who asked.
+ */
+export const setupReplayPlan = (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined) => {
+  const replay = cam.program.setupReplay(setup, program, geometryOf, configured)
+  const part = replay.part.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
+  const jobs = replay.registers.map((register) => ({
+    nc: program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
+    tools: replay.tools.map((t) => ({ number: t.number, cutter: t.cutter as never }))
+  }))
+  return { jobs, finish: (results: ReadonlyArray<cam.kernel.VerifyNcResult>) => cam.program.setupEvidence(program.gcode, replay, results, program.tools) }
+}
+
+/** The same replay run through the kernel's worker queue, one register after the other; a register that cannot finish is a preview with the reason. */
+export const replaySetupEffect = (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined) => {
+  const plan = setupReplayPlan(setup, program, geometryOf, configured)
+  return Effect.forEach(plan.jobs, (job) => runKernelJobEffect("cam-verify-nc", job).pipe(
+    Effect.map((outcome) => ("error" in outcome ? failedReplay(outcome.error) : outcome)),
+    Effect.catch((cause) => Effect.succeed(failedReplay(cause instanceof Error ? cause.message : String(cause))))
+  )).pipe(Effect.map((results) => plan.finish(results)))
+}
