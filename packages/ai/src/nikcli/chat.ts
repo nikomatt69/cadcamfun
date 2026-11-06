@@ -53,15 +53,19 @@ export interface HostChatInput {
   readonly stopHook?: StopHook
 }
 
+/** Lead-ins models put before the announcement ("Now let me", "Perfect, let me", "Next, I'll", "Bene, ora procedo"). */
+const LEAD_IN = String.raw`(?:(?:ok(?:ay)?|now|next|first|then|great|perfect|good|alright|all right|done|so|bene|perfetto|ottimo|ora|adesso|poi)[,.:!]?\s+)*`
+/** An offer to the user is how a finished answer ends, not a step the agent still owes ("Let me know...", "I'll wait..."). */
+const OFFERS = /^(?:(?:ok(?:ay)?|now|great|perfect|so)[,.:!]?\s+)*(?:let me know|i['’]ll wait|i will wait|i['’]ll be (?:happy|glad)|fammi sapere|fatemi sapere|attendo)\b/i
 /** What the agent said it would do next, as the last sentence of its answer ("Let me build the wheels:", "Procedo con..."). */
-const ANNOUNCES = /^(?:ok(?:ay)?[,.:]?\s+)?(?:let me|let['’]s|i['’]ll|i will|i['’]m going to|i am going to|now i|next,? i|first,? i|then i|procedo|vado a|inizio(?: a| con)?|comincio|ora (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|adesso (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|creo ora|costruisco ora|passo a)\b/i
+const ANNOUNCES = new RegExp(`^${LEAD_IN}(?:let me|let['’]s|i['’]ll|i will|i['’]m going to|i am going to|now i|next,? i|first,? i|then i|procedo|vado a|inizio(?: a| con)?|comincio|ora (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|adesso (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|creo ora|costruisco ora|passo a)\\b`, "i")
 
 export const announcesWork = (text: string): boolean => {
   const trimmed = text.trim()
   if (trimmed === "") return false
   const sentences = trimmed.split(/(?<=[.!?\n])\s+/).map((s) => s.trim()).filter((s) => s !== "")
   const last = sentences.at(-1) ?? ""
-  return !/\?$/.test(last) && ANNOUNCES.test(last)
+  return !/\?$/.test(last) && !OFFERS.test(last) && ANNOUNCES.test(last)
 }
 
 /** The host's own refusal texts (`permission/next.ts`): a rejected call, a rule that forbids it, a cancelled run. */
