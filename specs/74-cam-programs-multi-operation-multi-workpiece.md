@@ -134,7 +134,16 @@ Built on top of §2:
   `within` (the corrected register puts the eight corners of the blank within the tolerance of where they are: `residualMm`, `beforeMm`, the
   corrected register, a G68 left on), `outside` (with the reason: an axis no touch measures, a rotation written to the register about the wrong
   point), `missed` (a touch found nothing), `stopped` (an alarm: the correction beyond `limit`, a contact on a protected move) or `unreplayed`
-  (the blank is a plain block: a bore, boss, slot or inside corner needs its feature; a write to the table's C axis is not modelled; no blank).
+  (a write to the table's C axis is not modelled; no blank; a combination of features the replay does not build, below).
+  **Features in the replayed blank.** The replay places the feature each cycle measures: through bores in the plate (`plateWorld`), one rectangular
+  pocket cut into its top (a slot across X or across Y, an inside rectangle, an inside corner 40 mm into the part: `pocketWorld`), or the blank's
+  own outline for a boss, a web or an outside rectangle that is not as wide as the part (a web or rectangle as wide as the part is the plain
+  block). Not built, and said as `unreplayed`: bores with pockets or outlines in one probe, more than one pocket or outline, a slot or web at an
+  angle that is not a quarter turn, and any feature on an indexed face (the feature is placed on a flat table only).
+  **Rotation fallbacks.** A rotation is written the way the post can: `offset-r` on the Fanuc family (a register without a rotation) becomes G68
+  about the measured point; `g68` on Siemens (no G68 word) becomes the frame's rotation, with the note that it turns about the frame's zero;
+  LinuxCNC writes G68 with the Fanuc words and `G10 L2 R` for the register. The plan's `notes` say which one was used. A refusal remains only where
+  neither exists (Okuma, Klartext, GRBL) and carries the post's own reason.
   A failed replay is a warning on the probe program. It has no material-removal replay and no tilted-plane (G68.2 / CYCLE800) frame: an index is
   the table turn.
 
@@ -142,10 +151,20 @@ Still not done:
 
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
 2. The viewer does not draw the combined fixture view's clamps (the data is in the evidence); the desktop does not send `fixtures` / `envelope` to the sidecar.
-3. The probe inline in each part's toolpaths (the probe tool in the cutting programs' tool table and magazine); the probe replay on a blank with
-   features (bore, boss, slot, inside corner), on a tilted plane with the work offset in the table's frame (G68.2 / CYCLE800), and a table-C write.
+3. The probe inline in each part's toolpaths (the probe tool in the cutting programs' tool table and magazine); the probe replay on a tilted plane with
+   the work offset in the table's frame (G68.2 / CYCLE800), on an indexed face with a feature, and a table-C write.
 4. The insert of a back-boring bar is modelled as a body of revolution about the hole axis (its envelope), not as the oriented insert; the one
    tri-dexel of the fixture carves every register in one pass and its lattice (not the exact clamp test) limits the blank-to-blank contacts.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids in the carving (they are exact boxes in the contact
    test, but the body's remaining stock does not subtract what a clamp occupies of the blank); holder collision against the machine; no controller
    qualification (a pass is the reference interpreter's, not a machine's).
+
+## Note: the size of the API contracts snapshot (2026-11-06)
+
+`packages/api/test/__snapshots__/contracts.test.ts.snap` is the whole OpenAPI document (about 166,000 lines). Its large diffs are legitimate, not
+staleness: `cam.program.SetupSchema` has no identifier, so Effect inlines it at every place a setup travels (9 copies: plan, generate, saved
+documents, the stateless and saved routes, the assistant's inputs), about 2,700 lines each, and every field added to a setup, a template or a probe
+cycle is added 9 times. A regenerate at HEAD matches HEAD. Trying `SetupSchema.annotate({ identifier: "CamSetup" })` turns the nine copies into one
+component and `$ref`s (166,037 lines to 145,723 on the first try; a later setup field is then one copy, about 300 lines) at the price of
+regenerating the SDK types (`types.ts`, about 2,500 lines of churn once). It was not applied because another change to the setup schema was in
+flight in the same tree; apply it together with the next schema change and run `bun run generate` and the contracts test with `-u`.
