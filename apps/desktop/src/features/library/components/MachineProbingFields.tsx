@@ -3,7 +3,7 @@ import { t } from "../../../i18n/index.ts"
 import { INPUT, LABEL } from "../../../shared/components/WorkspacePage.tsx"
 import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
 import {
-  PROBE_NUMBER_FIELDS, SETTER_NUMBER_FIELDS, probingFormOf, probingIssues, writeProbe, writeSetter,
+  PROBE_MACRO_STYLES, PROBE_NUMBER_FIELDS, SETTER_NUMBER_FIELDS, probingFormOf, probingIssues, writeProbe, writeSetter,
   type ProbeNumberField, type SetterNumberField
 } from "../lib/machine-probing.ts"
 
@@ -47,6 +47,18 @@ export function MachineProbingFields(props: { readonly form: Row; readonly onPat
       <input id="res-probe-double" type="checkbox" class="h-3.5 w-3.5 accent-blue-600" checked={form().probe.doubleTouch === true}
         onChange={(e) => commit(writeProbe(config(), "doubleTouch", e.currentTarget.checked))} />
       <label for="res-probe-double" class="text-xs text-slate-700 dark:text-slate-300">{t("library.probing.doubleTouch")}</label>
+    </div>
+    <div>
+      <label for="res-probe-macro" class={LABEL}>{t("library.probing.macroStyle")}</label>
+      <select id="res-probe-macro" class={INPUT} data-testid="probe-macroStyle" value={form().probe.macroStyle ?? "inline"}
+        onChange={(e) => commit(writeProbe(config(), "macroStyle", e.currentTarget.value as (typeof PROBE_MACRO_STYLES)[number]))}>
+        <For each={PROBE_MACRO_STYLES}>{(style) => <option value={style}>{t(`library.probing.macro.${style}` as never)}</option>}</For>
+      </select>
+    </div>
+    <div class="flex items-center gap-2">
+      <input id="res-probe-tilted" type="checkbox" class="h-3.5 w-3.5 accent-blue-600" data-testid="probe-tiltedPlane" checked={form().probe.tiltedPlane === true}
+        onChange={(e) => commit(writeProbe(config(), "tiltedPlane", e.currentTarget.checked ? true : undefined))} />
+      <label for="res-probe-tilted" class="text-xs text-slate-700 dark:text-slate-300">{t("library.probing.tiltedPlane")}</label>
     </div>
     <Show when={form().probe.effectiveRadius !== undefined}>
       <p class="text-xs text-slate-600 dark:text-slate-300 md:col-span-2" data-testid="probe-calibration">

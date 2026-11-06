@@ -3,7 +3,7 @@ import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, History, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
+import { Activity, Blocks, BookOpen, ChevronDown, Copy, Download, FolderOpen, Maximize, Menu, MousePointer, Moon, History, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -41,7 +41,7 @@ const ICON_BUTTON = "h-7 w-7 flex items-center justify-center rounded-md hover:b
 const TOGGLE_ON = "bg-[color:var(--ent-accent-soft)] border-[color:var(--ent-accent)] text-[color:var(--ent-accent)]"
 const TOGGLE_OFF = "bg-[color:var(--ent-surface)] border-[color:var(--ent-line-strong)] hover:bg-[color:var(--ent-surface-subtle)] text-[color:var(--ent-text)]"
 
-/** The editor's top bar: menu, save/import/library, undo/redo, view toggles, CAM link, selection summary, FEA and PMI dialogs. */
+/** The editor's top bar: file actions, project navigation, undo/redo, view toggles and modelling tools. */
 export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Element {
   const [showComponentModal, setShowComponentModal] = createSignal(false)
   const elements = useElementsStore()
@@ -129,17 +129,23 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
         </Motion.button>
 
         <div class="ml-4 flex items-center gap-2">
-          <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title={t("cad.saveProject")}>
-            <Save size={16} class="text-[color:var(--ent-text-muted)]" />
+          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={`${GLASS_BUTTON} gap-1.5`} title={t("cad.io.importDrawing")} data-testid="cad-toolbar-import">
+            <Upload size={16} class="text-[color:var(--ent-text-muted)]" /><span>{t("keys.import")}</span>
           </Motion.button>
+          <Motion.button onClick={props.handleSaveProject} class={`${GLASS_BUTTON} gap-1.5`} title={t("cad.saveProject")} data-testid="cad-toolbar-save">
+            <Save size={16} class="text-[color:var(--ent-text-muted)]" /><span>{t("common.save")}</span>
+          </Motion.button>
+          <Motion.button onClick={() => { props.setDialogMode("export"); props.setShowImportExportDialog(true) }} class={`${GLASS_BUTTON} gap-1.5`} title={t("cad.io.exportDrawing")} data-testid="cad-toolbar-export">
+            <Download size={16} class="text-[color:var(--ent-text-muted)]" /><span>{t("keys.export")}</span>
+          </Motion.button>
+          <A href="/projects" class={`${GLASS_BUTTON} gap-1.5`} title={t("cad.projects")} data-testid="cad-toolbar-projects">
+            <FolderOpen size={16} class="text-[color:var(--ent-text-muted)]" /><span>{t("cad.projects")}</span>
+          </A>
           <Show when={props.onShowVersions}>
             <Motion.button onClick={() => props.onShowVersions?.()} class={GLASS_BUTTON} title={t("save.versions.title")} data-testid="open-versions">
               <History size={16} class="text-[color:var(--ent-text-muted)]" />
             </Motion.button>
           </Show>
-          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title={t("cad.importProject")}>
-            <Upload size={16} class="text-[color:var(--ent-text-muted)]" />
-          </Motion.button>
           <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title={t("cad.unifiedLibrary")}>
             <BookOpen size={16} class="text-[color:var(--ent-text-muted)]" />
           </Motion.button>

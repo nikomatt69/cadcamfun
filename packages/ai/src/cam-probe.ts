@@ -163,7 +163,7 @@ export const camProbePlan = (input: CamProbePlanInput, report?: Report): CamProb
   }
   let native: string | undefined
   if (input.native === true) {
-    const marked = p.nativeCycle(resolved.cycle, actions, input.macroStyle ?? "inline", moves, { probe: ctx.probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: input.frame !== undefined })
+    const marked = p.nativeCycle(resolved.cycle, actions, input.macroStyle ?? "inline", moves, { probe: ctx.probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: input.frame !== undefined, ...(input.dialect !== undefined ? { post: input.dialect } : {}) })
     if ("refused" in marked) return { error: `No native cycle: ${marked.refused}. Clear native for the inline touches.`, status: 400 }
     moves = [...marked.moves]
     native = marked.word
@@ -209,11 +209,23 @@ export interface CamProbeSimulateInput extends ProbeSetup {
   readonly options?: CamProbePlanInput["options"]
   /** The machine's rotary table: a `rotary-axis` operation needs it. */
   readonly assumed?: cam.probing.RotaryAssumption
+  /**
+   * The point of the drawing that is work zero, for cycles planned in work coordinates (the desktop: stock centre, top face); without it
+   * the drawing's own coordinates are the work coordinates.
+   */
+  readonly partOrigin?: { readonly x: number; readonly y: number; readonly z: number }
+  /** The stock as an element: what the probe touches when the drawing has no closed solid yet. */
+  readonly stockElement?: Readonly<Record<string, unknown>>
 }
 
 export interface CamProbeSimulateOutput {
   /** The program `line` numbers refer to: lines of `program.nc`, 1-based. Absent without `dialect`, or when the post refused (a warning says why). */
   readonly program?: ProbeProgram
+  /**
+   * The program as this run went: every macro resolved, every touch ending at its contact rather than at the end of its search. It is what
+   * a 3D view plays (the text alone would draw the stylus through the part); `lines[i]` is the line of `program.nc` of line i + 1.
+   */
+  readonly played?: { readonly text: string; readonly lines: ReadonlyArray<number> }
   readonly report: cam.probing.ProbeReport
   readonly offsetTable: Readonly<Record<string, cam.probing.OffsetEntry>>
   readonly identity: { readonly elements: string; readonly operations: string }
@@ -226,13 +238,13 @@ export interface CamProbeSimulateOutput {
  * text is rounded to the post's decimals); the text gives the place. When the two do not pair up one to one, the lines are left out and
  * a warning says why: a line on the wrong block would show a contact at the wrong moment.
  */
-const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: ReadonlyArray<cam.Move>, runs: ReadonlyArray<cam.probing.ReportRun>, world: cam.probing.ProbeWorld3, machine: cam.probing.SimMachine, warnings: string[]): { readonly program?: ProbeProgram; readonly runs: ReadonlyArray<cam.probing.ReportRun> } | undefined => {
+const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: ReadonlyArray<cam.Move>, runs: ReadonlyArray<cam.probing.ReportRun>, world: cam.probing.ProbeWorld3, machine: cam.probing.SimMachine, warnings: string[]): { readonly program?: ProbeProgram; readonly played?: CamProbeSimulateOutput["played"]; readonly runs: ReadonlyArray<cam.probing.ReportRun> } | undefined => {
   const text = probeProgramText(moves, input, dialect, input.options, input.post)
   if ("error" in text) { warnings.push(`no NC lines on the contacts: ${text.error}`); return undefined }
   const program = programOf(dialect, text.nc)
   const codes = cam.dialectOf(dialect)?.probing
   if (codes === undefined) return { program, runs }
-  const nc = cam.testing.simulateNc(text.nc, { world, machine, codes, ...(input.post?.probing !== undefined ? { probing: input.post.probing } : {}) })
+  const nc = cam.testing.simulateNc(text.nc, { world, machine, codes, rewrite: true, ...(input.post?.probing !== undefined ? { probing: input.post.probing } : {}) })
   const contacts = runs.flatMap((r) => r.outcome.contacts)
   const updates = runs.flatMap((r) => r.outcome.updates)
   const sameContacts = nc.contacts.length === contacts.length
@@ -242,6 +254,7 @@ const linesOnText = (dialect: cam.PostId, input: CamProbeSimulateInput, moves: R
   let c = 0, u = 0
   return {
     program,
+    played: { text: nc.expanded.text, lines: nc.expanded.lines },
     runs: runs.map((r) => ({
       ...r,
       outcome: {
@@ -259,16 +272,23 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   const m = input.misplacement
   if (m !== undefined && ((m.a ?? 0) !== 0 || (m.b ?? 0) !== 0)) return { error: "The part may be shifted and turned about the vertical (x, y, z, c); a tilt of the part (a, b) is not simulated.", status: 400 }
   const warnings: string[] = []
-  const built = cam.model.partMeshes(input.elements as never)
+  const drawn = cam.model.partMeshes(input.elements as never)
+  const built = drawn ?? (input.stockElement !== undefined ? cam.model.partMeshes([input.stockElement] as never) : undefined)
   if (built === undefined) return { error: "The drawing has no closed solid to touch (send solids, not curves or surfaces).", status: 400 }
+  if (drawn === undefined) warnings.push("the drawing has no closed solid: the probe touches the stock block")
   if (built.skipped.length > 0) warnings.push(`not part of the world the probe touches: ${built.skipped.join(", ")}`)
   warnings.push(...built.warnings)
   const active = input.settings.workOffset
   const table: cam.probing.WorkOffsetTable = { entries: input.workOffsets ?? {} }
   const base = p.getOffset(table, active)
   // The part sits where the control believes (the offset) plus how far it is really displaced.
-  const placement = { translate: { x: base.x + (m?.x ?? 0), y: base.y + (m?.y ?? 0), z: base.z + (m?.z ?? 0) }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
-  const artefacts = input.operations.flatMap((op) => { const w = p.artefactWorld(op.cycle); return w === undefined ? [] : [w] })
+  const o = input.partOrigin ?? { x: 0, y: 0, z: 0 }
+  const placement = { translate: { x: base.x + (m?.x ?? 0) - o.x, y: base.y + (m?.y ?? 0) - o.y, z: base.z + (m?.z ?? 0) - o.z }, ...(m?.c !== undefined && m.c !== 0 ? { rotate: m.c } : {}) }
+  // A stylus artefact stands where its cycle says in work coordinates, so the machine sees it through the offset; a rotary sphere is given in machine coordinates.
+  const artefacts = input.operations.flatMap((op) => {
+    const w = p.artefactWorld(op.cycle.kind === "stylus-calibrate" ? p.translateCycle(op.cycle, base.x, base.y, base.z) : op.cycle)
+    return w === undefined ? [] : [w]
+  })
   const world = artefacts.length === 0 ? p.meshWorld(built.meshes, placement) : p.unionWorld([p.meshWorld(built.meshes, placement), ...artefacts])
   const ctx = contextOf(input)
   const probe = ctx.probe
@@ -306,6 +326,7 @@ export const camProbeSimulate = (input: CamProbeSimulateInput, report?: Report):
   const placed = input.dialect === undefined ? undefined : linesOnText(input.dialect, input, allMoves, runs, world, { offsets: table, active, probe, start: { x: 0, y: 0, z: input.settings.safeZ }, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(kinematics !== undefined ? { kinematics } : {}) }, warnings)
   return {
     ...(placed !== undefined ? { program: placed.program } : {}),
+    ...(placed?.played !== undefined ? { played: placed.played } : {}),
     report: p.buildProbeReport(placed?.runs ?? runs), offsetTable: entries, warnings,
     identity: { elements: hash(input.elements), operations: hash(input.operations) }
   }

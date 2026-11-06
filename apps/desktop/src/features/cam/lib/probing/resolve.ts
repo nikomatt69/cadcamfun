@@ -26,7 +26,7 @@ export type FigureSource = "cycle" | "machine" | "settings" | "default"
 
 export interface ResolveInput {
   readonly overrides?: ProbeOverrides
-  readonly profile?: Pick<MachineProfile, "post" | "probing" | "toolSetter" | "workOffsets" | "workOffsetTable" | "feed" | "controller"> | undefined
+  readonly profile?: Pick<MachineProfile, "post" | "probing" | "toolSetter" | "workOffsets" | "workOffsetTable" | "feed" | "controller" | "rotary"> | undefined
   readonly defaults?: ProbingDefaults | undefined
   /** The work offset the cycle updates (its own choice wins over the machine's default and the settings'). */
   readonly workOffset?: string | undefined

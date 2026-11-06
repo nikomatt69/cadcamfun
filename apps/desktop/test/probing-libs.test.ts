@@ -1,8 +1,12 @@
 /** Pure probing libs of the desktop (spec 73 §4): inspection status / order / CSV and the work-offset table. */
-import { expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
+import { stockElementOf } from "../src/features/cam/lib/probing/part-solids.ts"
 import { cam } from "@cadcamfun/core"
 import { inspectionCsv, sortInspection, statusOf, summarizeInspection } from "../src/features/cam/lib/probing/inspection.ts"
-import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
+import { applyMeasured, diffRows, entriesOfRows, extendedOffsetsOf, offsetFamilyOf, offsetRefusal, offsetRowsOf, rotationViaOf, withRowValue } from "../src/features/cam/lib/probing/work-offsets.ts"
+import { expectedOfContacts } from "../src/features/cam/lib/probing/simulation.ts"
+import { targetsOf } from "../src/features/cam/lib/probing/probe-targets.ts"
+import { parseOffsetRef } from "../src/features/cam/lib/probing/contract.ts"
 import { contextOf, resolveSettings } from "../src/features/cam/lib/probing/resolve.ts"
 import type { InspectionVerdict } from "../src/features/cam/lib/probing/contract.ts"
 
@@ -78,4 +82,48 @@ test("the planning context carries the machine's work zero, so a tool setter cyc
   const settings = resolveSettings({ profile: p, workOffset: "G54" })
   expect(contextOf(settings, { profile: p }).workOrigin).toEqual({ x: 100, y: 200, z: -300 })
   expect(contextOf(resolveSettings({ profile: p, workOffset: "G55" }), { profile: p }).workOrigin).toBeUndefined()
+})
+
+describe("the stock as a part", () => {
+  const stock = { x: 10, y: 20, width: 100, height: 200, depth: 20, topZ: 5 }
+  test("its top is the stock top", () => {
+    const block = stockElementOf(stock)!
+    expect(block).toMatchObject({ type: "cube", x: 10, y: 20, z: -5, width: 100, height: 200, depth: 20 })
+    expect(cam.generator.elementBounds(block as never).max.z).toBeCloseTo(5, 9)
+  })
+  test("a stock without depth is no part", () => {
+    expect(stockElementOf({ ...stock, depth: 0 })).toBeUndefined()
+  })
+})
+
+describe("a rotation reaches the control it can", () => {
+  const ref = parseOffsetRef("G54")!
+  test("Fanuc keeps no rotation in the offset: G68; Siemens and LinuxCNC keep one", () => {
+    expect(rotationViaOf(ref, "fanuc")).toBe("g68")
+    expect(rotationViaOf(ref, "haas")).toBe("g68")
+    expect(rotationViaOf(ref, "siemens")).toBe("offset-r")
+    expect(rotationViaOf(parseOffsetRef("G55")!, "linuxcnc")).toBe("offset-r")
+  })
+})
+
+describe("contacts and planned touches", () => {
+  const planned = (name: string) => ({ name, expected: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } })
+  test("a double touch gives each planned touch to both of its contacts", () => {
+    const [a, b] = [planned("a"), planned("b")]
+    expect(expectedOfContacts(4, [a, b]).map((e) => e.name)).toEqual(["a", "a", "b", "b"])
+  })
+  test("one contact a touch stays as it is; counts that do not divide are not matched", () => {
+    const list = [planned("a"), planned("b")]
+    expect(expectedOfContacts(2, list)).toBe(list)
+    expect(expectedOfContacts(3, list)).toEqual([])
+  })
+})
+
+test("a feature that is not at Z0 keeps its height: a round or a corner target carries its top in work coordinates", () => {
+  const origin = { x: 200, y: 100, z: 50 }
+  const elements = [{ id: "pin", type: "cylinder", x: 215, y: 105, z: 55, radius: 12, height: 10 }, { id: "plate", type: "cube", x: 200, y: 100, z: 40, width: 120, height: 80, depth: 20 }] as never
+  const targets = targetsOf(elements, { origin })
+  const boss = targets.find((t) => t.id === "pin:boss")!
+  expect(boss.patch).toMatchObject({ centre: { x: 15, y: 5 }, diameter: 24, top: 10 })
+  expect(targets.find((t) => t.id === "plate:corner:left front")!.patch).toMatchObject({ top: 0 })
 })

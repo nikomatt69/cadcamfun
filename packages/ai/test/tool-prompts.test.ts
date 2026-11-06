@@ -102,7 +102,12 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Aligned with `BUDGETS.descriptions` in corpus.ts (35 600): the merged cam job and five-axis actions put main at 34 396, above the old 34 100.
     // +300: cam setup_plan / setup_list and cam_edit setup_save (saved multi-operation setups, RM-02).
     // +400: cam_edit probe / probe_run / probe_apply and the machine probing fields of library_edit (spec 73).
-    expect(total).toBeLessThan(36_300)
+    // +150: cam setup_plan workpieces (several parts on one fixture, one work offset each).
+    // +100: cam_edit setup_generate (the programs of a saved setup).
+    // +100: cam / cam_edit manufacture setups, carryStock and the per-setup result.
+    // +100: cam_edit setup_generate replays each work offset (release and evidence per program).
+    // +250: setup templates / uses and partProbe in the setup schema, cam_edit setup_generate probePart.
+    expect(total).toBeLessThan(37_000)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

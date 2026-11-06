@@ -3,9 +3,10 @@
  * work offset, tolerance), the inspection checks, a tilted plane for 5-axis probing and the figures it overrides. It is plain JSON
  * (it is stored on the element toolpath and persisted), and `operationWire` turns it into the wire record the sidecar plans.
  */
-import { parseOffsetRef, probing, type Characteristic, type ProbeAction, type ProbeCycleKind, type ProbeRoutine, type ProbeSettings, type UpdateMode, type WorkOffsetRef } from "./contract.ts"
+import { parseOffsetRef, probing, type Characteristic, type OffsetFamily, type ProbeAction, type ProbeCycleKind, type ProbeRoutine, type ProbeSettings, type UpdateMode, type WorkOffsetRef } from "./contract.ts"
 import { cycleOfSpec, defaultSpecOf, wireOf, type CycleSpec } from "./cycle-fields.ts"
 import { contextOf, resolveSettings, type ProbeOverrides, type ResolveInput } from "./resolve.ts"
+import { rotationViaOf } from "./work-offsets.ts"
 import type { ProbingDefaults } from "../../../../shared/state/settings.ts"
 
 /** A tilted probing plane, degrees (the machine's A / B / C of the plane the cycle runs in). */
@@ -118,7 +119,7 @@ const axesOf = (follow: ReadonlyArray<OffsetFollow>): Partial<Record<"X" | "Y" |
 export const refWire = (key: string): WorkOffsetRef | undefined => parseOffsetRef(key)
 
 /** The wire actions of an operation: set the offset (and its rotation), then inspect. Absent actions: a pure measurement. */
-export const actionsOf = (op: ProbeOperation): ReadonlyArray<Record<string, unknown>> => {
+export const actionsOf = (op: ProbeOperation, family?: OffsetFamily): ReadonlyArray<Record<string, unknown>> => {
   const out: Array<Record<string, unknown>> = []
   const ref = refWire(op.workOffset)
   const kind = op.cycle.kind
@@ -133,7 +134,7 @@ export const actionsOf = (op: ProbeOperation): ReadonlyArray<Record<string, unkn
     if (Object.keys(axes).length > 0) out.push({ kind: "set-offset", ref, axes, policy: policy(false) })
     if (op.follow.includes("R")) {
       const result = kind === "edge-angle" ? "angle" : "rotation"
-      out.push({ kind: "rotation", result, via: "offset-r", ref, policy: policy(true) })
+      out.push({ kind: "rotation", result, via: family === undefined ? "offset-r" : rotationViaOf(ref, family), ref, policy: policy(true) })
     }
   }
   if (kind === "tool-length" || kind === "tool-radius") {

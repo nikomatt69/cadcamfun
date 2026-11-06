@@ -64,12 +64,12 @@ const boxTargets = (id: string, label: string, box: Box, origin: WorkOrigin, sol
   for (const [corner, x, y, xs, ys] of corners) {
     out.push({
       id: `${id}:corner:${corner}`, elementId: id, label: `${label}: ${corner} corner`, kind: "corner",
-      patch: { corner: { x, y }, inside: !solid, xSense: xs, ySense: ys, depth }, point: { x, y, z: top - depth }, normal: { x: xs * -1, y: ys * -1, z: 0 }
+      patch: { corner: { x, y }, inside: !solid, xSense: xs, ySense: ys, depth, top }, point: { x, y, z: top - depth }, normal: { x: xs * -1, y: ys * -1, z: 0 }
     })
   }
   out.push({
     id: `${id}:rectangle`, elementId: id, label: `${label}: ${solid ? "block" : "pocket"} sides`, kind: "rectangle",
-    patch: { inside: !solid, centre: { x: cx, y: cy }, size: { x: r3(x1 - x0), y: r3(y1 - y0) }, depth }, point: { x: cx, y: cy, z: top - depth }, normal: Z
+    patch: { inside: !solid, centre: { x: cx, y: cy }, size: { x: r3(x1 - x0), y: r3(y1 - y0) }, depth, top }, point: { x: cx, y: cy, z: top - depth }, normal: Z
   })
   return out
 }
@@ -78,8 +78,8 @@ const roundTargets = (id: string, label: string, centre: { x: number; y: number;
   const cx = r3(centre.x - origin.x), cy = r3(centre.y - origin.y), top = r3(centre.top - origin.z), d = r3(centre.r * 2)
   const round = { centre: { x: cx, y: cy, z: top - SIDE_DEPTH }, radius: centre.r }
   return [
-    { id: `${id}:bore`, elementId: id, label: `${label}: bore`, kind: "bore", patch: { centre: { x: cx, y: cy }, diameter: d, depth: SIDE_DEPTH }, point: { x: cx, y: cy, z: top - SIDE_DEPTH }, normal: Z, round },
-    { id: `${id}:boss`, elementId: id, label: `${label}: boss`, kind: "boss", patch: { centre: { x: cx, y: cy }, diameter: d, depth: SIDE_DEPTH }, point: { x: cx, y: cy, z: top - SIDE_DEPTH }, normal: Z, round },
+    { id: `${id}:bore`, elementId: id, label: `${label}: bore`, kind: "bore", patch: { centre: { x: cx, y: cy }, diameter: d, depth: SIDE_DEPTH, top }, point: { x: cx, y: cy, z: top - SIDE_DEPTH }, normal: Z, round },
+    { id: `${id}:boss`, elementId: id, label: `${label}: boss`, kind: "boss", patch: { centre: { x: cx, y: cy }, diameter: d, depth: SIDE_DEPTH, top }, point: { x: cx, y: cy, z: top - SIDE_DEPTH }, normal: Z, round },
     { id: `${id}:top`, elementId: id, label: `${label}: top face`, kind: "z-surface", patch: { at: { x: cx, y: cy }, expectedZ: top }, point: { x: cx, y: cy, z: top }, normal: Z }
   ]
 }

@@ -10,6 +10,7 @@ import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { restoreKernelSettings, useGeneratorStore } from "../store/generatorStore.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
+import { evidenceOfProgram, placedProgram } from "./setup.ts"
 import { t } from "../../../i18n/index.ts"
 import { isSaveConflict } from "../../cad/lib/stored-revision.ts"
 
@@ -21,7 +22,7 @@ export type SavedCamProgram = typeof SavedCamProgram.Type
 export const camEditorRevision = (): string => {
   const store = useCamStore.getState(), generator = useGeneratorStore.getState()
   return cam.kernel.sha256(JSON.stringify([store.gcode, generator.settings, generator.printer,
-    useCADStore.getState().workpiece, store.operationResults, store.kernelArtifact, store.kernelRequest]))
+    useCADStore.getState().workpiece, store.operationResults, store.kernelArtifact, store.kernelRequest, store.generatedProgram]))
 }
 export const storedProgramRevision = (row: { readonly gcode?: string | null; readonly data: unknown }): string =>
   cam.kernel.sha256(JSON.stringify([row.gcode ?? "", row.data]))
@@ -30,7 +31,8 @@ export const snapshotCamProgram = async (app: AppState, gcode: string): Promise<
   const store = useCamStore.getState(), generator = useGeneratorStore.getState()
   const artifact = store.kernelArtifact?.nc === gcode && cam.kernel.sha256(gcode) === store.kernelArtifact.identity.nc ? store.kernelArtifact : undefined
   const request = artifact ? store.kernelRequest : undefined
-  const operations = !artifact && store.operationResults.length > 0 && combineOperationResults(store.operationResults).gcode === gcode ? store.operationResults : undefined
+  const generated = !artifact && store.generatedProgram?.gcode === gcode ? store.generatedProgram : undefined
+  const operations = !artifact && !generated && store.operationResults.length > 0 && combineOperationResults(store.operationResults).gcode === gcode ? store.operationResults : undefined
   const stock = artifact ? {
     ...useCADStore.getState().workpiece,
     width: artifact.stockBounds.max.x - artifact.stockBounds.min.x, height: artifact.stockBounds.max.y - artifact.stockBounds.min.y, depth: artifact.stockBounds.max.z - artifact.stockBounds.min.z,
@@ -38,22 +40,38 @@ export const snapshotCamProgram = async (app: AppState, gcode: string): Promise<
   } : useCADStore.getState().workpiece
   const drawing = drawingPayload(app)
   if (request?.stock) drawing["stock"] = request.stock
+  // The fixture a setup's program was made for: the saved program draws its parts where they lie, as the editor does.
+  if (generated) drawing["workpieces"] = structuredClone(generated.workpieces)
   const settings = generator.currentGCode === gcode ? generator.generatedSettings ?? generator.settings : generator.settings
   const snapshot = structuredClone(toJsonSafe({ settings, printer: generator.printer, stock, drawing, ...(operations ? { operations } : {}), ...(request ? { kernelRequest: request } : {}) })) as Record<string, unknown>
   // Parse the captured bytes, never the delayed editor preview, which may belong to earlier NC.
-  const program = artifact?.program ?? (operations ? combineOperationResults(operations).program : (await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode))).program)
+  const program = artifact?.program ?? generated?.program ?? (operations ? combineOperationResults(operations).program : (await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode))).program)
   return Schema.decodeUnknownSync(SavedCamProgram)({ format: "cadcamfun-cam", version: 1, gcode, program, ...snapshot, ...(artifact ? { kernelArtifact: artifact } : {}) })
 }
 
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
 /** Keep free-form metadata, but never attach earlier verification to changed program bytes. */
+const WorkpieceList = Schema.Array(cam.program.WorkpieceSchema)
+
+/** The fixture a saved setup program was made for (`drawing.workpieces`), when it held several parts. */
+export const workpiecesOfSnapshot = (snapshot: Pick<SavedCamProgram, "drawing"> | undefined): ReadonlyArray<cam.program.Workpiece> => {
+  const raw = snapshot?.drawing["workpieces"]
+  if (raw === undefined) return []
+  const decoded = Schema.decodeUnknownOption(WorkpieceList)(raw)
+  return decoded._tag === "Some" && decoded.value.length > 1 ? decoded.value : []
+}
+
 export const savedProgramData = (previous: unknown, snapshot: SavedCamProgram): Record<string, unknown> => {
   const data = { ...record(previous) }
-  for (const key of ["kernelArtifact", "kernelRequest", "turningPlan", "turningRequest", "identity", "verification", "response", "sourceRevision", "operations"]) delete data[key]
+  // The replay of a setup program is about those bytes: it is kept only for the very text it was made for (the editor's, or the earlier row's).
+  const earlier = evidenceOfProgram(data["setupEvidence"], snapshot.gcode)
+  const held = useCamStore.getState().generatedProgram
+  const evidence = held?.gcode === snapshot.gcode && held.evidence !== undefined ? held.evidence : earlier
+  for (const key of ["kernelArtifact", "kernelRequest", "turningPlan", "turningRequest", "identity", "verification", "response", "sourceRevision", "operations", "setupEvidence"]) delete data[key]
   const old = record(previous), oldArtifact = record(old["kernelArtifact"])
   if (snapshot.kernelArtifact && oldArtifact["nc"] === snapshot.gcode && typeof old["sourceRevision"] === "string") data["sourceRevision"] = old["sourceRevision"]
-  return { ...data, ...Schema.encodeSync(SavedCamProgram)(snapshot) }
+  return { ...data, ...Schema.encodeSync(SavedCamProgram)(snapshot), ...(evidence !== undefined ? { setupEvidence: evidence } : {}) }
 }
 
 export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "id" | "name" | "gcode" | "data" | "projectId" | "drawingId"> & Partial<Pick<ToolpathRow, "description" | "isPublic">>, current: () => boolean): Promise<void> => {
@@ -71,6 +89,10 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
   if (!current()) return
   const store = useCamStore.getState(), generator = useGeneratorStore.getState()
   store.clearOperationResults()
+  const fixture = snapshot?.gcode === code ? workpiecesOfSnapshot(snapshot) : []
+  // The replay stored with a setup program comes back with it, when it is about this very text.
+  const evidence = snapshot?.gcode === code ? evidenceOfProgram(data["setupEvidence"], code) : undefined
+  store.setGeneratedProgram(snapshot !== undefined && (fixture.length > 1 || evidence !== undefined) ? { gcode: code, program: snapshot.program, workpieces: fixture, ...(evidence !== undefined ? { evidence } : {}) } : undefined)
   if (snapshot?.gcode === code && snapshot.operations?.length && combineOperationResults(snapshot.operations).gcode === code) {
     for (const operation of snapshot.operations) store.upsertOperationResult(operation)
   }
@@ -78,7 +100,7 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
   store.setKernelArtifact(artifact)
   store.setKernelRequest(data["kernelRequest"] !== undefined ? Schema.decodeUnknownSync(CamKernelRequest)(data["kernelRequest"]) : undefined)
   store.setGcode(code)
-  store.setProgram(program)
+  store.setProgram(fixture.length > 1 ? placedProgram(program, fixture) : program)
   store.setActiveTab("editor")
   if (snapshot) {
     useGeneratorStore.setState({ settings: snapshot.settings, printer: snapshot.printer })

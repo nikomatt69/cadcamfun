@@ -26,6 +26,24 @@ const rest: OperationSpec = { id: "rest", strategy: "surface", mode: "rest", cle
 
 /** The X range of the cutting moves of the operation, from the NC between its marker and the next. */
 const xs = (nc: string, id: string): number[] => xRange(nc, id).all
+/** The cutting points of the operation in the plane, Y modal as the control reads it. */
+const xys = (nc: string, id: string): ReadonlyArray<{ readonly x: number; readonly y: number }> => {
+  const lines = nc.split("\n")
+  const from = lines.findIndex((l) => l.toUpperCase().includes(` ${id.toUpperCase()})`) && /OP\d+/.test(l))
+  const rest = lines.slice(from + 1)
+  const to = rest.findIndex((l) => /OP\d+ /.test(l))
+  let cutting = false, x = 0, y = 0
+  const out: Array<{ x: number; y: number }> = []
+  for (const l of to < 0 ? rest : rest.slice(0, to)) {
+    const g = /^G0?([0-3])\b/.exec(l)
+    if (g !== null) cutting = g[1] !== "0"
+    const mx = /X(-?\d+\.?\d*)/.exec(l), my = /Y(-?\d+\.?\d*)/.exec(l)
+    if (mx !== null) x = Number(mx[1])
+    if (my !== null) y = Number(my[1])
+    if (cutting && (mx !== null || my !== null)) out.push({ x, y })
+  }
+  return out
+}
 const xRange = (nc: string, id: string): { min: number; max: number; moves: number; all: number[] } => {
   const lines = nc.split("\n")
   const from = lines.findIndex((l) => l.toUpperCase().includes(` ${id.toUpperCase()})`) && /OP\d+/.test(l))
@@ -51,9 +69,16 @@ describe("rest machining from the stock the earlier operations left (spec 29 §6
     expect(a.operations.map((o) => o.status)).toEqual(["ok", "ok"])
     const r = xRange(a.nc, "rest")
     expect(r.moves).toBeGreaterThan(0)
-    // The Ø10 cutter cannot enter the 4 mm slot (x in -2..2): the Ø3 rest tool cuts there.
-    expect(xs(a.nc, "rough").some((x) => Math.abs(x) < 1.6)).toBe(false)
-    expect(xs(a.nc, "rest").some((x) => Math.abs(x) < 1.6)).toBe(true)
+    // The Ø10 cutter cannot enter the 4 mm slot (x in -2..2 between the walls, y in -10..10): the Ø3 rest tool cuts there. Past the
+    // walls' ends x = 0 is open air, and a ring may cross it there.
+    const inSlot = (p: { readonly x: number; readonly y: number }): boolean => Math.abs(p.x) < 1.6 && Math.abs(p.y) < 10
+    // Along each cutting move, not only at its ends: one straight pass runs the whole slot with both ends outside it.
+    const crosses = (points: ReadonlyArray<{ readonly x: number; readonly y: number }>): boolean => points.slice(1).some((p, i) => {
+      const q = points[i]!
+      return Array.from({ length: 41 }, (_, k) => ({ x: q.x + ((p.x - q.x) * k) / 40, y: q.y + ((p.y - q.y) * k) / 40 })).some(inSlot)
+    })
+    expect(crosses(xys(a.nc, "rough"))).toBe(false)
+    expect(crosses(xys(a.nc, "rest"))).toBe(true)
   })
 
   test("with nothing left for it (no rough before) the rest pass still works from the raw stock", () => {

@@ -3242,6 +3242,9 @@ type Endpoint29_0Input = {
   readonly smoothing?: Endpoint29_0Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint29_0Request["payload"]["postDefinition"]
   readonly print?: Endpoint29_0Request["payload"]["print"]
+  readonly setups?: Endpoint29_0Request["payload"]["setups"]
+  readonly carryStock?: Endpoint29_0Request["payload"]["carryStock"]
+  readonly setupId?: Endpoint29_0Request["payload"]["setupId"]
   readonly enforceTolerance?: Endpoint29_0Request["payload"]["enforceTolerance"]
   readonly process?: Endpoint29_0Request["payload"]["process"]
   readonly progress?: Endpoint29_0Request["payload"]["progress"]
@@ -3275,6 +3278,9 @@ const Endpoint29_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],
+      setups: input["setups"],
+      carryStock: input["carryStock"],
+      setupId: input["setupId"],
       enforceTolerance: input["enforceTolerance"],
       process: input["process"],
       progress: input["progress"],
@@ -3309,6 +3315,9 @@ type Endpoint29_1Input = {
   readonly smoothing?: Endpoint29_1Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint29_1Request["payload"]["postDefinition"]
   readonly print?: Endpoint29_1Request["payload"]["print"]
+  readonly setups?: Endpoint29_1Request["payload"]["setups"]
+  readonly carryStock?: Endpoint29_1Request["payload"]["carryStock"]
+  readonly setupId?: Endpoint29_1Request["payload"]["setupId"]
   readonly enforceTolerance?: Endpoint29_1Request["payload"]["enforceTolerance"]
   readonly process?: Endpoint29_1Request["payload"]["process"]
   readonly progress?: Endpoint29_1Request["payload"]["progress"]
@@ -3342,6 +3351,9 @@ const Endpoint29_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],
+      setups: input["setups"],
+      carryStock: input["carryStock"],
+      setupId: input["setupId"],
       enforceTolerance: input["enforceTolerance"],
       process: input["process"],
       progress: input["progress"],
@@ -3477,6 +3489,7 @@ type Endpoint29_8Input = {
   readonly dwell?: Endpoint29_8Request["payload"]["dwell"]
   readonly okuma?: Endpoint29_8Request["payload"]["okuma"]
   readonly start?: Endpoint29_8Request["payload"]["start"]
+  readonly register?: Endpoint29_8Request["payload"]["register"]
 }
 const Endpoint29_8 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29_8Input) =>
   raw["verifyNc"]({
@@ -3492,6 +3505,7 @@ const Endpoint29_8 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint29
       dwell: input["dwell"],
       okuma: input["okuma"],
       start: input["start"],
+      register: input["register"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -3703,11 +3717,19 @@ type Endpoint31_2Input = {
   readonly setup: Endpoint31_2Request["payload"]["setup"]
   readonly elements: Endpoint31_2Request["payload"]["elements"]
   readonly stock?: Endpoint31_2Request["payload"]["stock"]
+  readonly evidence?: Endpoint31_2Request["payload"]["evidence"]
+  readonly probePart?: Endpoint31_2Request["payload"]["probePart"]
 }
 const Endpoint31_2 = (raw: RawClient["camSetup"]) => (input: Endpoint31_2Input) =>
-  raw["generate"]({ payload: { setup: input["setup"], elements: input["elements"], stock: input["stock"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["generate"]({
+    payload: {
+      setup: input["setup"],
+      elements: input["elements"],
+      stock: input["stock"],
+      evidence: input["evidence"],
+      probePart: input["probePart"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint31_3Request = Parameters<RawClient["camSetup"]["probePlan"]>[0]
 type Endpoint31_3Input = {
@@ -3801,11 +3823,18 @@ type Endpoint31_12Input = {
   readonly setupId: Endpoint31_12Request["params"]["setupId"]
   readonly elements: Endpoint31_12Request["payload"]["elements"]
   readonly stock?: Endpoint31_12Request["payload"]["stock"]
+  readonly evidence?: Endpoint31_12Request["payload"]["evidence"]
+  readonly probePart?: Endpoint31_12Request["payload"]["probePart"]
 }
 const Endpoint31_12 = (raw: RawClient["camSetup"]) => (input: Endpoint31_12Input) =>
   raw["generateSaved"]({
     params: { id: input["id"], setupId: input["setupId"] },
-    payload: { elements: input["elements"], stock: input["stock"] },
+    payload: {
+      elements: input["elements"],
+      stock: input["stock"],
+      evidence: input["evidence"],
+      probePart: input["probePart"],
+    },
   }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint31_13Request = Parameters<RawClient["camSetup"]["remove"]>[0]
@@ -3839,6 +3868,9 @@ type Endpoint32_0Input = {
   readonly feature?: Endpoint32_0Request["payload"]["feature"]
   readonly settings?: Endpoint32_0Request["payload"]["settings"]
   readonly frame?: Endpoint32_0Request["payload"]["frame"]
+  readonly native?: Endpoint32_0Request["payload"]["native"]
+  readonly macroStyle?: Endpoint32_0Request["payload"]["macroStyle"]
+  readonly assumed?: Endpoint32_0Request["payload"]["assumed"]
   readonly checks?: Endpoint32_0Request["payload"]["checks"]
   readonly actions?: Endpoint32_0Request["payload"]["actions"]
 }
@@ -3849,6 +3881,9 @@ const Endpoint32_0 = (raw: RawClient["camProbing"]) => (input?: Endpoint32_0Inpu
       feature: input?.["feature"],
       settings: input?.["settings"],
       frame: input?.["frame"],
+      native: input?.["native"],
+      macroStyle: input?.["macroStyle"],
+      assumed: input?.["assumed"],
       checks: input?.["checks"],
       actions: input?.["actions"],
     },
@@ -3862,6 +3897,9 @@ type Endpoint32_1Input = {
   readonly options?: Endpoint32_1Request["payload"]["options"]
   readonly settings?: Endpoint32_1Request["payload"]["settings"]
   readonly frame?: Endpoint32_1Request["payload"]["frame"]
+  readonly native?: Endpoint32_1Request["payload"]["native"]
+  readonly macroStyle?: Endpoint32_1Request["payload"]["macroStyle"]
+  readonly assumed?: Endpoint32_1Request["payload"]["assumed"]
   readonly checks?: Endpoint32_1Request["payload"]["checks"]
   readonly actions?: Endpoint32_1Request["payload"]["actions"]
 }
@@ -3874,6 +3912,9 @@ const Endpoint32_1 = (raw: RawClient["camProbing"]) => (input: Endpoint32_1Input
       options: input["options"],
       settings: input["settings"],
       frame: input["frame"],
+      native: input["native"],
+      macroStyle: input["macroStyle"],
+      assumed: input["assumed"],
       checks: input["checks"],
       actions: input["actions"],
     },
@@ -3887,6 +3928,12 @@ type Endpoint32_2Input = {
   readonly frame?: Endpoint32_2Request["payload"]["frame"]
   readonly workOffsets?: Endpoint32_2Request["payload"]["workOffsets"]
   readonly misplacement?: Endpoint32_2Request["payload"]["misplacement"]
+  readonly partOrigin?: Endpoint32_2Request["payload"]["partOrigin"]
+  readonly stockElement?: Endpoint32_2Request["payload"]["stockElement"]
+  readonly dialect?: Endpoint32_2Request["payload"]["dialect"]
+  readonly post?: Endpoint32_2Request["payload"]["post"]
+  readonly options?: Endpoint32_2Request["payload"]["options"]
+  readonly assumed?: Endpoint32_2Request["payload"]["assumed"]
   readonly progress?: Endpoint32_2Request["payload"]["progress"]
 }
 const Endpoint32_2 = (raw: RawClient["camProbing"]) => (input: Endpoint32_2Input) =>
@@ -3898,6 +3945,12 @@ const Endpoint32_2 = (raw: RawClient["camProbing"]) => (input: Endpoint32_2Input
       frame: input["frame"],
       workOffsets: input["workOffsets"],
       misplacement: input["misplacement"],
+      partOrigin: input["partOrigin"],
+      stockElement: input["stockElement"],
+      dialect: input["dialect"],
+      post: input["post"],
+      options: input["options"],
+      assumed: input["assumed"],
       progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))

@@ -24,7 +24,7 @@ import { buildPartModelFromMeshes, partMeshes, type PartModel } from "../model/m
 import { meshBounds, type Mesh64 } from "../model/element-mesh.ts"
 import { AdaptiveParams, generateAdaptive } from "../operations/adaptive.ts"
 import { DrillParams, generateDrill } from "../operations/drill.ts"
-import { generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
+import { backBoreReach, backBoreShift, generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
 import { recognizeNamedFeatures, type NamedFeature } from "../model/features.ts"
 import { elementBrep } from "../../cad/scene-step.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
@@ -71,6 +71,7 @@ import {
   type CuttingOperationSpec,
   type ReleaseLevel,
   type ResidualStock,
+  type SolidCarry,
   type StockBox,
   type StockSummary
 } from "./contracts.ts"
@@ -538,6 +539,12 @@ export interface RunOptions extends PrepareOptions {
   readonly signal?: { readonly aborted: boolean }
   /** Cell visits the stock replay may spend (default `REPLAY_WORK_LIMIT`); a program past it is replayed up to the budget and the rest reported unchecked. */
   readonly replayWorkLimit?: number
+  /**
+   * Also replay every cutting move on a tri-dexel stock and keep it beside the artifact (`solidOf`): the stock this setup leaves with
+   * the voids of its undercut cutters, for the next setup of a carried job. `seed` is the stock the earlier setup left, read through
+   * this setup's frame. The claims of the setup are not decided by it (only the table-turned moves are).
+   */
+  readonly solidCarry?: { readonly seed?: SolidCarry }
 }
 
 /**
@@ -563,14 +570,14 @@ export const executeJob = (prepared: PreparedJob, options: RunOptions = {}): Cam
     return executeJobWith(prepared, (progress) => {
       if (options.signal?.aborted === true) throw new Cancelled()
       options.onProgress?.(progress)
-    }, options.replayWorkLimit ?? REPLAY_WORK_LIMIT)
+    }, options.replayWorkLimit ?? REPLAY_WORK_LIMIT, options.solidCarry)
   } catch (error) {
     if (error instanceof Cancelled) return { status: "failed", issues: [issue("Cancelled", "prepare", "The job was cancelled before it finished; no artifact was produced")] }
     throw error
   }
 }
 
-const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void, replayLimit: number): CamResult<CamArtifact> => {
+const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void, replayLimit: number, solid?: { readonly seed?: SolidCarry }): CamResult<CamArtifact> => {
   const { job, material, tools, machine, origin, stock, operations } = prepared
   const issues: CamIssue[] = []
   const o = origin
@@ -1215,6 +1222,17 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
   let undercutMoves = 0
   const undercutIds = new Set(operations.filter((x) => x.strategy === "drill" && x.cycle?.kind === "back-bore").map((x) => x.id))
+  // While a back-boring bar passes the pilot it is oriented and shifted by -Q (hole-cycles `backBoreShift`): its inserts (`flutes` of them, each `insertWidth` wide,
+  // the first towards +X) reach as far as their corners go about the hole axis, and its body reaches Q + body radius. The contact test of those moves uses that envelope (the
+  // planner's own pilot rule), centred on the hole axis; the axisymmetric Ø of the head would stand for an insert all round and refuse every pass.
+  const backBores = new Map<string, { readonly q: number; readonly envelope: Cutter; readonly body: Cutter; readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }> }>()
+  for (const x of operations) {
+    if (x.strategy !== "drill" || x.cycle?.kind !== "back-bore") continue
+    const bar = toolOf(x.tool), shifted = backBoreShift(bar, x.cycle.pilotDiameter)
+    if ("reason" in shifted) continue
+    const body = (bar.neckDiameter ?? 0) / 2, reach = backBoreReach(bar, shifted.shift)
+    backBores.set(x.id, { q: shifted.shift, body: { ...bar, diameter: bar.neckDiameter ?? 0 }, envelope: { ...bar, diameter: 2 * reach, neckDiameter: 2 * (body + shifted.shift), shankDiameter: Math.max(bar.shankDiameter ?? 0, 2 * (body + shifted.shift)) }, points: x.points.map((p) => shift2(p, o)) })
+  }
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
   let turnedMoves = 0
   /** What the voxel replay of the turned moves found: certain and possible contacts of the shank, holder and (rapids) flutes with material, and moves it could not check. */
@@ -1261,8 +1279,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     turnedVoxels = turnedStock
     // Spec 72 step 0.3: when the table turns, the stock is also replayed on the tri-dexel, move by move and in program order, so the
     // gouge and leftover verdicts rest on a stock whose error is declared and not on a bracket of voxels.
-    if (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined)) {
-      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}) })
+    if (solid !== undefined || undercutIds.size > 0 || (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined))) {
+      // A carried solid is read through this setup's frame: work point -> oriented -> CAD -> the earlier setup's oriented -> its work frame.
+      const earlier = solid?.seed
+      const seed = earlier === undefined ? undefined : (() => {
+        const back = transposeOf(jobTransform(job)), old = setupTransform(earlier.orientation)
+        return (p: Vec3): boolean => {
+          const cad = applyPoint(back, { x: p.x + o.x, y: p.y + o.y, z: p.z + o.z })
+          const q = applyPoint(old, cad)
+          return earlier.stock.solidAt({ x: q.x - earlier.origin.x, y: q.y - earlier.origin.y, z: q.z - earlier.origin.z })
+        }
+      })()
+      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}), ...(seed !== undefined ? { seed } : {}) })
+      if (earlier !== undefined && !earlier.complete) tri.unchecked(`the stock carried from the earlier setup was not replayed completely: ${earlier.reasons.join("; ") || "unknown reason"}`)
     }
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     let replayWork = 0
@@ -1337,7 +1366,37 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       }
       // A back-bore cuts the underside of the part: the height field sees the part from above only, so these moves are not carved into it
       // and not judged against it (the claims below stay unresolved, they are never read as passed).
-      if (op !== undefined && undercutIds.has(outcomes[opOfToolpath[op]!]?.id ?? "")) { undercutMoves++; continue }
+      if (op !== undefined && undercutIds.has(outcomes[opOfToolpath[op]!]?.id ?? "")) {
+        undercutMoves++
+        // The cut itself went onto the tri-dexel above; its shank and holder (and a rapid's flutes) are judged against what that stock holds now.
+        if (tri !== undefined) {
+          const tips: Vec3[] = [s.from]
+          forEachSample(seg, tri.stock.cell, (x, y, z) => { tips.push({ x, y, z }) })
+          if (seg.rapid) tips.push(s.to)
+          // Oriented and shifted over the pilot: judged as the envelope about the hole axis, the holder on the tool axis as it is.
+          const info = backBores.get(outcomes[opOfToolpath[op]!]?.id ?? "")
+          // The NC carries three decimals: a shift such as 2.5617 comes back as 2.562, so positions match to a few microns, not to the float.
+          const near = (a: number, b: number): boolean => Math.abs(a - b) < 2e-3
+          const hole = info?.points.find((pt) => near(s.from.y, pt.y) && near(s.to.y, pt.y) && near(s.from.x, pt.x - info.q) && near(s.to.x, pt.x - info.q))
+          // Between the bar on the axis and the bar shifted the insert moves away from the wall it cut (or through air above and below the part):
+          // there the body is judged and the insert is the declared tooth.
+          const lateral = hole === undefined ? info?.points.find((pt) => near(s.from.y, pt.y) && near(s.to.y, pt.y) && near(s.from.z, s.to.z) && ((near(s.from.x, pt.x) && near(s.to.x, pt.x - info.q)) || (near(s.from.x, pt.x - info.q) && near(s.to.x, pt.x)))) : undefined
+          const threshold = prepared.tolerance + tri.stock.errorBound
+          const hit = hole !== undefined && info !== undefined
+            ? tri.contact(info.envelope, seg.rapid ? ["cutting", "shank"] : ["shank"], tips.map((t) => ({ x: t.x + info.q, y: t.y, z: t.z })), undefined, threshold) ?? tri.contact(cutter, ["holder"], tips, undefined, threshold)
+            : lateral !== undefined && info !== undefined
+              ? tri.contact(info.body, ["cutting", "shank"], tips, undefined, threshold) ?? tri.contact(cutter, ["holder"], tips, undefined, threshold)
+              : tri.contact(cutter, seg.rapid ? ["cutting", "shank", "holder"] : ["shank", "holder"], tips, undefined, threshold)
+          if (hit !== undefined) {
+            if (seg.rapid) triContacts.rapid++; else triContacts.holder++
+            const key = seg.rapid ? "undercut-rapid" : "undercut-holder"
+            if (!triFindings.has(key)) triFindings.set(key, issue(seg.rapid ? "RapidInStock" : "HolderCollision", "replay",
+              seg.rapid ? `Rapid move through material at NC line ${s.line} while cutting under the part (${cutter.name}, ${hit.overlap.toFixed(3)} mm into the stock on the tri-dexel)` : `Shank or holder of ${cutter.name} is ${hit.overlap.toFixed(3)} mm into material at NC line ${s.line} while cutting under the part (tri-dexel)`,
+              { line: s.line, ...(hit.at !== undefined ? { point: hit.at } : {}), ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
+          }
+        }
+        continue
+      }
       let removed = 0
       forEachSample(seg, sampleStep(cellSize, model.radius), (x, y, z) => {
         if (seg.rapid) {
@@ -1406,9 +1465,16 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // the job declares them the tri-dexel does not decide that verdict and the claim stays unresolved.
   const declaredRemoval = (prepared.plan?.allowances ?? []).length > 0 || operations.some((op) => (op.strategy === "drill" && op.cycle !== undefined) || op.strategy === "chamfer" || op.strategy === "thread" || (op.strategy === "drill" && (op.cut === "tap" || toolOf(op.tool).kind === "tap")))
   const triAllowance = Math.max(0.05, prepared.scallop * 1.5)
-  const triVerdict: TriVerdict | undefined = tri?.verdict(workMeshes, prepared.tolerance, triAllowance)
+  // With the table flat the height field decides; the tri-dexel is then only the carried solid (read by `solidOf`).
+  // The moves the tri-dexel judges: those with the table turned and, where the replay is on it, the back-boring that cuts under the part.
+  const undercutOnTri = tri !== undefined && undercutMoves > 0
+  const triMoves = turnedMoves + (undercutOnTri ? undercutMoves : 0)
+  const triWhat = [turnedMoves > 0 ? `${turnedMoves} with the table turned` : "", undercutOnTri ? `${undercutMoves} cutting under the part` : ""].filter((x) => x !== "").join(", ")
+  const triVerdict: TriVerdict | undefined = triMoves > 0 ? tri?.verdict(workMeshes, prepared.tolerance, triAllowance) : undefined
   const triGougeFound = triVerdict !== undefined && !declaredRemoval && triVerdict.closedPart && triVerdict.gouge.depth > 0
-  const triGougeDecided = triVerdict !== undefined && triVerdict.complete && !declaredRemoval
+  // Declared removal the mesh does not carry (a drill point below a blind hole) shows as a gouge, so a gouge found beside it cannot be told
+  // from it: not decided. A replay that found none, within its declared error, is a pass whatever the job declares.
+  const triGougeDecided = triVerdict !== undefined && triVerdict.complete && (!declaredRemoval || (undercutOnTri && triVerdict.gouge.depth === 0))
   const triLeftDecided = triVerdict !== undefined && triVerdict.complete && declaredLeft.length === 0
   const triLeftFound = triVerdict !== undefined && triLeftDecided && (triVerdict.left.depth > 0 || triVerdict.detached > 0)
   if (triVerdict !== undefined && triLeftDecided) {
@@ -1544,41 +1610,41 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       id: "no-rapid-in-stock",
       status: interpreted === undefined ? "unresolved" : rapidHits > 0 || (triContactsDecide ? triContacts.rapid : turned.rapidSure) > 0 ? "failed" : !triContactsDecide && (turned.unchecked > 0 || turned.rapidPossible > 0) ? "unresolved" : "passed",
       detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material`
-        : triContactsDecide && triContacts.rapid > 0 ? `${triContacts.rapid} rapid moves with the table turned pass through material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
+        : triContactsDecide && triContacts.rapid > 0 ? `${triContacts.rapid} rapid moves ${turnedMoves > 0 ? "with the table turned" : "cutting under the part"} pass through material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
         : !triContactsDecide && turned.rapidSure > 0 ? `${turned.rapidSure} rapid moves with the table turned pass through material (voxel stock)`
         : !triContactsDecide && turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
         : !triContactsDecide && turned.rapidPossible > 0 ? `${turned.rapidPossible} rapid moves with the table turned come within a voxel of material that may remain`
-        : turnedMoves > 0 ? `No rapid touches the stock as replayed (${turnedMoves} moves with the table turned on the ${triContactsDecide ? `tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : "voxel stock"})` : "No rapid move touches the stock as replayed"
+        : triMoves > turnedMoves && triContactsDecide ? `No rapid touches the stock as replayed (${triWhat} on the tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm; the other moves on the height field)` : turnedMoves > 0 ? `No rapid touches the stock as replayed (${turnedMoves} moves with the table turned on the ${triContactsDecide ? `tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : "voxel stock"})` : "No rapid move touches the stock as replayed"
     },
     {
       id: "holder-clearance",
       status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 || (triContactsDecide ? triContacts.holder : turned.holderSure) > 0 ? "failed" : !triContactsDecide && (turned.unchecked > 0 || turned.holderPossible > 0) ? "unresolved" : "passed",
       detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock`
-        : triContactsDecide && triContacts.holder > 0 ? `${triContacts.holder} moves with the table turned bring the shank or holder into material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
+        : triContactsDecide && triContacts.holder > 0 ? `${triContacts.holder} moves ${turnedMoves > 0 ? "with the table turned" : "cutting under the part"} bring the shank or holder into material (tri-dexel, declared error ${tri!.stock.errorBound.toFixed(3)} mm)`
         : !triContactsDecide && turned.holderSure > 0 ? `${turned.holderSure} moves with the table turned bring the shank or holder into material (voxel stock)`
         : !triContactsDecide && turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
         : !triContactsDecide && turned.holderPossible > 0 ? `${turned.holderPossible} moves with the table turned bring the shank or holder within a voxel of material that may remain`
-        : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, ${triContactsDecide ? `tri-dexel for ${turnedMoves} moves with the table turned, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : `voxel stock for ${turnedMoves} moves with the table turned`})` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
+        : triMoves > turnedMoves && triContactsDecide ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, tri-dexel for ${triWhat}, declared error ${tri!.stock.errorBound.toFixed(3)} mm)` : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, ${triContactsDecide ? `tri-dexel for ${turnedMoves} moves with the table turned, declared error ${tri!.stock.errorBound.toFixed(3)} mm` : `voxel stock for ${turnedMoves} moves with the table turned`})` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
     },
     {
       id: "no-gouge",
-      status: interpreted === undefined ? "unresolved" : gougeColumns > 0 || triGougeFound ? "failed" : turnedMoves > 0 ? (triGougeDecided ? "passed" : "unresolved") : "passed",
+      status: interpreted === undefined ? "unresolved" : gougeColumns > 0 || triGougeFound ? "failed" : triMoves > 0 ? (triGougeDecided ? "passed" : "unresolved") : "passed",
       detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm`
-        : triVerdict !== undefined && triGougeFound ? `${triVerdict.gouge.depth.toFixed(3)} mm cut below the part on the tri-dexel replay of every move (${turnedMoves} with the table turned)`
-        : turnedMoves > 0 && triVerdict !== undefined && triGougeDecided ? `No cut below the part beyond ${(prepared.tolerance + triVerdict.errorBound).toFixed(3)} mm on the tri-dexel replay of every move (cell ${triVerdict.cell.toFixed(3)} mm, declared error ${triVerdict.errorBound.toFixed(3)} mm, ${turnedMoves} moves with the table turned)`
-        : turnedMoves > 0 ? `${turnedMoves} moves turn the table and the tri-dexel replay does not decide the gouge: ${declaredRemoval ? "the job declares removal the part mesh does not carry (drill points, chamfers, threads)" : triVerdict?.reasons.join("; ") ?? "no tri-dexel replay was made"}`
+        : triVerdict !== undefined && triGougeFound ? `${triVerdict.gouge.depth.toFixed(3)} mm cut below the part on the tri-dexel replay of every move (${triWhat})`
+        : triMoves > 0 && triVerdict !== undefined && triGougeDecided ? `No cut below the part beyond ${(prepared.tolerance + triVerdict.errorBound).toFixed(3)} mm on the tri-dexel replay of every move (cell ${triVerdict.cell.toFixed(3)} mm, declared error ${triVerdict.errorBound.toFixed(3)} mm, ${triWhat})${declaredRemoval ? "; the job declares removal the part mesh does not carry (drill points, chamfers, threads) and the replay found no cut below the part beyond that error" : ""}`
+        : triMoves > 0 ? `${triWhat} are judged on the tri-dexel and the replay does not decide the gouge: ${declaredRemoval ? "the job declares removal the part mesh does not carry (drill points, chamfers, threads)" : triVerdict?.reasons.join("; ") ?? "no tri-dexel replay was made"}`
         : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)`
     },
     {
       id: "material-removed",
-      status: interpreted === undefined ? "unresolved" : turnedMoves > 0 ? (triLeftDecided ? (triLeftFound ? "failed" : "passed") : maxRemaining > 0 ? "failed" : "unresolved") : maxRemaining > 0 ? "failed" : "passed",
+      status: interpreted === undefined ? "unresolved" : triMoves > 0 ? (triLeftDecided ? (triLeftFound ? "failed" : "passed") : maxRemaining > 0 ? "failed" : "unresolved") : maxRemaining > 0 ? "failed" : "passed",
       detail: [
-        turnedMoves > 0 && triVerdict !== undefined && triLeftDecided
+        triMoves > 0 && triVerdict !== undefined && triLeftDecided
           ? (triLeftFound
             ? `${remainingVolume.toFixed(1)} mm³ of stock stays beyond the part plus ${triAllowance.toFixed(2)} mm on the tri-dexel replay (${triVerdict.left.depth > 0 ? `up to ${triVerdict.left.depth.toFixed(3)} mm normal to the surface` : "uncut stock beside the part"}${triVerdict.detached > 0 ? `; ${triVerdict.detached.toFixed(1)} mm³ stands where the part has no surface above it` : ""}; declared error ${triVerdict.errorBound.toFixed(3)} mm)`
             : `The tri-dexel replay leaves no stock beyond the part plus ${triAllowance.toFixed(2)} mm (cell ${triVerdict.cell.toFixed(3)} mm, declared error ${triVerdict.errorBound.toFixed(3)} mm)`)
           : maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm`
-          : `The replayed stock matches the part within ${allowed.toFixed(3)} mm${turnedMoves > 0 && triVerdict !== undefined ? `; the tri-dexel replay does not decide the leftover: ${declaredLeft.length > 0 ? "the job declares material left standing (tabs)" : triVerdict.reasons.join("; ")}` : ""}`,
+          : `The replayed stock matches the part within ${allowed.toFixed(3)} mm${triMoves > 0 && triVerdict !== undefined ? `; the tri-dexel replay does not decide the leftover: ${declaredLeft.length > 0 ? "the job declares material left standing (tabs)" : triVerdict.reasons.join("; ")}` : ""}`,
         ...(turnedMoves > 0 && turnedVoxels !== undefined ? [fiveAxisRemovalText(turnedVoxels)] : [])
       ].join("; ")
     },
@@ -1593,7 +1659,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       detail: clearTable === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C) on a machine with no rotary table configured: the turning table is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked${clearance.rotaryChecked > 0 ? ` (${clearance.rotaryChecked} with the table turned, in the trunnion scene: the table body turns about the pivot)` : ""}; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table; stock and part contact is decided by the stock replay`
     }
   ]
-  if (undercutMoves > 0) {
+  // Back-boring cuts the underside, which the height field cannot see. Where the tri-dexel replayed every move, its verdicts stand for these
+  // moves; otherwise they are not checked and the claims stay unresolved, never read as passed.
+  if (undercutMoves > 0 && !(tri !== undefined && tri.replayed)) {
     for (const c of claims) {
       if ((c.id === "no-rapid-in-stock" || c.id === "holder-clearance" || c.id === "no-gouge" || c.id === "material-removed") && c.status === "passed") {
         claims[claims.indexOf(c)] = { id: c.id, status: "unresolved", detail: `${undercutMoves} moves of back-boring cut the underside of the part, which the height-field replay cannot see: they are not checked. ${c.detail}` }
@@ -1648,8 +1716,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const toolChanges = usedTools.length
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
+  // The tri-dexel of a carried stock is derived from what the earlier setup's program did, which the digest of that program's NC already names.
+  const stockModelOfDigest = job.stockModel?.kind === "residual" ? { stockModel: { kind: "residual" as const, residual: (({ solid: _solid, ...rest }) => rest)(job.stockModel.residual) } } : {}
   const jobDigest = digestOf("cam-kernel/job@1", {
     ...job,
+    ...stockModelOfDigest,
     part: job.part.kind === "meshes" ? { kind: "meshes", meshes: job.part.meshes.map((m) => ({ positions: Array.from(m.positions), indices: Array.from(m.indices) })) } : job.part,
     resolved: { material: material.id, machine: machine.id, tools: tools.map((t) => t.id) }
   })
@@ -1702,11 +1773,25 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       ...(tipErr !== undefined ? { tipError: tipErr } : {})
   }
   // The stock this program leaves, for the next setup (spec 69 C4); kept beside the artifact so the artifact stays small plain data.
+  if (tri !== undefined && solid !== undefined) {
+    const t = tri
+    SOLIDS.set(artifact, {
+      carry: { orientation: job.setupOrientation ?? "+Z", origin, stock: t.stock, complete: t.replayed && replayStoppedAt === undefined, reasons: replayStoppedAt === undefined ? [...t.reasonList] : [...t.reasonList, `the replay stopped at NC line ${replayStoppedAt}`] },
+      verdict: () => t.verdict(workMeshes, prepared.tolerance, triAllowance)
+    })
+  }
   RESIDUALS.set(artifact, { orientation: job.setupOrientation ?? "+Z", origin, nx: hf.nx, ny: hf.ny, minX: hf.minX, minY: hf.minY, cellX: hf.cellX, cellY: hf.cellY, floor: hf.floor, top: Float64Array.from(hf.top) })
   return { status: "ok", value: artifact }
 }
 
 const RESIDUALS = new WeakMap<CamArtifact, ResidualStock>()
+const SOLIDS = new WeakMap<CamArtifact, { readonly carry: SolidCarry; readonly verdict: () => TriVerdict }>()
+
+/**
+ * The tri-dexel stock a run left (only when it ran with `solidCarry`): the carry to hand to the next setup, and the comparison of that
+ * stock with the part in this setup's frame (what is left, what was cut below the part), within the declared error of the stock.
+ */
+export const solidOf = (artifact: CamArtifact): { readonly carry: SolidCarry; readonly verdict: () => TriVerdict } | undefined => SOLIDS.get(artifact)
 
 /**
  * The stock a run left, as a height field in the setup's work frame (spec 69 C4), or `undefined` for an artifact that did not come from

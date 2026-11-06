@@ -66,10 +66,32 @@ describe("hole breadth in a planned job", () => {
     expect(a.notes).toContainEqual(expect.stringMatching(/^H3-back-bore: bb planned/))
     expect(a.operations.find((o) => o.strategy === "drill" && o.toolId.startsWith("boringbar"))?.status).toBe("ok")
     expect(a.issues.filter((i) => i.severity === "error")).toEqual([])
-    // The underside is invisible to the height-field replay: the claims it cannot judge are unresolved, never passed.
+    // The underside is invisible to the height field, so the back-boring is judged on the tri-dexel replay of every move: its claims
+    // are decided there (with the error declared), and the faces that look away from this one setup still keep the job at preview.
+    for (const id of ["no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed"]) {
+      expect(a.claims.find((c) => c.id === id)?.status, id).toBe("passed")
+      expect(a.claims.find((c) => c.id === id)?.detail, id).toMatch(/tri-dexel/)
+    }
+    expect(a.claims.find((c) => c.id === "part-coverage")?.status).toBe("unresolved")
+    expect(a.release).not.toBe("verified-program")
+  })
+
+  test("a back-bore with an insert 4 mm wide is judged with the reach of its corners and still passes the pilot", () => {
+    const under: Feature = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
+    const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature
+    const bar = DEFAULT_CUTTERS.find((t) => t.kind === "boringbar")!
+    const tools = [...DEFAULT_CUTTERS.filter((t) => t.kind !== "boringbar"), { ...bar, id: "boringbar-wide", insertWidth: 4 }]
+    const a = ok(runJob(job([under, bb], { breadth: { holeCycles: true }, tools }, 30)))
+    expect(a.operations.find((o) => o.strategy === "drill" && o.toolId === "boringbar-wide")?.status).toBe("ok")
+    for (const id of ["no-rapid-in-stock", "holder-clearance"]) expect(a.claims.find((c) => c.id === id)?.status, id).toBe("passed")
+  })
+
+  test("a back-bore replay that stopped at its budget is not read as passed", () => {
+    const under: Feature = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
+    const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature
+    const a = ok(runJob(job([under, bb], { breadth: { holeCycles: true } }, 30), { replayWorkLimit: 2e5 }))
     const gouge = a.claims.find((c) => c.id === "no-gouge")
     expect(gouge?.status).toBe("unresolved")
-    expect(gouge?.detail).toMatch(/back-boring cut the underside/)
     expect(a.release).not.toBe("verified-program")
   })
 

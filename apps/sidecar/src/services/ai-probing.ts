@@ -4,7 +4,7 @@
  * (or named rows) into the machine's work offsets or its rotary calibration. Stale work is refused, never quietly used: a probe
  * measures one revision of the drawing, and an offset written from another would move the part by the wrong amount.
  */
-import { CamRotaryCalibrationResult, PROBE_FORMAT, type CamProbeApplyInput, type CamProbeInput, type CamProbeRunInput, type CamProbingDialect, type CamProbingSettingsInput, type ProbeReportDocument } from "@cadcamfun/api"
+import { CamRotaryCalibrationResult, PROBE_FORMAT, type CamProbeApplyInput, type CamProbeCalibration, type CamProbeInput, type CamProbeRunInput, type CamProbingDialect, type CamProbingSettingsInput, type ProbeReportDocument } from "@cadcamfun/api"
 import type { ToolHandlersShape } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
@@ -102,40 +102,29 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
     }
     const user = actorId()
     const dialect = await dialectOf(input)
-    let cycle: cam.probing.ProbeCycle
-    let chosenBecause: string | undefined
-    let actions: ReadonlyArray<cam.probing.ProbeAction> = []
-    let nc: string
-    let warnings: ReadonlyArray<string> = []
-    if (operation?.kind === "rotary-axis") {
-      // A calibration is planned by the rotary routine: it needs what the machine believes about its table.
-      const planned = await attempt(probing.plan.calibrateRotary(user, { axis: operation.axis, sphere: operation.sphere, angles: operation.angles.map((a) => a * 180 / Math.PI), settings, dialect }))
-      if (!planned.ok) return planned
-      if (planned.value.nc === undefined) return { ok: false, error: planned.value.refused ?? "The calibration program could not be written." }
-      cycle = operation
-      nc = planned.value.nc
-      warnings = planned.value.notes
-    } else {
-      const request = {
-        settings, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}),
-        ...(input.feature !== undefined ? { feature: { ...input.feature, elements } } : { operation: operation! })
-      }
-      const planned = await attempt(probing.plan.plan(user, request))
-      if (!planned.ok) return planned
-      cycle = planned.value.operation as cam.probing.ProbeCycle
-      chosenBecause = planned.value.chosenBecause
-      const wanted = actionsOf(cycle, input)
-      if (typeof wanted === "string") return { ok: false, error: wanted }
-      actions = wanted
-      const written = await attempt(probing.plan.emit(user, { operation: cycle, settings, dialect, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}), ...(actions.length > 0 ? { actions } : {}) }))
-      if (!written.ok) return written
-      nc = written.value.nc
-      warnings = [...planned.value.warnings, ...written.value.warnings]
+    const request = {
+      settings, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}), ...(input.native === true ? { native: true } : {}),
+      ...(input.feature !== undefined ? { feature: { ...input.feature, elements } } : { operation: operation! })
     }
+    const planned = await attempt(probing.plan.plan(user, request))
+    if (!planned.ok) return planned
+    const cycle = planned.value.operation as cam.probing.ProbeCycle
+    const chosenBecause = planned.value.chosenBecause
+    const actions = actionsOf(cycle, input)
+    if (typeof actions === "string") return { ok: false, error: actions }
+    const written = await attempt(probing.plan.emit(user, {
+      operation: cycle, settings, dialect, ...(input.frame !== undefined ? { frame: input.frame } : {}), ...(input.checks !== undefined ? { checks: input.checks } : {}),
+      ...(actions.length > 0 ? { actions } : {}), ...(input.native === true ? { native: true } : {})
+    }))
+    if (!written.ok) return written
+    const nc = written.value.nc
+    const native = written.value.native
+    const warnings = [...planned.value.warnings, ...written.value.warnings]
     if (startsSpindle(nc)) return { ok: false, error: "The written probing program starts the spindle: it was not stored. A probe must never turn under power." }
     const programHash = cam.kernel.sha256(nc)
     const data = {
       format: PROBE_FORMAT, operation: Schema.encodeSync(cam.kernel.ProbeCycleSchema)(cycle), dialect, sourceRevision: revision, identity: { nc: programHash },
+      ...(native !== undefined ? { native } : {}),
       ...(input.checks !== undefined && input.checks.length > 0 ? { checks: Schema.encodeSync(Schema.Array(cam.kernel.CharacteristicSchema))(input.checks) } : {}),
       ...(actions.length > 0 ? { actions: Schema.encodeSync(Schema.Array(cam.kernel.ProbeActionSchema))(actions) } : {}),
       ...(Object.keys(settings).length > 0 ? { settings: Object.fromEntries(Object.entries(settings).filter(([key]) => key !== "machineConfig")) } : {}),
@@ -151,8 +140,17 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
     await audit(loaded.projectId, "ai.cam.probe_saved", { drawingId: loaded.id, operationId: row.id, cycle: cycle.kind, dialect, nc: programHash })
     return {
       ok: true, operationId: row.id, cycle: cycle.kind, programHash, lines: nc.split("\n").length, dialect, revision, warnings,
-      ...(chosenBecause !== undefined ? { chosenBecause } : {}), drawingId: loaded.id, projectId: loaded.projectId
+      ...(chosenBecause !== undefined ? { chosenBecause } : {}), drawingId: loaded.id, projectId: loaded.projectId,
+      // The control's own cycle is written, not expanded: the replay reads the inline touches, so the program itself stays unproven.
+      ...(native !== undefined ? { native, claims: { probing: "unresolved" } } : {})
     }
+  }
+
+  /** The calibration a report holds: the job record of its operation, or the fit of a run against a table off its pivot. */
+  const calibrationOf = (doc: ProbeReportDocument): CamProbeCalibration | undefined => {
+    const data = record(doc.data)
+    const operations = Array.isArray(data["operations"]) ? data["operations"] as ReadonlyArray<{ calibration?: CamProbeCalibration }> : []
+    return operations.find((op) => op.calibration !== undefined)?.calibration ?? data["calibration"] as CamProbeCalibration | undefined
   }
 
   const answerOf = (doc: ProbeReportDocument, operationId: string) => {
@@ -165,7 +163,7 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       ...(typeof data["maxDeviationMm"] === "number" ? { maxDeviationMm: data["maxDeviationMm"] } : {}),
       ...(updates.length > 0 ? { updates } : {}),
       ...(Array.isArray(data["checks"]) && checks > 0 ? { results: data["checks"] } : {}),
-      ...(data["calibration"] !== undefined ? { calibration: data["calibration"] } : {})
+      ...(calibrationOf(doc) !== undefined ? { calibration: calibrationOf(doc) } : {})
     }
   }
 
@@ -181,7 +179,8 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
     const report = input.runId === undefined ? undefined : probeProgressReporter({ publish: events.publish }, projectId, input.runId)
     const cycle = record(data["operation"])
     let doc: ProbeReportDocument
-    if (cycle["kind"] === "rotary-axis") {
+    // A job operation measures the table as the control believes it; a table off its pivot is simulated by the calibration route.
+    if (cycle["kind"] === "rotary-axis" && input.calibrationError !== undefined) {
       const sphere = cycle["sphere"] as cam.probing.ProbeCycle & { centre: { x: number; y: number; z: number }; diameter: number }
       const error = input.calibrationError
       const run_ = await attempt(probing.plan.calibrateRotary(user, {
@@ -192,7 +191,10 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       const measured: CamRotaryCalibrationResult = run_.value
       const saved = await attempt(probing.reports.save(user, projectId, {
         name: row.name, kind: "rotary", source: "simulated", verdict: measured.calibration === undefined ? "incomplete" : "pass",
-        data: { verdict: measured.calibration === undefined ? "incomplete" : "pass", failed: 0, checks: [], updates: [], ...measured }, toolpathId: row.id, drawingId: loaded.id,
+        data: {
+          verdict: measured.calibration === undefined ? "incomplete" : "pass", failed: 0, checks: [], updates: [], axis: measured.axis, centres: measured.centres, notes: measured.notes,
+          ...(measured.calibration !== undefined ? { calibration: { kind: "rotary", axis: measured.axis, centres: measured.centres, angles: cycle["angles"], rotary: measured.calibration } } : { calibration: { kind: "refused", reason: measured.refused ?? "the centres do not make a circle" } })
+        }, toolpathId: row.id, drawingId: loaded.id,
         ...(machineConfig !== undefined ? { machineConfigId: machineConfig } : {}), ...(input.runId !== undefined ? { runId: input.runId } : {}),
         ...(row.gcode ? { programHash: cam.kernel.sha256(row.gcode) } : {}), ...(typeof data["sourceRevision"] === "string" ? { sourceRevision: data["sourceRevision"] } : {})
       }))
@@ -228,18 +230,27 @@ export const makeAiProbing = (deps: AiProbingDeps) => {
       const row = doc.toolpathId === null ? undefined : await storedOperation(doc.toolpathId, loaded)
       const stale = doc.sourceRevision !== drawingRevision(loaded) || row === undefined || (doc.programHash !== null && doc.programHash !== cam.kernel.sha256(row.gcode ?? ""))
       if (stale) return { ok: false, status: "stale", error: "The drawing or the probe program changed since this report: run cam_edit probe_run again." }
-      if (doc.kind === "rotary") {
-        if (input.setupId !== undefined) return { ok: false, error: "A rotary calibration belongs to the machine, not to a setup: leave setupId out." }
-        const fit = record(record(doc.data)["calibration"])
-        const pivot = fit["pivot"] as { x: number; y: number; z: number } | undefined
-        if (pivot === undefined) return { ok: false, error: "The report has no calibration to apply." }
-        const saved = await attempt(probing.probeConfig.put(user, input.machineConfig, {
-          rotaryCalibration: { pivotMeasured: pivot, at: doc.measuredAt, ...(fit["axisDirection"] !== undefined ? { axisDirection: fit["axisDirection"] as { x: number; y: number; z: number } } : {}), ...(typeof fit["axisTilt"] === "number" ? { axisError: Math.abs(fit["axisTilt"]) } : {}), ...(typeof fit["rms"] === "number" ? { rms: fit["rms"] } : {}) },
-          ...(input.baseUpdatedAt !== undefined ? { baseUpdatedAt: input.baseUpdatedAt } : {})
-        }))
+      const calibration = calibrationOf(doc)
+      if (calibration?.kind === "refused") return { ok: false, error: `The run gave no calibration: ${calibration.reason}.` }
+      if (calibration !== undefined) {
+        if (input.setupId !== undefined) return { ok: false, error: "A calibration belongs to the machine, not to a setup: leave setupId out." }
+        const base = input.baseUpdatedAt !== undefined ? { baseUpdatedAt: input.baseUpdatedAt } : {}
+        const body = async (): Promise<Parameters<typeof probing.probeConfig.put>[2] | { ok: false; error: string }> => {
+          if (calibration.kind === "rotary") {
+            const fit = calibration.rotary
+            return { rotaryCalibration: { pivotMeasured: fit.pivot, axisDirection: fit.axisDirection, axisError: Math.abs(fit.axisTilt), rms: fit.rms, at: doc.measuredAt }, ...base }
+          }
+          const held = await attempt(probing.probeConfig.get(user, input.machineConfig))
+          if (!held.ok) return held
+          const { ballDiameter: _ball, artefact: _artefact, ...stylus } = calibration.stylus
+          return { probing: { ...held.value.probing, calibration: { ...stylus, calibratedAt: doc.measuredAt } }, ...base }
+        }
+        const write = await body()
+        if ("ok" in write) return write
+        const saved = await attempt(probing.probeConfig.put(user, input.machineConfig, write))
         if (!saved.ok) return saved
-        await audit(projectId, "ai.cam.rotary_calibration_applied", { machineConfigId: input.machineConfig, reportId: doc.id })
-        return { ok: true, machineConfigId: input.machineConfig, updatedAt: saved.value.updatedAt, applied: ["rotary calibration"] }
+        await audit(projectId, calibration.kind === "rotary" ? "ai.cam.rotary_calibration_applied" : "ai.cam.stylus_calibration_applied", { machineConfigId: input.machineConfig, reportId: doc.id })
+        return { ok: true, machineConfigId: input.machineConfig, updatedAt: saved.value.updatedAt, applied: [`${calibration.kind} calibration`] }
       }
       const updates = record(doc.data)["updates"]
       if (!Array.isArray(updates) || updates.length === 0) return { ok: false, error: "The report moved no offset: nothing to apply." }

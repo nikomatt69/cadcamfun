@@ -86,6 +86,20 @@ export interface View3DProps {
   readonly axesVisible?: boolean
   readonly origin?: { readonly x: number; readonly y: number; readonly z: number }
   readonly stock?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
+  /** The raw pieces of the other workpieces on the fixture (the first is `stock`), drawn as outlines. */
+  readonly extraStocks?: ReadonlyArray<{ readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }>
+  /** The parts of a multi-part program seen together (the replay's one frame): each blank, how far its cuts reached, a crossed part in red. */
+  readonly fixtureBoxes?: ReadonlyArray<{
+    readonly name: string
+    readonly origin: { readonly x: number; readonly y: number; readonly z: number }
+    readonly size: { readonly x: number; readonly y: number; readonly z: number }
+    readonly state: "part" | "crossed"
+    readonly reach?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
+  }>
+  /** The clamps, jaws and plates of the setup (boxes in the first part's datum frame), outlined with their names. */
+  readonly clamps?: ReadonlyArray<{ readonly name: string; readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }>
+  /** The machine travel of the setup, drawn faintly around the work. */
+  readonly travel?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
   readonly showControls?: boolean
   /** Optional screen controls placed immediately before Fullscreen, including in fullscreen mode. */
   readonly controlsFooter?: JSX.Element
@@ -109,6 +123,8 @@ export interface View3DProps {
   /** What the machine scene found (set-up findings, printer layers) after each rebuild. */
   readonly onMachineInfo?: (info: MachineInfo) => void
   readonly toolpathDisplay?: {
+    /** Draw the toolpath lines and direction markers (default true). */
+    readonly showPathLines?: boolean
     readonly showPoints: boolean
     readonly showPointLabels: boolean
     readonly pointFilter: "all" | ToolpathPointKind
@@ -202,7 +218,7 @@ export function View3D(props: View3DProps) {
   const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.fixtureBoxes; props.clamps; props.travel; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -521,6 +537,41 @@ export function View3D(props: View3DProps) {
         boxGeometry.dispose()
         stock.position.set(stockOrigin.x + size.x / 2, stockOrigin.y + size.y / 2, stockOrigin.z + size.z / 2); stock.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(stock)
       }
+      if (props.stock && (props.machine === undefined || props.machine.kind === "mill")) {
+        for (const { size, origin } of props.extraStocks ?? []) {
+          const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z)
+          const outline = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: props.toolpathDisplay?.stockOpacity ?? .6 }))
+          boxGeometry.dispose()
+          outline.position.set(origin.x + size.x / 2, origin.y + size.y / 2, origin.z + size.z / 2); outline.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(outline)
+        }
+      }
+      // The setup's workholding (clamps, jaws, plates) and, faintly, the machine travel the placed blanks must lie inside.
+      if (props.machine === undefined || props.machine.kind === "mill") {
+        const box = (b: { readonly origin: Vec3; readonly size: Vec3 }, color: number, opacity: number, name: string): THREE.LineSegments => {
+          const geometry = new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z)
+          const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: false }))
+          geometry.dispose()
+          lines.position.set(b.origin.x + b.size.x / 2, b.origin.y + b.size.y / 2, b.origin.z + b.size.z / 2); lines.renderOrder = 7; lines.name = name; content.add(lines)
+          return lines
+        }
+        for (const clamp of props.clamps ?? []) {
+          box(clamp, 0xf59e0b, 0.95, "setup-clamp")
+          addPointLabel(clamp.name, { x: clamp.origin.x + clamp.size.x / 2, y: clamp.origin.y + clamp.size.y / 2, z: clamp.origin.z + clamp.size.z })
+        }
+        if (props.travel !== undefined) box(props.travel, 0x94a3b8, 0.25, "setup-travel")
+      }
+      // The parts of the program seen together: a blank each (red where a cut crossed into it), and a faint box for how far its own cuts reached.
+      for (const part of props.fixtureBoxes ?? []) {
+        const outline = (box: { readonly origin: Vec3; readonly size: Vec3 }, color: number, opacity: number): void => {
+          const geometry = new THREE.BoxGeometry(box.size.x, box.size.y, box.size.z)
+          const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: false }))
+          geometry.dispose()
+          lines.position.set(box.origin.x + box.size.x / 2, box.origin.y + box.size.y / 2, box.origin.z + box.size.z / 2); lines.renderOrder = 8; lines.name = "fixture-view"; content.add(lines)
+        }
+        outline(part, part.state === "crossed" ? 0xef4444 : 0x2dd4bf, 0.9)
+        if (part.reach !== undefined) outline(part.reach, part.state === "crossed" ? 0xef4444 : 0x38bdf8, 0.35)
+        addPointLabel(part.name, { x: part.origin.x + part.size.x / 2, y: part.origin.y + part.size.y / 2, z: part.origin.z + part.size.z })
+      }
       for (const raw of props.drawing?.entities ?? []) {
         if (!raw.visible || props.drawing?.layers.find(l => l.id === raw.layerId)?.visible === false) continue
         const e = renderEntity(raw)
@@ -541,7 +592,7 @@ export function View3D(props: View3DProps) {
         const cutter = props.tools?.get(props.program.toolpaths[0]?.toolId ?? "") ?? props.defaultTool
         const extent = props.stock ? Math.max(props.stock.size.x, props.stock.size.y, props.stock.size.z) : 100
         machineScene = createMachineScene({
-          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: { ...DEFAULT_MACHINE_DISPLAY, ...props.machineDisplay, showTool: props.toolpathDisplay?.showTool ?? props.machineDisplay?.showTool ?? true, showHolder: props.toolpathDisplay?.showHolder ?? props.machineDisplay?.showHolder ?? true },
+          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: { ...DEFAULT_MACHINE_DISPLAY, ...props.machineDisplay, showPathLines: props.toolpathDisplay?.showPathLines ?? true, showTool: props.toolpathDisplay?.showTool ?? props.machineDisplay?.showTool ?? true, showHolder: props.toolpathDisplay?.showHolder ?? props.machineDisplay?.showHolder ?? true },
           ...(start !== undefined ? { start } : {}),
           ...(props.machineOptions !== undefined ? { machineOptions: props.machineOptions } : {}),
           gaugeOf,
@@ -648,15 +699,15 @@ export function View3D(props: View3DProps) {
         content.add(line)
         return line
       }
-      const rapidLine = lineObject(buffers.rapid.positions, true)
-      const cutLine = lineObject(buffers.cut.positions, false, buffers.cut.colors)
+      const rapidLine = display?.showPathLines === false ? undefined : lineObject(buffers.rapid.positions, true)
+      const cutLine = display?.showPathLines === false ? undefined : lineObject(buffers.cut.positions, false, buffers.cut.colors)
       // The cuts under the stock's top face are the point of the program: a faint copy drawn through the material keeps them readable.
       const ghost = cutLine !== undefined && machine?.kind !== "3dprinter"
         ? createLines(buffers.cut.positions, { ...(buffers.cut.colors !== undefined ? { colors: buffers.cut.colors } : { color: 0x38bdf8 }), width: 1.2, opacity: 0.3, depthTest: false }, { quality: currentLookTier() })
         : undefined
       if (ghost !== undefined) { ghost.name = "toolpath:cuts-ghost"; ghost.renderOrder = 9; content.add(ghost) }
       // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
-      const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
+      const arrows = display?.showPathLines === false || display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
       if (arrows !== undefined) content.add(arrows.object)
       pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}), ...(ghost !== undefined ? { ghost } : {}) }
       props.onPathLegend?.(buffers.legend)
@@ -703,6 +754,8 @@ export function View3D(props: View3DProps) {
       orthographic.top = radius * 1.4; orthographic.bottom = -radius * 1.4; orthographic.updateProjectionMatrix()
     }
     rebuild(); resize()
+    // The effects ran before this mount: a view opened on a finished simulation has its overlay already, and it will not change again.
+    rebuildProbe()
     const observer = new ResizeObserver(resize)
     observer.observe(host)
     const raycaster = new THREE.Raycaster()

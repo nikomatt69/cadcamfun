@@ -19,9 +19,13 @@ export interface ProbeProgram {
   readonly notes: ReadonlyArray<string>
   readonly warnings: ReadonlyArray<string>
   readonly hash?: string
+  /** The word of a native cycle: the control runs its own cycle, the replay reads its inline equivalent. */
+  readonly native?: string
   readonly fingerprint: string
   /** The program parsed for the 3D view: what "Show in 3D" plays, with the motion track (its moves carry the NC lines of the touches). */
   readonly parsed?: { readonly program: cam.Program; readonly motion?: cam.viewer.MotionTrack | undefined }
+  /** A simulated run's program as it went: touches end at their contacts. `parsed` is this text, `lines[i]` the line of `nc` of its line i + 1. */
+  readonly played?: { readonly text: string; readonly lines: ReadonlyArray<number> }
 }
 
 /** The run the sidecar announced with `probe.progress`. */

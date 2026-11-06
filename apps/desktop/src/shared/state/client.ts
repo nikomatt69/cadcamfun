@@ -15,6 +15,8 @@ import { Context, Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { Api, Authorization } from "@cadcamfun/api"
+import { isCloudRequestPath } from "../../app/cloud-request.ts"
+import { identityAccessToken } from "../../app/identity-session.ts"
 import { getEndpoint, isTauri, resetEndpoint, type Endpoint } from "../../app/sidecar.ts"
 import { withSessionToken } from "./session.ts"
 import { createFakeApi, type ApiClient as FakeApiClient } from "../../testing/fake-api.ts"
@@ -25,11 +27,21 @@ import { createFakeApi, type ApiClient as FakeApiClient } from "../../testing/fa
  */
 export type Client = HttpApiClient.ForApi<typeof Api>
 
+const IDENTITY_HEADER = "x-identity-token"
+
+/** Session on every call; the account access token only on cloud routes, so the rest of the app stays the local profile. */
+const authorize = (request: HttpClientRequest.HttpClientRequest) => Effect.gen(function*() {
+  const signed = yield* withSessionToken(request)
+  if (!isCloudRequestPath(signed.url)) return signed
+  const token = yield* Effect.promise(() => identityAccessToken())
+  return token ? HttpClientRequest.setHeader(signed, IDENTITY_HEADER, token) : signed
+})
+
 /** Each client layer owns its launch token; reconnects cannot overwrite another runtime's authorization. */
 export class ApiClient extends Context.Service<ApiClient, HttpApiClient.ForApi<typeof Api>>()("cadcamfun/ApiClient") {
   static readonly layer = (options: ApiClientOptions) => {
     const authorization = HttpApiMiddleware.layerClient(Authorization, ({ next, request }) =>
-      Effect.flatMap(withSessionToken(HttpClientRequest.bearerToken(request, options.token)), next))
+      Effect.flatMap(authorize(HttpClientRequest.bearerToken(request, options.token)), next))
     return Layer.effect(ApiClient, HttpApiClient.make(Api, {
       baseUrl: options.baseUrl,
       transformClient: (client) => client.pipe(HttpClient.filterStatusOk)

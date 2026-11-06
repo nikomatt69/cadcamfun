@@ -50,6 +50,12 @@ export interface VerifyNcRequest {
   readonly start?: Vec3
   /** Cell visits the replay may spend (default 2e9). */
   readonly budget?: number
+  /**
+   * Replay only the moves under this work offset register (`G54`, `G55`, `G54.1 P3`): the stock, the part and the start are the frame
+   * of that register, so a program that machines several workpieces is replayed once per workpiece against that workpiece's own blank.
+   * Moves under other registers are not replayed; a register with no move is reported. Default: every move.
+   */
+  readonly register?: string
 }
 
 export interface NcFinding {
@@ -70,6 +76,9 @@ export interface VerifyNcResult {
   readonly gouge: Deviation
   readonly left: Deviation
   readonly detached: number
+  /** Material the blank held before the replay, and what the replayed moves took out of it, mm³ (the mean of the three ray directions; true within `errorBound`). */
+  readonly stockVolume: number
+  readonly removedVolume: number
   readonly cell: number
   /** The declared error of every figure, mm. */
   readonly errorBound: number
@@ -89,6 +98,7 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   const { min, max } = request.stock
   const cell = triCellFor({ x: max.x - min.x, y: max.y - min.y, z: max.z - min.z }, request.cell ?? 0.1)
   const replay = new TriReplay({ min, max, cell, budget: request.budget ?? 2e9 })
+  const stockVolume = replay.stock.volumeMean()
   const cutters = new Map(request.tools.map((t) => [t.number, t.cutter] as const))
   const radiusOf = new Map(request.tools.map((t) => [t.number, t.cutter.diameter / 2] as const))
   const full = new Map<Cutter, ToolSolid>()
@@ -114,8 +124,16 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   let feedMoves = 0, travelHits = 0, rapidHits = 0
   const unknown = new Set<number>()
   const states = run.states ?? []
+  const registerOf = (index: number): string => states[index]?.workOffset ?? "G54"
+  let inRegister = 0
   run.segments.forEach((s, index) => {
     if (s.kind === "dwell") return
+    if (request.register !== undefined) {
+      // The first move after a register switch starts where the previous register left the tool: its start is not in this frame.
+      if (registerOf(index) !== request.register) return
+      inRegister++
+      if (s.kind === "rapid" && index > 0 && registerOf(index - 1) !== request.register) return
+    }
     const tool = states[index]?.tool
     const cutter = tool === undefined ? undefined : cutters.get(tool)
     if (travel !== undefined) {
@@ -180,10 +198,16 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
     placed.push({ line: s.line, cutter, tips, axes })
   })
   for (const t of unknown) if (t >= 0) reasons.push(`tool T${t} is not described`)
+  if (request.register !== undefined && inRegister === 0) reasons.push(`the program has no move under ${request.register}`)
 
-  const verdict = replay.verdict(request.part, tolerance, allowance)
+  // Without a finished part there is nothing to compare the stock with: rapids through material, travel and unknown tools are still checked.
+  const noPart = request.part.length === 0
+  const checked = replay.verdict(request.part, tolerance, allowance)
+  const verdict = noPart
+    ? { ...checked, gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, closedPart: false, reasons: [...checked.reasons.filter((r) => !/part mesh/.test(r)), "no finished part was given: gouge and leftover are not judged"] }
+    : checked
   const threshold = tolerance + verdict.errorBound
-  if (verdict.gouge.depth > threshold && verdict.closedPart) {
+  if (!noPart && verdict.gouge.depth > threshold && verdict.closedPart) {
     // The first move after which the stock is cut below the part: the shortest prefix of the cutting moves that already gouges.
     // Removal only grows, so "this prefix gouges" is monotone and a bisection finds the move in log2(n) replays.
     const at = verdict.gouge.at
@@ -201,6 +225,7 @@ export const verifyNc = (request: VerifyNcRequest): VerifyNcResult => {
   const complete = reasons.length === 0
   return {
     complete, reasons, findings, gouge: verdict.gouge, left: verdict.left, detached: verdict.detached,
+    stockVolume, removedVolume: Math.max(0, stockVolume - replay.stock.volumeMean()),
     cell: verdict.cell, errorBound: verdict.errorBound, threshold, moves: run.segments.length, feedMoves,
     verdict: findings.some((f) => FAULT_KINDS.has(f.kind)) ? "faults" : complete ? "clean" : "incomplete"
   }

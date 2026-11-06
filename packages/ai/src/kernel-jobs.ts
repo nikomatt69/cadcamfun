@@ -246,6 +246,8 @@ export interface KernelJobs {
   readonly "parametric-report": { readonly input: { readonly history: unknown }; readonly output: ReturnType<typeof parametricReport> }
   /** The CAM kernel on a whole job (spec 29): NC plus evidence; progress is reported before each operation and stage. */
   readonly "cam-manufacture": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.runJob> }
+  /** The same job with several setups (`runSetups`): one program per setup, the job's coverage and release. */
+  readonly "cam-setups": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.runSetups> }
   readonly "cam-plan": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.planOnly> }
   /** The toolpath generator on one request (the panel's Generate button): G-code plus evidence; progress is reported before each step. */
   readonly "cam-generate": { readonly input: cam.generator.GenerateRequest; readonly output: cam.generator.GenerateOutcome }
@@ -304,6 +306,7 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   acceptance: (input) => acceptPart(parseHistory(input.history), input.checks, input.budgetMs === undefined ? {} : { budgetMs: input.budgetMs }),
   "parametric-report": (input) => parametricReport(parseHistory(input.history)),
   "cam-manufacture": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runJob(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),
+  "cam-setups": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runSetups(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),
   "cam-plan": ({ stockFromPartBottom, ...job }) => cam.kernel.planOnly(job, stockFromPartBottom === undefined ? {} : { stockFromPartBottom }),
   "cam-generate": (request, report) => cam.generator.generateToolpath(cam.generator.decodeGenerateRequest(request), report === undefined ? {} : { onProgress: report }),
   "cam-parse": ({ gcode, name }) => cam.generator.analyseGcode(gcode, name),
