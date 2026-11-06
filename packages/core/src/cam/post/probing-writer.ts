@@ -375,11 +375,11 @@ export const nativeProbeLines = (move: { readonly family: string; readonly numbe
 }
 
 /**
- * Coordinate rotation words: the Fanuc family's `G68 X Y R` / `G69`. Siemens (`ROT`), Okuma, Klartext and LinuxCNC are refused: none of the
- * replays reads their word, and the offset's own rotation (`offset-r`) or the table (`table-c`) does the same there.
+ * Coordinate rotation words: the Fanuc family's and LinuxCNC's `G68 X Y R` / `G69` (the same words on both). Siemens (`ROT`), Okuma and Klartext
+ * are refused: none of the replays reads their word, and the offset's own rotation (`offset-r`) or the table (`table-c`) does the same there.
  */
 export const rotationLines = (on: boolean, x: string, y: string, r: string, io: ProbeIo): string[] => {
-  if (io.codes.syntax !== "fanuc") return refuse(io, "a coordinate rotation (G68): correct the rotation through the offset (offset-r) or the table (table-c)")
+  if (io.codes.syntax !== "fanuc" && io.codes.syntax !== "linuxcnc") return refuse(io, "a coordinate rotation (G68): correct the rotation through the offset (offset-r) or the table (table-c)")
   return [on ? `G68 X${x} Y${y} R${r}` : "G69"]
 }
 

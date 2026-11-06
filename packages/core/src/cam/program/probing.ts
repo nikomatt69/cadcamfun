@@ -12,8 +12,10 @@ import type { Vec2 } from "../../cad/vec.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { analyseGcode } from "../generator/analysis.ts"
 import { getPost, dialectOf } from "../post/index.ts"
-import { formatOffsetRef, getOffset, offsetKey, withOffset, workToMachine, type OffsetAxis, type WorkOffsetRef, type WorkOffsetTable } from "../work-offset.ts"
+import { addressOf, formatOffsetRef, getOffset, offsetKey, withOffset, workToMachine, type OffsetAxis, type WorkOffsetRef, type WorkOffsetTable } from "../work-offset.ts"
 import type { GeneratedProgram } from "./programs.ts"
+import type { TiltedPlane } from "../post/types.ts"
+import { indexPlane } from "../indexing.ts"
 import type { PartDisplacement, Setup, Workpiece } from "./setup.ts"
 import { enabledOperations, workpiecesOf } from "./setup.ts"
 import { assignPockets } from "./tooltable.ts"
@@ -274,6 +276,25 @@ export interface PartProbePlan {
   readonly notes: ReadonlyArray<string>
 }
 
+
+/**
+ * The way a post can write the rotation the setup asked for. A Fanuc-family register has no rotation (its offsets are X Y Z), so a rotation
+ * asked of the register is written as G68 about the measured point; a Siemens frame has one but no G68 word here, so a G68 is written as the
+ * frame's rotation (about its zero, not the measured point). Where neither exists the request stays as it is and the post refuses it with its
+ * own reason. LinuxCNC has both (G10 L2 R and G68). `note` says what was changed.
+ */
+const rotationVia = (wanted: "g68" | "offset-r" | "table-c", ref: WorkOffsetRef, post: Setup["post"]["postId"]): { readonly via: "g68" | "offset-r" | "table-c"; readonly note?: string } => {
+  if (wanted === "table-c") return { via: wanted }
+  const codes = dialectOf(post)?.probing
+  if (codes === undefined) return { via: wanted }
+  const address = addressOf(ref, codes.offsets)
+  const canRegister = !("refused" in address) && address.write !== "native-only" && address.write !== "l20-only" && address.read("R") !== undefined
+  const canG68 = codes.syntax === "fanuc" || codes.syntax === "linuxcnc"
+  if (wanted === "offset-r" && !canRegister && canG68) return { via: "g68", note: `the ${post} post has no rotation in a work offset: the measured rotation is written as G68 about the measured point, which stays on for what follows` }
+  if (wanted === "g68" && !canG68 && canRegister) return { via: "offset-r", note: `the ${post} post writes no G68: the measured rotation is written into the register, which turns the part about the register's zero, not about the measured point (put the datum on the measured corner)` }
+  return { via: wanted }
+}
+
 const PART_PROBE_ID = "part-probe"
 const PART_PROBE_LIMIT = 5
 const DEG = Math.PI / 180
@@ -286,8 +307,22 @@ interface PartProbeBuild {
   readonly refused?: string
   readonly toolNumber: number
   readonly device: ProbeDevice
-  readonly parts: ReadonlyArray<{ readonly wp: Workpiece; readonly register: string; readonly ref: WorkOffsetRef; readonly moves: ReadonlyArray<Move>; readonly entry: PartProbeEntry; readonly kinds: ReadonlyArray<string> }>
+  readonly parts: ReadonlyArray<{ readonly wp: Workpiece; readonly register: string; readonly ref: WorkOffsetRef; readonly moves: ReadonlyArray<Move>; readonly entry: PartProbeEntry; readonly kinds: ReadonlyArray<string>; readonly via?: "g68" | "offset-r" | "table-c" }>
   readonly notes: ReadonlyArray<string>
+}
+
+/**
+ * Why the setup's tilted-plane parts cannot be written, or undefined: a part indexed `plane` needs a post whose control has the swivel words
+ * (`G68.2` + `G53.1`, `CYCLE800`, `PLANE SPATIAL`), and a Siemens post needs the machine's swivel data record. Refused, never written as another frame.
+ */
+export const planeRefusal = (setup: Setup): string | undefined => {
+  const parts = workpiecesOf(setup).filter((wp) => wp.index !== undefined && wp.indexAs === "plane")
+  if (parts.length === 0) return undefined
+  const dialect = dialectOf(setup.post.postId)
+  // The Klartext writer adds its own PLANE SPATIAL words to the dialect it writes with (the ISO dialect of a Heidenhain definition has none).
+  if (dialect?.tiltedPlane === undefined && setup.post.postId !== "heidenhain") return `${parts.map((p) => p.name).join(", ")} ${parts.length > 1 ? "are" : "is"} indexed as a tilted plane, and the ${setup.post.postId} post has no tilted-plane words (G68.2, CYCLE800, PLANE SPATIAL): use a post that has them (fanuc, haas, okuma, siemens, heidenhain) or index the part as a table turn`
+  if (dialect?.id === "siemens" && setup.post.swivel === undefined) return "A tilted plane on a Siemens post is CYCLE800: set the post's swivel.dataRecord (the machine's swivel data record)"
+  return undefined
 }
 
 /** The moves of the probe of every workpiece (cycles in the part's frame after its table turn), with the entry each one reports. */
@@ -316,26 +351,30 @@ const buildPartProbe = (setup: Setup): PartProbeBuild | { readonly refused: stri
     const ref: WorkOffsetRef = wp.workOffsetRef ?? ({ kind: "g5x", code: wp.workOffset } as const)
     const register = wp.workOffsetRef !== undefined ? formatOffsetRef(wp.workOffsetRef) : wp.workOffset
     // An indexed face: the table turns first, so the cycles run in the part's own frame, the face up (its register was set at that pose).
-    const moves: Move[] = wp.index === undefined ? [] : [{ _tag: "Orient", ...wp.index }]
+    const moves: Move[] = wp.index === undefined || wp.indexAs === "plane" ? [] : [{ _tag: "Orient", ...wp.index }]
     let touches = 0
     const axes: OffsetAxis[] = []
     const measured = new Set<"X" | "Y" | "Z">()
     const kinds: string[] = []
+    let via: "g68" | "offset-r" | "table-c" | undefined
     for (let c = 0; c < config.cycles.length; c++) {
       const ctx = { probe: device, safeZ, clearance, search, prefix: `w${w + 1}c${c + 1}_` }
       const routine = planProbeCycle(config.cycles[c]! as ProbeCycleSpec, ctx)
       if ("refused" in routine) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): ${routine.refused}`)
       const cycleAxes = (["X", "Y", "Z"] as const).filter((axis) => routine.results[axis.toLowerCase()] !== undefined)
       const angleResult = (["rotation", "angle"] as const).find((name) => routine.results[name] !== undefined && routine.units[name] === "deg")
-      const writesRotation = config.rotation !== undefined && angleResult !== undefined
+      const rotationWay = config.rotation === undefined ? undefined : rotationVia(config.rotation, ref, setup.post.postId)
+      const writesRotation = rotationWay !== undefined && angleResult !== undefined
+      if (writesRotation) via = rotationWay!.via
       if (cycleAxes.length === 0 && !writesRotation) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}) measures no X, Y or Z position${angleResult !== undefined ? " and the setup's partProbe has no rotation to write its angle to" : ""}: it cannot set a work offset`)
       const actions: ProbeAction[] = []
       if (cycleAxes.length > 0) actions.push({ kind: "set-offset", ref, axes: Object.fromEntries(cycleAxes.map((axis) => [axis, axis.toLowerCase()])), policy: { mode: "set", limit: config.limit ?? PART_PROBE_LIMIT } })
       if (writesRotation) {
         // The part turns by at most as much as the limit would move a point 100 mm from the datum: a larger angle is a wrong face or a loose part.
-        actions.push({ kind: "rotation", result: angleResult!, via: config.rotation!, ref, policy: { mode: "set", limit: (config.limit ?? PART_PROBE_LIMIT) * DEG } })
+        actions.push({ kind: "rotation", result: angleResult!, via: rotationWay!.via, ref, policy: { mode: "set", limit: (config.limit ?? PART_PROBE_LIMIT) * DEG } })
         axes.push("R")
-        notes.push(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): the measured ${angleResult} goes into ${config.rotation === "g68" ? "the control's coordinate rotation (G68, about the measured point: it stays on for what follows)" : config.rotation === "table-c" ? "the C axis of the table" : "the register's own rotation"}`)
+        notes.push(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): the measured ${angleResult} goes into ${rotationWay!.via === "g68" ? "the control's coordinate rotation (G68, about the measured point: it stays on for what follows)" : rotationWay!.via === "table-c" ? "the C axis of the table" : "the register's own rotation"}`)
+        if (rotationWay!.note !== undefined && !notes.includes(rotationWay!.note)) notes.push(rotationWay!.note)
       }
       let compiled: Move[]
       try { compiled = compileActions(routine, actions, ctx) } catch (error) { return refuse(`${wp.name}, cycle ${c + 1}: ${error instanceof Error ? error.message : String(error)}`) }
@@ -347,7 +386,7 @@ const buildPartProbe = (setup: Setup): PartProbeBuild | { readonly refused: stri
       axes.push(...cycleAxes)
       kinds.push(config.cycles[c]!.kind)
     }
-    parts.push({ wp, register, ref, moves, kinds, entry: { workpieceId: wp.id, name: wp.name, register, touches, axes, measured: (["X", "Y", "Z"] as const).filter((a) => measured.has(a)) } })
+    parts.push({ wp, register, ref, moves, kinds, ...(via !== undefined ? { via } : {}), entry: { workpieceId: wp.id, name: wp.name, register, touches, axes, measured: (["X", "Y", "Z"] as const).filter((a) => measured.has(a)) } })
   }
   return { toolNumber, device, parts, notes }
 }
@@ -415,6 +454,7 @@ const featuredBlank = (cycles: ReadonlyArray<PartProbeCycleLike>, lo: Corner3, h
 /** The replay of one part's probe moves against a blank that sits `d` away from nominal. */
 const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["parts"][number], d: { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number }, tolerance: number): PartProbeReplay => {
   const unreplayed = (reason: string): PartProbeReplay => ({ status: "unreplayed", reason })
+  if (part.wp.index !== undefined && part.wp.indexAs === "plane") return unreplayed("a part probed in a tilted work plane: the replay turns the table to the part's angles, it does not model the control's plane word (probed on the real part, not replayed)")
   if (setup.partProbe!.rotation === "table-c" && part.entry.axes.includes("R")) return unreplayed("a rotation written to the table's C axis turns the part about the table's pivot: the replay does not model that write")
   const block = part.wp.stock ?? setup.stock
   if (block === undefined) return unreplayed("the setup and the workpiece give no blank to replay against")
@@ -462,7 +502,7 @@ const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["p
   const unmeasured = (["X", "Y", "Z"] as const).filter((axis) => Math.abs(d[axis.toLowerCase() as "x" | "y" | "z"]) > 1e-9 && !part.entry.measured.includes(axis))
   const why = (_: number): string =>
     unmeasured.length > 0 ? `no cycle measures ${unmeasured.join(" and ")}, in which the blank is displaced`
-      : setup.partProbe!.rotation === "offset-r" && Math.abs(d.rotation) > 0 ? "a rotation written to the register turns the part about its zero, not about the point that was measured: put the datum on the measured corner or write the rotation with g68"
+      : part.via === "offset-r" && Math.abs(d.rotation) > 0 ? "a rotation written to the register turns the part about its zero, not about the point that was measured: put the datum on the measured corner or write the rotation with g68"
         : "the touches do not pin the blank down well enough (a rotation the cycles do not measure, or a stylus that does not reach the face where it is)"
   return {
     status: after <= tolerance ? "within" : "outside",
@@ -479,6 +519,30 @@ const displacementOf = (setup: Setup, wp: Workpiece, writesRotation: boolean): {
   return { x: own?.x ?? (own === undefined ? DEFAULT_DISPLACEMENT.x : 0), y: own?.y ?? (own === undefined ? DEFAULT_DISPLACEMENT.y : 0), z: own?.z ?? (own === undefined ? DEFAULT_DISPLACEMENT.z : 0), rotation: own?.rotation ?? (own === undefined && writesRotation ? DEFAULT_ROTATION : 0) }
 }
 
+/** The tilted plane of every part indexed as one, by the id of its probe toolpath. */
+const planesOf = (b: PartProbeBuild): Record<string, TiltedPlane> =>
+  Object.fromEntries(b.parts.filter((p) => p.wp.index !== undefined && p.wp.indexAs === "plane").map((p) => [`probe@${p.wp.id}`, indexPlane(p.wp.index!)]))
+
+/**
+ * The probe of each workpiece as a toolpath of its own, to be put at the start of that part's cutting toolpaths in the program that first
+ * cuts it (`partProbe.placement: "inline"`), instead of the separate probe program. `toolNumber` is the probe's pocket, `device` its tool id;
+ * `planes` names the tilted plane of the toolpaths whose part is indexed as one. Refused, with the reason, when no probe can be made.
+ */
+export const inlinePartProbe = (setup: Setup): { readonly refused: string } | { readonly toolNumber: number; readonly deviceId: string; readonly byPart: ReadonlyMap<string, Toolpath>; readonly planes: Readonly<Record<string, TiltedPlane>>; readonly entries: ReadonlyArray<PartProbeEntry>; readonly notes: ReadonlyArray<string> } => {
+  const built = buildPartProbe(setup)
+  if ("refused" in built && built.refused !== undefined) return { refused: built.refused }
+  const b = built as PartProbeBuild
+  const problem = planeRefusal(setup)
+  if (problem !== undefined) return { refused: problem }
+  const multi = workpiecesOf(setup).length > 1
+  const byPart = new Map<string, Toolpath>(b.parts.map((p) => [p.wp.id, {
+    id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}`, toolId: b.device.id, spindleRpm: 0, coolant: "off", moves: [...p.moves],
+    ...(multi ? { workOffset: p.wp.workOffset, ...(p.wp.workOffsetRef !== undefined ? { workOffsetRef: p.wp.workOffsetRef } : {}) } : {}),
+    operation: { id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}` }
+  } satisfies Toolpath]))
+  return { toolNumber: b.toolNumber, deviceId: b.device.id, byPart, planes: planesOf(b), entries: b.parts.map((p) => p.entry), notes: b.notes }
+}
+
 /**
  * The probe program of a setup's workpieces: for every workpiece (in the fixture's order) the configured cycles run in that part's frame
  * and the deviation of each measured datum is added to that part's own register. The post must write probing words; the register is
@@ -490,6 +554,8 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
   if ("refused" in built && built.refused !== undefined) return { plan: { refused: built.refused, toolNumber: built.toolNumber, parts: [], notes: [] } }
   const b = built as PartProbeBuild
   const config = setup.partProbe!
+  const planeProblem = planeRefusal(setup)
+  if (planeProblem !== undefined) return { plan: { refused: planeProblem, toolNumber: b.toolNumber, parts: [], notes: [] } }
   const post = getPost(setup.post.postId)
   const refuse = (refused: string): { readonly plan: PartProbePlan } => ({ plan: { refused, toolNumber: b.toolNumber, parts: [], notes: [] } })
   if (post === undefined) return refuse(`Post ${setup.post.postId} is not implemented`)
@@ -519,7 +585,8 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
       decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
       toolNumbers: { [b.device.id]: b.toolNumber }, retractBeforeToolChange: setup.retractBeforeToolChange,
       ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
-      ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
+      ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}),
+      ...(Object.keys(planesOf(b)).length > 0 ? { workPlanes: planesOf(b), ...(setup.post.swivel !== undefined ? { swivel: setup.post.swivel } : {}) } : {})
     })
   } catch (error) { return refuse(`The ${setup.post.postId} post cannot write the probe program: ${error instanceof Error ? error.message : String(error)}`) }
   const stats = analyseGcode(gcode, name).stats
@@ -541,7 +608,9 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
 export const planPartProbe = (setup: Setup): PartProbePlan => partProbeProgram(setup, setup.post.programNumberBase).plan
 
 /** The probe program that goes with a generated setup, numbered after its programs: the program, or why there is none. Run it first. */
-export const partProbeFor = (setup: Setup, generated: { readonly programs: ReadonlyArray<GeneratedProgram> }): { readonly program?: GeneratedProgram; readonly plan: PartProbePlan; readonly refused?: string } => {
+export const partProbeFor = (setup: Setup, generated: { readonly programs: ReadonlyArray<GeneratedProgram> }): { readonly program?: GeneratedProgram; readonly plan: PartProbePlan; readonly refused?: string; readonly inline?: boolean } => {
   const made = partProbeProgram(setup, setup.post.programNumberBase + generated.programs.length)
+  // Placed inline, the probe is already in the programs that cut each part: there is no separate program to run first.
+  if (setup.partProbe?.placement === "inline") return made.generated === undefined ? { plan: made.plan, refused: made.plan.refused ?? "The part probe made no program" } : { plan: made.plan, inline: true }
   return made.generated === undefined ? { plan: made.plan, refused: made.plan.refused ?? "The part probe made no program" } : { plan: made.plan, program: made.generated }
 }
