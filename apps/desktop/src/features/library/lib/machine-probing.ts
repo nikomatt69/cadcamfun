@@ -4,7 +4,7 @@
  * Values are read through the core machine profile, so a configuration in the legacy `{stylusRadius, feed}` shape shows its figures;
  * writes go to the stored config draft, which the detail page saves in the canonical shape.
  */
-import { kernel, stylusDiameterOf, type MachineProbing, type MachineRotaryCalibration, type MachineToolSetter } from "../../cam/lib/probing/contract.ts"
+import { MACRO_STYLES, kernel, stylusDiameterOf, type MacroStyle, type MachineProbing, type MachineRotaryCalibration, type MachineToolSetter } from "../../cam/lib/probing/contract.ts"
 
 type Config = Record<string, unknown>
 
@@ -14,8 +14,17 @@ export type ProbeNumberField = (typeof PROBE_NUMBER_FIELDS)[number]
 export const SETTER_NUMBER_FIELDS = ["x", "y", "z", "triggerZ", "discDiameter", "maxToolDiameter", "fastFeed", "touchFeed", "brokenTolerance"] as const
 export type SetterNumberField = (typeof SETTER_NUMBER_FIELDS)[number]
 
+/** The control's probe cycle packages the machine can carry (`inline`: none, the program writes every touch). */
+export const PROBE_MACRO_STYLES: ReadonlyArray<MacroStyle> = MACRO_STYLES
+
 export interface ProbingForm {
-  readonly probe: Readonly<Partial<Record<ProbeNumberField, number>>> & { readonly doubleTouch?: boolean; readonly effectiveRadius?: number; readonly calibratedAt?: string }
+  readonly probe: Readonly<Partial<Record<ProbeNumberField, number>>> & {
+    readonly doubleTouch?: boolean; readonly effectiveRadius?: number; readonly calibratedAt?: string
+    /** The cycle package on the control (Renishaw Inspection Plus, Heidenhain touch probe cycles, Siemens measuring cycles). */
+    readonly macroStyle?: MacroStyle
+    /** The control probes in a tilted working plane (G68.2 / CYCLE800 / PLANE): 5-axis probing needs it. */
+    readonly tiltedPlane?: boolean
+  }
   /** The tool setter as stored: possibly incomplete while it is being filled in. */
   readonly setter: Readonly<Partial<Record<SetterNumberField, number>>> & { readonly kind?: "contact" | "laser" }
   readonly hasSetter: boolean
@@ -39,7 +48,8 @@ export const probingFormOf = (config: Config, type?: string): ProbingForm => {
     probe: defined({
       stylusDiameter: stylusDiameterOf(p), stylusLength: p?.stylusLength, toolNumber: p?.toolNumber,
       touchFeed: p?.feeds?.touch ?? p?.feed, fastFeed: p?.feeds?.fast, backoff: p?.backoff, orientSpindle: p?.orientSpindle,
-      doubleTouch: p?.doubleTouch, effectiveRadius: p?.calibration?.effectiveRadius, calibratedAt: p?.calibration?.calibratedAt
+      doubleTouch: p?.doubleTouch, effectiveRadius: p?.calibration?.effectiveRadius, calibratedAt: p?.calibration?.calibratedAt,
+      macroStyle: p?.macroStyle, tiltedPlane: p?.tiltedPlane
     }),
     setter: defined({
       kind: rawSetter?.kind === "laser" ? "laser" as const : rawSetter?.kind === "contact" ? "contact" as const : undefined,
@@ -52,7 +62,7 @@ export const probingFormOf = (config: Config, type?: string): ProbingForm => {
 }
 
 /** Writes one probe figure into the config draft; `undefined` removes it. The legacy `stylusRadius` / `feed` follow, for older readers. */
-export const writeProbe = (config: Config, field: ProbeNumberField | "doubleTouch", value: number | boolean | undefined): Config => {
+export const writeProbe = (config: Config, field: ProbeNumberField | "doubleTouch" | "tiltedPlane" | "macroStyle", value: number | boolean | MacroStyle | undefined): Config => {
   const probing: Config = { ...(isObj(config.probing) ? config.probing : {}) }
   const feeds: Config = { ...(isObj(probing.feeds) ? probing.feeds : {}) }
   const set = (target: Config, key: string, v: unknown) => { if (v === undefined) delete target[key]; else target[key] = v }
@@ -67,6 +77,10 @@ export const writeProbe = (config: Config, field: ProbeNumberField | "doubleTouc
       break
     case "fastFeed":
       set(feeds, "fast", value)
+      break
+    case "macroStyle":
+      // `inline` is the default: stored as absent, so an older reader sees the configuration it knows.
+      set(probing, "macroStyle", value === "inline" ? undefined : value)
       break
     default:
       set(probing, field, value)
