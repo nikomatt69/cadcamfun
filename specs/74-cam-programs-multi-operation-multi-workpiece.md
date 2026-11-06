@@ -45,10 +45,12 @@ Built on top of §2:
 
 - **Fixture.** Extended registers (G54.1 Pn, up to 48 parts), a blank and a rotary index per part (tombstone), `dependsOn`, `magazineSize`,
   placed blanks that overlap refused, both part orders timed (6 s per change, indicative).
-- **Workholding.** `Setup.fixtures` (clamp boxes) and `Setup.envelope` (travel), both in the first part's datum frame: a blank in a clamp
-  or past the travel is a `workpieceIssues` entry and nothing is generated. A generated toolpath that reaches a clamp (tool radius sideways,
-  stick-out upwards from the tip, arcs by their box) is named once per operation, part and clamp. The clamp boxes are as exact as the
-  operator made them: there is no holder/shank collision against the machine itself.
+- **Workholding.** `Setup.fixtures` (clamp boxes) and `Setup.envelope` (travel) are stored in the first part's datum frame. Each part is
+  judged in its own frame: `boxInPartFrame` carries a clamp by that part's table index before the blank-overlap check, the toolpath reach
+  check, and the fixture replay's exact clamp test (a tilted-plane post has already turned the moves, so that replay leaves the clamp).
+  A blank in a clamp or past the travel is a `workpieceIssues` entry and nothing is generated. A generated toolpath that reaches a clamp
+  (tool radius sideways, stick-out upwards from the tip, arcs by their box) is named once per operation, part and clamp. The clamp boxes
+  are as exact as the operator made them: there is no holder/shank collision against the machine itself.
 - **Tool life and sister tools.** `Tool.lifeMinutes`, `Setup.sisters [{toolId, tool}]`. The cutting minutes of every run (programmed
   feeds, no acceleration) are counted over the whole setup with the kernel's life book (`consumeLife`, `pickSister`); when the next run
   would pass the life, the runs after it use the sister, on a pocket of its own, and the post calls it. Without a sister the program warns.
@@ -99,12 +101,15 @@ Built on top of §2:
   clamp as one solid), and every register's feed moves are cut into it in program order, so each part's remaining stock (`bodyRemovedMm3`,
   `bodyRemainingMm3`, next to the per-part replay's own figures) and every contact are read from the same body in the state it is in when the move runs
   (`body`: its cell and declared error). A move of a register is checked against the rest of the body (its own blank is no obstacle to its own tool,
-  except where another part's blank overlaps it): another part's blank on the lattice, with the tool as it is (flutes and shank, the holder when it is
-  described, so the tool radius counts; rapids count too; a contact shallower than `errorBoundMm` is below the lattice's noise), the clamps EXACTLY, as
-  boxes against the swept tool (`boxPenetration`, the tool sampled every 0.05 mm along the move, only where it can reach the box), so a graze of 0.3 mm
-  into a clamp is a crossing although the lattice cell is 0.25 mm or more (`clampMethod: "exact-box"`, `clampErrorMm: 0.05`: a penetration of that
-  much is never missed, one below 0.01 mm is the NC's own rounding). A replay that could not finish (`complete: false`, `reasons`: the cell grows until
-  the solid can be sampled, the work budget is per register, the clamp check has its own) claims nothing and keeps the release at `preview`. A single
+  except where another part's blank overlaps it). The tool is counted as it is (flutes and shank, the holder when it is
+  described, so the tool radius counts; rapids count too). The other blanks and the clamps are judged EXACTLY, as boxes against the swept tool (`boxPenetration`, the tool
+  sampled every 0.05 mm along the move, only where it can reach the box), so a graze of 0.3 mm into a clamp or into another part's blank is a crossing
+  although the lattice cell is 0.25 mm or more (`clampMethod` / `blankMethod: "exact-box"`, `clampErrorMm` / `blankErrorMm: 0.05`: a penetration of that
+  much is never missed, one below 0.01 mm is the NC's own rounding). A table index carries the other blank into the cutting part's frame the same way
+  (`boxInPartFrame` about that part's datum); a tilted plane is already applied by the interpreter, so that blank stays where the placement put it, and
+  a turned or tilted register is not carved into the lattice (its remaining stock stays the per-part replay's figure). The lattice still supplies remaining
+  stock for the registers it does carve. A replay that could not finish (`complete: false`, `reasons`: the cell grows until
+  the solid can be sampled, the work budget is per register, and the exact clamp check and the exact blank check each have their own) claims nothing and keeps the release at `preview`. A single
   part with clamps gets the view as well (`clamps`, crossings named by the clamp).
 
 - **Operation templates.** `Setup.templates` (a named cycle of steps: tool, settings, `dependsOn`, `fromPreviousStock`) and `Setup.uses` (a
@@ -125,8 +130,8 @@ Built on top of §2:
   belongs on the measured corner; the post must be able to write it: LinuxCNC and Siemens, not Fanuc), the control's coordinate rotation about the
   measured point (`g68`, right for any datum, stays on for what follows) or the table's C. `cam setup_plan` returns `probe` (tool number, register /
   touches / axes / `measured` axes per part, or `refused`); `setup_generate` and the HTTP generate routes take `probePart: true` and put that program
-  FIRST (`kind: "probe"`). It is a program of its own run before the cuts, not inline in each part's toolpaths (inline would put the probe in the
-  cutting programs' tool table and magazine: `generateSetup` would have to place it).
+  FIRST (`kind: "probe"`). `partProbe.placement: "inline"` instead puts each part's cycles at the start of that part's toolpaths, in the first
+  program that cuts it, and the probe takes a pocket of its own in that program's tool table and magazine.
   **Replay.** Each part's probe moves are run on the simulator (`runProbeMoves`) against its blank (the part's own, else the setup's) placed with a
   displacement from where the setup believes it: default 0.8 / -0.6 / 0.3 mm on every part and 0.5 degrees when a rotation is written;
   `partProbe.replay.displacements` (per workpiece or for all) and `tolerance` (default 0.05 mm) say otherwise. A part on an indexed face runs with
@@ -144,27 +149,47 @@ Built on top of §2:
   about the measured point; `g68` on Siemens (no G68 word) becomes the frame's rotation, with the note that it turns about the frame's zero;
   LinuxCNC writes G68 with the Fanuc words and `G10 L2 R` for the register. The plan's `notes` say which one was used. A refusal remains only where
   neither exists (Okuma, Klartext, GRBL) and carries the post's own reason.
-  A failed replay is a warning on the probe program. It has no material-removal replay and no tilted-plane (G68.2 / CYCLE800) frame: an index is
-  the table turn.
+  A failed replay is a warning on the probe program. It has no material-removal replay.
+  **Inline.** `partProbe.placement: "inline"` (`inlinePartProbe`, used by `generateSetup`): the probe of each part is a toolpath (`probe@<id>`) put
+  before that part's first cut, in the first program that cuts it, with the probe tool in a pocket of its own (the magazine check counts it; a post that
+  cannot write the probe leaves the cuts alone and says why in the warnings). Tool first loads the probe once at the start of the program for every part
+  it cuts first; part first probes each part as it reaches it (a change to the probe and back). `GeneratedProgram.probes` lists the parts probed in
+  it, and `GeneratedProgram.replayGcode` is the same program without the probe cycles: the replay runs that (a probe removes no material and the replay has no
+  part to touch), and the evidence notes say so. No separate probe program is stored (`partProbeFor` answers `inline: true`).
+- **Tilted work plane.** `Workpiece.indexAs: "plane"` writes a part's index as the control's own tilted plane instead of a table turn
+  (`indexPlane`: the plane's axes are the rows of the table's rotation, so the toolpath in plane coordinates lands where the table turn would carry it, the
+  datum at the part's zero). `generateSetup` passes it as `PostOptions.workPlanes` (Fanuc/Haas/Okuma `G68.2` + `G53.1` and `G69`, Siemens `CYCLE800` with
+  `post.swivel`, Heidenhain `PLANE SPATIAL`); the interpreter follows it, so the replay sees the moves in the fixture's frame. A post without the words (generic,
+  GRBL, LinuxCNC, Brother, Mazak, Mitsubishi) or a Siemens post without its swivel record refuses the setup with the reason (`planeRefusal`, an issue; nothing
+  is generated); the plane takes the tilt of one axis (A or B) and C. The probe of such a part is written inside the same plane, so it measures the datum the
+  cuts will use; its replay is `unreplayed` (the replay turns the table, it does not model the plane word).
+- **Each part's frame.** The fixture's boxes (clamps) and the other blanks are stored in the first part's datum frame. A table turn leaves a part's moves in its own
+  frame, so `boxInPartFrame` carries a box there (about that part's datum, by the table's rotation: a quarter turn keeps a box a box, any other angle gives the bounding
+  box, which covers and is conservative); the blank-overlap check, the reach check and both exact tests use it. A part turned or tilted by its index is not carved
+  into the lattice body (its remaining stock stays the per-part replay's figure, and the evidence notes say so); a tilted plane is already applied by the interpreter.
+- **Exact blank-to-blank contact.** Another part's blank is an obstacle judged like a clamp: the swept tool (radius, shank, holder when described) against the box, sampled
+  every 0.05 mm (`blankMethod: "exact-box"`, `blankErrorMm`), so a 0.3 mm graze below the lattice cell is a crossing and one 0.05 mm clear is not.
 
 Still not done:
 
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
 2. The viewer does not draw the combined fixture view's clamps (the data is in the evidence); the desktop does not send `fixtures` / `envelope` to the sidecar.
-3. The probe inline in each part's toolpaths (the probe tool in the cutting programs' tool table and magazine); the probe replay on a tilted plane with
-   the work offset in the table's frame (G68.2 / CYCLE800), on an indexed face with a feature, and a table-C write.
-4. The insert of a back-boring bar is modelled as a body of revolution about the hole axis (its envelope), not as the oriented insert; the one
-   tri-dexel of the fixture carves every register in one pass and its lattice (not the exact clamp test) limits the blank-to-blank contacts.
+3. The probe replay in a tilted plane (it is `unreplayed`), on an indexed face with a feature, and a table-C write.
+4. The pass of a back-boring bar through the pilot is judged on the cylinder of its farthest insert corner about the hole axis (`backBoreReach`, exact for the
+   oriented insert's corners): against a round pilot that is the contact the oriented insert makes, and it is conservative only against material that is not round about the
+   hole (the real insert occupies a sector, the envelope a full circle). A sector-shaped insert in the tri-dexel needs a non-axisymmetric tool solid, which the contact
+   test does not have. The one tri-dexel of the fixture carves every register that keeps a vertical tool in one pass; a part turned or tilted by its index is judged
+   exactly as boxes (blank-to-blank contact and clamps), and the lattice supplies the remaining-stock figures only for the others.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids in the carving (they are exact boxes in the contact
    test, but the body's remaining stock does not subtract what a clamp occupies of the blank); holder collision against the machine; no controller
    qualification (a pass is the reference interpreter's, not a machine's).
 
 ## Note: the size of the API contracts snapshot (2026-11-06)
 
-`packages/api/test/__snapshots__/contracts.test.ts.snap` is the whole OpenAPI document (about 166,000 lines). Its large diffs are legitimate, not
-staleness: `cam.program.SetupSchema` has no identifier, so Effect inlines it at every place a setup travels (9 copies: plan, generate, saved
-documents, the stateless and saved routes, the assistant's inputs), about 2,700 lines each, and every field added to a setup, a template or a probe
-cycle is added 9 times. A regenerate at HEAD matches HEAD. Trying `SetupSchema.annotate({ identifier: "CamSetup" })` turns the nine copies into one
-component and `$ref`s (166,037 lines to 145,723 on the first try; a later setup field is then one copy, about 300 lines) at the price of
-regenerating the SDK types (`types.ts`, about 2,500 lines of churn once). It was not applied because another change to the setup schema was in
-flight in the same tree; apply it together with the next schema change and run `bun run generate` and the contracts test with `-u`.
+`packages/api/test/__snapshots__/contracts.test.ts.snap` is the whole OpenAPI document (about 166,000 lines, 6.6 MB). Its large diffs are legitimate, not
+staleness: `cam.program.SetupSchema` had no identifier, so Effect inlined it at every place a setup travels (9 copies: plan, generate, saved documents, the stateless and
+saved routes, the assistant's inputs), about 2,700 lines each, and every field added to a setup, a template or a probe cycle was added 9 times. The snapshot test
+passes at every commit (a regenerate at HEAD matches HEAD), which is what rules out staleness. Applied: `SetupSchema` and `ToolpathSettingsSchema` now carry
+`annotate({ identifier: "CamSetup" })` / `"ToolpathSettings"`, so each is one component with `$ref`s: the snapshot went from 6.6 MB to 5.5 MB once (the SDK `types.ts`
+churned by about 2,200 lines once), and a later setup field is one copy, not nine. What is left of its size is the other big inlined schemas
+(`/api/toolpaths/manufacture` alone is 650 KB: the kernel request); the same two-line annotation on them is the next step if the snapshot is to shrink further.

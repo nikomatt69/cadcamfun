@@ -1,5 +1,332 @@
 export type JsonValue = null | boolean | number | string | Array<JsonValue> | { [key: string]: JsonValue }
 
+export type ToolpathSettings = {
+  machineType?: "mill" | "lathe" | "3dprinter"
+  operationType?:
+    | "contour"
+    | "pocket"
+    | "drill"
+    | "engrave"
+    | "profile"
+    | "threading"
+    | "3d_surface"
+    | "probing"
+    | "multiaxis"
+    | "facing"
+    | "turning"
+    | "boring"
+    | "threading"
+    | "grooving"
+    | "parting"
+    | "knurling"
+    | "standard"
+    | "vase"
+    | "support"
+    | "infill"
+    | "raft"
+    | "brim"
+  material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
+  toolType?:
+    | "endmill"
+    | "ballnose"
+    | "drill"
+    | "vbit"
+    | "chamfer"
+    | "threadmill"
+    | "reamer"
+    | "probe"
+    | "toolsetter"
+    | "turning"
+    | "facing"
+    | "threading"
+    | "grooving"
+    | "boring"
+    | "parting"
+    | "brass"
+    | "hardened"
+    | "ruby"
+    | "standard"
+  toolDiameter?: number
+  flutes?: number
+  depth?: number
+  stepdown?: number
+  stepover?: number
+  feedrate?: number
+  plungerate?: number
+  rpm?: number
+  tolerance?: number
+  offset?: "inside" | "outside" | "center"
+  direction?: "climb" | "conventional"
+  coolant?: boolean
+  finishingPass?: boolean
+  finishingAllowance?: number
+  finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
+  surfaceStrategy?: "roughing" | "parallel" | "waterline" | "steep-shallow" | "scallop" | "spiral" | "radial" | "flat"
+  steepAngle?: number
+  surfaceClearing?: "contour" | "adaptive"
+  adaptiveEngagement?: number
+  scallop?: number
+  rasterAngle?: number
+  rasterOneWay?: boolean
+  useAI?: boolean
+  aiDifficulty?: "simple" | "moderate" | "complex"
+  aiOptimize?: "speed" | "quality" | "balance"
+  optimizePath?: boolean
+  useArcFitting?: boolean
+  useHighSpeedMode?: boolean
+  useExactStop?: boolean
+  useToolCompensation?: boolean
+  useAdaptiveFeeds?: boolean
+  useRestMachining?: boolean
+  restToolDiameter?: number
+  fiveAxisStrategy?: "parallel" | "contour"
+  fiveAxisToolAxis?: "normal" | "lead"
+  fiveAxisLead?: number
+  fiveAxisTilt?: number
+  fiveAxisGouge?: boolean
+  toolNumber?: number
+  workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+  probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
+  probeFeed?: number
+  probeSearch?: number
+  probeStylus?: number
+  probeDialect?: "linuxcnc" | "fanuc"
+  probeFeatureSize?: number
+  threadPitch?: number
+  threadType?: "internal" | "external"
+  threadHand?: "right" | "left"
+  threadPasses?: number
+  threadSpringPasses?: number
+  latheZero?: "face" | "chuck"
+  bedOrigin?: "corner" | "center"
+  nozzleDiameter?: number
+  filamentDiameter?: number
+  layerHeight?: number
+  extrusionWidth?: number
+  printSpeed?: number
+  printTemperature?: number
+  bedWidth?: number
+  bedDepth?: number
+  centerOnBed?: boolean
+  bedTemperature?: number
+  stockDiameter?: number
+  stockLength?: number
+  spindleDirection?: "cw" | "ccw"
+  turningOperation?: "external" | "internal" | "face"
+  applyToolCompensation?: boolean
+  workholding?: "vise" | "clamps" | "plate" | "none"
+  viseJawAxis?: "x" | "y"
+  clampDepth?: number
+  viseJawHeight?: number
+  parallelsHeight?: number
+  workholdingConfigured?: boolean
+  latheTurret?: "rear" | "front"
+  chuckType?: "3-jaw" | "4-jaw" | "collet"
+  noseRadius?: number
+  gripLength?: number
+  tailstock?: boolean
+  stockBore?: number
+  printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
+  buildHeight?: number
+  originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
+  originX?: number
+  originY?: number
+  originZ?: number
+}
+
+export type CamSetup = {
+  id: string
+  name: string
+  machineType: "mill" | "lathe" | "3dprinter"
+  workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+  stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
+  post: {
+    postId:
+      | "generic"
+      | "fanuc"
+      | "grbl"
+      | "linuxcnc"
+      | "haas"
+      | "siemens"
+      | "heidenhain"
+      | "okuma"
+      | "mazak"
+      | "mitsubishi"
+      | "brother"
+    decimals: number
+    useCannedCycles: boolean
+    arcMode: "ijk" | "radius" | "linearize"
+    header: boolean
+    tolerance: number
+    lineNumbers?: { start: number; step: number }
+    stamp?: string
+    programNumberBase: number
+    swivel?: { dataRecord: string; retraction?: 0 | 1 | 2 | 4; retractDistance?: number; status?: number }
+  }
+  grouping: "single" | "perTool" | "perOperation"
+  retractBeforeToolChange: boolean
+  operations: Array<{
+    id: string
+    name: string
+    elementIds: Array<string>
+    params: ToolpathSettings
+    tool: {
+      id: string
+      name: string
+      kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+      diameter: number
+      flutes: number
+      maxRpm: number
+      stickout?: number
+      angle?: number
+      tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
+      profile?: Array<{ r: number; z: number }>
+    }
+    pocket?: number
+    enabled: boolean
+    fromPreviousStock: boolean
+    workpieceIds?: Array<string>
+    dependsOn?: Array<string>
+  }>
+  workpieces?: Array<{
+    id: string
+    name: string
+    workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+    workOffsetRef?:
+      | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
+      | { kind: "extended"; p: number }
+      | { kind: "frame"; n: number }
+      | { kind: "linuxcnc"; p: number }
+      | { kind: "preset"; row: number }
+    placement?: { x: number; y: number; z: number }
+    index?: { a?: number; b?: number; c?: number }
+    indexAs?: "table" | "plane"
+    stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
+  }>
+  magazineSize?: number
+  workpieceOrder?: "toolFirst" | "partFirst"
+  fixtures?: Array<{
+    id: string
+    name: string
+    min: { x: number; y: number; z: number }
+    max: { x: number; y: number; z: number }
+  }>
+  envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+  sisters?: Array<{
+    toolId: string
+    tool: {
+      id: string
+      name: string
+      kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+      diameter: number
+      flutes: number
+      maxRpm: number
+      stickout?: number
+      angle?: number
+      tipRadius?: number
+      holder?: { diameter: number; length: number }
+      lifeMinutes?: number
+      profile?: Array<{ r: number; z: number }>
+    }
+  }>
+  templates?: Array<{
+    id: string
+    name: string
+    steps: Array<{
+      id: string
+      name: string
+      params: ToolpathSettings
+      tool: {
+        id: string
+        name: string
+        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
+        diameter: number
+        flutes: number
+        maxRpm: number
+        stickout?: number
+        angle?: number
+        tipRadius?: number
+        holder?: { diameter: number; length: number }
+        lifeMinutes?: number
+        profile?: Array<{ r: number; z: number }>
+      }
+      pocket?: number
+      fromPreviousStock?: boolean
+      dependsOn?: Array<string>
+    }>
+  }>
+  uses?: Array<{
+    id: string
+    templateId: string
+    name?: string
+    elementIds: Array<string>
+    perElement?: boolean
+    order?: "perStep" | "perFeature"
+    workpieceIds?: Array<string>
+    enabled?: boolean
+    position?: number
+    overrides?: { [x: string]: number | string | boolean }
+  }>
+  partProbe?: {
+    cycles: Array<
+      | { kind: "z-surface"; at: { x: number; y: number }; expectedZ: number }
+      | { kind: "edge"; at: { x: number; y: number; z: number }; normal: { x: number; y: number } }
+      | {
+          kind: "corner"
+          corner: { x: number; y: number }
+          inside: boolean
+          xSense: 1 | -1
+          ySense: 1 | -1
+          depth: number
+          top?: number
+          inset?: number
+          touchesPerEdge?: 1 | 2
+        }
+      | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
+      | {
+          kind: "web" | "pocket"
+          centre: { x: number; y: number }
+          width: number
+          angle: number
+          depth: number
+          top?: number
+        }
+      | {
+          kind: "rectangle"
+          inside: boolean
+          centre: { x: number; y: number }
+          size: { x: number; y: number }
+          depth: number
+          top?: number
+        }
+      | {
+          kind: "edge-angle"
+          start: { x: number; y: number }
+          along: { x: number; y: number }
+          pitch: number
+          normal: { x: number; y: number }
+          depth: number
+          top?: number
+        }
+    >
+    toolNumber?: number
+    stylusDiameter?: number
+    feed?: number
+    search?: number
+    clearance?: number
+    safeZ?: number
+    placement?: "first-program" | "inline"
+    limit?: number
+    rotation?: "g68" | "offset-r" | "table-c"
+    replay?: {
+      displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
+      tolerance?: number
+    }
+  }
+}
+
 export type Unauthorized = { readonly _tag: "Unauthorized"; readonly message: string }
 export const isUnauthorized = (value: unknown): value is Unauthorized =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Unauthorized"
@@ -4518,6 +4845,12 @@ export type CamSetupPlanPayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -4698,6 +5031,7 @@ export type CamSetupPlanPayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -4980,6 +5314,7 @@ export type CamSetupPlanPayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -5030,6 +5365,12 @@ export type CamSetupValidatePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -5210,6 +5551,7 @@ export type CamSetupValidatePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -5492,6 +5834,7 @@ export type CamSetupValidatePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -5542,6 +5885,12 @@ export type CamSetupGeneratePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -5722,6 +6071,7 @@ export type CamSetupGeneratePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -6004,6 +6354,7 @@ export type CamSetupGeneratePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -6365,6 +6716,12 @@ export type CamSetupSavePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -6545,6 +6902,7 @@ export type CamSetupSavePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -6827,6 +7185,7 @@ export type CamSetupSavePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -6878,6 +7237,12 @@ export type CamSetupUpdatePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -7058,6 +7423,7 @@ export type CamSetupUpdatePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -7340,6 +7706,7 @@ export type CamSetupUpdatePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -15154,475 +15521,7 @@ export type CamSetupListOutput = Array<{
   id: string
   projectId: string
   name: string
-  setup: {
-    id: string
-    name: string
-    machineType: "mill" | "lathe" | "3dprinter"
-    workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-    stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    post: {
-      postId:
-        | "generic"
-        | "fanuc"
-        | "grbl"
-        | "linuxcnc"
-        | "haas"
-        | "siemens"
-        | "heidenhain"
-        | "okuma"
-        | "mazak"
-        | "mitsubishi"
-        | "brother"
-      decimals: number
-      useCannedCycles: boolean
-      arcMode: "ijk" | "radius" | "linearize"
-      header: boolean
-      tolerance: number
-      lineNumbers?: { start: number; step: number }
-      stamp?: string
-      programNumberBase: number
-    }
-    grouping: "single" | "perTool" | "perOperation"
-    retractBeforeToolChange: boolean
-    operations: Array<{
-      id: string
-      name: string
-      elementIds: Array<string>
-      params: {
-        machineType?: "mill" | "lathe" | "3dprinter"
-        operationType?:
-          | "contour"
-          | "pocket"
-          | "drill"
-          | "engrave"
-          | "profile"
-          | "threading"
-          | "3d_surface"
-          | "probing"
-          | "multiaxis"
-          | "facing"
-          | "turning"
-          | "boring"
-          | "threading"
-          | "grooving"
-          | "parting"
-          | "knurling"
-          | "standard"
-          | "vase"
-          | "support"
-          | "infill"
-          | "raft"
-          | "brim"
-        material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-        toolType?:
-          | "endmill"
-          | "ballnose"
-          | "drill"
-          | "vbit"
-          | "chamfer"
-          | "threadmill"
-          | "reamer"
-          | "probe"
-          | "toolsetter"
-          | "turning"
-          | "facing"
-          | "threading"
-          | "grooving"
-          | "boring"
-          | "parting"
-          | "brass"
-          | "hardened"
-          | "ruby"
-          | "standard"
-        toolDiameter?: number
-        flutes?: number
-        depth?: number
-        stepdown?: number
-        stepover?: number
-        feedrate?: number
-        plungerate?: number
-        rpm?: number
-        tolerance?: number
-        offset?: "inside" | "outside" | "center"
-        direction?: "climb" | "conventional"
-        coolant?: boolean
-        finishingPass?: boolean
-        finishingAllowance?: number
-        finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-        surfaceStrategy?:
-          | "roughing"
-          | "parallel"
-          | "waterline"
-          | "steep-shallow"
-          | "scallop"
-          | "spiral"
-          | "radial"
-          | "flat"
-        steepAngle?: number
-        surfaceClearing?: "contour" | "adaptive"
-        adaptiveEngagement?: number
-        scallop?: number
-        rasterAngle?: number
-        rasterOneWay?: boolean
-        useAI?: boolean
-        aiDifficulty?: "simple" | "moderate" | "complex"
-        aiOptimize?: "speed" | "quality" | "balance"
-        optimizePath?: boolean
-        useArcFitting?: boolean
-        useHighSpeedMode?: boolean
-        useExactStop?: boolean
-        useToolCompensation?: boolean
-        useAdaptiveFeeds?: boolean
-        useRestMachining?: boolean
-        restToolDiameter?: number
-        fiveAxisStrategy?: "parallel" | "contour"
-        fiveAxisToolAxis?: "normal" | "lead"
-        fiveAxisLead?: number
-        fiveAxisTilt?: number
-        fiveAxisGouge?: boolean
-        toolNumber?: number
-        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-        probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-        probeFeed?: number
-        probeSearch?: number
-        probeStylus?: number
-        probeDialect?: "linuxcnc" | "fanuc"
-        probeFeatureSize?: number
-        threadPitch?: number
-        threadType?: "internal" | "external"
-        threadHand?: "right" | "left"
-        threadPasses?: number
-        threadSpringPasses?: number
-        latheZero?: "face" | "chuck"
-        bedOrigin?: "corner" | "center"
-        nozzleDiameter?: number
-        filamentDiameter?: number
-        layerHeight?: number
-        extrusionWidth?: number
-        printSpeed?: number
-        printTemperature?: number
-        bedWidth?: number
-        bedDepth?: number
-        centerOnBed?: boolean
-        bedTemperature?: number
-        stockDiameter?: number
-        stockLength?: number
-        spindleDirection?: "cw" | "ccw"
-        turningOperation?: "external" | "internal" | "face"
-        applyToolCompensation?: boolean
-        workholding?: "vise" | "clamps" | "plate" | "none"
-        viseJawAxis?: "x" | "y"
-        clampDepth?: number
-        viseJawHeight?: number
-        parallelsHeight?: number
-        workholdingConfigured?: boolean
-        latheTurret?: "rear" | "front"
-        chuckType?: "3-jaw" | "4-jaw" | "collet"
-        noseRadius?: number
-        gripLength?: number
-        tailstock?: boolean
-        stockBore?: number
-        printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-        buildHeight?: number
-        originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-        originX?: number
-        originY?: number
-        originZ?: number
-      }
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-      pocket?: number
-      enabled: boolean
-      fromPreviousStock: boolean
-      workpieceIds?: Array<string>
-      dependsOn?: Array<string>
-    }>
-    workpieces?: Array<{
-      id: string
-      name: string
-      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-      workOffsetRef?:
-        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
-        | { kind: "extended"; p: number }
-        | { kind: "frame"; n: number }
-        | { kind: "linuxcnc"; p: number }
-        | { kind: "preset"; row: number }
-      placement?: { x: number; y: number; z: number }
-      index?: { a?: number; b?: number; c?: number }
-      stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    }>
-    magazineSize?: number
-    workpieceOrder?: "toolFirst" | "partFirst"
-    fixtures?: Array<{
-      id: string
-      name: string
-      min: { x: number; y: number; z: number }
-      max: { x: number; y: number; z: number }
-    }>
-    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
-    sisters?: Array<{
-      toolId: string
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-    }>
-    templates?: Array<{
-      id: string
-      name: string
-      steps: Array<{
-        id: string
-        name: string
-        params: {
-          machineType?: "mill" | "lathe" | "3dprinter"
-          operationType?:
-            | "contour"
-            | "pocket"
-            | "drill"
-            | "engrave"
-            | "profile"
-            | "threading"
-            | "3d_surface"
-            | "probing"
-            | "multiaxis"
-            | "facing"
-            | "turning"
-            | "boring"
-            | "threading"
-            | "grooving"
-            | "parting"
-            | "knurling"
-            | "standard"
-            | "vase"
-            | "support"
-            | "infill"
-            | "raft"
-            | "brim"
-          material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-          toolType?:
-            | "endmill"
-            | "ballnose"
-            | "drill"
-            | "vbit"
-            | "chamfer"
-            | "threadmill"
-            | "reamer"
-            | "probe"
-            | "toolsetter"
-            | "turning"
-            | "facing"
-            | "threading"
-            | "grooving"
-            | "boring"
-            | "parting"
-            | "brass"
-            | "hardened"
-            | "ruby"
-            | "standard"
-          toolDiameter?: number
-          flutes?: number
-          depth?: number
-          stepdown?: number
-          stepover?: number
-          feedrate?: number
-          plungerate?: number
-          rpm?: number
-          tolerance?: number
-          offset?: "inside" | "outside" | "center"
-          direction?: "climb" | "conventional"
-          coolant?: boolean
-          finishingPass?: boolean
-          finishingAllowance?: number
-          finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-          surfaceStrategy?:
-            | "roughing"
-            | "parallel"
-            | "waterline"
-            | "steep-shallow"
-            | "scallop"
-            | "spiral"
-            | "radial"
-            | "flat"
-          steepAngle?: number
-          surfaceClearing?: "contour" | "adaptive"
-          adaptiveEngagement?: number
-          scallop?: number
-          rasterAngle?: number
-          rasterOneWay?: boolean
-          useAI?: boolean
-          aiDifficulty?: "simple" | "moderate" | "complex"
-          aiOptimize?: "speed" | "quality" | "balance"
-          optimizePath?: boolean
-          useArcFitting?: boolean
-          useHighSpeedMode?: boolean
-          useExactStop?: boolean
-          useToolCompensation?: boolean
-          useAdaptiveFeeds?: boolean
-          useRestMachining?: boolean
-          restToolDiameter?: number
-          fiveAxisStrategy?: "parallel" | "contour"
-          fiveAxisToolAxis?: "normal" | "lead"
-          fiveAxisLead?: number
-          fiveAxisTilt?: number
-          fiveAxisGouge?: boolean
-          toolNumber?: number
-          workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-          probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-          probeFeed?: number
-          probeSearch?: number
-          probeStylus?: number
-          probeDialect?: "linuxcnc" | "fanuc"
-          probeFeatureSize?: number
-          threadPitch?: number
-          threadType?: "internal" | "external"
-          threadHand?: "right" | "left"
-          threadPasses?: number
-          threadSpringPasses?: number
-          latheZero?: "face" | "chuck"
-          bedOrigin?: "corner" | "center"
-          nozzleDiameter?: number
-          filamentDiameter?: number
-          layerHeight?: number
-          extrusionWidth?: number
-          printSpeed?: number
-          printTemperature?: number
-          bedWidth?: number
-          bedDepth?: number
-          centerOnBed?: boolean
-          bedTemperature?: number
-          stockDiameter?: number
-          stockLength?: number
-          spindleDirection?: "cw" | "ccw"
-          turningOperation?: "external" | "internal" | "face"
-          applyToolCompensation?: boolean
-          workholding?: "vise" | "clamps" | "plate" | "none"
-          viseJawAxis?: "x" | "y"
-          clampDepth?: number
-          viseJawHeight?: number
-          parallelsHeight?: number
-          workholdingConfigured?: boolean
-          latheTurret?: "rear" | "front"
-          chuckType?: "3-jaw" | "4-jaw" | "collet"
-          noseRadius?: number
-          gripLength?: number
-          tailstock?: boolean
-          stockBore?: number
-          printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-          buildHeight?: number
-          originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-          originX?: number
-          originY?: number
-          originZ?: number
-        }
-        tool: {
-          id: string
-          name: string
-          kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-          diameter: number
-          flutes: number
-          maxRpm: number
-          stickout?: number
-          angle?: number
-          tipRadius?: number
-          holder?: { diameter: number; length: number }
-          lifeMinutes?: number
-          profile?: Array<{ r: number; z: number }>
-        }
-        pocket?: number
-        fromPreviousStock?: boolean
-        dependsOn?: Array<string>
-      }>
-    }>
-    uses?: Array<{
-      id: string
-      templateId: string
-      name?: string
-      elementIds: Array<string>
-      perElement?: boolean
-      order?: "perStep" | "perFeature"
-      workpieceIds?: Array<string>
-      enabled?: boolean
-      position?: number
-      overrides?: { [x: string]: number | string | boolean }
-    }>
-    partProbe?: {
-      cycles: Array<
-        | { kind: "z-surface"; at: { x: number; y: number }; expectedZ: number }
-        | { kind: "edge"; at: { x: number; y: number; z: number }; normal: { x: number; y: number } }
-        | {
-            kind: "corner"
-            corner: { x: number; y: number }
-            inside: boolean
-            xSense: 1 | -1
-            ySense: 1 | -1
-            depth: number
-            top?: number
-            inset?: number
-            touchesPerEdge?: 1 | 2
-          }
-        | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
-        | {
-            kind: "web" | "pocket"
-            centre: { x: number; y: number }
-            width: number
-            angle: number
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "rectangle"
-            inside: boolean
-            centre: { x: number; y: number }
-            size: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "edge-angle"
-            start: { x: number; y: number }
-            along: { x: number; y: number }
-            pitch: number
-            normal: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-      >
-      toolNumber?: number
-      stylusDiameter?: number
-      feed?: number
-      search?: number
-      clearance?: number
-      safeZ?: number
-      limit?: number
-      rotation?: "g68" | "offset-r" | "table-c"
-      replay?: {
-        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
-        tolerance?: number
-      }
-    }
-  }
+  setup: CamSetup
   createdAt: string
   updatedAt: string
 }>
@@ -15637,475 +15536,7 @@ export type CamSetupSaveOutput = {
   id: string
   projectId: string
   name: string
-  setup: {
-    id: string
-    name: string
-    machineType: "mill" | "lathe" | "3dprinter"
-    workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-    stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    post: {
-      postId:
-        | "generic"
-        | "fanuc"
-        | "grbl"
-        | "linuxcnc"
-        | "haas"
-        | "siemens"
-        | "heidenhain"
-        | "okuma"
-        | "mazak"
-        | "mitsubishi"
-        | "brother"
-      decimals: number
-      useCannedCycles: boolean
-      arcMode: "ijk" | "radius" | "linearize"
-      header: boolean
-      tolerance: number
-      lineNumbers?: { start: number; step: number }
-      stamp?: string
-      programNumberBase: number
-    }
-    grouping: "single" | "perTool" | "perOperation"
-    retractBeforeToolChange: boolean
-    operations: Array<{
-      id: string
-      name: string
-      elementIds: Array<string>
-      params: {
-        machineType?: "mill" | "lathe" | "3dprinter"
-        operationType?:
-          | "contour"
-          | "pocket"
-          | "drill"
-          | "engrave"
-          | "profile"
-          | "threading"
-          | "3d_surface"
-          | "probing"
-          | "multiaxis"
-          | "facing"
-          | "turning"
-          | "boring"
-          | "threading"
-          | "grooving"
-          | "parting"
-          | "knurling"
-          | "standard"
-          | "vase"
-          | "support"
-          | "infill"
-          | "raft"
-          | "brim"
-        material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-        toolType?:
-          | "endmill"
-          | "ballnose"
-          | "drill"
-          | "vbit"
-          | "chamfer"
-          | "threadmill"
-          | "reamer"
-          | "probe"
-          | "toolsetter"
-          | "turning"
-          | "facing"
-          | "threading"
-          | "grooving"
-          | "boring"
-          | "parting"
-          | "brass"
-          | "hardened"
-          | "ruby"
-          | "standard"
-        toolDiameter?: number
-        flutes?: number
-        depth?: number
-        stepdown?: number
-        stepover?: number
-        feedrate?: number
-        plungerate?: number
-        rpm?: number
-        tolerance?: number
-        offset?: "inside" | "outside" | "center"
-        direction?: "climb" | "conventional"
-        coolant?: boolean
-        finishingPass?: boolean
-        finishingAllowance?: number
-        finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-        surfaceStrategy?:
-          | "roughing"
-          | "parallel"
-          | "waterline"
-          | "steep-shallow"
-          | "scallop"
-          | "spiral"
-          | "radial"
-          | "flat"
-        steepAngle?: number
-        surfaceClearing?: "contour" | "adaptive"
-        adaptiveEngagement?: number
-        scallop?: number
-        rasterAngle?: number
-        rasterOneWay?: boolean
-        useAI?: boolean
-        aiDifficulty?: "simple" | "moderate" | "complex"
-        aiOptimize?: "speed" | "quality" | "balance"
-        optimizePath?: boolean
-        useArcFitting?: boolean
-        useHighSpeedMode?: boolean
-        useExactStop?: boolean
-        useToolCompensation?: boolean
-        useAdaptiveFeeds?: boolean
-        useRestMachining?: boolean
-        restToolDiameter?: number
-        fiveAxisStrategy?: "parallel" | "contour"
-        fiveAxisToolAxis?: "normal" | "lead"
-        fiveAxisLead?: number
-        fiveAxisTilt?: number
-        fiveAxisGouge?: boolean
-        toolNumber?: number
-        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-        probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-        probeFeed?: number
-        probeSearch?: number
-        probeStylus?: number
-        probeDialect?: "linuxcnc" | "fanuc"
-        probeFeatureSize?: number
-        threadPitch?: number
-        threadType?: "internal" | "external"
-        threadHand?: "right" | "left"
-        threadPasses?: number
-        threadSpringPasses?: number
-        latheZero?: "face" | "chuck"
-        bedOrigin?: "corner" | "center"
-        nozzleDiameter?: number
-        filamentDiameter?: number
-        layerHeight?: number
-        extrusionWidth?: number
-        printSpeed?: number
-        printTemperature?: number
-        bedWidth?: number
-        bedDepth?: number
-        centerOnBed?: boolean
-        bedTemperature?: number
-        stockDiameter?: number
-        stockLength?: number
-        spindleDirection?: "cw" | "ccw"
-        turningOperation?: "external" | "internal" | "face"
-        applyToolCompensation?: boolean
-        workholding?: "vise" | "clamps" | "plate" | "none"
-        viseJawAxis?: "x" | "y"
-        clampDepth?: number
-        viseJawHeight?: number
-        parallelsHeight?: number
-        workholdingConfigured?: boolean
-        latheTurret?: "rear" | "front"
-        chuckType?: "3-jaw" | "4-jaw" | "collet"
-        noseRadius?: number
-        gripLength?: number
-        tailstock?: boolean
-        stockBore?: number
-        printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-        buildHeight?: number
-        originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-        originX?: number
-        originY?: number
-        originZ?: number
-      }
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-      pocket?: number
-      enabled: boolean
-      fromPreviousStock: boolean
-      workpieceIds?: Array<string>
-      dependsOn?: Array<string>
-    }>
-    workpieces?: Array<{
-      id: string
-      name: string
-      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-      workOffsetRef?:
-        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
-        | { kind: "extended"; p: number }
-        | { kind: "frame"; n: number }
-        | { kind: "linuxcnc"; p: number }
-        | { kind: "preset"; row: number }
-      placement?: { x: number; y: number; z: number }
-      index?: { a?: number; b?: number; c?: number }
-      stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    }>
-    magazineSize?: number
-    workpieceOrder?: "toolFirst" | "partFirst"
-    fixtures?: Array<{
-      id: string
-      name: string
-      min: { x: number; y: number; z: number }
-      max: { x: number; y: number; z: number }
-    }>
-    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
-    sisters?: Array<{
-      toolId: string
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-    }>
-    templates?: Array<{
-      id: string
-      name: string
-      steps: Array<{
-        id: string
-        name: string
-        params: {
-          machineType?: "mill" | "lathe" | "3dprinter"
-          operationType?:
-            | "contour"
-            | "pocket"
-            | "drill"
-            | "engrave"
-            | "profile"
-            | "threading"
-            | "3d_surface"
-            | "probing"
-            | "multiaxis"
-            | "facing"
-            | "turning"
-            | "boring"
-            | "threading"
-            | "grooving"
-            | "parting"
-            | "knurling"
-            | "standard"
-            | "vase"
-            | "support"
-            | "infill"
-            | "raft"
-            | "brim"
-          material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-          toolType?:
-            | "endmill"
-            | "ballnose"
-            | "drill"
-            | "vbit"
-            | "chamfer"
-            | "threadmill"
-            | "reamer"
-            | "probe"
-            | "toolsetter"
-            | "turning"
-            | "facing"
-            | "threading"
-            | "grooving"
-            | "boring"
-            | "parting"
-            | "brass"
-            | "hardened"
-            | "ruby"
-            | "standard"
-          toolDiameter?: number
-          flutes?: number
-          depth?: number
-          stepdown?: number
-          stepover?: number
-          feedrate?: number
-          plungerate?: number
-          rpm?: number
-          tolerance?: number
-          offset?: "inside" | "outside" | "center"
-          direction?: "climb" | "conventional"
-          coolant?: boolean
-          finishingPass?: boolean
-          finishingAllowance?: number
-          finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-          surfaceStrategy?:
-            | "roughing"
-            | "parallel"
-            | "waterline"
-            | "steep-shallow"
-            | "scallop"
-            | "spiral"
-            | "radial"
-            | "flat"
-          steepAngle?: number
-          surfaceClearing?: "contour" | "adaptive"
-          adaptiveEngagement?: number
-          scallop?: number
-          rasterAngle?: number
-          rasterOneWay?: boolean
-          useAI?: boolean
-          aiDifficulty?: "simple" | "moderate" | "complex"
-          aiOptimize?: "speed" | "quality" | "balance"
-          optimizePath?: boolean
-          useArcFitting?: boolean
-          useHighSpeedMode?: boolean
-          useExactStop?: boolean
-          useToolCompensation?: boolean
-          useAdaptiveFeeds?: boolean
-          useRestMachining?: boolean
-          restToolDiameter?: number
-          fiveAxisStrategy?: "parallel" | "contour"
-          fiveAxisToolAxis?: "normal" | "lead"
-          fiveAxisLead?: number
-          fiveAxisTilt?: number
-          fiveAxisGouge?: boolean
-          toolNumber?: number
-          workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-          probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-          probeFeed?: number
-          probeSearch?: number
-          probeStylus?: number
-          probeDialect?: "linuxcnc" | "fanuc"
-          probeFeatureSize?: number
-          threadPitch?: number
-          threadType?: "internal" | "external"
-          threadHand?: "right" | "left"
-          threadPasses?: number
-          threadSpringPasses?: number
-          latheZero?: "face" | "chuck"
-          bedOrigin?: "corner" | "center"
-          nozzleDiameter?: number
-          filamentDiameter?: number
-          layerHeight?: number
-          extrusionWidth?: number
-          printSpeed?: number
-          printTemperature?: number
-          bedWidth?: number
-          bedDepth?: number
-          centerOnBed?: boolean
-          bedTemperature?: number
-          stockDiameter?: number
-          stockLength?: number
-          spindleDirection?: "cw" | "ccw"
-          turningOperation?: "external" | "internal" | "face"
-          applyToolCompensation?: boolean
-          workholding?: "vise" | "clamps" | "plate" | "none"
-          viseJawAxis?: "x" | "y"
-          clampDepth?: number
-          viseJawHeight?: number
-          parallelsHeight?: number
-          workholdingConfigured?: boolean
-          latheTurret?: "rear" | "front"
-          chuckType?: "3-jaw" | "4-jaw" | "collet"
-          noseRadius?: number
-          gripLength?: number
-          tailstock?: boolean
-          stockBore?: number
-          printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-          buildHeight?: number
-          originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-          originX?: number
-          originY?: number
-          originZ?: number
-        }
-        tool: {
-          id: string
-          name: string
-          kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-          diameter: number
-          flutes: number
-          maxRpm: number
-          stickout?: number
-          angle?: number
-          tipRadius?: number
-          holder?: { diameter: number; length: number }
-          lifeMinutes?: number
-          profile?: Array<{ r: number; z: number }>
-        }
-        pocket?: number
-        fromPreviousStock?: boolean
-        dependsOn?: Array<string>
-      }>
-    }>
-    uses?: Array<{
-      id: string
-      templateId: string
-      name?: string
-      elementIds: Array<string>
-      perElement?: boolean
-      order?: "perStep" | "perFeature"
-      workpieceIds?: Array<string>
-      enabled?: boolean
-      position?: number
-      overrides?: { [x: string]: number | string | boolean }
-    }>
-    partProbe?: {
-      cycles: Array<
-        | { kind: "z-surface"; at: { x: number; y: number }; expectedZ: number }
-        | { kind: "edge"; at: { x: number; y: number; z: number }; normal: { x: number; y: number } }
-        | {
-            kind: "corner"
-            corner: { x: number; y: number }
-            inside: boolean
-            xSense: 1 | -1
-            ySense: 1 | -1
-            depth: number
-            top?: number
-            inset?: number
-            touchesPerEdge?: 1 | 2
-          }
-        | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
-        | {
-            kind: "web" | "pocket"
-            centre: { x: number; y: number }
-            width: number
-            angle: number
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "rectangle"
-            inside: boolean
-            centre: { x: number; y: number }
-            size: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "edge-angle"
-            start: { x: number; y: number }
-            along: { x: number; y: number }
-            pitch: number
-            normal: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-      >
-      toolNumber?: number
-      stylusDiameter?: number
-      feed?: number
-      search?: number
-      clearance?: number
-      safeZ?: number
-      limit?: number
-      rotation?: "g68" | "offset-r" | "table-c"
-      replay?: {
-        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
-        tolerance?: number
-      }
-    }
-  }
+  setup: CamSetup
   createdAt: string
   updatedAt: string
 }
@@ -16119,475 +15550,7 @@ export type CamSetupGetOutput = {
   id: string
   projectId: string
   name: string
-  setup: {
-    id: string
-    name: string
-    machineType: "mill" | "lathe" | "3dprinter"
-    workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-    stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    post: {
-      postId:
-        | "generic"
-        | "fanuc"
-        | "grbl"
-        | "linuxcnc"
-        | "haas"
-        | "siemens"
-        | "heidenhain"
-        | "okuma"
-        | "mazak"
-        | "mitsubishi"
-        | "brother"
-      decimals: number
-      useCannedCycles: boolean
-      arcMode: "ijk" | "radius" | "linearize"
-      header: boolean
-      tolerance: number
-      lineNumbers?: { start: number; step: number }
-      stamp?: string
-      programNumberBase: number
-    }
-    grouping: "single" | "perTool" | "perOperation"
-    retractBeforeToolChange: boolean
-    operations: Array<{
-      id: string
-      name: string
-      elementIds: Array<string>
-      params: {
-        machineType?: "mill" | "lathe" | "3dprinter"
-        operationType?:
-          | "contour"
-          | "pocket"
-          | "drill"
-          | "engrave"
-          | "profile"
-          | "threading"
-          | "3d_surface"
-          | "probing"
-          | "multiaxis"
-          | "facing"
-          | "turning"
-          | "boring"
-          | "threading"
-          | "grooving"
-          | "parting"
-          | "knurling"
-          | "standard"
-          | "vase"
-          | "support"
-          | "infill"
-          | "raft"
-          | "brim"
-        material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-        toolType?:
-          | "endmill"
-          | "ballnose"
-          | "drill"
-          | "vbit"
-          | "chamfer"
-          | "threadmill"
-          | "reamer"
-          | "probe"
-          | "toolsetter"
-          | "turning"
-          | "facing"
-          | "threading"
-          | "grooving"
-          | "boring"
-          | "parting"
-          | "brass"
-          | "hardened"
-          | "ruby"
-          | "standard"
-        toolDiameter?: number
-        flutes?: number
-        depth?: number
-        stepdown?: number
-        stepover?: number
-        feedrate?: number
-        plungerate?: number
-        rpm?: number
-        tolerance?: number
-        offset?: "inside" | "outside" | "center"
-        direction?: "climb" | "conventional"
-        coolant?: boolean
-        finishingPass?: boolean
-        finishingAllowance?: number
-        finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-        surfaceStrategy?:
-          | "roughing"
-          | "parallel"
-          | "waterline"
-          | "steep-shallow"
-          | "scallop"
-          | "spiral"
-          | "radial"
-          | "flat"
-        steepAngle?: number
-        surfaceClearing?: "contour" | "adaptive"
-        adaptiveEngagement?: number
-        scallop?: number
-        rasterAngle?: number
-        rasterOneWay?: boolean
-        useAI?: boolean
-        aiDifficulty?: "simple" | "moderate" | "complex"
-        aiOptimize?: "speed" | "quality" | "balance"
-        optimizePath?: boolean
-        useArcFitting?: boolean
-        useHighSpeedMode?: boolean
-        useExactStop?: boolean
-        useToolCompensation?: boolean
-        useAdaptiveFeeds?: boolean
-        useRestMachining?: boolean
-        restToolDiameter?: number
-        fiveAxisStrategy?: "parallel" | "contour"
-        fiveAxisToolAxis?: "normal" | "lead"
-        fiveAxisLead?: number
-        fiveAxisTilt?: number
-        fiveAxisGouge?: boolean
-        toolNumber?: number
-        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-        probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-        probeFeed?: number
-        probeSearch?: number
-        probeStylus?: number
-        probeDialect?: "linuxcnc" | "fanuc"
-        probeFeatureSize?: number
-        threadPitch?: number
-        threadType?: "internal" | "external"
-        threadHand?: "right" | "left"
-        threadPasses?: number
-        threadSpringPasses?: number
-        latheZero?: "face" | "chuck"
-        bedOrigin?: "corner" | "center"
-        nozzleDiameter?: number
-        filamentDiameter?: number
-        layerHeight?: number
-        extrusionWidth?: number
-        printSpeed?: number
-        printTemperature?: number
-        bedWidth?: number
-        bedDepth?: number
-        centerOnBed?: boolean
-        bedTemperature?: number
-        stockDiameter?: number
-        stockLength?: number
-        spindleDirection?: "cw" | "ccw"
-        turningOperation?: "external" | "internal" | "face"
-        applyToolCompensation?: boolean
-        workholding?: "vise" | "clamps" | "plate" | "none"
-        viseJawAxis?: "x" | "y"
-        clampDepth?: number
-        viseJawHeight?: number
-        parallelsHeight?: number
-        workholdingConfigured?: boolean
-        latheTurret?: "rear" | "front"
-        chuckType?: "3-jaw" | "4-jaw" | "collet"
-        noseRadius?: number
-        gripLength?: number
-        tailstock?: boolean
-        stockBore?: number
-        printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-        buildHeight?: number
-        originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-        originX?: number
-        originY?: number
-        originZ?: number
-      }
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-      pocket?: number
-      enabled: boolean
-      fromPreviousStock: boolean
-      workpieceIds?: Array<string>
-      dependsOn?: Array<string>
-    }>
-    workpieces?: Array<{
-      id: string
-      name: string
-      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-      workOffsetRef?:
-        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
-        | { kind: "extended"; p: number }
-        | { kind: "frame"; n: number }
-        | { kind: "linuxcnc"; p: number }
-        | { kind: "preset"; row: number }
-      placement?: { x: number; y: number; z: number }
-      index?: { a?: number; b?: number; c?: number }
-      stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    }>
-    magazineSize?: number
-    workpieceOrder?: "toolFirst" | "partFirst"
-    fixtures?: Array<{
-      id: string
-      name: string
-      min: { x: number; y: number; z: number }
-      max: { x: number; y: number; z: number }
-    }>
-    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
-    sisters?: Array<{
-      toolId: string
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-    }>
-    templates?: Array<{
-      id: string
-      name: string
-      steps: Array<{
-        id: string
-        name: string
-        params: {
-          machineType?: "mill" | "lathe" | "3dprinter"
-          operationType?:
-            | "contour"
-            | "pocket"
-            | "drill"
-            | "engrave"
-            | "profile"
-            | "threading"
-            | "3d_surface"
-            | "probing"
-            | "multiaxis"
-            | "facing"
-            | "turning"
-            | "boring"
-            | "threading"
-            | "grooving"
-            | "parting"
-            | "knurling"
-            | "standard"
-            | "vase"
-            | "support"
-            | "infill"
-            | "raft"
-            | "brim"
-          material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-          toolType?:
-            | "endmill"
-            | "ballnose"
-            | "drill"
-            | "vbit"
-            | "chamfer"
-            | "threadmill"
-            | "reamer"
-            | "probe"
-            | "toolsetter"
-            | "turning"
-            | "facing"
-            | "threading"
-            | "grooving"
-            | "boring"
-            | "parting"
-            | "brass"
-            | "hardened"
-            | "ruby"
-            | "standard"
-          toolDiameter?: number
-          flutes?: number
-          depth?: number
-          stepdown?: number
-          stepover?: number
-          feedrate?: number
-          plungerate?: number
-          rpm?: number
-          tolerance?: number
-          offset?: "inside" | "outside" | "center"
-          direction?: "climb" | "conventional"
-          coolant?: boolean
-          finishingPass?: boolean
-          finishingAllowance?: number
-          finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-          surfaceStrategy?:
-            | "roughing"
-            | "parallel"
-            | "waterline"
-            | "steep-shallow"
-            | "scallop"
-            | "spiral"
-            | "radial"
-            | "flat"
-          steepAngle?: number
-          surfaceClearing?: "contour" | "adaptive"
-          adaptiveEngagement?: number
-          scallop?: number
-          rasterAngle?: number
-          rasterOneWay?: boolean
-          useAI?: boolean
-          aiDifficulty?: "simple" | "moderate" | "complex"
-          aiOptimize?: "speed" | "quality" | "balance"
-          optimizePath?: boolean
-          useArcFitting?: boolean
-          useHighSpeedMode?: boolean
-          useExactStop?: boolean
-          useToolCompensation?: boolean
-          useAdaptiveFeeds?: boolean
-          useRestMachining?: boolean
-          restToolDiameter?: number
-          fiveAxisStrategy?: "parallel" | "contour"
-          fiveAxisToolAxis?: "normal" | "lead"
-          fiveAxisLead?: number
-          fiveAxisTilt?: number
-          fiveAxisGouge?: boolean
-          toolNumber?: number
-          workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-          probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-          probeFeed?: number
-          probeSearch?: number
-          probeStylus?: number
-          probeDialect?: "linuxcnc" | "fanuc"
-          probeFeatureSize?: number
-          threadPitch?: number
-          threadType?: "internal" | "external"
-          threadHand?: "right" | "left"
-          threadPasses?: number
-          threadSpringPasses?: number
-          latheZero?: "face" | "chuck"
-          bedOrigin?: "corner" | "center"
-          nozzleDiameter?: number
-          filamentDiameter?: number
-          layerHeight?: number
-          extrusionWidth?: number
-          printSpeed?: number
-          printTemperature?: number
-          bedWidth?: number
-          bedDepth?: number
-          centerOnBed?: boolean
-          bedTemperature?: number
-          stockDiameter?: number
-          stockLength?: number
-          spindleDirection?: "cw" | "ccw"
-          turningOperation?: "external" | "internal" | "face"
-          applyToolCompensation?: boolean
-          workholding?: "vise" | "clamps" | "plate" | "none"
-          viseJawAxis?: "x" | "y"
-          clampDepth?: number
-          viseJawHeight?: number
-          parallelsHeight?: number
-          workholdingConfigured?: boolean
-          latheTurret?: "rear" | "front"
-          chuckType?: "3-jaw" | "4-jaw" | "collet"
-          noseRadius?: number
-          gripLength?: number
-          tailstock?: boolean
-          stockBore?: number
-          printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-          buildHeight?: number
-          originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-          originX?: number
-          originY?: number
-          originZ?: number
-        }
-        tool: {
-          id: string
-          name: string
-          kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-          diameter: number
-          flutes: number
-          maxRpm: number
-          stickout?: number
-          angle?: number
-          tipRadius?: number
-          holder?: { diameter: number; length: number }
-          lifeMinutes?: number
-          profile?: Array<{ r: number; z: number }>
-        }
-        pocket?: number
-        fromPreviousStock?: boolean
-        dependsOn?: Array<string>
-      }>
-    }>
-    uses?: Array<{
-      id: string
-      templateId: string
-      name?: string
-      elementIds: Array<string>
-      perElement?: boolean
-      order?: "perStep" | "perFeature"
-      workpieceIds?: Array<string>
-      enabled?: boolean
-      position?: number
-      overrides?: { [x: string]: number | string | boolean }
-    }>
-    partProbe?: {
-      cycles: Array<
-        | { kind: "z-surface"; at: { x: number; y: number }; expectedZ: number }
-        | { kind: "edge"; at: { x: number; y: number; z: number }; normal: { x: number; y: number } }
-        | {
-            kind: "corner"
-            corner: { x: number; y: number }
-            inside: boolean
-            xSense: 1 | -1
-            ySense: 1 | -1
-            depth: number
-            top?: number
-            inset?: number
-            touchesPerEdge?: 1 | 2
-          }
-        | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
-        | {
-            kind: "web" | "pocket"
-            centre: { x: number; y: number }
-            width: number
-            angle: number
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "rectangle"
-            inside: boolean
-            centre: { x: number; y: number }
-            size: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "edge-angle"
-            start: { x: number; y: number }
-            along: { x: number; y: number }
-            pitch: number
-            normal: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-      >
-      toolNumber?: number
-      stylusDiameter?: number
-      feed?: number
-      search?: number
-      clearance?: number
-      safeZ?: number
-      limit?: number
-      rotation?: "g68" | "offset-r" | "table-c"
-      replay?: {
-        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
-        tolerance?: number
-      }
-    }
-  }
+  setup: CamSetup
   createdAt: string
   updatedAt: string
 }
@@ -16604,475 +15567,7 @@ export type CamSetupUpdateOutput = {
   id: string
   projectId: string
   name: string
-  setup: {
-    id: string
-    name: string
-    machineType: "mill" | "lathe" | "3dprinter"
-    workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-    stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    post: {
-      postId:
-        | "generic"
-        | "fanuc"
-        | "grbl"
-        | "linuxcnc"
-        | "haas"
-        | "siemens"
-        | "heidenhain"
-        | "okuma"
-        | "mazak"
-        | "mitsubishi"
-        | "brother"
-      decimals: number
-      useCannedCycles: boolean
-      arcMode: "ijk" | "radius" | "linearize"
-      header: boolean
-      tolerance: number
-      lineNumbers?: { start: number; step: number }
-      stamp?: string
-      programNumberBase: number
-    }
-    grouping: "single" | "perTool" | "perOperation"
-    retractBeforeToolChange: boolean
-    operations: Array<{
-      id: string
-      name: string
-      elementIds: Array<string>
-      params: {
-        machineType?: "mill" | "lathe" | "3dprinter"
-        operationType?:
-          | "contour"
-          | "pocket"
-          | "drill"
-          | "engrave"
-          | "profile"
-          | "threading"
-          | "3d_surface"
-          | "probing"
-          | "multiaxis"
-          | "facing"
-          | "turning"
-          | "boring"
-          | "threading"
-          | "grooving"
-          | "parting"
-          | "knurling"
-          | "standard"
-          | "vase"
-          | "support"
-          | "infill"
-          | "raft"
-          | "brim"
-        material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-        toolType?:
-          | "endmill"
-          | "ballnose"
-          | "drill"
-          | "vbit"
-          | "chamfer"
-          | "threadmill"
-          | "reamer"
-          | "probe"
-          | "toolsetter"
-          | "turning"
-          | "facing"
-          | "threading"
-          | "grooving"
-          | "boring"
-          | "parting"
-          | "brass"
-          | "hardened"
-          | "ruby"
-          | "standard"
-        toolDiameter?: number
-        flutes?: number
-        depth?: number
-        stepdown?: number
-        stepover?: number
-        feedrate?: number
-        plungerate?: number
-        rpm?: number
-        tolerance?: number
-        offset?: "inside" | "outside" | "center"
-        direction?: "climb" | "conventional"
-        coolant?: boolean
-        finishingPass?: boolean
-        finishingAllowance?: number
-        finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-        surfaceStrategy?:
-          | "roughing"
-          | "parallel"
-          | "waterline"
-          | "steep-shallow"
-          | "scallop"
-          | "spiral"
-          | "radial"
-          | "flat"
-        steepAngle?: number
-        surfaceClearing?: "contour" | "adaptive"
-        adaptiveEngagement?: number
-        scallop?: number
-        rasterAngle?: number
-        rasterOneWay?: boolean
-        useAI?: boolean
-        aiDifficulty?: "simple" | "moderate" | "complex"
-        aiOptimize?: "speed" | "quality" | "balance"
-        optimizePath?: boolean
-        useArcFitting?: boolean
-        useHighSpeedMode?: boolean
-        useExactStop?: boolean
-        useToolCompensation?: boolean
-        useAdaptiveFeeds?: boolean
-        useRestMachining?: boolean
-        restToolDiameter?: number
-        fiveAxisStrategy?: "parallel" | "contour"
-        fiveAxisToolAxis?: "normal" | "lead"
-        fiveAxisLead?: number
-        fiveAxisTilt?: number
-        fiveAxisGouge?: boolean
-        toolNumber?: number
-        workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-        probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-        probeFeed?: number
-        probeSearch?: number
-        probeStylus?: number
-        probeDialect?: "linuxcnc" | "fanuc"
-        probeFeatureSize?: number
-        threadPitch?: number
-        threadType?: "internal" | "external"
-        threadHand?: "right" | "left"
-        threadPasses?: number
-        threadSpringPasses?: number
-        latheZero?: "face" | "chuck"
-        bedOrigin?: "corner" | "center"
-        nozzleDiameter?: number
-        filamentDiameter?: number
-        layerHeight?: number
-        extrusionWidth?: number
-        printSpeed?: number
-        printTemperature?: number
-        bedWidth?: number
-        bedDepth?: number
-        centerOnBed?: boolean
-        bedTemperature?: number
-        stockDiameter?: number
-        stockLength?: number
-        spindleDirection?: "cw" | "ccw"
-        turningOperation?: "external" | "internal" | "face"
-        applyToolCompensation?: boolean
-        workholding?: "vise" | "clamps" | "plate" | "none"
-        viseJawAxis?: "x" | "y"
-        clampDepth?: number
-        viseJawHeight?: number
-        parallelsHeight?: number
-        workholdingConfigured?: boolean
-        latheTurret?: "rear" | "front"
-        chuckType?: "3-jaw" | "4-jaw" | "collet"
-        noseRadius?: number
-        gripLength?: number
-        tailstock?: boolean
-        stockBore?: number
-        printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-        buildHeight?: number
-        originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-        originX?: number
-        originY?: number
-        originZ?: number
-      }
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-      pocket?: number
-      enabled: boolean
-      fromPreviousStock: boolean
-      workpieceIds?: Array<string>
-      dependsOn?: Array<string>
-    }>
-    workpieces?: Array<{
-      id: string
-      name: string
-      workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-      workOffsetRef?:
-        | { kind: "g5x"; code: "G54" | "G55" | "G56" | "G57" | "G58" | "G59" }
-        | { kind: "extended"; p: number }
-        | { kind: "frame"; n: number }
-        | { kind: "linuxcnc"; p: number }
-        | { kind: "preset"; row: number }
-      placement?: { x: number; y: number; z: number }
-      index?: { a?: number; b?: number; c?: number }
-      stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
-    }>
-    magazineSize?: number
-    workpieceOrder?: "toolFirst" | "partFirst"
-    fixtures?: Array<{
-      id: string
-      name: string
-      min: { x: number; y: number; z: number }
-      max: { x: number; y: number; z: number }
-    }>
-    envelope?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
-    sisters?: Array<{
-      toolId: string
-      tool: {
-        id: string
-        name: string
-        kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-        diameter: number
-        flutes: number
-        maxRpm: number
-        stickout?: number
-        angle?: number
-        tipRadius?: number
-        holder?: { diameter: number; length: number }
-        lifeMinutes?: number
-        profile?: Array<{ r: number; z: number }>
-      }
-    }>
-    templates?: Array<{
-      id: string
-      name: string
-      steps: Array<{
-        id: string
-        name: string
-        params: {
-          machineType?: "mill" | "lathe" | "3dprinter"
-          operationType?:
-            | "contour"
-            | "pocket"
-            | "drill"
-            | "engrave"
-            | "profile"
-            | "threading"
-            | "3d_surface"
-            | "probing"
-            | "multiaxis"
-            | "facing"
-            | "turning"
-            | "boring"
-            | "threading"
-            | "grooving"
-            | "parting"
-            | "knurling"
-            | "standard"
-            | "vase"
-            | "support"
-            | "infill"
-            | "raft"
-            | "brim"
-          material?: "aluminum" | "steel" | "wood" | "plastic" | "brass" | "titanium" | "composite" | "other"
-          toolType?:
-            | "endmill"
-            | "ballnose"
-            | "drill"
-            | "vbit"
-            | "chamfer"
-            | "threadmill"
-            | "reamer"
-            | "probe"
-            | "toolsetter"
-            | "turning"
-            | "facing"
-            | "threading"
-            | "grooving"
-            | "boring"
-            | "parting"
-            | "brass"
-            | "hardened"
-            | "ruby"
-            | "standard"
-          toolDiameter?: number
-          flutes?: number
-          depth?: number
-          stepdown?: number
-          stepover?: number
-          feedrate?: number
-          plungerate?: number
-          rpm?: number
-          tolerance?: number
-          offset?: "inside" | "outside" | "center"
-          direction?: "climb" | "conventional"
-          coolant?: boolean
-          finishingPass?: boolean
-          finishingAllowance?: number
-          finishingStrategy?: "contour" | "parallel" | "spiral" | "radial"
-          surfaceStrategy?:
-            | "roughing"
-            | "parallel"
-            | "waterline"
-            | "steep-shallow"
-            | "scallop"
-            | "spiral"
-            | "radial"
-            | "flat"
-          steepAngle?: number
-          surfaceClearing?: "contour" | "adaptive"
-          adaptiveEngagement?: number
-          scallop?: number
-          rasterAngle?: number
-          rasterOneWay?: boolean
-          useAI?: boolean
-          aiDifficulty?: "simple" | "moderate" | "complex"
-          aiOptimize?: "speed" | "quality" | "balance"
-          optimizePath?: boolean
-          useArcFitting?: boolean
-          useHighSpeedMode?: boolean
-          useExactStop?: boolean
-          useToolCompensation?: boolean
-          useAdaptiveFeeds?: boolean
-          useRestMachining?: boolean
-          restToolDiameter?: number
-          fiveAxisStrategy?: "parallel" | "contour"
-          fiveAxisToolAxis?: "normal" | "lead"
-          fiveAxisLead?: number
-          fiveAxisTilt?: number
-          fiveAxisGouge?: boolean
-          toolNumber?: number
-          workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
-          probeCycle?: "zSurface" | "edgeX" | "edgeY" | "corner" | "bore" | "boss" | "toolLength"
-          probeFeed?: number
-          probeSearch?: number
-          probeStylus?: number
-          probeDialect?: "linuxcnc" | "fanuc"
-          probeFeatureSize?: number
-          threadPitch?: number
-          threadType?: "internal" | "external"
-          threadHand?: "right" | "left"
-          threadPasses?: number
-          threadSpringPasses?: number
-          latheZero?: "face" | "chuck"
-          bedOrigin?: "corner" | "center"
-          nozzleDiameter?: number
-          filamentDiameter?: number
-          layerHeight?: number
-          extrusionWidth?: number
-          printSpeed?: number
-          printTemperature?: number
-          bedWidth?: number
-          bedDepth?: number
-          centerOnBed?: boolean
-          bedTemperature?: number
-          stockDiameter?: number
-          stockLength?: number
-          spindleDirection?: "cw" | "ccw"
-          turningOperation?: "external" | "internal" | "face"
-          applyToolCompensation?: boolean
-          workholding?: "vise" | "clamps" | "plate" | "none"
-          viseJawAxis?: "x" | "y"
-          clampDepth?: number
-          viseJawHeight?: number
-          parallelsHeight?: number
-          workholdingConfigured?: boolean
-          latheTurret?: "rear" | "front"
-          chuckType?: "3-jaw" | "4-jaw" | "collet"
-          noseRadius?: number
-          gripLength?: number
-          tailstock?: boolean
-          stockBore?: number
-          printerKinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
-          buildHeight?: number
-          originType?: "workpiece-center" | "workpiece-corner" | "workpiece-corner2" | "machine-zero" | "custom"
-          originX?: number
-          originY?: number
-          originZ?: number
-        }
-        tool: {
-          id: string
-          name: string
-          kind: "endmill" | "ballnose" | "drill" | "vbit" | "facemill"
-          diameter: number
-          flutes: number
-          maxRpm: number
-          stickout?: number
-          angle?: number
-          tipRadius?: number
-          holder?: { diameter: number; length: number }
-          lifeMinutes?: number
-          profile?: Array<{ r: number; z: number }>
-        }
-        pocket?: number
-        fromPreviousStock?: boolean
-        dependsOn?: Array<string>
-      }>
-    }>
-    uses?: Array<{
-      id: string
-      templateId: string
-      name?: string
-      elementIds: Array<string>
-      perElement?: boolean
-      order?: "perStep" | "perFeature"
-      workpieceIds?: Array<string>
-      enabled?: boolean
-      position?: number
-      overrides?: { [x: string]: number | string | boolean }
-    }>
-    partProbe?: {
-      cycles: Array<
-        | { kind: "z-surface"; at: { x: number; y: number }; expectedZ: number }
-        | { kind: "edge"; at: { x: number; y: number; z: number }; normal: { x: number; y: number } }
-        | {
-            kind: "corner"
-            corner: { x: number; y: number }
-            inside: boolean
-            xSense: 1 | -1
-            ySense: 1 | -1
-            depth: number
-            top?: number
-            inset?: number
-            touchesPerEdge?: 1 | 2
-          }
-        | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
-        | {
-            kind: "web" | "pocket"
-            centre: { x: number; y: number }
-            width: number
-            angle: number
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "rectangle"
-            inside: boolean
-            centre: { x: number; y: number }
-            size: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-        | {
-            kind: "edge-angle"
-            start: { x: number; y: number }
-            along: { x: number; y: number }
-            pitch: number
-            normal: { x: number; y: number }
-            depth: number
-            top?: number
-          }
-      >
-      toolNumber?: number
-      stylusDiameter?: number
-      feed?: number
-      search?: number
-      clearance?: number
-      safeZ?: number
-      limit?: number
-      rotation?: "g68" | "offset-r" | "table-c"
-      replay?: {
-        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
-        tolerance?: number
-      }
-    }
-  }
+  setup: CamSetup
   createdAt: string
   updatedAt: string
 }

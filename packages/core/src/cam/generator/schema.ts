@@ -188,7 +188,7 @@ export const ToolpathSettingsSchema = Schema.Struct({
   originX: withDefault(Num, 0),
   originY: withDefault(Num, 0),
   originZ: withDefault(Num, 0)
-})
+}).annotate({ identifier: "ToolpathSettings" })
 export type ToolpathSettings = typeof ToolpathSettingsSchema.Type
 
 /** Decodes any object into full settings (missing fields take their defaults); throws on an invalid value. */

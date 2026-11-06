@@ -181,7 +181,7 @@ export const SetupSchema = Schema.Struct({
   uses: Schema.optionalKey(Schema.Array(TemplateUseSchema).check(Schema.isMaxLength(256))),
   /** The datum probe of every workpiece, generated as its own program on request. */
   partProbe: Schema.optionalKey(PartProbeSchema)
-})
+}).annotate({ identifier: "CamSetup" })
 export type Setup = typeof SetupSchema.Type
 
 export const decodeSetup = (input: unknown): Setup => Schema.decodeUnknownSync(SetupSchema)(input)
