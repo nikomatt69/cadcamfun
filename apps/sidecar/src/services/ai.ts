@@ -726,7 +726,7 @@ const toolHandlers = Effect.gen(function*() {
       if (generated.programs.length === 0) return { ok: false, error: "The setup generated no program.", issues: generated.issues, warnings: generated.warnings }
       // The datum probe of the parts, when asked for: a program of the probe tool, run before the cuts; it has nothing to replay.
       const probe = input.probePart === true ? cam.program.partProbeFor(setup, generated) : undefined
-      if (probe !== undefined && probe.program === undefined) return { ok: false, error: `probePart: ${probe.refused}` }
+      if (probe !== undefined && probe.program === undefined && probe.inline !== true) return { ok: false, error: `probePart: ${probe.refused}` }
       // Each stored text is replayed once per workpiece register against that workpiece's own blank, in the kernel worker: the release level and the findings are stored with it.
       const evidences = new Map<cam.program.GeneratedProgram, cam.program.SetupEvidence>()
       for (const program of generated.programs) evidences.set(program, await replaySetupProgram(setup, program, (op) => cam.program.geometryFor(op, byId, configured), configured))

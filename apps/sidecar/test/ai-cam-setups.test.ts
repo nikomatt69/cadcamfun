@@ -291,6 +291,21 @@ test("probePart stores the datum probe of every workpiece as the first program, 
   expect(plain.programs).toHaveLength(1)
   expect(plain.probe).toBeUndefined()
 
+  // Placed inline, the probe is inside the program that cuts the parts: one program, no separate probe program, and the replay runs the cuts only.
+  const inlineSaved = await call("cam_edit", { action: "setup_save", name: "Probed inline", setup: { ...base, partProbe: { ...partProbe, placement: "inline" } } })
+  const inlineGenerated = await call("cam_edit", { action: "setup_generate", setupId: inlineSaved.setupId, probePart: true })
+  expect(inlineGenerated.ok, inlineGenerated.error).toBe(true)
+  expect(inlineGenerated.programs).toHaveLength(1)
+  expect(inlineGenerated.programs[0].kind).toBeUndefined()
+  expect(inlineGenerated.programs[0].toolNumbers).toContain(2)
+  const inlineRow = (await app.call(`/api/toolpaths/${inlineGenerated.programs[0].operationId}`)).body
+  const inlineLines = String(inlineRow.gcode).split("\n").map((l: string) => l.trim())
+  expect(inlineLines.filter((l) => /^#5223=#5223\+/.test(l))).toHaveLength(1)
+  expect(inlineLines.filter((l) => /^#5243=#5243\+/.test(l))).toHaveLength(1)
+  expect(String(inlineRow.gcode).search(/T2\s*M6/)).toBeLessThan(String(inlineRow.gcode).search(/T1\s*M6/))
+  expect(inlineRow.data.setupEvidence.notes.join(" ")).toMatch(/without its probe cycles/)
+  expect(inlineRow.data.setupEvidence.registers.map((r: { register: string }) => r.register)).toEqual(["G54", "G55"])
+
   // A setup with no part probe cannot be asked for one.
   const unprobed = await call("cam_edit", { action: "setup_save", name: "Plain", setup: base })
   const refused = await call("cam_edit", { action: "setup_generate", setupId: unprobed.setupId, probePart: true })

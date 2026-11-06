@@ -364,6 +364,11 @@ export const validateSetup = (given: Setup): ReadonlyArray<SetupIssue> => {
       const pocket = pockets.get(op.id)!
       if (pocket > setup.magazineSize) issues.push({ operationId: op.id, message: `${op.name} needs pocket T${pocket}, the magazine holds ${setup.magazineSize}` })
     }
+    // An inline part probe is a tool of its own in the magazine, after the cutting tools and their sisters.
+    if (setup.partProbe?.placement === "inline") {
+      const probe = setup.partProbe.toolNumber ?? Math.max(0, ...pockets.values()) + (setup.sisters ?? []).length + 1
+      if (probe > setup.magazineSize) issues.push({ message: `The part probe is T${probe} and the magazine holds ${setup.magazineSize}: give the probe a pocket inside the magazine (partProbe.toolNumber) or take a tool out` })
+    }
   }
   return issues
 }

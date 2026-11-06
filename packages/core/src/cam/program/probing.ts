@@ -535,11 +535,21 @@ export const inlinePartProbe = (setup: Setup): { readonly refused: string } | { 
   const problem = planeRefusal(setup)
   if (problem !== undefined) return { refused: problem }
   const multi = workpiecesOf(setup).length > 1
+  const post = getPost(setup.post.postId)
+  if (post === undefined) return { refused: `Post ${setup.post.postId} is not implemented` }
   const byPart = new Map<string, Toolpath>(b.parts.map((p) => [p.wp.id, {
     id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}`, toolId: b.device.id, spindleRpm: 0, coolant: "off", moves: [...p.moves],
     ...(multi ? { workOffset: p.wp.workOffset, ...(p.wp.workOffsetRef !== undefined ? { workOffsetRef: p.wp.workOffsetRef } : {}) } : {}),
     operation: { id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}` }
   } satisfies Toolpath]))
+  // The post must be able to write every probe cycle: tried here on the probe toolpaths alone, so a control without the words (variables, a skip word) is named before the program is cut.
+  try {
+    post.emit(makeProgram("probe", [...byPart.values()], { workOffset: setup.workOffset }), {
+      decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: false, tolerance: setup.post.tolerance,
+      toolNumbers: { [b.device.id]: b.toolNumber },
+      ...(Object.keys(planesOf(b)).length > 0 ? { workPlanes: planesOf(b), ...(setup.post.swivel !== undefined ? { swivel: setup.post.swivel } : {}) } : {})
+    })
+  } catch (error) { return { refused: `The ${setup.post.postId} post cannot write the probe: ${error instanceof Error ? error.message : String(error)}` } }
   return { toolNumber: b.toolNumber, deviceId: b.device.id, byPart, planes: planesOf(b), entries: b.parts.map((p) => p.entry), notes: b.notes }
 }
 

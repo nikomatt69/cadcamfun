@@ -161,10 +161,10 @@ export const setupReplayPlan = (setup: cam.program.Setup, program: cam.program.G
   const replay = cam.program.setupReplay(setup, program, geometryOf, configured)
   const part = replay.part.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
   const jobs = replay.registers.map((register) => ({
-    nc: program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
+    nc: program.replayGcode ?? program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
     tools: replay.tools.map((t) => ({ number: t.number, cutter: t.cutter as never }))
   }))
-  return { jobs, finish: (results: ReadonlyArray<cam.kernel.VerifyNcResult>) => cam.program.setupEvidence(program.gcode, replay, results, program.tools) }
+  return { jobs, finish: (results: ReadonlyArray<cam.kernel.VerifyNcResult>) => cam.program.setupEvidence(program.gcode, replay, results, program.tools, program.replayGcode) }
 }
 
 /** The same replay run through the kernel's worker queue, one register after the other; a register that cannot finish is a preview with the reason. */

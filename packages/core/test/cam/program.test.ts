@@ -1,8 +1,11 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { DEFAULT_GEOMETRY, DEFAULT_SETTINGS, type GeometryInput } from "../../src/cam/generator/index.ts"
 import { program, indexPlane, indexMatrix, boxInPartFrame } from "../../src/cam/index.ts"
 import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
 import { analyseGcode } from "../../src/cam/generator/analysis.ts"
+
+// The fixture replays run a tri-dexel each: a few seconds on an idle machine, more on a busy one.
+setDefaultTimeout(60_000)
 
 const { assignPockets, buildToolTable, generateSetup, planPrograms, reorderByTool, validateSetup, DEFAULT_POST_CONFIG } = program
 
@@ -843,5 +846,77 @@ describe("a part indexed as a tilted work plane", () => {
     // At 45 degrees the box returned is the bounding box of the turned one: it covers it.
     const c45 = boxInPartFrame(clamp, datum, { c: 45 })
     expect(c45.max.x - c45.min.x).toBeGreaterThan(30 * Math.SQRT1_2)
+  })
+})
+
+describe("the probe of every part placed inside the program that first cuts it", () => {
+  const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" as const }, { id: "w2", name: "Part 2", workOffset: "G55" as const }, { id: "w3", name: "Part 3", workOffset: "G56" as const }]
+  const cycles: program.PartProbe["cycles"] = [{ kind: "z-surface", at: { x: 5, y: 5 }, expectedZ: 0 }, { kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }]
+  const inline = (over: Partial<program.Setup> = {}, probe: Partial<program.PartProbe> = {}): program.Setup =>
+    setup([op("a", t6), op("b", t3)], { workpieces: parts, stock: { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }, partProbe: { cycles, placement: "inline", ...probe }, ...over })
+  const lines = (text: string) => text.split("\n").map((l) => l.trim())
+
+  test("tool first: the probe is loaded once at the start of the program that cuts the parts, and every part is probed before its first cut", () => {
+    const made = generateSetup(inline(), geometryOf)
+    expect(made.programs).toHaveLength(1)
+    const p = made.programs[0]!
+    expect(p.probes).toEqual(["w1", "w2", "w3"])
+    expect(p.pockets["part-probe"]).toBe(3)
+    expect(p.toolNumbers).toContain(3)
+    const text = p.gcode
+    expect(text.match(/T3\s*M6/g)).toHaveLength(1)
+    // The probe tool is called before any cutting tool, and the probe of each register precedes its cuts.
+    expect(text.search(/T3\s*M6/)).toBeLessThan(text.search(/T1\s*M6/))
+    expect(p.program.toolpaths.map((t) => t.id).slice(0, 3)).toEqual(["probe@w1", "probe@w2", "probe@w3"])
+    expect(p.warnings.join(" ")).toMatch(/probed inside this program with T3/)
+    // The replay runs the cuts only: no probe words, the same cuts.
+    expect(p.replayGcode).toBeDefined()
+    expect(p.replayGcode).not.toMatch(/T3\s*M6/)
+    expect(p.replayGcode!.length).toBeLessThan(text.length)
+    expect(p.replayGcode!.match(/T\d+\s*M6/g)).toHaveLength(2)
+  })
+
+  test("part first: each part is probed as it is reached, with a tool change to the probe and back", () => {
+    const made = generateSetup(inline({ workpieceOrder: "partFirst" }), geometryOf)
+    const p = made.programs[0]!
+    expect(p.program.toolpaths.map((t) => t.id).slice(0, 3)).toEqual(["probe@w1", "a@w1", "b@w1"])
+    expect(p.gcode.match(/T3\s*M6/g)).toHaveLength(3)
+  })
+
+  test("with several programs a part is probed once, in the first program that cuts it; first-program placement leaves the programs alone", () => {
+    const made = generateSetup(inline({ grouping: "perTool" }), geometryOf)
+    expect(made.programs).toHaveLength(2)
+    expect(made.programs[0]!.probes).toEqual(["w1", "w2", "w3"])
+    expect(made.programs[1]!.probes).toBeUndefined()
+    expect(made.programs[1]!.gcode).not.toMatch(/T3\s*M6/)
+    const separate = generateSetup(inline({}, { placement: "first-program" }), geometryOf)
+    expect(separate.programs[0]!.probes).toBeUndefined()
+    expect(separate.programs[0]!.gcode).not.toMatch(/T3\s*M6/)
+    const asked = program.partProbeFor(inline(), made)
+    expect(asked.inline).toBe(true)
+    expect(asked.program).toBeUndefined()
+    expect(program.partProbeFor(inline({}, { placement: "first-program" }), made).program).toBeDefined()
+  })
+
+  test("a probe that cannot be written leaves the cuts and says why; the magazine counts the probe", () => {
+    const refused = generateSetup(inline({ post: { ...DEFAULT_POST_CONFIG, postId: "grbl" } }), geometryOf)
+    expect(refused.programs[0]!.probes).toBeUndefined()
+    expect(refused.warnings.join(" ")).toMatch(/not placed inline: The grbl post cannot write the probe/)
+    const full = validateSetup(inline({ magazineSize: 2 }))
+    expect(full.map((i) => i.message).join(" ")).toMatch(/part probe is T3 and the magazine holds 2/)
+    expect(validateSetup(inline({ magazineSize: 3 })).filter((i) => /magazine/.test(i.message))).toEqual([])
+  })
+
+  test("a part indexed as a tilted plane is probed inside the plane, before its cuts", () => {
+    const tilted = [{ id: "w1", name: "Part 1", workOffset: "G54" as const }, { id: "w2", name: "Part 2", workOffset: "G55" as const, index: { a: 90 }, indexAs: "plane" as const }]
+    const made = generateSetup(inline({ workpieces: tilted }), geometryOf)
+    const p = made.programs[0]!
+    expect(p.probes).toEqual(["w1", "w2"])
+    const text = lines(p.gcode)
+    // G68.2 is written for Part 2 around its probe and around each of its two cutting tools (the plane is cancelled before every tool change).
+    expect(text.filter((l) => /^G68\.2\b/.test(l))).toHaveLength(3)
+    expect(text.findIndex((l) => /^G68\.2\b/.test(l))).toBeLessThan(text.findIndex((l) => /^T1\s*M6/.test(l)))
+    expect(p.program.toolpaths.flatMap((t) => t.moves).some((m) => m._tag === "Orient")).toBe(false)
+    expect(program.planPartProbe(inline({ workpieces: tilted })).parts[1]!.replay).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/tilted work plane/) })
   })
 })

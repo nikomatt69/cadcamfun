@@ -24,6 +24,8 @@ const withEvidence = (given: cam.program.Setup, elements: Record<string, Record<
     if (probePart !== true) return { ...generated, programs: replayed }
     // The datum probe of the parts goes first: it is run before the cuts, and has no cutting tool to replay.
     const probe = p.partProbeFor(setup, generated)
+    // Placed inline, the probe is already inside the programs that cut each part: nothing to put first.
+    if (probe.inline === true) return { ...generated, programs: replayed }
     if (probe.program === undefined) return yield* new BadRequest({ message: `probePart: ${probe.refused}` })
     return { ...generated, programs: [{ ...probe.program, kind: "probe" as const }, ...replayed] }
   })

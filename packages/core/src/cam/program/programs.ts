@@ -24,6 +24,7 @@ import { formatOffsetRef } from "../work-offset.ts"
 import { dialectOf, getPost } from "../post/index.ts"
 import type { TiltedPlane } from "../post/types.ts"
 import { boxInPartFrame, indexPlane } from "../indexing.ts"
+import { inlinePartProbe, planeRefusal } from "./probing.ts"
 import type { Tool } from "../tool.ts"
 import type { Vec3 } from "../../cad/vec.ts"
 import type { Operation } from "./op.ts"
@@ -44,6 +45,10 @@ export interface GeneratedProgram {
   readonly pockets: Readonly<Record<string, number>>
   /** The tools the program calls, each once. */
   readonly tools: ReadonlyArray<Tool>
+  /** The parts whose datum probe (`partProbe.placement: "inline"`) is written inside this program, by workpiece id. */
+  readonly probes?: ReadonlyArray<string>
+  /** The same program without its probe cycles: what the replay runs (a probe removes no material and the replay has no part to touch). Absent when the program has no inline probe. */
+  readonly replayGcode?: string
 }
 
 /** What one tool cut over the setup, against the life it was given. */
@@ -455,8 +460,9 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
  * only when every register was replayed completely against a finished solid part and every tool has its holder described; anything
  * less is a preview, with the reason named. Legacy programs carry no machine claims beyond this replay.
  */
-export const setupEvidence = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>, tools: ReadonlyArray<Tool>): SetupEvidence => {
+export const setupEvidence = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>, tools: ReadonlyArray<Tool>, replayed: string = gcode): SetupEvidence => {
   const notes = [...replay.notes]
+  if (replayed !== gcode) notes.push("The replay ran the program without its probe cycles (a probe removes no material and the replay has no part to touch): the NC line numbers of the findings are those of that text")
   const registers = replay.registers.map((r, i) => {
     const v = results[i]!
     return {
@@ -473,7 +479,7 @@ export const setupEvidence = (gcode: string, replay: SetupReplay, results: Reado
   const clamped = (replay.fixtures ?? []).length > 0
   if (replay.registers.length > 1 && unplaced.length > 0) notes.push(`${unplaced.join(", ")} ha${unplaced.length > 1 ? "ve" : "s"} no placement: the parts are not seen together in one frame`)
   else if (replay.registers.length > 1 || (clamped && replay.registers.length === 1)) {
-    try { fixture = fixtureSimulation(gcode, replay, results, tools) } catch (cause) { notes.push(`The parts could not be seen together: ${cause instanceof Error ? cause.message : String(cause)}`) }
+    try { fixture = fixtureSimulation(replayed, replay, results, tools) } catch (cause) { notes.push(`The parts could not be seen together: ${cause instanceof Error ? cause.message : String(cause)}`) }
   }
   const crossed = fixture !== undefined && fixture.crossings.length > 0
   for (const c of fixture?.crossings ?? []) notes.push(c.message)
@@ -537,20 +543,6 @@ const fixtureReach = (setup: Setup, operations: ReadonlyArray<Operation>, toolpa
   return out
 }
 
-/**
- * Why the setup's tilted-plane parts cannot be written, or undefined: a part indexed `plane` needs a post whose control has the swivel words
- * (`G68.2` + `G53.1`, `CYCLE800`, `PLANE SPATIAL`), and a Siemens post needs the machine's swivel data record. Refused, never written as another frame.
- */
-export const planeRefusal = (setup: Setup): string | undefined => {
-  const parts = workpiecesOf(setup).filter((wp) => wp.index !== undefined && wp.indexAs === "plane")
-  if (parts.length === 0) return undefined
-  const dialect = dialectOf(setup.post.postId)
-  // The Klartext writer adds its own PLANE SPATIAL words to the dialect it writes with (the ISO dialect of a Heidenhain definition has none).
-  if (dialect?.tiltedPlane === undefined && setup.post.postId !== "heidenhain") return `${parts.map((p) => p.name).join(", ")} ${parts.length > 1 ? "are" : "is"} indexed as a tilted plane, and the ${setup.post.postId} post has no tilted-plane words (G68.2, CYCLE800, PLANE SPATIAL): use a post that has them (fanuc, haas, okuma, siemens, heidenhain) or index the part as a table turn`
-  if (dialect?.id === "siemens" && setup.post.swivel === undefined) return "A tilted plane on a Siemens post is CYCLE800: set the post's swivel.dataRecord (the machine's swivel data record)"
-  return undefined
-}
-
 export const generateSetup = (given: Setup, geometryOf: (operation: Operation) => GeometryInput): GeneratedSetup => {
   // Template uses become operations first; an already expanded setup comes back unchanged.
   const setup = expandSetup(given).setup
@@ -575,6 +567,11 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
   // Cutting minutes every tool has spent so far over the programs, in order; the tool each program really called, for the report.
   let lifeBook: ToolLifeBook = emptyLifeBook
   const called = new Map<string, { readonly tool: Tool; readonly pocket: number; readonly sisterOf?: string }>()
+  // Part probe placed inline: each part's cycles go to the start of that part's toolpaths, in the first program that cuts it.
+  const inlineProbe = setup.partProbe?.placement === "inline" ? inlinePartProbe(setup) : undefined
+  if (inlineProbe !== undefined && "refused" in inlineProbe) warnings.push(`The part probe is not placed inline: ${inlineProbe.refused}`)
+  const probe = inlineProbe !== undefined && !("refused" in inlineProbe) ? inlineProbe : undefined
+  const probed = new Set<string>()
   groupsOf(setup).forEach((group, index) => {
     const planned = plan.programs[index]!
     const programWarnings: string[] = []
@@ -602,8 +599,10 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
       return made
     }
     // The program of one order of the runs. The comparison below builds the other order from the same cached toolpaths.
-    const build = (order: WorkpieceOrder) => {
+    const build = (order: WorkpieceOrder, alreadyProbed: ReadonlySet<string> = probed) => {
       const toolpaths: Toolpath[] = []
+      const probedHere = new Set<string>(alreadyProbed)
+      const probesWritten: string[] = []
       const used: Operation[] = []
       let book = lifeBook
       const swapped = new Map<string, Tool>()
@@ -612,9 +611,21 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
       const buildWarnings: string[] = []
       // Parts indexed as a tilted plane: the toolpath stays in the plane's coordinates and the post writes the control's own word.
       const planes: Record<string, TiltedPlane> = {}
-      for (const { operation: op, workpiece, multi } of runsOf({ ...setup, workpieceOrder: order }, group.operations)) {
+      const runs = runsOf({ ...setup, workpieceOrder: order }, group.operations)
+      // The probe of a part goes before that part's first cut. Tool first loads the probe once for every part this program cuts first; part first probes each part as it reaches it.
+      const probeBefore = (workpieceId: string): void => {
+        const toolpath = probe?.byPart.get(workpieceId)
+        if (probe === undefined || toolpath === undefined || probedHere.has(workpieceId)) return
+        probedHere.add(workpieceId); probesWritten.push(workpieceId)
+        toolpaths.push(toolpath)
+        const plane = probe.planes[toolpath.id]
+        if (plane !== undefined) planes[toolpath.id] = plane
+      }
+      if (probe !== undefined && order !== "partFirst") for (const { operation: op, workpiece } of runs) if (toolpathOf(op) !== undefined) probeBefore(workpiece.id)
+      for (const { operation: op, workpiece, multi } of runs) {
         const made = toolpathOf(op)
         if (made === undefined) continue
+        if (probe !== undefined && order === "partFirst") probeBefore(workpiece.id)
         if (!used.includes(op)) used.push(op)
         // Tool life: a run goes to the tool in use unless its remaining life cannot cover it; then the next member of the sister group takes over.
         let tool = swapped.get(op.tool.id) ?? op.tool
@@ -646,34 +657,49 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
           : indexed)
       }
       const fixture = workpiecesOf(setup)
-      const program = makeProgram(planned.name, toolpaths, {
-        workOffset: toolpaths[0]?.workOffset ?? setup.workOffset,
-        ...(toolpaths[0]?.workOffsetRef !== undefined ? { workOffsetRef: toolpaths[0].workOffsetRef } : {}),
-        metadata: {
-          programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}),
-          ...(fixture.length > 1 ? { workpieces: fixture.map((wp) => `${wp.name}=${wp.workOffset}`).join(", ") } : {})
-        }
-      })
       const toolNumbers: Record<string, number> = {}
       for (const [id, c] of callsLocal) toolNumbers[id] = c.pocket
-      const gcode = post.emit(program, {
-        decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
-        toolNumbers, retractBeforeToolChange: setup.retractBeforeToolChange,
-        ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
-        ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}),
-        ...(Object.keys(planes).length > 0 ? { workPlanes: planes, ...(setup.post.swivel !== undefined ? { swivel: setup.post.swivel } : {}) } : {})
-      })
+      if (probesWritten.length > 0 && probe !== undefined) toolNumbers[probe.deviceId] = probe.toolNumber
+      // The program of a set of toolpaths, written with the post: the whole program, and (below) the same one without its probes for the replay.
+      const write = (tps: ReadonlyArray<Toolpath>) => {
+        const made = makeProgram(planned.name, tps, {
+          workOffset: tps[0]?.workOffset ?? setup.workOffset,
+          ...(tps[0]?.workOffsetRef !== undefined ? { workOffsetRef: tps[0].workOffsetRef } : {}),
+          metadata: {
+            programNumber: String(planned.programNumber), ...(setup.stock !== undefined ? { material: setup.stock.material } : {}),
+            ...(fixture.length > 1 ? { workpieces: fixture.map((wp) => `${wp.name}=${wp.workOffset}`).join(", ") } : {})
+          }
+        })
+        const ids = new Set(tps.map((t) => t.id))
+        const here = Object.fromEntries(Object.entries(planes).filter(([id]) => ids.has(id)))
+        const text = post.emit(made, {
+          decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
+          toolNumbers, retractBeforeToolChange: setup.retractBeforeToolChange,
+          ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
+          ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {}),
+          ...(Object.keys(here).length > 0 ? { workPlanes: here, ...(setup.post.swivel !== undefined ? { swivel: setup.post.swivel } : {}) } : {})
+        })
+        return { program: made, gcode: text }
+      }
+      const { program, gcode } = write(toolpaths)
+      const replayGcode = probesWritten.length > 0 ? write(toolpaths.filter((t) => !t.id.startsWith("probe@"))).gcode : undefined
       const stats = analyseGcode(gcode, planned.name).stats
-      return { toolpaths, used, program, gcode, stats, book, calls: callsLocal, toolNumbers, notes: buildWarnings, seconds: stats.estimatedSeconds + toolChangesOf(toolpaths) * TOOL_CHANGE_SECONDS }
+      return { toolpaths, used, program, gcode, replayGcode, probesWritten, probedHere, stats, book, calls: callsLocal, toolNumbers, notes: buildWarnings, seconds: stats.estimatedSeconds + toolChangesOf(toolpaths) * TOOL_CHANGE_SECONDS }
     }
     const order: WorkpieceOrder = setup.workpieceOrder ?? "toolFirst"
-    const { used, program, gcode, stats, seconds, book, calls, toolNumbers, notes } = build(order)
+    const probedBefore: ReadonlySet<string> = new Set(probed)
+    const { used, program, gcode, replayGcode, probesWritten, probedHere, stats, seconds, book, calls, toolNumbers, notes } = build(order, probedBefore)
     lifeBook = book
+    for (const id of probedHere) probed.add(id)
+    if (probe !== undefined && probesWritten.length > 0) {
+      const names = probesWritten.map((id) => workpiecesOf(setup).find((wp) => wp.id === id)?.name ?? id)
+      programWarnings.push(`The datum of ${names.join(", ")} is probed inside this program with T${probe.toolNumber} before ${probesWritten.length > 1 ? "its" : "the part's"} first cut, and each deviation goes into that part's register (a tool change to the probe and back; the replay runs the cuts without the probe)`)
+    }
     for (const [id, c] of calls) if (!called.has(id)) called.set(id, c)
     programWarnings.push(...notes)
     if (workpiecesOf(setup).length > 1 && used.length > 0) {
       const otherOrder: WorkpieceOrder = order === "toolFirst" ? "partFirst" : "toolFirst"
-      const other = build(otherOrder)
+      const other = build(otherOrder, probedBefore)
       if (Math.abs(other.seconds - seconds) >= 1) {
         const faster = other.seconds < seconds ? otherOrder : order
         programWarnings.push(`${faster === "toolFirst" ? "Tool first" : "Part first"} runs about ${Math.round(Math.abs(other.seconds - seconds))} s faster than ${faster === "toolFirst" ? "part first" : "tool first"} (${TOOL_CHANGE_SECONDS} s per tool change, indicative, uncalibrated)`)
@@ -682,8 +708,9 @@ export const generateSetup = (given: Setup, geometryOf: (operation: Operation) =
     programWarnings.push(...fixtureReach(setup, group.operations, toolpathOf))
     programs.push({
       name: planned.name, programNumber: planned.programNumber, gcode, program, stats,
-      warnings: programWarnings, operationIds: used.map((op) => op.id), toolNumbers: [...new Set([...planned.toolNumbers, ...[...calls.values()].map((c) => c.pocket)])],
-      pockets: toolNumbers, tools: [...calls.values()].map((c) => c.tool)
+      warnings: programWarnings, operationIds: used.map((op) => op.id), toolNumbers: [...new Set([...planned.toolNumbers, ...[...calls.values()].map((c) => c.pocket), ...(probesWritten.length > 0 && probe !== undefined ? [probe.toolNumber] : [])])],
+      pockets: toolNumbers, tools: [...calls.values()].map((c) => c.tool),
+      ...(probesWritten.length > 0 ? { probes: probesWritten, replayGcode: replayGcode! } : {})
     })
     warnings.push(...programWarnings)
   })
