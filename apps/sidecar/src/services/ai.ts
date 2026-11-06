@@ -4,7 +4,7 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiModes, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type HostToolContext, type ProviderId, type ToolHandlersShape,
+  searchWeb, makeNikCliRuntime, readPolicyFile, readStopHooksFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type HostToolContext, type ProviderId, type ToolHandlersShape,
   modToolContributions, modSpecs, isolatedPaths, projectScratchDir, readBrainPage, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, pmi, type History } from "@cadcamfun/core"
@@ -1960,8 +1960,14 @@ const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {
 /** nikcli resource policy (`provider.use`, `tool.use`) the operator keeps in `<data dir>/ai/policy.json`; absent means allow all. */
 const policyFile = (dataDir: string): string => `${dataDir}/ai/policy.json`
 
-const AiConfigLive = Layer.unwrap(AppConfigService.use((c) => readPolicyFile(policyFile(c.dataDir)).pipe(
-  Effect.map((policies) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false, localeEnv: c.localeEnv, ...(policies.length > 0 ? { policies } : {}) }))
+/** Stop hooks (spec 08 "Stop hooks") the operator keeps next to the policy, in `<data dir>/ai/hooks.json`; absent means none. */
+const hooksFile = (dataDir: string): string => `${dataDir}/ai/hooks.json`
+
+const AiConfigLive = Layer.unwrap(AppConfigService.use((c) => Effect.all([readPolicyFile(policyFile(c.dataDir)), readStopHooksFile(hooksFile(c.dataDir))]).pipe(
+  Effect.map(([policies, stopHooks]) => AiConfig.layer({
+    dataDir: c.dataDir, forceGateway: false, localeEnv: c.localeEnv,
+    ...(policies.length > 0 ? { policies } : {}), ...(stopHooks.length > 0 ? { stopHooks } : {})
+  }))
 )))
 
 /** Publishes the assistant's one workflow step (`ai/prompt`) to the runner that is already in scope. */

@@ -10,6 +10,7 @@ import { currentHostAgent } from "./primaries.ts"
 import { primaryOfHost, reminderFor } from "../prompts/reminders.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
 import { compactHostSession, readHostContextPolicy } from "./context.ts"
+import type { StopHook, StopHookVerdict } from "./stop-hooks.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
 
@@ -45,6 +46,11 @@ export interface HostChatInput {
    * `0` leaves the host's behaviour.
    */
   readonly autoContinues?: number
+  /**
+   * The operator's stop hooks (`stop-hooks.ts`, spec 08 "Stop hooks"): asked when the turn would end as done, with no other
+   * continuation. A block sends the agent back with the hook's reason and counts like any other continuation.
+   */
+  readonly stopHook?: StopHook
 }
 
 /** What the agent said it would do next, as the last sentence of its answer ("Let me build the wheels:", "Procedo con..."). */
@@ -92,6 +98,9 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
 }
 
 const MAX_STALLS = 2
+
+/** The synthetic prompt that sends the agent back after a stop hook blocked; the hook's reason follows it. */
+export const STOP_HOOK_PROMPT = "A stop hook reported that the work is not finished: "
 
 /**
  * The turn did work with the tools and then ended without a word: the user would see changes and no answer. Asked once per
@@ -514,6 +523,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let stalls = 0
         let askedForReport = false
         let compactedForOverflow = false
+        /** The current run was started by a stop-hook block (`stop_hook_active` for the next call). */
+        let continuedByHook = false
         let stepResumes = 0
         let successesAtStepLimit = 0
         const answers: string[] = []
@@ -724,8 +735,18 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             stalls = progressed ? 0 : stalls + 1
             // Never at the cost of an error: with the budget spent, a silent turn still ends as done.
             const silent = text.trim() === "" && answers.length === 0 && !askedForReport && continuations < maxContinues && continuationState.successfulCalls.size > 0
-            const nudge = continuationFor(continuationState, text, result.info?.finish) ?? (silent ? REPORT_PROMPT : undefined)
-            if (nudge === REPORT_PROMPT) { askedForReport = true; stalls = 0 }
+            const own = continuationFor(continuationState, text, result.info?.finish) ?? (silent ? REPORT_PROMPT : undefined)
+            if (own === REPORT_PROMPT) { askedForReport = true; stalls = 0 }
+            // The turn would end as done: the operator's stop hooks may send it back with a reason (Claude Code's `Stop`).
+            let blockedBy: string | undefined
+            if (own === undefined && input.stopHook !== undefined) {
+              const verdict: StopHookVerdict = await runHere(input.stopHook({
+                sessionId, cwd: host.directory, stopHookActive: continuedByHook, lastAssistantMessage: text,
+                openTodos: continuationState.todos.filter((t) => t.status === "pending" || t.status === "in_progress").map((t) => t.content)
+              })).catch(() => ({ decision: "allow" as const }))
+              if (verdict.decision === "block") blockedBy = verdict.reason
+            }
+            const nudge = own ?? (blockedBy !== undefined ? `${STOP_HOOK_PROMPT}${blockedBy}` : undefined)
             if (nudge !== undefined) {
               if (stalls >= MAX_STALLS || continuations >= maxContinues) {
                 offer({ type: "error", sessionId, code: "internal", message: stalls >= MAX_STALLS
@@ -736,6 +757,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               }
               if (text.trim() !== "") answers.push(text)
               continuations += 1
+              continuedByHook = blockedBy !== undefined
               offer({ type: "turn", sessionId, phase: "continuing", reason: nudge })
               successesAtNudge = new Map(continuationState.successfulCalls)
               failedToolsAtNudge = new Set(continuationState.toolErrors.keys())

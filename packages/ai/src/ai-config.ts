@@ -3,6 +3,7 @@ import type { IsolationOptions } from "./nikcli/isolation.ts"
 import type { LocaleEnv } from "./nikcli/locale.ts"
 import type { HostLogSink } from "./nikcli/logs.ts"
 import type { PolicyStatement } from "./nikcli/policy.ts"
+import type { StopHookSpec } from "./nikcli/stop-hooks.ts"
 import type { CacheRetention } from "./transform.ts"
 
 export interface AiConfigShape {
@@ -22,6 +23,8 @@ export interface AiConfigShape {
   readonly policies?: ReadonlyArray<PolicyStatement>
   /** The locale variables of the environment (`LocaleEnvConfig`), read once by the host; the reply language follows them. */
   readonly localeEnv?: LocaleEnv
+  /** The operator's stop hooks (`<data dir>/ai/hooks.json`, spec 08 "Stop hooks"). Omitted or empty: none. */
+  readonly stopHooks?: ReadonlyArray<StopHookSpec>
 }
 
 /**
