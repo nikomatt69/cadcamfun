@@ -4,7 +4,7 @@ import { expandCycle, moveTarget, type Move } from "../ir.ts"
 import { anglesFor, partToMachine, tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
 import { DEFAULT_CUTTERS, countersinkDepth, findCutter, pointLength, type Cutter } from "../kernel/cutters.ts"
 import { TriDexel, toolSolid } from "../kernel/tridexel.ts"
-import { BACK_BORE_CLEARANCE, backBoreShift, generateBackBore, generateCountersink, generateDeepHole, generateHoleCycle, generateTiltedDrill, peckSchedule, type HoleCycleInput, type HoleIndexing } from "./hole-cycles.ts"
+import { BACK_BORE_CLEARANCE, backBoreReach, backBoreShift, generateBackBore, generateCountersink, generateDeepHole, generateHoleCycle, generateTiltedDrill, peckSchedule, type HoleCycleInput, type HoleIndexing } from "./hole-cycles.ts"
 import type { HoleCycle } from "../kernel/contracts.ts"
 
 const lib = (id: string): Cutter => findCutter(DEFAULT_CUTTERS, id)!
@@ -217,6 +217,30 @@ describe("back boring through a pilot hole", () => {
     expect(6 - 5.5).toBeGreaterThanOrEqual(BACK_BORE_CLEARANCE - 1e-9 + 0.3)
     expect(backBoreShift(bar, 10)).toEqual({ reason: expect.stringMatching(/does not pass the Ø10 pilot/) })
     expect(backBoreShift({ ...bar, neckDiameter: undefined }, 12)).toEqual({ reason: expect.stringMatching(/no body diameter/) })
+  })
+
+  test("an insert wider than a point reaches farther about the hole axis with its corners, and more inserts need a wider pilot", () => {
+    // One point insert: reach R - Q = Q + body = 5.5 at Q = 2.5.
+    expect(backBoreReach(bar, 2.5)).toBeCloseTo(5.5, 9)
+    // A 4 mm wide insert: its corners stand ±14.5° off the centre line, 2 mm to either side of it, so they reach hypot(7.746 - Q, 2) about the hole axis.
+    const wide = { ...bar, insertWidth: 4 }
+    const best = backBoreShift(wide, 12)
+    expect("shift" in best).toBe(true)
+    const q = (best as { shift: number }).shift
+    expect(q).toBeCloseTo(2.56, 1)
+    expect(backBoreReach(wide, q)).toBeCloseTo(5.56, 1)
+    expect(backBoreReach(wide, q)).toBeGreaterThan(backBoreReach(bar, 2.5))
+    // The reach is as small as it gets at that shift: neither a bigger nor a smaller one does better.
+    expect(backBoreReach(wide, q + 0.2)).toBeGreaterThanOrEqual(backBoreReach(wide, q) - 1e-9)
+    expect(backBoreReach(wide, q - 0.2)).toBeGreaterThanOrEqual(backBoreReach(wide, q) - 1e-9)
+    // Room for the point insert (pilot 11.2: room 5.6 - 0.x) is not room for the wide one.
+    const tight = 2 * (backBoreReach(bar, 2.5) + BACK_BORE_CLEARANCE) + 0.01
+    expect("shift" in backBoreShift(bar, tight)).toBe(true)
+    expect(backBoreShift(wide, tight)).toEqual({ reason: expect.stringMatching(/4 mm wide.*does not pass/) })
+    // Two inserts opposite each other: the second one stands on the far side of the bar and reaches R + Q: no shift lets the bar through a pilot narrower than the bar.
+    const two = backBoreShift({ ...bar, flutes: 2 }, 12)
+    expect(two).toEqual({ reason: expect.stringMatching(/2 inserts.*does not pass the Ø12 pilot/) })
+    expect(backBoreReach({ ...bar, flutes: 2 }, 0)).toBeCloseTo(8, 9)
   })
 
   test("move sequence: shift, down through the pilot, back onto the axis, feed up to the ceiling, shift, out", () => {

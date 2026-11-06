@@ -24,7 +24,7 @@ import { buildPartModelFromMeshes, partMeshes, type PartModel } from "../model/m
 import { meshBounds, type Mesh64 } from "../model/element-mesh.ts"
 import { AdaptiveParams, generateAdaptive } from "../operations/adaptive.ts"
 import { DrillParams, generateDrill } from "../operations/drill.ts"
-import { backBoreShift, generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
+import { backBoreReach, backBoreShift, generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
 import { recognizeNamedFeatures, type NamedFeature } from "../model/features.ts"
 import { elementBrep } from "../../cad/scene-step.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
@@ -1222,15 +1222,15 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
   let undercutMoves = 0
   const undercutIds = new Set(operations.filter((x) => x.strategy === "drill" && x.cycle?.kind === "back-bore").map((x) => x.id))
-  // While a back-boring bar passes the pilot it is oriented and shifted by -Q (hole-cycles `backBoreShift`): its insert is one tooth towards +X,
-  // reaching R - Q, and its body reaches Q + body radius, both about the hole axis. The contact test of those moves uses that envelope (the
+  // While a back-boring bar passes the pilot it is oriented and shifted by -Q (hole-cycles `backBoreShift`): its inserts (`flutes` of them, each `insertWidth` wide,
+  // the first towards +X) reach as far as their corners go about the hole axis, and its body reaches Q + body radius. The contact test of those moves uses that envelope (the
   // planner's own pilot rule), centred on the hole axis; the axisymmetric Ø of the head would stand for an insert all round and refuse every pass.
   const backBores = new Map<string, { readonly q: number; readonly envelope: Cutter; readonly body: Cutter; readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }> }>()
   for (const x of operations) {
     if (x.strategy !== "drill" || x.cycle?.kind !== "back-bore") continue
     const bar = toolOf(x.tool), shifted = backBoreShift(bar, x.cycle.pilotDiameter)
     if ("reason" in shifted) continue
-    const body = (bar.neckDiameter ?? 0) / 2, reach = Math.max(bar.diameter / 2 - shifted.shift, body + shifted.shift)
+    const body = (bar.neckDiameter ?? 0) / 2, reach = backBoreReach(bar, shifted.shift)
     backBores.set(x.id, { q: shifted.shift, body: { ...bar, diameter: bar.neckDiameter ?? 0 }, envelope: { ...bar, diameter: 2 * reach, neckDiameter: 2 * (body + shifted.shift), shankDiameter: Math.max(bar.shankDiameter ?? 0, 2 * (body + shifted.shift)) }, points: x.points.map((p) => shift2(p, o)) })
   }
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
@@ -1375,7 +1375,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (seg.rapid) tips.push(s.to)
           // Oriented and shifted over the pilot: judged as the envelope about the hole axis, the holder on the tool axis as it is.
           const info = backBores.get(outcomes[opOfToolpath[op]!]?.id ?? "")
-          const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6
+          // The NC carries three decimals: a shift such as 2.5617 comes back as 2.562, so positions match to a few microns, not to the float.
+          const near = (a: number, b: number): boolean => Math.abs(a - b) < 2e-3
           const hole = info?.points.find((pt) => near(s.from.y, pt.y) && near(s.to.y, pt.y) && near(s.from.x, pt.x - info.q) && near(s.to.x, pt.x - info.q))
           // Between the bar on the axis and the bar shifted the insert moves away from the wall it cut (or through air above and below the part):
           // there the body is judged and the insert is the declared tooth.

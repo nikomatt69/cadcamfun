@@ -1924,6 +1924,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly neckDiameter?: number
     readonly formRadius?: number
     readonly headHeight?: number
+    readonly insertWidth?: number
     readonly fluteLength: number
     readonly shankDiameter: number
     readonly stickout: number
@@ -3220,6 +3221,7 @@ export type ToolpathGeneratorPlanPayload = {
     readonly neckDiameter?: number
     readonly formRadius?: number
     readonly headHeight?: number
+    readonly insertWidth?: number
     readonly fluteLength: number
     readonly shankDiameter: number
     readonly stickout: number
@@ -4309,6 +4311,7 @@ export type ToolpathGeneratorVerifyNcPayload = {
       readonly number?: number
       readonly neckDiameter?: number
       readonly headHeight?: number
+      readonly insertWidth?: number
     }
   }>
   readonly tolerance?: number

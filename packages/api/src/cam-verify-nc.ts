@@ -22,6 +22,7 @@ export const NcTool = Schema.Struct({
     ...CamKernelCutter.fields,
     neckDiameter: Schema.optionalKey(positive),
     headHeight: Schema.optionalKey(positive),
+    insertWidth: Schema.optionalKey(positive),
     holder: Schema.optionalKey(Schema.Struct({
       diameter: positive, length: positive,
       steps: Schema.optionalKey(Schema.Array(Schema.Struct({ diameter: positive, length: positive })).check(Schema.isMaxLength(16)))

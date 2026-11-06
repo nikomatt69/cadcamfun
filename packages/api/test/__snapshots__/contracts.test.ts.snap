@@ -24748,6 +24748,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "minLength": 1,
                           "type": "string",
                         },
+                        "insertWidth": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
                         "kind": {
                           "enum": [
                             "flat",
@@ -129707,6 +129711,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "minLength": 1,
                           "type": "string",
                         },
+                        "insertWidth": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
                         "kind": {
                           "enum": [
                             "flat",
@@ -144926,6 +144934,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "minLength": 1,
                           "type": "string",
                         },
+                        "insertWidth": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
                         "kind": {
                           "enum": [
                             "flat",
@@ -149188,6 +149200,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "id": {
                               "minLength": 1,
                               "type": "string",
+                            },
+                            "insertWidth": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
                             },
                             "kind": {
                               "enum": [
