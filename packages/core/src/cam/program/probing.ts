@@ -22,7 +22,7 @@ import { planProbeCycle } from "../probing/cycles.ts"
 import { compileActions } from "../probing/actions.ts"
 import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type ProbeDevice } from "../probing/device.ts"
 import { runProbeMoves, tablePose, type SimKinematics } from "../probing/simulate.ts"
-import { meshWorld } from "../probing/world.ts"
+import { boxWorld, cylinderWorld, meshWorld, plateWorld, pocketWorld, type Placement, type ProbeWorld3 } from "../probing/world.ts"
 import type { ProbeAction, ProbeCycle as ProbeCycleSpec } from "../probing/types.ts"
 
 export type ProbeCycle = "z-surface" | "edge" | "corner" | "bore" | "boss"
@@ -352,13 +352,69 @@ const buildPartProbe = (setup: Setup): PartProbeBuild | { readonly refused: stri
   return { toolNumber, device, parts, notes }
 }
 
+
+type PartProbeCycleLike = Setup["partProbe"] extends infer P ? P extends { cycles: ReadonlyArray<infer C> } ? C : never : never
+type Corner3 = { readonly x: number; readonly y: number; readonly z: number }
+
+/**
+ * The blank with the features the cycles measure, placed where the blank really is: `undefined` when every cycle works on the plain block,
+ * a world when some cycle needs a feature (through bores in the plate, one rectangular pocket cut into its top, or the blank's outline
+ * itself for a boss, an outside rectangle or a web), a reason when the combination is not modelled. A pocket is cut as deep as the cycle
+ * touches plus a margin, a slot or web runs the whole blank across its width, an inside corner is a pocket 40 mm into the part.
+ */
+const featuredBlank = (cycles: ReadonlyArray<PartProbeCycleLike>, lo: Corner3, hi: Corner3, placement: Placement): ProbeWorld3 | string | undefined => {
+  const bores: { centre: { x: number; y: number }; radius: number }[] = []
+  const pockets: { min: { x: number; y: number }; max: { x: number; y: number }; depth: number }[] = []
+  const shapes: ProbeWorld3[] = []
+  const thick = hi.z - lo.z
+  // An outline that is the blank's own (a web or an outside rectangle as wide as the part) is measured on the plain block.
+  const isBlank = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+    Math.abs(a.x - lo.x) < 1e-6 && Math.abs(a.y - lo.y) < 1e-6 && Math.abs(b.x - hi.x) < 1e-6 && Math.abs(b.y - hi.y) < 1e-6
+  const rightAngle = (angle: number): "x" | "y" | undefined => {
+    const k = ((angle % Math.PI) + Math.PI) % Math.PI
+    return Math.abs(k) < 1e-6 || Math.abs(k - Math.PI) < 1e-6 ? "x" : Math.abs(k - Math.PI / 2) < 1e-6 ? "y" : undefined
+  }
+  for (const c of cycles) {
+    switch (c.kind) {
+      case "bore": bores.push({ centre: c.centre, radius: c.diameter / 2 }); break
+      case "boss": shapes.push(cylinderWorld({ centre: c.centre, radius: c.diameter / 2, z0: lo.z, z1: hi.z, inside: false }, placement)); break
+      case "rectangle": {
+        const a = { x: c.centre.x - c.size.x / 2, y: c.centre.y - c.size.y / 2 }, b = { x: c.centre.x + c.size.x / 2, y: c.centre.y + c.size.y / 2 }
+        if (c.inside) pockets.push({ min: a, max: b, depth: Math.min(thick - 0.5, c.depth + 6) })
+        else if (!isBlank(a, b)) shapes.push(boxWorld({ x: a.x, y: a.y, z: lo.z }, { x: b.x, y: b.y, z: hi.z }, placement))
+        break
+      }
+      case "web": case "pocket": {
+        const across = rightAngle(c.angle)
+        if (across === undefined) return `a ${c.kind} at ${(c.angle * 180 / Math.PI).toFixed(1)} degrees: the replay models a ${c.kind} across X or across Y (probed on the real part, not replayed)`
+        const half = c.width / 2
+        const min = across === "x" ? { x: c.centre.x - half, y: lo.y } : { x: lo.x, y: c.centre.y - half }
+        const max = across === "x" ? { x: c.centre.x + half, y: hi.y } : { x: hi.x, y: c.centre.y + half }
+        if (c.kind === "pocket") pockets.push({ min, max, depth: Math.min(thick - 0.5, c.depth + 6) })
+        else if (!isBlank(min, max)) shapes.push(boxWorld({ x: min.x, y: min.y, z: lo.z }, { x: max.x, y: max.y, z: hi.z }, placement))
+        break
+      }
+      case "corner": if (c.inside) {
+        const L = 40
+        const xs = [c.corner.x, c.corner.x - c.xSense * L].sort((p, q) => p - q), ys = [c.corner.y, c.corner.y - c.ySense * L].sort((p, q) => p - q)
+        pockets.push({ min: { x: xs[0]!, y: ys[0]! }, max: { x: xs[1]!, y: ys[1]! }, depth: Math.min(thick - 0.5, c.depth + 6) })
+      } break
+      default: break
+    }
+  }
+  if (bores.length === 0 && pockets.length === 0 && shapes.length === 0) return undefined
+  const kinds = [bores.length > 0, pockets.length > 0, shapes.length > 0].filter(Boolean).length
+  if (kinds > 1) return "bores, pockets and outlines in one probe: the replay models one kind of feature at a time (probed on the real part, not replayed)"
+  if (pockets.length > 1) return "more than one pocket in one probe: the replay cuts one pocket into the blank (probed on the real part, not replayed)"
+  if (shapes.length > 1) return "more than one boss, web or outside rectangle in one probe: the replay models one outline (probed on the real part, not replayed)"
+  if (bores.length > 0) return plateWorld({ min: lo, max: hi, bores }, placement)
+  if (pockets.length === 1) return pocketWorld(lo, hi, pockets[0]!, placement)
+  return shapes[0]
+}
+
 /** The replay of one part's probe moves against a blank that sits `d` away from nominal. */
 const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["parts"][number], d: { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number }, tolerance: number): PartProbeReplay => {
   const unreplayed = (reason: string): PartProbeReplay => ({ status: "unreplayed", reason })
-  // The replay's blank is a plain block: a bore, a boss, a slot and an inside corner need a feature the block does not have.
-  const featured = part.kinds.filter((k) => k === "bore" || k === "boss" || k === "pocket" || (k === "rectangle" && (setup.partProbe!.cycles.find((c) => c.kind === "rectangle") as { inside?: boolean } | undefined)?.inside === true))
-  if (featured.length > 0) return unreplayed(`the replay's blank is a plain block: a ${featured[0]} cycle needs its feature (probed on the real part, not replayed)`)
-  if (setup.partProbe!.cycles.some((c) => c.kind === "corner" && c.inside)) return unreplayed("the replay's blank is a plain block: an inside corner needs its pocket (probed on the real part, not replayed)")
   if (setup.partProbe!.rotation === "table-c" && part.entry.axes.includes("R")) return unreplayed("a rotation written to the table's C axis turns the part about the table's pivot: the replay does not model that write")
   const block = part.wp.stock ?? setup.stock
   if (block === undefined) return unreplayed("the setup and the workpiece give no blank to replay against")
@@ -380,7 +436,10 @@ const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["p
   const toWorld = (p: { x: number; y: number; z: number }) => (kinematics === undefined ? machine(real(p)) : tablePose(kinematics, pose, true).toTable(machine(real(p))))
   const v = corners.map(toWorld)
   const tri = [0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5]
-  const world = meshWorld([{ positions: v.flatMap((p) => [p.x, p.y, p.z]), indices: tri }])
+  const featured = featuredBlank(setup.partProbe!.cycles, lo, hi, { translate: { x: datum.x + d.x, y: datum.y + d.y, z: datum.z + d.z }, rotate: theta })
+  if (typeof featured === "string") return unreplayed(featured)
+  if (featured !== undefined && index !== undefined) return unreplayed("a part on an indexed face with a feature to probe: the replay places the feature on a flat table only (probed on the real part, not replayed)")
+  const world = featured ?? meshWorld([{ positions: v.flatMap((p) => [p.x, p.y, p.z]), indices: tri }])
   const outcome = runProbeMoves(part.moves, world, { offsets: table, active: part.ref, probe: built.device, ...(kinematics !== undefined ? { kinematics } : {}) })
   const entry = outcome.offsets[offsetKey(part.ref)] ?? getOffset(table, part.ref)
   const rotation = outcome.rotation

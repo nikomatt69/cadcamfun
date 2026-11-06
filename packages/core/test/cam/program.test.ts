@@ -704,9 +704,34 @@ describe("the probe program replayed against a blank that is not where the setup
     expect(two.parts[1]!.replay!.corrected!.X).toBeCloseTo(100.8, 6)
   })
 
-  test("what the replay does not cover is said, never passed: a bore needs its feature; a failed replay is in the probe program's warnings", () => {
-    const bore = replayOf({ cycles: [zSurface, { kind: "bore", centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }] })
-    expect(bore).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/plain block: a bore cycle needs its feature/) })
+  test("the cycles that need a feature are replayed against a blank that has it: a bore, a boss, a slot, an inside rectangle and an inside corner", () => {
+    const flat = { kind: "z-surface" as const, at: { x: 8, y: 8 }, expectedZ: 0 }
+    const cases: ReadonlyArray<readonly [string, program.PartProbe["cycles"][number]]> = [
+      ["bore", { kind: "bore", centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }],
+      ["boss", { kind: "boss", centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }],
+      ["slot", { kind: "pocket", centre: { x: 30, y: 25 }, width: 14, angle: 0, depth: 5 }],
+      ["web", { kind: "web", centre: { x: 30, y: 25 }, width: 14, angle: Math.PI / 2, depth: 5 }],
+      ["inside rectangle", { kind: "rectangle", inside: true, centre: { x: 30, y: 25 }, size: { x: 30, y: 20 }, depth: 5 }],
+      ["inside corner", { kind: "corner", corner: { x: 45, y: 40 }, inside: true, xSense: 1, ySense: 1, depth: 5, touchesPerEdge: 2 }]
+    ]
+    for (const [name, cycle] of cases) {
+      const r = replayOf({ cycles: [cycle] })
+      expect(r.status, `${name}: ${r.reason}`).not.toBe("unreplayed")
+      // Whatever the probe makes of it, it is the feature that was touched: either the register lands on the blank, or the miss/stop is named.
+      if (r.status === "within") expect(r.residualMm!).toBeLessThan(0.05)
+    }
+    // A bore is found where the blank really is: the register takes the displacement the bore measures in X and Y.
+    const bore = replayOf({ cycles: [flat, cases[0]![1]] })
+    expect(bore.status, bore.reason).toBe("within")
+    expect(bore.corrected!.X).toBeCloseTo(0.8, 3)
+    expect(bore.corrected!.Y).toBeCloseTo(-0.6, 3)
+    // The combinations the replay does not model are named, never passed.
+    expect(replayOf({ cycles: [cases[0]![1], cases[1]![1]] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/one kind of feature at a time/) })
+    expect(replayOf({ cycles: [{ kind: "pocket", centre: { x: 30, y: 25 }, width: 14, angle: 0.3, depth: 5 }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/across X or across Y/) })
+    expect(replayOf({ cycles: [cases[0]![1]] }, { workpieces: [{ id: "w1", name: "Face", workOffset: "G54", index: { a: 90 } }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/indexed face with a feature/) })
+  })
+
+  test("a failed replay is in the probe program's warnings, and a setup without a blank has nothing to replay against", () => {
     const noBlank = program.planPartProbe(setup([op("a", t6)], { partProbe: { cycles: [zSurface] } })).parts[0]!.replay!
     expect(noBlank).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/no blank/) })
     const web = { kind: "web" as const, centre: { x: 30, y: 25 }, width: 60, angle: 0, depth: 5 }
