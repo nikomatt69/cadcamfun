@@ -14,7 +14,7 @@ import { ToolMediaResult } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 import type { CadHoleInput, CadInspectionInput as CadInspectionInputWire, VisionInput } from "@cadcamfun/api"
 import {
-  runParametricDfm, runParametricDrawing, runParametricExact, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
+  runParametricDfm, runParametricDrawing, runParametricExact, runParametricFastener, runParametricFromElement, runParametricConfigurations, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
 } from "./parametric.ts"
 
 const INPUTS = { ...CAD_ACTION_INPUTS, ...PARAMETRIC_ACTION_INPUTS }
@@ -163,6 +163,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.parametric_test", kind: "read", replaces: "cad_parametric",
     parameters: INPUTS["cad.parametric_test"],
     run: (input, context) => runParametricTest(input, context)
+  }),
+  defineWireAction({
+    id: "cad.parametric_configurations", kind: "read", replaces: "cad_parametric",
+    parameters: INPUTS["cad.parametric_configurations"],
+    run: (input, context) => runParametricConfigurations(input, context)
   }),
   defineWireAction({
     id: "cad.parametric_dfm", kind: "read", replaces: "cad_parametric",

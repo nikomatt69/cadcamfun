@@ -111,7 +111,19 @@ const computeParametricReport = (history: History) => {
       if (developed === undefined) return []
       try { return [[f.id, flatPatternDxf(developed, dimensionValue(f.width, result.parameters), f.id)] as const] } catch { return [] }
     })),
-    sketches: Object.entries(result.sketches).map(([id, s]) => ({ id, status: s.solve.status, degreesOfFreedom: s.solve.dof, residual: s.solve.residual })),
+    // What a person needs to finish a loose sketch: the constraints that clash or repeat each other, the points that can still move.
+    sketches: Object.entries(result.sketches).map(([id, s]) => {
+      const solve = s.solve
+      const clash = [...new Set([...solve.conflicts, ...(solve.diagnostics?.conflictSet ?? [])])]
+      const redundant = solve.diagnostics?.redundant ?? []
+      const freePoints = Object.keys(solve.diagnostics?.freedom ?? {})
+      return {
+        id, status: solve.status, degreesOfFreedom: solve.dof, residual: solve.residual,
+        ...(clash.length > 0 ? { conflicts: clash.slice(0, 8) } : {}), ...(redundant.length > 0 ? { redundant: redundant.slice(0, 8) } : {}),
+        ...(freePoints.length > 0 ? { freePoints: freePoints.slice(0, 8), freePointsTotal: freePoints.length } : {}),
+        ...(solve.message !== undefined && solve.status !== "fully-constrained" ? { message: solve.message } : {})
+      }
+    }),
     // The features that are kept but not built (spec 58), so the assistant knows what the person left out; absent when all are built.
     ...(() => {
       const left = Object.entries(result.states).filter(([, state]) => state.state !== "ok" && state.state !== "failed")

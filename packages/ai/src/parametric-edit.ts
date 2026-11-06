@@ -8,14 +8,28 @@
  */
 import type { ParametricEdit } from "@cadcamfun/api"
 import {
-  dimensionsOf, groupFeatures, insertFeature, removeFeature, removeParameter, renameFeature, renameParameter, setDimension, setParameter,
-  ungroupFeatures, dependentsOf, type Feature, type History
+  activateConfiguration, addConfiguration, addSketchConstraint, dimensionsOf, groupFeatures, insertFeature, removeConfiguration, removeFeature, removeParameter,
+  removeSketchConstraint, renameConfiguration, renameFeature, renameParameter, setConfigurationSuppressed, setConfigurationValue, setConstraintDriven,
+  setDimension, setParameter, sketchReport, ungroupFeatures, dependentsOf, type DimConstraint, type Feature, type History, type SketchReport
 } from "@cadcamfun/core"
 import { decodeHistory, parametricReport } from "./parametric.ts"
 
 export type EditOutcome =
-  | { readonly ok: true; readonly history: History; readonly report: ReturnType<typeof parametricReport>; readonly applied: ReadonlyArray<string>; readonly removed: ReadonlyArray<string> }
+  | {
+    readonly ok: true; readonly history: History; readonly report: ReturnType<typeof parametricReport>; readonly applied: ReadonlyArray<string>; readonly removed: ReadonlyArray<string>
+    /** The sketches whose constraints an edit changed, as the solver reports them (state of every constraint, degrees of freedom left). */
+    readonly sketches: ReadonlyArray<SketchReport>
+  }
   | { readonly ok: false; readonly error: string; readonly problems?: ReadonlyArray<string> }
+
+/** One sketch's constraints for the model: the constraint rows (index, name, state, value), the degrees of freedom left and who clashes. */
+export const sketchDetail = (history: History, featureId: string): SketchReport | undefined => {
+  const report = sketchReport(history, featureId)
+  if (report === undefined) return undefined
+  // A big sketch would list every point that can move: the first dozen say which part is loose.
+  const freedom = Object.fromEntries(Object.entries(report.freedom).slice(0, 12))
+  return { ...report, freedom }
+}
 
 const fail = (error: string, problems?: ReadonlyArray<string>): EditOutcome => ({ ok: false, error, ...(problems !== undefined ? { problems } : {}) })
 
@@ -43,6 +57,45 @@ const errorKeys = (report: ReturnType<typeof parametricReport>): Map<string, str
   new Map(report.issues.filter((i) => i.severity === "error").map((i) => [`${i.feature}\u0000${i.message}`, `${i.feature}: ${i.message}`]))
 
 const describeValue = (value: unknown): string => typeof value === "string" ? `"${value}"` : String(value)
+const describeValues = (values: Readonly<Record<string, number | string>>): string => Object.entries(values).map(([name, v]) => `${name} = ${describeValue(v)}`).join(", ")
+const suppressNote = (edit: { readonly suppress?: ReadonlyArray<string>; readonly release?: ReadonlyArray<string> }): string =>
+  `${edit.suppress !== undefined ? `; leaves out ${edit.suppress.join(", ")}` : ""}${edit.release !== undefined ? `; builds ${edit.release.join(", ")}` : ""}`
+
+const unknownConfiguration = (history: History, id: string): string => {
+  const list = history.configurations ?? []
+  return `there is no configuration '${id}'. ${list.length === 0 ? "The part has none: add_configuration creates the first (and keeps the current state as Default)." : `Configurations: ${list.map((c) => `${c.id} ("${c.name}")`).join(", ")}.`}`
+}
+/** A refusal about an unknown parameter, with the names that exist. */
+const withParameters = (refusal: string, history: History): string =>
+  refusal.startsWith("no parameter") ? `${refusal}. Parameters: ${Object.keys(history.parameters).join(", ") || "(none)"}; add one with set_parameter first` : refusal
+
+/**
+ * The values and suppressed features of configuration `id`, set one by one through core's editors (each checks its own refusal: an
+ * unknown parameter, a value that does not evaluate, an unknown feature). A history, or the text of the first refusal.
+ */
+const configurationContent = (history: History, id: string, edit: { readonly values?: Readonly<Record<string, number | string>>; readonly suppress?: ReadonlyArray<string>; readonly release?: ReadonlyArray<string> }): History | string => {
+  let next = history
+  for (const [name, value] of Object.entries(edit.values ?? {})) {
+    const set = setConfigurationValue(next, id, name, value)
+    if (set.refusal !== undefined) return `${withParameters(set.refusal, next)}.`
+    next = set.history
+  }
+  for (const [ids, on] of [[edit.suppress, true], [edit.release, false]] as const) {
+    if (ids === undefined) continue
+    const set = setConfigurationSuppressed(next, id, ids, on)
+    if (set.refusal !== undefined) return `${set.refusal}. Features: ${next.features.map((f) => f.id).join(", ")}.`
+    next = set.history
+  }
+  return next
+}
+
+const describeFreedom = (report: SketchReport): string =>
+  report.status === "fully-constrained" ? "fully constrained" : `${report.status}${report.dof >= 0 ? `, ${report.dof} degree(s) of freedom left` : ""}`
+/** The sketches of the history, for a refusal that named one that is not there. */
+const sketchHint = (history: History, feature: string): string => {
+  const sketches = history.features.filter((f) => f.type === "sketch").map((f) => f.id)
+  return sketches.includes(feature) ? "" : ` Sketch features: ${sketches.join(", ") || "(none)"}.`
+}
 
 /** The edits applied to a stored history; the result is the new history, its rebuild report and one line per edit. */
 export const editHistory = (stored: unknown, edits: ReadonlyArray<ParametricEdit>): EditOutcome => {
@@ -52,6 +105,7 @@ export const editHistory = (stored: unknown, edits: ReadonlyArray<ParametricEdit
   let next: History = before
   const applied: string[] = []
   const removed: string[] = []
+  const touched = new Set<string>()
   for (const [index, edit] of edits.entries()) {
     const at = `edits[${index}] ${edit.op}`
     try {
@@ -131,6 +185,78 @@ export const editHistory = (stored: unknown, edits: ReadonlyArray<ParametricEdit
           next = ungroupFeatures(next, edit.group)
           applied.push(`group ${edit.group} dissolved`)
           break
+        case "add_configuration": {
+          const added = addConfiguration(next, edit.name, edit.id)
+          if (added.refusal !== undefined) return fail(`${at}: ${added.refusal}.`)
+          next = added.history
+          // The new variant is the shown one: its values and suppressed set are written into the part as they are given.
+          const id = next.configuration!
+          const refused = configurationContent(next, id, edit)
+          if (typeof refused === "string") return fail(`${at}: ${refused}`)
+          next = refused
+          applied.push(`configuration '${edit.name}' (${id}) added and shown${edit.values !== undefined ? `; values ${describeValues(edit.values)}` : ""}${suppressNote(edit)}`)
+          break
+        }
+        case "set_configuration": {
+          if (edit.values === undefined && edit.clear === undefined && edit.suppress === undefined && edit.release === undefined) return fail(`${at}: send at least one of values, clear, suppress or release.`)
+          if (!(next.configurations ?? []).some((c) => c.id === edit.id)) return fail(`${at}: ${unknownConfiguration(next, edit.id)}`)
+          for (const name of edit.clear ?? []) {
+            const cleared = setConfigurationValue(next, edit.id, name, undefined)
+            if (cleared.refusal !== undefined) return fail(`${at}: ${withParameters(cleared.refusal, next)}.`)
+            next = cleared.history
+          }
+          const refused = configurationContent(next, edit.id, edit)
+          if (typeof refused === "string") return fail(`${at}: ${refused}`)
+          next = refused
+          applied.push(`configuration '${edit.id}' changed${edit.values !== undefined ? `: ${describeValues(edit.values)}` : ""}${edit.clear !== undefined ? `; ${edit.clear.join(", ")} follow the current value` : ""}${suppressNote(edit)}`)
+          break
+        }
+        case "activate_configuration": {
+          const shown = activateConfiguration(next, edit.id)
+          if (shown.refusal !== undefined) return fail(`${at}: ${shown.refusal.startsWith("no configuration") ? unknownConfiguration(next, edit.id) : shown.refusal + "."}`)
+          next = shown.history
+          applied.push(`configuration '${edit.id}' shown`)
+          break
+        }
+        case "rename_configuration": {
+          const renamed = renameConfiguration(next, edit.id, edit.name)
+          if (renamed.refusal !== undefined) return fail(`${at}: ${renamed.refusal.startsWith("no configuration") ? unknownConfiguration(next, edit.id) : renamed.refusal + "."}`)
+          next = renamed.history
+          applied.push(`configuration '${edit.id}' renamed "${edit.name}"`)
+          break
+        }
+        case "remove_configuration": {
+          const gone = removeConfiguration(next, edit.id)
+          if (gone.refusal !== undefined) return fail(`${at}: ${unknownConfiguration(next, edit.id)}`)
+          next = gone.history
+          applied.push(`configuration '${edit.id}' removed (the part stays as it shows now)`)
+          break
+        }
+        case "add_sketch_constraint": {
+          const changed = addSketchConstraint(next, edit.feature, edit.constraint as unknown as DimConstraint)
+          if (changed.refusal !== undefined) return fail(`${at}: ${changed.refusal}.${sketchHint(next, edit.feature)}`)
+          next = changed.history
+          applied.push(`sketch ${edit.feature}: ${edit.constraint.type} constraint added${changed.report !== undefined ? ` (${describeFreedom(changed.report)})` : ""}`)
+          touched.add(edit.feature)
+          break
+        }
+        case "remove_sketch_constraint": {
+          const changed = removeSketchConstraint(next, edit.feature, edit.index)
+          if (changed.refusal !== undefined) return fail(`${at}: ${changed.refusal}.${sketchHint(next, edit.feature)}`)
+          const was = (next.features.find((f) => f.id === edit.feature) as Extract<Feature, { type: "sketch" }>).sketch.constraints[edit.index]!
+          next = changed.history
+          applied.push(`sketch ${edit.feature}: ${was.type} constraint ${edit.index} removed${changed.report !== undefined ? ` (${describeFreedom(changed.report)})` : ""}`)
+          touched.add(edit.feature)
+          break
+        }
+        case "set_constraint_driven": {
+          const changed = setConstraintDriven(next, edit.feature, edit.index, edit.driven)
+          if (changed.refusal !== undefined) return fail(`${at}: ${changed.refusal}.${sketchHint(next, edit.feature)}`)
+          next = changed.history
+          applied.push(`sketch ${edit.feature}: constraint ${edit.index} is now a ${edit.driven ? "reference (driven)" : "driving"} dimension${changed.report !== undefined ? ` (${describeFreedom(changed.report)})` : ""}`)
+          touched.add(edit.feature)
+          break
+        }
       }
     } catch (error) {
       if (error instanceof RangeError) return fail(`${at}: ${error.message}`)
@@ -150,5 +276,7 @@ export const editHistory = (stored: unknown, edits: ReadonlyArray<ParametricEdit
     const introduced = [...errorKeys(report)].filter(([key]) => !previous.has(key)).map(([, text]) => text)
     if (introduced.length > 0) return fail("The edits were not applied: they make the part fail to rebuild.", introduced.slice(0, 12))
   }
-  return { ok: true, history: checked.data, report, applied, removed }
+  // A feature removed later in the same list takes its sketch report with it.
+  const sketches = [...touched].flatMap((id) => { const detail = sketchDetail(checked.data, id); return detail === undefined ? [] : [detail] })
+  return { ok: true, history: checked.data, report, applied, removed, sketches }
 }

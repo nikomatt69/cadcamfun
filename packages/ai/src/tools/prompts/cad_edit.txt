@@ -11,9 +11,9 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - import: attachment (preferred) or content, format? dxf|svg|step|iges|parasolid|mesh, depth? (required dxf/svg), up? (STEP), scale?, gap?, tolerance?, name?, color?, layer?. IGES stores exact solids; incomplete imports store nothing. Parasolid x_t text/x_b binary are unsupported. STEP/IGES imports recover geometry, not history.
 - export: format stl|stl_ascii|obj|3mf|step|iges, ids? (default all) or history, name?, unit?, tolerance?. Stores a file; answer: file {name,key,bytes,sha256}.
 - fasten: washers?. Inserts the screws, washers, nuts cad assembly lists missing.
-- parametric_create: history, name, x?, y?, z?, layer?. Store validated history; sketches use shapes or point/line/arc entities and constraints. Skill fusion-360-modelling.
+- parametric_create: history, name, material? (library grade: mass), x?, y?, z?, layer?. Store validated history; sketches use shapes or point/line/arc entities and constraints. Skill fusion-360-modelling.
 - parametric_update: elementId, parameters, expectedRevision from the last inspection; sets existing parameters only.
-- parametric_edit: elementId, expectedRevision, edits (1..40, atomic) of op: set_parameter name,value | rename_parameter from,to | remove_parameter name | set_dimension feature,path,value | replace_feature feature | insert_feature feature,after?|atStart? | remove_feature id,cascade? | rename_feature id,name? | group_features group,name,ids | ungroup_features group. Values: numbers or parameter expressions; paths from parametric_inspect.
+- parametric_edit: elementId, expectedRevision, edits (1..40, atomic) of op: set_parameter name,value | rename_parameter from,to | remove_parameter name | set_dimension feature,path,value | replace_feature feature | insert_feature feature,after?|atStart? | remove_feature id,cascade? | rename_feature id,name? | group_features group,name,ids | ungroup_features group | add_configuration name,id?,values?,suppress?,release? (variant from shown state) | set_configuration id,values?,clear?,suppress?,release? | activate_configuration id | rename_configuration id,name | remove_configuration id | add_sketch_constraint feature,constraint | remove_sketch_constraint feature,index | set_constraint_driven feature,index,driven. Values: numbers or parameter expressions; paths from parametric_inspect.
 - parametric_timeline: elementId, expectedRevision, suppress? release? (feature ids), rollback? (last built feature) | rollForward?, move? {feature,to}. Deletes nothing.
 - parametric_recipe_create: recipe, params?, name?, x?, y?, z?, layer?. Build and store a standard part.
 - parametric_convert: elementId, depth? (flat shapes), name?. Store a parametric twin; preserve shape/placement/properties and original.
@@ -28,7 +28,7 @@ History additions
 Fillet radiusEnd varies a straight-edge radius (not chamfers). Sheet flanges [{end,length,angle,relief?{width,depth}}] extend full-width edges with bendRadius; flatPatterns report blanks. Adjacent-edge corners unsupported. Hole: thread {designation,depth,fit?}, tolerance {upper,lower}, fit (H7) for drawing; thread takes designation.
 
 Result (JSON)
-ok, ids, elements, projectId, drawingId; parametric writes add elementId, revision, verification {verdict, volumeMm3, sizeMm, attention[]}. Read attention, skipped and errors before proceeding. Reinspect on stale revision; never guess a replacement.
+ok, ids, elements, projectId, drawingId; parametric writes add elementId, revision, verification {verdict, volumeMm3, sizeMm, massG (material set), centerOfGravityMm, sketches[] (dof, conflicts), attention[]}; configuration edits add designTable. Read attention, skipped and errors before proceeding. Reinspect on stale revision; never guess a replacement.
 
 Do not use it
 For inspection use cad. Move or modify existing geometry instead of deleting and rebuilding it.

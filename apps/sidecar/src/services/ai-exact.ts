@@ -3,6 +3,7 @@
  * with the long lists capped (a plate with two hundred holes must not fill the context), always with the true totals.
  */
 import { cad } from "@cadcamfun/core"
+import { massGrams, type VerificationMaterial } from "@cadcamfun/ai"
 
 const LIST_CAP = 40
 
@@ -15,22 +16,35 @@ const round = (value: unknown): unknown => {
 
 const capped = <T>(list: ReadonlyArray<T>): { readonly items: ReadonlyArray<T>; readonly total: number } => ({ items: list.slice(0, LIST_CAP), total: list.length })
 
-export const exactForModel = (analysis: cad.SceneAnalysis, drawing: Record<string, unknown>) => ({
+/**
+ * `materials` holds the density of the parts that have a material (by element id): their exact volume times it is the part's mass,
+ * and the total counts only the parts that have one (`massUnweighted` names the rest).
+ */
+export const exactForModel = (analysis: cad.SceneAnalysis, drawing: Record<string, unknown>, materials: ReadonlyMap<string, VerificationMaterial> = new Map()) => {
+  const massOf = (id: string, volume: number) => {
+    const density = materials.get(id)?.density
+    return density === undefined ? undefined : { name: density.name, densityGcm3: density.densityGcm3, source: density.source, massG: massGrams(volume, density.densityGcm3) }
+  }
+  const weighed = analysis.parts.flatMap((p) => { const m = massOf(p.id, p.volume); return m === undefined ? [] : [m.massG] })
+  const unweighted = analysis.parts.filter((p) => massOf(p.id, p.volume) === undefined).map((p) => p.id)
+  return {
   ok: true,
   ...(round({
-    totals: analysis.totals,
+    totals: { ...analysis.totals, ...(weighed.length > 0 ? { massG: weighed.reduce((a, b) => a + b, 0), ...(unweighted.length > 0 ? { massUnweighted: unweighted.slice(0, LIST_CAP) } : {}) } : {}) },
     parts: analysis.parts.map((p) => {
+      const mass = massOf(p.id, p.volume)
       const holes = capped(p.holes), bosses = capped(p.bosses)
       const fillets = capped(p.fillets ?? []), walls = capped(p.swarfWalls ?? []), free = capped(p.nurbsFaces ?? [])
       return {
-        ...p, holes: holes.items, holesTotal: holes.total, ...(holes.total > holes.items.length ? { holesOmitted: holes.total - holes.items.length } : {}), bosses: bosses.items, bossesTotal: bosses.total,
+        ...p, ...(mass !== undefined ? { material: { name: mass.name, densityGcm3: mass.densityGcm3, source: mass.source }, massG: mass.massG } : {}), holes: holes.items, holesTotal: holes.total, ...(holes.total > holes.items.length ? { holesOmitted: holes.total - holes.items.length } : {}), bosses: bosses.items, bossesTotal: bosses.total,
         ...(fillets.total > 0 ? { fillets: fillets.items, filletsTotal: fillets.total } : {}), ...(walls.total > 0 ? { swarfWalls: walls.items, swarfWallsTotal: walls.total } : {}), ...(free.total > 0 ? { nurbsFaces: free.items, nurbsFacesTotal: free.total } : {})
       }
     }),
     skipped: analysis.skipped
   }) as object),
   ...drawing
-})
+  }
+}
 
 /** Setup plans for the assistant: face lists are summarised (counts), the long lists capped, the totals kept. */
 export const setupsForModel = (report: cad.SceneSetups, drawing: Record<string, unknown>) => {

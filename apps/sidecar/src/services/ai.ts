@@ -19,7 +19,7 @@ import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
-import { changeParameters, editTimeline, historyRevision, failureMessage, inspectParametric, testParametric, verificationFor } from "./ai-parametric.ts"
+import { changeParameters, configurationsOfPart, editTimeline, historyRevision, failureMessage, inspectParametric, libraryDensity, materialFor, testParametric, verificationFor } from "./ai-parametric.ts"
 import { ActingUser, CurrentTurn, ensureTurnActive, invocationFailureText, isInvocationRefusal } from "./acting-user.ts"
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
@@ -44,7 +44,7 @@ import { makeCommandExecutor } from "./ai-command-execution.ts"
 import { makeAiEngineeringState } from "./ai-engineering-state.ts"
 import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
-import { type CadSceneInput, type CadSceneResult, KernelJobError, featureEditOf, normalizeElementBatch, outlineHistory, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { type CadSceneInput, type CadSceneResult, KernelJobError, designTableView, featureEditOf, materialOfElement, normalizeElementBatch, outlineHistory, runKernelJob, sketchDetail, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -868,7 +868,15 @@ const toolHandlers = Effect.gen(function*() {
       { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
-        return exactForModel(await runOwnedKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } }), where(loaded))
+        const analysis = await runOwnedKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } })
+        // The parts that carry a material also carry their mass (exact volume x library density).
+        const resolved = new Map<string, NonNullable<Awaited<ReturnType<typeof materialFor>>>>()
+        for (const part of analysis.parts) {
+          const element = loaded.elements.find((e) => e.id === part.id)
+          const material = element === undefined ? undefined : await materialFor(element, async (name) => libraryDensity(await run(materials.list(acting().id, { search: name })), name))
+          if (material !== undefined) resolved.set(part.id, material)
+        }
+        return exactForModel(analysis, where(loaded), resolved)
       } catch (error) { return kernelFailed("The exact analysis failed", error) }
     },
     cadTitleBlock: async (projectId, input) => {
@@ -1131,10 +1139,13 @@ const toolHandlers = Effect.gen(function*() {
       const signal = requestedSignal ?? actingCell.turn(local).signal
       { const denied = await refused(projectId); if (denied) return denied }
       if (input.action === "validate") return inspectParametric(input.history, signal)
+      // The part's material, from the user's library when the CAM library does not know the name: the mass of a variant follows it.
+      const materialOf = (element: Record<string, unknown>) => materialFor(element, async (name) => libraryDensity(await run(materials.list(acting().id, { search: name })), name))
       if (input.action === "create") {
-        const report = await inspectParametric(input.history, signal)
+        const material = await materialOf(input.material === undefined ? {} : { material: input.material })
+        const report = await inspectParametric(input.history, signal, material)
         if (!report.ok) return { ...report, ok: false, error: failureMessage(report, "Nothing was created") }
-        const added = await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }]) as Record<string, unknown>
+        const added = await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, ...(input.material !== undefined ? { material: input.material } : {}), x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }]) as Record<string, unknown>
         if (added["ok"] !== true) return added
         // What was stored, read back: the id and revision the next update needs, and the verdict of the build (volume, size, warnings).
         const stored = (added["elements"] as ReadonlyArray<Record<string, unknown>>)[0]
@@ -1164,11 +1175,19 @@ const toolHandlers = Effect.gen(function*() {
       const element = loaded.elements.find((e) => e.id === input.elementId && e.type === "parametric")
       if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }
       const history = element["history"]
+      const material = await materialOf(element)
       if (input.action === "inspect") {
-        const inspected = await inspectParametric(history, signal)
-        // The dimensions a structural edit can bind (path, label, value); a history the schema refuses has none to list.
-        return { ...inspected, ...("history" in inspected ? { features: outlineHistory(inspected.history, input.feature) } : {}), elementId: element.id, ...where(loaded) }
+        const inspected = await inspectParametric(history, signal, material)
+        // The dimensions a structural edit can bind (path, label, value); a history the schema refuses has none to list. One sketch asked
+        // for also lists its constraints with their state and the degrees of freedom left.
+        const table = "history" in inspected ? designTableView(inspected.history) : undefined
+        const sketch = "history" in inspected && input.feature !== undefined ? sketchDetail(inspected.history, input.feature) : undefined
+        return {
+          ...inspected, ...("history" in inspected ? { features: outlineHistory(inspected.history, input.feature) } : {}), ...(sketch !== undefined ? { sketch } : {}), ...(table !== undefined ? { designTable: table } : {}),
+          ...(materialOfElement(element) !== undefined ? { material: materialOfElement(element) } : {}), elementId: element.id, ...where(loaded)
+        }
       }
+      if (input.action === "configurations") return { ...configurationsOfPart(history, input.compare === true, material), elementId: element.id, revision: historyRevision(history), mutated: false, ...where(loaded) }
       if (input.action === "test") return { ...(await testParametric(history, input, signal)), elementId: element.id, ...where(loaded) }
       if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
       if (input.action === "timeline") {
@@ -1176,7 +1195,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!edited.ok) return { ...edited, ...where(loaded) }
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
-        return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report), report: edited.report, ...where(loaded) }
+        return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report, material), report: edited.report, ...where(loaded) }
       }
       if (input.action === "edit") {
         const edited = structuredClone(await runOwnedKernelJob("parametric-edit", { history, edits: input.edits }, { signal }))
@@ -1184,18 +1203,20 @@ const toolHandlers = Effect.gen(function*() {
         const updated = { ...element, history: edited.history }
         await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
         return {
-          ok: true, mutation: "edit", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report), report: edited.report,
-          applied: edited.applied, ...(edited.removed.length > 0 ? { removed: edited.removed } : {}), ...where(loaded)
+          ok: true, mutation: "edit", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), verification: verificationFor(edited.history, edited.report, material), report: edited.report,
+          applied: edited.applied, ...(edited.removed.length > 0 ? { removed: edited.removed } : {}),
+          // What the configuration and sketch edits left behind: the design table (the shown variant is the one verified above) and each touched sketch's constraints.
+          ...(designTableView(edited.history) !== undefined ? { designTable: designTableView(edited.history) } : {}), ...(edited.sketches.length > 0 ? { sketches: edited.sketches } : {}), ...where(loaded)
         }
       }
       const changed = await changeParameters(history, input.parameters, signal)
       if (!changed.ok) return { ...changed, ...where(loaded) }
       if (!changed.report.ok) {
-        return { ...changed.report, verification: verificationFor(changed.history, changed.report), diagnosis: changed.diagnosis, error: failureMessage({ diagnosis: changed.diagnosis }, "The parameters were not changed: the variant fails and the part is untouched"), ...where(loaded) }
+        return { ...changed.report, verification: verificationFor(changed.history, changed.report, material), diagnosis: changed.diagnosis, error: failureMessage({ diagnosis: changed.diagnosis }, "The parameters were not changed: the variant fails and the part is untouched"), ...where(loaded) }
       }
       const updated = { ...element, history: changed.history }
       await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
-      return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), verification: verificationFor(changed.history, changed.report), report: changed.report, ...where(loaded) }
+      return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), verification: verificationFor(changed.history, changed.report, material), report: changed.report, ...where(loaded) }
     },
     addEntities: async (projectId, entities) => {
       const loaded = await load(projectId, true)

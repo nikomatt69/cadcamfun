@@ -109,6 +109,11 @@ const parametricInspect = Schema.Struct({
   features: Schema.optionalKey(Schema.Array(record)), ...drawingRef
 })
 const parametricTest = Schema.Struct({ ok: Schema.Boolean, revision: str, mutated: Schema.Literal(false), cases: Schema.Array(record), elementId: str, ...drawingRef })
+/** The configurations of a part: the design table (null when it has none) and, when compared, each variant rebuilt and measured. */
+const parametricConfigurations = Schema.Struct({
+  ok: Schema.Boolean, elementId: str, revision: str, mutated: Schema.Literal(false), active: nullable(str),
+  designTable: nullable(record), variants: Schema.optionalKey(Schema.Array(record)), ...drawingRef
+})
 const parametricDfm = Schema.Struct({ ok: Schema.Boolean, process: str, toolDiameter: num, issues: Schema.Array(record), metrics: Schema.Struct({ bodies: int, volumeMm3: num }) })
 const parametricExact = Schema.Struct({
   ok: Schema.Boolean, bodies: Schema.Array(record), issues: Schema.Array(record), warnings: Schema.optionalKey(strings),
@@ -190,7 +195,7 @@ const parametricTimeline = Schema.Struct({ ok: Schema.Literal(true), mutation: S
 /** A structural edit of a stored part: what each edit did, the features that went with a removal, and the rebuild report. */
 const parametricEdited = Schema.Struct({
   ok: Schema.Literal(true), mutation: Schema.Literal("edit"), ids: strings, elements, revision: str, report: record, applied: strings,
-  removed: Schema.optionalKey(strings), ...drawingRef
+  removed: Schema.optionalKey(strings), designTable: Schema.optionalKey(record), sketches: Schema.optionalKey(Schema.Array(record)), ...drawingRef
 })
 const recipeCreated = Schema.Struct({ ok: Schema.Literal(true), recipe: str, history: record, report: Schema.Struct(parametricReport), created: parametricCreated })
 const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, source: Schema.Struct({ id: str, type: str }), notes: strings, ...drawingRef })
@@ -384,6 +389,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.parametric_validate": read(parametricValidate),
   "cad.parametric_inspect": read(parametricInspect),
   "cad.parametric_test": read(parametricTest),
+  "cad.parametric_configurations": read(parametricConfigurations),
   "cad.parametric_dfm": read(parametricDfm),
   "cad.parametric_exact": read(parametricExact),
   "cad.exact": read(exact),

@@ -109,7 +109,7 @@ export const ELEMENT_TYPES = Object.keys(ELEMENT_SPECS) as ReadonlyArray<Element
 /** Fields every element may carry besides its own. */
 /** A component or group holds at most this many children (one call holds at most 40 elements in all). */
 const MAX_CHILDREN = 40
-const COMMON = ["name", "color", "wireframe", "layer", "layerId", "component", "rotation", "scale", "opacity", "linewidth"] as const
+const COMMON = ["name", "color", "wireframe", "layer", "layerId", "component", "rotation", "scale", "opacity", "linewidth", "material"] as const
 
 /**
  * The base pieces: plain solids the assistant lays down first and then combines, cuts or builds on. They are created as
@@ -188,6 +188,10 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
   // No profile given means the round tube of `radius`, not the default sample square.
   if (type === "sweep" && input["profile"] === undefined) element["profile"] = []
   for (const key of COMMON) if (input[key] !== undefined) element[key] = input[key]
+  // The material is a designation the library resolves to a density (mass = volume x density); it is text, never an object.
+  if (element["material"] !== undefined && (typeof element["material"] !== "string" || element["material"].trim() === "" || element["material"].length > 100)) {
+    return { ok: false, error: `${type}.material must be a material grade or designation of 1 to 100 characters (aluminium, S235JR, PA6, ...)` }
+  }
   if (BASE_PRIMITIVES.has(type) && element["wireframe"] === undefined) element["wireframe"] = true
   if (input["rotation"] !== undefined) {
     const r = input["rotation"] as Record<string, unknown> | null
