@@ -295,6 +295,27 @@ describe("workholding: clamps and the machine's travel", () => {
     // The pocket stays inside the plate: the same clamp is not touched.
     expect(generateSetup(setup(ops, { stock: snug, workpieces: parts, fixtures: [clamp(23, 40)] }), geometryOf).warnings.filter((w) => /reaches/.test(w))).toEqual([])
   })
+
+  test("a clamp is judged in the indexed part's frame: the table turn carries it onto the blank, and off it", () => {
+    const placed = { x: 50, y: 50, z: 10, origin: { x: -25, y: -25, z: 0 }, material: "aluminum" }
+    const part = { id: "w1", name: "Part 1", workOffset: "G54" as const, placement: { x: 100, y: 0, z: 0 }, index: { a: 90 } }
+    const onto = { id: "c1", name: "Clamp 1", min: { x: 80, y: -10, z: 5 }, max: { x: 90, y: 0, z: 15 } }
+    const off = { id: "c1", name: "Clamp 1", min: { x: 80, y: 10, z: -5 }, max: { x: 90, y: 20, z: 0 } }
+    expect(validateSetup(setup(ops, { stock: placed, workpieces: [part], fixtures: [onto] })).map((i) => i.message).join(" ")).toMatch(/Part 1's blank overlaps Clamp 1/)
+    expect(validateSetup(setup(ops, { stock: placed, workpieces: [part], fixtures: [off] })).filter((i) => /overlaps Clamp/.test(i.message))).toHaveLength(0)
+    expect(validateSetup(setup(ops, { stock: placed, workpieces: [{ ...part, index: undefined }], fixtures: [off] })).map((i) => i.message).join(" ")).toMatch(/overlaps Clamp 1/)
+  })
+
+  test("an indexed part meets the clamp where the table carries it, and misses the same box left in the first frame", () => {
+    const snug = { ...stock, x: 44, origin: { x: -22, y: -25, z: 0 } }
+    const outside = [op("a", t6, {}, { operationType: "profile" })]
+    const turned = { id: "c1", name: "Clamp 1", min: { x: -18, y: -40, z: -12 }, max: { x: 18, y: -23, z: 4 } }
+    const part = { id: "w1", name: "Part 1", workOffset: "G54" as const, placement: { x: 0, y: 0, z: 0 }, index: { c: 90 } }
+    const hit = generateSetup(setup(outside, { stock: snug, workpieces: [part], fixtures: [turned] }), geometryOf)
+    expect(hit.warnings.filter((w) => /reaches/.test(w))).toEqual(["Op a: the tool reaches Clamp 1 (Endmill Ø6 Ø6, 34 mm out of the holder)"])
+    const missed = generateSetup(setup(outside, { stock: snug, workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }], fixtures: [turned] }), geometryOf)
+    expect(missed.warnings.filter((w) => /reaches/.test(w))).toEqual([])
+  })
 })
 
 describe("tool life and sister tools", () => {
@@ -477,6 +498,41 @@ describe("the fixture as ONE body: every part's remaining stock from the same so
     const clear = program.setupEvidence(gcode, { ...one, fixtures: [clamp(20.05)] }, [clean], held)
     expect(clear.fixture!.crossings).toEqual([])
     expect(clear.fixture!.complete).toBe(true)
+  })
+
+  test("a graze of 0.3 mm into another part's blank is a crossing the lattice cell would miss; one 0.05 mm clear is not", () => {
+    const neighbor = (x: number) => ({ register: "G56", workpieceId: "w2", name: "Part 2", stock: { min: { x: 0, y: -20, z: -10 }, max: { x: 20, y: 20, z: 5 } }, datum: { x, y: 0, z: 0 } })
+    const grazed = program.setupEvidence(gcode, { ...one, registers: [one.registers[0]!, neighbor(19.7)] }, [clean, clean], held)
+    expect(grazed.fixture!.crossings.map((c) => [c.register, c.other])).toEqual([["G54", "G56"]])
+    expect(grazed.fixture!.crossings[0]!.message).toMatch(/0\.3 mm into it by the exact box test, within 0\.05 mm/)
+    expect(grazed.fixture!.blankMethod).toBe("exact-box")
+    expect(grazed.fixture!.blankErrorMm).toBe(0.05)
+    expect(grazed.release).toBe("blocked")
+    const clear = program.setupEvidence(gcode, { ...one, registers: [one.registers[0]!, neighbor(20.05)] }, [clean, clean], held)
+    expect(clear.fixture!.crossings).toEqual([])
+    expect(clear.fixture!.complete).toBe(true)
+  })
+
+  test("a turned part meets the other blank where the table carries it: a neighbour that is grazed unturned is clear once the table turns it away, and the part is not carved into the lattice body", () => {
+    const neighbor = { register: "G56", workpieceId: "w2", name: "Part 2", stock: { min: { x: 0, y: -20, z: -10 }, max: { x: 20, y: 20, z: 5 } }, datum: { x: 19.7, y: 0, z: 0 } }
+    const grazed = program.setupEvidence(gcode, { ...one, registers: [one.registers[0]!, neighbor] }, [clean, clean], held)
+    expect(grazed.fixture!.crossings).toHaveLength(1)
+    const turned = program.setupEvidence(gcode, { ...one, registers: [{ ...one.registers[0]!, index: { c: 90 } }, neighbor] }, [clean, clean], held)
+    // A quarter turn about the datum carries the neighbour off the side the program cuts toward: the same program no longer reaches it, and the view says it is judged as boxes.
+    expect(turned.fixture!.crossings.filter((c) => c.register === "G54" && c.other === "G56")).toEqual([])
+    expect(turned.fixture!.notes!.join(" ")).toMatch(/Part 1 \(G54\) is turned by its index.*not carved into the lattice body/)
+    expect(turned.fixture!.parts[0]!.bodyRemainingMm3).toBeUndefined()
+    expect(grazed.fixture!.notes).toBeUndefined()
+  })
+
+  test("a table index carries the clamp into the part frame before the exact test; the same box with no index is clear", () => {
+    const indexed = { ...one.registers[0]!, index: { c: 90 } }
+    const raw = { id: "c1", name: "Clamp 1", min: { x: -20, y: -39.7, z: -10 }, max: { x: 20, y: -19.7, z: 5 } }
+    const hit = program.setupEvidence(gcode, { ...one, registers: [indexed], fixtures: [raw] }, [clean], held)
+    expect(hit.fixture!.crossings.map((c) => c.other)).toEqual(["c1"])
+    expect(hit.fixture!.crossings[0]!.message).toMatch(/exact box test/)
+    const plain = program.setupEvidence(gcode, { ...one, fixtures: [raw] }, [clean], held)
+    expect(plain.fixture!.crossings).toEqual([])
   })
 })
 
