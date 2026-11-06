@@ -9,6 +9,7 @@ import { CADCAM_AGENT, PRIMARY_STEP_LIMIT } from "./config.ts"
 import { currentHostAgent } from "./primaries.ts"
 import { primaryOfHost, reminderFor } from "../prompts/reminders.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
+import { compactHostSession, readHostContextPolicy } from "./context.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
 
@@ -74,7 +75,7 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
   if (state.lastToolError && DENIAL.test(state.lastToolError)) return undefined
   // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
   if (finish === "length") {
-    return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_edit action add call, one operation at a time, and keep going until the request is complete and checked."
+    return "Your last message was cut off by the output limit; if you were writing a tool call, it did not run. Resume directly from where you stopped: no apology, no recap. Split the remaining work into smaller calls (at most 10 elements per cad_edit action add call, one operation at a time) and keep going until the request is complete and checked."
   }
   const open = state.todos.filter((t) => t.status === "pending" || t.status === "in_progress")
   if (open.length > 0) {
@@ -92,6 +93,12 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
 
 const MAX_STALLS = 2
 
+/**
+ * The turn did work with the tools and then ended without a word: the user would see changes and no answer. Asked once per
+ * turn (Claude Code always closes a turn with a reply); a second silent answer ends the turn as it is.
+ */
+export const REPORT_PROMPT = "You finished without replying. In a few sentences, tell the user what you did, the result you checked, and anything left open. Do not call tools unless something is still unfinished."
+
 /** What a failure message says about its cause: worth waiting out, or something only the user can fix. */
 export const isTransientFailure = (message: string): boolean => {
   // A full context window is cured by a summary, never by waiting.
@@ -108,6 +115,9 @@ export const isInterruption = (message: string): boolean => /session interrupted
 const INTERRUPT_BACKOFF_MS = 1_000
 const INTERRUPTED_MESSAGE = "The assistant was interrupted before it could answer. Send the message again."
 
+/** A step that closed on tool calls: the model goes on once the tools answered (`tool-calls` and the OpenAI spelling). */
+const isToolStepFinish = (reason: string | undefined): boolean => reason === "tool-calls" || reason === "tool_calls"
+
 const STEP_LIMIT_NAME = "StepLimitError"
 const STEP_LIMIT_MESSAGE = "The assistant used up the model steps of one run. Completed changes were preserved."
 /** How many runs one turn may chain after step budgets ran out, as long as each run made tool calls. */
@@ -118,7 +128,24 @@ const RESUME_PROMPT = "The connection to the model failed and has been restored.
 /** nikcli's retry curve (`session/retry.ts`): 2 s, doubling, never longer than 30 s. */
 const RESUME_BACKOFF_MS = 2_000
 const RESUME_BACKOFF_MAX_MS = 30_000
-export const resumeDelay = (attempt: number): number => Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS)
+/** A provider's own wait hint is a floor under the curve, bounded so a buggy hint cannot stall a turn (opencode `model-retry.ts`). */
+const RETRY_HINT_MAX_MS = 15 * 60_000
+/** A known unit after the number, or none at all: "3 hours" is not read as three seconds. */
+const RETRY_HINT = /(?:retry[- ]after|try again in|retry in|retrying in|resets? in)[:\s]*(\d+(?:\.\d+)?)(?:\s*(ms|milliseconds?|s|secs?|seconds?|m|mins?|minutes?)\b|(?!\s*[a-z]))/i
+
+/** The wait a failure message asks for ("Retry-After: 20", "Please try again in 7.5s", "retry in 1m"), or undefined. */
+export const retryHintMs = (message: string): number | undefined => {
+  const match = RETRY_HINT.exec(message)
+  if (match === null) return undefined
+  const amount = Number(match[1])
+  if (!Number.isFinite(amount) || amount < 0) return undefined
+  const unit = (match[2] ?? "s").toLowerCase()
+  const ms = unit.startsWith("ms") || unit.startsWith("milli") ? amount : unit.startsWith("m") ? amount * 60_000 : amount * 1_000
+  return Math.min(Math.ceil(ms), RETRY_HINT_MAX_MS)
+}
+
+export const resumeDelay = (attempt: number, message?: string): number =>
+  Math.max(Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS), (message === undefined ? undefined : retryHintMs(message)) ?? 0)
 
 /** Automatic continuation is bounded independently of native goal iterations. */
 export const DEFAULT_AUTO_CONTINUES = 8
@@ -325,17 +352,29 @@ export const replyHostPermission = (
     catch: (cause) => new AiProviderError({ message: cause instanceof Error ? cause.message : String(cause) })
   })
 
-const failureOf = (result: HostPromptResult): { message: string; aborted: boolean } | undefined => {
+interface TurnFailure {
+  readonly message: string
+  readonly aborted: boolean
+  /** The provider refused the request as longer than the model's context window. */
+  readonly overflow: boolean
+}
+
+const failureOf = (result: HostPromptResult): TurnFailure | undefined => {
   if (result.info === undefined) {
-    return { message: result.data?.message ?? result.name ?? "The host rejected the prompt.", aborted: false }
+    const message = result.data?.message ?? result.name ?? "The host rejected the prompt."
+    return { message, aborted: false, overflow: isContextOverflowError(message) }
   }
   const error = result.info.error
   if (error === undefined) return undefined
+  const message = error.data?.message ?? error.name ?? "The model request failed."
   return {
-    message: error.data?.message ?? error.name ?? "The model request failed.",
-    aborted: error.name === "MessageAbortedError" || isInterruption(error.data?.message ?? error.name ?? "")
+    message,
+    aborted: error.name === "MessageAbortedError" || isInterruption(error.data?.message ?? error.name ?? ""),
+    overflow: error.name === "MessageContextOverflowError" || error.name === "ContextOverflowError" || isContextOverflowError(message)
   }
 }
+
+const failureOfMessage = (message: string): TurnFailure => ({ message, aborted: false, overflow: isContextOverflowError(message) })
 
 /**
  * One chat turn through the embedded host. Events are subscribed to BEFORE the
@@ -361,7 +400,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       // explicit abort (`abortHostSession`) stops a turn; the client recovers the result with `readHostSessionState`.
 
       const state = newMapperState()
-      let stepCeiling = input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10
+      // One budget for every turn, `/goal` included. The host restarts its own step count at each goal iteration and this count
+      // never restarts within a run, so the pause always lands at or before the host's forced-summary step. An aborted step
+      // does not pause the goal: the resumed run finishes, and the host's goal continuation carries on from there.
+      let stepCeiling = PRIMARY_STEP_LIMIT
       let limitReached!: (result: HostPromptResult) => void
       let stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
       // True from the moment the step budget ran out until the turn is resumed: the aborted run's trailing events are not shown.
@@ -369,6 +411,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       let terminal = false
       state.ownTexts.add(input.message.trim())
       state.ownTexts.add(RESUME_PROMPT)
+      state.ownTexts.add(REPORT_PROMPT)
       let connected!: () => void
       const connectedPromise = new Promise<void>((resolve) => (connected = resolve))
       const offer = (event: AiEvent) => {
@@ -390,7 +433,17 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               continue
             }
             for (const mapped of mapHostEvent(sessionId, event, state)) {
-              if (mapped.type === "step" && mapped.phase === "start" && mapped.index > stepCeiling && !suspended) {
+              if (mapped.type !== "step" || suspended) {
+                offer(mapped)
+                continue
+              }
+              // The last step of the budget closed on tool calls: its tools have answered and the host is about to send the next
+              // request, which on its own last step is nikcli's forced summary. Pause here so that request is never sent.
+              const spentAfter = mapped.phase === "finish" && mapped.index >= stepCeiling && isToolStepFinish(mapped.reason)
+              // Backstop: a step past the budget started anyway (the finish was missed or came without a reason).
+              const spentBefore = mapped.phase === "start" && mapped.index > stepCeiling
+              if (spentAfter) offer(mapped)
+              if (spentAfter || spentBefore) {
                 // The step budget of one run is spent, not the job: the run is stopped here and the turn resumes by itself (see `STEP_LIMIT_NAME`).
                 suspended = true
                 limitReached({ name: STEP_LIMIT_NAME, data: { message: STEP_LIMIT_MESSAGE } })
@@ -459,6 +512,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let successesAtNudge: ReadonlyMap<string, string> | undefined
         let failedToolsAtNudge: ReadonlySet<string> = new Set()
         let stalls = 0
+        let askedForReport = false
+        let compactedForOverflow = false
         let stepResumes = 0
         let successesAtStepLimit = 0
         const answers: string[] = []
@@ -546,7 +601,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             const snapshot = await readMessages(1)
             beforePromptKnown = snapshot !== undefined
             beforePrompt = snapshot?.at(-1)?.info.id
-            stepCeiling = state.step + (input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10)
+            stepCeiling = state.step + PRIMARY_STEP_LIMIT
             usedGoalCommand = false
             if (goalPending !== undefined) {
               goalPending = undefined
@@ -572,7 +627,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               attempt += 1
               offer({ type: "turn", sessionId, phase: "recovering", reason: message })
               offer({ type: "retry", sessionId, attempt, message: `${message} Resuming automatically (${attempt}/${resumes}).` })
-              await pause(resumeDelay(attempt))
+              await pause(resumeDelay(attempt, message))
               parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
               continue
             }
@@ -612,13 +667,34 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           let continuationState: EventMapperState | undefined = state
           if (subscriber.signal.aborted) continuationState = await readContinuationState(host, sessionId).catch(() => undefined)
           const sessionError = continuationState?.sessionError
-          const failure = failureOf(result) ?? (sessionError !== undefined ? { message: sessionError, aborted: false } : undefined)
+          const failure = failureOf(result) ?? (sessionError !== undefined ? failureOfMessage(sessionError) : undefined)
+          // The pinned host stores a provider's context-overflow refusal as the turn's error and stops: its own compaction only
+          // runs on its token estimate. Summarise once and carry on, as Claude Code and upstream opencode do; a second overflow
+          // in the same turn means the summary did not help, and it is reported. As upstream, only the user compacts when
+          // automatic compaction is off, overflow included.
+          if (failure?.overflow && !failure.aborted && !compactedForOverflow && !controller.signal.aborted
+            && await runHere(readHostContextPolicy(host).pipe(Effect.map((policy) => policy.auto), Effect.catch(() => Effect.succeed(true))))) {
+            compactedForOverflow = true
+            offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
+            const compactionsBefore = state.compactions
+            const compacted = await runHere(compactHostSession(host, sessionId, input.model).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false))))
+            // Let the summary's bus events (`session.compacted`) reach the subscriber before the next run starts.
+            const settle = Date.now() + IDLE_GRACE_MS
+            while (compacted && !subscriber.signal.aborted && state.compactions === compactionsBefore && Date.now() < settle) await pause(10)
+            if (compacted && !controller.signal.aborted) {
+              state.retry = undefined
+              state.sessionError = undefined
+              state.idle = false
+              parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
+              continue
+            }
+          }
           if (failure && !failure.aborted && attempt < resumes && isTransientFailure(failure.message)) {
             // The host gave up on this call; the conversation is intact, so ask it to carry on after a pause.
             attempt += 1
             offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
             offer({ type: "retry", sessionId, attempt, message: `${failure.message} Resuming automatically (${attempt}/${resumes}).` })
-            await pause(resumeDelay(attempt))
+            await pause(resumeDelay(attempt, failure.message))
             state.retry = undefined
             state.sessionError = undefined
             state.idle = false
@@ -646,7 +722,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             const progressed = previousSuccesses === undefined || [...continuationState.successfulCalls].some(([callId, tool]) =>
               !previousSuccesses.has(callId) && (failedToolsAtNudge.size === 0 || failedToolsAtNudge.has(tool)))
             stalls = progressed ? 0 : stalls + 1
-            const nudge = continuationFor(continuationState, text, result.info?.finish)
+            // Never at the cost of an error: with the budget spent, a silent turn still ends as done.
+            const silent = text.trim() === "" && answers.length === 0 && !askedForReport && continuations < maxContinues && continuationState.successfulCalls.size > 0
+            const nudge = continuationFor(continuationState, text, result.info?.finish) ?? (silent ? REPORT_PROMPT : undefined)
+            if (nudge === REPORT_PROMPT) { askedForReport = true; stalls = 0 }
             if (nudge !== undefined) {
               if (stalls >= MAX_STALLS || continuations >= maxContinues) {
                 offer({ type: "error", sessionId, code: "internal", message: stalls >= MAX_STALLS

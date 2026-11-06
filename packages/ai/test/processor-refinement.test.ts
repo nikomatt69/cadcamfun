@@ -284,3 +284,16 @@ for (const scenario of ["completed", "unavailable", "pending", "late-disconnect"
     expect(prompts).toBe(scenario === "pending" ? 2 : 1)
   })
 }
+
+test("with automatic compaction off, a context overflow is reported and never compacted", async () => {
+  let summarized = 0
+  const host = { client: {
+    config: { get: async () => ({ compaction: { auto: false } }) },
+    session: { messages: async () => [], abort: async () => true, summarize: async () => { summarized += 1; return true } },
+    events: { subscribe: async function* () { yield { type: "server.connected", properties: {} } } },
+    "session-prompt": { prompt: async () => ({ info: { error: { name: "MessageContextOverflowError", data: { message: "prompt is too long" } } }, parts: [] }) }
+  } } as unknown as ProjectHost
+  const events = await Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId: "s", message: "Build", model: { providerID: "fake", modelID: "fake" }, continues: 0 })))
+  expect(summarized).toBe(0)
+  expect(events.at(-1)).toMatchObject({ type: "error", code: "provider", message: "prompt is too long" })
+})

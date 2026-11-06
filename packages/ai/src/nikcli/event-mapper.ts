@@ -62,6 +62,8 @@ export interface EventMapperState {
   programCalls: number
   /** User messages the host writes for a command this stream ran (`/goal`): its own wording, not something the user said meanwhile. */
   skipUserMessages: number
+  /** `session.compacted` events seen for this session: a summary the stream asked for has landed. */
+  compactions: number
 }
 
 export const newMapperState = (): EventMapperState => ({
@@ -89,7 +91,8 @@ export const newMapperState = (): EventMapperState => ({
   ownTexts: new Set(),
   reportedUser: new Set(),
   programCalls: 0,
-  skipUserMessages: 0
+  skipUserMessages: 0,
+  compactions: 0
 })
 
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
@@ -463,7 +466,9 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
       }]
     }
     case "session.compacted": {
-      return str(props["sessionID"]) === sessionId ? [{ type: "compaction", sessionId, phase: "finish" }, { type: "compacted", sessionId }] : []
+      if (str(props["sessionID"]) !== sessionId) return []
+      state.compactions += 1
+      return [{ type: "compaction", sessionId, phase: "finish" }, { type: "compacted", sessionId }]
     }
     case "session.idle": {
       if (str(props["sessionID"]) === sessionId) state.idle = true

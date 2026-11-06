@@ -24,6 +24,14 @@ export const CADCAM_AGENT = PRIMARIES.build.host
 export const CADCAM_WORKER = SUBAGENTS.researcher.host
 /** A primary yields after this many model steps; bounded continuation can carry genuine unfinished work forward. */
 export const PRIMARY_STEP_LIMIT = 25
+/**
+ * The bound the host itself enforces on a primary. nikcli spends its last step on a forced text-only "MAXIMUM STEPS REACHED"
+ * summary (`session/prompt/max-steps.txt`) and then ends the run. The application owns the budget instead (`chat.ts` pauses
+ * the run and renews it while it makes progress), so the host's forced step comes one step after the application's pause:
+ * the request the pause aborts is the summary nobody asked for, never a step of real work. Without a live stream the bound
+ * still holds.
+ */
+export const HOST_STEP_LIMIT = PRIMARY_STEP_LIMIT + 1
 /** Inactivity limits apply to provider traffic, not the time spent running a kernel tool. */
 export const PROVIDER_INACTIVITY_MS = 120_000
 export const BACKGROUND_TOOL_IDS = ["agent"] as const
@@ -208,7 +216,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
       const held = Object.fromEntries(Object.entries(permission).filter(([tool]) => !spec.without.includes(tool) && (spec.canEdit || !externalWrites.has(tool))))
       return [spec.host, {
         mode: "primary",
-        steps: PRIMARY_STEP_LIMIT,
+        steps: HOST_STEP_LIMIT,
         description: spec.description,
         prompt: spec.focus === "" ? input.systemPrompt : `${input.systemPrompt}\n\n${spec.focus}`,
         permission: held

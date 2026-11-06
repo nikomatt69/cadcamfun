@@ -7,7 +7,7 @@ import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { Effect, Scope, Stream } from "effect"
 import type { AiEvent } from "../src/events.ts"
-import { DEFAULT_AUTO_CONTINUES, announcesWork, continuationFor, createHostSession, hostChatStream, queueHostMessage, resumeDelay } from "../src/nikcli/chat.ts"
+import { DEFAULT_AUTO_CONTINUES, announcesWork, continuationFor, createHostSession, hostChatStream, queueHostMessage, resumeDelay, retryHintMs } from "../src/nikcli/chat.ts"
 import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
 import { makeNikCliRuntime, type NikCliRuntime } from "../src/nikcli/runtime.ts"
 import { buildTools, type ToolHandlersShape } from "../src/tools/catalogue.ts"
@@ -195,7 +195,20 @@ describe("the turn does not end on words", () => {
 
 describe("the loop's limits are nikcli's", () => {
   test("resumes follow nikcli's retry curve: 2 s, doubling, never past 30 s", () => {
-    expect([1, 2, 3, 4, 5, 6, 10].map(resumeDelay)).toEqual([2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000])
+    expect([1, 2, 3, 4, 5, 6, 10].map((attempt) => resumeDelay(attempt))).toEqual([2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000])
+  })
+  test("a provider's own wait hint is a floor under the curve, within fifteen minutes", () => {
+    expect(retryHintMs("Rate limited. Retry-After: 20")).toBe(20_000)
+    expect(retryHintMs("Rate limit reached. Please try again in 7.5s.")).toBe(7_500)
+    expect(retryHintMs("Quota resets in 2 minutes")).toBe(120_000)
+    expect(retryHintMs("Overloaded, retry after 350ms")).toBe(350)
+    expect(retryHintMs("try again in 3 hours")).toBeUndefined()
+    expect(retryHintMs("retry after 3600 seconds")).toBe(900_000)
+    expect(retryHintMs("The server is overloaded.")).toBeUndefined()
+    expect(resumeDelay(1, "429 Too Many Requests: try again in 12s")).toBe(12_000)
+    expect(resumeDelay(3, "503 Service Unavailable")).toBe(8_000)
+    // A hint shorter than the curve does not shorten it.
+    expect(resumeDelay(3, "Overloaded, retry after 350ms")).toBe(8_000)
   })
   test("ordinary chat has a bounded continuation budget", () => {
     expect(DEFAULT_AUTO_CONTINUES).toBe(8)
@@ -242,5 +255,37 @@ describe("a message written while the agent works", () => {
     expect(events.filter((e) => e.type === "user_message")).toEqual([{ type: "user_message", sessionId, text: "also make it 5 mm thick" }])
     expect(events.at(-1)).toMatchObject({ type: "done" })
     expect((events.at(-1) as Extract<AiEvent, { type: "done" }>).text).toContain("Thickness set to 5 mm.")
+  })
+})
+
+describe("a turn closes with a reply", () => {
+  test("work that ends without a word is followed by one short report", async () => {
+    let reports = 0
+    script = (request) => {
+      if (textOf(request).includes("You finished without replying")) { reports += 1; return { text: "Described the drawing: one cube, nothing open." } }
+      return lastIsTool(request) ? { text: "" } : { toolCalls: [{ name: "cad_describe_drawing", args: {} }] }
+    }
+    const events = await run("describe the drawing", "persist-report")
+    expect(reports).toBe(1)
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "Described the drawing: one cube, nothing open." })
+  })
+
+  test("it is asked once: a second silent answer ends the turn as done, never as an error", async () => {
+    let reports = 0
+    script = (request) => {
+      if (textOf(request).includes("You finished without replying")) { reports += 1; return { text: "" } }
+      return lastIsTool(request) ? { text: "" } : { toolCalls: [{ name: "cad_describe_drawing", args: {} }] }
+    }
+    const events = await run("describe the drawing", "persist-report-twice")
+    expect(reports).toBe(1)
+    expect(events.at(-1)).toMatchObject({ type: "done" })
+  })
+
+  test("a silent answer without any tool work is left alone", async () => {
+    let prompts = 0
+    script = () => { prompts += 1; return { text: "" } }
+    const events = await run("hello", "persist-report-none")
+    expect(prompts).toBe(1)
+    expect(events.at(-1)).toMatchObject({ type: "done" })
   })
 })
