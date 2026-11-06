@@ -159,7 +159,8 @@ jobs:
           LISTED=""
           for _ in $(seq 1 20); do
             # Only a GET counts: the script's own POST to create the project logs the same URL.
-            if grep -B1 '"http.url": "/api/projects"' simulator-out/sidecar.err | grep -q '"http.method": "GET"'; then LISTED=yes; break; fi
+            # Logger.formatJson is compact (`"http.url":"/api/projects"`). A space after the colon never matches.
+            if grep -E '"http\.method"[[:space:]]*:[[:space:]]*"GET"' simulator-out/sidecar.err | grep -Eq '"http\.(url|path)"[[:space:]]*:[[:space:]]*"/api/projects"'; then LISTED=yes; break; fi
             sleep 2
           done
           echo "projects listed by the app: ${LISTED:-no}"
